@@ -474,6 +474,8 @@
   "ws.layout.three": "Kolme saraketta",
   "ws.layout.grid": "Ruudukko",
   "ws.layout.add": "Lisää ikkuna",
+  "ws.add.menu": "Lisää…",
+  "ws.add.webapp": "Lisää verkkosovellus",
   "ws.layout.save": "Tallenna asettelu",
   "ws.layout.saved": "Asettelu tallennettu",
   "ws.layout.move": "Siirrä toiseen aktiviteettiin",

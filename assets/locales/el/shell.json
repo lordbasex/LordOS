@@ -474,6 +474,8 @@
   "ws.layout.three": "Τρεις στήλες",
   "ws.layout.grid": "Πλέγμα",
   "ws.layout.add": "Προσθήκη παραθύρου",
+  "ws.add.menu": "Προσθήκη…",
+  "ws.add.webapp": "Προσθήκη εφαρμογής ιστού",
   "ws.layout.save": "Αποθήκευση διάταξης",
   "ws.layout.saved": "Η διάταξη αποθηκεύτηκε",
   "ws.layout.move": "Μετακίνηση σε άλλη δραστηριότητα",

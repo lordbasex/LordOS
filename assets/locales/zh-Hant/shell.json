@@ -467,6 +467,8 @@
   "ws.layout.three": "三欄",
   "ws.layout.grid": "格狀",
   "ws.layout.add": "加入視窗",
+  "ws.add.menu": "新增…",
+  "ws.add.webapp": "新增網頁應用程式",
   "ws.layout.save": "儲存版面",
   "ws.layout.saved": "已儲存版面",
   "ws.layout.move": "移到其他活動",

@@ -467,6 +467,8 @@
   "ws.layout.three": "3열",
   "ws.layout.grid": "격자",
   "ws.layout.add": "창 추가",
+  "ws.add.menu": "추가…",
+  "ws.add.webapp": "웹 앱 추가",
   "ws.layout.save": "레이아웃 저장",
   "ws.layout.saved": "레이아웃을 저장했습니다",
   "ws.layout.move": "다른 활동으로 이동",

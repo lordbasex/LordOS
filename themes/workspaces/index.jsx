@@ -79,6 +79,8 @@ const H = {
   notif: () => panel.set((p) => (p?.name === 'notif' ? null : { name: 'notif', display: mainDisplay().id })),
   addWindow: (d, e) => { if (e) noteLaunch(e.x, e.y); panel.set({ name: 'search', mode: 'apps', display: d.id }); },
   addWidget: (d) => widgetPicker.set({ display: d }),
+  // the Store's Web apps page: "Add from an address" and the catalog (docs/WEBAPPS.md)
+  addWebApp: () => wm.open('store', { args: { page: 'webapps' } }),
   edit: (id) => editing.set(id),
   closePanel: () => panel.set(null),
 };
@@ -239,7 +241,7 @@ function App() {
         <WidgetDropTarget />
         {plans.map(({ d, key, label: dname, plan }) => (
           <GroupFrame key={d.id} t={t} plan={plan} d={d} dkey={key} dname={dname} desk={desktop} meta={deskMeta} multi={plans.length > 1} canMove={canMove}
-            onAddWindow={H.addWindow} onAddWidget={H.addWidget} onEdit={H.edit} showEmpty={!onboarding} />
+            onAddWindow={H.addWindow} onAddWidget={H.addWidget} onAddWebApp={H.addWebApp} onEdit={H.edit} showEmpty={!onboarding} />
         ))}
         {onboarding && main ? (
           <View style={{ position: 'absolute', left: main.plan.work.x, top: main.plan.work.y, width: main.plan.work.w, height: main.plan.work.h, alignItems: 'center', justifyContent: 'center' }}>
@@ -287,7 +289,9 @@ function App() {
         {crown && <Menu t={t} x={crown.x} y={crown.y} onClose={() => crownMenu.set(null)} items={crownItems} />}
         {desk && (
           <Menu t={t} x={desk.x} y={desk.y} onClose={() => deskMenu.set(null)} items={[
+            { label: tr('shell.ws.layout.add'), onClick: () => H.addWindow(displayAt(desk.x, desk.y) || mainDisplay(), desk) },
             { label: tr('shell.widgets.add'), onClick: () => widgetPicker.set({ display: displayAt(desk.x, desk.y) || mainDisplay(), x: desk.x, y: desk.y }) },
+            { label: tr('shell.ws.add.webapp'), onClick: () => H.addWebApp() },
             '-',
             { label: tr('shell.ws.activity.new'), disabled: list.length >= 9, onClick: () => newActivity() },
             { label: tr('shell.desktops.overview'), onClick: () => openOverview() },

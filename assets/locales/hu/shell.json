@@ -474,6 +474,8 @@
   "ws.layout.three": "Három oszlop",
   "ws.layout.grid": "Rács",
   "ws.layout.add": "Ablak hozzáadása",
+  "ws.add.menu": "Hozzáadás…",
+  "ws.add.webapp": "Webalkalmazás hozzáadása",
   "ws.layout.save": "Elrendezés mentése",
   "ws.layout.saved": "Elrendezés mentve",
   "ws.layout.move": "Áthelyezés másik tevékenységbe",

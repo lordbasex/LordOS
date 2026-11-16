@@ -474,6 +474,8 @@
   "ws.layout.three": "Tre kolumner",
   "ws.layout.grid": "Rutnät",
   "ws.layout.add": "Lägg till fönster",
+  "ws.add.menu": "Lägg till…",
+  "ws.add.webapp": "Lägg till webbapp",
   "ws.layout.save": "Spara layout",
   "ws.layout.saved": "Layouten sparad",
   "ws.layout.move": "Flytta till en annan aktivitet",

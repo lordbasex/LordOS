@@ -481,6 +481,8 @@
   "ws.layout.three": "Trei coloane",
   "ws.layout.grid": "Grilă",
   "ws.layout.add": "Adaugă fereastră",
+  "ws.add.menu": "Adaugă…",
+  "ws.add.webapp": "Adaugă o aplicație web",
   "ws.layout.save": "Salvează aranjamentul",
   "ws.layout.saved": "Aranjament salvat",
   "ws.layout.move": "Mută în altă activitate",

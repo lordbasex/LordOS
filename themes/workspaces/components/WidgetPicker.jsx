@@ -128,8 +128,10 @@ export function WidgetPicker({ t }) {
   if (!p) return null;
   const area = workAreaOf(p.display);
   const kinds = widgetKinds();
-  const cols = Math.min(4, kinds.length);
-  const W = cols * 176 + (cols - 1) * 10 + 36;
+  // four columns (fewer on a narrow display); a card is 176 px plus its 1 px border on each side
+  const CARD = 178, GAPX = 10;
+  const cols = Math.max(1, Math.min(4, kinds.length, Math.floor((area.w - 48 - 36 + GAPX) / (CARD + GAPX))));
+  const W = cols * CARD + (cols - 1) * GAPX + 36 + 2;
   const pick = (k, size) => {
     if (!k.sizes) {
       widgetPicker.set(null);

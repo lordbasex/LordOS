@@ -474,6 +474,8 @@
   "ws.layout.three": "তিন কলাম",
   "ws.layout.grid": "গ্রিড",
   "ws.layout.add": "উইন্ডো যোগ করুন",
+  "ws.add.menu": "যোগ করুন…",
+  "ws.add.webapp": "ওয়েব অ্যাপ যোগ করুন",
   "ws.layout.save": "বিন্যাস সংরক্ষণ",
   "ws.layout.saved": "বিন্যাস সংরক্ষিত",
   "ws.layout.move": "অন্য কার্যক্রমে সরান",

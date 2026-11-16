@@ -474,6 +474,8 @@
   "ws.layout.three": "Three columns",
   "ws.layout.grid": "Grid",
   "ws.layout.add": "Add window",
+  "ws.add.menu": "Add…",
+  "ws.add.webapp": "Add web app",
   "ws.layout.save": "Save layout",
   "ws.layout.saved": "Layout saved",
   "ws.layout.move": "Move to another activity",

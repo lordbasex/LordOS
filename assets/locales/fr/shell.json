@@ -474,6 +474,8 @@
   "ws.layout.three": "Trois colonnes",
   "ws.layout.grid": "Grille",
   "ws.layout.add": "Ajouter une fenêtre",
+  "ws.add.menu": "Ajouter…",
+  "ws.add.webapp": "Ajouter une app web",
   "ws.layout.save": "Enregistrer la disposition",
   "ws.layout.saved": "Disposition enregistrée",
   "ws.layout.move": "Déplacer vers une autre activité",

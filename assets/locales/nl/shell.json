@@ -474,6 +474,8 @@
   "ws.layout.three": "Drie kolommen",
   "ws.layout.grid": "Raster",
   "ws.layout.add": "Venster toevoegen",
+  "ws.add.menu": "Toevoegen…",
+  "ws.add.webapp": "Web-app toevoegen",
   "ws.layout.save": "Indeling bewaren",
   "ws.layout.saved": "Indeling bewaard",
   "ws.layout.move": "Naar een andere activiteit",

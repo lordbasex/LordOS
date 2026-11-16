@@ -467,6 +467,8 @@
   "ws.layout.three": "三栏",
   "ws.layout.grid": "网格",
   "ws.layout.add": "添加窗口",
+  "ws.add.menu": "添加…",
+  "ws.add.webapp": "添加网页应用",
   "ws.layout.save": "保存布局",
   "ws.layout.saved": "布局已保存",
   "ws.layout.move": "移到其他活动",

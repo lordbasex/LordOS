@@ -474,6 +474,8 @@
   "ws.layout.three": "Tatlong column",
   "ws.layout.grid": "Grid",
   "ws.layout.add": "Magdagdag ng window",
+  "ws.add.menu": "Magdagdag…",
+  "ws.add.webapp": "Magdagdag ng web app",
   "ws.layout.save": "I-save ang layout",
   "ws.layout.saved": "Na-save ang layout",
   "ws.layout.move": "Ilipat sa ibang aktibidad",

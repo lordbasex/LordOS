@@ -105,6 +105,11 @@ export function resizeDeskWidget(id, size) {
 }
 export const deskWidgetSize = (size) => { const r = rectOf({ x: 0, y: 0, cell: 170, gap: 16 }, 0, 0, size); return [r.w, r.h]; };
 
+// how many widgets each display shows in the activity in view, by its key (widgetDisplayKey): a display with widgets
+// isn't empty, so the theme leaves its empty state out
+export const deskWidgetsShown = createStore({});
+export const widgetDisplayKey = (d) => dkOf(d);
+
 let started = false;
 export function startDeskWidgets() {
   if (started) return;
@@ -125,6 +130,10 @@ export function startDeskWidgets() {
       }
     }
     for (const type of Object.keys(BODIES)) setWidgets(`ws-${type}`, byType[type] || []);
+    const per = {};
+    for (const list of Object.values(byType)) for (const w of list) per[w.dk] = (per[w.dk] || 0) + 1;
+    // replaced, not merged (a store merges an object into an object): a display left with none drops out
+    if (JSON.stringify(per) !== JSON.stringify(deskWidgetsShown.get())) deskWidgetsShown.set(() => per);
   };
   settings.subscribe(() => publish());
   activeDesktop.subscribe(() => publish());

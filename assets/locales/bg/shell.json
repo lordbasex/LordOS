@@ -474,6 +474,8 @@
   "ws.layout.three": "Три колони",
   "ws.layout.grid": "Решетка",
   "ws.layout.add": "Добави прозорец",
+  "ws.add.menu": "Добавяне…",
+  "ws.add.webapp": "Добавяне на уеб приложение",
   "ws.layout.save": "Запази подредбата",
   "ws.layout.saved": "Подредбата е запазена",
   "ws.layout.move": "Премести в друга дейност",

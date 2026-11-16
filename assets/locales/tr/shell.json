@@ -474,6 +474,8 @@
   "ws.layout.three": "Üç sütun",
   "ws.layout.grid": "Izgara",
   "ws.layout.add": "Pencere ekle",
+  "ws.add.menu": "Ekle…",
+  "ws.add.webapp": "Web uygulaması ekle",
   "ws.layout.save": "Düzeni kaydet",
   "ws.layout.saved": "Düzen kaydedildi",
   "ws.layout.move": "Başka bir etkinliğe taşı",

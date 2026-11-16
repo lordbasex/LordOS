@@ -467,6 +467,8 @@
   "ws.layout.three": "Tiga kolom",
   "ws.layout.grid": "Kisi",
   "ws.layout.add": "Tambah jendela",
+  "ws.add.menu": "Tambah…",
+  "ws.add.webapp": "Tambah aplikasi web",
   "ws.layout.save": "Simpan tata letak",
   "ws.layout.saved": "Tata letak disimpan",
   "ws.layout.move": "Pindahkan ke aktivitas lain",

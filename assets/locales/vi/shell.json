@@ -467,6 +467,8 @@
   "ws.layout.three": "Ba cột",
   "ws.layout.grid": "Lưới",
   "ws.layout.add": "Thêm cửa sổ",
+  "ws.add.menu": "Thêm…",
+  "ws.add.webapp": "Thêm ứng dụng web",
   "ws.layout.save": "Lưu bố cục",
   "ws.layout.saved": "Đã lưu bố cục",
   "ws.layout.move": "Chuyển sang hoạt động khác",

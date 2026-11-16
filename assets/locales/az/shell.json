@@ -474,6 +474,8 @@
   "ws.layout.three": "Üç sütun",
   "ws.layout.grid": "Tor",
   "ws.layout.add": "Pəncərə əlavə et",
+  "ws.add.menu": "Əlavə et…",
+  "ws.add.webapp": "Veb tətbiq əlavə et",
   "ws.layout.save": "Düzülüşü saxla",
   "ws.layout.saved": "Düzülüş saxlanıldı",
   "ws.layout.move": "Başqa fəaliyyətə köçür",

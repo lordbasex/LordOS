@@ -474,6 +474,8 @@
   "ws.layout.three": "سه ستون",
   "ws.layout.grid": "شبکه",
   "ws.layout.add": "افزودن پنجره",
+  "ws.add.menu": "افزودن…",
+  "ws.add.webapp": "افزودن برنامهٔ وب",
   "ws.layout.save": "ذخیرهٔ چیدمان",
   "ws.layout.saved": "چیدمان ذخیره شد",
   "ws.layout.move": "انتقال به فعالیت دیگر",

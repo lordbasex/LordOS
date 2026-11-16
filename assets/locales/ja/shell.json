@@ -467,6 +467,8 @@
   "ws.layout.three": "3列",
   "ws.layout.grid": "グリッド",
   "ws.layout.add": "ウインドウを追加",
+  "ws.add.menu": "追加…",
+  "ws.add.webapp": "Webアプリを追加",
   "ws.layout.save": "レイアウトを保存",
   "ws.layout.saved": "レイアウトを保存しました",
   "ws.layout.move": "別のアクティビティへ移動",

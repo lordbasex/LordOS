@@ -96,7 +96,9 @@ displays do. Nothing runs per frame, nothing polls.
   display's work area holds a grid of 170 px cells with 16 px gaps, anchored to its top right (TangoOS's grid). A widget
   takes a block of cells by its size: small 1×1, medium 2×1, large 2×2, wide 4×1, extra large 4×2; no other widget can be placed
   or dropped over it. Widgets belong to an activity and a display (its connector): another activity shows its own, or
-  none. **Add widget** (the empty state, or a right click on the wallpaper) opens the catalog over that display, with a
+  none. A display with widgets but no window isn't empty: the empty state's card is left out there. The "+" in the
+  frame header is a menu (Add window, Add widget, Add web app, the last opening the Store's Web apps page); the
+  wallpaper's right-click menu starts with the same three. **Add widget** opens the catalog over that display, with a
   button per size; the widget goes on the first free block from the top right ("no room" says so). Dragged anywhere, a
   dashed block shows where it will land, the nearest free one; its right-click menu changes its size (where it fits),
   its options (the clock: analog or digital, cities from the Clock app) and removes it; it opens inside the

@@ -474,6 +474,8 @@
   "ws.layout.three": "Tres columnas",
   "ws.layout.grid": "Cuadrícula",
   "ws.layout.add": "Agregar ventana",
+  "ws.add.menu": "Agregar…",
+  "ws.add.webapp": "Agregar app web",
   "ws.layout.save": "Guardar disposición",
   "ws.layout.saved": "Disposición guardada",
   "ws.layout.move": "Mover a otra actividad",

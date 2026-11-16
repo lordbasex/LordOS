@@ -481,6 +481,8 @@
   "ws.layout.three": "Trzy kolumny",
   "ws.layout.grid": "Siatka",
   "ws.layout.add": "Dodaj okno",
+  "ws.add.menu": "Dodaj…",
+  "ws.add.webapp": "Dodaj aplikację internetową",
   "ws.layout.save": "Zapisz układ",
   "ws.layout.saved": "Układ zapisany",
   "ws.layout.move": "Przenieś do innej aktywności",

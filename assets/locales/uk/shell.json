@@ -481,6 +481,8 @@
   "ws.layout.three": "Три колонки",
   "ws.layout.grid": "Сітка",
   "ws.layout.add": "Додати вікно",
+  "ws.add.menu": "Додати…",
+  "ws.add.webapp": "Додати вебзастосунок",
   "ws.layout.save": "Зберегти розкладку",
   "ws.layout.saved": "Розкладку збережено",
   "ws.layout.move": "Перемістити до іншого заняття",

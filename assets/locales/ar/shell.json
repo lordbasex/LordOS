@@ -502,6 +502,8 @@
   "ws.layout.three": "ثلاثة أعمدة",
   "ws.layout.grid": "شبكة",
   "ws.layout.add": "إضافة نافذة",
+  "ws.add.menu": "إضافة…",
+  "ws.add.webapp": "إضافة تطبيق ويب",
   "ws.layout.save": "حفظ التخطيط",
   "ws.layout.saved": "تم حفظ التخطيط",
   "ws.layout.move": "نقل إلى نشاط آخر",

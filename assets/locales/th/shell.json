@@ -467,6 +467,8 @@
   "ws.layout.three": "สามคอลัมน์",
   "ws.layout.grid": "ตาราง",
   "ws.layout.add": "เพิ่มหน้าต่าง",
+  "ws.add.menu": "เพิ่ม…",
+  "ws.add.webapp": "เพิ่มเว็บแอป",
   "ws.layout.save": "บันทึกเลย์เอาต์",
   "ws.layout.saved": "บันทึกเลย์เอาต์แล้ว",
   "ws.layout.move": "ย้ายไปกิจกรรมอื่น",

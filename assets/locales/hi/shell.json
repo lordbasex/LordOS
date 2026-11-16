@@ -474,6 +474,8 @@
   "ws.layout.three": "तीन कॉलम",
   "ws.layout.grid": "ग्रिड",
   "ws.layout.add": "विंडो जोड़ें",
+  "ws.add.menu": "जोड़ें…",
+  "ws.add.webapp": "वेब ऐप जोड़ें",
   "ws.layout.save": "लेआउट सहेजें",
   "ws.layout.saved": "लेआउट सहेजा गया",
   "ws.layout.move": "दूसरी गतिविधि में ले जाएँ",

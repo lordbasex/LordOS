@@ -5,7 +5,7 @@
 // between the tiles: dragging it shows a line (moved with lord.setStyle, no React render per pointer move) and the
 // tiles change once, on release. With no window on the display, a short empty state offers the same two ways in.
 import {
-  View, Text, Layer, addListener, useStore, windows, wm, windowTitle, windowIcon, desktopList, desktopName, displayFor, launchApp, useLauncherApps, t as tr,
+  View, Text, Layer, addListener, useStore, windows, wm, windowTitle, windowIcon, desktopList, desktopName, displayFor, launchApp, useLauncherApps, deskWidgetsShown, widgetDisplayKey, t as tr,
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
@@ -127,11 +127,15 @@ function MinimizedTray({ t, d, ids }) {
 
 const countOn = (desk, d) => (ws) => ws.filter((w) => w.desktop === desk && !w.minimized && !w.fullscreen && !w.pip && tileable({ ...w, maximized: false }) && displayFor(w)?.id === d.id).length;
 
-export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, desk, meta, multi, canMove, onAddWindow, onAddWidget, onEdit, showEmpty }) {
+export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, desk, meta, multi, canMove, onAddWindow, onAddWidget, onAddWebApp, onEdit, showEmpty }) {
   const count = useStore(windows, countOn(desk, d));
   const minIds = useStore(windows, minimizedOn(desk, d));
   const minimized = minIds ? minIds.split('\n') : [];
-  const bare = !!showEmpty && count === 0 && !minimized.length;   // the empty state's card is up
+  const widgetsHere = useStore(deskWidgetsShown, (s) => (s[widgetDisplayKey(d)] || 0) > 0);
+  // nothing open here: the free slots keep only their outlines (no "Free space" over the widgets or the card)
+  const bare = count === 0 && !minimized.length;
+  // the empty state's card only on a display with nothing at all: no window, none minimized, no widget
+  const empty = bare && !widgetsHere;
   // the free slots of this display's tiles (a window minimized there keeps its place): a dashed outline to fill
   const holesJson = useStore(tiled, (s) => JSON.stringify(s.holes?.[dkey] || []));
   const holes = JSON.parse(holesJson);
@@ -140,6 +144,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
   const slots = Math.max(count, slotCount);
   const [picker, setPicker] = useState(null);
   const [moveMenu, setMoveMenu] = useState(null);
+  const [addMenu, setAddMenu] = useState(null);   // the header's "+": window, widget, web app
   const [saved, setSaved] = useState(false);
   const layoutBtn = useRef(null);
   const apps = useLauncherApps();
@@ -186,7 +191,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
           <HeaderButton t={t} wide anchor={layoutBtn} active={!!picker} label={tr(`shell.ws.layout.${layout}`)} onClick={openPicker}>
             <LayoutMini cells={LAYOUT_CELLS[layout]} w={20} h={14} color={t.frameText} fill={t.frameText} active />
           </HeaderButton>
-          <HeaderButton t={t} label={tr('shell.ws.layout.add')} onClick={(e) => onAddWindow(d, e)}><PlusGlyph color={t.frameText} size={12} /></HeaderButton>
+          <HeaderButton t={t} active={!!addMenu} label={tr('shell.ws.add.menu')} onClick={(e) => setAddMenu({ x: e.x, y: e.y + 12, e })}><PlusGlyph color={t.frameText} size={12} /></HeaderButton>
           <HeaderButton t={t} label={tr('shell.ws.layout.save')} onClick={() => { saveLayout(desk); setSaved(true); }}><SaveGlyph color={t.frameText} bg={t.solidBg} size={14} /></HeaderButton>
           {canMove ? (
             <HeaderButton t={t} label={tr('shell.ws.layout.move')} onClick={(e) => { const id = wm.focused(); if (id) setMoveMenu({ x: e.x, y: e.y + 12, id }); }}><MoveGlyph color={t.frameText} size={14} /></HeaderButton>
@@ -214,7 +219,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
       {/* kept mounted and only shown or hidden: an activity switch then changes one style here, not a whole card */}
       {showEmpty ? (
         <View style={{ position: 'absolute', left: area.x, top: area.y, width: area.w, height: area.h, alignItems: 'center', justifyContent: 'center', pointerEvents: 'box-none',
-          display: count === 0 && !minimized.length ? 'flex' : 'none' }}>
+          display: empty ? 'flex' : 'none' }}>
           <Surface t={t} radius={18} still style={{ alignItems: 'center', gap: 10, width: Math.min(560, area.w - 48), paddingHorizontal: 24, paddingVertical: 20 }}>
             <Text style={{ fontSize: 15, fontWeight: 600, color: t.frameText, textAlign: 'center' }}>{tr('shell.ws.empty.title')}</Text>
             <Text style={{ fontSize: 12.5, color: t.textDim, textAlign: 'center' }}>{tr('shell.ws.empty.body')}</Text>
@@ -241,6 +246,11 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
         </View>
       ) : null}
       {picker && <LayoutPicker t={t} at={picker} current={layout} onPick={(l) => setLayout(desk, dkey, l)} onClose={() => setPicker(null)} />}
+      {addMenu && <Menu t={t} x={addMenu.x} y={addMenu.y} onClose={() => setAddMenu(null)} items={[
+        { label: tr('shell.ws.layout.add'), onClick: () => onAddWindow(d, addMenu.e) },
+        ...(onAddWidget ? [{ label: tr('shell.widgets.add'), onClick: () => onAddWidget(d) }] : []),
+        ...(onAddWebApp ? [{ label: tr('shell.ws.add.webapp'), onClick: () => onAddWebApp(d) }] : []),
+      ]} />}
       {moveMenu && <Menu t={t} x={moveMenu.x} y={moveMenu.y} onClose={() => setMoveMenu(null)}
         items={desktopList.get().filter((x) => x !== desk).map((x) => ({ label: desktopName(x), onClick: () => wm.moveToDesktop(moveMenu.id, x) }))} />}
     </>

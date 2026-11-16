@@ -474,6 +474,8 @@
   "ws.layout.three": "Drei Spalten",
   "ws.layout.grid": "Raster",
   "ws.layout.add": "Fenster hinzufügen",
+  "ws.add.menu": "Hinzufügen …",
+  "ws.add.webapp": "Web-App hinzufügen",
   "ws.layout.save": "Layout sichern",
   "ws.layout.saved": "Layout gesichert",
   "ws.layout.move": "In andere Aktivität verschieben",

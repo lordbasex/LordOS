@@ -381,6 +381,13 @@ await flush();
   wp.widgetPicker.set(null);
   const g = grid.gridOf(sdk.workAreaOf(R));
   const at = (w) => { const r = grid.rectOf(g, w.col, w.row, w.size); return [...styles].some(([id, st]) => st.left === r.x && st.top === r.y && st.width === r.w && st.height === r.h && attached(id)); };
+  // the empty state's card shows only on a display with nothing at all: a widget is something
+  const visible = (id) => { for (let n = id; n; n = parents.get(n)) if (styles.get(n)?.display === 'none') return false; return attached(id); };
+  const cardOn = (D) => [...texts].some(([id, v]) => {
+    if (v !== sdk.t('shell.ws.empty.title') || !visible(id)) return false;
+    for (let n = parents.get(id); n; n = parents.get(n)) { const st = styles.get(n); if (st?.position === 'absolute' && st.left >= D.x && st.left < D.x + D.w) return true; }
+    return false;
+  });
   const c1 = sdk.addDeskWidget('clock', 's', R);
   const c2 = sdk.addDeskWidget('calendar', 'l', R);
   for (let i = 0; i < 2; i++) await flush();
@@ -447,6 +454,35 @@ await flush();
   for (const id of [c1, c2]) sdk.removeDeskWidget(id);
   for (let i = 0; i < 2; i++) await flush();
   check('widgets: removed', list().length, 0);
+  // in an activity with nothing open on the right display: the card, gone once a widget is there, back after
+  {
+    const other = sdk.desktopList.get().find((x) => x !== desk && !sdk.windows.get().some((w) => w.desktop === x && sdk.displayFor(w)?.id === R.id));
+    if (other != null) {
+      sdk.activeDesktop.set(other);
+      for (let i = 0; i < 2; i++) await flush();
+      check('empty card: on a display with nothing', cardOn(R), true);
+      const cw = sdk.addDeskWidget('clock', 's', R);
+      for (let i = 0; i < 3; i++) await flush();
+      check('empty card: none over a widget', cardOn(R), false);
+      sdk.removeDeskWidget(cw);
+      for (let i = 0; i < 3; i++) await flush();
+      check('empty card: back once the widget is gone', cardOn(R), true);
+      sdk.activeDesktop.set(desk);
+      for (let i = 0; i < 2; i++) await flush();
+    } else check('empty card: an activity to try it in', false, true);
+  }
+  // the header's "+" is a menu: a window, a widget, a web app
+  {
+    // the header's buttons (28 px high, radius 9): the layout one is wide (10 px sides), "+" is the next one
+    const hb = (pad) => [...styles].filter(([id, st]) => st.height === 28 && st.borderRadius === 9 && st.paddingLeft === pad && visible(id)).map(([id]) => id).sort((a, b) => a - b);
+    const wide = hb(10), narrow = hb(7);
+    const plus = wide.map((w) => narrow.find((n) => n > w && parents.get(n) === parents.get(w))).filter(Boolean);
+    globalThis.__lordEvent('down', plus[0], 0, 0, 0); globalThis.__lordEvent('up', plus[0], 0, 0, 0);
+    for (let i = 0; i < 2; i++) await flush();
+    check('add menu: one "+" per display, its three entries', [plus.length >= 1, ['shell.ws.layout.add', 'shell.widgets.add', 'shell.ws.add.webapp'].every((k) => shownT(sdk.t(k)) >= 1)], [true, true]);
+    globalThis.__lordEvent('down', null, L.x + 5, L.y + 600, 0); globalThis.__lordEvent('up', null, L.x + 5, L.y + 600, 0);
+    for (let i = 0; i < 2; i++) await flush();
+  }
 }
 
 // every built-in widget renders in each of its sizes, and none adds a timer every second

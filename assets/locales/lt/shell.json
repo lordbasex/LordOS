@@ -481,6 +481,8 @@
   "ws.layout.three": "Trys stulpeliai",
   "ws.layout.grid": "Tinklelis",
   "ws.layout.add": "Pridėti langą",
+  "ws.add.menu": "Pridėti…",
+  "ws.add.webapp": "Pridėti žiniatinklio programą",
   "ws.layout.save": "Įrašyti išdėstymą",
   "ws.layout.saved": "Išdėstymas įrašytas",
   "ws.layout.move": "Perkelti į kitą veiklą",

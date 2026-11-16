@@ -474,6 +474,8 @@
   "ws.layout.three": "Tres columnes",
   "ws.layout.grid": "Quadrícula",
   "ws.layout.add": "Afegeix una finestra",
+  "ws.add.menu": "Afegeix…",
+  "ws.add.webapp": "Afegeix una aplicació web",
   "ws.layout.save": "Desa la disposició",
   "ws.layout.saved": "Disposició desada",
   "ws.layout.move": "Mou a una altra activitat",

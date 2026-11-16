@@ -58,7 +58,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     world cities; its four cities fit the wide 4×1 block, and one kept at 4×2 shows as the wide one). The right-click
     menu opens inside the widget's own display, inwards at an edge, instead of running onto the next monitor. Main and
     side keeps three slots (the side split in two) and Grid four, each free one shown as a dashed space even with fewer
-    windows open; with nothing open the outlines stay and only the empty state's card speaks. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    windows open; with nothing open the outlines stay and only the empty state's card speaks. The empty state's card
+    shows only on a display with nothing at all (no window, none minimized, no widget); widgets alone hide it. The "+"
+    in each frame header is now a menu: Add window, Add widget, Add web app (the Store's Web apps page), and the
+    wallpaper's right-click menu starts with the same three. The widget catalog shows four columns (it wrapped to
+    three: the cards' borders were left out of its width), fewer on a narrow display. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button

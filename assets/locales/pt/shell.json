@@ -474,6 +474,8 @@
   "ws.layout.three": "Três colunas",
   "ws.layout.grid": "Grade",
   "ws.layout.add": "Adicionar janela",
+  "ws.add.menu": "Adicionar…",
+  "ws.add.webapp": "Adicionar app web",
   "ws.layout.save": "Salvar layout",
   "ws.layout.saved": "Layout salvo",
   "ws.layout.move": "Mover para outra atividade",
