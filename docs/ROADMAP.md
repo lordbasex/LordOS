@@ -833,6 +833,8 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   - a different activity per monitor (per-display desktops in the SDK and the compositor's parking) and the Overview
     per display;
   - ~~**Weather widget**~~: done in 0.8.8.10 (approved 2026-11-16; docs/WORKSPACES.md, "Weather").
+  - **LordBridge** (separate project, 2026-11-16; docs/LORDBRIDGE.md): Windows programs (Wine), games (Proton), Android
+    (Waydroid), engine versions side by side like nvm. Phase 0 done outside this tree; phase 1 needs a `lord.bridge` exception.
   - **Voice assistant** (stage 4, maintainer's decision 2026-11-16, "más adelante"): speak, LordOS turns it into text
     (whisper.cpp, local), an AI answers and LordOS reads it aloud (lord-say). Decisions first: which AI answers (local or
     a cloud service, and with which account) and the microphone permission (the broker's device grant).

@@ -144,3 +144,4 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | Document | What it covers |
 |---|---|
 | [HANDWIRED_NOTES.md](HANDWIRED_NOTES.md) | Research notes on a related UI project |
+- [LORDBRIDGE.md](LORDBRIDGE.md) — LordBridge, the separate project for Windows (Wine), games (Proton) and Android apps: phases and what it needs from LordOS.
