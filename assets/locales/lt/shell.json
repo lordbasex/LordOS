@@ -560,6 +560,7 @@
   "widgets.size.s": "Mažas",
   "widgets.size.m": "Vidutinis",
   "widgets.size.l": "Didelis",
+  "widgets.size.w": "Platus",
   "widgets.size.xl": "Labai didelis",
   "widgets.clock.analog": "Analoginis",
   "widgets.clock.digital": "Skaitmeninis",

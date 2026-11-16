@@ -203,7 +203,7 @@ export function foldMissing(saved, connected, mainKey) {
 // placed gets no slot. Returns { stacks, swapOut } (swapOut: windows to minimize).
 // min: the layout's slots, kept even empty (Two halves always shows two: an empty one is a free space); max: at most that
 // many (One at a time: one slot, the others minimized behind the window shown).
-export const SLOTS = { single: [1, 1], halves: [2, Infinity], three: [3, Infinity], split: [2, Infinity], grid: [0, Infinity] };
+export const SLOTS = { single: [1, 1], halves: [2, Infinity], three: [3, Infinity], split: [3, Infinity], grid: [4, Infinity] };
 export const slotLimits = (layout) => SLOTS[layout] || [0, Infinity];
 // empty slots beyond `min` go, from the end (a slot left by a window that moved away)
 export function trimSlots(stacks, min) {

@@ -546,6 +546,7 @@
   "widgets.size.s": "小",
   "widgets.size.m": "中",
   "widgets.size.l": "大",
+  "widgets.size.w": "横長",
   "widgets.size.xl": "特大",
   "widgets.clock.analog": "アナログ",
   "widgets.clock.digital": "デジタル",

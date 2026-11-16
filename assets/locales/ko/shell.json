@@ -546,6 +546,7 @@
   "widgets.size.s": "작게",
   "widgets.size.m": "중간",
   "widgets.size.l": "크게",
+  "widgets.size.w": "가로형",
   "widgets.size.xl": "아주 크게",
   "widgets.clock.analog": "아날로그",
   "widgets.clock.digital": "디지털",

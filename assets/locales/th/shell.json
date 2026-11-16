@@ -546,6 +546,7 @@
   "widgets.size.s": "เล็ก",
   "widgets.size.m": "กลาง",
   "widgets.size.l": "ใหญ่",
+  "widgets.size.w": "แบบกว้าง",
   "widgets.size.xl": "ใหญ่พิเศษ",
   "widgets.clock.analog": "เข็ม",
   "widgets.clock.digital": "ดิจิทัล",

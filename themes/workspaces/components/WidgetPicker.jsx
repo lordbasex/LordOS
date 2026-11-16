@@ -1,6 +1,6 @@
 // Add widget: the desktop widget catalog (sdk/deskwidgets.jsx) as cards over a display, opened from the empty state's
 // "Add widget" or the wallpaper's right-click menu. Each card has a button per size (small 1×1, medium 2×1, large 2×2,
-// extra large 4×2, drawn as its block of cells); a click puts the widget on the first free block of that display's grid,
+// wide 4×1, extra large 4×2, drawn as its block of cells); a click puts the widget on the first free block of that display's grid,
 // in the activity in view. Escape or a click outside closes it.
 import { View, Text, Layer, addListener, useStore, createStore, widgetKinds, widgetCatalog, workAreaOf, addDeskWidget, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -85,7 +85,7 @@ function KindGlyph({ type, t }) {
   return <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: dim }} />;
 }
 
-const SPANS = { s: [1, 1], m: [2, 1], l: [2, 2], xl: [4, 2] };
+const SPANS = { s: [1, 1], m: [2, 1], l: [2, 2], w: [4, 1], xl: [4, 2] };
 function SizeChip({ t, size, onPick }) {
   const [hover, setHover] = useState(false);
   const [c, r] = SPANS[size];

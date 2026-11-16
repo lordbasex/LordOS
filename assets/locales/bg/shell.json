@@ -553,6 +553,7 @@
   "widgets.size.s": "Малък",
   "widgets.size.m": "Среден",
   "widgets.size.l": "Голям",
+  "widgets.size.w": "Широк",
   "widgets.size.xl": "Много голям",
   "widgets.clock.analog": "Аналогов",
   "widgets.clock.digital": "Цифров",

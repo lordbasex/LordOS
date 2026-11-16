@@ -553,6 +553,7 @@
   "widgets.size.s": "Kicsi",
   "widgets.size.m": "Közepes",
   "widgets.size.l": "Nagy",
+  "widgets.size.w": "Széles",
   "widgets.size.xl": "Extra nagy",
   "widgets.clock.analog": "Analóg",
   "widgets.clock.digital": "Digitális",

@@ -546,6 +546,7 @@
   "widgets.size.s": "Kecil",
   "widgets.size.m": "Sederhana",
   "widgets.size.l": "Besar",
+  "widgets.size.w": "Lebar",
   "widgets.size.xl": "Sangat besar",
   "widgets.clock.analog": "Analog",
   "widgets.clock.digital": "Digital",

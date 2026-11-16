@@ -546,6 +546,7 @@
   "widgets.size.s": "Nhỏ",
   "widgets.size.m": "Vừa",
   "widgets.size.l": "Lớn",
+  "widgets.size.w": "Rộng",
   "widgets.size.xl": "Rất lớn",
   "widgets.clock.analog": "Kim",
   "widgets.clock.digital": "Số",

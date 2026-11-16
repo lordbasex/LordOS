@@ -553,6 +553,7 @@
   "widgets.size.s": "Pieni",
   "widgets.size.m": "Keskikokoinen",
   "widgets.size.l": "Suuri",
+  "widgets.size.w": "Leveä",
   "widgets.size.xl": "Erittäin suuri",
   "widgets.clock.analog": "Analoginen",
   "widgets.clock.digital": "Digitaalinen",

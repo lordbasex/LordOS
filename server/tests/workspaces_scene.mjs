@@ -80,7 +80,7 @@ check('the left display untouched (free)', tiler.layoutOf(desk, 'DP-1').layout, 
 sdk.wm.setFrame(c, { ...frameOf(c), x: frameOf(c).x + 20, w: frameOf(c).w - 80 });
 await flush();
 check('resized by hand: it floats', tiler.isFloating(c), true);
-check('the others re-tile as two', [a, b].map(frameOf), tileRects('split', plan(M).work, 2, 2 / 3));
+check('the others keep their tiles; main and side keeps three slots, the floated one\'s now free', [a, b].map(frameOf), tileRects('split', plan(M).work, 3, 2 / 3).slice(0, 2));
 tiler.setFloating(c, false);
 await flush();
 check('Tile this window: back in a tile', frameOf(c), tileRects('split', plan(M).work, 3, 2 / 3)[2]);
@@ -419,6 +419,30 @@ await flush();
     check('widgets: dragged over another, it lands on a free block', grid.occupancy([moved, still]).size, grid.occupancy([moved]).size + grid.occupancy([still]).size);
     check('widgets: the other one kept its block', [still.col, still.row], [w2.col, w2.row]);
     check('widgets: it did move', [moved.col, moved.row].join() !== [ww.col, ww.row].join(), true);
+  }
+  // right-clicked at the display's edge: its menu opens inwards, inside that display (not onto the next monitor)
+  {
+    const ww = list().find((w) => w.id === c1);
+    const r = grid.rectOf(g, ww.col, ww.row, ww.size);
+    const card = [...styles].filter(([id, st]) => st.left === r.x && st.top === r.y && st.width === r.w && attached(id)).pop()?.[0];   // the card, inside its host
+    globalThis.__lordEvent('down', card, r.x + r.w - 4, r.y + 10, 2);
+    globalThis.__lordEvent('up', card, r.x + r.w - 4, r.y + 10, 2);
+    for (let i = 0; i < 2; i++) await flush();
+    const frame = [...styles].find(([id, st]) => st.left === R.x && st.top === R.y && st.width === R.w && st.height === R.h && st.pointerEvents === 'box-none' && attached(id));
+    const box = [...styles].find(([id, st]) => st.shadowBlur === 30 && st.shadowOffsetY === 10 && attached(id))?.[1];
+    check('widget menu: laid inside its own display', [!!frame, !!box && box.left >= 4 && box.left + box.width <= R.w - 4], [true, true]);
+    globalThis.__lordEvent('down', null, L.x + 5, L.y + 400, 0);
+    globalThis.__lordEvent('up', null, L.x + 5, L.y + 400, 0);
+    for (let i = 0; i < 2; i++) await flush();
+    check('widget menu: a click outside closes it', [...styles].some(([id, st]) => st.shadowBlur === 30 && st.shadowOffsetY === 10 && attached(id)), false);
+  }
+  // a clock kept at the old 4×2 size shows as the 4×1 row of cities
+  {
+    sdk.setDeskWidget(c1, { size: 'xl' });
+    for (let i = 0; i < 2; i++) await flush();
+    const ww = list().find((w) => w.id === c1);
+    const r = grid.rectOf(g, 0, 0, 'w');
+    check('widgets: the old extra large clock is the wide one', [...styles].some(([id, st]) => st.width === r.w && st.height === r.h && attached(id)), true);
   }
   for (const id of [c1, c2]) sdk.removeDeskWidget(id);
   for (let i = 0; i < 2; i++) await flush();

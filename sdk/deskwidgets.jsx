@@ -2,7 +2,7 @@
 // widget's body. widgets.js draws the layer; widgetgrid.js has the grid's rules.
 //
 //   registerWidgetKind({ type, nameKey, descKey, sizes?, add?(x, y) })   an entry of the catalog. Built-in kinds have
-//                          sizes (s 1×1, m 2×1, l 2×2, xl 4×2); an app's kind without sizes adds its own widget
+//                          sizes (s 1×1, m 2×1, l 2×2, w 4×1, xl 4×2); an app's kind without sizes adds its own widget
 //                          (the Notes app's sticky note, which it keeps itself)
 //   widgetKinds()          the catalog, in order (a kind may say it isn't available here: Battery with no battery)
 //   addDeskWidget(type, size, display)   a widget on the first free block of that display's grid, in the activity in
@@ -55,7 +55,13 @@ const all = () => (Array.isArray(settings.get().deskWidgets) ? settings.get().de
 const dkOf = (d) => (d && typeof d.connector === 'string' && d.connector ? d.connector : `#${d?.id ?? 0}`);
 const shown = () => (screenDisplays() || []).filter((d) => !screen.mirror || d.main);
 const gridFor = (d) => gridOf(workAreaOf(d));
-const sizeOf = (w) => (SIZE_ORDER.includes(w.size) && KIND_SIZES[w.type]?.includes(w.size) ? w.size : KIND_SIZES[w.type]?.[0] || 's');
+// a size the kind no longer has: its nearest one (the clock's 4×2 row of cities became the 4×1 wide one), else its first
+const RENAMED = { xl: 'w' };
+const sizeOf = (w) => {
+  const ok = KIND_SIZES[w.type] || [];
+  if (SIZE_ORDER.includes(w.size) && ok.includes(w.size)) return w.size;
+  return ok.includes(RENAMED[w.size]) ? RENAMED[w.size] : ok[0] || 's';
+};
 const deskOf = (w) => (w.desk == null ? activeDesktop.get() : w.desk);
 
 // The blocks of one activity on one display: kept ones where they fit, the others (no block yet, a display gone, a
@@ -192,7 +198,10 @@ function WidgetCard({ widget }) {
   return (
     <>
       <View onMouseDown={(e) => { if (!e.button) drag.current = { mx: e.x, my: e.y, x: widget.x, y: widget.y, moving: false }; }}
-        onContextMenu={(e) => setMenu({ x: e.x, y: e.y })}
+        onContextMenu={(e) => {
+          const d = shown().find((x) => e.x >= x.x && e.x < x.x + x.w && e.y >= x.y && e.y < x.y + x.h) || shown().find((x) => dkOf(x) === widget.dk) || { x: 0, y: 0, w: 4000, h: 4000 };
+          setMenu({ x: e.x, y: e.y, d: { x: d.x, y: d.y, w: d.w, h: d.h } });
+        }}
         style={{ position: 'absolute', left: g.x, top: g.y, width: widget.w, height: widget.h, borderRadius: 22, overflow: 'hidden',
           backgroundColor: L.blur ? L.bg : L.solid, ...(L.blur ? { backdropFilter: `blur(${L.blur}px)` } : null),
           border: `0.5px solid ${L.dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
@@ -201,7 +210,14 @@ function WidgetCard({ widget }) {
           {Body ? <Body w={widget} L={L} /> : null}
         </View>
       </View>
-      {menu ? <Layer name="popover"><ContextMenu x={menu.x} y={menu.y} items={items} onClose={() => setMenu(null)} /></Layer> : null}
+      {menu ? (
+        // inside the widget's own display: near an edge it opens inwards, never onto the next monitor
+        <Layer name="popover">
+          <View style={{ position: 'absolute', left: menu.d.x, top: menu.d.y, width: menu.d.w, height: menu.d.h, pointerEvents: 'box-none' }}>
+            <ContextMenu x={menu.x - menu.d.x} y={menu.y - menu.d.y} items={items} bounds={{ w: menu.d.w, h: menu.d.h }} onClose={() => setMenu(null)} />
+          </View>
+        </Layer>
+      ) : null}
     </>
   );
 }
@@ -362,16 +378,16 @@ function ClockBody({ w, L }) {
       </View>
     );
   }
-  // xl: four cities, a face each
+  // w (4×1): four cities in a row, a face each
   const list = [localZone(), ...cities(3)];
   return (
     <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
       {list.map((z) => {
         const d = zoneDate(z, now) || date;
         return (
-          <View key={z || 'here'} style={{ alignItems: 'center', gap: 6 }}>
-            {digital ? <Big L={L} size={40}>{formatTime(d)}</Big> : <AnalogFace L={L} size={140} date={d} />}
-            <Text style={{ fontSize: 13, fontWeight: 650, color: L.text }}>{cityName(z) || here}</Text>
+          <View key={z || 'here'} style={{ alignItems: 'center', gap: 3, width: 160 }}>
+            {digital ? <View style={{ height: 100, justifyContent: 'center' }}><Big L={L} size={36}>{formatTime(d)}</Big></View> : <AnalogFace L={L} size={100} date={d} />}
+            <Text style={{ fontSize: 12, fontWeight: 650, color: L.text, textAlign: 'center', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 160 }}>{cityName(z) || here}</Text>
             <Sub L={L} center>{formatTime(d)}</Sub>
           </View>
         );
@@ -762,7 +778,7 @@ function ClaudeBody({ w, L }) {
 // ---- the kinds: their sizes (the first is the default), bodies and menu entries ----
 const BODIES = { clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
   battery: BatteryBody, reminders: RemindersBody, clipboard: ClipboardBody, claude: ClaudeBody, nowplaying: NowPlayingBody, readaloud: ReadAloudBody };
-const KIND_SIZES = { clock: ['s', 'm', 'l', 'xl'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
+const KIND_SIZES = { clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
   temps: ['s', 'm', 'l'], battery: ['s', 'm'], reminders: ['s', 'm', 'l'], clipboard: ['m', 'l'], claude: ['s', 'm', 'l'], nowplaying: ['m'], readaloud: ['s', 'm'] };
 export const kindSizes = (type) => KIND_SIZES[type] || null;
 const KIND_MENU = {

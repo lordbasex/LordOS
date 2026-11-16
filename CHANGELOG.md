@@ -53,9 +53,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     so it gets the whole half instead of a third. Lord Flow and Lord Classic are unchanged: the SDK's `snapThirds` is
     off for them and its new `moveGrab` store is read only by Workspaces. "Add widget" in a display's empty state, or a right click on
     the wallpaper, opens the widget catalog: each widget takes a block of the display's grid (small 1×1, medium 2×1,
-    large 2×2, extra large 4×2, TangoOS's 170 px cells) that no other can take, belongs to the activity in view, is
+    large 2×2, wide 4×1, extra large 4×2, TangoOS's 170 px cells) that no other can take, belongs to the activity in view, is
     dragged to the nearest free block and resized or set up from its right-click menu (the clock: analog or digital,
-    world cities). Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    world cities; its four cities fit the wide 4×1 block, and one kept at 4×2 shows as the wide one). The right-click
+    menu opens inside the widget's own display, inwards at an edge, instead of running onto the next monitor. Main and
+    side keeps three slots (the side split in two) and Grid four, each free one shown as a dashed space even with fewer
+    windows open; with nothing open the outlines stay and only the empty state's card speaks. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button

@@ -38,7 +38,7 @@ const MOCK = `globalThis.__lordTest = (() => {
   let nextId = 1, saved = '{}';
   const base = {
     screen: { width: 1920, height: 1080, displays: [], mirror: false },
-    version: 'test', now: () => Date.now(), stats: () => ({}),
+    version: 'test', now: () => Date.now(), stats: () => ({}), measureText: (s, size) => String(s || '').length * size * 0.55,
     getLayout: (id) => layouts.get(id) || [-10000, -10000, 1, 1],
     createNode: () => { counts.ops++; const id = nextId++; styles.set(id, {}); return id; },
     setStyle: (id, k, v) => { counts.ops++; const s = styles.get(id); if (!s) return; if (v === undefined) delete s[k]; else s[k] = v; },

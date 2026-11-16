@@ -7,7 +7,7 @@ import { wsPrefs, effectiveSurface, metaFromSaved, savedFromMeta, cleanActivity,
   ACTIVITY_ICONS, ACTIVITY_COLORS, MAX_PINS, WS_VERSION } from '../../themes/workspaces/model/activities.js';
 import { makeTheme, accents, deep, material } from '../../themes/workspaces/tokens.js';
 import { cleanThemeMeta, themeOptionValue, themeOptionPatch } from '../../sdk/thememeta.js';
-import { slotStacks, shownIn, dropInto, slotAt, dropSlot } from '../../themes/workspaces/model/layouts.js';
+import { slotStacks, shownIn, dropInto, slotAt, dropSlot, slotLimits } from '../../themes/workspaces/model/layouts.js';
 import { assistFor, follow, other } from '../../themes/workspaces/model/magnet.js';
 import { readFileSync } from 'node:fs';
 
@@ -248,6 +248,10 @@ eq('material is plain data', JSON.parse(JSON.stringify(material('crystal', true)
 // ---- slots: a minimized window keeps its place ----
 {
   const min = (ids) => (id) => ids.includes(id);
+  // Main and side keeps three slots (the side split in two) and Grid four, free ones shown even with fewer windows
+  eq('slots: main and side keeps three', slotStacks([], ['files'], min([]), new Set(), { min: slotLimits('split')[0] }).stacks, [['files'], [], []]);
+  eq('slots: grid keeps four', slotStacks([], ['files', 'chrome'], min([]), new Set(), { min: slotLimits('grid')[0] }).stacks, [['files'], ['chrome'], [], []]);
+  eq('slots: grid with nothing open still shows its four', slotStacks([], [], min([]), new Set(), { min: slotLimits('grid')[0] }).stacks.length, 4);
   let r = slotStacks([], ['files', 'chrome'], min([]));
   eq('slots: two windows, two slots', [r.stacks, r.swapOut], [[['files'], ['chrome']], []]);
   r = slotStacks(r.stacks, ['files', 'chrome'], min(['files']));

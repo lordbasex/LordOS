@@ -3,7 +3,7 @@
 // like TangoOS's; a widget takes a block of cells by its size and keeps them: no other widget can be placed or dropped
 // over them.
 //
-//   SIZES                    s 1×1, m 2×1, l 2×2, xl 4×2 (cells: columns × rows)
+//   SIZES                    s 1×1, m 2×1, l 2×2, w 4×1 (wide), xl 4×2 (cells: columns × rows)
 //   gridOf(area)             { cols, rows, x, y, cell, gap } for a work area
 //   rectOf(g, col, row, size)   the pixels of a block
 //   occupancy(list, except)  the cells the widgets in `list` hold (a Set of "col,row")
@@ -14,8 +14,8 @@
 export const CELL = 170;
 export const GAP = 16;
 export const MARGIN = 24;
-export const SIZES = { s: [1, 1], m: [2, 1], l: [2, 2], xl: [4, 2] };
-export const SIZE_ORDER = ['s', 'm', 'l', 'xl'];
+export const SIZES = { s: [1, 1], m: [2, 1], l: [2, 2], w: [4, 1], xl: [4, 2] };
+export const SIZE_ORDER = ['s', 'm', 'l', 'w', 'xl'];
 export const spanOf = (size) => SIZES[size] || SIZES.s;
 
 export function gridOf(area, cell = CELL, gap = GAP, margin = MARGIN) {

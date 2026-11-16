@@ -553,6 +553,7 @@
   "widgets.size.s": "Liten",
   "widgets.size.m": "Mellan",
   "widgets.size.l": "Stor",
+  "widgets.size.w": "Bred",
   "widgets.size.xl": "Extra stor",
   "widgets.clock.analog": "Analog",
   "widgets.clock.digital": "Digital",

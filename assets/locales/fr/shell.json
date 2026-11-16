@@ -553,6 +553,7 @@
   "widgets.size.s": "Petit",
   "widgets.size.m": "Moyen",
   "widgets.size.l": "Grand",
+  "widgets.size.w": "Large",
   "widgets.size.xl": "Très grand",
   "widgets.clock.analog": "Analogique",
   "widgets.clock.digital": "Numérique",

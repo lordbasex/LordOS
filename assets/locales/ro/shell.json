@@ -560,6 +560,7 @@
   "widgets.size.s": "Mic",
   "widgets.size.m": "Mediu",
   "widgets.size.l": "Mare",
+  "widgets.size.w": "Lat",
   "widgets.size.xl": "Foarte mare",
   "widgets.clock.analog": "Analogic",
   "widgets.clock.digital": "Digital",

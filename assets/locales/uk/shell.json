@@ -560,6 +560,7 @@
   "widgets.size.s": "Малий",
   "widgets.size.m": "Середній",
   "widgets.size.l": "Великий",
+  "widgets.size.w": "Широкий",
   "widgets.size.xl": "Дуже великий",
   "widgets.clock.analog": "Стрілковий",
   "widgets.clock.digital": "Цифровий",

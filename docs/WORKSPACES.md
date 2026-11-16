@@ -44,7 +44,8 @@ settings.themeOptions.workspaces = { surface, spine, spineEvery }
 
 Layouts (`model/layouts.js`), chosen per display: **Free** (windows stay where they are; the default), **One at a
 time**, **Two halves** (two columns; more windows stack in rows, alternating sides), **Main and side** (a main tile and
-a column of up to three), **Three columns** and **Grid**. The tiler (`tiler.js`) writes the SDK's
+a column of up to three; it keeps three slots, the side split in two, free ones shown), **Three columns** and
+**Grid** (four slots at least, two by two). The tiler (`tiler.js`) writes the SDK's
 window store once for every window that moves (the same fields `wm.setFrame` writes) when something changes: a window
 opens, closes, is minimized or comes back, the layout or its divider changes, the activity in view changes, the
 displays do. Nothing runs per frame, nothing polls.
@@ -93,13 +94,14 @@ displays do. Nothing runs per frame, nothing polls.
   click on Chrome's tab strip, or on any title bar) opens the same flyout at the pointer.
 - **Widgets** (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`, `components/WidgetPicker.jsx`; Lord Workspaces only). Each
   display's work area holds a grid of 170 px cells with 16 px gaps, anchored to its top right (TangoOS's grid). A widget
-  takes a block of cells by its size: small 1×1, medium 2×1, large 2×2, extra large 4×2; no other widget can be placed
+  takes a block of cells by its size: small 1×1, medium 2×1, large 2×2, wide 4×1, extra large 4×2; no other widget can be placed
   or dropped over it. Widgets belong to an activity and a display (its connector): another activity shows its own, or
   none. **Add widget** (the empty state, or a right click on the wallpaper) opens the catalog over that display, with a
   button per size; the widget goes on the first free block from the top right ("no room" says so). Dragged anywhere, a
   dashed block shows where it will land, the nearest free one; its right-click menu changes its size (where it fits),
-  its options (the clock: analog or digital, cities from the Clock app) and removes it. Kinds and sizes: Clock (s
-  analog face or digital, m with world cities, l, xl four cities), Calendar (s today and the next event, m the next
+  its options (the clock: analog or digital, cities from the Clock app) and removes it; it opens inside the
+  widget's display. Kinds and sizes: Clock (s
+  analog face or digital, m with world cities, l, w four cities in a row), Calendar (s today and the next event, m the next
   three, l the month), System (CPU and memory as tick rings), Network (rates; m with the last minute's columns),
   Disks, Temperatures and fans, Battery (only with one), Reminders, Clipboard, Claude Code, Now playing and Read aloud;
   the Notes app's sticky note stays a free note of its own. The look is TangoOS's: 22 px corners, the Crystal blur

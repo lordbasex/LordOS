@@ -553,6 +553,7 @@
   "widgets.size.s": "Küçük",
   "widgets.size.m": "Orta",
   "widgets.size.l": "Büyük",
+  "widgets.size.w": "Geniş",
   "widgets.size.xl": "Çok büyük",
   "widgets.clock.analog": "Analog",
   "widgets.clock.digital": "Dijital",

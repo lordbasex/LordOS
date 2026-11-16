@@ -581,6 +581,7 @@
   "widgets.size.s": "صغير",
   "widgets.size.m": "متوسط",
   "widgets.size.l": "كبير",
+  "widgets.size.w": "عريض",
   "widgets.size.xl": "كبير جدًا",
   "widgets.clock.analog": "تناظري",
   "widgets.clock.digital": "رقمي",

@@ -553,6 +553,7 @@
   "widgets.size.s": "Klein",
   "widgets.size.m": "Middel",
   "widgets.size.l": "Groot",
+  "widgets.size.w": "Breed",
   "widgets.size.xl": "Extra groot",
   "widgets.clock.analog": "Analoog",
   "widgets.clock.digital": "Digitaal",
