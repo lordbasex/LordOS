@@ -125,6 +125,71 @@ static void read_settings(const char *home) {
     free(t);
 }
 
+/* a locale name with a country: "es_AR", "es_AR.UTF-8", "pt-BR" */
+static int has_country(const char *v) {
+    size_t n = v ? strlen(v) : 0;
+    if (!n || n > 40) return 0;
+    for (size_t i = 0; i < n; i++)
+        if (!((v[i] >= 'a' && v[i] <= 'z') || (v[i] >= 'A' && v[i] <= 'Z') || (v[i] >= '0' && v[i] <= '9') || strchr("_-.@", v[i]))) return 0;
+    size_t k = strcspn(v, "_-");
+    return k < n && v[k + 1] >= 'A' && v[k + 1] <= 'Z' && v[k + 2] >= 'A' && v[k + 2] <= 'Z';
+}
+
+/* LC_MONETARY's, else LANG's value in a "VAR=value" file (locale.conf, /etc/default/locale), when it has a country */
+static int region_in_file(const char *path, char *out, size_t n) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return 0;
+    size_t len;
+    char *t = read_all(fd, &len);
+    close(fd);
+    int found = 0;
+    for (int pass = 0; pass < 2 && !found; pass++) {
+        const char *var = pass ? "LANG=" : "LC_MONETARY=";
+        for (char *line = t; line && *line && !found;) {
+            char *nl = strchr(line, '\n');
+            if (nl) *nl = 0;
+            if (!strncmp(line, var, strlen(var))) {
+                char *v = line + strlen(var);
+                if (*v == '"') { v++; char *q = strchr(v, '"'); if (q) *q = 0; }
+                if (has_country(v)) { snprintf(out, n, "%s", v); found = 1; }
+            }
+            if (nl) *nl = '\n';
+            line = nl ? nl + 1 : NULL;
+        }
+    }
+    free(t);
+    return found;
+}
+
+/* The user's region, which says how "$" is read (saytext.c): Settings → Language & Region's (settings.json "region"),
+ * else the user's ~/.config/locale.conf (LC_MONETARY, LANG), else this process's LC_ALL, LC_MONETARY or LANG (a
+ * terminal's), else the computer's /etc/default/locale. -l and -v don't change it. Empty when none names a country. */
+static void user_region(const char *home, char *out, size_t n) {
+    char path[PATH_MAX];
+    out[0] = 0;
+    snprintf(path, sizeof path, "%s/.config/lordos/settings.json", home);
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd >= 0) {
+        size_t len;
+        char *t = read_all(fd, &len);
+        close(fd);
+        JDoc d = { 0 };
+        const char *v;
+        if (!json_parse(t, len, &d, NULL, 0) && d.root && (v = json_str(d.root, "region")) && has_country(v)) snprintf(out, n, "%s", v);
+        json_free(&d);
+        free(t);
+        if (out[0]) return;
+    }
+    snprintf(path, sizeof path, "%s/.config/locale.conf", home);
+    if (region_in_file(path, out, n)) return;
+    static const char *const vars[] = { "LC_ALL", "LC_MONETARY", "LANG" };
+    for (int i = 0; i < 3; i++) {
+        const char *v = getenv(vars[i]);
+        if (has_country(v)) { snprintf(out, n, "%s", v); return; }
+    }
+    region_in_file("/etc/default/locale", out, n);
+}
+
 static int simple_name(const char *s, size_t max) {
     size_t n = s ? strlen(s) : 0;
     if (!n || n > max) return 0;
@@ -500,6 +565,19 @@ int main(int argc, char **argv) {
         lang = say_language(text, len, fallback);
     }
     if (strcmp(lang, "es") && strcmp(lang, "en") && strcmp(lang, "pt")) lang = "en";    /* the languages LordOS has voices for */
+    /* Spanish and Portuguese models don't read digits or symbols: numbers, times, money… written out as words
+     * (saytext.c), before the text is split so the pieces are measured on what is spoken. English stays as it is. */
+    if (strcmp(lang, "en")) {
+        size_t nlen;
+        char region[48];
+        user_region(home, region, sizeof region);
+        char *spoken = say_normalize(text, len, lang, region[0] ? region : NULL, &nlen);
+        if (!spoken) die("out of memory", NULL);
+        free(text);
+        text = spoken;
+        len = nlen;
+        if (!len) return 0;
+    }
     if (!quality) quality = conf_quality[0] ? conf_quality : "auto";
     if (strcmp(quality, "auto") && strcmp(quality, "standard") && strcmp(quality, "hd")) die("quality is auto, standard or hd", quality);
     const char *roots[2] = { user_root, ROOTS_SYS };

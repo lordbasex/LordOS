@@ -48,6 +48,88 @@ Defaults: `~/.config/lordos/voice.json` (`voices` per language, `voice`, `langua
   voice runs on (`docs/MONITOR.md`, "GPU"): lord-tts itself is sandboxed and not dumpable, so its `/proc` isn't
   readable. It is not lord-tts's folder: the helper can't write it.
 
+## Text normalization (Spanish and Portuguese, since 0.8.8.10)
+
+Pocket TTS's Spanish and Portuguese models, HD and standard, never learned to read digits or symbols: "Tengo 88 años y
+nací en 1987" came out as "Tengo bronce proteaños y nací en Crombiquit…" with every HD voice, while the same sentence
+written in words was read perfectly. audio.cpp's text preparation (`prepare_pocket_tts_text`) normalizes no numbers in
+any language; the English models read digits because they learned them. So `say` writes them out as words itself,
+for `es` and `pt` only (English text is left exactly as it is): `say_normalize()` in `server/src/tts/saytext.c`, a pure
+function with its own tables and no dependency, run on the whole text once the language is known and before it is
+split into sentences (so pieces are measured on what is spoken). Portuguese uses the Brazilian forms where the two
+differ (dezesseis, dezenove, bilhão, "1.º de maio" → primeiro de maio). The rules follow the usual ones (num2words,
+NVIDIA NeMo's text normalization), not their code.
+
+| Written | Spanish | Portuguese |
+|---|---|---|
+| `88`, `1987`, `2026` | ochenta y ocho, mil novecientos ochenta y siete, dos mil veintiséis | oitenta e oito, mil novecentos e oitenta e sete, dois mil e vinte e seis |
+| `100`, `101`, `1.000.000`, `1.000.000.000` | cien, ciento uno, un millón, mil millones | cem, cento e um, um milhão, um bilhão |
+| `21 años`, `1 libro` (a count before a noun, under 1000) | veintiún años, un libro | vinte e um anos, um livro |
+| `-5`, `−5` | menos cinco | menos cinco |
+| `1.987`, `1 000`, `1.234,56`, `1,000,000` | thousands and comma decimals | the same |
+| `3,5`, `3.5`, `3,05` | tres coma cinco, tres punto cinco, tres coma cero cinco | três vírgula cinco, três ponto cinco, três vírgula zero cinco |
+| `0.8.8.10`, `192.168.0.1` | cero punto ocho punto ocho punto diez | zero ponto oito… |
+| `25%`, `1,5 %` | veinticinco por ciento | vinte e cinco por cento |
+| `1.º`, `1.ª`, `3.er`, `21.º` (1–100; above, the cardinal) | primero, primera, tercer, vigésimo primero | primeiro, primeira, —, vigésimo primeiro |
+| `14:30`, `14:00`, `14h30`, `1:02:03`, `48 hs` | catorce y treinta, catorce horas, …, una hora, dos minutos y tres segundos, cuarenta y ocho horas | catorze e trinta, catorze horas, … |
+| `15/11/2026`, `2026-11-15`, `15.11.2026` (day first) | quince de noviembre de dos mil veintiséis | quinze de novembro de dois mil e vinte e seis |
+| `25 €`, `€25`, `25,50 €`, `1.000.000 €` | veinticinco euros, … con cincuenta, un millón de euros | vinte e cinco euros, … e cinquenta, um milhão de euros |
+| `$10` (the user's region: below) | diez pesos in AR, MX, CL, CO, UY, DO, CU; diez dólares elsewhere or with no region | dez dólares (dez pesos in those countries) |
+| `US$ 10`, `U$S 10`, `USD 10`, `10 USD`, `R$ 10`, `£2` | diez dólares (always), …, diez reales, dos libras (feminine: veintiuna libras) | dez dólares (always), …, dez reais, duas libras |
+| `21 °C`, `1°C`, `90°` | veintiún grados Celsius, un grado Celsius, noventa grados | vinte e um graus Celsius, … |
+| `#LordOS`, `#5`, `# Título` | LordOS, número cinco, Título | LordOS, número cinco |
+| `nº 5`, `n.º 5`, `@user`, `A & B`, `2+2 = 4` | número cinco, arroba user, A y B, dos más dos igual a cuatro | …, A e B, dois mais dois igual a quatro |
+| `10-20` (a rising range of up to 4 digits) | diez a veinte | dez a vinte |
+| `24/7` | veinticuatro barra siete | vinte e quatro barra sete |
+
+Digit by digit: a number that starts with 0 (`0800`, `007`), one of more than 9 digits written without separators
+(phone numbers such as `1155551234`), and one of more than 12 even with them. `612 345 678` (three groups of three
+with plain spaces) is a phone number read in its groups, not 612 million; plain spaces group thousands only after one
+or two digits or once (`1 000`, `12 345 678`, `100 000`), and no-break or thin spaces always do. `11-5555-1234` is read
+group by group. Ambiguities, as decided: one `.` followed by exactly three digits is a thousands separator (`1.987` is
+1987, as written in Spanish and Portuguese), any other single `.` or `,` is a decimal point, read as written ("punto",
+"coma").
+
+**`$` by region** (maintainer's decision, 2026-11-16). A `$` alone is read as the currency of the user's region:
+"pesos" where the country's own peso is written `$` (Argentina, Mexico, Chile, Colombia, Uruguay, the Dominican
+Republic, Cuba), "dólares" (in both languages) anywhere else (Spain, the United States, Ecuador, El Salvador, Puerto Rico,
+Brazil, Portugal…) and when no region is known. `US$`, `U$S` and `USD` are always dollars and `R$` always reais. The
+region is the one in Settings → Language & Region (`"region"` in `~/.config/lordos/settings.json`, such as `es_AR`),
+else `LC_MONETARY` or `LANG` in `~/.config/locale.conf`, else `say`'s own `LC_ALL`, `LC_MONETARY` or `LANG` (a
+terminal's), else the computer's `/etc/default/locale`; only a value with a country counts (`es.UTF-8`, which
+lord-server gives lord-say, doesn't). `-l` and `-v` don't change it. The region is a parameter of
+`say_normalize()`, which stays a pure function; `say.c` finds it.
+
+Digits inside words are split off and read with the same rules, up to 4 digits as a number and longer ones digit by
+digit: `MP3` MP tres, `4K` cuatro K, `H264` H doscientos sesenta y cuatro, `COVID-19` COVID diecinueve, `1080p` mil
+ochenta p. `C#`, `F#` and `C++` stay. Addresses and e-mails (`https://…`, `www.…`, `name@host.tld`) keep their letters,
+lose the scheme, name their punctuation (punto/ponto, arroba, barra, guion/hífen, guion bajo/sublinhado, dos
+puntos/dois pontos) and read their digits one by one: `info@lordos.org` info arroba lordos punto org.
+
+Not covered: units (`5 km`, `10 GB` keep their abbreviation), fractions (`1/2` is "uno barra dos"), Roman numerals,
+numbers above 999 999 999 999, the feminine of a count before a feminine noun (`1 casa` is "un casa"; money in libras
+and hours are feminine), and the European Portuguese forms.
+
+Tests: `server/tests/saytext_test.c` (267 checks, 242 of them normalization: 126 Spanish, 82 Portuguese, 4 with
+English and other languages left untouched, and 30 for `$` by region).
+
+Round trip, measured on 2026-11-15 on an i9-10900 with an RX 580: every installed Spanish and Portuguese voice (23 HD
+and 22 standard each) said two sentences with the `say` of 0.8.8.9 and with this one, and whisper.cpp's `small` model
+transcribed each recording (whole, and again from a third and two thirds in, since it sometimes drops a sentence); an
+item counts when the transcript has the number, in digits or in words. Sentence 1 is "Tengo 88 años y nací en 1987.
+Compré 3 libros por 25 euros. #LordOS es genial." (4 items); sentence 2 is "La inflación fue del 3,5% y el libro
+cuesta 25,50 €. La reunión es a las 14:30 y quedé en 2.º lugar. El 15/11/2026 hacía 21 °C." (8 items: 3,5, the
+percent, 25,50, 14:30, 2.º, 15 November, 2026, 21), each with its Portuguese translation (R$ for the price).
+
+| Model | Sentence 1, before → after | Sentence 2, before → after |
+|---|---|---|
+| Spanish HD | 0/92 → 92/92 | 0/184 → 184/184 |
+| Spanish standard | 51/88 → 84/88 | 73/176 → 170/176 |
+| Portuguese HD | 1/92 → 87/92 | 10/184 → 172/184 |
+| Portuguese standard | 70/88 → 85/88 | 49/176 → 176/176 |
+
+Most of what is left is whisper's own spelling of what was said right ("80 e 8" for oitenta e oito, "20 e um").
+
 ## Reading aloud from the desktop
 
 Every place with text has **Speech** (`sdk/voice.js`, `speechMenu`):
@@ -182,7 +264,8 @@ by git; the image builders run it). `server/mk/tts.mk` builds its Pocket TTS fam
 `-DENGINE_ENABLE_CPU_ALL_VARIANTS=ON` (so one image serves every x86-64 processor) and Vulkan. It needs `cmake`,
 `glslc`, `libvulkan-dev` and `spirv-headers`; without them `make` skips lord-tts.
 
-Tests: `server/tests/saytext_test.c` (cleaning terminal output, splitting sentences, telling the language),
+Tests: `server/tests/saytext_test.c` (cleaning terminal output, splitting sentences, telling the language, writing
+Spanish and Portuguese numbers and symbols out as words),
 `server/tests/levels_test.c` (the wave's bands), `server/tests/voiceplayer_model_test.mjs` (where the player goes, the
 wave's motion; all three in `make test`) and
 `server/tests/tts_test.sh` (speech in es/en/pt on the CPU and the GPU, the confinement in both, a voice file that
