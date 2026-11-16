@@ -360,7 +360,7 @@
   "sound.balanceLeft": "左 {pct} %",
   "sound.balanceRight": "右 {pct} %",
   "sound.balanceReset": "中央に戻す",
-  "style.hint": "どちらのスタイルにも同じアプリがあります。変更はログアウトせずにすぐ適用され、開いているウインドウは戻ります。",
+  "style.hint": "どのデスクトップスタイルにも同じアプリがあります。変更はログアウトせずにすぐ適用され、開いているウインドウは戻ります。",
   "style.title": "デスクトップのスタイル",
   "system.apply": "{name} を使用",
   "system.hint": "すべてのユーザーとサービス用（/etc/default/locale）。現在：{name}",

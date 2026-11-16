@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Gauche {pct} %",
   "sound.balanceRight": "Droite {pct} %",
   "sound.balanceReset": "Centrer",
-  "style.hint": "Les deux styles ont les mêmes apps. Le changement s’applique aussitôt, sans fermer la session ; les fenêtres ouvertes reviennent.",
+  "style.hint": "Tous les styles de bureau ont les mêmes apps. Le changement s’applique aussitôt, sans fermer la session ; les fenêtres ouvertes reviennent.",
   "style.title": "Style du bureau",
   "system.apply": "Utiliser {name}",
   "system.hint": "Pour tous les utilisateurs et services (/etc/default/locale). Actuellement : {name}",

@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Izquierda {pct} %",
   "sound.balanceRight": "Derecha {pct} %",
   "sound.balanceReset": "Centrar",
-  "style.hint": "Los dos estilos tienen las mismas apps. El cambio se aplica al instante, sin cerrar sesión; las ventanas abiertas vuelven.",
+  "style.hint": "Todos los estilos de escritorio tienen las mismas apps. El cambio se aplica al instante, sin cerrar sesión; las ventanas abiertas vuelven.",
   "style.title": "Estilo de escritorio",
   "system.apply": "Usar {name}",
   "system.hint": "Para todos los usuarios y servicios (/etc/default/locale). Hoy: {name}",

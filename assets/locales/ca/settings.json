@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Esquerra {pct} %",
   "sound.balanceRight": "Dreta {pct} %",
   "sound.balanceReset": "Centra",
-  "style.hint": "Els dos estils tenen les mateixes apps. El canvi s’aplica a l’instant, sense tancar la sessió; les finestres obertes tornen.",
+  "style.hint": "Tots els estils d’escriptori tenen les mateixes apps. El canvi s’aplica a l’instant, sense tancar la sessió; les finestres obertes tornen.",
   "style.title": "Estil de l’escriptori",
   "system.apply": "Fes servir {name}",
   "system.hint": "Per a tots els usuaris i serveis (/etc/default/locale). Ara: {name}",

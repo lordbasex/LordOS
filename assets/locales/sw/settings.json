@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Kushoto {pct} %",
   "sound.balanceRight": "Kulia {pct} %",
   "sound.balanceReset": "Katikati",
-  "style.hint": "Mitindo yote miwili ina programu zilezile. Badiliko hutumika papo hapo, bila kutoka; madirisha yaliyofunguliwa hurudi.",
+  "style.hint": "Kila mtindo wa eneo-kazi una programu zilezile. Badiliko hutumika papo hapo, bila kutoka; madirisha yaliyofunguliwa hurudi.",
   "style.title": "Mtindo wa eneo-kazi",
   "system.apply": "Tumia {name}",
   "system.hint": "Kwa watumiaji na huduma zote (/etc/default/locale). Sasa: {name}",

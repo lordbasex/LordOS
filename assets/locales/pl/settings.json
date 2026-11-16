@@ -372,7 +372,7 @@
   "sound.balanceLeft": "W lewo {pct} %",
   "sound.balanceRight": "W prawo {pct} %",
   "sound.balanceReset": "Wyśrodkuj",
-  "style.hint": "Oba style mają te same aplikacje. Zmiana działa od razu, bez wylogowania; otwarte okna wracają.",
+  "style.hint": "Każdy styl pulpitu ma te same aplikacje. Zmiana działa od razu, bez wylogowania; otwarte okna wracają.",
   "style.title": "Styl pulpitu",
   "system.apply": "Użyj {name}",
   "system.hint": "Dla wszystkich użytkowników i usług (/etc/default/locale). Obecnie: {name}",

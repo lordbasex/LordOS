@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Sol {pct} %",
   "sound.balanceRight": "Sağ {pct} %",
   "sound.balanceReset": "Mərkəzə",
-  "style.hint": "Hər iki üslubda eyni tətbiqlər var. Dəyişiklik seansdan çıxmadan dərhal tətbiq olunur; açıq pəncərələr geri qayıdır.",
+  "style.hint": "Bütün masaüstü üslublarında eyni tətbiqlər var. Dəyişiklik seansdan çıxmadan dərhal tətbiq olunur; açıq pəncərələr geri qayıdır.",
   "style.title": "İş masası üslubu",
   "system.apply": "İstifadə et: {name}",
   "system.hint": "Bütün istifadəçilər və xidmətlər üçün (/etc/default/locale). Hazırda: {name}",

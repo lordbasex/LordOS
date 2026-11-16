@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Links {pct} %",
   "sound.balanceRight": "Rechts {pct} %",
   "sound.balanceReset": "Zentrieren",
-  "style.hint": "Beide Stile haben dieselben Apps. Die Änderung gilt sofort, ohne Abmelden; geöffnete Fenster kehren zurück.",
+  "style.hint": "Jeder Desktop-Stil hat dieselben Apps. Die Änderung gilt sofort, ohne Abmelden; geöffnete Fenster kehren zurück.",
   "style.title": "Schreibtischstil",
   "system.apply": "{name} verwenden",
   "system.hint": "Für alle Benutzer und Dienste (/etc/default/locale). Aktuell: {name}",

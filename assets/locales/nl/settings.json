@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Links {pct} %",
   "sound.balanceRight": "Rechts {pct} %",
   "sound.balanceReset": "Centreer",
-  "style.hint": "Beide stijlen hebben dezelfde apps. De wijziging geldt meteen, zonder af te melden; geopende vensters komen terug.",
+  "style.hint": "Elke bureaubladstijl heeft dezelfde apps. De wijziging geldt meteen, zonder af te melden; geopende vensters komen terug.",
   "style.title": "Bureaubladstijl",
   "system.apply": "Gebruik {name}",
   "system.hint": "Voor alle gebruikers en services (/etc/default/locale). Nu: {name}",

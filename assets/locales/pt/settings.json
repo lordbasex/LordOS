@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Esquerda {pct} %",
   "sound.balanceRight": "Direita {pct} %",
   "sound.balanceReset": "Centralizar",
-  "style.hint": "Os dois estilos têm os mesmos apps. A mudança é aplicada na hora, sem sair da sessão; as janelas abertas voltam.",
+  "style.hint": "Todos os estilos de área de trabalho têm os mesmos apps. A mudança é aplicada na hora, sem sair da sessão; as janelas abertas voltam.",
   "style.title": "Estilo da área de trabalho",
   "system.apply": "Usar {name}",
   "system.hint": "Para todos os usuários e serviços (/etc/default/locale). Atual: {name}",

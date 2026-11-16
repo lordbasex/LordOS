@@ -360,7 +360,7 @@
   "sound.balanceLeft": "Trái {pct} %",
   "sound.balanceRight": "Phải {pct} %",
   "sound.balanceReset": "Về giữa",
-  "style.hint": "Cả hai kiểu có cùng các ứng dụng. Thay đổi được áp dụng ngay, không cần đăng xuất; các cửa sổ đang mở sẽ trở lại.",
+  "style.hint": "Mọi kiểu màn hình nền đều có cùng các ứng dụng. Thay đổi được áp dụng ngay, không cần đăng xuất; các cửa sổ đang mở sẽ trở lại.",
   "style.title": "Kiểu màn hình nền",
   "system.apply": "Dùng {name}",
   "system.hint": "Cho mọi người dùng và dịch vụ (/etc/default/locale). Hiện tại: {name}",

@@ -372,7 +372,7 @@
   "sound.balanceLeft": "Stânga {pct} %",
   "sound.balanceRight": "Dreapta {pct} %",
   "sound.balanceReset": "Centrează",
-  "style.hint": "Ambele stiluri au aceleași aplicații. Schimbarea se aplică imediat, fără deconectare; ferestrele deschise revin.",
+  "style.hint": "Toate stilurile de desktop au aceleași aplicații. Schimbarea se aplică imediat, fără deconectare; ferestrele deschise revin.",
   "style.title": "Stilul desktopului",
   "system.apply": "Folosește {name}",
   "system.hint": "Pentru toți utilizatorii și serviciile (/etc/default/locale). Acum: {name}",

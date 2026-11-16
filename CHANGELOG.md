@@ -75,6 +75,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `build/wdog-test` in `make test` (a stall seen once, quick iterations and a theme load not, the priority drop where
   real time can be had, an endless JS loop with a `try/catch` stopped, the next task running normally).
 
+### Changed
+
+- **Settings → Appearance → Desktop style:** its hint said "Both styles have the same apps", untrue with a third style.
+  It now reads "Every desktop style has the same apps." (no number, so new themes don't need it changed), in all 35
+  languages; the rest of the hint is the same. Lord Flow and Lord Classic show it too.
+
 ### Fixed
 
 - **Lord Workspaces froze a desktop with three monitors (in development; found on the maintainer's computer with the

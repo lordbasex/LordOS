@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Bal {pct} %",
   "sound.balanceRight": "Jobb {pct} %",
   "sound.balanceReset": "Középre",
-  "style.hint": "Mindkét stílusban ugyanazok az alkalmazások vannak. A módosítás azonnal érvényes, kijelentkezés nélkül; a megnyitott ablakok visszajönnek.",
+  "style.hint": "Minden asztalstílusban ugyanazok az alkalmazások vannak. A módosítás azonnal érvényes, kijelentkezés nélkül; a megnyitott ablakok visszajönnek.",
   "style.title": "Asztal stílusa",
   "system.apply": "{name} használata",
   "system.hint": "Minden felhasználóhoz és szolgáltatáshoz (/etc/default/locale). Jelenleg: {name}",

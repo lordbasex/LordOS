@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Vasen {pct} %",
   "sound.balanceRight": "Oikea {pct} %",
   "sound.balanceReset": "Keskitä",
-  "style.hint": "Molemmissa tyyleissä on samat sovellukset. Muutos tulee voimaan heti ilman uloskirjautumista; avoimet ikkunat palaavat.",
+  "style.hint": "Jokaisessa työpöytätyylissä on samat sovellukset. Muutos tulee voimaan heti ilman uloskirjautumista; avoimet ikkunat palaavat.",
   "style.title": "Työpöydän tyyli",
   "system.apply": "Käytä: {name}",
   "system.hint": "Kaikille käyttäjille ja palveluille (/etc/default/locale). Nyt: {name}",

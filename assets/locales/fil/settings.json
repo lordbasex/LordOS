@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Kaliwa {pct} %",
   "sound.balanceRight": "Kanan {pct} %",
   "sound.balanceReset": "Igitna",
-  "style.hint": "Pareho ang mga app ng dalawang istilo. Ilalapat agad ang pagbabago, nang hindi nagla-log out; babalik ang mga bukas na window.",
+  "style.hint": "Pareho ang mga app ng bawat istilo ng desktop. Ilalapat agad ang pagbabago, nang hindi nagla-log out; babalik ang mga bukas na window.",
   "style.title": "Istilo ng desktop",
   "system.apply": "Gamitin ang {name}",
   "system.hint": "Para sa lahat ng user at serbisyo (/etc/default/locale). Ngayon: {name}",

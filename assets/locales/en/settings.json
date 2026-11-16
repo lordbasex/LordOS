@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Left {pct} %",
   "sound.balanceRight": "Right {pct} %",
   "sound.balanceReset": "Center",
-  "style.hint": "Both styles have the same apps. The change is applied right away, without logging out; open windows come back.",
+  "style.hint": "Every desktop style has the same apps. The change is applied right away, without logging out; open windows come back.",
   "style.title": "Desktop style",
   "system.apply": "Use {name}",
   "system.hint": "For all users and services (/etc/default/locale). Now: {name}",

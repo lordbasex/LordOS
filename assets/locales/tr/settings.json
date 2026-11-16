@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Sol %{pct}",
   "sound.balanceRight": "Sağ %{pct}",
   "sound.balanceReset": "Ortala",
-  "style.hint": "İki stilde de aynı uygulamalar var. Değişiklik oturumu kapatmadan hemen uygulanır; açık pencereler geri gelir.",
+  "style.hint": "Tüm masaüstü stillerinde aynı uygulamalar var. Değişiklik oturumu kapatmadan hemen uygulanır; açık pencereler geri gelir.",
   "style.title": "Masaüstü stili",
   "system.apply": "{name} kullan",
   "system.hint": "Tüm kullanıcılar ve hizmetler için (/etc/default/locale). Şu an: {name}",

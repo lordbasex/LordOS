@@ -360,7 +360,7 @@
   "sound.balanceLeft": "Kiri {pct} %",
   "sound.balanceRight": "Kanan {pct} %",
   "sound.balanceReset": "Tengahkan",
-  "style.hint": "Kedua-dua gaya mempunyai apl yang sama. Perubahan digunakan serta-merta, tanpa log keluar; tetingkap yang terbuka kembali.",
+  "style.hint": "Setiap gaya desktop mempunyai apl yang sama. Perubahan digunakan serta-merta, tanpa log keluar; tetingkap yang terbuka kembali.",
   "style.title": "Gaya desktop",
   "system.apply": "Guna {name}",
   "system.hint": "Untuk semua pengguna dan perkhidmatan (/etc/default/locale). Kini: {name}",

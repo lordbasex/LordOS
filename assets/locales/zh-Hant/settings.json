@@ -360,7 +360,7 @@
   "sound.balanceLeft": "左 {pct} %",
   "sound.balanceRight": "右 {pct} %",
   "sound.balanceReset": "置中",
-  "style.hint": "兩種風格都有相同的 App。變更會立即套用，不需要登出；已開啟的視窗會恢復。",
+  "style.hint": "每種桌面風格都有相同的 App。變更會立即套用，不需要登出；已開啟的視窗會恢復。",
   "style.title": "桌面風格",
   "system.apply": "使用 {name}",
   "system.hint": "適用於所有使用者和服務（/etc/default/locale）。目前：{name}",

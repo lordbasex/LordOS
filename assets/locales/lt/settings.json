@@ -372,7 +372,7 @@
   "sound.balanceLeft": "Kairėn {pct} %",
   "sound.balanceRight": "Dešinėn {pct} %",
   "sound.balanceReset": "Centruoti",
-  "style.hint": "Abu stiliai turi tas pačias programas. Pakeitimas pritaikomas iš karto, neatsijungiant; atviri langai grįžta.",
+  "style.hint": "Visi darbalaukio stiliai turi tas pačias programas. Pakeitimas pritaikomas iš karto, neatsijungiant; atviri langai grįžta.",
   "style.title": "Darbalaukio stilius",
   "system.apply": "Naudoti {name}",
   "system.hint": "Visiems naudotojams ir tarnyboms (/etc/default/locale). Dabar: {name}",

@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Vänster {pct} %",
   "sound.balanceRight": "Höger {pct} %",
   "sound.balanceReset": "Centrera",
-  "style.hint": "Båda stilarna har samma appar. Ändringen gäller direkt, utan att logga ut; öppna fönster kommer tillbaka.",
+  "style.hint": "Alla skrivbordsstilar har samma appar. Ändringen gäller direkt, utan att logga ut; öppna fönster kommer tillbaka.",
   "style.title": "Skrivbordsstil",
   "system.apply": "Använd {name}",
   "system.hint": "För alla användare och tjänster (/etc/default/locale). Nu: {name}",

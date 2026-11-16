@@ -360,7 +360,7 @@
   "sound.balanceLeft": "왼쪽 {pct}%",
   "sound.balanceRight": "오른쪽 {pct}%",
   "sound.balanceReset": "가운데로",
-  "style.hint": "두 스타일 모두 같은 앱을 사용합니다. 로그아웃하지 않고 즉시 적용되며, 열려 있던 윈도우는 다시 나타납니다.",
+  "style.hint": "모든 데스크톱 스타일에서 같은 앱을 사용합니다. 로그아웃하지 않고 즉시 적용되며, 열려 있던 윈도우는 다시 나타납니다.",
   "style.title": "데스크탑 스타일",
   "system.apply": "{name} 사용",
   "system.hint": "모든 사용자 및 서비스용(/etc/default/locale). 현재: {name}",

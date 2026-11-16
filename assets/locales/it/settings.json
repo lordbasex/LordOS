@@ -366,7 +366,7 @@
   "sound.balanceLeft": "Sinistra {pct} %",
   "sound.balanceRight": "Destra {pct} %",
   "sound.balanceReset": "Centra",
-  "style.hint": "Entrambi gli stili hanno le stesse app. La modifica si applica subito, senza uscire; le finestre aperte ricompaiono.",
+  "style.hint": "Tutti gli stili della scrivania hanno le stesse app. La modifica si applica subito, senza uscire; le finestre aperte ricompaiono.",
   "style.title": "Stile della scrivania",
   "system.apply": "Usa {name}",
   "system.hint": "Per tutti gli utenti e i servizi (/etc/default/locale). Attuale: {name}",
