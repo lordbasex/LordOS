@@ -45,7 +45,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     grow into it, the free space shows with Add window, a new app takes it, and bringing the first back swaps the two.
     Dragging a tiled window onto another tile swaps them, and dragging it to another monitor adds it to that monitor's
     tiles; choosing a layout again takes back every floating window of that display, including one dragged there from
-    another monitor (before, it stayed loose and the others filled the screen). A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
+    another monitor (before, it stayed loose and the others filled the screen). While a window is dragged over a tiled monitor,
+    a glass rectangle shows the slot it will take, and the drop takes it; resting on a side edge half a second turns a
+    half into a third; resting on the maximize button opens a flyout of halves, thirds, main and side, and quarters (on
+    a tiled monitor it sets that layout and slot). Lord Flow and Lord Classic are unchanged: the SDK's `snapThirds` is
+    off for them and its new `moveGrab` store is read only by Workspaces. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button
     still closes it. The tiler writes the window store once per change and
