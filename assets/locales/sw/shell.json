@@ -1,5 +1,8 @@
 {
   "app.about": "Kuhusu {app}",
+  "app.crashed": "{app} imekumbwa na tatizo",
+  "app.crashedBody": "Sehemu nyingine ya eneo-kazi inaendelea kufanya kazi. Funga dirisha hili kisha ufungue programu tena.",
+  "app.crashedClose": "Funga dirisha",
   "app.hide": "Ficha {app}",
   "app.hideOthers": "Ficha Zingine",
   "app.quit": "Ondoka {app}",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "Chini",
   "widgets.soundwave.sensitivity.normal": "Kawaida",
   "widgets.soundwave.sensitivity.high": "Juu",
+  "widgets.soundwave.idle": "Kukiwa kimya",
+  "widgets.soundwave.idle.hide": "Ficha",
+  "widgets.soundwave.idle.line": "Onyesha mstari",
   "widgets.pin.bottomCenter": "Weka katikati chini",
   "widgets.note.name": "Kidokezo cha kubandika",
   "widgets.note.desc": "Kidokezo kutoka Madokezo kwenye eneo-kazi",

@@ -1,5 +1,8 @@
 {
   "app.about": "{app} について",
+  "app.crashed": "{app} で問題が発生しました",
+  "app.crashedBody": "デスクトップのほかの部分はそのまま動作します。このウインドウを閉じて、アプリを開き直してください。",
+  "app.crashedClose": "ウインドウを閉じる",
   "app.hide": "{app} を隠す",
   "app.hideOthers": "ほかを隠す",
   "app.quit": "{app} を終了",
@@ -523,6 +526,9 @@
   "widgets.soundwave.sensitivity.low": "低",
   "widgets.soundwave.sensitivity.normal": "標準",
   "widgets.soundwave.sensitivity.high": "高",
+  "widgets.soundwave.idle": "無音のとき",
+  "widgets.soundwave.idle.hide": "非表示",
+  "widgets.soundwave.idle.line": "線を表示",
   "widgets.pin.bottomCenter": "下部中央に配置",
   "widgets.note.name": "付箋",
   "widgets.note.desc": "メモの付箋をデスクトップに",

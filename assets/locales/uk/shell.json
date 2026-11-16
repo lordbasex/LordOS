@@ -1,5 +1,8 @@
 {
   "app.about": "Про {app}",
+  "app.crashed": "У {app} виникла проблема",
+  "app.crashedBody": "Решта робочого столу працює далі. Закрийте це вікно й відкрийте застосунок знову.",
+  "app.crashedClose": "Закрити вікно",
   "app.hide": "Сховати {app}",
   "app.hideOthers": "Сховати інші",
   "app.quit": "Завершити {app}",
@@ -537,6 +540,9 @@
   "widgets.soundwave.sensitivity.low": "Низька",
   "widgets.soundwave.sensitivity.normal": "Звичайна",
   "widgets.soundwave.sensitivity.high": "Висока",
+  "widgets.soundwave.idle": "У тиші",
+  "widgets.soundwave.idle.hide": "Приховувати",
+  "widgets.soundwave.idle.line": "Показувати лінію",
   "widgets.pin.bottomCenter": "По центру внизу",
   "widgets.note.name": "Стікер",
   "widgets.note.desc": "Нотатка з Нотаток на робочому столі",

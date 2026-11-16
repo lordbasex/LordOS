@@ -1,5 +1,8 @@
 {
   "app.about": "{app} haqqında",
+  "app.crashed": "{app} problemlə üzləşdi",
+  "app.crashedBody": "Masaüstünün qalan hissəsi işləməyə davam edir. Bu pəncərəni bağlayın və tətbiqi yenidən açın.",
+  "app.crashedClose": "Pəncərəni bağla",
   "app.hide": "{app} tətbiqini gizlət",
   "app.hideOthers": "Digərlərini gizlət",
   "app.quit": "{app} tətbiqindən çıx",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "Aşağı",
   "widgets.soundwave.sensitivity.normal": "Normal",
   "widgets.soundwave.sensitivity.high": "Yüksək",
+  "widgets.soundwave.idle": "Səssizlikdə",
+  "widgets.soundwave.idle.hide": "Gizlət",
+  "widgets.soundwave.idle.line": "Bir xətt göstər",
   "widgets.pin.bottomCenter": "Aşağıda mərkəzlə",
   "widgets.note.name": "Yapışqan qeyd",
   "widgets.note.desc": "Qeydlərdən masaüstündə bir qeyd",

@@ -1,5 +1,8 @@
 {
   "app.about": "{app} Hakkında",
+  "app.crashed": "{app} bir sorunla karşılaştı",
+  "app.crashedBody": "Masaüstünün geri kalanı çalışmaya devam ediyor. Bu pencereyi kapatıp uygulamayı yeniden açın.",
+  "app.crashedClose": "Pencereyi kapat",
   "app.hide": "{app} Uygulamasını Gizle",
   "app.hideOthers": "Diğerlerini Gizle",
   "app.quit": "{app} Uygulamasından Çık",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "Düşük",
   "widgets.soundwave.sensitivity.normal": "Normal",
   "widgets.soundwave.sensitivity.high": "Yüksek",
+  "widgets.soundwave.idle": "Sessizken",
+  "widgets.soundwave.idle.hide": "Gizle",
+  "widgets.soundwave.idle.line": "Bir çizgi göster",
   "widgets.pin.bottomCenter": "Altta ortala",
   "widgets.note.name": "Yapışkan not",
   "widgets.note.desc": "Notlar'dan masaüstüne bir not",

@@ -1,5 +1,8 @@
 {
   "app.about": "關於 {app}",
+  "app.crashed": "{app} 發生問題",
+  "app.crashedBody": "桌面的其他部分仍正常運作。請關閉這個視窗，再重新開啟應用程式。",
+  "app.crashedClose": "關閉視窗",
   "app.hide": "隱藏 {app}",
   "app.hideOthers": "隱藏其他",
   "app.quit": "結束 {app}",
@@ -523,6 +526,9 @@
   "widgets.soundwave.sensitivity.low": "低",
   "widgets.soundwave.sensitivity.normal": "正常",
   "widgets.soundwave.sensitivity.high": "高",
+  "widgets.soundwave.idle": "靜音時",
+  "widgets.soundwave.idle.hide": "隱藏",
+  "widgets.soundwave.idle.line": "顯示一條線",
   "widgets.pin.bottomCenter": "底部置中",
   "widgets.note.name": "便條",
   "widgets.note.desc": "把「備忘錄」中的便條放到桌面",

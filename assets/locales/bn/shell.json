@@ -1,5 +1,8 @@
 {
   "app.about": "{app} সম্পর্কে",
+  "app.crashed": "{app} একটি সমস্যায় পড়েছে",
+  "app.crashedBody": "ডেস্কটপের বাকি অংশ কাজ করছে। এই উইন্ডোটি বন্ধ করে অ্যাপটি আবার খুলুন।",
+  "app.crashedClose": "উইন্ডো বন্ধ করুন",
   "app.hide": "{app} লুকান",
   "app.hideOthers": "অন্যগুলো লুকান",
   "app.quit": "{app} বন্ধ করুন",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "কম",
   "widgets.soundwave.sensitivity.normal": "স্বাভাবিক",
   "widgets.soundwave.sensitivity.high": "বেশি",
+  "widgets.soundwave.idle": "নীরবতায়",
+  "widgets.soundwave.idle.hide": "লুকান",
+  "widgets.soundwave.idle.line": "একটি রেখা দেখান",
   "widgets.pin.bottomCenter": "নিচে মাঝখানে রাখুন",
   "widgets.note.name": "স্টিকি নোট",
   "widgets.note.desc": "ডেস্কটপে নোটস থেকে একটি নোট",

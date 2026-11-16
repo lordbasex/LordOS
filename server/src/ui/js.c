@@ -257,7 +257,7 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
         js_media_node(n, id);
         node_invalidate(n);
     } else if (n && key && !strcmp(key, "wave") && n->type == NODE_WAVE && n->wave && JS_IsObject(argv[2])) {
-        /* the look of <SoundWave>: { lines, colors: [0xRRGGBB × 3], gain } (sdk/soundwave.js) */
+        /* the look of <SoundWave>: { lines, colors: [0xRRGGBB × 3], gain, hideIdle } (sdk/deskwidgets.jsx) */
         WaveConf *w = n->wave;
         double d;
         JSValue v = JS_GetPropertyStr(c, argv[2], "lines");
@@ -265,6 +265,9 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
         JS_FreeValue(c, v);
         v = JS_GetPropertyStr(c, argv[2], "gain");
         if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 0.25 && d <= 3) w->gain = (float)d;
+        JS_FreeValue(c, v);
+        v = JS_GetPropertyStr(c, argv[2], "hideIdle");
+        if (JS_IsBool(v)) w->hide_idle = JS_ToBool(c, v);
         JS_FreeValue(c, v);
         v = JS_GetPropertyStr(c, argv[2], "colors");
         for (uint32_t i = 0; i < 3 && JS_IsArray(c, v); i++) {

@@ -1371,7 +1371,7 @@ function SoundWaveBody({ w, L }) {
   const src = sourceOf(w.opts);
   useSpectrumSource(src);
   const look = { lines: w.opts?.lines === 'few' ? 8 : w.opts?.lines === 'many' ? 22 : 16,
-    colors: colorsOf(w.opts?.palette || 'neon', th.accent), gain: gainOf(w.opts?.sensitivity) };
+    colors: colorsOf(w.opts?.palette || 'neon', th.accent), gain: gainOf(w.opts?.sensitivity), hideIdle: w.opts?.idle !== 'line' };
   const wave = <SoundWave wave={look} style={{ flex: 1 }} />;
   if (waveFrame(w) === 'none') return wave;
   const name = src.kind === 'mic' ? t('shell.widgets.soundwave.mic') : src.kind === 'app' ? src.label : t('shell.widgets.soundwave.desktop');
@@ -1396,6 +1396,7 @@ function soundWaveMenu(w) {
     ] },
     { label: t('shell.widgets.soundwave.colors'), submenu: PALETTE_ORDER.map((p) => ({ label: t(`shell.widgets.soundwave.palette.${p}`), ...pick(p, w.opts?.palette || 'neon', 'palette') })) },
     { label: t('shell.widgets.soundwave.lines'), submenu: ['few', 'normal', 'many'].map((v) => ({ label: t(`shell.widgets.soundwave.lines.${v}`), ...pick(v, w.opts?.lines || 'normal', 'lines') })) },
+    { label: t('shell.widgets.soundwave.idle'), submenu: ['hide', 'line'].map((v) => ({ label: t(`shell.widgets.soundwave.idle.${v}`), ...pick(v, w.opts?.idle || 'hide', 'idle') })) },
     { label: t('shell.widgets.soundwave.sensitivity'), submenu: ['low', 'normal', 'high'].map((v) => ({ label: t(`shell.widgets.soundwave.sensitivity.${v}`), ...pick(v, w.opts?.sensitivity || 'normal', 'sensitivity') })) },
   ];
 }

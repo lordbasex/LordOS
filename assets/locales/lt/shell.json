@@ -1,5 +1,8 @@
 {
   "app.about": "Apie {app}",
+  "app.crashed": "{app} susidūrė su problema",
+  "app.crashedBody": "Likusi darbalaukio dalis veikia toliau. Uždarykite šį langą ir vėl atidarykite programą.",
+  "app.crashedClose": "Uždaryti langą",
   "app.hide": "Slėpti {app}",
   "app.hideOthers": "Slėpti kitas",
   "app.quit": "Išeiti iš {app}",
@@ -537,6 +540,9 @@
   "widgets.soundwave.sensitivity.low": "Mažas",
   "widgets.soundwave.sensitivity.normal": "Įprastas",
   "widgets.soundwave.sensitivity.high": "Didelis",
+  "widgets.soundwave.idle": "Tyloje",
+  "widgets.soundwave.idle.hide": "Slėpti",
+  "widgets.soundwave.idle.line": "Rodyti liniją",
   "widgets.pin.bottomCenter": "Centruoti apačioje",
   "widgets.note.name": "Lipnus lapelis",
   "widgets.note.desc": "Užrašas iš Užrašų darbalaukyje",

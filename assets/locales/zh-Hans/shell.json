@@ -1,5 +1,8 @@
 {
   "app.about": "关于 {app}",
+  "app.crashed": "{app} 遇到了问题",
+  "app.crashedBody": "桌面的其余部分仍在正常运行。请关闭此窗口，然后重新打开应用。",
+  "app.crashedClose": "关闭窗口",
   "app.hide": "隐藏 {app}",
   "app.hideOthers": "隐藏其他",
   "app.quit": "退出 {app}",
@@ -523,6 +526,9 @@
   "widgets.soundwave.sensitivity.low": "低",
   "widgets.soundwave.sensitivity.normal": "正常",
   "widgets.soundwave.sensitivity.high": "高",
+  "widgets.soundwave.idle": "静音时",
+  "widgets.soundwave.idle.hide": "隐藏",
+  "widgets.soundwave.idle.line": "显示一条线",
   "widgets.pin.bottomCenter": "底部居中",
   "widgets.note.name": "便签",
   "widgets.note.desc": "把“备忘录”中的便签放到桌面",

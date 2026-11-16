@@ -1,5 +1,8 @@
 {
   "app.about": "{app} névjegye",
+  "app.crashed": "A(z) {app} hibába ütközött",
+  "app.crashedBody": "Az asztal többi része tovább működik. Zárja be ezt az ablakot, és nyissa meg újra az alkalmazást.",
+  "app.crashedClose": "Ablak bezárása",
   "app.hide": "{app} elrejtése",
   "app.hideOthers": "Többi elrejtése",
   "app.quit": "Kilépés: {app}",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "Alacsony",
   "widgets.soundwave.sensitivity.normal": "Normál",
   "widgets.soundwave.sensitivity.high": "Magas",
+  "widgets.soundwave.idle": "Csendben",
+  "widgets.soundwave.idle.hide": "Elrejtés",
+  "widgets.soundwave.idle.line": "Egy vonal mutatása",
   "widgets.pin.bottomCenter": "Középre alul",
   "widgets.note.name": "Öntapadó jegyzet",
   "widgets.note.desc": "Egy jegyzet a Jegyzetekből az asztalon",

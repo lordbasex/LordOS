@@ -1,5 +1,8 @@
 {
   "app.about": "За {app}",
+  "app.crashed": "{app} срещна проблем",
+  "app.crashedBody": "Останалата част от работния плот продължава да работи. Затворете този прозорец и отворете приложението отново.",
+  "app.crashedClose": "Затвори прозореца",
   "app.hide": "Скрий {app}",
   "app.hideOthers": "Скрий другите",
   "app.quit": "Изход от {app}",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "Ниска",
   "widgets.soundwave.sensitivity.normal": "Нормална",
   "widgets.soundwave.sensitivity.high": "Висока",
+  "widgets.soundwave.idle": "При тишина",
+  "widgets.soundwave.idle.hide": "Скрий",
+  "widgets.soundwave.idle.line": "Покажи линия",
   "widgets.pin.bottomCenter": "Центрирай долу",
   "widgets.note.name": "Лепяща бележка",
   "widgets.note.desc": "Бележка от Бележки на работния плот",

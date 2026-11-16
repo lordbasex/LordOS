@@ -106,6 +106,9 @@ void wave_render(WaveConf *w, const Spectrum *sp, int pw, int ph, float k) {
         w->ph = ph;
     }
     if (k < 0.5f) k = 0.5f;
+    /* hidden in silence: the whole wave fades with the loudest band, nothing at all once it is quiet */
+    const float idle = w->hide_idle ? (sp->level * 5 > 1 ? 1 : sp->level * 5) : 1;
+    if (idle <= 0) { memset(w->px, 0, (size_t)pw * ph * 4); return; }
     const int lines = w->lines < 2 ? 2 : w->lines > 24 ? 24 : w->lines;
 
     /* the envelope along the width; ys holds every line's heights (lines × (pw + 1)) */
@@ -233,7 +236,7 @@ void wave_render(WaveConf *w, const Spectrum *sp, int pw, int ph, float k) {
         xa[x] = (x0 < 0 ? 0 : x0 >= hw ? hw - 1 : x0) * 3;
         xa[pw + x] = (x0 + 1 < 0 ? 0 : x0 + 1 >= hw ? hw - 1 : x0 + 1) * 3;
         float dx = x < pw - 1 - x ? (float)x : (float)(pw - 1 - x);
-        tx[pw + x] = smooth01(dx / fade_w) * (1024 / 6.0f);
+        tx[pw + x] = smooth01(dx / fade_w) * idle * (1024 / 6.0f);
     }
     const int hl = hy0 + hb - 1;
     for (int y = 0; y < ph; y++) {

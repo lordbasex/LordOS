@@ -87,6 +87,14 @@ int main(void) {
     }
     CHECK(lit_mid > W / 2 && lit_far == 0, "silence: a glowing line along the middle (%d lit there, %d away)", lit_mid, lit_far);
 
+    /* hidden in silence: nothing at all */
+    w->hide_idle = 1;
+    wave_render(w, &s, W, H, 1);
+    int lit = 0;
+    for (int i = 0; i < W * H; i++) lit += (w->px[i] >> 24) != 0;
+    CHECK(lit == 0, "hidden in silence: %d pixels drawn", lit);
+    w->hide_idle = 0;
+
     /* bass moves the middle, not the ends */
     tone(&s, 80, 0.5, 6);
     wave_render(w, &s, W, H, 1);

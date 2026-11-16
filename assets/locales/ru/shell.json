@@ -1,5 +1,8 @@
 {
   "app.about": "О приложении {app}",
+  "app.crashed": "В {app} возникла проблема",
+  "app.crashedBody": "Остальной рабочий стол продолжает работать. Закройте это окно и откройте приложение снова.",
+  "app.crashedClose": "Закрыть окно",
   "app.hide": "Скрыть {app}",
   "app.hideOthers": "Скрыть остальные",
   "app.quit": "Завершить {app}",
@@ -537,6 +540,9 @@
   "widgets.soundwave.sensitivity.low": "Низкая",
   "widgets.soundwave.sensitivity.normal": "Обычная",
   "widgets.soundwave.sensitivity.high": "Высокая",
+  "widgets.soundwave.idle": "В тишине",
+  "widgets.soundwave.idle.hide": "Скрывать",
+  "widgets.soundwave.idle.line": "Показывать линию",
   "widgets.pin.bottomCenter": "По центру внизу",
   "widgets.note.name": "Стикер",
   "widgets.note.desc": "Заметка из Заметок на рабочем столе",

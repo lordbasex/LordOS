@@ -57,7 +57,13 @@ function job(fn) {
   });
 }
 
-const call = (name, ...a) => { const m = api(); return m ? m[name](...a) : null; };
+// A refused request (a path outside the home or that no longer exists, a bad id) throws in C: here it is null, as with no
+// helper, so an app that opens what a restored window remembered never takes the desktop down with it (0.8.8.10).
+const call = (name, ...a) => {
+  const m = api();
+  if (!m) return null;
+  try { return m[name](...a); } catch (e) { console.error(`media: ${name}: ${e?.message || e}`); return null; }
+};
 
 export const media = {
   available: () => !!api(),

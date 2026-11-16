@@ -1,5 +1,8 @@
 {
   "app.about": "Tietoja: {app}",
+  "app.crashed": "{app} kohtasi ongelman",
+  "app.crashedBody": "Muu työpöytä toimii edelleen. Sulje tämä ikkuna ja avaa sovellus uudelleen.",
+  "app.crashedClose": "Sulje ikkuna",
   "app.hide": "Kätke {app}",
   "app.hideOthers": "Kätke muut",
   "app.quit": "Lopeta {app}",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "Matala",
   "widgets.soundwave.sensitivity.normal": "Normaali",
   "widgets.soundwave.sensitivity.high": "Korkea",
+  "widgets.soundwave.idle": "Hiljaisuudessa",
+  "widgets.soundwave.idle.hide": "Piilota",
+  "widgets.soundwave.idle.line": "Näytä viiva",
   "widgets.pin.bottomCenter": "Keskitä alas",
   "widgets.note.name": "Muistilappu",
   "widgets.note.desc": "Muistiinpano Muistiinpanoista työpöydälle",

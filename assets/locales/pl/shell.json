@@ -1,5 +1,8 @@
 {
   "app.about": "{app} — informacje",
+  "app.crashed": "{app} napotkała problem",
+  "app.crashedBody": "Reszta pulpitu działa dalej. Zamknij to okno i otwórz aplikację ponownie.",
+  "app.crashedClose": "Zamknij okno",
   "app.hide": "Ukryj {app}",
   "app.hideOthers": "Ukryj pozostałe",
   "app.quit": "Zakończ {app}",
@@ -537,6 +540,9 @@
   "widgets.soundwave.sensitivity.low": "Niska",
   "widgets.soundwave.sensitivity.normal": "Normalna",
   "widgets.soundwave.sensitivity.high": "Wysoka",
+  "widgets.soundwave.idle": "W ciszy",
+  "widgets.soundwave.idle.hide": "Ukryj",
+  "widgets.soundwave.idle.line": "Pokaż linię",
   "widgets.pin.bottomCenter": "Wyśrodkuj na dole",
   "widgets.note.name": "Karteczka",
   "widgets.note.desc": "Notatka z Notatek na pulpicie",

@@ -1,5 +1,8 @@
 {
   "app.about": "Over {app}",
+  "app.crashed": "{app} liep tegen een probleem aan",
+  "app.crashedBody": "De rest van het bureaublad blijft werken. Sluit dit venster en open de app opnieuw.",
+  "app.crashedClose": "Venster sluiten",
   "app.hide": "Verberg {app}",
   "app.hideOthers": "Verberg andere",
   "app.quit": "Stop {app}",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "Laag",
   "widgets.soundwave.sensitivity.normal": "Normaal",
   "widgets.soundwave.sensitivity.high": "Hoog",
+  "widgets.soundwave.idle": "Bij stilte",
+  "widgets.soundwave.idle.hide": "Verbergen",
+  "widgets.soundwave.idle.line": "Een lijn tonen",
   "widgets.pin.bottomCenter": "Onderaan centreren",
   "widgets.note.name": "Plakbriefje",
   "widgets.note.desc": "Een notitie uit Notities op het bureaublad",

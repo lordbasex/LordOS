@@ -1,5 +1,8 @@
 {
   "app.about": "Giới thiệu {app}",
+  "app.crashed": "{app} gặp sự cố",
+  "app.crashedBody": "Phần còn lại của màn hình vẫn hoạt động. Hãy đóng cửa sổ này và mở lại ứng dụng.",
+  "app.crashedClose": "Đóng cửa sổ",
   "app.hide": "Ẩn {app}",
   "app.hideOthers": "Ẩn các ứng dụng khác",
   "app.quit": "Thoát {app}",
@@ -523,6 +526,9 @@
   "widgets.soundwave.sensitivity.low": "Thấp",
   "widgets.soundwave.sensitivity.normal": "Bình thường",
   "widgets.soundwave.sensitivity.high": "Cao",
+  "widgets.soundwave.idle": "Khi im lặng",
+  "widgets.soundwave.idle.hide": "Ẩn",
+  "widgets.soundwave.idle.line": "Hiện một đường",
   "widgets.pin.bottomCenter": "Căn giữa phía dưới",
   "widgets.note.name": "Ghi chú dán",
   "widgets.note.desc": "Một ghi chú từ Ghi chú trên màn hình nền",

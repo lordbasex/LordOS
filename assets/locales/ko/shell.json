@@ -1,5 +1,8 @@
 {
   "app.about": "{app}에 관하여",
+  "app.crashed": "{app}에 문제가 생겼습니다",
+  "app.crashedBody": "데스크톱의 나머지 부분은 계속 작동합니다. 이 창을 닫고 앱을 다시 여세요.",
+  "app.crashedClose": "창 닫기",
   "app.hide": "{app} 가리기",
   "app.hideOthers": "기타 가리기",
   "app.quit": "{app} 종료",
@@ -523,6 +526,9 @@
   "widgets.soundwave.sensitivity.low": "낮음",
   "widgets.soundwave.sensitivity.normal": "보통",
   "widgets.soundwave.sensitivity.high": "높음",
+  "widgets.soundwave.idle": "무음일 때",
+  "widgets.soundwave.idle.hide": "숨기기",
+  "widgets.soundwave.idle.line": "선 표시",
   "widgets.pin.bottomCenter": "아래 가운데에 고정",
   "widgets.note.name": "스티커 메모",
   "widgets.note.desc": "메모 앱의 메모를 데스크톱에",

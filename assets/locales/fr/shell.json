@@ -1,5 +1,8 @@
 {
   "app.about": "À propos de {app}",
+  "app.crashed": "{app} a rencontré un problème",
+  "app.crashedBody": "Le reste du bureau continue de fonctionner. Fermez cette fenêtre et rouvrez l'app.",
+  "app.crashedClose": "Fermer la fenêtre",
   "app.hide": "Masquer {app}",
   "app.hideOthers": "Masquer les autres",
   "app.quit": "Quitter {app}",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "Faible",
   "widgets.soundwave.sensitivity.normal": "Normale",
   "widgets.soundwave.sensitivity.high": "Élevée",
+  "widgets.soundwave.idle": "En silence",
+  "widgets.soundwave.idle.hide": "Masquer",
+  "widgets.soundwave.idle.line": "Afficher une ligne",
   "widgets.pin.bottomCenter": "Centrer en bas",
   "widgets.note.name": "Note adhésive",
   "widgets.note.desc": "Une note de Notes sur le bureau",

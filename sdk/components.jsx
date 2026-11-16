@@ -1,7 +1,7 @@
 // components.jsx — base controls for apps. They take colors from useTheme(), so they
 // adapt to any theme.
 import { View, Text, addListener, displayFor, onCommit, onScreenChange, capsLock } from '@lordos/runtime';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Component, createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useTheme } from './theme.js';
 import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop } from './windows.js';
 import { onDesktop } from './desktopmodel.js';
@@ -1160,6 +1160,28 @@ export function FilesDropHint({ over, title, note }) {
 }
 
 // The theme uses <AppHost id focused /> inside its window frame.
+// An app that throws while it renders or in an effect stops at its own window: the window shows what happened and a
+// button to close it, and the rest of the desktop keeps running. Without it React unmounts the whole shell, a black
+// screen (0.8.8.10: Photos restored with a picture that no longer existed). The error goes to the log.
+function CrashNotice({ id, name }) {
+  const t = useTheme() || {};
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24, backgroundColor: t.windowBg }}>
+      <Text style={{ fontSize: 15, fontWeight: 600, color: t.text, textAlign: 'center' }}>{tr('shell.app.crashed', { app: name })}</Text>
+      <Text style={{ fontSize: 12.5, color: t.textDim, textAlign: 'center', maxWidth: 360 }}>{tr('shell.app.crashedBody')}</Text>
+      <View onClick={() => wm.close(id)} style={{ marginTop: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: t.controlRadius || 8, backgroundColor: t.accent }}>
+        <Text style={{ fontSize: 13, fontWeight: 600, color: t.onAccent || '#fff' }}>{tr('shell.app.crashedClose')}</Text>
+      </View>
+    </View>
+  );
+}
+class AppBoundary extends Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(err) { console.error(`app ${this.props.app}: ${err?.message || err}`); }
+  render() { return this.state.failed ? <CrashNotice id={this.props.id} name={this.props.name} /> : this.props.children; }
+}
+
 export function AppHost({ id, focused }) {
   const app = getApp(id);
   const args = useStore(windows, (ws) => ws.find((w) => w.id === id)?.args || null);
@@ -1180,7 +1202,7 @@ export function AppHost({ id, focused }) {
   return (
     <AppWindowContext.Provider value={{ id, focused, args, mode, protected: prot, overlayHost }}>
       <View ref={area} protected={prot} style={{ flex: 1, alignSelf: 'stretch' }}>
-        <C />
+        <AppBoundary id={id} app={app.id} name={app.name || app.id}><C /></AppBoundary>
         <View ref={setOverlayHost} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }} />
       </View>
     </AppWindowContext.Provider>

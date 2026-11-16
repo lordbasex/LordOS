@@ -1,5 +1,8 @@
 {
   "app.about": "{app} के बारे में",
+  "app.crashed": "{app} में कोई समस्या आई",
+  "app.crashedBody": "डेस्कटॉप का बाकी हिस्सा चलता रहेगा। यह विंडो बंद करें और ऐप फिर से खोलें।",
+  "app.crashedClose": "विंडो बंद करें",
   "app.hide": "{app} छिपाएँ",
   "app.hideOthers": "अन्य छिपाएँ",
   "app.quit": "{app} बंद करें",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "कम",
   "widgets.soundwave.sensitivity.normal": "सामान्य",
   "widgets.soundwave.sensitivity.high": "ज़्यादा",
+  "widgets.soundwave.idle": "शांति में",
+  "widgets.soundwave.idle.hide": "छिपाएँ",
+  "widgets.soundwave.idle.line": "एक रेखा दिखाएँ",
   "widgets.pin.bottomCenter": "नीचे बीच में रखें",
   "widgets.note.name": "स्टिकी नोट",
   "widgets.note.desc": "डेस्कटॉप पर Notes से एक नोट",

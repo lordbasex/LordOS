@@ -1,5 +1,8 @@
 {
   "app.about": "دربارهٔ {app}",
+  "app.crashed": "{app} با مشکلی روبه‌رو شد",
+  "app.crashedBody": "بقیهٔ میزکار همچنان کار می‌کند. این پنجره را ببندید و برنامه را دوباره باز کنید.",
+  "app.crashedClose": "بستن پنجره",
   "app.hide": "پنهان کردن {app}",
   "app.hideOthers": "پنهان کردن بقیه",
   "app.quit": "خروج از {app}",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "کم",
   "widgets.soundwave.sensitivity.normal": "عادی",
   "widgets.soundwave.sensitivity.high": "زیاد",
+  "widgets.soundwave.idle": "در سکوت",
+  "widgets.soundwave.idle.hide": "پنهان کردن",
+  "widgets.soundwave.idle.line": "نمایش یک خط",
   "widgets.pin.bottomCenter": "وسط پایین",
   "widgets.note.name": "یادداشت چسبان",
   "widgets.note.desc": "یادداشتی از یادداشت‌ها روی میز کار",

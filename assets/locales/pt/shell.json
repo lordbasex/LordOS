@@ -1,5 +1,8 @@
 {
   "app.about": "Sobre o {app}",
+  "app.crashed": "{app} teve um problema",
+  "app.crashedBody": "O resto da área de trabalho continua funcionando. Feche esta janela e abra o app de novo.",
+  "app.crashedClose": "Fechar janela",
   "app.hide": "Ocultar {app}",
   "app.hideOthers": "Ocultar outros",
   "app.quit": "Sair do {app}",
@@ -530,6 +533,9 @@
   "widgets.soundwave.sensitivity.low": "Baixa",
   "widgets.soundwave.sensitivity.normal": "Normal",
   "widgets.soundwave.sensitivity.high": "Alta",
+  "widgets.soundwave.idle": "Em silêncio",
+  "widgets.soundwave.idle.hide": "Ocultar",
+  "widgets.soundwave.idle.line": "Mostrar uma linha",
   "widgets.pin.bottomCenter": "Centralizar embaixo",
   "widgets.note.name": "Nota adesiva",
   "widgets.note.desc": "Uma nota do Notas na área de trabalho",

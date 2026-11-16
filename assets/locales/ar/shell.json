@@ -1,5 +1,8 @@
 {
   "app.about": "حول {app}",
+  "app.crashed": "واجه {app} مشكلة",
+  "app.crashedBody": "يواصل باقي سطح المكتب العمل. أغلق هذه النافذة وافتح التطبيق مرة أخرى.",
+  "app.crashedClose": "إغلاق النافذة",
   "app.hide": "إخفاء {app}",
   "app.hideOthers": "إخفاء الآخرين",
   "app.quit": "إنهاء {app}",
@@ -558,6 +561,9 @@
   "widgets.soundwave.sensitivity.low": "منخفضة",
   "widgets.soundwave.sensitivity.normal": "عادية",
   "widgets.soundwave.sensitivity.high": "عالية",
+  "widgets.soundwave.idle": "عند الصمت",
+  "widgets.soundwave.idle.hide": "إخفاء",
+  "widgets.soundwave.idle.line": "إظهار خط",
   "widgets.pin.bottomCenter": "توسيط في الأسفل",
   "widgets.note.name": "ملاحظة لاصقة",
   "widgets.note.desc": "ملاحظة من الملاحظات على سطح المكتب",

@@ -1,5 +1,8 @@
 {
   "app.about": "Tentang {app}",
+  "app.crashed": "{app} mengalami masalah",
+  "app.crashedBody": "Bagian lain desktop tetap berjalan. Tutup jendela ini lalu buka aplikasinya lagi.",
+  "app.crashedClose": "Tutup jendela",
   "app.hide": "Sembunyikan {app}",
   "app.hideOthers": "Sembunyikan yang Lain",
   "app.quit": "Keluar dari {app}",
@@ -523,6 +526,9 @@
   "widgets.soundwave.sensitivity.low": "Rendah",
   "widgets.soundwave.sensitivity.normal": "Normal",
   "widgets.soundwave.sensitivity.high": "Tinggi",
+  "widgets.soundwave.idle": "Saat hening",
+  "widgets.soundwave.idle.hide": "Sembunyikan",
+  "widgets.soundwave.idle.line": "Tampilkan garis",
   "widgets.pin.bottomCenter": "Tengah di bawah",
   "widgets.note.name": "Catatan tempel",
   "widgets.note.desc": "Catatan dari Catatan di desktop",

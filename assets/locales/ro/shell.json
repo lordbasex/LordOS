@@ -1,5 +1,8 @@
 {
   "app.about": "Despre {app}",
+  "app.crashed": "{app} a întâmpinat o problemă",
+  "app.crashedBody": "Restul desktopului funcționează în continuare. Închide această fereastră și deschide din nou aplicația.",
+  "app.crashedClose": "Închide fereastra",
   "app.hide": "Ascunde {app}",
   "app.hideOthers": "Ascunde-le pe celelalte",
   "app.quit": "Ieși din {app}",
@@ -537,6 +540,9 @@
   "widgets.soundwave.sensitivity.low": "Scăzută",
   "widgets.soundwave.sensitivity.normal": "Normală",
   "widgets.soundwave.sensitivity.high": "Ridicată",
+  "widgets.soundwave.idle": "În liniște",
+  "widgets.soundwave.idle.hide": "Ascunde",
+  "widgets.soundwave.idle.line": "Arată o linie",
   "widgets.pin.bottomCenter": "Centrează jos",
   "widgets.note.name": "Notiță adezivă",
   "widgets.note.desc": "O notiță din Notițe pe desktop",
