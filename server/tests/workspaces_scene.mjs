@@ -384,6 +384,20 @@ await flush();
   check('widgets: removed', [(sdk.settings.get().deskWidgets || []).length, [...styles].some(([id, st]) => st.left === R.x + 200 && st.top === 300 && attached(id))], [0, false]);
 }
 
+// every built-in widget renders on the desktop, and none adds a timer every second
+{
+  const types = ['clock', 'system', 'calendar', 'nowplaying', 'readaloud', 'network', 'disks', 'temps', 'battery', 'reminders', 'clipboard', 'claude'];
+  const ids = types.map((ty, i) => sdk.addDeskWidget(ty, R.x + 40 + (i % 4) * 300, 120 + Math.floor(i / 4) * 260));
+  for (let i = 0; i < 3; i++) await flush();
+  const placed = types.map((ty, i) => [...styles].some(([id, st]) => st.left === R.x + 40 + (i % 4) * 300 && st.top === 120 + Math.floor(i / 4) * 260 && st.width === sdk.deskWidgetSize(ty)[0] && attached(id)));
+  check('widgets: all twelve on the desktop', placed.every(Boolean) ? 'all' : types.filter((_, i) => !placed[i]), 'all');
+  check('widgets: no timer every second', intervals(1000), 0);
+  check('widgets: battery offered only with a battery', sdk.widgetKinds().some((k) => k.type === 'battery'), !!sdk.battery?.get?.()?.hasBattery);
+  for (const id of ids) sdk.removeDeskWidget(id);
+  for (let i = 0; i < 2; i++) await flush();
+  check('widgets: all removed', (sdk.settings.get().deskWidgets || []).length, 0);
+}
+
 // the free layout's magnet, on the left display (free): the other window fills the other half, the shared edge follows
 {
   const magnet = await import('../../themes/workspaces/magnet.js');

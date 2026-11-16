@@ -94,8 +94,10 @@ displays do. Nothing runs per frame, nothing polls.
 - **Widgets** (`sdk/deskwidgets.jsx`, `components/WidgetPicker.jsx`; Lord Workspaces only). **Add widget** in the
   empty state of a display, or a right click on the wallpaper, opens the catalog over that display: Clock (the minute,
   no timer per second), System (CPU and memory, read only while shown), Calendar (this month, days with events
-  marked), Now playing, Read aloud (the clipboard, with lord-say) and the Notes app's sticky note
-  (`registerWidgetKind`). A widget is placed at the right-click point or near the top of the display, kept in
+  marked), Now playing, Read aloud (the clipboard, with lord-say), Network (rate, address, Wi‑Fi signal), Disks,
+  Temperatures and fans (lord-fand), Battery (offered only with one), Reminders (tick to complete), Clipboard (click to
+  copy again), Claude Code (its sessions, working or waiting, and context) and the Notes app's sticky note
+  (`registerWidgetKind`). Every timer runs only while its widget is shown. A widget is placed at the right-click point or near the top of the display, kept in
   `settings.deskWidgets` (`[{ id, type, x, y }]`, no migration), moved by its top bar (one write when released) and
   removed with its ×. The other themes never publish these widgets (`startDeskWidgets` is called by Workspaces only);
   the sticky notes stay everywhere, as before.
@@ -268,7 +270,8 @@ What these say:
 
 ## Changed from the proposal
 
-- **No weather widget:** the shell asks nothing from the internet.
+- **Weather widget:** not yet; the shell asks nothing from the internet, and a reviewed path for Open-Meteo waits for
+  the maintainer's OK (docs/ROADMAP.md).
 - **"Seek" is Search and "Control Atlas" is the Control Center**, LordOS's own names.
 - **The group doesn't move as a whole and the divider applies on release:** no `setFrame` loop per pointer move.
 - **The group frame is a border, not a frosted panel,** and Crystal's live blur stays on the spine and on the open
@@ -300,7 +303,7 @@ What these say:
   composites; over a Linux app's window a blur only tints. A GPU blur pass is compositor work.
 - **Alt+Space** (and other keys over Linux apps): the compositor's key lists are fixed C tables
   (`server/src/wl/keygrab.c`); Workspaces reuses Lord Flow's. A table of its own is a reviewed change.
-- **Weather** in the status cluster: not planned (no network from the shell).
+- **Weather**: a widget waiting for a reviewed network path (docs/ROADMAP.md).
 - **A different activity per monitor** and **the Overview per display** (above): SDK and compositor changes.
 - **Damage in several rectangles** (`LORD_DAMAGE=multi`, off by default): with it, a small change far from the spine
   would never join a large one; the theme already keeps its moving parts out of the spine's margin.

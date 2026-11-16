@@ -832,7 +832,17 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
     Flow's until then;
   - a different activity per monitor (per-display desktops in the SDK and the compositor's parking) and the Overview
     per display;
-  - no weather widget: the shell asks nothing from the internet.
+  - **Weather widget** (asked by the maintainer on 2026-11-16, design waiting for his OK): Open-Meteo
+    (`api.open-meteo.com`, free, no key; it serves the national weather services, like Apple's own list of sources). The
+    shell asks nothing from the internet today and `lord-fetch` is reserved for the blocklists (AGENTS.md), so it needs a
+    reviewed path of its own: a fixed host, GET only, a small JSON answer parsed in a sandboxed helper, off until the person
+    turns it on and chooses a city (the time zone's coordinates, `lord.monitor.info().home`, as the default, no GPS).
+  - **Voice assistant** (stage 4, maintainer's decision 2026-11-16, "más adelante"): speak, LordOS turns it into text
+    (whisper.cpp, local), an AI answers and LordOS reads it aloud (lord-say). Decisions first: which AI answers (local or
+    a cloud service, and with which account) and the microphone permission (the broker's device grant).
+  - More widgets suggested 2026-11-16: world clocks, countdown and timer (with the Clock app), recent files, LordOS
+    updates, an app launcher of 4 or 8 pinned apps; the Wi‑Fi network's name in the Network widget needs a `lord.net`
+    call for the connected SSID (today only an admin scan reports it).
 
 - [ ] **Later, from GitHub suggestions** (maintainer's decisions 2026-11-15, "más adelante"):
   - Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)): 75 % and 80 % first, never 50 %;

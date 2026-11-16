@@ -43,6 +43,44 @@ function KindGlyph({ type, t }) {
       {[10, 22, 30, 18, 26, 12].map((h, i) => <View key={i} style={{ width: 3, height: h, borderRadius: 2, backgroundColor: i % 2 ? a : t.text }} />)}
     </View>
   );
+  if (type === 'network') return (
+    <View style={{ width: 34, height: 34, flexDirection: 'row', alignItems: 'flex-end', gap: 3, direction: 'ltr' }}>
+      {[8, 15, 23, 31].map((h, i) => <View key={i} style={{ width: 6, height: h, borderRadius: 2, backgroundColor: i < 3 ? a : dim }} />)}
+    </View>
+  );
+  if (type === 'disks') return (
+    <View style={{ width: 34, height: 34, gap: 4, justifyContent: 'center' }}>
+      {[0.7, 0.4].map((f, i) => <View key={i} style={{ height: 9, borderRadius: 3, backgroundColor: dim, direction: 'ltr' }}><View style={{ width: `${f * 100}%`, height: 9, borderRadius: 3, backgroundColor: a }} /></View>)}
+    </View>
+  );
+  if (type === 'temps') return (
+    <View style={{ width: 34, height: 34, alignItems: 'center' }}>
+      <View style={{ width: 10, height: 22, borderRadius: 5, border: `2px solid ${dim}`, overflow: 'hidden', justifyContent: 'flex-end' }}><View style={{ height: 11, backgroundColor: '#E5484D' }} /></View>
+      <View style={{ width: 16, height: 16, borderRadius: 8, marginTop: -5, backgroundColor: '#E5484D' }} />
+    </View>
+  );
+  if (type === 'battery') return (
+    <View style={{ width: 34, height: 34, flexDirection: 'row', alignItems: 'center', direction: 'ltr' }}>
+      <View style={{ width: 28, height: 16, borderRadius: 4, border: `2px solid ${dim}`, padding: 2 }}><View style={{ width: '70%', height: '100%', borderRadius: 2, backgroundColor: '#22A06B' }} /></View>
+      <View style={{ width: 3, height: 7, borderRadius: 1, backgroundColor: dim }} />
+    </View>
+  );
+  if (type === 'reminders') return (
+    <View style={{ width: 34, height: 34, gap: 5, justifyContent: 'center' }}>
+      {[0, 1, 2].map((i) => <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, direction: 'ltr' }}><View style={{ width: 7, height: 7, borderRadius: 4, border: `1.5px solid ${a}` }} /><View style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: dim }} /></View>)}
+    </View>
+  );
+  if (type === 'clipboard') return (
+    <View style={{ width: 28, height: 34, borderRadius: 5, border: `2px solid ${dim}`, alignItems: 'center', paddingTop: 7, gap: 4 }}>
+      <View style={abs({ left: 7, top: -4, width: 10, height: 6, borderRadius: 2, backgroundColor: a })} />
+      {[16, 12, 14].map((w, i) => <View key={i} style={{ width: w, height: 3, borderRadius: 2, backgroundColor: dim }} />)}
+    </View>
+  );
+  if (type === 'claude') return (
+    <View style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}>
+      {[0, 45, 90, 135].map((deg) => <View key={deg} style={abs({ left: 15, top: 3, width: 4, height: 28, borderRadius: 2, backgroundColor: '#D97757', transform: `rotate(${deg}deg)` })} />)}
+    </View>
+  );
   return <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: dim }} />;
 }
 
@@ -72,7 +110,7 @@ export function WidgetPicker({ t }) {
   if (!p) return null;
   const area = workAreaOf(p.display);
   const kinds = widgetKinds();
-  const cols = Math.min(3, kinds.length);
+  const cols = Math.min(4, kinds.length);
   const W = cols * 176 + (cols - 1) * 10 + 36;
   const pick = (k) => {
     widgetPicker.set(null);

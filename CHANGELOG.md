@@ -53,7 +53,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     so it gets the whole half instead of a third. Lord Flow and Lord Classic are unchanged: the SDK's `snapThirds` is
     off for them and its new `moveGrab` store is read only by Workspaces. "Add widget" in a display's empty state, or a right click on
     the wallpaper, opens a catalog of desktop widgets: Clock, System (CPU and memory), Calendar (this month, days with
-    events marked), Now playing, Read aloud (the clipboard, with lord-say) and the Notes app's sticky note; they are
+    events marked), Now playing, Read aloud (the clipboard, with lord-say), Network, Disks, Temperatures and fans,
+    Battery, Reminders, Clipboard, Claude Code and the Notes app's sticky note; they are
     kept in `settings.deskWidgets`, moved by their top bar and removed with ×, and appear only in Lord Workspaces
     (`sdk/deskwidgets.jsx`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
