@@ -16,6 +16,7 @@ typedef struct WaveConf {
     int lines;                      /* 4 … 24 */
     uint32_t col[3];                /* RGB: the first line, the middle one, the last one */
     float gain;                     /* 0.25 … 3 */
+    int hide_idle;                  /* nothing in silence: the lines fade out with the level (else one still line) */
     /* the last raster, reused while neither the bands nor the size changed */
     uint32_t *px;
     float *acc, *half, *g1, *g2, *tmp;

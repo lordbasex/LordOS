@@ -122,8 +122,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     core while sound plays: only the band of rows the lines and glow reach, the glow at half size, tables for the
     rest). Listening to the microphone shows as recording (the microphone
     indicator lights); the desktop and an app don't open a microphone. Transparent by default (no card: it reads as
-    part of the wallpaper) or on a card; colours (Neon, the theme's accent, Aurora, Fire, Ice), number of lines and
-    sensitivity from its right-click menu. **Pin to the bottom centre** for every widget (`opts.pin`,
+    part of the wallpaper) or on a card; colours (Neon, the theme's accent, Aurora, Fire, Ice), number of lines,
+    sensitivity and what it shows in silence (nothing by default, it fades out; or one still line) from its
+    right-click menu. **Pin to the bottom centre** for every widget (`opts.pin`,
     `widgetgrid.js pinnedRect`): centred along the bottom of its display, off the grid; dragging puts it back on the
     grid. A new sound wave starts pinned there. Tests: `spectrum-test` (bands, silence, the lines' shape and bounds),
     `soundwave-model-test` and the Workspaces scene. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now

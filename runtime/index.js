@@ -17,7 +17,7 @@ export const Terminal = 'terminal';
 export const Surface = 'surface';
 // <MediaView media={id} />: video, photo, capture or camera from lord.media (docs/MEDIA.md); drawn by C.
 export const MediaView = 'media';
-// <SoundWave wave={{ lines, colors: [0xRRGGBB × 3], gain }} />: the sound wave widget's lines, drawn by C from the
+// <SoundWave wave={{ lines, colors: [0xRRGGBB × 3], gain, hideIdle }} />: the sound wave widget's lines, drawn by C from the
 // spectrum lord.sound.spectrum listens to (server/src/ui/wave.c); JS sends only its look.
 export const SoundWave = 'wave';
 export const screen = { width: lord.screen.width, height: lord.screen.height, displays: [], mirror: false };
