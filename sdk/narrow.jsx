@@ -4,6 +4,7 @@
 // there, the sidebar lays over the content instead of squeezing it.
 //
 //   useWindowWidth()               the app window's width (0 outside a window)
+//   useWindowHeight()              its height (0 outside a window): a sheet's scrolling body is capped by it
 //   useNarrow(px = NARROW)         true while the window is narrower than px
 //   useSidebar(px, key)            { narrow, shown, toggle, close }: the sidebar's state, one choice kept for a wide
 //                                  window (shown by default) and one for a narrow one (hidden by default), both kept
@@ -27,6 +28,11 @@ export const MIN_H = 360;
 export function useWindowWidth() {
   const { id } = useAppWindow() || {};
   return useStore(windows, (ws) => (id == null ? 0 : ws.find((w) => w.id === id)?.w || 0));
+}
+
+export function useWindowHeight() {
+  const { id } = useAppWindow() || {};
+  return useStore(windows, (ws) => (id == null ? 0 : ws.find((w) => w.id === id)?.h || 0));
 }
 
 export function useNarrow(px = NARROW) {

@@ -179,9 +179,11 @@ function Overview({ s, last, onTab }) {
   const { t: tr } = useLocale();
   const info = monitor.info();
   const card = useCardStyle();
+  // a narrow window (a Workspaces tile): the paired cards go one under the other
+  const pairRow = { flexDirection: useNarrow(640) ? 'column' : 'row', gap: 12 };
   return (
     <>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
+      <View style={pairRow}>
         <Card icon="cpu" title={tr('monitor.cpu')} style={{ flex: 1 }}
           right={<Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap' }}>{info ? tr('monitor.cpuModel', { model: info.cpuModel || tr('monitor.cpu'), count: info.cores }) : ''}</Text>}>
           <Big value={fmt.pct(tr, last.cpu)} />
@@ -192,7 +194,7 @@ function Overview({ s, last, onTab }) {
           <Chart series={[{ label: tr('monitor.used'), values: s.mem, color: C.mem }]} max={last.mem.total} format={fmt.mem} times={s.times} height={86} bg={card.bg} />
         </Card>
       </View>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
+      <View style={pairRow}>
         <Card icon="network" title={tr('monitor.network')} style={{ flex: 1 }}>
           <Pair items={[{ label: tr('monitor.received'), value: fmt.rate(tr, last.net.rx), color: C.rx }, { label: tr('monitor.sent'), value: fmt.rate(tr, last.net.tx), color: C.tx }]} />
           <Chart series={[{ label: tr('monitor.received'), values: s.rx, color: C.rx }, { label: tr('monitor.sent'), values: s.tx, color: C.tx }]}
@@ -205,7 +207,7 @@ function Overview({ s, last, onTab }) {
         </Card>
       </View>
       {/* (0.8.8.6) the GPU, LordOS's AI and the virtual machines: read once per second while the Overview is on screen */}
-      <View style={{ flexDirection: 'row', gap: 12 }}>
+      <View style={pairRow}>
         <OverviewGpu onOpen={() => onTab?.('gpu')} style={{ flex: 2 }} />
         <OverviewAiVms style={{ flex: 1, flexDirection: 'column' }} />
       </View>

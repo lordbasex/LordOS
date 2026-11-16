@@ -75,7 +75,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (Cleaner 880×600, Disks 760×480, …) ran over the next window. Every native app's minimum is now at most 480×360,
     and below 640 px their sidebars hide behind a toolbar button and open over the content (`sdk/narrow.jsx`:
     `useWindowWidth`, `useNarrow`, `useSidebar`, `SidebarToggle`, `SidebarOverlay`; the window store's width, no
-    polling). Wide windows look as before. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    polling). Wide windows look as before. In a short window Calendar's and Reminders' sheets scroll their fields
+    between the title and the buttons (`useWindowHeight`), Machines' snapshot timeline gives way to the selected
+    snapshot's panel, Monitor's Overview stacks its paired cards below 640 px, and Databases' ⋯ menu has its tooltip. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button

@@ -4,6 +4,7 @@
 import {
   View, Text, useTheme, useStore, createStore, useAppWindow, direction, ScrollView, Button, Hairline, takeTextFocus, releaseTextFocus,
   weekdayName, formatTime, formatDate, t,
+  useWindowHeight,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -121,6 +122,9 @@ function MenuItem({ it, onDone }) {
 
 export function Sheet({ title, onClose, children, footer, width = 440 }) {
   const th = useTheme();
+  // in a short window (a Workspaces tile) the fields scroll between the title and the buttons
+  const winH = useWindowHeight();
+  const bodyMax = winH ? Math.max(120, winH - 200) : 2000;
   return (
     <View onMouseDown={(e) => e.stopPropagation?.()} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, zIndex: 100,
       alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }}>
@@ -131,7 +135,9 @@ export function Sheet({ title, onClose, children, footer, width = 440 }) {
             <Text style={{ fontSize: 15, fontWeight: 600, color: th.text }}>{title}</Text>
           </View>
         ) : null}
-        <View style={{ paddingHorizontal: 20, paddingVertical: 12, gap: 10, flexShrink: 1 }}>{children}</View>
+        <ScrollView style={{ maxHeight: bodyMax }}>
+          <View style={{ paddingHorizontal: 20, paddingVertical: 12, gap: 10 }}>{children}</View>
+        </ScrollView>
         {footer ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 14 }}>
             <Hairline edge="top" />

@@ -3,7 +3,7 @@
 // snapshots of the system disk and the UEFI variables together, with the memory when the machine runs, under
 // operation.json, the entry in snapshots.json written last. Going back to a snapshot with memory on a machine that's
 // off starts it from there.
-import { View, Text, Image, TextInput, ScrollView, Toggle, useAppWindow, wm, fs, formatDate, formatTime, t as tr } from '@lordos/sdk';
+import { View, Text, Image, TextInput, ScrollView, Toggle, useAppWindow, useWindowHeight, wm, fs, formatDate, formatTime, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, snapName, snapSize, thumbSrc } from './model.js';
 import { usePal, has, bytes, Btn, Sheet, markColors } from './ui.jsx';
@@ -42,6 +42,8 @@ export function Snapshots({ dir, name: name0 }) {
   const [list, setList] = useState([]);
   const [lim, setLim] = useState({ max: 64, warn: 20 });
   const [sel, setSel] = useState(null);
+  // a short window (a Workspaces tile): the timeline gives way to the selected snapshot's panel and scrolls
+  const short = (useWindowHeight() || 900) < 560;
   const [taking, setTaking] = useState(null);       // the name being typed, or null
   const [goBack, setGoBack] = useState(null);       // the snapshot asked about
   const [first, setFirst] = useState(true);
@@ -106,16 +108,16 @@ export function Snapshots({ dir, name: name0 }) {
   const full = list.length >= lim.max;
 
   return (
-    <View style={{ flex: 1, padding: 22, gap: 16, backgroundColor: p.bg }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Text style={{ flex: 1, fontSize: 20, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.snap.title', { name: m.name })}</Text>
+    <View style={{ flex: 1, padding: short ? 12 : 22, gap: short ? 10 : 16, backgroundColor: p.bg }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+        <Text style={{ flex: 1, minWidth: 160, fontSize: short ? 16 : 20, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.snap.title', { name: m.name })}</Text>
         <Text style={{ fontSize: 12, color: list.length >= lim.warn ? '#ffc56e' : p.dim }}>{tr('machines.snap.count', { n: list.length, warn: lim.warn, size: bytes(total) })}</Text>
         <Btn primary label={busy?.what === 'take' ? tr('machines.snap.taking') : tr('machines.snap.take')} disabled={!!busy || full || m.suspended}
           onClick={() => setTaking(snapName(list, tr('machines.snap.defaultName')))} />
       </View>
       {/* the timeline in rows of as many cards as the window's width takes, in the window's free height (no spacer beside
           it: it got half of that), scrolling when there are more rows than fit */}
-      <ScrollView style={{ flex: 1, minHeight: 262 }}>
+      <ScrollView style={{ flex: 1, minHeight: short ? 90 : 262 }}>
         <View ref={gridRef} style={{ gap: 12, paddingBottom: 6 }}>
           {rowsOf([...list.map((s) => (
             <View key={s.tag} onClick={() => setSel(s.tag)} style={{ width: 196, height: 250 }}>

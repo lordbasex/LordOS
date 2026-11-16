@@ -184,7 +184,7 @@ export function Workspace({ s, tabs, onReconnect }) {
         <View style={{ flex: 1 }} />
         {compact ? null : lockedNote}
         {tight ? (
-          <MenuButton items={[
+          <MenuButton title={tr('disks.more')} items={[
             { label: tr('databases.pane.relations'), checked: v.pane === 'relations', onClick: () => pane('relations') },
             { label: tr('databases.pane.triggers'), checked: v.pane === 'triggers', onClick: () => pane('triggers') }, '-',
             { label: tr('databases.pane.users'), checked: v.pane === 'users', onClick: () => pane('users') },
