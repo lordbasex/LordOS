@@ -622,5 +622,22 @@
   "widgets.vpn.none": "Още няма настроена VPN.",
   "widgets.vpn.add": "Настройване на VPN",
   "widgets.vpn.choose": "Избор на VPN",
-  "widgets.vpn.settings": "Отваряне в Настройки"
+  "widgets.vpn.settings": "Отваряне в Настройки",
+  "widgets.timer.name": "Таймер",
+  "widgets.timer.desc": "Обратно броене и хронометър от приложението Часовник",
+  "widgets.timer.stopwatch": "Хронометър",
+  "widgets.timer.reset": "Нулиране",
+  "widgets.timer.openClock": "Отваряне на Часовник",
+  "widgets.recent.name": "Скорошни файлове",
+  "widgets.recent.desc": "Файловете, които отворихте наскоро",
+  "widgets.updates.name": "Актуализации",
+  "widgets.updates.desc": "Дали LordOS и приложенията са актуални",
+  "widgets.updates.upToDate": "LordOS е актуална",
+  "widgets.updates.available": "Налична е LordOS {version}",
+  "widgets.updates.apps": "Актуализации на приложения: {n}",
+  "widgets.updates.restart": "Рестартирайте, за да завършите",
+  "widgets.launcher.name": "Приложения",
+  "widgets.launcher.desc": "Любимите приложения с едно щракване",
+  "widgets.launcher.choose": "Избор на приложения",
+  "widgets.launcher.empty": "Изберете приложения от менюто му"
 }

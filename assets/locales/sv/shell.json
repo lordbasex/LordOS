@@ -622,5 +622,22 @@
   "widgets.vpn.none": "Inget VPN har konfigurerats än.",
   "widgets.vpn.add": "Konfigurera ett VPN",
   "widgets.vpn.choose": "Välj VPN",
-  "widgets.vpn.settings": "Öppna i Inställningar"
+  "widgets.vpn.settings": "Öppna i Inställningar",
+  "widgets.timer.name": "Timer",
+  "widgets.timer.desc": "Nedräkning och tidtagarur från appen Klocka",
+  "widgets.timer.stopwatch": "Tidtagarur",
+  "widgets.timer.reset": "Nollställ",
+  "widgets.timer.openClock": "Öppna Klocka",
+  "widgets.recent.name": "Senaste filer",
+  "widgets.recent.desc": "Filerna du öppnat nyligen",
+  "widgets.updates.name": "Uppdateringar",
+  "widgets.updates.desc": "Om LordOS och dina appar är uppdaterade",
+  "widgets.updates.upToDate": "LordOS är uppdaterat",
+  "widgets.updates.available": "LordOS {version} finns",
+  "widgets.updates.apps": "{n} appuppdateringar",
+  "widgets.updates.restart": "Starta om för att slutföra",
+  "widgets.launcher.name": "Appar",
+  "widgets.launcher.desc": "Dina favoritappar, ett klick bort",
+  "widgets.launcher.choose": "Välj appar",
+  "widgets.launcher.empty": "Välj appar i dess meny"
 }

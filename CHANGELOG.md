@@ -81,7 +81,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     **VPN widget**: a switch with relief (sunken track, raised knob, ON/OFF) that turns a VPN from Settings → Network →
     VPN on or off with the same actions Settings uses; medium shows its address and traffic, large lists every VPN
     with a switch each. One widget per VPN (chosen from its menu; the only one by default), so several can be on the
-    desktop at once. A password, sign-on or certificate question sends the person to Settings. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    desktop at once. A password, sign-on or certificate question sends the person to Settings.
+    **Timer, Recent files, Updates and Apps widgets**: the Clock app's timer (presets, pause, cancel) and stopwatch;
+    the files opened lately; whether LordOS and the apps are up to date (the last check of the signed lists, nothing
+    fetched); and 4 or 8 apps to launch (the Dock's pins until chosen). Cleaner in a small window: its icon rail was
+    kept wide by the sidebar's opening animation when the window was tiled at once; the animation no longer runs on
+    opening, and the rail's icons have their section's name as a tooltip. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button

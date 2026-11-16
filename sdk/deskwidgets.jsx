@@ -41,6 +41,13 @@ import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_O
 import { kindOf, unitFor, temp as tempIn, skyOf } from './weathermodel.js';
 import { vpnState, rates as vpnRates, targetOf, eventOf } from './vpnmodel.js';
 import { admin } from './admin.js';
+import { clockTimer, timerStart, timerPause, timerResume, timerReset, timerLeft, stopwatch, swStart, swStop, swReset, swElapsed } from './alarms.js';
+import { recent as fsRecent, basename } from './fs.js';
+import { openFileWithApps } from './sysopen.js';
+import { lordosUpdate, restartNeeded } from './updates.js';
+import { storeUpdates } from './appcontrol.js';
+import { useLauncherApps, launchApp } from './apps.js';
+import { dock, dockIdOf } from './dock.js';
 import { locale } from './i18n.js';
 import { regionCountry } from './localename.js';
 
@@ -1107,13 +1114,148 @@ function VpnRow({ L, vpn }) {
   );
 }
 
+// ---- timer and stopwatch (the Clock app's own, sdk/alarms.js: they keep running and ring with the window closed) ----
+const mmss = (ms) => {
+  const s = Math.ceil(Math.max(0, ms) / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`;
+};
+// a tick every second only while something runs (idle: no timer at all)
+function useRunningTick(running) {
+  const [, set] = useState(0);
+  useEffect(() => { if (!running) return undefined; const id = setInterval(() => set((x) => x + 1), 1000); return () => clearInterval(id); }, [running]);
+}
+function TimerBody({ w, L }) {
+  const tm = useStore(clockTimer), sw = useStore(stopwatch);
+  useRunningTick(tm.state === 'running' || sw.running);
+  const left = timerLeft(tm), frac = tm.duration ? 1 - left / (tm.duration * 1000) : 0;
+  const timer = (
+    <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
+      <TickRing L={L} size={w.size === 's' ? 92 : 100} value={tm.state === 'idle' ? 0 : frac} color={tm.state === 'paused' ? L.warn : L.accent}>
+        <Text style={{ fontSize: 20, fontWeight: 600, color: L.text }}>{tm.state === 'idle' ? '—' : mmss(left)}</Text>
+      </TickRing>
+      {tm.state === 'idle' ? (
+        <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+          {[1, 5, 25].map((n) => <Pill key={n} L={L} label={t('clock.timer.preset', { n })} onClick={() => timerStart(n * 60)} />)}
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          <Pill L={L} primary label={t(tm.state === 'running' ? 'clock.timer.pause' : 'clock.timer.resume')} onClick={tm.state === 'running' ? timerPause : timerResume} />
+          <Pill L={L} label={t('clock.cancel')} onClick={timerReset} />
+        </View>
+      )}
+    </View>
+  );
+  if (w.size === 's') return timer;
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', gap: 12 }}>
+      {timer}
+      <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: L.sep }} />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <Sub L={L} center>{t('shell.widgets.timer.stopwatch')}</Sub>
+        <Text style={{ fontSize: 26, fontWeight: 600, color: L.text }}>{mmss(swElapsed(sw))}</Text>
+        <View style={{ flexDirection: 'row', gap: 4 }}>
+          <Pill L={L} primary label={t(sw.running ? 'clock.timer.pause' : 'clock.timer.start')} onClick={sw.running ? swStop : swStart} />
+          <Pill L={L} label={t('shell.widgets.timer.reset')} onClick={swReset} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ---- recent files (lord.fs.recent: the ones opened lately, as Files' Recents) ----
+const extOf = (n) => { const m = /\.([A-Za-z0-9]{1,5})$/.exec(String(n || '')); return m ? m[1].toUpperCase() : ''; };
+function RecentBody({ w, L }) {
+  const n = w.size === 'l' ? 8 : 3;
+  const list = useEvery(() => { try { return fsRecent(n, 30) || []; } catch (e) { return []; } }, 60000, [n]) || [];
+  return (
+    <View style={{ flex: 1, gap: 6 }}>
+      <Head L={L} title={t('shell.widgets.recent.name')} />
+      {!list.length ? <Quiet L={L} text={t('shell.recent.none')} /> : list.slice(0, n).map((f) => {
+        const name = f.name || basename(f.path);
+        return (
+          <View key={f.path} onClick={() => openFileWithApps(f.path, name)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 24 }}>
+            <View style={{ width: 30, height: 20, borderRadius: 5, backgroundColor: L.track, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 8.5, fontWeight: 700, color: L.dim }}>{extOf(name) || '•'}</Text>
+            </View>
+            <Text style={{ flex: 1, fontSize: 12.5, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{name}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ---- updates: LordOS's own package and the apps' (the signed lists' last check; nothing is fetched here) ----
+function UpdatesBody({ w, L }) {
+  const st = useEvery(() => {
+    let os = null, apps = 0, restart = null;
+    try { os = lordosUpdate(); } catch (e) { os = null; }
+    try { apps = storeUpdates(); } catch (e) { apps = 0; }
+    try { restart = restartNeeded(); } catch (e) { restart = null; }
+    return { os, apps, restart };
+  }, 600000) || {};
+  const ok = !st.os?.available && !st.apps && !st.restart;
+  const open = () => wm.open('store', { args: { page: 'updates' } });
+  return (
+    <View style={{ flex: 1, gap: 6 }}>
+      <Head L={L} title={t('shell.widgets.updates.name')} right={st.os?.installed ? `LordOS ${String(st.os.installed).split('~')[0]}` : ''} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: ok ? L.ok : L.warn }}>
+          <Text style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{ok ? '✓' : '↑'}</Text>
+        </View>
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: 600, color: L.text, textAlign: 'start' }}>
+          {st.restart ? t('shell.widgets.updates.restart') : st.os?.available ? t('shell.widgets.updates.available', { version: String(st.os.version).split('~')[0] }) : t('shell.widgets.updates.upToDate')}
+        </Text>
+      </View>
+      {st.apps ? <Sub L={L}>{t('shell.widgets.updates.apps', { n: st.apps })}</Sub> : null}
+      {!ok || w.size !== 's' ? <View style={{ marginTop: 'auto' }}><Pill L={L} primary={!ok} label={t('settings.updates.open')} onClick={open} /></View> : null}
+    </View>
+  );
+}
+
+// ---- app launcher: 4 or 8 apps (the widget's own choice, else the Dock's pins) ----
+let launcherApps = [];    // the last list a launcher drew: its right-click menu offers these
+function LauncherBody({ w, L }) {
+  const all = useLauncherApps();
+  launcherApps = all;
+  const n = w.size === 'l' ? 8 : 4;
+  const chosen = Array.isArray(w.opts?.apps) ? w.opts.apps : null;
+  let pins = [];
+  try { pins = dock.pinned() || []; } catch (e) { pins = []; }
+  const byId = (id) => all.find((a) => a.id === id) || all.find((a) => dockIdOf(a.id) === id);
+  const list = (chosen || pins).map(byId).filter(Boolean).slice(0, n);
+  const size = w.size === 's' ? 40 : 46;
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', justifyContent: 'space-around', rowGap: 10 }}>
+      {list.map((a) => (
+        <View key={a.id} onClick={() => launchApp(a.id)} style={{ width: w.size === 's' ? '45%' : '24%', alignItems: 'center', gap: 4 }}>
+          {a.Icon ? <a.Icon size={size} /> : null}
+          {w.size !== 's' ? <Text style={{ fontSize: 11, color: L.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 76, textAlign: 'center' }}>{a.name}</Text> : null}
+        </View>
+      ))}
+      {!list.length ? <Quiet L={L} text={t('shell.widgets.launcher.empty')} /> : null}
+    </View>
+  );
+}
+
 // ---- the kinds: their sizes (the first is the default), bodies and menu entries ----
-const BODIES = { vpn: VpnBody, weather: WeatherBody, clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
+const BODIES = { timer: TimerBody, recent: RecentBody, updates: UpdatesBody, launcher: LauncherBody, vpn: VpnBody, weather: WeatherBody, clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
   battery: BatteryBody, reminders: RemindersBody, clipboard: ClipboardBody, claude: ClaudeBody, nowplaying: NowPlayingBody, readaloud: ReadAloudBody };
-const KIND_SIZES = { vpn: ['s', 'm', 'l'], weather: ['s', 'm', 'l'], clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
+const KIND_SIZES = { timer: ['s', 'm'], recent: ['m', 'l'], updates: ['s', 'm'], launcher: ['s', 'm', 'l'], vpn: ['s', 'm', 'l'], weather: ['s', 'm', 'l'], clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
   temps: ['s', 'm', 'l'], battery: ['s', 'm'], reminders: ['s', 'm', 'l'], clipboard: ['m', 'l'], claude: ['s', 'm', 'l'], nowplaying: ['m'], readaloud: ['s', 'm'] };
 export const kindSizes = (type) => KIND_SIZES[type] || null;
 const KIND_MENU = {
+  timer: () => [{ label: t('shell.widgets.timer.openClock'), onClick: () => wm.open('clock') }],
+  recent: () => [{ label: t('apps.files'), onClick: () => wm.open('files') }],
+  // which apps: a check per app (the Dock's pins until chosen), at most 8
+  launcher: (w) => {
+    const apps = launcherApps;
+    const cur = Array.isArray(w.opts?.apps) ? w.opts.apps : null;
+    return [{ label: t('shell.widgets.launcher.choose'), submenu: apps.slice(0, 40).map((a) => {
+      const on = cur ? cur.includes(a.id) : false;
+      return { label: a.name, checked: on, onClick: () => setDeskWidget(w.id, { opts: { apps: on ? cur.filter((x) => x !== a.id) : [...(cur || []), a.id].slice(-8) } }) };
+    }) }];
+  },
   // which VPN this widget drives: one widget per VPN, as many as wanted
   vpn: (w) => {
     const list = vpnList(), cur = targetOf(w.opts, list);

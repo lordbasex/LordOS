@@ -615,5 +615,22 @@
   "widgets.vpn.none": "尚未设置 VPN。",
   "widgets.vpn.add": "设置 VPN",
   "widgets.vpn.choose": "选择 VPN",
-  "widgets.vpn.settings": "在设置中打开"
+  "widgets.vpn.settings": "在设置中打开",
+  "widgets.timer.name": "计时器",
+  "widgets.timer.desc": "“时钟”应用的倒计时和秒表",
+  "widgets.timer.stopwatch": "秒表",
+  "widgets.timer.reset": "重置",
+  "widgets.timer.openClock": "打开时钟",
+  "widgets.recent.name": "最近的文件",
+  "widgets.recent.desc": "你最近打开的文件",
+  "widgets.updates.name": "更新",
+  "widgets.updates.desc": "LordOS 和应用是否为最新",
+  "widgets.updates.upToDate": "LordOS 已是最新",
+  "widgets.updates.available": "LordOS {version} 可用",
+  "widgets.updates.apps": "{n} 个应用更新",
+  "widgets.updates.restart": "重新启动以完成更新",
+  "widgets.launcher.name": "应用",
+  "widgets.launcher.desc": "常用应用，一键打开",
+  "widgets.launcher.choose": "选择应用",
+  "widgets.launcher.empty": "从它的菜单中选择应用"
 }

@@ -4,6 +4,7 @@
 // lord-server (lord.clean). Sections appear only for what works.
 import {
   View, cleaner, wm, windows, useStore, useAppWindow, useSettings, useWindowButtons, themes, userDirs, t as tr, formatBytes, spacing,
+ Tooltip,
 } from '@lordos/sdk';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Label, Sky, Tints, Tile, Orb, Enter, Pill, GlassButton, PalProvider, usePal, tween, useRail, PAD } from './ui.jsx';
@@ -45,7 +46,9 @@ function SideItem({ id, section, go, rail, badge }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   const on = section === id;
+  // a rail of icons (a small window, or while a scan runs): the section's name as a tooltip
   return (
+    <Tooltip text={rail ? tr(`cleaner.section.${id}`) : ''}>
     <View onClick={() => go(id)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ height: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m, borderRadius: 13, border: `1px solid ${on ? p.line : 'transparent'}`,
         backgroundColor: on || hover ? p.glass : 'transparent' }}>
@@ -53,6 +56,7 @@ function SideItem({ id, section, go, rail, badge }) {
       {rail ? null : <Label size={14} lines={1}>{tr(`cleaner.section.${id}`)}</Label>}
       {badge ? <View style={{ position: 'absolute', left: 30, top: 2, paddingHorizontal: 5, height: 16, borderRadius: 8, justifyContent: 'center', backgroundColor: p.accent }}><Label size={10} weight={700} style={{ color: p.btnText }}>{badge}</Label></View> : null}
     </View>
+    </Tooltip>
   );
 }
 
@@ -188,7 +192,11 @@ function Body() {
     startModule(0);
     setPolling(true);
   });
+  // the sidebar narrows to icons while a scan runs and widens after; never on opening (the window may be tiled into a
+  // small tile right then, and a running tween would keep the wide sidebar over the rail), never in a small window
+  const sideRun = useRef(false);
   useEffect(() => {
+    if (!sideRun.current) { sideRun.current = true; return; }
     if (!side.current || rail) return;
     const to = pipe ? 76 : 236, from = pipe ? 236 : 76;
     tween(side.current, { width: [from, to] }, { ms: 420 });

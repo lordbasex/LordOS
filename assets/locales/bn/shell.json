@@ -622,5 +622,22 @@
   "widgets.vpn.none": "এখনো কোনো VPN সেট করা নেই।",
   "widgets.vpn.add": "VPN সেট করুন",
   "widgets.vpn.choose": "VPN বেছে নিন",
-  "widgets.vpn.settings": "সেটিংসে খুলুন"
+  "widgets.vpn.settings": "সেটিংসে খুলুন",
+  "widgets.timer.name": "টাইমার",
+  "widgets.timer.desc": "ঘড়ি অ্যাপের কাউন্টডাউন ও স্টপওয়াচ",
+  "widgets.timer.stopwatch": "স্টপওয়াচ",
+  "widgets.timer.reset": "রিসেট",
+  "widgets.timer.openClock": "ঘড়ি খুলুন",
+  "widgets.recent.name": "সাম্প্রতিক ফাইল",
+  "widgets.recent.desc": "সম্প্রতি খোলা ফাইল",
+  "widgets.updates.name": "আপডেট",
+  "widgets.updates.desc": "LordOS ও অ্যাপগুলো হালনাগাদ কিনা",
+  "widgets.updates.upToDate": "LordOS হালনাগাদ",
+  "widgets.updates.available": "LordOS {version} পাওয়া যাচ্ছে",
+  "widgets.updates.apps": "{n}টি অ্যাপ আপডেট",
+  "widgets.updates.restart": "আপডেট শেষ করতে রিস্টার্ট করুন",
+  "widgets.launcher.name": "অ্যাপ",
+  "widgets.launcher.desc": "প্রিয় অ্যাপ এক ক্লিকে",
+  "widgets.launcher.choose": "অ্যাপ বেছে নিন",
+  "widgets.launcher.empty": "এর মেনু থেকে অ্যাপ বেছে নিন"
 }

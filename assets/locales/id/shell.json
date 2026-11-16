@@ -615,5 +615,22 @@
   "widgets.vpn.none": "Belum ada VPN yang diatur.",
   "widgets.vpn.add": "Atur VPN",
   "widgets.vpn.choose": "Pilih VPN",
-  "widgets.vpn.settings": "Buka di Pengaturan"
+  "widgets.vpn.settings": "Buka di Pengaturan",
+  "widgets.timer.name": "Timer",
+  "widgets.timer.desc": "Hitung mundur dan stopwatch dari aplikasi Jam",
+  "widgets.timer.stopwatch": "Stopwatch",
+  "widgets.timer.reset": "Atur ulang",
+  "widgets.timer.openClock": "Buka Jam",
+  "widgets.recent.name": "File terbaru",
+  "widgets.recent.desc": "File yang baru kamu buka",
+  "widgets.updates.name": "Pembaruan",
+  "widgets.updates.desc": "Apakah LordOS dan aplikasimu terbaru",
+  "widgets.updates.upToDate": "LordOS sudah terbaru",
+  "widgets.updates.available": "LordOS {version} tersedia",
+  "widgets.updates.apps": "{n} pembaruan aplikasi",
+  "widgets.updates.restart": "Mulai ulang untuk menyelesaikan pembaruan",
+  "widgets.launcher.name": "Aplikasi",
+  "widgets.launcher.desc": "Aplikasi favoritmu, sekali klik",
+  "widgets.launcher.choose": "Pilih aplikasi",
+  "widgets.launcher.empty": "Pilih aplikasi dari menunya"
 }

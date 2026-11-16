@@ -131,6 +131,12 @@ displays do. Nothing runs per frame, nothing polls.
   lists every VPN with a switch each. State, address and traffic come from the interface in `lord.net.interfaces()`
   every 3 s while shown (`sdk/vpnmodel.js`, `tests/vpn_model_test.mjs`). When the VPN asks for a password, a single
   sign-on or a certificate, or fails, the widget offers **Open in Settings**, where those questions are answered.
+- **Timer** (s, m), **Recent files** (m, l), **Updates** (s, m) and **Apps** (s, m, l), the rest of the widget plan:
+  the timer and stopwatch are the Clock app's own (`sdk/alarms.js`: they keep running and ring with the widget gone;
+  a tick each second only while one runs); recent files are `lord.fs.recent` (Files' Recents), opened with their
+  app; Updates reads the signed lists' last check (`lordosUpdate`, `storeUpdates`, `restartNeeded`: nothing is
+  fetched) every 10 minutes and opens the Store's Updates page; Apps launches 4 or 8 apps, the Dock's pins until
+  chosen from its menu (`opts.apps`).
 - **Apps with their own frame** (Cleaner) draw no lights in Lord Workspaces: the theme's buttons at the end are the
   only ones, as in Lord Classic.
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title

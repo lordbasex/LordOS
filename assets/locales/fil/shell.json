@@ -622,5 +622,22 @@
   "widgets.vpn.none": "Wala pang naka-set up na VPN.",
   "widgets.vpn.add": "Mag-set up ng VPN",
   "widgets.vpn.choose": "Pumili ng VPN",
-  "widgets.vpn.settings": "Buksan sa Settings"
+  "widgets.vpn.settings": "Buksan sa Settings",
+  "widgets.timer.name": "Timer",
+  "widgets.timer.desc": "Countdown at stopwatch ng Clock app",
+  "widgets.timer.stopwatch": "Stopwatch",
+  "widgets.timer.reset": "I-reset",
+  "widgets.timer.openClock": "Buksan ang Clock",
+  "widgets.recent.name": "Mga kamakailang file",
+  "widgets.recent.desc": "Mga file na binuksan mo kamakailan",
+  "widgets.updates.name": "Mga update",
+  "widgets.updates.desc": "Kung updated ang LordOS at mga app mo",
+  "widgets.updates.upToDate": "Updated ang LordOS",
+  "widgets.updates.available": "May LordOS {version} na",
+  "widgets.updates.apps": "{n} update ng app",
+  "widgets.updates.restart": "Mag-restart para matapos ang update",
+  "widgets.launcher.name": "Mga app",
+  "widgets.launcher.desc": "Mga paborito mong app, isang click lang",
+  "widgets.launcher.choose": "Pumili ng app",
+  "widgets.launcher.empty": "Pumili ng app mula sa menu nito"
 }

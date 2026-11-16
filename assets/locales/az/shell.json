@@ -622,5 +622,22 @@
   "widgets.vpn.none": "Hələ VPN qurulmayıb.",
   "widgets.vpn.add": "VPN qur",
   "widgets.vpn.choose": "VPN seç",
-  "widgets.vpn.settings": "Ayarlarda aç"
+  "widgets.vpn.settings": "Ayarlarda aç",
+  "widgets.timer.name": "Taymer",
+  "widgets.timer.desc": "Saat tətbiqinin geri sayımı və saniyəölçəni",
+  "widgets.timer.stopwatch": "Saniyəölçən",
+  "widgets.timer.reset": "Sıfırla",
+  "widgets.timer.openClock": "Saatı aç",
+  "widgets.recent.name": "Son fayllar",
+  "widgets.recent.desc": "Son açdığın fayllar",
+  "widgets.updates.name": "Yeniləmələr",
+  "widgets.updates.desc": "LordOS və tətbiqlərin yenidirmi",
+  "widgets.updates.upToDate": "LordOS yenidir",
+  "widgets.updates.available": "LordOS {version} mövcuddur",
+  "widgets.updates.apps": "{n} tətbiq yeniləməsi",
+  "widgets.updates.restart": "Yeniləməni bitirmək üçün yenidən başlat",
+  "widgets.launcher.name": "Tətbiqlər",
+  "widgets.launcher.desc": "Sevimli tətbiqlərin bir kliklə",
+  "widgets.launcher.choose": "Tətbiq seç",
+  "widgets.launcher.empty": "Menyusundan tətbiq seç"
 }

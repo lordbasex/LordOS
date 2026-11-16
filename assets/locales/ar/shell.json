@@ -650,5 +650,22 @@
   "widgets.vpn.none": "لم يُعدّ أي VPN بعد.",
   "widgets.vpn.add": "إعداد VPN",
   "widgets.vpn.choose": "اختيار VPN",
-  "widgets.vpn.settings": "الفتح في الإعدادات"
+  "widgets.vpn.settings": "الفتح في الإعدادات",
+  "widgets.timer.name": "المؤقت",
+  "widgets.timer.desc": "العد التنازلي وساعة الإيقاف من تطبيق الساعة",
+  "widgets.timer.stopwatch": "ساعة الإيقاف",
+  "widgets.timer.reset": "إعادة تعيين",
+  "widgets.timer.openClock": "فتح الساعة",
+  "widgets.recent.name": "الملفات الأخيرة",
+  "widgets.recent.desc": "الملفات التي فتحتها مؤخرًا",
+  "widgets.updates.name": "التحديثات",
+  "widgets.updates.desc": "هل LordOS وتطبيقاتك محدّثة",
+  "widgets.updates.upToDate": "LordOS محدّث",
+  "widgets.updates.available": "يتوفر LordOS {version}",
+  "widgets.updates.apps": "{n} تحديثات للتطبيقات",
+  "widgets.updates.restart": "أعد التشغيل لإكمال التحديث",
+  "widgets.launcher.name": "التطبيقات",
+  "widgets.launcher.desc": "تطبيقاتك المفضلة بنقرة واحدة",
+  "widgets.launcher.choose": "اختيار التطبيقات",
+  "widgets.launcher.empty": "اختر التطبيقات من قائمته"
 }

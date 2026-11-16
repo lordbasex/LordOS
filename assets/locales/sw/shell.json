@@ -622,5 +622,22 @@
   "widgets.vpn.none": "Bado hakuna VPN iliyowekwa.",
   "widgets.vpn.add": "Weka VPN",
   "widgets.vpn.choose": "Chagua VPN",
-  "widgets.vpn.settings": "Fungua katika Mipangilio"
+  "widgets.vpn.settings": "Fungua katika Mipangilio",
+  "widgets.timer.name": "Kipima muda",
+  "widgets.timer.desc": "Kuhesabu kurudi nyuma na saa ya kusimamisha ya programu ya Saa",
+  "widgets.timer.stopwatch": "Saa ya kusimamisha",
+  "widgets.timer.reset": "Weka upya",
+  "widgets.timer.openClock": "Fungua Saa",
+  "widgets.recent.name": "Faili za hivi karibuni",
+  "widgets.recent.desc": "Faili ulizofungua hivi karibuni",
+  "widgets.updates.name": "Masasisho",
+  "widgets.updates.desc": "Kama LordOS na programu zako ziko sasa",
+  "widgets.updates.upToDate": "LordOS iko sasa",
+  "widgets.updates.available": "LordOS {version} inapatikana",
+  "widgets.updates.apps": "Masasisho {n} ya programu",
+  "widgets.updates.restart": "Anzisha upya kumaliza kusasisha",
+  "widgets.launcher.name": "Programu",
+  "widgets.launcher.desc": "Programu unazopenda kwa kubofya mara moja",
+  "widgets.launcher.choose": "Chagua programu",
+  "widgets.launcher.empty": "Chagua programu kutoka menyu yake"
 }

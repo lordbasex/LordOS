@@ -615,5 +615,22 @@
   "widgets.vpn.none": "ยังไม่ได้ตั้งค่า VPN",
   "widgets.vpn.add": "ตั้งค่า VPN",
   "widgets.vpn.choose": "เลือก VPN",
-  "widgets.vpn.settings": "เปิดในการตั้งค่า"
+  "widgets.vpn.settings": "เปิดในการตั้งค่า",
+  "widgets.timer.name": "ตัวจับเวลา",
+  "widgets.timer.desc": "นับถอยหลังและนาฬิกาจับเวลาจากแอปนาฬิกา",
+  "widgets.timer.stopwatch": "นาฬิกาจับเวลา",
+  "widgets.timer.reset": "รีเซ็ต",
+  "widgets.timer.openClock": "เปิดนาฬิกา",
+  "widgets.recent.name": "ไฟล์ล่าสุด",
+  "widgets.recent.desc": "ไฟล์ที่คุณเปิดเมื่อเร็วๆ นี้",
+  "widgets.updates.name": "อัปเดต",
+  "widgets.updates.desc": "LordOS และแอปเป็นเวอร์ชันล่าสุดหรือไม่",
+  "widgets.updates.upToDate": "LordOS เป็นเวอร์ชันล่าสุด",
+  "widgets.updates.available": "มี LordOS {version} แล้ว",
+  "widgets.updates.apps": "อัปเดตแอป {n} รายการ",
+  "widgets.updates.restart": "รีสตาร์ทเพื่ออัปเดตให้เสร็จ",
+  "widgets.launcher.name": "แอป",
+  "widgets.launcher.desc": "แอปโปรดในคลิกเดียว",
+  "widgets.launcher.choose": "เลือกแอป",
+  "widgets.launcher.empty": "เลือกแอปจากเมนูของวิดเจ็ต"
 }

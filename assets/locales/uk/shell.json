@@ -629,5 +629,22 @@
   "widgets.vpn.none": "VPN ще не налаштовано.",
   "widgets.vpn.add": "Налаштувати VPN",
   "widgets.vpn.choose": "Вибрати VPN",
-  "widgets.vpn.settings": "Відкрити в Налаштуваннях"
+  "widgets.vpn.settings": "Відкрити в Налаштуваннях",
+  "widgets.timer.name": "Таймер",
+  "widgets.timer.desc": "Зворотний відлік і секундомір застосунку «Годинник»",
+  "widgets.timer.stopwatch": "Секундомір",
+  "widgets.timer.reset": "Скинути",
+  "widgets.timer.openClock": "Відкрити «Годинник»",
+  "widgets.recent.name": "Нещодавні файли",
+  "widgets.recent.desc": "Файли, які ви нещодавно відкривали",
+  "widgets.updates.name": "Оновлення",
+  "widgets.updates.desc": "Чи актуальні LordOS і застосунки",
+  "widgets.updates.upToDate": "LordOS оновлено",
+  "widgets.updates.available": "Доступна LordOS {version}",
+  "widgets.updates.apps": "Оновлень застосунків: {n}",
+  "widgets.updates.restart": "Перезапустіть, щоб завершити оновлення",
+  "widgets.launcher.name": "Застосунки",
+  "widgets.launcher.desc": "Улюблені застосунки в один клік",
+  "widgets.launcher.choose": "Вибрати застосунки",
+  "widgets.launcher.empty": "Виберіть застосунки в його меню"
 }

@@ -622,5 +622,22 @@
   "widgets.vpn.none": "Encara no hi ha cap VPN configurada.",
   "widgets.vpn.add": "Configura una VPN",
   "widgets.vpn.choose": "Tria la VPN",
-  "widgets.vpn.settings": "Obre a Configuració"
+  "widgets.vpn.settings": "Obre a Configuració",
+  "widgets.timer.name": "Temporitzador",
+  "widgets.timer.desc": "Compte enrere i cronòmetre de l'app Rellotge",
+  "widgets.timer.stopwatch": "Cronòmetre",
+  "widgets.timer.reset": "Reinicia",
+  "widgets.timer.openClock": "Obre Rellotge",
+  "widgets.recent.name": "Fitxers recents",
+  "widgets.recent.desc": "Els fitxers que has obert últimament",
+  "widgets.updates.name": "Actualitzacions",
+  "widgets.updates.desc": "Si LordOS i les teves apps estan al dia",
+  "widgets.updates.upToDate": "LordOS està al dia",
+  "widgets.updates.available": "Hi ha disponible LordOS {version}",
+  "widgets.updates.apps": "{n} actualitzacions d'apps",
+  "widgets.updates.restart": "Reinicia per acabar d'actualitzar",
+  "widgets.launcher.name": "Apps",
+  "widgets.launcher.desc": "Les teves apps preferides, a un clic",
+  "widgets.launcher.choose": "Tria apps",
+  "widgets.launcher.empty": "Tria apps des del seu menú"
 }

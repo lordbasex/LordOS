@@ -615,5 +615,22 @@
   "widgets.vpn.none": "Chưa thiết lập VPN nào.",
   "widgets.vpn.add": "Thiết lập VPN",
   "widgets.vpn.choose": "Chọn VPN",
-  "widgets.vpn.settings": "Mở trong Cài đặt"
+  "widgets.vpn.settings": "Mở trong Cài đặt",
+  "widgets.timer.name": "Hẹn giờ",
+  "widgets.timer.desc": "Đếm ngược và bấm giờ của ứng dụng Đồng hồ",
+  "widgets.timer.stopwatch": "Bấm giờ",
+  "widgets.timer.reset": "Đặt lại",
+  "widgets.timer.openClock": "Mở Đồng hồ",
+  "widgets.recent.name": "Tệp gần đây",
+  "widgets.recent.desc": "Các tệp bạn mở gần đây",
+  "widgets.updates.name": "Cập nhật",
+  "widgets.updates.desc": "LordOS và ứng dụng đã cập nhật chưa",
+  "widgets.updates.upToDate": "LordOS đã cập nhật",
+  "widgets.updates.available": "Đã có LordOS {version}",
+  "widgets.updates.apps": "{n} bản cập nhật ứng dụng",
+  "widgets.updates.restart": "Khởi động lại để hoàn tất cập nhật",
+  "widgets.launcher.name": "Ứng dụng",
+  "widgets.launcher.desc": "Ứng dụng yêu thích chỉ một cú nhấp",
+  "widgets.launcher.choose": "Chọn ứng dụng",
+  "widgets.launcher.empty": "Chọn ứng dụng từ menu của nó"
 }

@@ -377,7 +377,7 @@ await flush();
   wp.widgetPicker.set({ display: R });
   await flush();
   check('widgets: the catalog opens', shownT(sdk.t('shell.widgets.title')), 1);
-  check('widgets: its kinds', ['weather', 'clock', 'system', 'calendar', 'nowplaying', 'readaloud', 'network', 'disks', 'temps', 'reminders', 'clipboard', 'claude'].every((k) => shownT(sdk.t(`shell.widgets.${k}.name`)) >= 1), true);
+  check('widgets: its kinds', ['timer', 'recent', 'updates', 'launcher', 'vpn', 'weather', 'clock', 'system', 'calendar', 'nowplaying', 'readaloud', 'network', 'disks', 'temps', 'reminders', 'clipboard', 'claude'].every((k) => shownT(sdk.t(`shell.widgets.${k}.name`)) >= 1), true);
   wp.widgetPicker.set(null);
   const g = grid.gridOf(sdk.workAreaOf(R));
   const at = (w) => { const r = grid.rectOf(g, w.col, w.row, w.size); return [...styles].some(([id, st]) => st.left === r.x && st.top === r.y && st.width === r.w && st.height === r.h && attached(id)); };

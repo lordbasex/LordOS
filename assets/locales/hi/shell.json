@@ -622,5 +622,22 @@
   "widgets.vpn.none": "अभी कोई VPN सेट नहीं है।",
   "widgets.vpn.add": "VPN सेट करें",
   "widgets.vpn.choose": "VPN चुनें",
-  "widgets.vpn.settings": "सेटिंग्स में खोलें"
+  "widgets.vpn.settings": "सेटिंग्स में खोलें",
+  "widgets.timer.name": "टाइमर",
+  "widgets.timer.desc": "घड़ी ऐप का उलटी गिनती और स्टॉपवॉच",
+  "widgets.timer.stopwatch": "स्टॉपवॉच",
+  "widgets.timer.reset": "रीसेट",
+  "widgets.timer.openClock": "घड़ी खोलें",
+  "widgets.recent.name": "हाल की फ़ाइलें",
+  "widgets.recent.desc": "हाल में खोली गई फ़ाइलें",
+  "widgets.updates.name": "अपडेट",
+  "widgets.updates.desc": "क्या LordOS और ऐप्स अप टू डेट हैं",
+  "widgets.updates.upToDate": "LordOS अप टू डेट है",
+  "widgets.updates.available": "LordOS {version} उपलब्ध है",
+  "widgets.updates.apps": "{n} ऐप अपडेट",
+  "widgets.updates.restart": "अपडेट पूरा करने के लिए रीस्टार्ट करें",
+  "widgets.launcher.name": "ऐप्स",
+  "widgets.launcher.desc": "पसंदीदा ऐप्स एक क्लिक पर",
+  "widgets.launcher.choose": "ऐप्स चुनें",
+  "widgets.launcher.empty": "इसके मेनू से ऐप्स चुनें"
 }

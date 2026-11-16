@@ -622,5 +622,22 @@
   "widgets.vpn.none": "هنوز هیچ VPN تنظیم نشده است.",
   "widgets.vpn.add": "تنظیم VPN",
   "widgets.vpn.choose": "انتخاب VPN",
-  "widgets.vpn.settings": "باز کردن در تنظیمات"
+  "widgets.vpn.settings": "باز کردن در تنظیمات",
+  "widgets.timer.name": "زمان‌سنج",
+  "widgets.timer.desc": "شمارش معکوس و کرنومتر برنامهٔ ساعت",
+  "widgets.timer.stopwatch": "کرنومتر",
+  "widgets.timer.reset": "بازنشانی",
+  "widgets.timer.openClock": "باز کردن ساعت",
+  "widgets.recent.name": "پرونده‌های اخیر",
+  "widgets.recent.desc": "پرونده‌هایی که اخیراً باز کردید",
+  "widgets.updates.name": "به‌روزرسانی‌ها",
+  "widgets.updates.desc": "آیا LordOS و برنامه‌ها به‌روزند",
+  "widgets.updates.upToDate": "LordOS به‌روز است",
+  "widgets.updates.available": "LordOS {version} در دسترس است",
+  "widgets.updates.apps": "{n} به‌روزرسانی برنامه",
+  "widgets.updates.restart": "برای تمام کردن به‌روزرسانی دوباره راه‌اندازی کنید",
+  "widgets.launcher.name": "برنامه‌ها",
+  "widgets.launcher.desc": "برنامه‌های محبوبتان با یک کلیک",
+  "widgets.launcher.choose": "انتخاب برنامه‌ها",
+  "widgets.launcher.empty": "برنامه‌ها را از منوی آن انتخاب کنید"
 }

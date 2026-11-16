@@ -622,5 +622,22 @@
   "widgets.vpn.none": "No VPN is set up yet.",
   "widgets.vpn.add": "Set up a VPN",
   "widgets.vpn.choose": "Choose VPN",
-  "widgets.vpn.settings": "Open in Settings"
+  "widgets.vpn.settings": "Open in Settings",
+  "widgets.timer.name": "Timer",
+  "widgets.timer.desc": "A countdown and a stopwatch, the Clock app's own",
+  "widgets.timer.stopwatch": "Stopwatch",
+  "widgets.timer.reset": "Reset",
+  "widgets.timer.openClock": "Open Clock",
+  "widgets.recent.name": "Recent files",
+  "widgets.recent.desc": "The files you opened lately",
+  "widgets.updates.name": "Updates",
+  "widgets.updates.desc": "Whether LordOS and your apps are up to date",
+  "widgets.updates.upToDate": "LordOS is up to date",
+  "widgets.updates.available": "LordOS {version} is available",
+  "widgets.updates.apps": "{n} app updates",
+  "widgets.updates.restart": "Restart to finish updating",
+  "widgets.launcher.name": "Apps",
+  "widgets.launcher.desc": "Your favorite apps, one click away",
+  "widgets.launcher.choose": "Choose apps",
+  "widgets.launcher.empty": "Choose apps from its menu"
 }

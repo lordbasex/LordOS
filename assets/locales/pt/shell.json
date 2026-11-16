@@ -622,5 +622,22 @@
   "widgets.vpn.none": "Nenhuma VPN configurada ainda.",
   "widgets.vpn.add": "Configurar uma VPN",
   "widgets.vpn.choose": "Escolher VPN",
-  "widgets.vpn.settings": "Abrir em Ajustes"
+  "widgets.vpn.settings": "Abrir em Ajustes",
+  "widgets.timer.name": "Temporizador",
+  "widgets.timer.desc": "Contagem regressiva e cronômetro, os do app Relógio",
+  "widgets.timer.stopwatch": "Cronômetro",
+  "widgets.timer.reset": "Zerar",
+  "widgets.timer.openClock": "Abrir Relógio",
+  "widgets.recent.name": "Arquivos recentes",
+  "widgets.recent.desc": "Os arquivos que você abriu recentemente",
+  "widgets.updates.name": "Atualizações",
+  "widgets.updates.desc": "Se o LordOS e seus apps estão em dia",
+  "widgets.updates.upToDate": "O LordOS está em dia",
+  "widgets.updates.available": "O LordOS {version} está disponível",
+  "widgets.updates.apps": "{n} atualizações de apps",
+  "widgets.updates.restart": "Reinicie para terminar de atualizar",
+  "widgets.launcher.name": "Apps",
+  "widgets.launcher.desc": "Seus apps favoritos, a um clique",
+  "widgets.launcher.choose": "Escolher apps",
+  "widgets.launcher.empty": "Escolha apps no menu dele"
 }

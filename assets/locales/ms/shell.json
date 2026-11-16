@@ -615,5 +615,22 @@
   "widgets.vpn.none": "Belum ada VPN disediakan.",
   "widgets.vpn.add": "Sediakan VPN",
   "widgets.vpn.choose": "Pilih VPN",
-  "widgets.vpn.settings": "Buka dalam Tetapan"
+  "widgets.vpn.settings": "Buka dalam Tetapan",
+  "widgets.timer.name": "Pemasa",
+  "widgets.timer.desc": "Kira detik dan jam randik apl Jam",
+  "widgets.timer.stopwatch": "Jam randik",
+  "widgets.timer.reset": "Tetap semula",
+  "widgets.timer.openClock": "Buka Jam",
+  "widgets.recent.name": "Fail terkini",
+  "widgets.recent.desc": "Fail yang anda buka baru-baru ini",
+  "widgets.updates.name": "Kemas kini",
+  "widgets.updates.desc": "Sama ada LordOS dan apl anda terkini",
+  "widgets.updates.upToDate": "LordOS terkini",
+  "widgets.updates.available": "LordOS {version} tersedia",
+  "widgets.updates.apps": "{n} kemas kini apl",
+  "widgets.updates.restart": "Mulakan semula untuk selesai mengemas kini",
+  "widgets.launcher.name": "Apl",
+  "widgets.launcher.desc": "Apl kegemaran anda, satu klik sahaja",
+  "widgets.launcher.choose": "Pilih apl",
+  "widgets.launcher.empty": "Pilih apl daripada menunya"
 }

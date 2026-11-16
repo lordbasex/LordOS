@@ -622,5 +622,22 @@
   "widgets.vpn.none": "Nog geen VPN ingesteld.",
   "widgets.vpn.add": "VPN instellen",
   "widgets.vpn.choose": "VPN kiezen",
-  "widgets.vpn.settings": "Openen in Instellingen"
+  "widgets.vpn.settings": "Openen in Instellingen",
+  "widgets.timer.name": "Timer",
+  "widgets.timer.desc": "Afteltimer en stopwatch van de Klok-app",
+  "widgets.timer.stopwatch": "Stopwatch",
+  "widgets.timer.reset": "Opnieuw",
+  "widgets.timer.openClock": "Klok openen",
+  "widgets.recent.name": "Recente bestanden",
+  "widgets.recent.desc": "De bestanden die je onlangs opende",
+  "widgets.updates.name": "Updates",
+  "widgets.updates.desc": "Of LordOS en je apps bijgewerkt zijn",
+  "widgets.updates.upToDate": "LordOS is bijgewerkt",
+  "widgets.updates.available": "LordOS {version} is beschikbaar",
+  "widgets.updates.apps": "{n} app-updates",
+  "widgets.updates.restart": "Herstart om het bijwerken af te ronden",
+  "widgets.launcher.name": "Apps",
+  "widgets.launcher.desc": "Je favoriete apps, met één klik",
+  "widgets.launcher.choose": "Apps kiezen",
+  "widgets.launcher.empty": "Kies apps via het menu"
 }

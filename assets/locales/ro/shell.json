@@ -629,5 +629,22 @@
   "widgets.vpn.none": "Niciun VPN configurat încă.",
   "widgets.vpn.add": "Configurează un VPN",
   "widgets.vpn.choose": "Alege VPN",
-  "widgets.vpn.settings": "Deschide în Setări"
+  "widgets.vpn.settings": "Deschide în Setări",
+  "widgets.timer.name": "Cronometru invers",
+  "widgets.timer.desc": "Numărătoare inversă și cronometru din aplicația Ceas",
+  "widgets.timer.stopwatch": "Cronometru",
+  "widgets.timer.reset": "Resetează",
+  "widgets.timer.openClock": "Deschide Ceas",
+  "widgets.recent.name": "Fișiere recente",
+  "widgets.recent.desc": "Fișierele deschise recent",
+  "widgets.updates.name": "Actualizări",
+  "widgets.updates.desc": "Dacă LordOS și aplicațiile sunt la zi",
+  "widgets.updates.upToDate": "LordOS este la zi",
+  "widgets.updates.available": "LordOS {version} este disponibil",
+  "widgets.updates.apps": "{n} actualizări de aplicații",
+  "widgets.updates.restart": "Repornește pentru a termina actualizarea",
+  "widgets.launcher.name": "Aplicații",
+  "widgets.launcher.desc": "Aplicațiile preferate, la un clic",
+  "widgets.launcher.choose": "Alege aplicații",
+  "widgets.launcher.empty": "Alege aplicații din meniul lui"
 }

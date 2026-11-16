@@ -615,5 +615,22 @@
   "widgets.vpn.none": "VPN はまだ設定されていません。",
   "widgets.vpn.add": "VPN を設定",
   "widgets.vpn.choose": "VPN を選択",
-  "widgets.vpn.settings": "設定で開く"
+  "widgets.vpn.settings": "設定で開く",
+  "widgets.timer.name": "タイマー",
+  "widgets.timer.desc": "時計アプリのタイマーとストップウォッチ",
+  "widgets.timer.stopwatch": "ストップウォッチ",
+  "widgets.timer.reset": "リセット",
+  "widgets.timer.openClock": "時計を開く",
+  "widgets.recent.name": "最近使ったファイル",
+  "widgets.recent.desc": "最近開いたファイル",
+  "widgets.updates.name": "アップデート",
+  "widgets.updates.desc": "LordOS とアプリが最新かどうか",
+  "widgets.updates.upToDate": "LordOS は最新です",
+  "widgets.updates.available": "LordOS {version} を利用できます",
+  "widgets.updates.apps": "アプリのアップデート {n} 件",
+  "widgets.updates.restart": "再起動してアップデートを完了",
+  "widgets.launcher.name": "アプリ",
+  "widgets.launcher.desc": "お気に入りのアプリをワンクリックで",
+  "widgets.launcher.choose": "アプリを選択",
+  "widgets.launcher.empty": "メニューからアプリを選択"
 }

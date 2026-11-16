@@ -622,5 +622,22 @@
   "widgets.vpn.none": "Δεν έχει ρυθμιστεί ακόμη VPN.",
   "widgets.vpn.add": "Ρύθμιση VPN",
   "widgets.vpn.choose": "Επιλογή VPN",
-  "widgets.vpn.settings": "Άνοιγμα στις Ρυθμίσεις"
+  "widgets.vpn.settings": "Άνοιγμα στις Ρυθμίσεις",
+  "widgets.timer.name": "Χρονόμετρο",
+  "widgets.timer.desc": "Αντίστροφη μέτρηση και χρονόμετρο της εφαρμογής Ρολόι",
+  "widgets.timer.stopwatch": "Χρονόμετρο",
+  "widgets.timer.reset": "Μηδενισμός",
+  "widgets.timer.openClock": "Άνοιγμα Ρολογιού",
+  "widgets.recent.name": "Πρόσφατα αρχεία",
+  "widgets.recent.desc": "Τα αρχεία που ανοίξατε πρόσφατα",
+  "widgets.updates.name": "Ενημερώσεις",
+  "widgets.updates.desc": "Αν το LordOS και οι εφαρμογές είναι ενημερωμένα",
+  "widgets.updates.upToDate": "Το LordOS είναι ενημερωμένο",
+  "widgets.updates.available": "Διατίθεται το LordOS {version}",
+  "widgets.updates.apps": "{n} ενημερώσεις εφαρμογών",
+  "widgets.updates.restart": "Επανεκκινήστε για να ολοκληρωθεί",
+  "widgets.launcher.name": "Εφαρμογές",
+  "widgets.launcher.desc": "Οι αγαπημένες σας εφαρμογές με ένα κλικ",
+  "widgets.launcher.choose": "Επιλογή εφαρμογών",
+  "widgets.launcher.empty": "Επιλέξτε εφαρμογές από το μενού του"
 }

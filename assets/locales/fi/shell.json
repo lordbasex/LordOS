@@ -622,5 +622,22 @@
   "widgets.vpn.none": "VPN:ää ei ole vielä määritetty.",
   "widgets.vpn.add": "Määritä VPN",
   "widgets.vpn.choose": "Valitse VPN",
-  "widgets.vpn.settings": "Avaa asetuksissa"
+  "widgets.vpn.settings": "Avaa asetuksissa",
+  "widgets.timer.name": "Ajastin",
+  "widgets.timer.desc": "Kellosovelluksen ajastin ja sekuntikello",
+  "widgets.timer.stopwatch": "Sekuntikello",
+  "widgets.timer.reset": "Nollaa",
+  "widgets.timer.openClock": "Avaa Kello",
+  "widgets.recent.name": "Viimeisimmät tiedostot",
+  "widgets.recent.desc": "Viimeksi avaamasi tiedostot",
+  "widgets.updates.name": "Päivitykset",
+  "widgets.updates.desc": "Ovatko LordOS ja sovellukset ajan tasalla",
+  "widgets.updates.upToDate": "LordOS on ajan tasalla",
+  "widgets.updates.available": "LordOS {version} on saatavilla",
+  "widgets.updates.apps": "{n} sovelluspäivitystä",
+  "widgets.updates.restart": "Käynnistä uudelleen päivityksen viimeistelemiseksi",
+  "widgets.launcher.name": "Sovellukset",
+  "widgets.launcher.desc": "Suosikkisovelluksesi yhden napsautuksen päässä",
+  "widgets.launcher.choose": "Valitse sovellukset",
+  "widgets.launcher.empty": "Valitse sovellukset sen valikosta"
 }

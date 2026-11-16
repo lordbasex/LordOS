@@ -629,5 +629,22 @@
   "widgets.vpn.none": "Nie skonfigurowano jeszcze VPN.",
   "widgets.vpn.add": "Skonfiguruj VPN",
   "widgets.vpn.choose": "Wybierz VPN",
-  "widgets.vpn.settings": "Otwórz w Ustawieniach"
+  "widgets.vpn.settings": "Otwórz w Ustawieniach",
+  "widgets.timer.name": "Minutnik",
+  "widgets.timer.desc": "Odliczanie i stoper z aplikacji Zegar",
+  "widgets.timer.stopwatch": "Stoper",
+  "widgets.timer.reset": "Wyzeruj",
+  "widgets.timer.openClock": "Otwórz Zegar",
+  "widgets.recent.name": "Ostatnie pliki",
+  "widgets.recent.desc": "Pliki otwierane ostatnio",
+  "widgets.updates.name": "Aktualizacje",
+  "widgets.updates.desc": "Czy LordOS i aplikacje są aktualne",
+  "widgets.updates.upToDate": "LordOS jest aktualny",
+  "widgets.updates.available": "Dostępny jest LordOS {version}",
+  "widgets.updates.apps": "Aktualizacje aplikacji: {n}",
+  "widgets.updates.restart": "Uruchom ponownie, aby dokończyć",
+  "widgets.launcher.name": "Aplikacje",
+  "widgets.launcher.desc": "Ulubione aplikacje pod ręką",
+  "widgets.launcher.choose": "Wybierz aplikacje",
+  "widgets.launcher.empty": "Wybierz aplikacje z jego menu"
 }

@@ -622,5 +622,22 @@
   "widgets.vpn.none": "ابھی کوئی VPN سیٹ نہیں۔",
   "widgets.vpn.add": "VPN سیٹ کریں",
   "widgets.vpn.choose": "VPN چنیں",
-  "widgets.vpn.settings": "ترتیبات میں کھولیں"
+  "widgets.vpn.settings": "ترتیبات میں کھولیں",
+  "widgets.timer.name": "ٹائمر",
+  "widgets.timer.desc": "گھڑی ایپ کا الٹی گنتی اور اسٹاپ واچ",
+  "widgets.timer.stopwatch": "اسٹاپ واچ",
+  "widgets.timer.reset": "ری سیٹ",
+  "widgets.timer.openClock": "گھڑی کھولیں",
+  "widgets.recent.name": "حالیہ فائلیں",
+  "widgets.recent.desc": "وہ فائلیں جو آپ نے حال ہی میں کھولیں",
+  "widgets.updates.name": "اپ ڈیٹس",
+  "widgets.updates.desc": "کیا LordOS اور ایپس تازہ ہیں",
+  "widgets.updates.upToDate": "LordOS تازہ ہے",
+  "widgets.updates.available": "LordOS {version} دستیاب ہے",
+  "widgets.updates.apps": "{n} ایپ اپ ڈیٹس",
+  "widgets.updates.restart": "اپ ڈیٹ مکمل کرنے کے لیے دوبارہ شروع کریں",
+  "widgets.launcher.name": "ایپس",
+  "widgets.launcher.desc": "پسندیدہ ایپس ایک کلک پر",
+  "widgets.launcher.choose": "ایپس چنیں",
+  "widgets.launcher.empty": "اس کے مینو سے ایپس چنیں"
 }

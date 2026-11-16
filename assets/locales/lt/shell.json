@@ -629,5 +629,22 @@
   "widgets.vpn.none": "Dar nėra nustatyto VPN.",
   "widgets.vpn.add": "Nustatyti VPN",
   "widgets.vpn.choose": "Pasirinkti VPN",
-  "widgets.vpn.settings": "Atidaryti nustatymuose"
+  "widgets.vpn.settings": "Atidaryti nustatymuose",
+  "widgets.timer.name": "Laikmatis",
+  "widgets.timer.desc": "Laikrodžio programos atgalinis laikmatis ir chronometras",
+  "widgets.timer.stopwatch": "Chronometras",
+  "widgets.timer.reset": "Atstatyti",
+  "widgets.timer.openClock": "Atidaryti Laikrodį",
+  "widgets.recent.name": "Naujausi failai",
+  "widgets.recent.desc": "Neseniai atidaryti failai",
+  "widgets.updates.name": "Naujinimai",
+  "widgets.updates.desc": "Ar LordOS ir programos atnaujintos",
+  "widgets.updates.upToDate": "LordOS atnaujinta",
+  "widgets.updates.available": "Yra LordOS {version}",
+  "widgets.updates.apps": "Programų naujinimų: {n}",
+  "widgets.updates.restart": "Paleiskite iš naujo, kad baigtumėte",
+  "widgets.launcher.name": "Programos",
+  "widgets.launcher.desc": "Mėgstamos programos vienu paspaudimu",
+  "widgets.launcher.choose": "Pasirinkti programas",
+  "widgets.launcher.empty": "Pasirinkite programas jo meniu"
 }

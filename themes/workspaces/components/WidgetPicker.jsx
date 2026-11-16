@@ -14,6 +14,28 @@ const abs = (s) => ({ position: 'absolute', ...s });
 // a small drawing of each kind (no emoji, no images)
 function KindGlyph({ type, t }) {
   const a = t.accent, dim = t.textDim;
+  if (type === 'timer') return (
+    <View style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 28, height: 28, borderRadius: 14, border: `3px solid ${a}` }} />
+      <View style={abs({ left: 15.5, top: 9, width: 3, height: 9, borderRadius: 1.5, backgroundColor: t.text })} />
+      <View style={abs({ left: 14, top: 0, width: 6, height: 4, borderRadius: 1, backgroundColor: t.text })} />
+    </View>
+  );
+  if (type === 'recent') return (
+    <View style={{ width: 34, height: 34, gap: 4, justifyContent: 'center' }}>
+      {[0, 1, 2].map((i) => <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, direction: 'ltr' }}><View style={{ width: 9, height: 7, borderRadius: 2, backgroundColor: i ? dim : a }} /><View style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: dim }} /></View>)}
+    </View>
+  );
+  if (type === 'updates') return (
+    <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#22A06B', alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 18, fontWeight: 700, color: '#ffffff' }}>↑</Text>
+    </View>
+  );
+  if (type === 'launcher') return (
+    <View style={{ width: 34, height: 34, flexDirection: 'row', flexWrap: 'wrap', gap: 4, direction: 'ltr' }}>
+      {['#F97316', a, '#22A06B', '#E5484D'].map((c) => <View key={c} style={{ width: 15, height: 15, borderRadius: 4, backgroundColor: c }} />)}
+    </View>
+  );
   if (type === 'vpn') return (
     <View style={{ width: 34, height: 34, justifyContent: 'center', direction: 'ltr' }}>
       <View style={{ width: 34, height: 18, borderRadius: 9, backgroundColor: '#3fbf6e', justifyContent: 'center' }}>

@@ -615,5 +615,22 @@
   "widgets.vpn.none": "아직 설정된 VPN이 없습니다.",
   "widgets.vpn.add": "VPN 설정",
   "widgets.vpn.choose": "VPN 선택",
-  "widgets.vpn.settings": "설정에서 열기"
+  "widgets.vpn.settings": "설정에서 열기",
+  "widgets.timer.name": "타이머",
+  "widgets.timer.desc": "시계 앱의 타이머와 스톱워치",
+  "widgets.timer.stopwatch": "스톱워치",
+  "widgets.timer.reset": "재설정",
+  "widgets.timer.openClock": "시계 열기",
+  "widgets.recent.name": "최근 파일",
+  "widgets.recent.desc": "최근에 연 파일",
+  "widgets.updates.name": "업데이트",
+  "widgets.updates.desc": "LordOS와 앱이 최신인지 여부",
+  "widgets.updates.upToDate": "LordOS가 최신입니다",
+  "widgets.updates.available": "LordOS {version} 사용 가능",
+  "widgets.updates.apps": "앱 업데이트 {n}개",
+  "widgets.updates.restart": "업데이트를 마치려면 재시동",
+  "widgets.launcher.name": "앱",
+  "widgets.launcher.desc": "즐겨 쓰는 앱을 한 번에",
+  "widgets.launcher.choose": "앱 선택",
+  "widgets.launcher.empty": "메뉴에서 앱 선택"
 }

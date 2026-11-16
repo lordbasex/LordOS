@@ -622,5 +622,22 @@
   "widgets.vpn.none": "Még nincs beállított VPN.",
   "widgets.vpn.add": "VPN beállítása",
   "widgets.vpn.choose": "VPN kiválasztása",
-  "widgets.vpn.settings": "Megnyitás a Beállításokban"
+  "widgets.vpn.settings": "Megnyitás a Beállításokban",
+  "widgets.timer.name": "Időzítő",
+  "widgets.timer.desc": "Az Óra app visszaszámlálója és stopperje",
+  "widgets.timer.stopwatch": "Stopper",
+  "widgets.timer.reset": "Nullázás",
+  "widgets.timer.openClock": "Óra megnyitása",
+  "widgets.recent.name": "Legutóbbi fájlok",
+  "widgets.recent.desc": "A nemrég megnyitott fájlok",
+  "widgets.updates.name": "Frissítések",
+  "widgets.updates.desc": "Naprakész-e a LordOS és az alkalmazásaid",
+  "widgets.updates.upToDate": "A LordOS naprakész",
+  "widgets.updates.available": "Elérhető a LordOS {version}",
+  "widgets.updates.apps": "{n} alkalmazásfrissítés",
+  "widgets.updates.restart": "Indítsd újra a frissítés befejezéséhez",
+  "widgets.launcher.name": "Alkalmazások",
+  "widgets.launcher.desc": "Kedvenc alkalmazásaid egy kattintásra",
+  "widgets.launcher.choose": "Alkalmazások kiválasztása",
+  "widgets.launcher.empty": "Válassz alkalmazásokat a menüjéből"
 }
