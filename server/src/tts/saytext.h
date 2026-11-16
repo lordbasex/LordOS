@@ -22,7 +22,9 @@ const char *say_language(const char *s, size_t len, const char *fallback);
 /* Spanish and Portuguese only (lang "es" or "pt"; any other language comes back as it is): numbers, decimals,
  * percentages, ordinals, times, dates, money, degrees and the symbols # @ & + = written out as words, since their
  * Pocket TTS models never learned to read digits (docs/VOICE.md, "Text normalization"). Portuguese is Brazilian's.
+ * region is the user's ("es_AR", "pt_BR", NULL when unknown): "$" is read as pesos in a country whose peso is written
+ * "$" (AR, MX, CL, CO, UY, DO, CU), as dollars anywhere else; US$, U$S and USD are always dollars, R$ reais.
  * A new NUL-terminated string, *outlen its length; NULL when out of memory. */
-char *say_normalize(const char *s, size_t len, const char *lang, size_t *outlen);
+char *say_normalize(const char *s, size_t len, const char *lang, const char *region, size_t *outlen);
 
 #endif

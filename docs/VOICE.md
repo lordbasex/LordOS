@@ -74,7 +74,8 @@ NVIDIA NeMo's text normalization), not their code.
 | `14:30`, `14:00`, `14h30`, `1:02:03`, `48 hs` | catorce y treinta, catorce horas, …, una hora, dos minutos y tres segundos, cuarenta y ocho horas | catorze e trinta, catorze horas, … |
 | `15/11/2026`, `2026-11-15`, `15.11.2026` (day first) | quince de noviembre de dos mil veintiséis | quinze de novembro de dois mil e vinte e seis |
 | `25 €`, `€25`, `25,50 €`, `1.000.000 €` | veinticinco euros, … con cincuenta, un millón de euros | vinte e cinco euros, … e cinquenta, um milhão de euros |
-| `$10`, `US$ 10`, `U$S 10`, `R$ 10`, `£2` | diez dólares, …, diez reales, dos libras (feminine: veintiuna libras) | dez dólares, …, dez reais, duas libras |
+| `$10` (the user's region: below) | diez pesos in AR, MX, CL, CO, UY, DO, CU; diez dólares elsewhere or with no region | dez dólares (dez pesos in those countries) |
+| `US$ 10`, `U$S 10`, `USD 10`, `10 USD`, `R$ 10`, `£2` | diez dólares (always), …, diez reales, dos libras (feminine: veintiuna libras) | dez dólares (always), …, dez reais, duas libras |
 | `21 °C`, `1°C`, `90°` | veintiún grados Celsius, un grado Celsius, noventa grados | vinte e um graus Celsius, … |
 | `#LordOS`, `#5`, `# Título` | LordOS, número cinco, Título | LordOS, número cinco |
 | `nº 5`, `n.º 5`, `@user`, `A & B`, `2+2 = 4` | número cinco, arroba user, A y B, dos más dos igual a cuatro | …, A e B, dois mais dois igual a quatro |
@@ -87,7 +88,17 @@ with plain spaces) is a phone number read in its groups, not 612 million; plain 
 or two digits or once (`1 000`, `12 345 678`, `100 000`), and no-break or thin spaces always do. `11-5555-1234` is read
 group by group. Ambiguities, as decided: one `.` followed by exactly three digits is a thousands separator (`1.987` is
 1987, as written in Spanish and Portuguese), any other single `.` or `,` is a decimal point, read as written ("punto",
-"coma"); `$` is read as dollars (a Latin American `$` peso can't be told apart).
+"coma").
+
+**`$` by region** (maintainer's decision, 2026-11-16). A `$` alone is read as the currency of the user's region:
+"pesos" where the country's own peso is written `$` (Argentina, Mexico, Chile, Colombia, Uruguay, the Dominican
+Republic, Cuba), "dólares" (in both languages) anywhere else (Spain, the United States, Ecuador, El Salvador, Puerto Rico,
+Brazil, Portugal…) and when no region is known. `US$`, `U$S` and `USD` are always dollars and `R$` always reais. The
+region is the one in Settings → Language & Region (`"region"` in `~/.config/lordos/settings.json`, such as `es_AR`),
+else `LC_MONETARY` or `LANG` in `~/.config/locale.conf`, else `say`'s own `LC_ALL`, `LC_MONETARY` or `LANG` (a
+terminal's), else the computer's `/etc/default/locale`; only a value with a country counts (`es.UTF-8`, which
+lord-server gives lord-say, doesn't). `-l` and `-v` don't change it. The region is a parameter of
+`say_normalize()`, which stays a pure function; `say.c` finds it.
 
 Digits inside words are split off and read with the same rules, up to 4 digits as a number and longer ones digit by
 digit: `MP3` MP tres, `4K` cuatro K, `H264` H doscientos sesenta y cuatro, `COVID-19` COVID diecinueve, `1080p` mil
@@ -99,8 +110,8 @@ Not covered: units (`5 km`, `10 GB` keep their abbreviation), fractions (`1/2` i
 numbers above 999 999 999 999, the feminine of a count before a feminine noun (`1 casa` is "un casa"; money in libras
 and hours are feminine), and the European Portuguese forms.
 
-Tests: `server/tests/saytext_test.c` (237 checks, 212 of them normalization: 126 Spanish, 82 Portuguese, and 4 with
-English and other languages left untouched).
+Tests: `server/tests/saytext_test.c` (267 checks, 242 of them normalization: 126 Spanish, 82 Portuguese, 4 with
+English and other languages left untouched, and 30 for `$` by region).
 
 Round trip, measured on 2026-11-15 on an i9-10900 with an RX 580: every installed Spanish and Portuguese voice (23 HD
 and 22 standard each) said two sentences with the `say` of 0.8.8.9 and with this one, and whisper.cpp's `small` model

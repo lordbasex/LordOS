@@ -152,7 +152,8 @@ const char *say_language(const char *s, size_t len, const char *fallback) {
  * (docs/VOICE.md, "Text normalization"). Portuguese is Brazilian Portuguese where the two differ (dezesseis,
  * dezenove, bilhão). The rules follow the usual ones (num2words, NeMo's text normalization) with tables of our own. */
 
-typedef struct { char *p; size_t n, cap; int oom; } Out;
+/* the text being written; peso: "$" is the peso of the user's region, not the dollar */
+typedef struct { char *p; size_t n, cap; int oom, peso; } Out;
 
 static void put(Out *o, const char *s, size_t n) {
     if (o->oom || !n) return;
@@ -201,8 +202,26 @@ static const Cur CUR[] = {
     { "$", "dólar", "dólares", "dólar", "dólares", 0 },
     { "\xe2\x82\xac", "euro", "euros", "euro", "euros", 0 },             /* € */
     { "\xc2\xa3", "libra", "libras", "libra", "libras", 1 },             /* £ */
+    { "USD", "dólar", "dólares", "dólar", "dólares", 0 },
 };
-#define CUR_AFTER 3                     /* $ € £ also go after the amount */
+#define CUR_DOLLAR 3                    /* "$": pesos in a peso country (say_normalize's region) */
+#define CUR_AFTER 3                     /* $ € £ USD also go after the amount */
+
+/* the countries whose own currency is a peso written "$": Argentina, Mexico, Chile, Colombia, Uruguay, the Dominican
+ * Republic, Cuba. Elsewhere (Spain, the United States, Ecuador, El Salvador, Puerto Rico, Brazil…) "$" is the dollar. */
+static const char *const PESO_COUNTRIES[] = { "AR", "MX", "CL", "CO", "UY", "DO", "CU", NULL };
+
+/* the country of a region: "es_AR", "es_AR.UTF-8", "es-AR" or "AR" → "AR"; 0 when none */
+static int peso_region(const char *r) {
+    if (!r) return 0;
+    const char *c = r;
+    size_t n = strcspn(r, "_-.@");
+    if (r[n] == '_' || r[n] == '-') c = r + n + 1;
+    else if (n != 2) return 0;
+    if (!(c[0] >= 'A' && c[0] <= 'Z' && c[1] >= 'A' && c[1] <= 'Z') || (c[2] && !strchr(".@", c[2]))) return 0;
+    for (int i = 0; PESO_COUNTRIES[i]; i++) if (c[0] == PESO_COUNTRIES[i][0] && c[1] == PESO_COUNTRIES[i][1]) return 1;
+    return 0;
+}
 
 /* -- cardinals, 0 … 999 999 999 999 -- */
 static const char *const ES_U[30] = { "cero", "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve",
@@ -425,6 +444,7 @@ static void money(Out *o, int L, const Num *m, int c) {
     const Cur *cu = &CUR[c];
     int g = cu->fem ? G_FEM : L == 0 ? G_APOC : G_FULL;
     const char *one = L == 0 ? cu->es1 : cu->pt1, *many = L == 0 ? cu->es : cu->pt;
+    if (c == CUR_DOLLAR && o->peso) { one = "peso"; many = "pesos"; }
     unsigned long long v = value(m->ip, m->in);
     if (m->kind == 1 && m->fn == 2 && num_ok(m)) {               /* 25,50 € veinticinco euros con cincuenta */
         card(o, L, v, g);
@@ -600,7 +620,7 @@ static size_t number(Out *o, int L, const unsigned char *p, size_t i, size_t len
     if (k < len && p[k] == '%') { plain(o, L, &m, G_FULL); word(o, x->percent); return k + 1; }
     /* 25 €, 25€, 5 £, 10$ */
     for (int t = CUR_AFTER; cur < 0 && m.kind != 2 && t < (int)(sizeof CUR / sizeof *CUR); t++)
-        if (has_at(p, k, len, CUR[t].sym)) { cur = t; j = k + strlen(CUR[t].sym); }
+        if (has_at(p, k, len, CUR[t].sym) && !letter_at(p, k + strlen(CUR[t].sym), len)) { cur = t; j = k + strlen(CUR[t].sym); }
     if (cur >= 0) { money(o, L, &m, cur); return j; }
     /* 25 °C, 25°, 25ºC */
     if (m.kind != 2 && (has_at(p, k, len, "\xc2\xb0") ||
@@ -711,8 +731,9 @@ static size_t tidy(char *s, size_t n) {
     return o;
 }
 
-char *say_normalize(const char *s, size_t len, const char *lang, size_t *outlen) {
+char *say_normalize(const char *s, size_t len, const char *lang, const char *region, size_t *outlen) {
     Out o = { 0 };
+    o.peso = peso_region(region);
     int L = lang && !strcmp(lang, "es") ? 0 : lang && !strcmp(lang, "pt") ? 1 : -1;
     put(&o, " ", 1);                                       /* always a buffer; tidy() drops it */
     if (L < 0) {

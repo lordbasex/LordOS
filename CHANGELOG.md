@@ -28,9 +28,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     addresses group by group ("0.8.8.10"); percentages; ordinals 1–100 masculine and feminine ("1.º", "1.ª", "1º",
     Spanish "1.er" primer and "3.er" tercer); times ("14:30" catorce y treinta/catorze e trinta, "14:00" catorce horas,
     "14h30", "1:02:03", "48 hs"); dates day first ("15/11/2026", "2026-11-15"); money before or after the amount (€,
-    $, US$, U$S, R$, £; "25,50 €" veinticinco euros con cincuenta, "1.000.000 €" un millón de euros; libras feminine);
+    $, US$, U$S, USD, R$, £; "25,50 €" veinticinco euros con cincuenta, "1.000.000 €" un millón de euros; libras
+    feminine; US$, U$S and USD always dollars, R$ always reais);
     degrees ("21 °C" veintiún grados Celsius); "#LordOS" LordOS, "#5" número cinco, "nº 5", "@" arroba, "&" y/e, "+"
     and "=" before a number más/mais and igual a; rising ranges ("10-20" diez a veinte).
+  - *"$" by region* (maintainer's decision): a "$" alone is read as "pesos" when the user's region is one whose peso is
+    written "$" (Argentina, Mexico, Chile, Colombia, Uruguay, the Dominican Republic, Cuba) and as "dólares" anywhere
+    else (Spain, the United States, Brazil, Portugal…) or with no region. The region is Settings → Language & Region's
+    (`settings.json`), else `~/.config/locale.conf`'s `LC_MONETARY` or `LANG`, else the terminal's, else the computer's;
+    `say -l` and `-v` don't change it.
   - *Read digit by digit:* numbers that start with 0 ("0800"), more than 9 digits without separators (phone numbers),
     more than 12 with them; "612 345 678" is read in its three groups, not as 612 million. Digits inside words are
     split off ("MP3" MP tres, "4K" cuatro K, "H264" H doscientos sesenta y cuatro, longer runs digit by digit); "C#"
@@ -39,8 +45,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - *Not covered yet:* units ("5 km"), fractions ("1/2" is read "uno barra dos"), Roman numerals, the feminine of a
     count before a feminine noun ("1 casa"), and European Portuguese forms (Brazilian ones are used: dezesseis,
     bilhão).
-  - *Tests:* `server/tests/saytext_test.c` grows from 25 to 237 checks (126 Spanish and 82 Portuguese cases, and
-    English and other languages left untouched), all in `make test`; 300,000 random inputs under ASan and UBSan found
+  - *Tests:* `server/tests/saytext_test.c` grows from 25 to 267 checks (126 Spanish and 82 Portuguese cases,
+    English and other languages left untouched, and 30 for "$" by region), all in `make test`; 300,000 random inputs under ASan and UBSan found
     nothing.
   - *Measured* (the same i9-10900 and RX 580, every installed Spanish and Portuguese voice, 23 HD and 22 standard
     each, transcribed with whisper.cpp's `small` model; an item counts when the transcript has the number, in digits

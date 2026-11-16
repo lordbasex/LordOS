@@ -40,15 +40,47 @@ static void lang(const char *what, const char *in, const char *fallback, const c
     eqs(what, got, strlen(got), want);
 }
 
-static void norm(const char *lang, const char *in, const char *want) {
+/* in, as written by the user of a region ("es_AR"; NULL when unknown) */
+static void norm_in(const char *lang, const char *region, const char *in, const char *want) {
     size_t len = 0;
-    char *got = say_normalize(in, strlen(in), lang, &len);
+    char *got = say_normalize(in, strlen(in), lang, region, &len);
     char what[300];
-    snprintf(what, sizeof what, "%s: %s", lang ? lang : "(none)", in);
+    snprintf(what, sizeof what, "%s (%s): %s", lang ? lang : "(none)", region ? region : "no region", in);
     if (!got) { n++; bad++; printf("✗ %s: out of memory\n", what); return; }
     eqs(what, got, len, want);
     if (strlen(got) != len) { bad++; printf("✗ %s: length %zu, NUL at %zu\n", what, len, strlen(got)); }
     free(got);
+}
+
+static void norm(const char *lang, const char *in, const char *want) { norm_in(lang, NULL, in, want); }
+
+/* "$" by the user's region (Settings -> Language & Region): pesos where the peso is written "$" */
+static void normalize_region(void) {
+    static const char *const pesos[] = { "es_AR", "es_MX", "es_CL", "es_CO", "es_UY", "es_DO", "es_CU", NULL };
+    for (int i = 0; pesos[i]; i++) norm_in("es", pesos[i], "$10", "diez pesos");
+    norm_in("es", "es_AR", "Cuesta $ 1 y 21 $.", "Cuesta un peso y veintiún pesos.");
+    norm_in("es", "es_AR.UTF-8", "$1.000.000", "un millón de pesos");
+    norm_in("es", "es-MX", "$25,50", "veinticinco pesos con cincuenta");
+    norm_in("es", "AR", "$10", "diez pesos");
+    norm_in("es", "es_AR", "US$ 10, U$S 10, USD 10 y 10 USD", "diez dólares, diez dólares, diez dólares y diez dólares");
+    norm_in("es", "es_AR", "R$ 10 y 10 €", "diez reales y diez euros");
+    norm_in("es", "es_US", "$10", "diez dólares");
+    norm_in("es", "es_ES", "$10", "diez dólares");
+    norm_in("es", "es_EC", "$10", "diez dólares");
+    norm_in("es", "es_PR", "$10", "diez dólares");
+    norm_in("es", NULL, "$10", "diez dólares");
+    norm_in("es", "", "$10", "diez dólares");
+    norm_in("es", "es", "$10", "diez dólares");
+    norm_in("es", "es.UTF-8", "$10", "diez dólares");
+    norm_in("es", "C.UTF-8", "$10", "diez dólares");
+    norm_in("es", "es_ARG", "$10", "diez dólares");
+    norm_in("pt", "pt_BR", "$10 e R$ 10", "dez dólares e dez reais");
+    norm_in("pt", "pt_PT", "$10", "dez dólares");
+    norm_in("pt", NULL, "R$ 1", "um real");
+    norm_in("pt", "es_AR", "$10 e US$ 10", "dez pesos e dez dólares");
+    norm_in("pt", "pt_BR", "USD 1", "um dólar");
+    norm_in("en", "es_AR", "$10", "$10");
+    norm_in("es", "es_AR", "10 USDT", "diez USDT");
 }
 
 static void normalize_es(void) {
@@ -330,6 +362,7 @@ int main(void) {
     normalize_es();
     normalize_pt();
     normalize_others();
+    normalize_region();
     printf("saytext_test: %d/%d\n", n - bad, n);
     return bad != 0;
 }
