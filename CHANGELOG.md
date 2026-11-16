@@ -117,6 +117,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button
     still closes it. The tiler writes the window store once per change and
     never runs per frame.
+  - *Bars like a video player's controls:* the activity strip and the status cluster now blur like the Context Spine
+    (the theme's material: Crystal, Translucent or Opaque, the same as the spine and menus), and each of their
+    controls sits on its own pill that shows under the pointer, with thin lines between groups and glyphs in the
+    spine's colour (`components/BarButton.jsx`, tokens `iconFg`, `itemHover`, `barSeparator`). Activity icons keep the
+    colour chosen for them.
   - *Several displays:* one activity spans every display, each with its own frame, layout and divider, and switching
     activity switches them all. Save layout keeps, per display connector, the layout and the app of each tile, and
     windows of those apps go back there; with fewer monitors a missing display's apps join the main display's tiles; a

@@ -18,13 +18,13 @@ const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, an
     const n = icon.current?.id;
     if (n) tween(n, { scaleX: [to === 1 ? 1.08 : 1, to], scaleY: [to === 1 ? 1.08 : 1, to] }, { ms, ease: EASE.spring, clear: to === 1 });
   };
-  const fg = active ? t.onAccent : hover ? t.text : t.textDim;
+  const fg = active ? t.onAccent : hover ? t.iconFgHover : t.iconFg;
   return (
     <View ref={anchor} onClick={(e) => onClick(e)} title={expanded ? undefined : label}
       onMouseEnter={() => { setHover(true); spring(1.08, 180); }} onMouseLeave={() => { setHover(false); spring(1, 220); }}
       onMouseDown={() => spring(0.92, 120)} onMouseUp={() => spring(1.08, 160)}
       style={{ alignSelf: 'stretch', marginHorizontal: 6, paddingVertical: expanded ? 8 : 10, borderRadius: 12, alignItems: 'center', gap: 4,
-        backgroundColor: active ? t.accent : hover ? t.hover : 'transparent' }}>
+        backgroundColor: active ? t.accent : hover ? t.itemHover : 'transparent' }}>
       <View ref={icon} style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>{glyph(fg, active ? t.accent : t.solidBg)}</View>
       {expanded ? <Text style={{ fontSize: 10.5, fontWeight: 600, color: fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 70, textAlign: 'center' }}>{label}</Text> : null}
     </View>
