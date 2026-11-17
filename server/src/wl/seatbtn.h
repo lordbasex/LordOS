@@ -32,4 +32,20 @@ static inline int sb_drag_released(const SeatBtn *after, int drag_button, int bu
     return button == drag_button || !sb_any(after);
 }
 
+/* A start_drag's serial against the press it must name (issue #177): one of the serials that press was sent with
+ * (one per wl_pointer of the client), or a newer serial that is not newer than the newest the display gave out.
+ * GTK 3 sends the newest serial it has seen, not its press's: after a click that focused the window that is the
+ * keyboard's enter or modifiers, which come after the button (the theme focuses the window when it sees the
+ * press), so Firefox's first drag in a window it had just been clicked into was refused. wl.c asks this only
+ * while that client's press is still held on the window it names. Serials wrap: "newer" is by signed difference. */
+static inline int sb_serial_ok(uint32_t serial, const uint32_t *press, int npress, uint32_t newest) {
+    if (npress <= 0) return 0;
+    uint32_t first = press[0];
+    for (int i = 0; i < npress; i++) {
+        if (press[i] == serial) return 1;
+        if ((int32_t)(press[i] - first) < 0) first = press[i];
+    }
+    return (int32_t)(serial - first) > 0 && (int32_t)(newest - serial) >= 0;
+}
+
 #endif

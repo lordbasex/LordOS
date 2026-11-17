@@ -1,6 +1,7 @@
-/* seatbtn_test.c — the seat's buttons as drag and drop sees them (src/wl/seatbtn.h; issue #176). */
+/* seatbtn_test.c — the seat's buttons as drag and drop sees them (src/wl/seatbtn.h; issues #176, #177). */
 #include "wl/seatbtn.h"
 
+#include <stdint.h>
 #include <stdio.h>
 
 static int fails, total;
@@ -67,6 +68,21 @@ int main(void) {
     sb_event(&s, 40, 1);
     sb_event(&s, -1, 1);
     is(sb_any(&s), 0, "out-of-range buttons hold nothing");
+
+    /* start_drag's serial (issue #177): the press's own serials, or GTK 3's newest one given out since */
+    uint32_t press[2] = { 100, 101 };   /* two wl_pointers of one client: one serial each */
+    is(sb_serial_ok(100, press, 2, 105), 1, "the first pointer's press serial");
+    is(sb_serial_ok(101, press, 2, 105), 1, "the second pointer's press serial");
+    is(sb_serial_ok(104, press, 2, 105), 1, "GTK 3: the keyboard's enter after the click");
+    is(sb_serial_ok(105, press, 2, 105), 1, "GTK 3: the newest serial given out");
+    is(sb_serial_ok(106, press, 2, 105), 0, "a serial not given out yet");
+    is(sb_serial_ok(99, press, 2, 105), 0, "a serial older than the press");
+    is(sb_serial_ok(100 + 1000, press, 2, 105), 0, "a made-up serial (tests/dnd_client.c)");
+    is(sb_serial_ok(100, press, 0, 105), 0, "no press: nothing names one");
+    uint32_t wrap[1] = { 0xfffffffeu };  /* the display's serials wrap around */
+    is(sb_serial_ok(1, wrap, 1, 3), 1, "across the wrap: newer");
+    is(sb_serial_ok(0xfffffff0u, wrap, 1, 3), 0, "across the wrap: older");
+    is(sb_serial_ok(4, wrap, 1, 3), 0, "across the wrap: not given out yet");
 
     printf("seatbtn: %d/%d ok\n", total - fails, total);
     return fails != 0;

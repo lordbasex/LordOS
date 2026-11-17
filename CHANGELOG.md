@@ -404,6 +404,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   a set now (`server/src/wl/seatbtn.h`): a button's next release clears it, and a drag also ends at the release of the
   button that started it, whatever another button looks like (as Weston does). Checked in `build/seatbtn-test` (in
   `make -C server test`: a lost release, a doubled press, another button stuck down, a second button mid-drag).
+- **Firefox's (and any GTK 3 app's) first drag in a window it had just been clicked into was refused (GitHub #177).**
+  A drag must name the press it comes from, and the compositor took only that press's own serial. GTK 3 names the
+  newest serial it has seen instead, and after a click that focused the window that is the keyboard's `enter` or
+  `modifiers`, which LordOS sends after the button (the theme focuses the window when it sees the press): the drag was
+  cancelled before it started and the tab went back. A serial newer than the press and not newer than the newest the
+  display gave out is taken too, still only while that client's press is held on the window it names (`sb_serial_ok`
+  in `server/src/wl/seatbtn.h`). Checked in `build/seatbtn-test` (the press's serials, newer ones, ones not given out,
+  older ones, a made-up one, across the serials' wrap) and in `build/dnd-client`, whose second drag now starts as GTK 3
+  starts one.
 - **The real-time priority's demotion left the main thread at real time.** On `SIGXCPU` lord-server asked the kernel
   for `SCHED_OTHER` alone, which it refuses for a thread with `SCHED_RESET_ON_FORK` (the main one) without
   `CAP_SYS_NICE`: only the paint threads went back. It keeps the flag now (`par.c`).

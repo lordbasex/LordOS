@@ -281,7 +281,9 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
 
 - **Between Linux apps.** An app starts a drag with `wl_data_device.start_drag` and the serial of the press
   it is in. The serial must be the one of a press of that client, with the button still down, on the window
-  that got it: any other serial cancels the source and nothing happens. A second `start_drag` while a drag
+  that got it, or a newer one given out while that press is held: GTK 3 (Firefox, Floorp) names the newest
+  serial it has seen, which after a click that focused the window is the keyboard's (#177). Any other serial
+  cancels the source and nothing happens. A second `start_drag` while a drag
   runs is cancelled too. While the button is down no app gets the pointer: the surface under it gets
   `enter`, `motion` and `leave` on its data device, with a new `wl_data_offer` each time it enters (the
   source's types and, from version 3, its actions). The target's `accept` and `set_actions` reach the source
@@ -380,10 +382,11 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   who may hand files to LordOS, synthetic or mismatched `SelectionNotify` events and owners that changed
   before the read),
   `build/dndgate-test` (also in it: a sandboxed root, a drop claimed only at its release), `build/seatbtn-test`
-  (also in it: the release that ends a drag with a lost release, a doubled press or another button down), and
+  (also in it: the release that ends a drag with a lost release, a doubled press or another button down, and the
+  serials a `start_drag` may name), and
   `build/dnd-client` inside a session. Without input it checks a serial that names no press, the
   protocol errors and that the compositor stays up. With two presses in its window it checks the offer, the
-  actions, a second drag, the icon and the source destroyed mid-drag, receive, drop and finish; a third,
+  actions, a second drag (started with the newest serial, as GTK 3 does), the icon and the source destroyed mid-drag, receive, drop and finish; a third,
   released on the desktop, checks that an unclaimed drop is cancelled without its list being asked for; a
   fourth, released on a Files folder with a list that never ends, that it is cancelled after 5 seconds.
 

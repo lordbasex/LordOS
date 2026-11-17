@@ -3881,10 +3881,11 @@ static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resou
     if (icon && icon->role != R_NONE && icon->role != R_DNDICON) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_ROLE, "the icon has another role"); return; }
     if (src && src->used) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_USED_SOURCE, "the source was already used"); return; }
     if (src) src->used = 2;
-    /* the press it names: this client's, current (a button still down), on the window that got it */
+    /* the press it names: this client's, current (a button still down), on the window that got it; the serial is
+     * that press's or, as GTK 3 sends, a newer one given out while it is held (seatbtn.h sb_serial_ok) */
     int ok = !drag.on && o && o->client == c && buttons_held > 0 && press_surf && press_surf->client == c &&
-             toplevel_of(o) == toplevel_of(press_surf), known = 0;
-    for (int i = 0; ok && i < npress; i++) if (press_serials[i] == serial) known = 1;
+             toplevel_of(o) == toplevel_of(press_surf);
+    int known = ok && sb_serial_ok(serial, press_serials, npress, wl_display_get_serial(dpy));   /* GTK 3: its newest */
     if (!ok || !known) {
         if (src) wl_data_source_send_cancelled(src->res);
         return;
