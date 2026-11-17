@@ -374,8 +374,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (`store.set(() => map)`); the logic moved to `apps/files/tags.js`, tested by `files-tags-test`.
 - **Files: Select All (Ctrl+A / ⌘A) selects the column you are in** (GitHub #170). In the column view it always took
   the first column's items, so picking a file in a subfolder and pressing Ctrl+A selected the parent's items. It now
-  takes the column of the item last clicked (while selected), else the deepest column with a selection, as Finder
-  does (`columnAll` in `apps/files/colview.js`, tested by `files-colview-test`). In the list view with unfolded folders
+  takes the column of the item last clicked (while selected), else the deepest column with a selection
+  (`columnAll` in `apps/files/colview.js`, tested by `files-colview-test`). In the list view with unfolded folders
   it selects every row shown, their items too, instead of only the top level. The Edit menu's Select All does the same.
 - **Files: a picture replaced by another one under the same name shows the new one** in its icon, the preview pane
   and Quick Preview (GitHub #180). lord-server kept decoded thumbnails by path only, and an idle one stays cached for
