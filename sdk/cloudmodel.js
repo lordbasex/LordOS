@@ -52,7 +52,19 @@ export function pathsToAsk(paths, accounts, max = 400) {
 
 // one color per account, in the order they were added (the mocks' blue, purple, orange, green first)
 export const ACCOUNT_COLORS = ['#0a84ff', '#bf5af2', '#ff9f0a', '#30d158', '#ff375f', '#5e5ce6', '#64d2ff', '#ffd60a'];
+// The person can choose one in the account's page (Settings → Cloud, settings.cloudColors: { <account id>: '#rrggbb' }, one
+// of ACCOUNT_COLORS); otherwise the order rule above, so two accounts of one provider still differ (issue #184).
+let chosen = {};
+export function setChosenColors(map) {
+  const out = {};
+  if (map && typeof map === 'object' && !Array.isArray(map)) {
+    for (const [id, c] of Object.entries(map)) if (typeof id === 'string' && id.length <= 64 && ACCOUNT_COLORS.includes(c)) out[id] = c;
+  }
+  chosen = out;
+}
+export const chosenColor = (id) => chosen[id] || null;
 export const accountColor = (accounts, id) => {
+  if (chosen[id]) return chosen[id];
   const i = Math.max(0, (accounts || []).findIndex((a) => a.id === id));
   return ACCOUNT_COLORS[i % ACCOUNT_COLORS.length];
 };

@@ -949,6 +949,35 @@ function KnownIssue({ a }) {
   );
 }
 
+// The account's color: Automatic (the order it was added in) or one of the palette's, kept in settings.cloudColors.
+function ColorRow({ a, accounts }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const [s, set] = useSettings();
+  const mine = (s.cloudColors || {})[a.id] || null;
+  const pick = (c) => {
+    const next = { ...(s.cloudColors || {}) };
+    if (c) next[a.id] = c; else delete next[a.id];
+    set({ cloudColors: next });
+  };
+  const swatch = (c, on, label) => (
+    <View key={c || 'auto'} aria-label={label} onClick={() => pick(c)} style={{ width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
+      backgroundColor: c || 'transparent', border: c ? 'none' : `1.5px dashed ${t.textDim}` }}>
+      {on ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c ? '#fff' : t.text }} /> : null}
+    </View>
+  );
+  return (
+    <View style={[box(t), { paddingHorizontal: 14, paddingVertical: 12, gap: 8 }]}>
+      <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.color')}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, direction: 'ltr', alignItems: 'center' }}>
+        {swatch(null, !mine, tr('cloud.colorAuto'))}
+        {M.ACCOUNT_COLORS.map((c) => swatch(c, mine === c, c))}
+      </View>
+      <Dim t={t}>{mine ? tr('cloud.colorChosen') : tr('cloud.colorAutoHint')}</Dim>
+    </View>
+  );
+}
+
 function AccountPage({ a, st }) {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -998,6 +1027,7 @@ function AccountPage({ a, st }) {
     <View style={{ flex: wide ? 1 : undefined, minWidth: 0, alignSelf: 'stretch', gap: 16 }}>
       <KnownIssue a={a} />
       <SpaceCard a={a} accounts={accs} />
+      <ColorRow a={a} accounts={accs} />
       <HereCard a={a} />
       <KeptList a={a} onAdd={() => setView({ sheet: { kind: 'pickFolder', id: a.id } })} />
       <LinksList a={a} />

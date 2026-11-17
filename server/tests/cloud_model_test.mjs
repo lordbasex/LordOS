@@ -742,4 +742,14 @@ eq('known issue: others have none', [M.knownIssue('onedrive'), M.knownIssue(''),
   eq('here: no accounts', M.here([]), { size: 0, kept: 0, free: 0, rows: [] });
 }
 
+// a color chosen in Settings → Cloud wins; anything not in the palette is ignored; Automatic is the order rule (#184)
+{
+  const accs = [{ id: 'a' }, { id: 'b' }];
+  M.setChosenColors({ b: M.ACCOUNT_COLORS[5], a: '#123456', c: 'red' });
+  eq('chosen color: the palette one wins', M.accountColor(accs, 'b'), M.ACCOUNT_COLORS[5]);
+  eq('chosen color: not from the palette, ignored', M.accountColor(accs, 'a'), M.ACCOUNT_COLORS[0]);
+  M.setChosenColors(null);
+  eq('chosen color: none, the order rule again', M.accountColor(accs, 'b'), M.ACCOUNT_COLORS[1]);
+}
+
 console.log(`cloud model: ${ok} checks ${process.exitCode ? 'with failures' : 'passed'}`);
