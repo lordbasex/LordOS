@@ -1,5 +1,6 @@
 // settings.js — user settings, stored in ~/.config/lordos/settings.json.
 import { createStore, useStore } from './store.js';
+import { markExistingUser } from './firststartmodel.js';
 
 const DEFAULTS = {
   mode: 'dark',          // 'dark' | 'light'
@@ -50,13 +51,15 @@ const DEFAULTS = {
   cloudColors: {},            // 0.8.8.10 (#184), Settings → Cloud: a color chosen per account id (cloudmodel.js accountColor); new key, no migration
   themeOptions: {},           // 0.8.9, a theme's own choices from its theme.json "options", by theme id (thememeta.js); new key, no migration
   workspaces: null,           // 0.8.9, Lord Workspaces' activities: { v, activities } (themes/workspaces/model/activities.js); new key, no migration
+  desktopChosen: false,       // 0.8.9, the first-start desktop chooser was finished (sdk/firststart.jsx); migration 5 sets it for existing users
+  firstStart: null,           // 0.8.9, that chooser's step while it is open, across its live theme switches (sdk/firststartmodel.js cleanState)
 };
 
 // Per-user settings migrations (docs/UPDATES.md, "Migrations"): when an update changes the shape or
 // meaning of a setting, it appends [schema, (settings) => newSettings] here. Each runs once per user,
 // in order, when the session loads the file; "schema" records the last one applied. The system-wide
 // migrations (as root) are the lordos package's (packaging/migrations).
-export const SETTINGS_SCHEMA = 5;
+export const SETTINGS_SCHEMA = 6;
 // A Terminal key mapping that sends what a US keyboard's key types anyway (keys.js names keys by their
 // US position): on a US keyboard it does nothing, on any other it types the wrong character. The iTerm2
 // importer made them from keypad entries before 0.8.8.6 ("-" typed "/" on a Latin American keyboard).
@@ -99,6 +102,7 @@ const MIGRATIONS = [
     // same (their default); only Lord Workspaces, new in 0.8.9, shows its own. Any other picture stays.
     return s.wallpaper === 'lumo-celestial' ? { ...s, wallpaper: null } : s;
   }],
+  [6, markExistingUser],  // 0.8.9: someone who already used LordOS never sees the first-start desktop chooser (firststartmodel.js)
 ];
 export function migrateSettings(s) {
   let out = s;

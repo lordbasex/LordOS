@@ -23,6 +23,7 @@ import {
   VideoSetup, setDesktopDecor, setStatusPanelPlacer, WidgetPicker, widgetPicker,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
+import { useFirstStartOpen } from '@lordos/sdk';   // (0.8.9) the activity onboarding waits for the first-start desktop chooser
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { makeTheme } from './tokens.js';
 import { displayPlan, shownDisplays, onChrome } from './model/geometry.js';
@@ -284,7 +285,8 @@ function App() {
   const onDesk = all.filter((w) => w.desktop === desktop && !w.pip).length;
   // the header's Move button: a window of this activity in front and another activity to send it to
   const canMove = !!focused && list.length > 1;
-  const onboarding = needsOnboarding(deskMeta, list.length, onDesk) && !inOverview;
+  const chooserOpen = useFirstStartOpen();
+  const onboarding = needsOnboarding(deskMeta, list.length, onDesk) && !inOverview && !chooserOpen;
   const controlAnchor = () => {
     const n = controlRef.current;
     if (n) { const [x, y, w, h] = lord.getLayout(n.id); return { x, y, w, h }; }

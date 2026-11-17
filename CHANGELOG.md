@@ -48,6 +48,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   GPU path. (`themes/workspaces`, `apps/settings/Slideshow.jsx`, `server/src/ui/js.c`, `server/src/ui/ui.h`,
   docs/WORKSPACES.md "Wallpaper and slideshow"; tests in `server/tests/slideshow_model_test.mjs` (new, in `make test`),
   `workspaces_scene.mjs`, `build/engine-test` `test_image_wallpaper_thumb`, timing in `build/engine-test bench-slideshow`)
+- **First start: choose your desktop.** The first session of a new account on an installed system opens a three-step
+  chooser in the language picked in the installer (`sdk/firststart.jsx`, `sdk/firststartmodel.js`; docs/SETTINGS.md,
+  "First start"). Step 1, over the dimmed desktop: the crown, "Choose your desktop" and three equal cards for Lord Flow,
+  Lord Classic and Lord Workspaces, each with a real picture (`assets/desktops/*.jpg`, 640 × 400, about 40 KB each), its
+  name and the theme's own description; the cards come in a random order every time, none is chosen and none is
+  marked as recommended, and "See it live" waits for a choice. Step 2: the chosen desktop is applied for real with the
+  live theme switch, and the panel becomes a small floating box (330 px) on the end side of the work area at about
+  mid-height, never over the Dock, the Classic taskbar or the Workspaces spine; its grip drags it anywhere inside the
+  display's work area, the three names switch live (a ✓ on the current one), with Back and Use this. Step 3, "Change it
+  whenever you like": a drawn replica of Settings → Appearance in the person's language with Desktop style ringed and
+  the chosen desktop selected, the path Settings → Appearance → Desktop style, Back and Start. Back works on every
+  step; the step, the pick, the order and the box's place are kept in `settings.firstStart` across the theme switch
+  (the JS context is discarded) and checked when read back, and a failed switch leaves the theme as it was. Tab, Space,
+  Enter and Escape (Back) work throughout, and it follows right-to-left languages. It never shows on the live system,
+  on the OVA's first boot, on the login screen or to anyone who already used LordOS: settings migration 5 marks
+  `desktopChosen` on a settings file that shows an earlier session (`welcomeShown`, `sessionSaved` or a chosen
+  `theme`), while the files the installer, the OVA's first boot and Settings → Users write for a new account don't
+  count. It is mounted by the SDK for all three themes, "Welcome to LordOS" and Lord Workspaces' activity onboarding
+  wait for it, and once done it leaves no listener or timer (the three themes' idle wakeups are unchanged). Settings →
+  Appearance's drawn desktop-style pictures moved into the SDK (`sdk/stylethumb.jsx`, `DesktopStyleThumb`) so the
+  replica draws the same ones. 11 new texts in all 35 languages. Tests: `server/tests/firststart_model_test.mjs` (51
+  checks: who sees it, the random order, the saved state, Back and forward, the box's place) and
+  `firststart_scene.mjs` over each theme (33 checks each: the whole wizard, the switch and resume, the drag, the keys,
+  nothing left after Start), both in `make test`.
 - **Desktop widgets in Lord Flow and Lord Classic too**, the same as in Lord Workspaces: "Add widget…" in the
   wallpaper's right-click menu opens the catalog (search, categories, sizes), widgets sit on each display's grid, can be
   dragged to another block and keep their data fresh through the shared widget feed. The catalog moved from the theme

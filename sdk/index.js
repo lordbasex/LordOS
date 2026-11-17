@@ -136,6 +136,7 @@ import { NotificationBanner } from './notify.js';
 import { startAlarms } from './alarms.js';
 import { startDiskWatch } from './diskwatch.js';
 import { maybeStartTour } from './help.js';
+import { FirstStart, startFirstStart } from './firststart.jsx';
 import { liveStartWindow } from './livestart.js';
 import { getApp as getAppOf, isLiveSystem as isLiveSystemOf, wm as wmOf, windows as windowsStore } from './windows.js';
 export const windowIcon = (w) => windowIconOf(w, getAppOf);
@@ -292,7 +293,8 @@ export function startShell(element) {
   startAlarms();                        // Clock alarms and timer, with the app closed
   startMail();                          // new-mail notifications and passwords on demand (docs/MAIL.md)
   startReminders();                     // calendar and reminder alarms, with the apps closed
-  maybeStartTour();                     // "Welcome to LordOS", the first time
+  // (0.8.9) a new account's first session: choose the desktop (firststart.jsx); "Welcome to LordOS" waits for it
+  if (!startFirstStart({ list: themes.list, current: themes.current, use: (id) => themes.use(id), onDone: maybeStartTour })) maybeStartTour();
   startHardware();                      // Night Light, idle timers, battery in the menu bar (hardware.jsx)
   startTray();                          // the tray icons of Linux apps next to the status items (trayitems.jsx)
   startDiskWatch();                     // notices when a disk gets too hot or its health gets worse
@@ -360,7 +362,7 @@ function LocaleRoot({ children }) {
     at('floating', FloatingWindows),
     at('overlay', SpotlightPanel, LiveSpeechPanel),
     at('popover', ClipboardPanel, EmojiPanel),
-    at('modal', PrintDialog, RestorePrompt),
+    at('modal', PrintDialog, RestorePrompt, FirstStart),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),
     at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
     at('input', OskPanel, ImeOverlay));
@@ -380,4 +382,7 @@ export { useStream, saveStreamPassword, STREAM_KEYRING_APP } from './streams.jsx
 export { streamUrlOk, splitCredentials, withCredentials, protocolOf, lowQuality, parseM3U, hostKey } from './streammodel.js';
 export { VideoSetup, videoSetup } from './videowidget.jsx';
 
-export { WidgetPicker, widgetPicker } from './widgetpicker.jsx';   // Add widget, in every theme (0.8.8.10)
+export { WidgetPicker, widgetPicker } from './widgetpicker.jsx';
+// (0.8.9) the first-start desktop chooser and Desktop style's drawn pictures (Settings → Appearance)
+export { FirstStart, startFirstStart, firstStartState, useFirstStartOpen } from './firststart.jsx';
+export { DesktopStyleThumb, SketchThumb, knownStyleTheme } from './stylethumb.jsx';   // Add widget, in every theme (0.8.8.10)

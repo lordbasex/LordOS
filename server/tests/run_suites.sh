@@ -555,6 +555,14 @@ EOF
         run "workspaces-test (themes/workspaces on three displays)" node tests/workspaces_test.mjs
     else skip "workspaces-test" "node and the repository's node_modules (npm install)"; fi
     if have node; then run "workspaces-model-test (themes/workspaces/model, tokens.js, sdk/thememeta.js)" node tests/workspaces_model_test.mjs; fi
+    # (0.8.9) the first-start desktop chooser: who sees it, the random order, the steps across the live theme switch,
+    # and the whole wizard drawn over each theme (sdk/firststart.jsx)
+    if have node; then run "firststart-model-test (sdk/firststartmodel.js)" node tests/firststart_model_test.mjs; fi
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default classic workspaces; do
+            run "firststart-scene-$th (sdk/firststart.jsx over themes/$th)" node tests/workspaces_test.mjs firststart_scene.mjs "$th"
+        done
+    else skip "firststart-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8, #111) how many app buttons fit on a Classic taskbar, and how big
     if have node; then run "classic-taskbarfit-test (themes/classic/taskbarfit.js)" node tests/classic_taskbarfit_test.mjs; fi
     # (0.8.8.6) the Terminal's key mappings: iTerm2's keypad, "\n", settings migration 2
