@@ -83,14 +83,13 @@ function Splitter({ t, desk, dkey, layout, ratio, area, count }) {
   );
 }
 
-// The frame itself: only a border in the accent (Crystal adds a brighter top edge), the same for every activity, so a
+// The frame itself: only a thin border in the accent (no brighter top edge: the maintainer found the doubled line at
+// the top unconvincing, 0.8.8.10), the same for every activity, so a
 // switch never repaints this display-sized box; the activity's own colour is on its header chip and its pill. No fill:
 // a scrim over the whole work area was the costly part of a switch on the CPU path (docs/WORKSPACES.md, "Performance").
 const FrameBox = memo(function FrameBox({ t, f }) {
   return (
-    <View style={{ position: 'absolute', left: f.x, top: f.y, width: f.w, height: f.h, borderRadius: 18, border: `1.5px solid ${alpha(t.accent, 0.45)}`, pointerEvents: 'none' }}>
-      {t.mat.edge ? <View style={{ position: 'absolute', left: 24, right: 24, top: 0, height: 1, backgroundColor: alpha(t.accent, 0.85) }} /> : null}
-    </View>
+    <View style={{ position: 'absolute', left: f.x, top: f.y, width: f.w, height: f.h, borderRadius: 18, border: `1.5px solid ${alpha(t.accent, 0.45)}`, pointerEvents: 'none' }} />
   );
 });
 

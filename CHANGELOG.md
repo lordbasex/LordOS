@@ -146,6 +146,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     the pointer (Photos restored with a picture that no longer existed). lord.media calls that C refuses (a path
     outside the home or gone) now return null in the SDK, as with no helper. A free slot's "Free space" and Add window
     stay out on a display with widgets (the frame header's + adds a window).
+  - *The activity frame is one thin line:* the brighter accent line along its top is gone, so the frame no longer
+    looks doubled there.
   - *Claude Code widget, small:* the context ring is larger (it names itself inside: Context) and the state and limit
     bars sit along the bottom, as the weather's text does.
   - *Several displays:* one activity spans every display, each with its own frame, layout and divider, and switching
