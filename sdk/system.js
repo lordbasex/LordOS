@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { formatNumber, t } from './i18n.js';
 export { memUsedKB } from './memfigure.js';
+import { sameValue } from './samevalue.js';
+export { sameValue };
 
 export const systemInfo = () => lord.system.info();
 
@@ -18,7 +20,7 @@ export function lordosVersion(info) {
 function usePoll(read, intervalMs) {
   const [value, setValue] = useState(read);
   useEffect(() => {
-    const id = setInterval(() => setValue(read()), intervalMs);
+    const id = setInterval(() => { const next = read(); setValue((prev) => (sameValue(prev, next) ? prev : next)); }, intervalMs);
     return () => clearInterval(id);
   }, [intervalMs]);
   return value;
@@ -32,7 +34,8 @@ export function systemReport() {
 }
 export const useServerStats = (intervalMs = 2000) => usePoll(() => lord.stats(), intervalMs);
 
-// CPU usage (0..1) computed between reads of /proc/stat.
+// CPU usage (0..1) computed between reads of /proc/stat, in steps of 1 % (what every view shows): an unchanged
+// percentage is the same number, so it re-renders nothing.
 export function useCpuUsage(intervalMs = 1500) {
   const [usage, setUsage] = useState(0);
   useEffect(() => {
@@ -40,7 +43,7 @@ export function useCpuUsage(intervalMs = 1500) {
     const id = setInterval(() => {
       const [t1, i1] = lord.system.cpuTimes();
       const dt = t1 - t0;
-      setUsage(dt > 0 ? Math.max(0, Math.min(1, 1 - (i1 - i0) / dt)) : 0);
+      setUsage(dt > 0 ? Math.round(Math.max(0, Math.min(1, 1 - (i1 - i0) / dt)) * 100) / 100 : 0);
       t0 = t1; i0 = i1;
     }, intervalMs);
     return () => clearInterval(id);

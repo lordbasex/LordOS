@@ -18,7 +18,7 @@
 // The look follows TangoOS's widgets (the maintainer's own design): 22 px corners, the Crystal blur, 12 px headings,
 // large figures. Nothing on them runs per second: clocks move once a minute; System, Network, Temperatures and Claude
 // Code read only while shown.
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { View, Text, addListener, screen, onScreenChange, displays as screenDisplays, mainDisplay } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
@@ -28,7 +28,7 @@ import { Layer } from './layers.js';
 import { ContextMenu } from './contextmenu.jsx';
 import { workAreaOf, activeDesktop, wm } from './windows.js';
 import { t, formatTime, formatDate, monthName, weekdayName } from './i18n.js';
-import { useCpuUsage, useSystemInfo, formatBytes } from './system.js';
+import { useCpuUsage, useSystemInfo, formatBytes, sameValue } from './system.js';
 import { memUsedKB } from './memfigure.js';
 import { NowPlayingTile } from './media.js';
 import { speak, stopSpeaking, speakAvailable } from './voice.js';
@@ -281,15 +281,21 @@ function Line({ L, label, value, color }) {
   );
 }
 const Quiet = ({ L, text }) => <Text style={{ fontSize: 12, color: L.dim, textAlign: 'start', paddingTop: 4 }}>{text}</Text>;
-// a ring of short ticks (no SVG in the renderer): the filled ones are the value
+// a ring of short ticks (no SVG in the renderer): the filled ones are the value. The ticks are their own memoized
+// component with plain props, so a ring whose filled count and colours are unchanged (most refreshes: the value
+// moves by less than a tick) costs nothing in React; only the text in the middle is updated.
+const TickMarks = memo(function TickMarks({ size, ticks, n, on, off }) {
+  const c = size / 2, r = c - 4;
+  return Array.from({ length: ticks }, (_, i) => {
+    const a = (i / ticks) * Math.PI * 2, x = c + Math.sin(a) * r, y = c - Math.cos(a) * r;
+    return <View key={i} style={{ position: 'absolute', left: x - 1.5, top: y - 4, width: 3, height: 8, borderRadius: 1.5, backgroundColor: i < n ? on : off, transform: `rotate(${(i / ticks) * 360}deg)` }} />;
+  });
+});
 function TickRing({ L, size, value, color, ticks = 40, children }) {
-  const c = size / 2, r = c - 4, n = Math.round(Math.max(0, Math.min(1, value || 0)) * ticks);
+  const n = Math.round(Math.max(0, Math.min(1, value || 0)) * ticks);
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', direction: 'ltr' }}>
-      {Array.from({ length: ticks }, (_, i) => {
-        const a = (i / ticks) * Math.PI * 2, x = c + Math.sin(a) * r, y = c - Math.cos(a) * r;
-        return <View key={i} style={{ position: 'absolute', left: x - 1.5, top: y - 4, width: 3, height: 8, borderRadius: 1.5, backgroundColor: i < n ? color || L.accent : L.track, transform: `rotate(${(i / ticks) * 360}deg)` }} />;
-      })}
+      <TickMarks size={size} ticks={ticks} n={n} on={color || L.accent} off={L.track} />
       {children}
     </View>
   );
@@ -297,7 +303,7 @@ function TickRing({ L, size, value, color, ticks = 40, children }) {
 // a timer only while mounted
 function useEvery(fn, ms, deps = []) {
   const [v, setV] = useState(() => { try { return fn(); } catch (e) { return null; } });
-  useEffect(() => { const id = setInterval(() => { try { setV(fn()); } catch (e) { setV(null); } }, ms); return () => clearInterval(id); }, deps);
+  useEffect(() => { const id = setInterval(() => { let x = null; try { x = fn(); } catch (e) { /* null */ } setV((p) => (sameValue(p, x) ? p : x)); }, ms); return () => clearInterval(id); }, deps);
   return v;
 }
 function useMinute() {

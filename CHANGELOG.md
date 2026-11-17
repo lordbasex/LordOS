@@ -165,6 +165,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Desk widgets refresh only what changed (all themes).** Measured with `perf` on a 3-display desktop at rest,
+  about a third of lord-server's time went to JavaScript, mostly widgets re-rendering on their timers with the same
+  data. Now a polled value that reads the same as before (`sameValue`, `sdk/samevalue.js`) keeps the old one, so
+  React renders nothing; CPU usage is reported in steps of 1 % (what every view shows); and a gauge's ring of ticks
+  is a memoized component, so a refresh that moves the value by less than a tick rebuilds only the number in the
+  middle, not 36–48 tick views.
+- **`lord.system.info` reads `/proc/cpuinfo` once.** The processor's name and core count don't change during a
+  session, and the file is costly for the kernel to generate (one block per CPU, each asked for its clock); the
+  System widget polled it every 5 seconds.
+
 - **Settings → Appearance → Desktop style:** its hint said "Both styles have the same apps", untrue with a third style.
   It now reads "Every desktop style has the same apps." (no number, so new themes don't need it changed), in all 35
   languages; the rest of the hint is the same. Lord Flow and Lord Classic show it too.
