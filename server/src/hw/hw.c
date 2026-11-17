@@ -31,7 +31,7 @@ const PowerState *hw_power(void) { return &power; }
  * notices never came). */
 #define POWER_POLL_MS 30000.0
 static double power_next;               /* CLOCK_MONOTONIC ms of the next read, 0 = none */
-static char power_last[4096];
+static char power_last[8192];
 
 static double hw_now_ms(void) {
     struct timespec t;
@@ -41,7 +41,7 @@ static double hw_now_ms(void) {
 
 static void power_changed(void) {
     power_read("/sys/class/power_supply", &power);
-    char j[4096];
+    char j[8192];
     power_json(&power, j, sizeof j);
     power_next = power.has_battery ? hw_now_ms() + POWER_POLL_MS : 0;
     if (!strcmp(j, power_last)) return;

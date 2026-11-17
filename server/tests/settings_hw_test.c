@@ -347,6 +347,24 @@ static void test_power(void) {
     CHECK(power_read(dir, &ps) == 3);
     CHECK(ps.on_ac && ps.charging && ps.percent == 50 && ps.minutes_left == 120);
     CHECK(ps.s[1].health == 100 && fabs(ps.s[1].watts - 12) < 1e-9);
+    /* the live readings and the battery's facts: volts, amps, temperature (signed tenths), Wh from charge × voltage,
+     * manufacture date, and charge control */
+    CHECK(fabs(ps.s[1].volts - 12) < 1e-9 && fabs(ps.s[1].amps - 1) < 1e-9 && fabs(ps.s[1].wh_now - 24) < 1e-6 && fabs(ps.s[1].wh_full - 48) < 1e-6);
+    CHECK(ps.s[1].temp_c == -1000 && ps.s[1].mfg_year == 0 && ps.s[1].start_threshold == -1 && ps.s[1].end_threshold == -1 && ps.s[1].behaviours == 0);
+    wfile(dir, "BAT0", "temp", "-52");
+    wfile(dir, "BAT0", "manufacture_year", "2024");
+    wfile(dir, "BAT0", "manufacture_month", "3");
+    wfile(dir, "BAT0", "charge_control_start_threshold", "70");
+    wfile(dir, "BAT0", "charge_control_end_threshold", "80");
+    wfile(dir, "BAT0", "charge_behaviour", "auto [inhibit-charge] force-discharge");
+    CHECK(power_read(dir, &ps) == 3);
+    CHECK(fabs(ps.s[1].temp_c + 5.2) < 1e-9 && ps.s[1].mfg_year == 2024 && ps.s[1].mfg_month == 3);
+    CHECK(ps.s[1].start_threshold == 70 && ps.s[1].end_threshold == 80);
+    CHECK(ps.s[1].behaviours == (POWER_BEH_AUTO | POWER_BEH_INHIBIT | POWER_BEH_DISCHARGE) && ps.s[1].behaviour == POWER_BEH_INHIBIT);
+    { int l = 0;
+      CHECK(power_parse_behaviour("[auto] inhibit-charge\n", &l) == POWER_BEH_AUTO && l == (POWER_BEH_AUTO | POWER_BEH_INHIBIT));
+      CHECK(power_parse_behaviour("auto bogus [rm -rf]", &l) == 0 && l == POWER_BEH_AUTO);
+      CHECK(power_parse_behaviour("", &l) == 0 && l == 0); }
     char json[4096];
     size_t n = power_json(&ps, json, sizeof json);
     CHECK(n > 0 && n < sizeof json && json[n - 1] == '}');

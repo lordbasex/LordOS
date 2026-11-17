@@ -38,7 +38,8 @@ import { speak, stopSpeaking, speakAvailable } from './voice.js';
 import { events, reminders, usePimQuery } from './calendar.js';
 import { useFan } from './cooling.jsx';
 import { battery, bluetooth } from './hardware.jsx';
-import { devicesFrom, fractionOf, shortName, toneOf as deviceTone } from './devicesmodel.js';
+import { fractionOf, toneOf as deviceTone } from './devicesmodel.js';
+import { useDevices, deviceShort, deviceValue, deviceVia } from './devices.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
 import { wifiBars, monthCells, weekStartFor } from './menubarmodel.js';
 import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect } from './widgetgrid.js';
@@ -886,20 +887,6 @@ function BatteryBody({ w, L }) {
 // No timer: lord.power and lord.bt send their changes (a power_supply uevent, a BlueZ signal), so the list is as
 // fresh as the kernel's and costs nothing at rest. lord-hidpp's exact Logitech percentages come through the shared
 // feed once a minute while a Devices widget is in view.
-const hidppRead = () => { try { return lord.hidpp?.batteries ? lord.hidpp.batteries() || [] : []; } catch (e) { return []; } };
-function useDevices() {
-  const pw = useStore(battery), bt = useStore(bluetooth);
-  const hp = useFeed('hidpp', hidppRead, 60000);
-  // a power_supply change (a keyboard waking up and reconnecting: an MX Keys answers only while awake) makes
-  // lord-server ask lord-hidpp again; its answer comes a few seconds later
-  const [fresh, setFresh] = useState(null);
-  useEffect(() => {
-    hidppRead();
-    const id = setTimeout(() => setFresh(hidppRead()), 4000);
-    return () => clearTimeout(id);
-  }, [pw]);
-  return devicesFrom(pw, bt, fresh && fresh.length >= (hp || []).length ? fresh : hp);
-}
 // a small drawing of each kind, in plain views (no SVG in the renderer)
 function DeviceGlyph({ kind, size, color }) {
   const u = size / 24, line = Math.max(1.5, 1.8 * u);
@@ -915,12 +902,6 @@ function DeviceGlyph({ kind, size, color }) {
   return <View style={box}>{b({ left: 4 * u, top: 8 * u, width: 15 * u, height: 8 * u, borderRadius: 2 * u, border: `${line}px solid ${color}` })}{b({ left: 19.5 * u, top: 10.5 * u, width: 1.8 * u, height: 3 * u, borderRadius: u, backgroundColor: color })}</View>;
 }
 const toneColor = (L, d) => ({ ok: L.ok, warn: L.warn, crit: L.crit }[deviceTone(d)]);
-const deviceName = (d) => (d.kind === 'laptop' && !d.name ? t('shell.widgets.devices.computer') : d.name);
-const deviceShort = (d) => (d.kind === 'laptop' && !d.name ? t('shell.widgets.devices.computer') : shortName(d.name));
-// "85 %", "⚡100 %", the level's word when there is no percentage, "No data" with neither
-const deviceValue = (d) => `${d.charging ? '⚡' : ''}${d.percent >= 0 ? `${d.percent} %` : d.level ? t(`shell.widgets.devices.level.${d.level}`) : d.charging ? t('shell.widgets.devices.chargingNow') : t('shell.widgets.devices.unknown')}`;
-// "Logitech · charging"
-const deviceVia = (d) => `${t(`shell.widgets.devices.via.${d.via}`)}${d.charging ? ` · ${t('shell.widgets.devices.charging')}` : ''}`;
 function DeviceRing({ L, d, size, ticks = 32 }) {
   return (
     <TickRing L={L} size={size} value={fractionOf(d)} color={toneColor(L, d)} ticks={ticks}>

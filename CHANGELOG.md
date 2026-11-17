@@ -12,6 +12,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Monitor: Battery and Devices tabs, live.** Devices (when something connected has a battery): every device's
+  battery, its connection and a bar, from the same list as the Devices widget. Battery (only on a computer with one):
+  charge, power, time left or to full, temperature, voltage, current, energy and the charging state, read every 2 s
+  while the tab is shown (`lord.power.live()`, new), with the power of the last 60 s. Only what happens now; the
+  history goes to Settings → Battery. `lord.power.state()` now also carries each battery's voltage, current,
+  temperature, energy in Wh, manufacture date and its charge control (thresholds and `charge_behaviour`). Strings in
+  all 35 languages.
+
 - **The battery in the bar opens the batteries of every device (all themes).** On a computer with a battery, a click
   on its bar item now shows the computer's, the mice', keyboards' and headphones' charge (the Devices widget's list).
 - **lord-hidpp: the exact battery of Logitech mice and keyboards** (maintainer's approval 2026-11-17, battery reads

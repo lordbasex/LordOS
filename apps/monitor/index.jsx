@@ -6,7 +6,7 @@
 import {
   View, Text, Image, ScrollView, Segmented, Toolbar, typeScale, useTheme, useLocale, useStore, useSettings, useAppWindow,
   useMonitor, monitor, monitorSamples, monitorProcesses, formatBytes, formatNumber, LordOSLogo, iconFromFile, getApp, appName,
-  Dropdown, useNarrow,
+  Dropdown, useNarrow, useBattery, useDevices,
 } from '@lordos/sdk';
 import { registerDockActions } from '@lordos/sdk';
 import * as sdk from '@lordos/sdk';
@@ -21,6 +21,7 @@ import { BlocklistsPrivacy } from './Blocklists.jsx';
 import { FirewallPrivacy } from './Firewall.jsx';
 import { FirewallRulesPrivacy } from './FwRules.jsx';
 import { CoolingTab } from './Cooling.jsx';
+import { DevicesTab, BatteryTab } from './Devices.jsx';
 import { ProcessesTab, ProcessLayers } from './Processes.jsx';
 import { DisksTab } from './DisksTab.jsx';
 import { VoltageTab } from './Voltage.jsx';
@@ -475,11 +476,16 @@ export default function Monitor() {
   const ready = useStore(monitorSamples, (l) => l.length > 0);
   // Voltage only exists where the machine reports something (not in a virtual machine, for one)
   const hasVolt = useStore(monitorSamples, (l) => !!l[l.length - 1]?.volt);
-  const view = tab === 'voltage' && !hasVolt ? 'overview' : tab;
+  // Battery only on a computer with one; Devices when something connected has a battery (docs/DEVICES.md)
+  const hasBattery = !!useBattery()?.hasBattery;
+  const hasDevices = useDevices().length > 0;
+  const view = (tab === 'voltage' && !hasVolt) || (tab === 'battery' && !hasBattery) || (tab === 'devices' && !hasDevices) ? 'overview' : tab;
   const tabs = [
     ['overview', tr('monitor.tab.overview')], ['cpu', tr('monitor.cpu')], ['memory', tr('monitor.memory')], ['gpu', tr('monitor.gpu.title')],
     ['network', tr('monitor.network')], ['disks', tr('monitor.disks')], ['processes', tr('monitor.processes')], ['cooling', tr('monitor.tab.cooling')],
     ...(hasVolt ? [['voltage', tr('monitor.tab.voltage')]] : []),
+    ...(hasBattery ? [['battery', tr('monitor.tab.battery')]] : []),
+    ...(hasDevices ? [['devices', tr('monitor.tab.devices')]] : []),
   ];
   if (!monitor.available()) {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.unavailable')}</Text></View>;
@@ -511,6 +517,10 @@ export default function Monitor() {
       ) : view === 'voltage' ? (
         <ScrollView resetKey="voltage" style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><VoltageTab /></View>
+        </ScrollView>
+      ) : view === 'battery' || view === 'devices' ? (
+        <ScrollView resetKey={view} style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}>{view === 'battery' ? <BatteryTab /> : <DevicesTab />}</View>
         </ScrollView>
       ) : view === 'cooling' ? (
         <ScrollView resetKey="cooling" style={{ flex: 1 }}>

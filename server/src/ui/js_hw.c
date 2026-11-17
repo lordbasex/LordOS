@@ -251,8 +251,19 @@ static const JSCFunctionListEntry display_funcs[] = {
 
 static JSValue f_power_state(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
-    char j[4096];
+    char j[8192];
     power_json(hw_power(), j, sizeof j);
+    return JS_ParseJSON(c, j, strlen(j), "<power>");
+}
+
+/* lord.power.live(): the supplies read now (Monitor's Battery tab asks every 2 s while it is shown; lord.power.state()
+ * is the last uevent's or poll's) */
+static JSValue f_power_live(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    PowerState ps;
+    power_read("/sys/class/power_supply", &ps);
+    char j[8192];
+    power_json(&ps, j, sizeof j);
     return JS_ParseJSON(c, j, strlen(j), "<power>");
 }
 
@@ -312,6 +323,7 @@ static const JSCFunctionListEntry hidpp_funcs[] = {
 
 static const JSCFunctionListEntry power_funcs[] = {
     JS_CFUNC_DEF("state", 0, f_power_state),
+    JS_CFUNC_DEF("live", 0, f_power_live),
     JS_CFUNC_DEF("profiles", 0, f_power_profiles),
     JS_CFUNC_DEF("setProfile", 1, f_power_set_profile),
     JS_CFUNC_DEF("buttons", 0, f_power_buttons),

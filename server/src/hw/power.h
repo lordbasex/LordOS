@@ -24,7 +24,19 @@ typedef struct {
     int cycles;                 /* -1 unknown */
     double watts;               /* current draw, -1 unknown */
     char model[48], vendor[48], technology[16];
+    /* live readings and the battery's own facts (Monitor → Battery, Settings → Battery); -1 / 0 when not reported */
+    double volts, amps, temp_c;           /* voltage_now, current_now (its size), temp (tenths of °C); temp_c -1000 unknown */
+    double wh_now, wh_full, wh_design;    /* energy_*, or charge_* times the design (else present) voltage */
+    int mfg_year, mfg_month;              /* manufacture_year / manufacture_month, 0 unknown */
+    /* charge control (docs/BATTERY.md): the kernel's standard attributes, -1 where the battery has none */
+    int start_threshold, end_threshold;
+    int behaviours;                       /* POWER_BEH_* the battery lists in charge_behaviour */
+    int behaviour;                        /* the selected one (POWER_BEH_*), 0 unknown */
 } PowerSupply;
+
+enum { POWER_BEH_AUTO = 1, POWER_BEH_INHIBIT = 2, POWER_BEH_DISCHARGE = 4 };
+/* "[auto] inhibit-charge force-discharge" → the listed ones (mask) and the bracketed one; pure, tested */
+int power_parse_behaviour(const char *text, int *listed);
 
 typedef struct {
     PowerSupply s[POWER_MAX];

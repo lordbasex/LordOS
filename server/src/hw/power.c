@@ -32,6 +32,26 @@ static long long num(const char *root, const char *dev, const char *name) {
     return *e ? -1 : v;
 }
 
+int power_parse_behaviour(const char *text, int *listed) {
+    static const struct { const char *w; int b; } W[] = { { "auto", POWER_BEH_AUTO }, { "inhibit-charge", POWER_BEH_INHIBIT }, { "force-discharge", POWER_BEH_DISCHARGE } };
+    int cur = 0, mask = 0;
+    const char *p = text ? text : "";
+    while (*p) {
+        while (*p == ' ' || *p == '\n' || *p == '\t') p++;
+        if (!*p) break;
+        int sel = *p == '[';
+        if (sel) p++;
+        size_t n = 0;
+        while (p[n] && p[n] != ' ' && p[n] != ']' && p[n] != '\n' && p[n] != '\t') n++;
+        for (size_t i = 0; i < sizeof W / sizeof W[0]; i++)
+            if (strlen(W[i].w) == n && !strncmp(p, W[i].w, n)) { mask |= W[i].b; if (sel) cur = W[i].b; }
+        p += n;
+        if (*p == ']') p++;
+    }
+    if (listed) *listed = mask;
+    return cur;
+}
+
 static void read_one(const char *root, const char *dev, PowerSupply *s) {
     char type[32] = "", scope[32] = "";
     memset(s, 0, sizeof *s);
@@ -46,6 +66,9 @@ static void read_one(const char *root, const char *dev, PowerSupply *s) {
     s->percent = -1;
     s->minutes_left = s->health = s->cycles = -1;
     s->watts = -1;
+    s->volts = s->amps = s->wh_now = s->wh_full = s->wh_design = -1;
+    s->temp_c = -1000;
+    s->start_threshold = s->end_threshold = -1;
     if (!s->battery) return;
     if (attr(root, dev, "status", s->status, sizeof s->status)) snprintf(s->status, sizeof s->status, "Unknown");
     attr(root, dev, "capacity_level", s->level, sizeof s->level);
@@ -72,6 +95,39 @@ static void read_one(const char *root, const char *dev, PowerSupply *s) {
     if (s->health > 100) s->health = 100;
     s->cycles = (int)num(root, dev, "cycle_count");
     if (s->cycles == 0) s->cycles = -1;      /* many firmwares report 0 for "unknown" */
+    long long uv = num(root, dev, "voltage_now"), ua = num(root, dev, "current_now"), tt = num(root, dev, "temp");
+    if (uv > 0) s->volts = (double)uv / 1e6;
+    if (ua != -1) s->amps = (double)(ua < 0 ? -ua : ua) / 1e6;
+    {   /* temp may be negative (a cold battery): read it signed */
+        char tb[32];
+        if (!attr(root, dev, "temp", tb, sizeof tb) && tb[0]) { char *e; long v = strtol(tb, &e, 10); if (!*e && v > -400 && v < 1000) s->temp_c = v / 10.0; }
+        (void)tt;
+    }
+    if (num(root, dev, "energy_now") >= 0) {
+        long long en = num(root, dev, "energy_now"), ef = num(root, dev, "energy_full"), ed = num(root, dev, "energy_full_design");
+        if (en >= 0) s->wh_now = en / 1e6;
+        if (ef > 0) s->wh_full = ef / 1e6;
+        if (ed > 0) s->wh_design = ed / 1e6;
+    } else {
+        long long cn = num(root, dev, "charge_now"), cf = num(root, dev, "charge_full"), cd = num(root, dev, "charge_full_design");
+        long long vd = num(root, dev, "voltage_min_design");
+        double v = vd > 0 ? vd / 1e6 : uv > 0 ? uv / 1e6 : 0;
+        if (v > 0) {
+            if (cn >= 0) s->wh_now = cn / 1e6 * v;
+            if (cf > 0) s->wh_full = cf / 1e6 * v;
+            if (cd > 0) s->wh_design = cd / 1e6 * v;
+        }
+    }
+    long long my = num(root, dev, "manufacture_year"), mm = num(root, dev, "manufacture_month");
+    if (my >= 1990 && my <= 2100) s->mfg_year = (int)my;
+    if (mm >= 1 && mm <= 12) s->mfg_month = (int)mm;
+    long long st = num(root, dev, "charge_control_start_threshold"), et = num(root, dev, "charge_control_end_threshold");
+    if (st >= 0 && st <= 100) s->start_threshold = (int)st;
+    if (et >= 0 && et <= 100) s->end_threshold = (int)et;
+    {
+        char bb[96];
+        if (!attr(root, dev, "charge_behaviour", bb, sizeof bb)) s->behaviour = power_parse_behaviour(bb, &s->behaviours);
+    }
     long long tte = num(root, dev, "time_to_empty_now"), ttf = num(root, dev, "time_to_full_now");
     if (!strcmp(s->status, "Discharging")) {
         if (tte > 0) s->minutes_left = (int)(tte / 60);
@@ -153,6 +209,12 @@ size_t power_json(const PowerState *ps, char *out, size_t n) {
         wq(&o, s->vendor);
         w(&o, ",\"technology\":");
         wq(&o, s->technology);
+        if (s->battery) {
+            w(&o, ",\"volts\":%.3f,\"amps\":%.3f,\"tempC\":%.1f,\"whNow\":%.2f,\"whFull\":%.2f,\"whDesign\":%.2f,\"mfgYear\":%d,\"mfgMonth\":%d",
+              s->volts, s->amps, s->temp_c, s->wh_now, s->wh_full, s->wh_design, s->mfg_year, s->mfg_month);
+            w(&o, ",\"startThreshold\":%d,\"endThreshold\":%d,\"behaviours\":%d,\"behaviour\":%d",
+              s->start_threshold, s->end_threshold, s->behaviours, s->behaviour);
+        }
         w(&o, "}");
     }
     w(&o, "]}");
