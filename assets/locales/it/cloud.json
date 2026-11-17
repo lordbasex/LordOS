@@ -5,8 +5,9 @@
   "accounts": "Account",
   "allAccounts": "Tutti gli account",
   "onThisComputer": "Su questo computer",
-  "cacheLine": "{size} · {kept} mantenuti",
+  "hereLine": "{size} · {kept} mantenuti · {free} liberabili",
   "freeUp": "Libera spazio",
+  "freeUpHint": "«Libera spazio» rimuove le copie locali dei file che non sono mantenuti su questo computer; i file mantenuti e le modifiche in attesa di caricamento restano.",
   "freed": "{size} liberati su questo computer",
   "freedSkipped": {
     "one": "{size} liberati; {count} elemento resta (aperto, mantenuto o in attesa di invio)",

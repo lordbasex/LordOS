@@ -5,8 +5,9 @@
   "accounts": "Comptes",
   "allAccounts": "Tots els comptes",
   "onThisComputer": "En aquest ordinador",
-  "cacheLine": "{size} · {kept} conservats",
+  "hereLine": "{size} · {kept} conservats · {free} es poden alliberar",
   "freeUp": "Allibera espai",
+  "freeUpHint": "«Allibera espai» elimina les còpies locals dels fitxers que no es conserven en aquest ordinador; els fitxers conservats i els canvis pendents de pujar es queden.",
   "freed": "S’han alliberat {size} en aquest ordinador",
   "freedSkipped": {
     "one": "S’han alliberat {size}; es queda {count} element (obert, conservat o esperant per pujar)",

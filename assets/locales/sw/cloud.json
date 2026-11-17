@@ -5,8 +5,9 @@
   "accounts": "Akaunti",
   "allAccounts": "Akaunti zote",
   "onThisComputer": "Kwenye kompyuta hii",
-  "cacheLine": "{size} · {kept} zimewekwa",
+  "hereLine": "{size} · {kept} zimewekwa · {free} zinaweza kuachiliwa",
   "freeUp": "Pata Nafasi",
+  "freeUpHint": "\"Pata Nafasi\" huondoa nakala za ndani za faili ambazo hazijawekwa kwenye kompyuta hii; faili zilizowekwa na mabadiliko yanayosubiri kupakiwa hubaki.",
   "freed": "{size} zimeachiliwa kwenye kompyuta hii",
   "freedSkipped": {
     "one": "{size} zimeachiliwa; kipengee {count} kinabaki (kiko wazi, kimewekwa au kinasubiri kupanda)",

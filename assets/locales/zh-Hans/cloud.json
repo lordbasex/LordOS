@@ -5,8 +5,9 @@
   "accounts": "账户",
   "allAccounts": "所有账户",
   "onThisComputer": "在这台电脑上",
-  "cacheLine": "{size} · 保留 {kept}",
+  "hereLine": "{size} · 保留 {kept} · 可释放 {free}",
   "freeUp": "释放空间",
+  "freeUpHint": "“释放空间”会删除未保留在这台电脑上的文件的本地副本；保留的文件和等待上传的更改不受影响。",
   "freed": "已在这台电脑上释放 {size}",
   "freedSkipped": {
     "other": "已释放 {size}；{count} 个项目保留（已打开、已保留或等待上传）"

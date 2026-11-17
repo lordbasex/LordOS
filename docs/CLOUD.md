@@ -461,7 +461,14 @@ In Settings' second group, next to Sharing, glyph `☁`, color `#0a84ff`:
    6.1). A row opens the account (6.3). Since 0.8.8.7 (#86) every list of accounts is by name: Settings, the menu bar
    panel, Files' sidebar and Network, and the file dialog (`sortAccounts`/`compareNames` in `sdk/cloudmodel.js`: case and
    accents aside, numbers by value, equal names by id). An account keeps the color of the order it was added in.
-2. **On this computer**: cache use per account, the free-space threshold (7.2), **Free Up Space**.
+2. **On this computer**: cache use per account, the free-space threshold (7.2), **Free Up Space**. Since 0.8.8.10
+   (#184) the line says what each figure is: everything here, the kept part, and what Free Up Space can drop (the
+   rest: `hereOf`/`here` in `sdk/cloudmodel.js`, from `cacheBytes` and `keptBytes`, measured once a minute); with
+   more than one account a row per account adds up to it, a line says what Free Up Space removes and what stays,
+   and the button is off when nothing can be freed. Each account's page has the same box with Free Up Space for
+   that account alone. Not done, waiting for a decision: showing the account's user or e-mail (rclone marks it
+   sensitive, so it lives in the keyring and JavaScript never sees it; OAuth providers don't give it at all) and a
+   color chosen per account or per provider (the color is the order the account was added in, 12).
 3. **Bandwidth**: upload and download limits, "Pause on battery", "Pause on metered networks".
 4. **Service**: state (running, its version, uptime, memory), **Restart**, **Show Log** (opens the Logs app on the unit),
    and a line "Only LordOS can reach it: it listens on no network address."

@@ -5,8 +5,9 @@
   "accounts": "Paskyros",
   "allAccounts": "Visos paskyros",
   "onThisComputer": "Šiame kompiuteryje",
-  "cacheLine": "{size} · laikoma: {kept}",
+  "hereLine": "{size} · laikoma: {kept} · galima atlaisvinti: {free}",
   "freeUp": "Atlaisvinti vietos",
+  "freeUpHint": "„Atlaisvinti vietos“ pašalina vietines kopijas failų, kurie nelaikomi šiame kompiuteryje; laikomi failai ir įkėlimo laukiantys pakeitimai lieka.",
   "freed": "Šiame kompiuteryje atlaisvinta {size}",
   "freedSkipped": {
     "one": "Atlaisvinta {size}; lieka {count} elementas (atidarytas, laikomas arba laukia įkėlimo)",

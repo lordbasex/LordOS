@@ -5,8 +5,9 @@
   "accounts": "アカウント",
   "allAccounts": "すべてのアカウント",
   "onThisComputer": "このコンピュータ上",
-  "cacheLine": "{size} · 保持 {kept}",
+  "hereLine": "{size} · 保持 {kept} · 解放可能 {free}",
   "freeUp": "空き領域を確保",
+  "freeUpHint": "「空き領域を確保」は、このコンピュータに保持していないファイルのローカルコピーを削除します。保持しているファイルとアップロード待ちの変更は残ります。",
   "freed": "このコンピュータで {size} を解放しました",
   "freedSkipped": {
     "other": "{size} を解放しました。{count} 項目は残ります（開いている、保持中、またはアップロード待ち）"

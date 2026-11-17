@@ -138,6 +138,23 @@ export function spaceLine(about, fmt) {
   return { key: 'cloud.space.usedOf', vars: { used: fmt(u.used), total: fmt(u.total) } };
 }
 
+// ---- on this computer (#184) ----
+
+// What an account's files take on this computer, from lord-server's measure (cf_measure, once a minute): size is every
+// cached copy (kept ones included), kept the part of it that is kept, free what Free Up Space can drop (the rest; files
+// open or with changes waiting are skipped too, so it is at most this). Turned-off accounts are left out of `here`.
+export function hereOf(acc) {
+  const size = Math.max(0, Number(acc && acc.cacheBytes) || 0);
+  const kept = Math.min(size, Math.max(0, Number(acc && acc.keptBytes) || 0));
+  return { size, kept, free: size - kept };
+}
+// Settings → Cloud's "On this computer": the total and one row per account that has anything here, by name.
+export function here(accounts) {
+  const rows = sortAccounts(liveAccounts(accounts)).map((a) => ({ id: a.id, name: a.name, ...hereOf(a) })).filter((r) => r.size > 0);
+  const total = rows.reduce((t, r) => ({ size: t.size + r.size, kept: t.kept + r.kept, free: t.free + r.free }), { size: 0, kept: 0, free: 0 });
+  return { ...total, rows };
+}
+
 // ---- on and off ----
 
 // An account turned off (lord-server's `disabled`, state 'off'): not mounted, nothing in Files, the file dialogs, the menu

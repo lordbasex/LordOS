@@ -317,6 +317,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Settings → Cloud says what "On this computer" counts, account by account (GitHub #184).** The line read "144 MB ·
+  144 MB kept", and it wasn't clear that the first figure is everything the accounts have here and the second the kept
+  part of it, nor what Free Up Space would do. It now reads "144 MB · 144 MB kept · 0 bytes can be freed"; with more
+  than one account a row per account (by name, with its color) adds up to it; a line says that Free Up Space removes the
+  local copies of files that aren't kept and that kept files and changes waiting to go up stay; and the button is off
+  when nothing can be freed. Each account's page gets the same box, with Free Up Space for that account alone. The
+  figures are lord-server's own measure of the cache (`cacheBytes`, `keptBytes`), nothing estimated (`hereOf` and
+  `here` in `sdk/cloudmodel.js`, checked in `cloud_model_test.mjs`). New texts in every language (`cloud.hereLine`,
+  `cloud.freeUpHint`; `cloud.cacheLine` is gone). Not done, for the maintainer to decide: showing the user or e-mail an
+  account signs in with (it is kept in the keyring with the password and never reaches the interface; OAuth providers
+  don't tell it) and choosing an account's color (one per provider by default, as asked).
 - **Cleaner's panel by the clock wears the theme's colours** (all themes): its cards, bars and button take the shell's
   tokens (`shellPalette` in `sdk/cleanertheme.js`), like the bar's other panels; the Cleaner window keeps the look chosen
   in Cleaner → Settings.
