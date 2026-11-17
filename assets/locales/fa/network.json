@@ -151,5 +151,10 @@
   "wifi.saved": "ذخیره‌شده",
   "wifi.scan": "جستجو",
   "wifi.scanning": "در حال جستجو…",
-  "wifi.wrongKey": "گذرواژه نادرست است."
+  "wifi.wrongKey": "گذرواژه نادرست است.",
+  "wifi.available": "شبکه‌های Wi-Fi در دسترس",
+  "wifi.currentLabel": "{ssid} — متصل",
+  "wifi.connect": "اتصال",
+  "wifi.notInRange": "خارج از برد",
+  "wifi.knownFooter": "LordOS وقتی یک شبکهٔ ذخیره‌شده در برد باشد، خودش به آن وصل می‌شود. «فراموش کردن» شبکه و گذرواژه‌اش را از این رایانه حذف می‌کند."
 }

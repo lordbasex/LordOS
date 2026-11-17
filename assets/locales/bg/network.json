@@ -151,5 +151,10 @@
   "wifi.saved": "запазена",
   "wifi.scan": "Сканирай",
   "wifi.scanning": "Сканиране…",
-  "wifi.wrongKey": "Паролата е грешна."
+  "wifi.wrongKey": "Паролата е грешна.",
+  "wifi.available": "Налични Wi-Fi мрежи",
+  "wifi.currentLabel": "{ssid} – Свързано",
+  "wifi.connect": "Свързване",
+  "wifi.notInRange": "Извън обхват",
+  "wifi.knownFooter": "LordOS сам се свързва със запазена мрежа, когато е в обхват. „Забрави“ премахва мрежата и паролата ѝ от този компютър."
 }

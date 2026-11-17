@@ -3,11 +3,12 @@
 import {
   View, Text, useTheme, useLocale, Button, Toggle, Segmented, TextInput,
   admin, fs, formatBytes, keyring, AutofillButton, spacing, typeScale, errorText, statusText,
-  ToolbarButton, MenuButton, openUrl, FilePicker, Layer, useAppWindow, wm,
+  ToolbarButton, MenuButton, openUrl, FilePicker, Layer, useAppWindow, wm, SignalGlyph, wifiBars,
 } from '@lordos/sdk';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Stack, Section, SettingRow, ValueRow, FieldRow, Badge, Note, Message, Actions, StatusDot, tint } from './ui.jsx';
 import { pemBlock, PEM_CERT, PEM_KEY, formFromConfig, configLines, fingerprint } from './vpnform.js';
+import { wifiRows, markCurrent, savedRows } from './wifimodel.js';
 
 // VPN interfaces (WireGuard, OpenVPN, IPsec, PPTP, OpenConnect, Fortinet): shown under VPN.
 const isVpnIf = (i) => ['wireguard', 'tun', 'xfrm', 'ppp'].includes(i.type) || /^(wg|ovpn|ips|ppp|oc|fvpn)-/.test(i.name);
@@ -161,38 +162,42 @@ function InterfacePage({ name, net }) {
 }
 
 // ---- Wi-Fi ----
-
-const bars = (dbm) => (dbm >= -55 ? '▂▄▆█' : dbm >= -67 ? '▂▄▆' : dbm >= -78 ? '▂▄' : '▂');
+// GitHub #167: the network LordOS is connected to comes first in "Available Wi-Fi networks" (net-wifi-scan marks it
+// "current" from wpa_supplicant's STATUS), named "Connected" and with its own Disconnect button; the signal is the
+// Control Center's bars (SignalGlyph, wifiBars). Saved networks say which is connected or in range, join one in range
+// and forget any. The order is wifimodel.js's.
 
 function WifiPage({ net }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const radios = net.ifs.filter((i) => i.type === 'wifi');
   const [dev, setDev] = useState(radios[0]?.name || '');
+  const devRef = useRef(dev);
+  devRef.current = dev;
   const [list, setList] = useState([]);
   const [scanning, setScanning] = useState(false);
   const [pick, setPick] = useState(null);
   const [pass, setPass] = useState('');
   const [msg, setMsg] = useState(null);
   const known = has() ? lord.net.wifiKnown() : [];
-  const cur = net.ifs.find((i) => i.name === dev);
   const scan = () => {
     if (!dev) return;
     setScanning(true);
     const found = [];
     admin.run('net-wifi-scan', dev, (line) => { try { found.push(JSON.parse(line)); } catch (e) { /* text */ } }, { quiet: true })
-      .then(() => setList(found.sort((a, b) => b.signal - a.signal)), (e) => setMsg({ ok: false, text: e.message }))
+      .then(() => setList(wifiRows(found)), (e) => setMsg({ ok: false, text: e.message }))
       .finally(() => setScanning(false));
   };
   useEffect(() => { scan(); }, [dev]);
   useNetEvent((text) => {
     const m = /^net wifi (\S+) (connected|disconnected|wrong-key|no-sae)\s?(.*)$/.exec(text);
-    if (!m || m[1] !== dev) return;
-    if (m[2] === 'connected') setMsg({ ok: true, text: tr('network.wifi.connected', { ssid: m[3] }) });
+    if (!m || m[1] !== devRef.current) return;
+    if (m[2] === 'connected') { setMsg({ ok: true, text: tr('network.wifi.connected', { ssid: m[3] }) }); setList((l) => markCurrent(l, m[3])); }
+    else if (m[2] === 'disconnected') setList((l) => markCurrent(l, null));
     else if (m[2] === 'wrong-key') setMsg({ ok: false, text: tr('network.wifi.wrongKey') });
     else if (m[2] === 'no-sae') setMsg({ ok: false, text: tr('network.wifi.noSae') });
   });
-  if (!radios.length) return <Stack><Section title="Wi-Fi" footer={tr('network.wifi.none')} /></Stack>;
+  if (!radios.length) return <Stack><Section title={tr('network.wifi.available')} footer={tr('network.wifi.none')} /></Stack>;
   const connect = (n, password) => {
     setPick(null);
     setPass('');
@@ -200,26 +205,35 @@ function WifiPage({ net }) {
     if (password && n.ssid) keyring.set('settings', { service: `wifi:${n.ssid}`, secret: password, label: `Wi-Fi ${n.ssid}` }).catch(() => {});
     run(setMsg, 'net-wifi-connect', `${dev}\n${n.ssid}\n${password || ''}`, tr('network.wifi.connecting', { ssid: n.ssid }));
   };
+  const disconnect = () => run(setMsg, 'net-wifi-disconnect', dev).then((r) => { if (r) setList((l) => markCurrent(l, null)); });
+  const forget = (ssid) => run(setMsg, 'net-wifi-forget', ssid).then((r) => { if (r) setList((l) => l.map((n) => (n.ssid === ssid ? { ...n, known: false } : n))); });
   // A secured network saved as open (one an older version overwrote, GitHub #124) asks for its
   // password again instead of joining without one.
   const savedOpen = (n) => known.some((k) => k.ssid === n.ssid && k.security === 'open');
+  const join = (n) => {
+    if (!n || n.current) return;
+    if (n.security === 'open' || (n.known && !savedOpen(n))) connect(n, '');
+    else setPick(n);
+  };
   const dim = { fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap' };
+  const saved = savedRows(known, list);
   return (
     <Stack>
-      <Section title="Wi-Fi" accessory={(
+      <Section title={tr('network.wifi.available')} accessory={(
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
           {radios.length > 1 && <Segmented small value={dev} onChange={setDev} options={radios.map((r) => [r.name, r.name])} />}
           <Button small label={scanning ? tr('network.wifi.scanning') : tr('network.wifi.scan')} onClick={() => !scanning && scan()} />
-          {cur?.up && <Button small label={tr('network.wifi.disconnect')} onClick={() => run(setMsg, 'net-wifi-disconnect', dev)} />}
         </View>
       )}>
         {list.length === 0 ? <SettingRow label={scanning ? tr('network.wifi.scanning') : tr('network.wifi.noNetworks')} labelStyle={{ color: t.textDim }} /> : null}
         {list.map((n, idx) => (
           <View key={`${n.bssid}${idx}`}>
-            <SettingRow onClick={() => (n.security === 'open' || (n.known && !savedOpen(n)) ? connect(n, '') : setPick(n))}
-              icon={<Text style={{ width: 30, fontSize: typeScale.callout, color: t.accent, direction: 'ltr' }}>{bars(n.signal)}</Text>}
-              label={n.ssid || tr('network.wifi.hidden')} labelStyle={{ whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {n.known && <Text style={dim}>{tr('network.wifi.saved')}</Text>}
+            <SettingRow onClick={() => join(n)}
+              icon={<View style={{ width: 30, alignItems: 'center' }}><SignalGlyph color={n.current ? t.accent : t.text} size={16} level={wifiBars(n.signal)} /></View>}
+              label={n.current ? tr('network.wifi.currentLabel', { ssid: n.ssid }) : n.ssid || tr('network.wifi.hidden')}
+              labelStyle={{ whiteSpace: 'nowrap', overflow: 'hidden', ...(n.current ? { fontWeight: 600 } : null) }}>
+              {n.current && admin.available() ? <Button small label={tr('network.wifi.disconnect')} onClick={disconnect} /> : null}
+              {n.known && !n.current ? <Text style={dim}>{tr('network.wifi.saved')}</Text> : null}
               <Text style={dim}>{n.security === 'open' ? tr('network.wifi.open') : n.security.toUpperCase()}</Text>
               <Text style={{ ...dim, width: 64, textAlign: 'end', direction: 'ltr' }}>{`${n.signal} dBm`}</Text>
             </SettingRow>
@@ -235,11 +249,15 @@ function WifiPage({ net }) {
         ))}
       </Section>
       <Message msg={msg} />
-      {known.length > 0 && (
-        <Section title={tr('network.wifi.known')}>
-          {known.map((k) => (
-            <SettingRow key={k.ssid} label={k.ssid}>
-              {admin.available() && <Button small label={tr('network.wifi.forget')} onClick={() => run(setMsg, 'net-wifi-forget', k.ssid)} />}
+      {saved.length > 0 && (
+        <Section title={tr('network.wifi.known')} footer={tr('network.wifi.knownFooter')}>
+          {saved.map((k) => (
+            <SettingRow key={k.ssid} label={k.current ? tr('network.wifi.currentLabel', { ssid: k.ssid }) : k.ssid}
+              hint={k.current || k.inRange ? undefined : tr('network.wifi.notInRange')}
+              labelStyle={k.current ? { fontWeight: 600 } : undefined}>
+              {admin.available() && k.current ? <Button small label={tr('network.wifi.disconnect')} onClick={disconnect} /> : null}
+              {admin.available() && !k.current && k.inRange ? <Button small label={tr('network.wifi.connect')} onClick={() => join(list.find((n) => n.ssid === k.ssid))} /> : null}
+              {admin.available() ? <Button small label={tr('network.wifi.forget')} onClick={() => forget(k.ssid)} /> : null}
             </SettingRow>
           ))}
         </Section>

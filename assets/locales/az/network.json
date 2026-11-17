@@ -151,5 +151,10 @@
   "wifi.saved": "saxlanılıb",
   "wifi.scan": "Axtar",
   "wifi.scanning": "Axtarılır…",
-  "wifi.wrongKey": "Parol yanlışdır."
+  "wifi.wrongKey": "Parol yanlışdır.",
+  "wifi.available": "Mövcud Wi-Fi şəbəkələri",
+  "wifi.currentLabel": "{ssid} — Qoşulub",
+  "wifi.connect": "Qoşul",
+  "wifi.notInRange": "Əhatə dairəsindən kənarda",
+  "wifi.knownFooter": "LordOS yadda saxlanmış şəbəkə əhatə dairəsində olanda ona özü qoşulur. Unut şəbəkəni və onun parolunu bu kompüterdən silir."
 }

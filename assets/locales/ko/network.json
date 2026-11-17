@@ -151,5 +151,10 @@
   "wifi.saved": "저장됨",
   "wifi.scan": "검색",
   "wifi.scanning": "검색하는 중…",
-  "wifi.wrongKey": "암호가 잘못되었습니다."
+  "wifi.wrongKey": "암호가 잘못되었습니다.",
+  "wifi.available": "사용 가능한 Wi-Fi 네트워크",
+  "wifi.currentLabel": "{ssid} — 연결됨",
+  "wifi.connect": "연결",
+  "wifi.notInRange": "범위 밖",
+  "wifi.knownFooter": "저장된 네트워크가 범위 안에 있으면 LordOS가 알아서 연결합니다. 삭제는 네트워크와 그 암호를 이 컴퓨터에서 삭제합니다."
 }

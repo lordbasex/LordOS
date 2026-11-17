@@ -288,6 +288,29 @@ static void unescape_ssid(const char *in, char *out, size_t n) {
     out[o] = 0;
 }
 
+/* The network an interface is joined to, from wpa_supplicant's STATUS reply: 1 and its SSID (unescaped) when
+ * wpa_state is COMPLETED and an ssid= line is there, else 0 and "". Read only; used by net-wifi-scan to mark the
+ * network LordOS is connected to (GitHub #167). */
+int wifi_status_ssid(const char *status, char *ssid, size_t n) {
+    if (n) ssid[0] = 0;
+    if (!status || n < 2) return 0;
+    int done = 0;
+    char raw[160] = "";
+    for (const char *l = status; l && *l;) {
+        const char *e = strchr(l, '\n');
+        size_t k = e ? (size_t)(e - l) : strlen(l);
+        if (k == 19 && !strncmp(l, "wpa_state=COMPLETED", 19)) done = 1;
+        else if (k > 5 && !strncmp(l, "ssid=", 5) && k - 5 < sizeof raw) { memcpy(raw, l + 5, k - 5); raw[k - 5] = 0; }
+        l = e ? e + 1 : NULL;
+    }
+    if (!done || !raw[0]) return 0;
+    char out[64];
+    unescape_ssid(raw, out, sizeof out);
+    if (!out[0] || strlen(out) > 32 || strlen(out) >= n) return 0;
+    snprintf(ssid, n, "%s", out);
+    return 1;
+}
+
 void wifi_act_scan(const char *ifname) {
     char me[108];
     int fd = ctrl_open(ifname, me, sizeof me);
@@ -345,6 +368,33 @@ void wifi_act_scan(const char *ifname) {
         l = e;
     }
     free(res);
+    /* the network the interface is joined to is marked "current" (GitHub #167); one the scan didn't see (it went
+     * quiet for a moment) is listed anyway, with the level SIGNAL_POLL reads */
+    char st[2048], cur[40] = "";
+    int joined = wifi_ctrl(ifname, "STATUS", st, sizeof st) > 0 && wifi_status_ssid(st, cur, sizeof cur);
+    if (joined) {
+        int i = 0;
+        while (i < n && strcmp(nets[i].ssid, cur)) i++;
+        if (i == n && n < 96) {
+            int rssi = -100;
+            char sp[256];
+            if (wifi_ctrl(ifname, "SIGNAL_POLL", sp, sizeof sp) > 0) {
+                const char *r = strstr(sp, "RSSI=");
+                if (r) { int v = atoi(r + 5); if (v < 0 && v > -150) rssi = v; }
+            }
+            snprintf(nets[n].ssid, sizeof nets[n].ssid, "%s", cur);
+            nets[n].bssid[0] = 0;
+            const char *b = strstr(st, "bssid=");
+            if (b) { size_t k = strcspn(b + 6, "\n"); if (k < sizeof nets[n].bssid) { memcpy(nets[n].bssid, b + 6, k); nets[n].bssid[k] = 0; } }
+            const char *km = strstr(st, "key_mgmt=");
+            snprintf(nets[n].sec, sizeof nets[n].sec, "%s", km && !strncmp(km + 9, "NONE", 4) ? "open" : km && strstr(km, "SAE") ? "wpa3" : "wpa2");
+            nets[n].freq = 0;
+            const char *f = strstr(st, "freq=");
+            if (f) nets[n].freq = atoi(f + 5);
+            nets[n].signal = rssi;
+            n++;
+        }
+    }
     for (int i = 0; i < n; i++) {
         char sh[72], kp[160];
         hex((const uint8_t *)nets[i].ssid, strlen(nets[i].ssid), sh);
@@ -352,8 +402,9 @@ void wifi_act_scan(const char *ifname) {
         Buf b = {0};
         buf_printf(&b, "{\"ssid\":");
         buf_json_str(&b, nets[i].ssid);
-        buf_printf(&b, ",\"bssid\":\"%s\",\"freq\":%d,\"signal\":%d,\"security\":\"%s\",\"known\":%s}",
-                   nets[i].bssid, nets[i].freq, nets[i].signal, nets[i].sec, access(kp, F_OK) == 0 ? "true" : "false");
+        buf_printf(&b, ",\"bssid\":\"%s\",\"freq\":%d,\"signal\":%d,\"security\":\"%s\",\"known\":%s,\"current\":%s}",
+                   nets[i].bssid, nets[i].freq, nets[i].signal, nets[i].sec, access(kp, F_OK) == 0 ? "true" : "false",
+                   joined && !strcmp(nets[i].ssid, cur) ? "true" : "false");
         if (b.p) admin_say("LOG", "%s", b.p);
         buf_free(&b);
     }

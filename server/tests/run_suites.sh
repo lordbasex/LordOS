@@ -176,6 +176,7 @@ EOF
     run "net-test wake" build/net-test wake
     run "net-test wifi-saved" build/net-test wifi-saved
     run "net-test wireless" build/net-test wireless
+    run "net-test wifi-status" build/net-test wifi-status
     run "pkg-test" build/pkg-test
     # (0.8.8.9) lordos + lordos-web updated together: the engine's dpkg order against a real dpkg in a throwaway root
     if have dpkg && have dpkg-deb; then run "pkg-breaks-dpkg-test (lordos + lordos-web, dpkg --root)" sh tests/pkg_breaks_dpkg_test.sh
@@ -322,6 +323,9 @@ EOF
     # window snapping geometry (sdk/snap.js): zones without gaps or overlaps, drop zones, Super+arrows
     if have node; then run "snap-test (sdk/snap.js)" node tests/snap_test.mjs
     else skip "snap-test" "node"; fi
+    # Settings → Network → Wi-Fi's lists: the connected network first, saved ones in range (GitHub #167)
+    if have node; then run "wifi-model-test (apps/settings/wifimodel.js)" node tests/wifi_model_test.mjs
+    else skip "wifi-model-test" "node"; fi
     # smartctl's JSON → the Disks/Monitor SMART model (sdk/smartparse.js), with real smartctl output
     if have node; then run "smart-parse-test (sdk/smartparse.js)" node tests/smart_parse_test.mjs
     else skip "smart-parse-test" "node"; fi

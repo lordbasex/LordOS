@@ -12,6 +12,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Settings → Network → Wi-Fi shows which network you are on, and manages saved ones** (GitHub #167). The list is
+  now "Available Wi-Fi networks": the network LordOS is connected to comes first whatever its signal, as "<name> —
+  Connected" with its own Disconnect button (the header keeps only Scan, and the radio picker with two radios); the
+  others follow strongest first, with the Control Center's signal bars instead of the text ones. Saved networks put the
+  connected one first, then those in range with a Connect button, then the rest marked "Not in range", each with
+  Forget, and a footer says LordOS joins them by itself. `net-wifi-scan` adds `"current"` to the network the
+  interface is joined to (wpa_supplicant's `STATUS`, read only; one the scan missed is listed with `SIGNAL_POLL`'s
+  level); no new action or argument. (`apps/settings/Network.jsx`, `wifimodel.js`, `server/src/net/wifi.c`
+  `wifi_status_ssid`; `server/tests/wifi_model_test.mjs`, `net-test wifi-status`)
 - **Window snapping in Lord Flow, and a switch for it** (GitHub #182; all themes). Dragging a window to the left or
   right edge of a display fills that half of its work area, near a corner a quarter, and to the top edge the whole area
   (maximized), with a rounded preview in the accent's color under the window while dragging. Dragging it away gives it

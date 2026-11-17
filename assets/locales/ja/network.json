@@ -151,5 +151,10 @@
   "wifi.saved": "保存済み",
   "wifi.scan": "スキャン",
   "wifi.scanning": "スキャンしています…",
-  "wifi.wrongKey": "パスワードが違います。"
+  "wifi.wrongKey": "パスワードが違います。",
+  "wifi.available": "利用可能な Wi-Fi ネットワーク",
+  "wifi.currentLabel": "{ssid} — 接続済み",
+  "wifi.connect": "接続",
+  "wifi.notInRange": "範囲外",
+  "wifi.knownFooter": "保存済みのネットワークが範囲内にあると、LordOS は自動で接続します。「このネットワークを削除」はネットワークとそのパスワードをこのコンピュータから消去します。"
 }

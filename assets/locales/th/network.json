@@ -151,5 +151,10 @@
   "wifi.saved": "บันทึกแล้ว",
   "wifi.scan": "สแกน",
   "wifi.scanning": "กำลังสแกน…",
-  "wifi.wrongKey": "รหัสผ่านไม่ถูกต้อง"
+  "wifi.wrongKey": "รหัสผ่านไม่ถูกต้อง",
+  "wifi.available": "เครือข่าย Wi-Fi ที่ใช้ได้",
+  "wifi.currentLabel": "{ssid} — เชื่อมต่อแล้ว",
+  "wifi.connect": "เชื่อมต่อ",
+  "wifi.notInRange": "อยู่นอกระยะ",
+  "wifi.knownFooter": "LordOS จะเข้าร่วมเครือข่ายที่บันทึกไว้เองเมื่ออยู่ในระยะ ลืม จะลบเครือข่ายและรหัสผ่านออกจากคอมพิวเตอร์เครื่องนี้"
 }

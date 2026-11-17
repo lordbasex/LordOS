@@ -151,5 +151,10 @@
   "wifi.saved": "salvată",
   "wifi.scan": "Scanează",
   "wifi.scanning": "Se scanează…",
-  "wifi.wrongKey": "Parola este greșită."
+  "wifi.wrongKey": "Parola este greșită.",
+  "wifi.available": "Rețele Wi-Fi disponibile",
+  "wifi.currentLabel": "{ssid} — Conectat",
+  "wifi.connect": "Conectează",
+  "wifi.notInRange": "În afara razei",
+  "wifi.knownFooter": "LordOS se conectează singur la o rețea salvată când este în rază. Uită elimină rețeaua și parola ei de pe acest computer."
 }

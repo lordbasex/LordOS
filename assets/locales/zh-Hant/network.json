@@ -151,5 +151,10 @@
   "wifi.saved": "已儲存",
   "wifi.scan": "掃描",
   "wifi.scanning": "正在掃描…",
-  "wifi.wrongKey": "密碼錯誤。"
+  "wifi.wrongKey": "密碼錯誤。",
+  "wifi.available": "可用的 Wi-Fi 網路",
+  "wifi.currentLabel": "{ssid} — 已連線",
+  "wifi.connect": "連線",
+  "wifi.notInRange": "不在範圍內",
+  "wifi.knownFooter": "已儲存的網路在範圍內時，LordOS 會自動加入。「忘記」會從這部電腦上刪除該網路及其密碼。"
 }

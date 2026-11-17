@@ -151,5 +151,10 @@
   "wifi.saved": "zapisana",
   "wifi.scan": "Skanuj",
   "wifi.scanning": "Skanowanie…",
-  "wifi.wrongKey": "Nieprawidłowe hasło."
+  "wifi.wrongKey": "Nieprawidłowe hasło.",
+  "wifi.available": "Dostępne sieci Wi-Fi",
+  "wifi.currentLabel": "{ssid} — Połączono",
+  "wifi.connect": "Połącz",
+  "wifi.notInRange": "Poza zasięgiem",
+  "wifi.knownFooter": "LordOS sam łączy się z zapisaną siecią, gdy jest w zasięgu. Zapomnij usuwa sieć i jej hasło z tego komputera."
 }

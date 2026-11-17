@@ -151,5 +151,10 @@
   "wifi.saved": "salva",
   "wifi.scan": "Buscar redes",
   "wifi.scanning": "Buscando…",
-  "wifi.wrongKey": "A senha está incorreta."
+  "wifi.wrongKey": "A senha está incorreta.",
+  "wifi.available": "Redes Wi-Fi disponíveis",
+  "wifi.currentLabel": "{ssid} — Conectada",
+  "wifi.connect": "Conectar",
+  "wifi.notInRange": "Fora de alcance",
+  "wifi.knownFooter": "O LordOS se conecta sozinho a uma rede salva quando ela está ao alcance. Esquecer apaga a rede e a senha dela deste computador."
 }

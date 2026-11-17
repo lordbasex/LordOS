@@ -151,5 +151,10 @@
   "wifi.saved": "已保存",
   "wifi.scan": "扫描",
   "wifi.scanning": "正在扫描…",
-  "wifi.wrongKey": "密码错误。"
+  "wifi.wrongKey": "密码错误。",
+  "wifi.available": "可用的 Wi-Fi 网络",
+  "wifi.currentLabel": "{ssid} — 已连接",
+  "wifi.connect": "连接",
+  "wifi.notInRange": "不在范围内",
+  "wifi.knownFooter": "已保存的网络在范围内时，LordOS 会自动加入。“忽略”会从这台电脑上删除该网络及其密码。"
 }

@@ -192,6 +192,14 @@ connection, Wi-Fi and VPN (`apps/settings/Network.jsx`). Control Center shows th
 and whether there are active VPNs, and opens that section; its Wi-Fi tile (and Lord Classic's network glyph) lights
 the signal's bars (issue #114).
 
+**Wi-Fi page (0.8.8.10, GitHub #167):** "Available Wi-Fi networks" lists the scan with the network LordOS is connected
+to first, whatever its signal, named "<name> — Connected" with its own **Disconnect** button; the others follow by
+signal, each with the Control Center's bars (`SignalGlyph`, `wifiBars`) and its level in dBm. The header keeps only the
+radio picker (with two or more) and **Scan**. "Saved networks" puts the connected one first, then those in range (with
+**Connect**), then the rest ("Not in range"), and **Forget** on each. A `net wifi <if> connected|disconnected` event
+moves the mark without scanning again. The order is `apps/settings/wifimodel.js` (tested by
+`server/tests/wifi_model_test.mjs`); connecting, disconnecting and forgetting are the existing `net-wifi-*` actions.
+
 | | |
 |---|---|
 | ![network](settings-network.png) | ![vpn](vpn-wireguard.png) |
@@ -234,7 +242,7 @@ replies carry only data (a count, a public key).
 | `net-up` / `net-down` | `if` | admin | `net-down` also stops its DHCP/wpa |
 | `net-config` | `if\nmethod=dhcp\|static\|off\naddress=ip/n\n…gateway=ip\ndns=ip…` | admin | Saves and applies. Rejects system interfaces. |
 | `net-manage` / `net-unmanage` | `if` | admin | Writes and deletes `/etc/systemd/network/00-lordos-<if>.network` (`Unmanaged=yes`) and runs `networkctl reload`. |
-| `net-wifi-scan` | `if` | anyone | One `LOG` per network with `{ ssid, bssid, freq, signal, security: open\|wep\|wpa\|wpa2\|wpa2/wpa3\|wpa3\|enterprise, known }`, then `OK <n>` (≈3–10 s) |
+| `net-wifi-scan` | `if` | anyone | One `LOG` per network with `{ ssid, bssid, freq, signal, security: open\|wep\|wpa\|wpa2\|wpa2/wpa3\|wpa3\|enterprise, known, current }`, then `OK <n>` (≈3–10 s). `current` (0.8.8.10, GitHub #167): the network the interface is joined to, from wpa_supplicant's `STATUS` (`wpa_state=COMPLETED` and its `ssid=`, `wifi_status_ssid`, tested by `net-test wifi-status`); one the scan missed is listed anyway with `SIGNAL_POLL`'s level. Read only: the same action, no new argument |
 | `net-wifi-connect` | `if\nssid\npassword` (empty if open) | anyone | `OK wifi.connecting ssid=<ssid>`. The result arrives as an EVENT. An empty password for a network saved with a password or a derived key joins it with the saved one and leaves its files as they are (a click on a saved network in Settings; GitHub #124, 0.8.8.8). A network an earlier version had already saved again as open can't be repaired that way, so Settings asks for the password when a network saved as open shows up as secured in the scan, and joining with it saves it again. |
 | `net-wifi-disconnect` | `if` | anyone | |
 | `net-wifi-forget` | `ssid` | admin | |

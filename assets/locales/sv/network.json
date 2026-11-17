@@ -151,5 +151,10 @@
   "wifi.saved": "sparat",
   "wifi.scan": "Sök",
   "wifi.scanning": "Söker…",
-  "wifi.wrongKey": "Lösenordet är fel."
+  "wifi.wrongKey": "Lösenordet är fel.",
+  "wifi.available": "Tillgängliga wifi-nätverk",
+  "wifi.currentLabel": "{ssid} – Ansluten",
+  "wifi.connect": "Anslut",
+  "wifi.notInRange": "Inte inom räckhåll",
+  "wifi.knownFooter": "LordOS ansluter själv till ett sparat nätverk när det är inom räckhåll. Glöm tar bort nätverket och dess lösenord från den här datorn."
 }

@@ -151,5 +151,10 @@
   "wifi.saved": "salvata",
   "wifi.scan": "Cerca",
   "wifi.scanning": "Ricerca in corso…",
-  "wifi.wrongKey": "La password è errata."
+  "wifi.wrongKey": "La password è errata.",
+  "wifi.available": "Reti Wi-Fi disponibili",
+  "wifi.currentLabel": "{ssid} — Connessa",
+  "wifi.connect": "Connetti",
+  "wifi.notInRange": "Fuori portata",
+  "wifi.knownFooter": "LordOS si collega da solo a una rete salvata quando è a portata. Dimentica rimuove la rete e la sua password da questo computer."
 }

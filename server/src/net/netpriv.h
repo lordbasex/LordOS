@@ -122,6 +122,7 @@ void ovpn_run(const char *name);                /* daemon: launches openvpn and 
 int  wifi_start(const char *ifname);            /* wpa_supplicant + the interface's daemon */
 int  wifi_ctrl(const char *ifname, const char *cmd, char *reply, size_t n);
 void wifi_act_scan(const char *ifname);
+int  wifi_status_ssid(const char *status, char *ssid, size_t n);   /* STATUS: joined (1) and to which SSID */
 void wifi_act_connect(const char *ifname, const char *ssid, const char *pass);
 enum { WIFI_SAVED_OPEN, WIFI_SAVED_PASS, WIFI_SAVED_PSK };
 int  wifi_saved_kind(const char *keytext);      /* what a saved .key holds (NULL: nothing saved) */

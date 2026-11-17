@@ -151,5 +151,10 @@
   "wifi.saved": "guardada",
   "wifi.scan": "Buscar redes",
   "wifi.scanning": "Buscando…",
-  "wifi.wrongKey": "La contraseña no es correcta."
+  "wifi.wrongKey": "La contraseña no es correcta.",
+  "wifi.available": "Redes Wi-Fi disponibles",
+  "wifi.currentLabel": "{ssid} — Conectada",
+  "wifi.connect": "Conectar",
+  "wifi.notInRange": "Fuera de alcance",
+  "wifi.knownFooter": "LordOS se conecta solo a una red guardada cuando está al alcance. Olvidar borra la red y su contraseña de esta computadora."
 }
