@@ -12,6 +12,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Settings → Users: a picture for your account, chosen and fitted** (all themes). "Choose image…" opens the file
+  chooser instead of a path to type; the picture (any size or format lord-media reads, turned upright) shows in a
+  circle, the slider zooms and dragging places it; Save cuts that square from the full picture, scales it to 512 × 512
+  and writes a JPEG (`~/.cache/lordos/avatar.jpg`, a few dozen KB even from a 100 MB photo), which `user-avatar` copies
+  as before. The preview works on a copy at most 1200 px wide. (`apps/settings/AvatarEditor.jsx`, `avatarmodel.js`)
 - **Text consoles while the desktop runs: Ctrl+Alt+F1…F12** (all themes). The keyboard is the session's, so the kernel
   never saw the keys and nothing happened. Now lord-server takes them and asks lord-sessiond, which keeps tty1 in
   `VT_PROCESS` mode: leaving locks the session (as Lock Screen), takes the monitor back and lets the kernel switch;
