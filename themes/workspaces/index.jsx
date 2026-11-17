@@ -37,7 +37,7 @@ import { GlassTarget, DropTarget, SnapFlyout, dropTarget, useDropTarget } from '
 import { tween, EASE, reduceMotion } from './motion.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Spine } from './components/Spine.jsx';
-import { ActivityStrip, StatusCluster, STATUS_W } from './components/TopBar.jsx';
+import { ActivityStrip, ActivityPeek, StatusCluster, STATUS_W } from './components/TopBar.jsx';
 import { GroupFrame, trayNodes } from './components/GroupFrame.jsx';
 import { Search } from './components/Search.jsx';
 import { ControlCenter } from './components/ControlCenter.jsx';
@@ -275,6 +275,7 @@ function App() {
           {main?.plan.top ? (
             <>
               <ActivityStrip t={t} rect={stripRect} onEdit={H.edit} />
+              <ActivityPeek t={t} />
               <StatusCluster t={t} rect={main.plan.top} rtl={rtl} screenW={screen.width} unread={unread} onControl={H.control} onNotif={H.notif} />
             </>
           ) : null}

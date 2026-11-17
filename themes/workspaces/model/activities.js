@@ -130,5 +130,13 @@ export function recentOrder(prev, now, list) {
 // How many recent activities the spine has room for on a display of this height (none on short ones).
 export const spineRecentRoom = (h) => (h >= 860 ? 3 : h >= 720 ? 2 : h >= 620 ? 1 : 0);
 
+// The Focus Surface's summary of an activity: its windows (wins: the open ones, without the theme's own panels), the ones
+// in front first and minimized ones last, at most `max` of them; total and how many more there are.
+export function activitySummary(wins, desk, max = 6) {
+  const on = wins.filter((w) => w.desktop === desk);
+  const order = [...on.filter((w) => !w.minimized).reverse(), ...on.filter((w) => w.minimized)];
+  return { total: on.length, shown: order.slice(0, max), more: Math.max(0, on.length - max) };
+}
+
 // The onboarding shows on the only activity while nothing was set up and nothing is open.
 export const needsOnboarding = (meta, count, windows) => count === 1 && !!meta && !meta.setup && windows === 0;

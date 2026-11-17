@@ -12,7 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
-- **Settings → Battery, for any laptop (all themes).** Like the iPhone's battery page and AlDente, through the kernel's
+- **Settings → Battery, for any laptop (all themes).** Through the kernel's
   standard attributes (no vendor tool): the state with the plug-in, resume and limit marks; the daily use of the last
   8 days and the level by hour; screen active and idle time on battery; the estimated use per app (each app's CPU on
   battery); the battery's condition, maximum capacity, real cycles (counted by LordOS when the battery reports none),
