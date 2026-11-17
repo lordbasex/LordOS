@@ -721,4 +721,25 @@ eq('known issue: others have none', [M.knownIssue('onedrive'), M.knownIssue(''),
   eq('rclone log: no kind, nothing', M.rcloneLogExcerpt(log, {}), '');
 }
 
+// #184: what each account takes on this computer, and the total that the rows add up to
+{
+  eq('here of one', M.hereOf({ cacheBytes: 300, keptBytes: 100 }), { size: 300, kept: 100, free: 200 });
+  eq('here: all kept, nothing to free', M.hereOf({ cacheBytes: 144, keptBytes: 144 }), { size: 144, kept: 144, free: 0 });
+  eq('here: kept never more than the cache', M.hereOf({ cacheBytes: 10, keptBytes: 50 }), { size: 10, kept: 10, free: 0 });
+  eq('here: nothing measured', M.hereOf({}), { size: 0, kept: 0, free: 0 });
+  eq('here of nothing', M.hereOf(null), { size: 0, kept: 0, free: 0 });
+  const accs = [
+    { id: 'c2', name: 'Work', cacheBytes: 500, keptBytes: 0 },
+    { id: 'c1', name: 'Photos', cacheBytes: 1000, keptBytes: 1000 },
+    { id: 'c3', name: 'Empty', cacheBytes: 0, keptBytes: 0 },
+    { id: 'c4', name: 'Off', cacheBytes: 70, keptBytes: 0, disabled: true },
+  ];
+  const h = M.here(accs);
+  eq('here: total of the accounts on', [h.size, h.kept, h.free], [1500, 1000, 500]);
+  eq('here: rows by name, only those with something here', h.rows.map((r) => [r.id, r.name, r.size, r.kept, r.free]),
+    [['c1', 'Photos', 1000, 1000, 0], ['c2', 'Work', 500, 0, 500]]);
+  eq('here: the rows add up to the total', h.rows.reduce((s, r) => s + r.size, 0), h.size);
+  eq('here: no accounts', M.here([]), { size: 0, kept: 0, free: 0, rows: [] });
+}
+
 console.log(`cloud model: ${ok} checks ${process.exitCode ? 'with failures' : 'passed'}`);

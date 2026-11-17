@@ -8,11 +8,13 @@
 //     own reader (server/src/logs/journal.c);
 //   - System and Kernel: the system journal. If the user is in systemd-journal or adm it is read
 //     directly; otherwise an administrator asks for it via the helper's closed logs-system action.
-// Filters by level, time, process or unit, and text; live with inotify (no polling); exports the
+// Cloud's log (cloud.log) shows which account each line is about where lord-server knows it (#183, cloudAccounts).
+// Filters by level (that level only), time, process or unit, and text; live with inotify (no polling); exports the
 // filtered view to Documents. The list draws only the visible rows.
 import {
   View, Text, TextInput, Segmented, SidebarItem, SectionTitle, useTheme, useLocale,
   logs, fs, formatDate, formatNumber, addListener, parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder,
+  levelMatch, LEVEL_MAX, cloudAccounts, useCloud, cloudModel,
   Toolbar, ToolbarButton, ToolbarSpacer, SearchField, EmptyState, Hairline, spacing, typeScale, useAppWindow,
   useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
@@ -118,14 +120,25 @@ function Dot({ p }) {
   return <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c || 'transparent', border: c ? 'none' : '1px solid rgba(128,128,128,0.5)' }} />;
 }
 
+// A Cloud account a line of cloud.log is about (#183): "Provider · Name" on screen; withName false gives
+// "Provider (c1a2b3c4d)" for the exported file, which may end up attached to a report. An account removed since: its id.
+function accountLabel(id, accounts, withName = true) {
+  const a = (accounts || []).find((x) => x.id === id);
+  if (!a) return id;
+  const p = cloudModel.providerName(a);
+  return withName ? `${p} · ${a.name}` : `${p} (${id})`;
+}
+
 // ---- entry details ----
-function Detail({ e, narrow }) {
+function Detail({ e, narrow, accounts }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   if (!e) return <EmptyState title={null} hint={tr('logs.pick')} style={{ padding: spacing.l }} />;
+  const acct = e.acct ? accountLabel(e.acct, accounts) : '';
   const rows = [
     [tr('logs.field.time'), e.t ? `${formatDate(new Date(e.t / 1000), 'long')} ${clock(e.t / 1000)}` : tr('logs.line', { n: e.line })],
     [tr('logs.field.level'), tr(`logs.level.${levelOf(e.p)}`) + (e.p >= 0 ? ` (${e.p})` : '')],
+    ...(acct ? [[tr('logs.field.account'), acct]] : []),
     [tr('logs.field.process'), e.id || '—'],
     [tr('logs.field.pid'), e.pid >= 0 ? String(e.pid) : '—'],
     [tr('logs.field.unit'), e.u || '—'],
@@ -137,7 +150,7 @@ function Detail({ e, narrow }) {
       <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
           <Dot p={e.p} />
-          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.id || '—'}</Text>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{acct || e.id || '—'}</Text>
         </View>
         <Text style={{ fontSize: typeScale.callout, color: t.text, fontFamily: 'monospace', lineHeight: 1.4, textAlign: 'start' }}>{e.m}</Text>
       </View>
@@ -154,7 +167,6 @@ function Detail({ e, narrow }) {
 }
 
 const RANGES = { '15m': 15 * 60e6, hour: 3600e6, day: 86400e6, all: 0 };
-const LEVELS = { all: null, info: 6, warning: 4, error: 3 };
 
 export default function Registros() {
   const t = useTheme();
@@ -172,6 +184,7 @@ export default function Registros() {
   const [sel, setSel] = useState(-1);
   const [state, setState] = useState({ loading: false, error: '', ms: 0 });
   const [notice, setNotice] = useState('');
+  const accounts = useCloud().accounts || [];
   const sources = useMemo(() => { try { return logs.sources(); } catch (e) { return { user: 0, system: false }; } }, []);
   const files = useMemo(() => { try { return sortFiles(logs.files()); } catch (e) { return []; } }, [src.kind]);
   const logDir = useMemo(() => { try { return (logs.dir() || {}).dir || ''; } catch (e) { return ''; } }, []);
@@ -189,7 +202,7 @@ export default function Registros() {
 
   const buildQuery = (since) => {
     const q = { limit: 3000 };
-    if (LEVELS[level] != null) q.prio = LEVELS[level];
+    if (LEVEL_MAX[level] != null) q.prio = LEVEL_MAX[level];      // that level and more urgent: levelMatch keeps the level
     if (RANGES[range]) q.since = Date.now() * 1000 - RANGES[range];
     if (since) q.since = since;
     if (proc && procValid) q.match = proc;
@@ -199,9 +212,18 @@ export default function Registros() {
   };
 
   const runJournal = (q) => {
-    if (src.kind === 'user') return logs.query({ ...q, scope: 'user' });
-    if (sources.system) return logs.query({ ...q, scope: 'system' });
-    return logs.system(q);                    // administrators, through the helper
+    const only = (rows) => (Array.isArray(rows) ? rows.filter((r) => levelMatch(r.p, level)) : rows);
+    if (src.kind === 'user') return logs.query({ ...q, scope: 'user' }).then(only);
+    if (sources.system) return logs.query({ ...q, scope: 'system' }).then(only);
+    return logs.system(q).then(only);         // administrators, through the helper
+  };
+
+  // one of LordOS's files, parsed and filtered; cloud.log's rows get their account (#183)
+  const readFile = () => {
+    let rows = parseLordLog(src.file ? logs.tail(src.file, 512 * 1024) || '' : '', src.file || '');
+    if (/^cloud\.log(\.prev|\.old)?$/.test(src.file || '')) rows = cloudAccounts(rows);
+    const s = search.toLowerCase();
+    return rows.filter((r) => levelMatch(r.p, level) && (!s || r.m.toLowerCase().includes(s)) && (!proc || r.id === proc));
   };
 
   // full reload when the source or the filters change (text, after a short pause)
@@ -213,12 +235,7 @@ export default function Registros() {
       try {
         let rows;
         if (isJournal) rows = await runJournal(buildQuery(0));
-        else {
-          const text = src.file ? logs.tail(src.file, 512 * 1024) || '' : '';
-          rows = parseLordLog(text, src.file || '');
-          const s = search.toLowerCase(), max = LEVELS[level];
-          rows = rows.filter((r) => (max == null || r.p <= max) && (!s || r.m.toLowerCase().includes(s)) && (!proc || r.id === proc));
-        }
+        else rows = readFile();
         if (seq !== query.current.seq) return;
         newest.current = rows.length ? rows[rows.length - 1].t : Date.now() * 1000;
         setItems(rows);
@@ -249,9 +266,7 @@ export default function Registros() {
         let more;
         if (isJournal) more = await runJournal(buildQuery(newest.current));
         else {
-          const all = parseLordLog(logs.tail(src.file, 512 * 1024) || '', src.file || '');
-          const s = search.toLowerCase(), max = LEVELS[level];
-          setItems(all.filter((r) => (max == null || r.p <= max) && (!s || r.m.toLowerCase().includes(s))));
+          setItems(readFile());
           more = null;
         }
         if (more && more.length && seq === query.current.seq) {
@@ -271,7 +286,8 @@ export default function Registros() {
   const exportView = () => {
     const lines = items.map((e) => {
       const when = e.t ? `${formatDate(new Date(e.t / 1000), 'short')} ${clock(e.t / 1000)}` : `#${e.line}`;
-      return `${when} ${tr(`logs.level.${levelOf(e.p)}`)} ${e.id || '-'}${e.pid >= 0 ? `[${e.pid}]` : ''}: ${e.m}`;
+      const acct = e.acct ? ` [${accountLabel(e.acct, accounts, false)}]` : '';
+      return `${when} ${tr(`logs.level.${levelOf(e.p)}`)} ${e.id || '-'}${e.pid >= 0 ? `[${e.pid}]` : ''}${acct}: ${e.m}`;
     });
     const d = new Date();
     const name = `${tr('logs.exportName')}-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.txt`;
@@ -296,7 +312,8 @@ export default function Registros() {
         <View style={{ width: 10, alignItems: 'center' }}><Dot p={e.p} /></View>
         <Text style={{ width: COL_TIME, fontSize: typeScale.caption, color: on ? '#fff' : t.textDim, fontFamily: 'monospace', whiteSpace: 'nowrap', direction: 'ltr', textAlign: 'start' }}>{e.t ? clock(e.t / 1000) : `#${e.line}`}</Text>
         <Text style={{ width: colProc, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.id || '—'}</Text>
-        <Text style={{ flex: 1, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.m.replace(/\n/g, ' ⏎ ')}</Text>
+        <Text style={{ flex: 1, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
+          {e.acct ? `${accountLabel(e.acct, accounts)}: ` : ''}{e.m.replace(/\n/g, ' ⏎ ')}</Text>
       </View>
     );
   };
@@ -367,7 +384,7 @@ export default function Registros() {
         </View>
         <View style={{ height: height < 560 ? 112 : 156 }}>
           <Hairline edge="top" />
-          <Detail e={sel >= 0 ? items[sel] : null} narrow={narrow} />
+          <Detail e={sel >= 0 ? items[sel] : null} narrow={narrow} accounts={accounts} />
         </View>
         <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
           <Hairline edge="top" />

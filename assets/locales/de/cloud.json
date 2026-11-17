@@ -5,8 +5,9 @@
   "accounts": "Konten",
   "allAccounts": "Alle Konten",
   "onThisComputer": "Auf diesem Computer",
-  "cacheLine": "{size} · {kept} behalten",
+  "hereLine": "{size} · {kept} behalten · {free} freigebbar",
   "freeUp": "Speicherplatz freigeben",
+  "freeUpHint": "„Speicherplatz freigeben“ entfernt die lokalen Kopien der Dateien, die nicht auf diesem Computer behalten werden; behaltene Dateien und Änderungen, die noch hochgeladen werden, bleiben.",
   "freed": "{size} auf diesem Computer freigegeben",
   "freedSkipped": {
     "one": "{size} freigegeben; {count} Objekt bleibt (geöffnet, behalten oder wartet auf Upload)",

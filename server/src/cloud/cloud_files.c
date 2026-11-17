@@ -210,6 +210,7 @@ static void live_of(Acc *a, const char *rel, CloudLive *l) {
     }
     for (int i = 0; i < a->nerrn; i++) if (!strcmp(a->errn[i], rel)) l->error = 1;
     l->kept = cloud_kept((const char *const *)a->keep, a->nkeep, rel);
+    if (l->kept && cloud_fails_has(&a->kfail, rel, (long long)time(NULL))) l->error = 1;   /* #185: Keep couldn't read it */
 }
 
 static int under(const char *name, const char *dir) {
@@ -240,7 +241,9 @@ char *cf_status(const char *const *paths, int n) {
             for (int k = 0; k < a->nq; k++) up |= under(a->q[k].name, rel);
             for (int k = 0; k < a->nt; k++) { if (a->t[k].up) up |= under(a->t[k].name, rel); else down |= under(a->t[k].name, rel); }
             down |= cloud_kept_busy((const char *const *)a->keep, a->keep_busy, a->nkeep, rel);
-            s = up ? "up" : down ? "down" : cloud_kept((const char *const *)a->keep, a->nkeep, rel) ? "kept" : "cloud";
+            /* #185: a kept folder the keeper couldn't read (set aside for an hour) says so, instead of "kept" */
+            int kept = cloud_kept((const char *const *)a->keep, a->nkeep, rel);
+            s = up ? "up" : down ? "down" : kept && cloud_fails_has(&a->kfail, rel, (long long)time(NULL)) ? "error" : kept ? "kept" : "cloud";
         } else {
             CloudMeta m;
             int have = !read_meta(a->id, rel, &m);
@@ -457,16 +460,44 @@ static int still_ok(const char *id) {
 }
 
 /* One kept entry's pass of the keeper (#71): the entry is marked as coming down when a file of it is missing, and
- * cleared when a pass read everything (a pass that stopped, paused or gone, leaves it as it was) */
+ * cleared when a pass read everything (a pass that stopped, paused or gone, leaves it as it was). What was set aside
+ * as failing (#185, CloudFails) doesn't keep it "coming down": it shows as an error of its own */
 typedef struct { const char *root; int marked, incomplete, gave_up; } KeepPass;
+
+/* #185: rel failed less than an hour ago while the provider answered: the pass goes around it */
+static int set_aside(const char *id, const char *rel) {
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find(id);
+    int r = a && cloud_fails_has(&a->kfail, rel, (long long)time(NULL));
+    pthread_mutex_unlock(&cl_mu);
+    return r;
+}
 
 /* #85: a call through the mount failed because the provider didn't answer (pCloud after a pause, its address not found
  * for minutes): rclone held each folder while it waited, so a pass that went on walked folder after folder, 15 s each,
  * and whatever else read those folders waited with it. The pass stops at the first one and the account is checked now;
- * the keeper comes back when the check finds it answering (check_acc) */
-static void gave_up(const Snap *s, KeepPass *kp, int err) {
+ * the keeper comes back when the check finds it answering (check_acc).
+ * #185: but one folder can fail for good while the provider answers (OneDrive's Personal Vault: "ObjectHandle is
+ * Invalid"), and the pass stopped there every time: nothing after it came down and every folder kept the "coming
+ * down" arrow. So the path is set aside too: if the check finds the provider answering, the keeper is called back and
+ * goes around it (set_aside) for an hour. Each path is set aside once, so the two can't call each other forever; a check
+ * that finds the provider unreachable forgets them all (cloud.c, check_acc): they failed because of that. A path that
+ * fails otherwise (refused, not a time out) never stopped the pass, but left the entry "coming down" for good: it is
+ * set aside the same way, without the check. */
+static void gave_up(const Snap *s, KeepPass *kp, int err, const char *rel) {
     kp->incomplete = 1;
-    if (kp->gave_up || !cloud_mount_gave_up(err)) return;
+    if (kp->gave_up) return;
+    int timeout = cloud_mount_gave_up(err);
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find(s->id);
+    /* the kept entry itself failing is the provider, not one folder of it: never set aside */
+    if (a && strcmp(rel, kp->root)) {
+        cloud_fails_expire(&a->kfail, (long long)time(NULL));
+        /* the check calls the keeper back if the provider answers */
+        if (cloud_fails_add(&a->kfail, rel, (long long)time(NULL)) == 1 && timeout) a->keeper_wait = 1;
+    }
+    pthread_mutex_unlock(&cl_mu);
+    if (!timeout) return;
     kp->gave_up = 1;
     fprintf(stderr, "cloud: %s: the provider didn't answer through the mount: Keep on This Computer waits for it\n", s->id);
     cl_check_soon(s->id);
@@ -490,7 +521,7 @@ static void fetch(const Snap *s, const char *rel, KeepPass *kp) {
     char p[PATH_MAX * 2];
     cl_pf(p, sizeof p, "%s/%s/%s", cl_root, s->name, rel);
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
-    if (fd < 0) { gave_up(s, kp, errno); return; }
+    if (fd < 0) { gave_up(s, kp, errno, rel); return; }
     static char buf[1 << 20];
     long long done = 0;
     ssize_t n;
@@ -498,7 +529,7 @@ static void fetch(const Snap *s, const char *rel, KeepPass *kp) {
         done += n;
         if ((done & ((64 << 20) - 1)) < n && !still_ok(s->id)) { kp->incomplete = 1; break; }   /* every 64 MB: paused, gone? */
     }
-    if (n < 0) gave_up(s, kp, errno);
+    if (n < 0) gave_up(s, kp, errno, rel);
     posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
     close(fd);
 }
@@ -506,12 +537,13 @@ static void fetch(const Snap *s, const char *rel, KeepPass *kp) {
 static void fetch_tree(const Snap *s, const char *rel, int depth, KeepPass *kp) {
     char p[PATH_MAX * 2];
     cl_pf(p, sizeof p, "%s/%s%s%s", cl_root, s->name, rel[0] ? "/" : "", rel);
+    if (set_aside(s->id, rel)) return;                                        /* #185: failed lately, gone around */
     struct stat st;
-    if (lstat(p, &st)) { if (errno != ENOENT) gave_up(s, kp, errno); return; }   /* ENOENT: gone (in the cloud too) */
+    if (lstat(p, &st)) { if (errno != ENOENT) gave_up(s, kp, errno, rel); return; }   /* ENOENT: gone (in the cloud too) */
     if (S_ISREG(st.st_mode)) { fetch(s, rel, kp); return; }
     if (!S_ISDIR(st.st_mode) || depth > WALK_DEPTH) return;
     DIR *d = opendir(p);
-    if (!d) { gave_up(s, kp, errno); return; }
+    if (!d) { gave_up(s, kp, errno, rel); return; }
     errno = 0;
     for (struct dirent *e; (e = readdir(d)); errno = 0) {
         if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
@@ -520,7 +552,7 @@ static void fetch_tree(const Snap *s, const char *rel, int depth, KeepPass *kp) 
         if (kp->gave_up || !still_ok(s->id)) { kp->incomplete = 1; break; }
         fetch_tree(s, r, depth + 1, kp);
     }
-    if (errno && !kp->incomplete) gave_up(s, kp, errno);       /* readdir failed part way */
+    if (errno && !kp->incomplete) gave_up(s, kp, errno, rel);  /* readdir failed part way */
     closedir(d);
 }
 

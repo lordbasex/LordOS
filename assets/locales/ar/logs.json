@@ -2,6 +2,7 @@
   "pick": "اختر إدخالًا لرؤية الرسالة الكاملة وحقولها.",
   "field.time": "الوقت",
   "field.level": "المستوى",
+  "field.account": "الحساب",
   "field.process": "العملية",
   "field.pid": "PID",
   "field.unit": "الوحدة",

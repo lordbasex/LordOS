@@ -579,14 +579,22 @@ LordOS's log viewer.
     `shell`, each with its previous session's `.prev`, then `xwayland`, `cloud`; a file's `.old`, the
     older part its 16 MB cap moved aside, is shown as "(older part)"), then **Apps** (`apps/<app>.log`),
     **Web apps** (`web/<app>-<profile>.log`) and **Older logs** (`cache/<name>.log`: what an older version
-    left in `~/.cache/lordos`). Stamped lines show their time, level and subsystem; other lines (a
-    Linux app's own output) get a level from their words (`sdk/logfile.js`).
-- **Filters:** level (all, info and above, warnings and above, errors), time range (15 min, 1 hour,
+    left in `~/.cache/lordos`). Stamped lines show their time, level and subsystem; rclone's own lines in
+    `cloud` too (since 0.8.8.10, #183: `2026/11/17 10:12:59 ERROR : …`, local time; the unstamped lines
+    after one are the rest of its message, a provider's multi-line error); other lines (a Linux app's own
+    output) get a level from their words (`sdk/logfile.js`). In `cloud`, a line about one account says
+    which, as "provider · name": lord-server writes a line of its own after each rc call about an account
+    that failed (`ERROR c1a2b3c4d: operations/list: …`, the id only), rclone's copy of it is folded into it
+    and rclone's lines of the same second that end with the same error take the account too
+    (`cloudAccounts`). The export writes the provider and the id, never the name.
+- **Filters:** level (all, or only info, only warnings, only errors: until 0.8.8.10 each level showed the
+  more urgent ones too, so a log of errors looked the same under every choice, #183), time range (15 min, 1 hour,
   24 h, everything), process or unit (`[A-Za-z0-9@._:-]`, the same check as the C side), and free-text
   search in the message.
 - **Live:** follows new entries as they arrive (see below) and keeps the view pinned to the bottom
   until the user scrolls up.
-- **Detail:** the selected entry with its time, level, process, PID, UID, unit and boot id.
+- **Detail:** the selected entry with its time, level, Cloud account (cloud.log), process, PID, UID, unit
+  and boot id.
 - **Export:** the filtered view as text, to the user's Documents folder (`userDirs()`, so
   `~/Documentos` in Spanish) through `fs.write`.
 - A virtualized list (only the visible rows are drawn); at most 3000 entries per query and

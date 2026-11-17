@@ -2,6 +2,7 @@
   "pick": "Pasirinkite įrašą, kad matytumėte visą pranešimą ir jo laukus.",
   "field.time": "Laikas",
   "field.level": "Lygis",
+  "field.account": "Paskyra",
   "field.process": "Procesas",
   "field.pid": "PID",
   "field.unit": "Vienetas",

@@ -2,6 +2,7 @@
   "pick": "Välj en post för att se hela meddelandet och dess fält.",
   "field.time": "Tid",
   "field.level": "Nivå",
+  "field.account": "Konto",
   "field.process": "Process",
   "field.pid": "PID",
   "field.unit": "Enhet",

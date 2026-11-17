@@ -5,8 +5,9 @@
   "accounts": "Accounts",
   "allAccounts": "All accounts",
   "onThisComputer": "On this computer",
-  "cacheLine": "{size} · {kept} kept",
+  "hereLine": "{size} · {kept} kept · {free} can be freed",
   "freeUp": "Free Up Space",
+  "freeUpHint": "Free Up Space removes the local copies of files that aren’t kept on this computer; kept files and changes waiting to go up stay.",
   "freed": "{size} freed on this computer",
   "freedSkipped": {
     "one": "{size} freed; {count} item stays (open, kept or waiting to go up)",

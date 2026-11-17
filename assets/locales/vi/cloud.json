@@ -5,8 +5,9 @@
   "accounts": "Tài khoản",
   "allAccounts": "Tất cả tài khoản",
   "onThisComputer": "Trên máy tính này",
-  "cacheLine": "{size} · giữ lại {kept}",
+  "hereLine": "{size} · giữ lại {kept} · có thể giải phóng {free}",
   "freeUp": "Giải phóng dung lượng",
+  "freeUpHint": "“Giải phóng dung lượng” xoá bản sao cục bộ của các tệp không được giữ lại trên máy tính này; tệp được giữ lại và các thay đổi đang chờ tải lên vẫn còn.",
   "freed": "Đã giải phóng {size} trên máy tính này",
   "freedSkipped": {
     "other": "Đã giải phóng {size}; {count} mục vẫn ở lại (đang mở, được giữ hoặc đang chờ tải lên)"

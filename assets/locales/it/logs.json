@@ -2,6 +2,7 @@
   "pick": "Seleziona una voce per vedere il messaggio completo e i suoi campi.",
   "field.time": "Ora",
   "field.level": "Livello",
+  "field.account": "Account",
   "field.process": "Processo",
   "field.pid": "PID",
   "field.unit": "Unità",

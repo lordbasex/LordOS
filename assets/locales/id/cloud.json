@@ -5,8 +5,9 @@
   "accounts": "Akun",
   "allAccounts": "Semua akun",
   "onThisComputer": "Di komputer ini",
-  "cacheLine": "{size} · {kept} disimpan",
+  "hereLine": "{size} · {kept} disimpan · {free} dapat dikosongkan",
   "freeUp": "Kosongkan Ruang",
+  "freeUpHint": "Kosongkan Ruang menghapus salinan lokal file yang tidak disimpan di komputer ini; file yang disimpan dan perubahan yang menunggu diunggah tetap ada.",
   "freed": "{size} dikosongkan di komputer ini",
   "freedSkipped": {
     "other": "{size} dikosongkan; {count} item tetap ada (terbuka, disimpan, atau menunggu diunggah)"

@@ -317,6 +317,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Settings → Cloud says what "On this computer" counts, account by account (GitHub #184).** The line read "144 MB ·
+  144 MB kept", and it wasn't clear that the first figure is everything the accounts have here and the second the kept
+  part of it, nor what Free Up Space would do. It now reads "144 MB · 144 MB kept · 0 bytes can be freed"; with more
+  than one account a row per account (by name, with its color) adds up to it; a line says that Free Up Space removes the
+  local copies of files that aren't kept and that kept files and changes waiting to go up stay; and the button is off
+  when nothing can be freed. Each account's page gets the same box, with Free Up Space for that account alone. The
+  figures are lord-server's own measure of the cache (`cacheBytes`, `keptBytes`), nothing estimated (`hereOf` and
+  `here` in `sdk/cloudmodel.js`, checked in `cloud_model_test.mjs`). New texts in every language (`cloud.hereLine`,
+  `cloud.freeUpHint`; `cloud.cacheLine` is gone). Not done, for the maintainer to decide: showing the user or e-mail an
+  account signs in with (it is kept in the keyring with the password and never reaches the interface; OAuth providers
+  don't tell it) and choosing an account's color (one per provider by default, as asked).
 - **Cleaner's panel by the clock wears the theme's colours** (all themes): its cards, bars and button take the shell's
   tokens (`shellPalette` in `sdk/cleanertheme.js`), like the bar's other panels; the Cleaner window keeps the look chosen
   in Cleaner → Settings.
@@ -397,6 +408,44 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   became "<name> 2.<ext>", past the limit, so the copy failed: the free names Files gives copies, duplicates, new
   folders, extracted folders and archives now shorten the stem, whole characters only, keeping the number and the
   extension (`apps/files/names.js`). Tested by `files-names-test` and `fsops-test`.
+- **Logs: the level filter showed the same lines under every choice, and Cloud's log didn't say which account a line
+  was about (GitHub #183).** Reported from Settings → Cloud → Show Log: 681 errors, and Info or Warnings still listed
+  them. Three causes, three fixes:
+  - *The filter:* each choice showed that level and every more urgent one ("Info" was everything but debug), so a log
+    made of errors looked the same under each. "Info", "Warnings" and "Errors" now show that level only, as their
+    names say (notice and info are both "Info"; debug shows under "All"); for the journal lord-server is still asked
+    for that priority and the more urgent ones, and the app keeps the level (`levelMatch`, `LEVEL_MAX` in
+    `sdk/logfile.js`).
+  - *rclone's lines:* `cloud.log` is written by rclone (`2026/11/17 10:12:59 ERROR : …`), which the Logs app didn't
+    parse: no time (the row showed its line number), a level guessed from the words, and each line of a provider's
+    multi-line error (Google Drive's JSON details) was a row of its own, at "Info". They now get their time (local) and
+    rclone's level (CRITICAL, ERROR, NOTICE, INFO, DEBUG), and the unstamped lines after one are the rest of its message.
+  - *The account:* one rclone serves every account and its lines name none. lord-server now adds a line of its own to
+    `cloud.log` after each rc call about an account that failed (`ERROR c1a2b3c4d: operations/list: <rclone's error>`,
+    `note_failure` in `cloud.c`; the account's id only, as the file may be attached to a report; `cloud_body_account`
+    in `cloud_pure.c` takes it from the call). The Logs app shows it as "provider · name" before the message and in
+    the entry's details (new **Account** field, `logs.field.account` in every language), folds rclone's own copy of
+    that error into it, and gives the account to rclone's lines of the same second that end with the same error
+    (`cloudAccounts`). Lines rclone writes on its own for a mount (a file of the cache, a folder listed by Files) still
+    can't be told apart: rclone doesn't say which mount they come from. The export writes the provider and the id,
+    never the account's name.
+  `logfile-test` checks rclone's lines, the multi-line errors, the filter and the accounts; `cloud-test` checks
+  `cloud_body_account`.
+- **Cloud: an account kept on this computer stayed "coming down" for good when one of its folders can't be read
+  (GitHub #185).** Reported with an account set to keep every file here: after copying files into a folder, the files
+  showed the green check but the folder, and every other folder, kept the blue arrow, and files already in the cloud
+  at the top of the account never came down. The provider refuses to list one folder (its locked vault: "ObjectHandle
+  is Invalid") although it answers for everything else, and Keep on This Computer's pass stopped at the first folder
+  that failed (the rule for a provider that doesn't answer, #85, 0.8.8.7): everything after it in the walk was never
+  read, and the kept entry was never marked complete, so every folder under it kept the "coming down" glyph. Now a
+  path that fails while the provider answers is set aside for an hour (`CloudFails` in `cloud_pure.c`, at most 32 per
+  account): the account is checked at once and, when it answers, the keeper comes back and goes around that path, so
+  the rest comes down and the folders turn to kept; the path shows the error glyph meanwhile and is tried again after
+  the hour, at the next mount, or when the person keeps a folder again. The kept entry itself failing is still the
+  provider not answering (never set aside), and a check that finds the provider unreachable forgets what was set aside.
+  A path refused with another error (not a time out), which never stopped the pass but also left the entry "coming
+  down" for good, is set aside the same way, without the check.
+  `cloud-test` checks the set (added, inside a failed folder, the hour, the limit).
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.

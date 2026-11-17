@@ -5,8 +5,9 @@
   "accounts": "Konton",
   "allAccounts": "Alla konton",
   "onThisComputer": "På den här datorn",
-  "cacheLine": "{size} · {kept} behålls",
+  "hereLine": "{size} · {kept} behålls · {free} kan frigöras",
   "freeUp": "Frigör utrymme",
+  "freeUpHint": "”Frigör utrymme” tar bort de lokala kopiorna av filer som inte behålls på den här datorn; filer som behålls och ändringar som väntar på att laddas upp stannar kvar.",
   "freed": "{size} frigjort på den här datorn",
   "freedSkipped": {
     "one": "{size} frigjort; {count} objekt blir kvar (öppet, behållet eller väntar på uppladdning)",

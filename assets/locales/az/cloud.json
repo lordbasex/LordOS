@@ -5,8 +5,9 @@
   "accounts": "Hesablar",
   "allAccounts": "Bütün hesablar",
   "onThisComputer": "Bu kompüterdə",
-  "cacheLine": "{size} · {kept} saxlanılır",
+  "hereLine": "{size} · {kept} saxlanılır · {free} boşaldıla bilər",
   "freeUp": "Yer boşalt",
+  "freeUpHint": "«Yer boşalt» bu kompüterdə saxlanılmayan faylların yerli nüsxələrini silir; saxlanılan fayllar və yüklənməyi gözləyən dəyişikliklər qalır.",
   "freed": "Bu kompüterdə {size} boşaldıldı",
   "freedSkipped": {
     "one": "{size} boşaldıldı; {count} element qalır (açıq, saxlanılan və ya yüklənməyi gözləyən)",

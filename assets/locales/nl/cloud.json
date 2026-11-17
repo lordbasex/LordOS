@@ -5,8 +5,9 @@
   "accounts": "Accounts",
   "allAccounts": "Alle accounts",
   "onThisComputer": "Op deze computer",
-  "cacheLine": "{size} · {kept} behouden",
+  "hereLine": "{size} · {kept} behouden · {free} vrij te maken",
   "freeUp": "Maak ruimte vrij",
+  "freeUpHint": "‘Maak ruimte vrij’ verwijdert de lokale kopieën van bestanden die niet op deze computer worden behouden; behouden bestanden en wijzigingen die nog moeten worden geüpload blijven.",
   "freed": "{size} vrijgemaakt op deze computer",
   "freedSkipped": {
     "one": "{size} vrijgemaakt; {count} item blijft (open, behouden of wacht op uploaden)",

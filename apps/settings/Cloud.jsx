@@ -283,13 +283,40 @@ function AccountRow({ a, accounts, last }) {
   );
 }
 
+// "1.2 GB · 800 MB kept · 400 MB can be freed" (#184): what the cache holds, the kept part, what Free Up Space can drop
+const hereText = (h, tr) => tr('cloud.hereLine', { size: formatBytes(h.size), kept: formatBytes(h.kept), free: formatBytes(h.free) });
+
+// An account's own "On this computer" (#184), with Free Up Space for that account alone
+function HereCard({ a }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const h = M.hereOf(a);
+  const [msg, setMsg] = useState('');
+  const free = () => {
+    const r = cloud.free([a.mount]);
+    setMsg(tr('cloud.freed', { size: formatBytes(r?.freed || 0) }));
+  };
+  return (
+    <View aria-label={tr('cloud.onThisComputer')} style={[box(t), { paddingHorizontal: 14, paddingVertical: 12, gap: 6 }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.onThisComputer')}</Text>
+          <Dim t={t}>{hereText(h, tr)}</Dim>
+        </View>
+        <Button small label={tr('cloud.freeUp')} disabled={h.free <= 0 || !a.mount} onClick={free} />
+      </View>
+      <Dim t={t} style={{ fontSize: typeScale.caption }}>{msg || tr('cloud.freeUpHint')}</Dim>
+    </View>
+  );
+}
+
 function Overview({ st }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const accs = st.accounts || [];
   const o = st.options || {};
   const svc = st.service || {};
-  const cache = accs.reduce((s, a) => s + (a.cacheBytes || 0), 0), kept = accs.reduce((s, a) => s + (a.keptBytes || 0), 0);
+  const here = M.here(accs);
   const [msg, setMsg] = useState(null);
   const freeAll = () => {
     const r = cloud.free(M.liveAccounts(accs).map((a) => a.mount));
@@ -326,9 +353,22 @@ function Overview({ st }) {
       ) : null}
       <View aria-label={tr('cloud.onThisComputer')} style={box(t)}>
         <BoxRow t={t}>
-          <Text style={{ flex: 1, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('cloud.onThisComputer')}</Text>
-          <Dim t={t}>{tr('cloud.cacheLine', { size: formatBytes(cache), kept: formatBytes(kept) })}</Dim>
-          <Button small label={tr('cloud.freeUp')} disabled={!accs.length} onClick={freeAll} />
+          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+            <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('cloud.onThisComputer')}</Text>
+            <Dim t={t}>{hereText(here, tr)}</Dim>
+          </View>
+          <Button small label={tr('cloud.freeUp')} disabled={!accs.length || here.free <= 0} onClick={freeAll} />
+        </BoxRow>
+        {/* #184: what each account takes, adding up to the line above */}
+        {here.rows.length > 1 ? here.rows.map((r) => (
+          <BoxRow key={r.id} t={t} pad={6}>
+            <View style={{ width: 12 }}><AccountBadge color={M.accountColor(accs, r.id)} size={12} /></View>
+            <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{r.name}</Text>
+            <Dim t={t}>{hereText(r, tr)}</Dim>
+          </BoxRow>
+        )) : null}
+        <BoxRow t={t} pad={6}>
+          <Dim t={t} style={{ flex: 1, fontSize: typeScale.caption }}>{tr('cloud.freeUpHint')}</Dim>
         </BoxRow>
         <BoxRow t={t}>
           <Text style={{ flex: 1, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr('cloud.freeBelow')}</Text>
@@ -958,6 +998,7 @@ function AccountPage({ a, st }) {
     <View style={{ flex: wide ? 1 : undefined, minWidth: 0, alignSelf: 'stretch', gap: 16 }}>
       <KnownIssue a={a} />
       <SpaceCard a={a} accounts={accs} />
+      <HereCard a={a} />
       <KeptList a={a} onAdd={() => setView({ sheet: { kind: 'pickFolder', id: a.id } })} />
       <LinksList a={a} />
       {verified ? null : (

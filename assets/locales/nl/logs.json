@@ -2,6 +2,7 @@
   "pick": "Kies een item om het volledige bericht en de velden te zien.",
   "field.time": "Tijd",
   "field.level": "Niveau",
+  "field.account": "Account",
   "field.process": "Proces",
   "field.pid": "PID",
   "field.unit": "Unit",

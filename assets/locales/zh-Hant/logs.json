@@ -2,6 +2,7 @@
   "pick": "選取一個項目以查看完整訊息及其欄位。",
   "field.time": "時間",
   "field.level": "層級",
+  "field.account": "帳號",
   "field.process": "程序",
   "field.pid": "PID",
   "field.unit": "單元",
