@@ -368,6 +368,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Disks: pressing Mount could turn the whole desktop black (GitHub #174).** In 0.8.8.8 and 0.8.8.9, when mounting
+  failed on a FAT, exFAT, NTFS, HFS+ or APFS drive with the disk formats not installed (most USB sticks), Disks drew its "Get the formats" button with a `Button` it never imported:
+  "Button is not defined" while rendering, and React unmounted the shell. The import is in place now, and each app
+  window has its own error boundary (Changed, above), so such a mistake stays in its window. A new check,
+  `server/tests/jsx_undeclared_test.mjs` (in `make test`), reads every `.jsx` of the apps, themes, SDK and runtime and
+  fails on a component used as a JSX tag that is never imported or declared in its file; esbuild bundles such a file
+  without a warning.
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.
