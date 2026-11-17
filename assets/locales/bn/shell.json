@@ -440,6 +440,8 @@
   "ws.spine.control": "নিয়ন্ত্রণ",
   "ws.spine.collapse": "বার গুটিয়ে নিন",
   "ws.spine.expand": "বার প্রসারিত করুন",
+  "ws.spine.recent": "সাম্প্রতিক",
+  "ws.spine.settings": "সেটিংস",
   "ws.activity.new": "নতুন কার্যক্রম",
   "ws.activity.newShort": "নতুন",
   "ws.activity.position": "কার্যক্রম {n}/{total} · সর্বোচ্চ {max}",

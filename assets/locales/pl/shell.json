@@ -447,6 +447,8 @@
   "ws.spine.control": "Sterowanie",
   "ws.spine.collapse": "Zwiń kolumnę",
   "ws.spine.expand": "Rozwiń kolumnę",
+  "ws.spine.recent": "Ostatnie",
+  "ws.spine.settings": "Ustawienia",
   "ws.activity.new": "Nowa aktywność",
   "ws.activity.newShort": "Nowa",
   "ws.activity.position": "Aktywność {n} z {total} · do {max}",

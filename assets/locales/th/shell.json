@@ -433,6 +433,8 @@
   "ws.spine.control": "ตัวควบคุม",
   "ws.spine.collapse": "ยุบแถบ",
   "ws.spine.expand": "ขยายแถบ",
+  "ws.spine.recent": "ล่าสุด",
+  "ws.spine.settings": "การตั้งค่า",
   "ws.activity.new": "กิจกรรมใหม่",
   "ws.activity.newShort": "ใหม่",
   "ws.activity.position": "กิจกรรม {n} จาก {total} · สูงสุด {max}",

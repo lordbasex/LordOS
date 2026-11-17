@@ -119,5 +119,16 @@ export function togglePin(pins, key) {
   return [...pins, key].slice(0, MAX_PINS);
 }
 
+// The order the activities were last shown in: the one in view first, then the others from the most recent; a new
+// desktop goes last and a removed one goes away. prev: the previous order; now: the desktop in view; list: every desktop.
+export function recentOrder(prev, now, list) {
+  const have = new Set(list);
+  const rest = (prev || []).filter((id) => id !== now && have.has(id));
+  const fresh = list.filter((id) => id !== now && !rest.includes(id));
+  return [...(have.has(now) ? [now] : []), ...rest, ...fresh];
+}
+// How many recent activities the spine has room for on a display of this height (none on short ones).
+export const spineRecentRoom = (h) => (h >= 860 ? 3 : h >= 720 ? 2 : h >= 620 ? 1 : 0);
+
 // The onboarding shows on the only activity while nothing was set up and nothing is open.
 export const needsOnboarding = (meta, count, windows) => count === 1 && !!meta && !meta.setup && windows === 0;

@@ -440,6 +440,8 @@
   "ws.spine.control": "Mga kontrol",
   "ws.spine.collapse": "Paliitin ang bar",
   "ws.spine.expand": "Palakihin ang bar",
+  "ws.spine.recent": "Kamakailan",
+  "ws.spine.settings": "Mga Setting",
   "ws.activity.new": "Bagong aktibidad",
   "ws.activity.newShort": "Bago",
   "ws.activity.position": "Aktibidad {n} sa {total} · hanggang {max}",

@@ -447,6 +447,8 @@
   "ws.spine.control": "Comenzi",
   "ws.spine.collapse": "Restrânge coloana",
   "ws.spine.expand": "Extinde coloana",
+  "ws.spine.recent": "Recente",
+  "ws.spine.settings": "Setări",
   "ws.activity.new": "Activitate nouă",
   "ws.activity.newShort": "Nouă",
   "ws.activity.position": "Activitatea {n} din {total} · până la {max}",

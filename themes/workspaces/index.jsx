@@ -83,6 +83,8 @@ const H = {
   // the Store's Web apps page: "Add from an address" and the catalog (docs/WEBAPPS.md)
   addWebApp: () => wm.open('store', { args: { page: 'webapps' } }),
   edit: (id) => editing.set(id),
+  activity: (id) => { panel.set(null); switchDesktop(id); },
+  settings: () => { panel.set(null); wm.open('settings'); },
   closePanel: () => panel.set(null),
 };
 
@@ -198,7 +200,7 @@ function App() {
   }), []);
 
   const leaving = useLeaving(all, main?.plan.spine);
-  const spineActive = useMemo(() => ({ overview: inOverview, apps: open?.name === 'search' && open.mode === 'apps', control: open?.name === 'control', menu: !!crown }),
+  const spineActive = useMemo(() => ({ overview: inOverview, apps: open?.name === 'search' && open.mode === 'apps', control: open?.name === 'control', notif: open?.name === 'notif', menu: !!crown }),
     [inOverview, open, crown]);
   const stripRect = useMemo(() => (main?.plan.top ? { ...main.plan.top, w: main.plan.top.w - STATUS_W } : null), [main]);
   if (open?.name === 'notif' && history.length) seen.current = Math.max(seen.current, history[0].id);
@@ -266,8 +268,9 @@ function App() {
         <DesktopWidgets layer="above" />
         <Layer name="dock">
           {plans.map(({ d, plan }) => (plan.spine ? (
-            <Spine key={d.id} t={t} rect={plan.spine} mode={plan.mode} rtl={rtl} active={spineActive} controlRef={d.main ? controlRef : undefined}
-              onCrown={H.crown} onActivities={H.activities} onApps={H.apps} onFiles={H.files} onControl={H.control} onToggle={toggleSpine} />
+            <Spine key={d.id} t={t} rect={plan.spine} mode={plan.mode} rtl={rtl} active={spineActive} controlRef={d.main ? controlRef : undefined} desk={desktop} unread={unread}
+              onCrown={H.crown} onActivities={H.activities} onApps={H.apps} onFiles={H.files} onControl={H.control} onToggle={toggleSpine}
+              onNotif={H.notif} onSettings={H.settings} onEditActivity={H.edit} onActivity={H.activity} />
           ) : null))}
           {main?.plan.top ? (
             <>

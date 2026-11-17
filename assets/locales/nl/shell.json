@@ -440,6 +440,8 @@
   "ws.spine.control": "Bediening",
   "ws.spine.collapse": "Kolom inklappen",
   "ws.spine.expand": "Kolom uitklappen",
+  "ws.spine.recent": "Recent",
+  "ws.spine.settings": "Instellingen",
   "ws.activity.new": "Nieuwe activiteit",
   "ws.activity.newShort": "Nieuw",
   "ws.activity.position": "Activiteit {n} van {total} · tot {max}",

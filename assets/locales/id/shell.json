@@ -433,6 +433,8 @@
   "ws.spine.control": "Kontrol",
   "ws.spine.collapse": "Ciutkan bilah",
   "ws.spine.expand": "Bentangkan bilah",
+  "ws.spine.recent": "Terbaru",
+  "ws.spine.settings": "Pengaturan",
   "ws.activity.new": "Aktivitas baru",
   "ws.activity.newShort": "Baru",
   "ws.activity.position": "Aktivitas {n} dari {total} · hingga {max}",

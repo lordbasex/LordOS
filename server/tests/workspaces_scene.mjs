@@ -112,6 +112,8 @@ check('new activity: set up, a different colour', [state.activityOf(nd).setup, s
 check('new activity: the old activity\'s windows hidden', [a, b, c, s].every((id) => sdk.wm.get(id).desktop === desk), true);
 sdk.switchDesktop(desk);
 await flush();
+check('spine: the activity in view first, the new one next among the recent', state.recentActivities.get().slice(0, 2), [desk, nd]);
+check('spine: the recent activity by name', [...texts].filter(([id, x]) => x === sdk.desktopName(nd) && attached(id)).length >= 1, true);
 check('back: the tiles kept', [a, b, c].map(frameOf), tileRects('split', plan(M).work, 3, 2 / 3));
 
 // Search on the display it opens for (the one under the pointer)

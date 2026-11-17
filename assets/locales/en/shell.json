@@ -440,6 +440,8 @@
   "ws.spine.control": "Controls",
   "ws.spine.collapse": "Collapse the spine",
   "ws.spine.expand": "Expand the spine",
+  "ws.spine.recent": "Recent",
+  "ws.spine.settings": "Settings",
   "ws.activity.new": "New activity",
   "ws.activity.newShort": "New",
   "ws.activity.position": "Activity {n} of {total} · up to {max}",

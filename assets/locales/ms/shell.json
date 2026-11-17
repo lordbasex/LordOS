@@ -433,6 +433,8 @@
   "ws.spine.control": "Kawalan",
   "ws.spine.collapse": "Kuncupkan bar",
   "ws.spine.expand": "Kembangkan bar",
+  "ws.spine.recent": "Terkini",
+  "ws.spine.settings": "Tetapan",
   "ws.activity.new": "Aktiviti baharu",
   "ws.activity.newShort": "Baharu",
   "ws.activity.position": "Aktiviti {n} daripada {total} · hingga {max}",

@@ -440,6 +440,8 @@
   "ws.spine.control": "Vezérlők",
   "ws.spine.collapse": "Sáv összecsukása",
   "ws.spine.expand": "Sáv kinyitása",
+  "ws.spine.recent": "Legutóbbiak",
+  "ws.spine.settings": "Beállítások",
   "ws.activity.new": "Új tevékenység",
   "ws.activity.newShort": "Új",
   "ws.activity.position": "{n}. tevékenység / {total} · legfeljebb {max}",

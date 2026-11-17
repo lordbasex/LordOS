@@ -433,6 +433,8 @@
   "ws.spine.control": "控制",
   "ws.spine.collapse": "收合側欄",
   "ws.spine.expand": "展開側欄",
+  "ws.spine.recent": "最近",
+  "ws.spine.settings": "設定",
   "ws.activity.new": "新增活動",
   "ws.activity.newShort": "新增",
   "ws.activity.position": "活動 {n}/{total} · 最多 {max}",

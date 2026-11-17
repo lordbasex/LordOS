@@ -440,6 +440,8 @@
   "ws.spine.control": "Reglage",
   "ws.spine.collapse": "Fäll ihop listen",
   "ws.spine.expand": "Fäll ut listen",
+  "ws.spine.recent": "Senaste",
+  "ws.spine.settings": "Inställningar",
   "ws.activity.new": "Ny aktivitet",
   "ws.activity.newShort": "Ny",
   "ws.activity.position": "Aktivitet {n} av {total} · upp till {max}",

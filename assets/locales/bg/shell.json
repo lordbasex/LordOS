@@ -440,6 +440,8 @@
   "ws.spine.control": "Управление",
   "ws.spine.collapse": "Свий лентата",
   "ws.spine.expand": "Разгъни лентата",
+  "ws.spine.recent": "Последни",
+  "ws.spine.settings": "Настройки",
   "ws.activity.new": "Нова дейност",
   "ws.activity.newShort": "Нова",
   "ws.activity.position": "Дейност {n} от {total} · до {max}",

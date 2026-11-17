@@ -440,6 +440,8 @@
   "ws.spine.control": "Controles",
   "ws.spine.collapse": "Recolher a coluna",
   "ws.spine.expand": "Expandir a coluna",
+  "ws.spine.recent": "Recentes",
+  "ws.spine.settings": "Ajustes",
   "ws.activity.new": "Nova atividade",
   "ws.activity.newShort": "Nova",
   "ws.activity.position": "Atividade {n} de {total} · até {max}",

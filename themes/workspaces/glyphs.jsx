@@ -3,7 +3,7 @@
 import { View } from '@lordos/sdk';
 
 export { MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, BluetoothGlyph, SignalGlyph } from '@lordos/sdk';
-export { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, SearchGlyph, SpeakerGlyph, BellGlyph, PowerGlyph, Chevron, FolderGlyph, PageGlyph } from '../classic/glyphs.jsx';
+export { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, SearchGlyph, SpeakerGlyph, BellGlyph, PowerGlyph, Chevron, FolderGlyph, PageGlyph, GearGlyph } from '../classic/glyphs.jsx';
 
 const abs = (s) => ({ position: 'absolute', ...s });
 

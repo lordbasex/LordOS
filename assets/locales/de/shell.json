@@ -440,6 +440,8 @@
   "ws.spine.control": "Steuerung",
   "ws.spine.collapse": "Leiste einklappen",
   "ws.spine.expand": "Leiste ausklappen",
+  "ws.spine.recent": "Zuletzt verwendet",
+  "ws.spine.settings": "Einstellungen",
   "ws.activity.new": "Neue Aktivität",
   "ws.activity.newShort": "Neu",
   "ws.activity.position": "Aktivität {n} von {total} · bis zu {max}",

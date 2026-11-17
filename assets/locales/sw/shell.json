@@ -440,6 +440,8 @@
   "ws.spine.control": "Vidhibiti",
   "ws.spine.collapse": "Kunja upau",
   "ws.spine.expand": "Panua upau",
+  "ws.spine.recent": "Za hivi karibuni",
+  "ws.spine.settings": "Mipangilio",
   "ws.activity.new": "Shughuli mpya",
   "ws.activity.newShort": "Mpya",
   "ws.activity.position": "Shughuli {n} kati ya {total} · hadi {max}",

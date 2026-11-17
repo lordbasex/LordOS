@@ -440,6 +440,8 @@
   "ws.spine.control": "Χειριστήρια",
   "ws.spine.collapse": "Σύμπτυξη στήλης",
   "ws.spine.expand": "Ανάπτυξη στήλης",
+  "ws.spine.recent": "Πρόσφατα",
+  "ws.spine.settings": "Ρυθμίσεις",
   "ws.activity.new": "Νέα δραστηριότητα",
   "ws.activity.newShort": "Νέα",
   "ws.activity.position": "Δραστηριότητα {n} από {total} · έως {max}",

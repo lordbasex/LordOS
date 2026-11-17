@@ -447,6 +447,8 @@
   "ws.spine.control": "Керування",
   "ws.spine.collapse": "Згорнути панель",
   "ws.spine.expand": "Розгорнути панель",
+  "ws.spine.recent": "Нещодавні",
+  "ws.spine.settings": "Налаштування",
   "ws.activity.new": "Нове заняття",
   "ws.activity.newShort": "Нове",
   "ws.activity.position": "Заняття {n} з {total} · до {max}",

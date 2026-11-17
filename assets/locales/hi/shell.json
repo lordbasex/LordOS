@@ -440,6 +440,8 @@
   "ws.spine.control": "नियंत्रण",
   "ws.spine.collapse": "पट्टी समेटें",
   "ws.spine.expand": "पट्टी फैलाएँ",
+  "ws.spine.recent": "हाल के",
+  "ws.spine.settings": "सेटिंग्स",
   "ws.activity.new": "नई गतिविधि",
   "ws.activity.newShort": "नई",
   "ws.activity.position": "गतिविधि {n}/{total} · अधिकतम {max}",

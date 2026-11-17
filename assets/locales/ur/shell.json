@@ -440,6 +440,8 @@
   "ws.spine.control": "کنٹرولز",
   "ws.spine.collapse": "پٹی سمیٹیں",
   "ws.spine.expand": "پٹی پھیلائیں",
+  "ws.spine.recent": "حالیہ",
+  "ws.spine.settings": "ترتیبات",
   "ws.activity.new": "نئی سرگرمی",
   "ws.activity.newShort": "نئی",
   "ws.activity.position": "سرگرمی {n} از {total} · زیادہ سے زیادہ {max}",

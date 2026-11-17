@@ -440,6 +440,8 @@
   "ws.spine.control": "Denetimler",
   "ws.spine.collapse": "Şeridi daralt",
   "ws.spine.expand": "Şeridi genişlet",
+  "ws.spine.recent": "Son kullanılanlar",
+  "ws.spine.settings": "Ayarlar",
   "ws.activity.new": "Yeni etkinlik",
   "ws.activity.newShort": "Yeni",
   "ws.activity.position": "Etkinlik {n}/{total} · en fazla {max}",

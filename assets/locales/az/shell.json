@@ -440,6 +440,8 @@
   "ws.spine.control": "İdarəetmə",
   "ws.spine.collapse": "Zolağı yığ",
   "ws.spine.expand": "Zolağı aç",
+  "ws.spine.recent": "Son",
+  "ws.spine.settings": "Parametrlər",
   "ws.activity.new": "Yeni fəaliyyət",
   "ws.activity.newShort": "Yeni",
   "ws.activity.position": "Fəaliyyət {n}/{total} · ən çox {max}",

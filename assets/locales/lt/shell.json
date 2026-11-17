@@ -447,6 +447,8 @@
   "ws.spine.control": "Valdikliai",
   "ws.spine.collapse": "Suskleisti juostą",
   "ws.spine.expand": "Išskleisti juostą",
+  "ws.spine.recent": "Naujausi",
+  "ws.spine.settings": "Nustatymai",
   "ws.activity.new": "Nauja veikla",
   "ws.activity.newShort": "Nauja",
   "ws.activity.position": "Veikla {n} iš {total} · iki {max}",

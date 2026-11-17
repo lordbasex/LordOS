@@ -468,6 +468,8 @@
   "ws.spine.control": "عناصر التحكم",
   "ws.spine.collapse": "طي الشريط",
   "ws.spine.expand": "توسيع الشريط",
+  "ws.spine.recent": "الأخيرة",
+  "ws.spine.settings": "الإعدادات",
   "ws.activity.new": "نشاط جديد",
   "ws.activity.newShort": "جديد",
   "ws.activity.position": "النشاط {n} من {total} · حتى {max}",

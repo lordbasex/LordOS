@@ -440,6 +440,8 @@
   "ws.spine.control": "Controls",
   "ws.spine.collapse": "Plega la columna",
   "ws.spine.expand": "Desplega la columna",
+  "ws.spine.recent": "Recents",
+  "ws.spine.settings": "Configuració",
   "ws.activity.new": "Activitat nova",
   "ws.activity.newShort": "Nova",
   "ws.activity.position": "Activitat {n} de {total} · fins a {max}",
