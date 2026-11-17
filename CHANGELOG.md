@@ -532,8 +532,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **A fullscreen window took the mouse and the keyboard of every monitor (all themes).** With a YouTube video full
   screen on one display, the pointer did nothing on the others and every key went to the video until it left
   fullscreen. Now a fullscreen window owns its own display only (`server/src/wl/wl.c` `on_fs`): the pointer on another
-  display reaches the desktop and its windows there, and the keys go to the fullscreen window while the pointer is on
-  its display (or before the pointer has moved), else to the window focused elsewhere. One display: as before.
+  display reaches the desktop and its windows there. One display: as before.
+- **With a window fullscreen on one display, the keys went back to it whenever the pointer crossed its display
+  (GitHub #175).** A text field clicked on another monitor lost the keys as soon as the pointer passed over the video,
+  and the theme could not focus a window there while the pointer was on the video's display. The keys now follow the
+  window chosen, not the pointer (`server/src/wl/fsfocus.h`): a window chosen on another display keeps them, clicking
+  the fullscreen window gives them back to it (the theme never sees that click, so the compositor does it), a window
+  that goes fullscreen takes them unless they are with a window on another display, and a window under the fullscreen
+  one (on its display, so not seen) never takes them. With no window focused, the fullscreen window gets them while
+  the pointer is on its display. One display: the fullscreen window always has the keys, as before. Checked in
+  `build/fsfocus-test` (in `make -C server test`).
 - **A Linux app's maximize or unmaximize request that LordOS refused got no answer** (xdg-shell asks for a configure
   after each), and Google Chrome stopped responding while it waited. Refused requests are answered with the state as it
   is. Lord Workspaces' padlock also tells the app it can't maximize or minimize (xdg-shell 5 `wm_capabilities`,
@@ -553,6 +561,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     answers every size with another one is asked once) and `workspaces_scene.mjs` (idempotent passes, a stubborn app
     stays tiled with a bounded number of changes).
   - *Search:* the Apps view no longer builds the home folder's file index; it starts with the first typed character.
+- **A drag and drop inside a Linux app could stay going after the mouse button was released (GitHub #176, #177).** In
+  Google Chrome a page's box dragged onto a canvas kept following the pointer and never dropped; in Firefox and Floorp
+  a tab dragged along the tab bar went back to its place. The compositor counted the seat's held buttons and ended a
+  drag only when that count went back to zero, so one press counted twice or one release that never arrived (two
+  devices reporting the same button, a kernel buffer overrun, a console or session switch with a button down) kept the
+  count above zero for good: from then on no Wayland drag ended at its release, only with Escape. The held buttons are
+  a set now (`server/src/wl/seatbtn.h`): a button's next release clears it, and a drag also ends at the release of the
+  button that started it, whatever another button looks like (as Weston does). Checked in `build/seatbtn-test` (in
+  `make -C server test`: a lost release, a doubled press, another button stuck down, a second button mid-drag).
+- **Firefox's (and any GTK 3 app's) first drag in a window it had just been clicked into was refused (GitHub #177).**
+  A drag must name the press it comes from, and the compositor took only that press's own serial. GTK 3 names the
+  newest serial it has seen instead, and after a click that focused the window that is the keyboard's `enter` or
+  `modifiers`, which LordOS sends after the button (the theme focuses the window when it sees the press): the drag was
+  cancelled before it started and the tab went back. A serial newer than the press and not newer than the newest the
+  display gave out is taken too, still only while that client's press is held on the window it names (`sb_serial_ok`
+  in `server/src/wl/seatbtn.h`). Checked in `build/seatbtn-test` (the press's serials, newer ones, ones not given out,
+  older ones, a made-up one, across the serials' wrap) and in `build/dnd-client`, whose second drag now starts as GTK 3
+  starts one.
 - **The real-time priority's demotion left the main thread at real time.** On `SIGXCPU` lord-server asked the kernel
   for `SCHED_OTHER` alone, which it refuses for a thread with `SCHED_RESET_ON_FORK` (the main one) without
   `CAP_SYS_NICE`: only the paint threads went back. It keeps the flag now (`par.c`).

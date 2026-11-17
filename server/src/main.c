@@ -511,7 +511,7 @@ static void dispatch_pointer(Server *s) {
     for (int i = 0; i < s->nbuttons; i++) { down[i] = s->buttons[i].down; button[i] = s->buttons[i].button; }
     double t0 = now_ms();
     int over = 0;
-    if (grabbing && !ended) wl_pointer_grab(s->nbuttons, down);
+    if (grabbing && !ended) wl_pointer_grab(s->nbuttons, down, button);
     else over = wl_pointer(x, y, target, s->moved, s->nbuttons, down, button, s->wheel);
     if (over == 2) id = 0;                  /* sobre un menú de una app Linux: el árbol no lo ve */
     if (ended) js_wm_end(gnode, gedges, gdx, gdy, gdw, gdh);

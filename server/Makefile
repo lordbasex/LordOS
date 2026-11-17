@@ -447,6 +447,18 @@ build/wlregion-test: tests/wlregion_test.c src/wl/wlregion.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -Isrc -o $@ tests/wlregion_test.c
 	./$@
+# the seat's buttons for drag and drop: a drag ends at its button's release (src/wl/seatbtn.h, issues #176 and #177)
+test: build/seatbtn-test
+build/seatbtn-test: tests/seatbtn_test.c src/wl/seatbtn.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/seatbtn_test.c
+	./$@
+# who has the keyboard while a Linux window is fullscreen on one of several displays (src/wl/fsfocus.h, issue #175)
+test: build/fsfocus-test
+build/fsfocus-test: tests/fsfocus_test.c src/wl/fsfocus.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/fsfocus_test.c
+	./$@
 
 test: build/xwm-test
 build/xwm-test: tests/xwm_test.c src/wl/x11wire.c src/wl/x11wire.h
