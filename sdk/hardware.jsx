@@ -30,7 +30,9 @@ import { t, formatDate, formatTime, weekdayName } from './i18n.js';
 import { notify, dismissNotification } from './notify.js';
 import { linuxAppFor, shortAppName, windowAppName } from './apps.js';
 import { admin } from './admin.js';
-import { registerStatusItem } from './statusitems.js';
+import { registerStatusItem, statusPanelAt } from './statusitems.js';
+import { Overlay } from './layers.js';
+import { devicesFrom, fractionOf, toneOf as deviceTone } from './devicesmodel.js';
 import { TextInput, Toggle } from './components.jsx';
 import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
 import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu, webInspectAsk, answerWebInspect } from './webapps.js';
@@ -357,14 +359,39 @@ export function BatteryGlyph({ percent, charging, color, width = 24 }) {
     charging ? h(Text, { style: { position: 'absolute', left: width / 2 - 4, top: -2, fontSize: 10, color: '#fff' } }, '⚡') : null);
 }
 
+// The battery in the bar (every theme): only on a computer with one. A click opens the batteries of everything
+// connected (the computer, mice, keyboards, headphones: sdk/devicesmodel.js), as in the Devices widget.
 function BatteryStatus({ color, height }) {
   const b = useBattery();
+  const bt = useBluetooth();
   const s = useStore(settings);
+  const [open, setOpen] = useState(false);
+  const btn = useRef(null);
   if (!b || !b.hasBattery) return null;
   const p = powerPrefs(s);
-  return h(View, { style: { height, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', gap: 5 } },
+  return h(View, { ref: btn, onClick: () => setOpen((o) => !o), title: t('shell.widgets.devices.name'),
+    style: { height, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', gap: 5 } },
     p.menuPercent && b.percent >= 0 ? h(Text, { style: { fontSize: 12, fontWeight: 500, color } }, `${b.percent}%`) : null,
-    h(BatteryGlyph, { percent: b.percent, charging: b.charging, color }));
+    h(BatteryGlyph, { percent: b.percent, charging: b.charging, color }),
+    open ? h(Overlay, { anchor: btn, onClose: () => setOpen(false) }, h(View, { style: statusPanelAt(btn) }, h(DevicesPanel, { power: b, bt }))) : null);
+}
+function DevicesPanel({ power, bt }) {
+  const th = useSystemTokens();
+  let hp = [];
+  try { hp = lord.hidpp?.batteries ? lord.hidpp.batteries() || [] : []; } catch (e) { hp = []; }
+  const list = devicesFrom(power, bt, hp);
+  const tone = (d) => ({ ok: '#3dd68c', warn: '#f5b43c', crit: '#ff6b6e' }[deviceTone(d)]);
+  const value = (d) => `${d.charging ? '⚡' : ''}${d.percent >= 0 ? `${d.percent} %` : d.level ? t(`shell.widgets.devices.level.${d.level}`) : '—'}`;
+  return h(View, { style: { width: 280, padding: 14, gap: 10, borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`,
+    boxShadow: '0 12px 36px rgba(0,0,0,0.35)' } },
+  h(Text, { style: { fontSize: 13, fontWeight: 700, color: th.text, textAlign: 'start' } }, t('shell.widgets.devices.name')),
+  ...list.map((d) => h(View, { key: d.id, style: { gap: 4 } },
+    h(View, { style: { flexDirection: 'row', gap: 8 } },
+      h(Text, { style: { flex: 1, fontSize: 12.5, fontWeight: 600, color: th.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } },
+        d.kind === 'laptop' && !d.name ? t('shell.widgets.devices.computer') : d.name),
+      h(Text, { style: { fontSize: 12.5, fontWeight: 600, color: th.text } }, value(d))),
+    h(View, { style: { height: 5, borderRadius: 3, backgroundColor: th.separator, direction: 'ltr' } },
+      h(View, { style: { width: `${Math.round(Math.max(0.03, fractionOf(d)) * 100)}%`, height: 5, borderRadius: 3, backgroundColor: tone(d) } })))));
 }
 
 // ---- Bluetooth pairing requests (drawn by the system) ----

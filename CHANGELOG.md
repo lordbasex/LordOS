@@ -12,6 +12,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **The battery in the bar opens the batteries of every device (all themes).** On a computer with a battery, a click
+  on its bar item now shows the computer's, the mice', keyboards' and headphones' charge (the Devices widget's list).
 - **Lord Workspaces: a Devices widget.** The battery of everything connected in one card, as rings with the kind's
   drawing: the computer (when it has a battery), mice and keyboards on a Logitech receiver or over Bluetooth
   (`/sys/class/power_supply`, scope Device) and headphones and the rest that BlueZ reports a battery for. A device
