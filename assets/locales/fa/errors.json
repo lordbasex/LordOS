@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "بوت‌لودر به‌روز نشد (کد {code})",
   "hw.logindFailed": "تنظیمات توان اعمال نشد (کد {code})",
   "hw.noBacklight": "چنین نور پس‌زمینه‌ای نیست",
+  "hw.noChargeControl": "این باتری کنترل شارژ ندارد",
+  "hw.chargeControlFailed": "تغییر شارژ ممکن نشد: {errno}",
   "hw.noCpufreq": "این رایانه تنظیم بسامد پردازنده ندارد",
   "hw.noEeprom": "ابزارهای بوت‌لودر (rpi-eeprom) نصب نیستند",
   "hw.noKernelLog": "گزارش هسته خوانده نشد",

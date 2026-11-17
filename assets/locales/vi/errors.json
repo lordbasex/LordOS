@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Không thể cập nhật bootloader (mã {code})",
   "hw.logindFailed": "Không thể áp dụng cài đặt năng lượng (mã {code})",
   "hw.noBacklight": "Không có đèn nền như vậy",
+  "hw.noChargeControl": "Pin này không có điều khiển sạc",
+  "hw.chargeControlFailed": "Không thể đổi chế độ sạc: {errno}",
   "hw.noCpufreq": "Máy tính này không hỗ trợ điều chỉnh tần số CPU",
   "hw.noEeprom": "Chưa cài công cụ bootloader (rpi-eeprom)",
   "hw.noKernelLog": "Không thể đọc nhật ký kernel",

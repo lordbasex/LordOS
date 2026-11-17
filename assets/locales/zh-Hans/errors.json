@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "无法更新引导加载程序（代码 {code}）",
   "hw.logindFailed": "无法应用电源设置（代码 {code}）",
   "hw.noBacklight": "没有此背光",
+  "hw.noChargeControl": "此电池不支持充电控制",
+  "hw.chargeControlFailed": "无法更改充电：{errno}",
   "hw.noCpufreq": "这台电脑不支持 CPU 频率调节",
   "hw.noEeprom": "未安装引导加载程序工具（rpi-eeprom）",
   "hw.noKernelLog": "无法读取内核日志",

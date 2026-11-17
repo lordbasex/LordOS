@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "বুটলোডার আপডেট করা যায়নি (কোড {code})",
   "hw.logindFailed": "পাওয়ার সেটিংস প্রয়োগ করা যায়নি (কোড {code})",
   "hw.noBacklight": "এমন কোনো ব্যাকলাইট নেই",
+  "hw.noChargeControl": "এই ব্যাটারিতে চার্জ নিয়ন্ত্রণ নেই",
+  "hw.chargeControlFailed": "চার্জিং বদলানো যায়নি: {errno}",
   "hw.noCpufreq": "এই কম্পিউটারে CPU ফ্রিকোয়েন্সি স্কেলিং নেই",
   "hw.noEeprom": "বুটলোডার টুল (rpi-eeprom) ইনস্টল করা নেই",
   "hw.noKernelLog": "কার্নেল লগ পড়া যায়নি",

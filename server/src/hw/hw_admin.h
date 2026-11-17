@@ -62,6 +62,7 @@
 
 #include "../admin.h"
 #include "rpifw.h"
+#include "battery_admin.h"   /* battery-thresholds, battery-behaviour (admin only) */
 
 void hw_act_brightness(const AdminReq *r, const char *arg, size_t len);
 void hw_act_keyboard_light(const AdminReq *r, const char *arg, size_t len);
@@ -153,6 +154,8 @@ void hw_act_wallpaper_login_image(const AdminReq *r, const char *arg, size_t len
     { "video-optimize", hw_act_video, A_ANYONE }, \
     { "browser-restore", hw_act_browser_restore, A_ANYONE }, \
     { "boot-test", hw_act_boot_test, 0 }, \
-    { "boot-test-cancel", hw_act_boot_test_cancel, A_ANYONE },
+    { "boot-test-cancel", hw_act_boot_test_cancel, A_ANYONE }, \
+    { "battery-thresholds", hw_act_battery_thresholds, 0 }, \
+    { "battery-behaviour", hw_act_battery_behaviour, 0 },
 
 #endif

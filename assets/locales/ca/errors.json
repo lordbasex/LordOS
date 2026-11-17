@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "No s’ha pogut actualitzar el carregador d’arrencada (codi {code})",
   "hw.logindFailed": "No s’ha pogut aplicar la configuració d’energia (codi {code})",
   "hw.noBacklight": "No existeix aquesta retroil·luminació",
+  "hw.noChargeControl": "Aquesta bateria no té control de càrrega",
+  "hw.chargeControlFailed": "No s’ha pogut canviar la càrrega: {errno}",
   "hw.noCpufreq": "Aquest ordinador no permet ajustar la freqüència de la CPU",
   "hw.noEeprom": "Les eines del carregador d’arrencada (rpi-eeprom) no estan instal·lades",
   "hw.noKernelLog": "No s’ha pogut llegir el registre del nucli",

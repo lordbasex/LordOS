@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Impossible de mettre à jour le chargeur d’amorçage (code {code})",
   "hw.logindFailed": "Impossible d’appliquer les réglages d’énergie (code {code})",
   "hw.noBacklight": "Ce rétroéclairage n’existe pas",
+  "hw.noChargeControl": "Cette batterie n’a pas de contrôle de charge",
+  "hw.chargeControlFailed": "Impossible de modifier la charge : {errno}",
   "hw.noCpufreq": "Cet ordinateur ne prend pas en charge la variation de fréquence du CPU",
   "hw.noEeprom": "Les outils du chargeur d’amorçage (rpi-eeprom) ne sont pas installés",
   "hw.noKernelLog": "Impossible de lire le journal du noyau",

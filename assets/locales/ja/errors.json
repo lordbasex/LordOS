@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "ブートローダーを更新できませんでした（コード {code}）",
   "hw.logindFailed": "電源設定を適用できませんでした（コード {code}）",
   "hw.noBacklight": "そのようなバックライトはありません",
+  "hw.noChargeControl": "このバッテリーは充電制御に対応していません",
+  "hw.chargeControlFailed": "充電を変更できませんでした: {errno}",
   "hw.noCpufreq": "このコンピュータは CPU の周波数調整に対応していません",
   "hw.noEeprom": "ブートローダーのツール（rpi-eeprom）がインストールされていません",
   "hw.noKernelLog": "カーネルログを読み取れませんでした",

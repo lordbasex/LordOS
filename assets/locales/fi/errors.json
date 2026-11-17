@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Käynnistyslatainta ei voitu päivittää (koodi {code})",
   "hw.logindFailed": "Virta-asetuksia ei voitu ottaa käyttöön (koodi {code})",
   "hw.noBacklight": "Taustavaloa ei ole",
+  "hw.noChargeControl": "Tässä akussa ei ole latauksen hallintaa",
+  "hw.chargeControlFailed": "Latausta ei voitu muuttaa: {errno}",
   "hw.noCpufreq": "Tässä tietokoneessa ei ole suorittimen taajuussäätöä",
   "hw.noEeprom": "Käynnistyslataimen työkaluja (rpi-eeprom) ei ole asennettu",
   "hw.noKernelLog": "Ytimen lokia ei voitu lukea",

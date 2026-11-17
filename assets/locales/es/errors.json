@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "No se pudo actualizar el cargador de arranque (código {code})",
   "hw.logindFailed": "No se pudo aplicar la configuración de energía (código {code})",
   "hw.noBacklight": "No existe esa retroiluminación",
+  "hw.noChargeControl": "Esta batería no tiene control de carga",
+  "hw.chargeControlFailed": "No se pudo cambiar la carga: {errno}",
   "hw.noCpufreq": "Esta computadora no permite cambiar la frecuencia del procesador",
   "hw.noEeprom": "Las herramientas del cargador de arranque (rpi-eeprom) no están instaladas",
   "hw.noKernelLog": "No se pudo leer el registro del kernel",

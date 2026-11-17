@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Nem sikerült frissíteni a rendszertöltőt (kód: {code})",
   "hw.logindFailed": "Az energiabeállításokat nem sikerült alkalmazni (kód: {code})",
   "hw.noBacklight": "Nincs ilyen háttérvilágítás",
+  "hw.noChargeControl": "Ennek az akkumulátornak nincs töltésvezérlése",
+  "hw.chargeControlFailed": "A töltés nem módosítható: {errno}",
   "hw.noCpufreq": "Ezen a számítógépen nincs CPU-frekvenciaszabályozás",
   "hw.noEeprom": "A rendszertöltő eszközei (rpi-eeprom) nincsenek telepítve",
   "hw.noKernelLog": "A kernelnaplót nem sikerült beolvasni",

@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Nie udało się zaktualizować programu rozruchowego (kod {code})",
   "hw.logindFailed": "Nie udało się zastosować ustawień zasilania (kod {code})",
   "hw.noBacklight": "Nie ma takiego podświetlenia",
+  "hw.noChargeControl": "Ta bateria nie ma sterowania ładowaniem",
+  "hw.chargeControlFailed": "Nie udało się zmienić ładowania: {errno}",
   "hw.noCpufreq": "Ten komputer nie ma skalowania częstotliwości procesora",
   "hw.noEeprom": "Narzędzia programu rozruchowego (rpi-eeprom) nie są zainstalowane",
   "hw.noKernelLog": "Nie udało się odczytać dziennika jądra",

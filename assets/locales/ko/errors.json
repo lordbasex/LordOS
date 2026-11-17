@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "부트로더를 업데이트할 수 없습니다(코드 {code})",
   "hw.logindFailed": "전원 설정을 적용할 수 없습니다(코드 {code})",
   "hw.noBacklight": "그런 백라이트가 없습니다",
+  "hw.noChargeControl": "이 배터리는 충전 제어를 지원하지 않습니다",
+  "hw.chargeControlFailed": "충전을 바꿀 수 없습니다: {errno}",
   "hw.noCpufreq": "이 컴퓨터는 CPU 주파수 조절을 지원하지 않습니다",
   "hw.noEeprom": "부트로더 도구(rpi-eeprom)가 설치되어 있지 않습니다",
   "hw.noKernelLog": "커널 로그를 읽을 수 없습니다",

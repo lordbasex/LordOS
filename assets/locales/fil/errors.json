@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Hindi ma-update ang bootloader (code {code})",
   "hw.logindFailed": "Hindi mailapat ang mga setting ng power (code {code})",
   "hw.noBacklight": "Walang ganyang backlight",
+  "hw.noChargeControl": "Walang kontrol sa pag-charge ang bateryang ito",
+  "hw.chargeControlFailed": "Hindi mabago ang pag-charge: {errno}",
   "hw.noCpufreq": "Walang CPU frequency scaling ang computer na ito",
   "hw.noEeprom": "Hindi naka-install ang mga tool ng bootloader (rpi-eeprom)",
   "hw.noKernelLog": "Hindi mabasa ang log ng kernel",

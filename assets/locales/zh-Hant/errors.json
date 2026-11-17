@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "無法更新開機載入程式（代碼 {code}）",
   "hw.logindFailed": "無法套用電源設定（代碼 {code}）",
   "hw.noBacklight": "沒有此背光",
+  "hw.noChargeControl": "此電池不支援充電控制",
+  "hw.chargeControlFailed": "無法變更充電：{errno}",
   "hw.noCpufreq": "這部電腦不支援 CPU 頻率調整",
   "hw.noEeprom": "未安裝開機載入程式工具（rpi-eeprom）",
   "hw.noKernelLog": "無法讀取核心記錄",

@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Haikuweza kusasisha kipakiaji cha kuwasha (msimbo {code})",
   "hw.logindFailed": "Mipangilio ya nishati haikuweza kutumika (msimbo {code})",
   "hw.noBacklight": "Taa hiyo ya nyuma haipo",
+  "hw.noChargeControl": "Betri hii haina udhibiti wa chaji",
+  "hw.chargeControlFailed": "Haikuweza kubadilisha uchaji: {errno}",
   "hw.noCpufreq": "Kompyuta hii haina ubadilishaji wa masafa ya CPU",
   "hw.noEeprom": "Zana za kipakiaji cha kuwasha (rpi-eeprom) hazijasakinishwa",
   "hw.noKernelLog": "Kumbukumbu ya kerneli haikuweza kusomwa",

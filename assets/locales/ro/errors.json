@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Bootloaderul nu a putut fi actualizat (cod {code})",
   "hw.logindFailed": "Setările de alimentare nu au putut fi aplicate (cod {code})",
   "hw.noBacklight": "Iluminarea de fundal nu există",
+  "hw.noChargeControl": "Această baterie nu are control al încărcării",
+  "hw.chargeControlFailed": "Încărcarea nu a putut fi schimbată: {errno}",
   "hw.noCpufreq": "Acest computer nu are scalarea frecvenței procesorului",
   "hw.noEeprom": "Instrumentele bootloaderului (rpi-eeprom) nu sunt instalate",
   "hw.noKernelLog": "Jurnalul kernelului nu a putut fi citit",

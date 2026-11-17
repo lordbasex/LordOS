@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "बूटलोडर अपडेट नहीं हो सका (कोड {code})",
   "hw.logindFailed": "पावर सेटिंग्स लागू नहीं हो सकीं (कोड {code})",
   "hw.noBacklight": "ऐसी कोई बैकलाइट नहीं",
+  "hw.noChargeControl": "इस बैटरी में चार्ज नियंत्रण नहीं है",
+  "hw.chargeControlFailed": "चार्जिंग बदली नहीं जा सकी: {errno}",
   "hw.noCpufreq": "इस कंप्यूटर में CPU आवृत्ति स्केलिंग नहीं है",
   "hw.noEeprom": "बूटलोडर टूल (rpi-eeprom) इंस्टॉल नहीं हैं",
   "hw.noKernelLog": "कर्नेल लॉग पढ़ा नहीं जा सका",

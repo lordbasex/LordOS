@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Yükləyicini yeniləmək mümkün olmadı (kod {code})",
   "hw.logindFailed": "Enerji parametrlərini tətbiq etmək mümkün olmadı (kod {code})",
   "hw.noBacklight": "Belə arxa işıq yoxdur",
+  "hw.noChargeControl": "Bu batareyada şarj idarəsi yoxdur",
+  "hw.chargeControlFailed": "Şarjı dəyişmək olmadı: {errno}",
   "hw.noCpufreq": "Bu kompüterdə prosessor tezliyinin tənzimlənməsi yoxdur",
   "hw.noEeprom": "Yükləyici alətləri (rpi-eeprom) quraşdırılmayıb",
   "hw.noKernelLog": "Nüvə jurnalını oxumaq mümkün olmadı",

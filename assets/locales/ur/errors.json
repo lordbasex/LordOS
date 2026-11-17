@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "بوٹ لوڈر اپ ڈیٹ نہیں ہو سکا (کوڈ {code})",
   "hw.logindFailed": "پاور ترتیبات لاگو نہیں ہو سکیں (کوڈ {code})",
   "hw.noBacklight": "ایسی کوئی بیک لائٹ نہیں",
+  "hw.noChargeControl": "اس بیٹری میں چارج کنٹرول نہیں",
+  "hw.chargeControlFailed": "چارجنگ تبدیل نہ ہو سکی: {errno}",
   "hw.noCpufreq": "اس کمپیوٹر میں CPU فریکوئنسی اسکیلنگ نہیں",
   "hw.noEeprom": "بوٹ لوڈر ٹولز (rpi-eeprom) انسٹال نہیں",
   "hw.noKernelLog": "کرنل لاگ پڑھا نہیں جا سکا",

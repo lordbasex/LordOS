@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "تعذّر تحديث محمّل الإقلاع (الرمز {code})",
   "hw.logindFailed": "تعذّر تطبيق إعدادات الطاقة (الرمز {code})",
   "hw.noBacklight": "لا توجد إضاءة خلفية كهذه",
+  "hw.noChargeControl": "هذه البطارية لا تدعم التحكم في الشحن",
+  "hw.chargeControlFailed": "تعذر تغيير الشحن: {errno}",
   "hw.noCpufreq": "لا يدعم هذا الحاسوب تغيير تردد المعالج",
   "hw.noEeprom": "أدوات محمّل الإقلاع (rpi-eeprom) غير مثبّتة",
   "hw.noKernelLog": "تعذّرت قراءة سجل النواة",

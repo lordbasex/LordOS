@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Impossibile aggiornare il bootloader (codice {code})",
   "hw.logindFailed": "Impossibile applicare le impostazioni di alimentazione (codice {code})",
   "hw.noBacklight": "Retroilluminazione inesistente",
+  "hw.noChargeControl": "Questa batteria non ha controllo di carica",
+  "hw.chargeControlFailed": "Impossibile cambiare la carica: {errno}",
   "hw.noCpufreq": "Questo computer non supporta la regolazione della frequenza della CPU",
   "hw.noEeprom": "Gli strumenti del bootloader (rpi-eeprom) non sono installati",
   "hw.noKernelLog": "Impossibile leggere il registro del kernel",

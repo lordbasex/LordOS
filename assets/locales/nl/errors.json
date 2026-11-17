@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "De bootloader kon niet worden bijgewerkt (code {code})",
   "hw.logindFailed": "De energie-instellingen konden niet worden toegepast (code {code})",
   "hw.noBacklight": "Die achtergrondverlichting bestaat niet",
+  "hw.noChargeControl": "Deze batterij heeft geen laadregeling",
+  "hw.chargeControlFailed": "Laden kon niet worden gewijzigd: {errno}",
   "hw.noCpufreq": "Deze computer heeft geen schaling van de CPU-frequentie",
   "hw.noEeprom": "De bootloadertools (rpi-eeprom) zijn niet geïnstalleerd",
   "hw.noKernelLog": "Het kernellogboek kon niet worden gelezen",

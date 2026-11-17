@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Önyükleyici güncellenemedi (kod {code})",
   "hw.logindFailed": "Güç ayarları uygulanamadı (kod {code})",
   "hw.noBacklight": "Böyle bir arka ışık yok",
+  "hw.noChargeControl": "Bu pilde şarj denetimi yok",
+  "hw.chargeControlFailed": "Şarj değiştirilemedi: {errno}",
   "hw.noCpufreq": "Bu bilgisayarda işlemci frekansı ölçekleme yok",
   "hw.noEeprom": "Önyükleyici araçları (rpi-eeprom) yüklü değil",
   "hw.noKernelLog": "Çekirdek günlüğü okunamadı",

@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Tidak dapat memperbarui bootloader (kode {code})",
   "hw.logindFailed": "Pengaturan daya tidak dapat diterapkan (kode {code})",
   "hw.noBacklight": "Lampu latar tidak ada",
+  "hw.noChargeControl": "Baterai ini tidak punya kontrol pengisian",
+  "hw.chargeControlFailed": "Pengisian tidak dapat diubah: {errno}",
   "hw.noCpufreq": "Komputer ini tidak memiliki penskalaan frekuensi CPU",
   "hw.noEeprom": "Alat bootloader (rpi-eeprom) tidak terpasang",
   "hw.noKernelLog": "Log kernel tidak dapat dibaca",

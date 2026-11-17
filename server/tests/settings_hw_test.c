@@ -671,7 +671,77 @@ static void test_tablet_power(void) {
     if (system(cmd)) { /* a leftover in /tmp */ }
 }
 
+static int rdint(const char *dir, const char *dev, const char *name) {
+    char p[512];
+    snprintf(p, sizeof p, "%s/%s/%s", dir, dev, name);
+    FILE *f = fopen(p, "r");
+    int v = -1;
+    if (f) { if (fscanf(f, "%d", &v) != 1) v = -1; fclose(f); }
+    return v;
+}
+static void rdtext(const char *dir, const char *dev, const char *name, char *out, size_t n) {
+    char p[512];
+    snprintf(p, sizeof p, "%s/%s/%s", dir, dev, name);
+    FILE *f = fopen(p, "r");
+    out[0] = 0;
+    if (f) { if (!fgets(out, (int)n, f)) out[0] = 0; fclose(f); }
+}
+
+/* Settings → Battery's root actions (hw/battery_admin.c): the system battery chosen root-side, numbers 50..100 with
+ * start below end, written in an order the kernel accepts, and only a charge_behaviour the battery lists */
+static void test_battery_admin(void) {
+    char dir[] = "/tmp/batadm-XXXXXX";
+    CHECK(mkdtemp(dir) != NULL);
+    char devices[600];
+    snprintf(devices, sizeof devices, "%s/", dir);
+    char name[32];
+    CHECK(hw_battery_pick(dir, devices, name, sizeof name) == -1);          /* nothing yet */
+    wfile(dir, "hidpp_battery_0", "type", "Battery");
+    wfile(dir, "hidpp_battery_0", "scope", "Device");
+    wfile(dir, "hidpp_battery_0", "charge_control_end_threshold", "100");
+    wfile(dir, "AC", "type", "Mains");
+    CHECK(hw_battery_pick(dir, devices, name, sizeof name) == -1);          /* a mouse is never the battery */
+    wfile(dir, "BAT1", "type", "Battery");
+    wfile(dir, "BAT0", "type", "Battery");
+    CHECK(hw_battery_pick(dir, devices, name, sizeof name) == 0 && !strcmp(name, "BAT0"));
+    CHECK(hw_battery_pick(dir, "/sys/devices/", name, sizeof name) == -1);  /* not a real device: refused */
+
+    int st, en;
+    CHECK(hw_battery_thresholds_parse("70 80", &st, &en) == 0 && st == 70 && en == 80);
+    CHECK(hw_battery_thresholds_parse("50 100\n", &st, &en) == 0);
+    const char *bad[] = { "", "80", "80 70", "80 80", "49 80", "70 101", "-5 80", "70 80 90", "70 8a", "70 80; rm", " 70 0x50", NULL };
+    for (int i = 0; bad[i]; i++) CHECK(hw_battery_thresholds_parse(bad[i], &st, &en) == -1);
+
+    /* no charge control at all: refused, nothing written */
+    CHECK(hw_battery_set_thresholds(dir, devices, 70, 80) == -1);
+    /* only an end threshold (most laptops): the start is validated and left alone */
+    wfile(dir, "BAT0", "charge_control_end_threshold", "100");
+    CHECK(hw_battery_set_thresholds(dir, devices, 70, 80) == 0 && rdint(dir, "BAT0", "charge_control_end_threshold") == 80);
+    /* both, lowering below the current start: start first */
+    wfile(dir, "BAT0", "charge_control_start_threshold", "90");
+    wfile(dir, "BAT0", "charge_control_end_threshold", "95");
+    CHECK(hw_battery_set_thresholds(dir, devices, 60, 75) == 0);
+    CHECK(rdint(dir, "BAT0", "charge_control_start_threshold") == 60 && rdint(dir, "BAT0", "charge_control_end_threshold") == 75);
+    CHECK(rdint(dir, "hidpp_battery_0", "charge_control_end_threshold") == 100);    /* the mouse untouched */
+    CHECK(hw_battery_set_thresholds(dir, devices, 80, 70) == -1);
+
+    CHECK(hw_battery_behaviour_parse("auto") == POWER_BEH_AUTO && hw_battery_behaviour_parse("inhibit-charge\n") == POWER_BEH_INHIBIT);
+    CHECK(hw_battery_behaviour_parse("force-discharge") == POWER_BEH_DISCHARGE);
+    CHECK(!hw_battery_behaviour_parse("") && !hw_battery_behaviour_parse("Auto") && !hw_battery_behaviour_parse("auto inhibit-charge") && !hw_battery_behaviour_parse("../x"));
+    CHECK(hw_battery_set_behaviour(dir, devices, POWER_BEH_INHIBIT) == -1);        /* no charge_behaviour */
+    wfile(dir, "BAT0", "charge_behaviour", "[auto] inhibit-charge");
+    CHECK(hw_battery_set_behaviour(dir, devices, POWER_BEH_DISCHARGE) == -1);      /* not listed by this battery */
+    CHECK(hw_battery_set_behaviour(dir, devices, POWER_BEH_INHIBIT) == 0);
+    char txt[64];
+    rdtext(dir, "BAT0", "charge_behaviour", txt, sizeof txt);
+    CHECK(!strcmp(txt, "inhibit-charge\n"));
+    char cmd[700];
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
+    if (system(cmd)) { /* a leftover in /tmp */ }
+}
+
 int main(void) {
+    test_battery_admin();
     test_admin();
     test_eeprom();
     test_edid();

@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "ไม่สามารถอัปเดตบูตโหลดเดอร์ได้ (รหัส {code})",
   "hw.logindFailed": "ไม่สามารถใช้การตั้งค่าพลังงานได้ (รหัส {code})",
   "hw.noBacklight": "ไม่มีไฟพื้นหลังนี้",
+  "hw.noChargeControl": "แบตเตอรี่นี้ไม่มีการควบคุมการชาร์จ",
+  "hw.chargeControlFailed": "เปลี่ยนการชาร์จไม่ได้: {errno}",
   "hw.noCpufreq": "คอมพิวเตอร์นี้ไม่มีการปรับความถี่ CPU",
   "hw.noEeprom": "ไม่ได้ติดตั้งเครื่องมือบูตโหลดเดอร์ (rpi-eeprom)",
   "hw.noKernelLog": "ไม่สามารถอ่านบันทึกของเคอร์เนลได้",

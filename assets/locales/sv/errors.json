@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Kunde inte uppdatera startladdaren (kod {code})",
   "hw.logindFailed": "Ströminställningarna kunde inte tillämpas (kod {code})",
   "hw.noBacklight": "Ingen sådan bakgrundsbelysning",
+  "hw.noChargeControl": "Det här batteriet har ingen laddningsstyrning",
+  "hw.chargeControlFailed": "Laddningen kunde inte ändras: {errno}",
   "hw.noCpufreq": "Den här datorn har ingen frekvensskalning för CPU:n",
   "hw.noEeprom": "Startladdarverktygen (rpi-eeprom) är inte installerade",
   "hw.noKernelLog": "Kärnloggen kunde inte läsas",

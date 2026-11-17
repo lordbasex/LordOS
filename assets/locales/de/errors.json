@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Der Bootloader konnte nicht aktualisiert werden (Code {code})",
   "hw.logindFailed": "Die Energieeinstellungen konnten nicht angewendet werden (Code {code})",
   "hw.noBacklight": "Keine solche Hintergrundbeleuchtung",
+  "hw.noChargeControl": "Dieser Akku hat keine Ladesteuerung",
+  "hw.chargeControlFailed": "Das Laden konnte nicht geändert werden: {errno}",
   "hw.noCpufreq": "Dieser Computer hat keine CPU-Taktanpassung",
   "hw.noEeprom": "Die Bootloader-Werkzeuge (rpi-eeprom) sind nicht installiert",
   "hw.noKernelLog": "Das Kernel-Protokoll konnte nicht gelesen werden",

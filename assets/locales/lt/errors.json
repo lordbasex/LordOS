@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Nepavyko atnaujinti paleidyklės (kodas {code})",
   "hw.logindFailed": "Nepavyko pritaikyti maitinimo nustatymų (kodas {code})",
   "hw.noBacklight": "Tokio foninio apšvietimo nėra",
+  "hw.noChargeControl": "Ši baterija neturi įkrovimo valdymo",
+  "hw.chargeControlFailed": "Nepavyko pakeisti įkrovimo: {errno}",
   "hw.noCpufreq": "Šiame kompiuteryje procesoriaus dažnio keitimas nepalaikomas",
   "hw.noEeprom": "Paleidyklės įrankiai (rpi-eeprom) neįdiegti",
   "hw.noKernelLog": "Nepavyko perskaityti branduolio žurnalo",

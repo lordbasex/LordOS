@@ -278,6 +278,8 @@
   "hw.eepromUpdateFailed": "Could not update the bootloader (code {code})",
   "hw.logindFailed": "The power settings could not be applied (code {code})",
   "hw.noBacklight": "No such backlight",
+  "hw.noChargeControl": "This battery has no charge control",
+  "hw.chargeControlFailed": "Could not change the charging: {errno}",
   "hw.noCpufreq": "This computer has no CPU frequency scaling",
   "hw.noEeprom": "The bootloader tools (rpi-eeprom) are not installed",
   "hw.noKernelLog": "The kernel log could not be read",
