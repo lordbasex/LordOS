@@ -136,6 +136,44 @@ put in graphics mode once (`KD_GRAPHICS`) and goes back to text when the service
 The card, the input and the monitor socket are never left open in the children (web
 connections, workers): `sd_mon_child()` closes them before dropping root.
 
+### Text consoles (Ctrl+Alt+F1…F12)
+
+The keyboard is the session's (`EVIOCGRAB`), so the kernel never sees Ctrl+Alt+F2 itself. Instead:
+
+- **lord-server** takes Ctrl+Alt+F1…F12 before anything else (`input_vt_key` in `inputkind.h`; no app or theme gets
+  the key) and asks lord-sessiond: `{"a":"vt","n":2}`. Asking also closes the Passwords vault and ends a share, as
+  Lock Screen does (`mirror.c`).
+- **lord-sessiond** keeps tty1 in `VT_PROCESS` mode (`monitor.c`), so the kernel asks before leaving it (SIGUSR1) and
+  says when it is back (SIGUSR2); a `chvt` from a root shell goes the same way. Leaving: the session on the monitor
+  is **locked** (as Lock Screen: its browsers signed out of the remote desktop, the login screen asked for in lock
+  mode), the monitor is taken back (input revoked, DRM master dropped), tty1 goes back to text mode and the switch
+  goes on. The login screen just leaves. While another console is in front nothing is lent: a "show" from a worker
+  waits (`held_fd`).
+- **Coming back** (Ctrl+Alt+F1 on a text console, the kernel's own key): tty1 is in graphics mode again and the
+  login screen comes up locked for that user; the session behind it never stopped.
+- **Text consoles exist as before:** `getty@tty2…6` start when they are first shown (logind's autovt).
+
+### Text mode, and startlordos (as startx)
+
+For those who boot to a text console and start the desktop by hand:
+
+- **Once:** the boot menu's **LordOS (text mode)** entry, which the package adds (`/etc/grub.d/11_lordos_text`: the
+  system's first entry with `lordos.text=1` and the console's cursor back; `update-grub` runs on install and remove).
+  On a Raspberry Pi, add `lordos.text=1` to the line in `/boot/firmware/cmdline.txt`.
+- **Every start:** Settings → Users & Login → **Start in text mode** (administrators only): the closed action
+  `boot-text on|off` writes or removes `/etc/lordos/text-mode`. By hand: `sudo touch /etc/lordos/text-mode`, and
+  `sudo rm /etc/lordos/text-mode` to go back.
+- **What changes then:** lord-sessiond leaves the monitor alone (it says so in its log: "text mode"); the network,
+  remote desktop and Sharing go on as usual. `lordos-text-login.service` puts a login prompt on tty1 (as
+  `getty@tty1`, which LordOS masks).
+- **startlordos:** log in on a console and type `startlordos`. It runs lord-server as you on that console (the log
+  in `~/.cache/lordos/startlordos.log`); Log Out or Ctrl+Alt+Backspace brings the console back. Ctrl+Alt+F1…F12 work
+  there too (lord-server keeps its own console in `VT_PROCESS` mode and lets the card and the input go while another
+  console is in front). Without lord-sessiond there is no login screen behind it, so no Lock Screen or Switch User,
+  and no administrator's actions in Settings. It also works from tty2…6 while lord-sessiond has the login screen
+  on tty1. Those who want the name `startx`: `alias startx=startlordos` in `~/.bashrc` (a `startx` from the xinit
+  package would be X11's).
+
 ### No usable display driver
 
 `sd_mon_open` (`remote/monitor.c`) waits up to 30 s for a card with KMS, a connector and a CRTC

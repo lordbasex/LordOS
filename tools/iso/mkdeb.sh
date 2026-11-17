@@ -27,6 +27,9 @@
 #   /usr/lib/lordos/code-manifest.sig     its Ed25519 signature (release key; docs/SIGNING.md)
 #   /usr/lib/lordos/lordos-live-prep      live preparation (grub language, folders)
 #   /usr/lib/systemd/system/lordos.service  lord-sessiond on tty1
+#   /usr/lib/systemd/system/lordos-text-login.service  a login prompt on tty1 in text mode (docs/SESSIONS.md)
+#   /etc/grub.d/11_lordos_text            the boot menu's "LordOS (text mode)" entry
+#   /usr/bin/startlordos                  the desktop from a text console, as startx
 #   /usr/lib/lordos/lordos-splash         boot splash hand-off (Plymouth → LordOS, docs/SESSIONS.md)
 #   /usr/share/backgrounds/lordos/        the wallpapers (<category>/lordos-<name>.jpg, thumbs/), linked
 #                                         from /usr/lib/lordos/assets/wallpapers
@@ -289,6 +292,11 @@ install -d "$PKG/usr/lib/sysctl.d"
 printf '%s\n' '# LordOS: ptrace only of descendants (docs/FIREWALL.md, "Linux apps")' 'kernel.yama.ptrace_scope = 1' > "$PKG/usr/lib/sysctl.d/50-lordos-ptrace.conf"
 chmod 644 "$PKG/usr/lib/sysctl.d/50-lordos-ptrace.conf"
 install -m 644 tools/iso/rootfs/etc/systemd/system/lordos.service "$PKG/usr/lib/systemd/system/lordos.service"
+# text mode (docs/SESSIONS.md, "Text mode"): a login prompt on tty1 when lordos.text=1 or /etc/lordos/text-mode,
+# the boot menu's "LordOS (text mode)" entry, and startlordos to start the desktop from a console (as startx)
+install -m 644 tools/iso/rootfs/etc/systemd/system/lordos-text-login.service "$PKG/usr/lib/systemd/system/lordos-text-login.service"
+install -D -m 755 tools/boot/grub/11_lordos_text "$PKG/etc/grub.d/11_lordos_text"
+install -D -m 755 packaging/bin/startlordos "$PKG/usr/bin/startlordos"
 # smooth video in Chromium without hardware decoding (docs/VIDEO.md); the Firefox manifest stays out
 X="$PKG/usr/share/chromium/extensions/lordos-video"
 install -d "$X"
@@ -461,6 +469,7 @@ set -e
 if [ "$1" = configure ] && command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload >/dev/null 2>&1 || true
     systemctl enable lord-fand.service >/dev/null 2>&1 || true
+    systemctl enable lordos-text-login.service >/dev/null 2>&1 || true     # does nothing unless in text mode
     if [ -d /run/systemd/system ]; then systemctl restart systemd-sysctl.service >/dev/null 2>&1 || true; fi
     if [ -d /run/systemd/system ]; then systemctl restart lord-fand.service >/dev/null 2>&1 || true; fi
 fi
@@ -490,6 +499,11 @@ if [ "$1" = configure ] && [ -e /usr/lib/lordos/bin/lord-hidpp ]; then
         udevadm trigger --subsystem-match=hidraw --action=change >/dev/null 2>&1 || true
     fi
 fi
+# the boot menu's "LordOS (text mode)" entry (/etc/grub.d/11_lordos_text): the menu is written again where GRUB is the
+# boot loader (not a Raspberry Pi, not a container or an image being built without /boot/grub)
+if [ "$1" = configure ] && [ -e /boot/grub/grub.cfg ] && command -v update-grub >/dev/null 2>&1; then
+    update-grub >/dev/null 2>&1 || true
+fi
 # version-to-version system changes, each applied once (docs/UPDATES.md, "Migrations")
 if [ "$1" = configure ] && [ -x /usr/lib/lordos/migrate ]; then
     /usr/lib/lordos/migrate "${2:-}"
@@ -515,6 +529,7 @@ set -e
 if [ "$1" = remove ] && command -v systemctl >/dev/null 2>&1; then
     if [ -d /run/systemd/system ]; then systemctl stop lord-fand.service >/dev/null 2>&1 || true; fi
     systemctl disable lord-fand.service >/dev/null 2>&1 || true
+    systemctl disable lordos-text-login.service >/dev/null 2>&1 || true
 fi
 if [ "$1" = remove ]; then update-alternatives --quiet --remove say /usr/lib/lordos/bin/lord-say 2>/dev/null || true; fi
 # the boot splash theme goes away with the package: Plymouth back to its default theme first
@@ -533,6 +548,13 @@ if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/apt/sources.list.d/lor
 # the browsers' video settings written by Settings (video-optimize, docs/VIDEO.md)
 if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/chromium/policies/managed/lordos-video.json /etc/firefox-esr/lordos-video.js /etc/chromium/policies/recommended/lordos-session.json /etc/firefox-esr/lordos-session.js; fi
 if [ "$1" = purge ]; then rm -rf /var/lib/lordos/migrations /var/log/lordos; fi
+# the text mode choice (Settings, boot-text) and the boot menu's entry go with the package
+if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/lordos/text-mode; fi
+if [ "$1" = purge ]; then rm -f /etc/grub.d/11_lordos_text; fi
+if { [ "$1" = remove ] || [ "$1" = purge ]; } && [ -e /boot/grub/grub.cfg ] && command -v update-grub >/dev/null 2>&1; then
+    [ -e /etc/grub.d/11_lordos_text ] && chmod -x /etc/grub.d/11_lordos_text 2>/dev/null || true
+    update-grub >/dev/null 2>&1 || true
+fi
 # lord-hidpp's setgid override goes with the package; its group only on purge
 if [ "$1" = remove ] || [ "$1" = purge ]; then dpkg-statoverride --remove /usr/lib/lordos/bin/lord-hidpp >/dev/null 2>&1 || true; fi
 if [ "$1" = purge ] && getent group lordos-hidpp >/dev/null 2>&1; then groupdel lordos-hidpp 2>/dev/null || true; fi

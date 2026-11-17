@@ -1,0 +1,24 @@
+#!/bin/sh
+# startlordos — the LordOS desktop from a text console, as startx does (docs/SESSIONS.md, "Text mode"). Log in on a
+# console (tty1 in text mode, or Ctrl+Alt+F2…F6 any time) and type startlordos; leaving the desktop (Log Out, or
+# Ctrl+Alt+Backspace) brings the console back. It runs lord-server as you, on this console: no login screen, no
+# lord-sessiond hand-off, so Lock Screen, Switch User and the administrator's actions are not there.
+set -eu
+tty_now=$(tty 2>/dev/null || true)
+case "$tty_now" in
+    /dev/tty[1-9]|/dev/tty[1-9][0-9]) ;;
+    *) echo "startlordos: run it on a text console (Ctrl+Alt+F1…F6), not in a terminal window or over ssh" >&2; exit 1 ;;
+esac
+if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    echo "startlordos: no XDG_RUNTIME_DIR: log in on the console first (login sets it up)" >&2
+    exit 1
+fi
+L=/usr/lib/lordos
+[ -x "$L/bin/lord-server" ] || { echo "startlordos: $L/bin/lord-server is missing (is the lordos package installed?)" >&2; exit 1; }
+log_dir="${XDG_CACHE_HOME:-$HOME/.cache}/lordos"
+mkdir -p "$log_dir"
+[ -f "$log_dir/startlordos.log" ] && mv -f "$log_dir/startlordos.log" "$log_dir/startlordos.log.prev"
+echo "startlordos: starting the desktop on $tty_now (log: $log_dir/startlordos.log)"
+cd "$L/bin"
+exec "$L/bin/lord-server" --theme "$L/themes/default/theme.bundle.js" --fonts "$L/assets/fonts" --shell "$L/assets/shell" \
+    > "$log_dir/startlordos.log" 2>&1

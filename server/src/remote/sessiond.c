@@ -127,6 +127,21 @@ static char *read_root_file(const char *path, size_t max) {
     return t;
 }
 
+/* Text mode (docs/SESSIONS.md, "Text mode"): lordos.text=1 on the kernel's command line (the boot menu's "LordOS
+ * (text mode)") or /etc/lordos/text-mode (Settings → Users & Login, the boot-text action; root's, else ignored). Then
+ * lord-sessiond leaves the monitor alone: lordos-text-login.service puts a login prompt on tty1, and startlordos there
+ * starts the desktop as startx does. The network, remote desktop and the rest go on as usual. */
+static int text_mode(void) {
+    char cmd[2048] = "";
+    FILE *f = fopen("/proc/cmdline", "r");
+    if (f) { if (!fgets(cmd, sizeof cmd, f)) cmd[0] = 0; fclose(f); }
+    for (const char *p = cmd; (p = strstr(p, "lordos.text=1")) != NULL; p++)
+        if ((p == cmd || p[-1] == ' ') && (p[13] == 0 || p[13] == ' ' || p[13] == '\n')) return 1;
+    char *t = read_root_file("/etc/lordos/text-mode", 4096);
+    if (t) { free(t); return 2; }
+    return 0;
+}
+
 static void load_access(void) {
     char *t = read_root_file(RD_ACCESS, 16384);
     int bad = 0;
@@ -906,12 +921,25 @@ static int keep_lend(void) {
 }
 
 /* What the workers send: which session to show and messages for the login screen. */
+static int held_fd = -1;                /* a "show" that came while a text console was in front, and its line */
+static char held[48];
+static void show_from(const char *buf, int fd);
 static void from_worker(void) {
     char buf[4200];
     int fd;
     int n = sd_ctl_recv(wk_r, buf, sizeof buf, &fd);
-    if (n <= 0) { if (fd >= 0) close(fd); return; }
+    if (n > 0) { show_from(buf, fd); return; }
+    if (fd >= 0) close(fd);
+}
+static void show_from(const char *buf, int fd) {
     char user[40];
+    if (sd_mon_away() && fd >= 0 && (!strcmp(buf, "show g") || !strncmp(buf, "show u ", 7))) {
+        /* a text console is in front: nothing is lent until ours is back (vt_return) */
+        if (held_fd >= 0) close(held_fd);
+        held_fd = fd;
+        snprintf(held, sizeof held, "%.47s", buf);
+        return;
+    }
     if (!strcmp(buf, "show g") && fd >= 0) {
         greeter_stop_at = 0;
         if (greeter_asked_at) sd_log("monitor: the login screen (%s), %.0f ms after the screen went dark", greeter_mode, (rd_now() - greeter_asked_at) * 1000);
@@ -988,6 +1016,13 @@ static void leave_for_greeter(const char *mode) {
  * log in, restart or shut down. */
 static void from_shown(int type, const char *j) {
     if (type == RP_SHOWN) { first_frame(); return; }
+    /* Ctrl+Alt+F1…F12, from the session or the login screen: the switch itself happens in vt_away */
+    if (type == RP_SESSION && (shown == 'u' || shown == 'g') && strstr(j, "\"vt\"")) {
+        char a[16] = "";
+        jstr(j, "a", a, sizeof a);
+        if (!strcmp(a, "vt")) sd_mon_vt_switch(jint(j, "n", 0));
+        return;
+    }
     if (type == RP_SESSION && shown == 'u') {
         char a[16] = "";
         jstr(j, "a", a, sizeof a);
@@ -1034,6 +1069,38 @@ static void from_shown(int type, const char *j) {
         jstr(j, "a", what, sizeof what);
         power(what, "from the login screen");
     }
+}
+
+/* The kernel wants to show another console (Ctrl+Alt+Fn, a chvt): a session on the monitor is locked as with Lock
+ * Screen (the login screen comes up locked on our console when it is back), the login screen just leaves; the monitor
+ * is taken back, then the switch goes on. */
+static void vt_away(void) {
+    if (shown == 'u') {
+        sd_log("%s left for a text console: the session is locked", shown_user);
+        struct passwd *lp = sd_valid_username(shown_user) ? getpwnam(shown_user) : NULL;
+        if (lp) rd_tokens_drop_uid(lp->pw_uid);
+        greeter_dark = 0;
+        greeter_off_s = greeter_sleep_s = greeter_sleep_left_s = 86400;
+        leave_for_greeter("lock");      /* the login screen it asks for is held until we are back */
+    } else if (shown == 'g') {
+        left_on_purpose = 1;
+        sd_mon_lost();
+        set_shown('-', NULL);
+        sd_log("the login screen left for a text console");
+    }
+    sd_mon_vt_release();
+}
+/* Our console is in front again: what was held is shown, or the login screen is asked for. */
+static void vt_return(void) {
+    sd_mon_vt_acquire();
+    sd_log("back from a text console");
+    if (held_fd >= 0) {
+        char line[48];
+        snprintf(line, sizeof line, "%s", held);
+        int fd = held_fd;
+        held_fd = -1;
+        show_from(line, fd);
+    } else if (shown == '-' && worker_pid < 0 && pending == W_NONE) show_greeter(greeter_mode, greeter_user);
 }
 
 static void monitor_event(void) {
@@ -1400,9 +1467,10 @@ static void stop_greeters(const char *why) {
 
 /* ---- main ---- */
 
-static volatile sig_atomic_t stop, reload;
+static volatile sig_atomic_t stop, reload, vt_leave, vt_back;
 static void on_term(int s) { (void)s; stop = 1; }
 static void on_hup(int s) { (void)s; reload = 1; }
+static void on_vt(int s) { if (s == SIGUSR1) vt_leave = 1; else vt_back = 1; }
 
 int main(int argc, char **argv) {
     int no_monitor = 0;
@@ -1423,6 +1491,10 @@ int main(int argc, char **argv) {
     sigaction(SIGINT, &sa, NULL);
     struct sigaction sh = { .sa_handler = on_hup };
     sigaction(SIGHUP, &sh, NULL);
+    /* text consoles: the kernel's questions for our tty1 (monitor.c); no SA_RESTART, so poll wakes at once */
+    struct sigaction sv = { .sa_handler = on_vt };
+    sigaction(SIGUSR1, &sv, NULL);
+    sigaction(SIGUSR2, &sv, NULL);
     find_paths();
     load_config();
     load_last_user();
@@ -1503,11 +1575,13 @@ int main(int argc, char **argv) {
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, wk) == 0) { wk_r = wk[0]; wk_w = wk[1]; }
     /* the network belongs to the system: lord-netd brings it up before the greeter (netsup.c) */
     sd_netd_start();
-    has_monitor = !no_monitor && sd_mon_open() == 0;
+    int text = no_monitor ? 0 : text_mode();
+    if (text) sd_log("text mode (%s): no login screen; log in on tty1 and type startlordos", text == 1 ? "lordos.text=1" : "/etc/lordos/text-mode");
+    has_monitor = !no_monitor && !text && sd_mon_open() == 0;
     if (has_monitor) boot_monitor();
     else {
         first_frame();                  /* nothing will be shown: the boot splash can go now */
-        if (!no_monitor) tell_no_display();
+        if (!no_monitor && !text) tell_no_display();
     }
     if (rd_conf.enabled) start_remote();
     write_status();
@@ -1549,6 +1623,8 @@ int main(int argc, char **argv) {
                 rd_unlock();
             }
         }
+        if (vt_leave) { vt_leave = 0; vt_away(); }
+        if (vt_back) { vt_back = 0; vt_return(); }
         if (r > 0 && p[4].fd >= 0 && p[4].revents) sd_netd_event();
         sd_netd_tick();
         sd_cgroup_tick();

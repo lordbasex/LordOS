@@ -97,6 +97,7 @@
 #include <grp.h>
 #include <linux/capability.h>
 #include <linux/kd.h>
+#include <linux/vt.h>
 #include <math.h>
 #include <poll.h>
 #include <pwd.h>
@@ -1166,6 +1167,7 @@ static void display_detach(void) {
     for (int i = 0; i < OUT_MAX; i++) s->out[i].gpu = -1;
     input_close(&s->input);
     kb_reset_state();                           /* a key held now (the ❖ of ❖L) is released where we can't see it */
+    s->ctrl = s->alt = s->shift = 0;            /* Ctrl and Alt of Ctrl+Alt+F2 are released on the text console */
     for (int i = OUT_MAX - 1; i >= 0; i--) {        /* the second displays first: out[0] owns the fd */
         Out *o = &s->out[i];
         if (!o->on && i) continue;
@@ -1182,6 +1184,49 @@ static void display_detach(void) {
     js_input_drop();
     set_size(s, s->W & ~1, s->H & ~1);  /* a frame in memory of the same size */
     fprintf(stderr, "monitor: the session leaves the screen\n");
+}
+
+/* Text consoles (Ctrl+Alt+F1…F12, docs/SESSIONS.md "Text consoles"). Under lord-sessiond the session only asks
+ * ({"a":"vt"}): lord-sessiond locks it, takes the monitor back and switches. A standalone lord-server (startlordos
+ * from a text console, as startx; or a developer's) owns its console in VT_PROCESS mode: the kernel asks before
+ * switching away (SIGUSR1, read from vt_sfd), and it lets the card and the input go; back on its console (SIGUSR2) it
+ * opens them again and draws everything. */
+static int vt_tty = -1, vt_sfd = -1, vt_away;
+static char vt_card[64];
+static void vt_request(int n) {
+    if (vt_tty < 0) {
+        char j[48];
+        snprintf(j, sizeof j, "{\"a\":\"vt\",\"n\":%d}", n);
+        mirror_session(j);
+        return;
+    }
+    struct vt_stat st;
+    if (vt_away || (!ioctl(vt_tty, VT_GETSTATE, &st) && st.v_active == n)) return;
+    if (ioctl(vt_tty, VT_ACTIVATE, n)) fprintf(stderr, "lord-server: text console %d: %s\n", n, strerror(errno));
+}
+static void display_attach(const int *fds, int n, int flags);
+static void display_detach(void);
+static void vt_signal(Server *s) {
+    struct signalfd_siginfo si;
+    while (read(vt_sfd, &si, sizeof si) == (ssize_t)sizeof si) {
+        if (si.ssi_signo == SIGUSR1 && !vt_away) {
+            fprintf(stderr, "lord-server: leaving for another text console\n");
+            display_detach();               /* the card's master and the input go with their fds */
+            ioctl(vt_tty, KDSETMODE, KD_TEXT);
+            ioctl(vt_tty, VT_RELDISP, 1);
+            vt_away = 1;
+        } else if (si.ssi_signo == SIGUSR2 && vt_away) {
+            ioctl(vt_tty, VT_RELDISP, VT_ACKACQ);
+            ioctl(vt_tty, KDSETMODE, KD_GRAPHICS);
+            vt_away = 0;
+            int fd = open(vt_card, O_RDWR | O_CLOEXEC);   /* nobody is master now: this open is */
+            if (fd < 0) { fprintf(stderr, "lord-server: back on the console, but %s: %s\n", vt_card, strerror(errno)); continue; }
+            display_attach(&fd, 1, 0);
+            if (input_open(&s->input)) fprintf(stderr, "input: no devices (permissions?)\n");
+            wl_input_devices_changed();
+            fprintf(stderr, "lord-server: back on its text console\n");
+        }
+    }
 }
 
 static void on_input(void *ud, const InputDevice *d, const struct input_event *ev) {
@@ -1243,6 +1288,8 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         /* ends a share with no JavaScript in the way; only here, on the physical keyboard: what the API or
          * the remote desktop injects doesn't pass through on_input (docs/SHORTCUTS.md) */
         if (ev->code == KEY_ESC && ev->value == 1 && s->ctrl && s->alt && s->shift && share_user_stop()) break;
+        /* Ctrl+Alt+F1…F12: a text console (taken here, so no app or theme gets the key) */
+        if (ev->value == 1 && s->ctrl && s->alt && !s->shift && input_vt_key(ev->code)) { vt_request(input_vt_key(ev->code)); break; }
         /* Buttons in the DOM's numbering: 0 left, 1 middle, 2 right, 3 back, 4 forward (inputkind.h, issue #159) */
         int button = input_dom_button(ev->code);
         /* Settings → Mouse & Trackpad, primary button on the right: a mouse's (not a touchpad's) */
@@ -2576,9 +2623,13 @@ int main(int argc, char **argv) {
     int vt = -1;
     if (!s.headless) {
         if (input_open(&s.input)) fprintf(stderr, "input: no devices (permissions?)\n");
-        /* The text console stops drawing over us. */
-        vt = open("/dev/tty0", O_RDWR | O_CLOEXEC);
+        /* The text console stops drawing over us: our own (startlordos runs on the console it was typed on, which the
+         * person owns), else the one in front (root) */
+        const char *own = isatty(STDIN_FILENO) ? ttyname(STDIN_FILENO) : NULL;
+        vt = own && !strncmp(own, "/dev/tty", 8) && own[8] >= '1' && own[8] <= '9' ? open(own, O_RDWR | O_CLOEXEC | O_NOCTTY) : -1;
+        if (vt < 0) vt = open("/dev/tty0", O_RDWR | O_CLOEXEC);
         if (vt >= 0 && ioctl(vt, KDSETMODE, KD_GRAPHICS)) { close(vt); vt = -1; }
+        snprintf(vt_card, sizeof vt_card, "%s", card);
     }
 
     /* Privileged helper (a closed set of actions: region, time zone, language packs). The
@@ -2681,6 +2732,22 @@ int main(int argc, char **argv) {
     fprintf(stderr, "lord-server: frame pipeline %s (LORD_PIPELINE: unset or 0 off, 1 while frames are heavy, 2 always)\n",
             fpipe.mode == FPIPE_OFF ? "off" : fpipe.mode == FPIPE_ALWAYS ? "always" : "while frames are heavy");
     int sfd = signalfd(-1, &mask, SFD_CLOEXEC);
+    /* text consoles, standalone: VT_PROCESS on our console once the loop can answer (vt_signal) */
+    if (vt >= 0) {
+        sigset_t vm;
+        sigemptyset(&vm);
+        sigaddset(&vm, SIGUSR1);
+        sigaddset(&vm, SIGUSR2);
+        sigprocmask(SIG_BLOCK, &vm, NULL);
+        struct sigaction fw = { .sa_handler = forward_stop, .sa_flags = SA_RESTART };   /* a worker thread passes it on */
+        sigemptyset(&fw.sa_mask);
+        sigaction(SIGUSR1, &fw, NULL);
+        sigaction(SIGUSR2, &fw, NULL);
+        vt_sfd = signalfd(-1, &vm, SFD_CLOEXEC | SFD_NONBLOCK);
+        struct vt_mode m = { .mode = VT_PROCESS, .relsig = SIGUSR1, .acqsig = SIGUSR2 };
+        if (vt_sfd >= 0 && !ioctl(vt, VT_SETMODE, &m)) vt_tty = vt;
+        else fprintf(stderr, "lord-server: no text consoles (VT_PROCESS): %s\n", strerror(errno));
+    }
 
     double start = now_ms();
     /* the watchdog (wdog.h): a stall of this loop never leaves the desktop frozen at real time */
@@ -2847,11 +2914,13 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[141 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
+        struct pollfd pfd[142 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
         pfd[n++] = (struct pollfd){ sfd, POLLIN, 0 };
+        int vt_i = n;
+        pfd[n++] = (struct pollfd){ vt_sfd, POLLIN, 0 };
         for (int i = 0; i < s.input.count; i++) pfd[n++] = (struct pollfd){ s.input.dev[i].fd, POLLIN, 0 };
         int tbase = n, nterm = term_pollfds(pfd + n, TERM_MAX, term_ids);
         n += nterm;
@@ -2928,6 +2997,8 @@ int main(int argc, char **argv) {
             }
         }
         if (pfd[1].revents & POLLIN) break;
+        int vt_moved = vt_sfd >= 0 && (pfd[vt_i].revents & POLLIN);
+        if (vt_moved) vt_signal(&s);           /* the input list changed: this pass's poll entries are stale */
         /* the watchdog's other half (wdog.h): a display whose page flip never completes leaves the desktop
          * frozen on it while this loop runs on; said once per flip, from fields this loop already keeps */
         if (!s.headless) {
@@ -2943,9 +3014,9 @@ int main(int argc, char **argv) {
             }
         }
         int lost[INPUT_MAX_DEVICES], nlost = 0;
-        for (int i = 0; i < s.input.count; i++) {
-            if (pfd[2 + i].revents & POLLIN) input_dispatch(&s.input, i, on_input, &s);
-            if (pfd[2 + i].revents & (POLLERR | POLLHUP | POLLNVAL)) lost[nlost++] = i;
+        for (int i = 0; !vt_moved && i < s.input.count; i++) {
+            if (pfd[3 + i].revents & POLLIN) input_dispatch(&s.input, i, on_input, &s);
+            if (pfd[3 + i].revents & (POLLERR | POLLHUP | POLLNVAL)) lost[nlost++] = i;
         }
         /* un dispositivo que dejó de servir (desenchufado, o revocado al cambiar de sesión): se cierra
          * solo ese. Dejar el monitor lo decide únicamente lord-sessiond (RP_UNDISPLAY), nunca un error */
@@ -3034,6 +3105,7 @@ int main(int argc, char **argv) {
     wl_stop();
     snd_stop();
     js_shutdown();
+    if (vt_tty >= 0) { struct vt_mode m = { .mode = VT_AUTO }; ioctl(vt_tty, VT_SETMODE, &m); }
     if (vt >= 0) { ioctl(vt, KDSETMODE, KD_TEXT); close(vt); }
     for (int i = 0; i < OUT_MAX; i++) out_free(&s.out[i]);
     out_free(&s.cap);

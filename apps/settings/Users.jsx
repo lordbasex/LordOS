@@ -80,6 +80,14 @@ export function UsersSettings() {
       {isAdmin && !adding && <Actions><Button label={tr('settings.users.add')} onClick={() => { setAdding(true); setMsg(null); }} /></Actions>}
       {busy && <Note>{tr('settings.users.working')}</Note>}
       <Message msg={msg} />
+      {isAdmin && !adding && (
+        // the whole computer's: no login screen at the next boots, a login prompt on tty1 and startlordos there (as startx)
+        <Section title={tr('settings.users.loginTitle')} footer={tr('settings.users.textModeHint')}>
+          <SettingRow label={tr('settings.users.textMode')}>
+            <Toggle small on={!!data.textMode} onChange={(on) => run('boot-text', on ? 'on' : 'off', tr('settings.users.saved'))} />
+          </SettingRow>
+        </Section>
+      )}
       {adding ? <AddUser onDone={(name) => { setAdding(false); if (name) setSel(name); }} run={run} />
         : cur ? <UserDetail key={cur.name} user={cur} isAdmin={isAdmin} run={run} autologin={data.autologin} admins={data.users.filter((x) => x.admin).length} /> : null}
     </Stack>

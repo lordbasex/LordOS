@@ -163,6 +163,11 @@ void sd_mon_lost(void);                             /* takes it away (revokes) *
 void sd_mon_child(void);                            /* in a child: closes the copies without revoking */
 int  sd_mon_hotplug_fd(void);                       /* inotify on /dev/input, or -1 */
 void sd_mon_hotplug(void);                          /* devices plugged in or removed */
+/* text consoles (Ctrl+Alt+F1…F12): our tty1 in VT_PROCESS mode, SIGUSR1 to leave it, SIGUSR2 when it is back */
+int  sd_mon_vt_switch(int n);                       /* asks the kernel for console n (1…12, not ours) */
+void sd_mon_vt_release(void);                       /* after taking the monitor back: the switch goes on */
+void sd_mon_vt_acquire(void);                       /* ours again: graphics mode */
+int  sd_mon_away(void);                             /* another console is in front */
 
 /* Messages from the workers to the main process (SOCK_SEQPACKET socketpair; one line, sometimes with
  * an fd): "show g" + fd · "show u <user>" + fd · "greeter-in <json>" */

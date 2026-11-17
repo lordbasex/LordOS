@@ -2346,6 +2346,8 @@ static JSValue f_users_list(JSContext *c, JSValueConst this_val, int argc, JSVal
     if (a) { a += 10; size_t k = strspn(a, "abcdefghijklmnopqrstuvwxyz0123456789_-"); if (k < sizeof au) { memcpy(au, a, k); au[k] = 0; } }
     free(conf);
     JS_SetPropertyStr(c, o, "autologin", JS_NewString(c, au));
+    /* Settings → Users & Login → Start in text mode (the boot-text action; docs/SESSIONS.md, "Text mode") */
+    JS_SetPropertyStr(c, o, "textMode", JS_NewBool(c, access("/etc/lordos/text-mode", F_OK) == 0));
     return o;
 }
 

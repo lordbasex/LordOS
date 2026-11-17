@@ -60,6 +60,14 @@ static inline int input_dom_button(int code) {
     }
 }
 
+/* Ctrl+Alt+F1…F12: the text console it asks for (1…12), or 0 for any other key (docs/SESSIONS.md, "Text consoles"). */
+static inline int input_vt_key(int code) {
+    if (code >= KEY_F1 && code <= KEY_F10) return code - KEY_F1 + 1;
+    if (code == KEY_F11) return 11;
+    if (code == KEY_F12) return 12;
+    return 0;
+}
+
 /* What a Wayland app gets for a DOM button: BTN_SIDE and BTN_EXTRA for back and forward, as libinput sends them
  * (GTK, Qt and the browsers go back and forward on them; Xwayland makes them X buttons 8 and 9). */
 static inline unsigned input_evdev_button(int dom) {

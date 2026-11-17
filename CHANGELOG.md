@@ -12,6 +12,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Text consoles while the desktop runs: Ctrl+Alt+F1…F12** (all themes). The keyboard is the session's, so the kernel
+  never saw the keys and nothing happened. Now lord-server takes them and asks lord-sessiond, which keeps tty1 in
+  `VT_PROCESS` mode: leaving locks the session (as Lock Screen), takes the monitor back and lets the kernel switch;
+  Ctrl+Alt+F1 brings tty1 back with the login screen locked for that user. Modifiers held at the switch are released.
+  (docs/SESSIONS.md, "Text consoles")
+- **Text mode and `startlordos`, for starting the desktop by hand as startx** (docs/SESSIONS.md, "Text mode"): the
+  boot menu gets **LordOS (text mode)** (`/etc/grub.d/11_lordos_text`, the system's first entry plus `lordos.text=1`);
+  Settings → Users → **Start in text mode** keeps it for every start (the closed admin action `boot-text on|off`,
+  administrators only, writes `/etc/lordos/text-mode`). Then lord-sessiond leaves the monitor alone,
+  `lordos-text-login.service` puts a login prompt on tty1, and `startlordos` there runs the desktop as that user on that
+  console, with Ctrl+Alt+F1…F12 too (lord-server lets the card and the input go while another console is in front).
+  `lord.users.list()` tells Settings whether text mode is on (`textMode`).
+
 - **Lord Workspaces: the rest of its proposal.** Checked item by item against the theme's design document:
   - **Context Spine:** at the bottom, the shortcuts' help and Settings beside the Control Center. The activities
     themselves stay on the strip's pills only.

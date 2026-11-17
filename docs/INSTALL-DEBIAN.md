@@ -66,7 +66,7 @@ this works even though the script itself comes through a pipe.
    - **display manager:** if GDM, SDDM, LightDM or another display manager is set as
      `display-manager.service`, it asks whether to disable it. If you say yes, it is disabled (not
      removed), `lordos.service` is enabled and `getty@tty1` is masked: at the next boot LordOS shows
-     its login screen on tty1. The other text consoles stay (Ctrl+Alt+F2). If you say no (or pass
+     its login screen on tty1. The other text consoles stay (Ctrl+Alt+F2; docs/SESSIONS.md, "Text consoles"). If you say no (or pass
      `--keep-display-manager`), LordOS is installed but not enabled at boot, and the final message
      shows the commands to switch later;
    - enables linger for your user, so their PipeWire starts with the system (as on the installed ISO);

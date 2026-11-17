@@ -1,0 +1,17 @@
+#!/bin/sh
+# 11_lordos_text — the boot menu's "LordOS (text mode)" entry (docs/SESSIONS.md, "Text mode"), installed by the
+# lordos package in /etc/grub.d. It is the system's own first entry (what /etc/grub.d/10_linux writes for the newest
+# kernel) with lordos.text=1 added (and the console's cursor back, which LordOS hides for its splash): no login screen, a login prompt on tty1, and startlordos there starts the desktop.
+# Nothing else in the menu changes. To drop the entry: chmod -x /etc/grub.d/11_lordos_text && update-grub.
+set -e
+[ -x /etc/grub.d/10_linux ] || exit 0
+GRUB_CMDLINE_LINUX_DEFAULT="${GRUB_CMDLINE_LINUX_DEFAULT:-} lordos.text=1" GRUB_DISABLE_SUBMENU=true GRUB_DISABLE_RECOVERY=true \
+    /etc/grub.d/10_linux 2>/dev/null | awk '
+    # only the first menu entry, from its "menuentry" line to its closing brace at the start of a line
+    !on && /^menuentry / { on = 1 }
+    on { print }
+    on && /^}/ { exit }
+' | sed -e "1s/^menuentry '[^']*'/menuentry 'LordOS (text mode)'/" \
+        -e "1s/\\\$menuentry_id_option '[a-z]*-simple-/\$menuentry_id_option 'lordos-text-/" \
+        -e "1s/\\\$menuentry_id_option 'gnulinux-[^']*-advanced-/\$menuentry_id_option 'lordos-text-/" \
+        -e "s/ vt.global_cursor_default=0//"
