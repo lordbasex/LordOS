@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -293,8 +294,23 @@ int cgroup_release_at(int svcfd, int outfd) {
     return bad ? -1 : 0;
 }
 
-int cgroup_restore_at(int svcfd, const char *saved) {
-    int n = 0;
+/* One noted line, checked: 0 and its four fields, or -1. */
+static int note_parse(const char *line, char *sess, char *child, char *file, char *v) {
+    int used = 0;
+    if (sscanf(line, "%63s %95s %23s %n", sess, child, file, &used) != 3 || used <= 0) return -1;
+    if ((size_t)snprintf(v, 64, "%s", line + used) >= 64) return -1;
+    return session_dir_ok(sess) && session_child_ok(child) && limit_file_ok(file) && limit_value_ok(v) ? 0 : -1;
+}
+/* the leaf sess/child, open (for writing its files), or -1 when it is gone */
+static int note_leaf(int svcfd, const char *sess, const char *child) {
+    int sfd = openat(svcfd, sess, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    int lfd = sfd >= 0 ? openat(sfd, child, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC) : -1;
+    if (sfd >= 0) close(sfd);
+    return lfd;
+}
+
+int cgroup_restore_at(int svcfd, const char *saved, int *failed) {
+    int n = 0, bad = 0;
     char line[256];
     for (const char *p = saved; p && *p;) {
         size_t l = strcspn(p, "\n");
@@ -302,21 +318,64 @@ int cgroup_restore_at(int svcfd, const char *saved) {
             memcpy(line, p, l);
             line[l] = 0;
             char sess[64], child[96], file[24], v[64];
-            int used = 0;
-            if (sscanf(line, "%63s %95s %23s %n", sess, child, file, &used) == 3 && used > 0 &&
-                (size_t)snprintf(v, sizeof v, "%s", line + used) < sizeof v &&
-                session_dir_ok(sess) && session_child_ok(child) && limit_file_ok(file) && limit_value_ok(v)) {
-                int sfd = openat(svcfd, sess, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-                int lfd = sfd >= 0 ? openat(sfd, child, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC) : -1;
-                if (lfd >= 0 && !write_at(lfd, file, v)) n++;
-                if (lfd >= 0) close(lfd);
-                if (sfd >= 0) close(sfd);
+            int lfd = note_parse(line, sess, child, file, v) ? -1 : note_leaf(svcfd, sess, child);
+            if (lfd >= 0) {                 /* a leaf that is gone needs nothing; one that refuses is a failure */
+                if (!write_at(lfd, file, v)) n++; else bad++;
+                close(lfd);
             }
         }
         p += l;
         if (*p == '\n') p++;
     }
+    if (failed) *failed = bad;
     return n;
+}
+
+/* key of a noted line: its first three fields and a space */
+static int note_key(const char *line, size_t l, char *key, size_t kn) {
+    char buf[256], sess[64], child[96], file[24], v[64];
+    if (l >= sizeof buf) return -1;
+    memcpy(buf, line, l);
+    buf[l] = 0;
+    if (note_parse(buf, sess, child, file, v)) return -1;
+    return (size_t)snprintf(key, kn, "%s %s %s ", sess, child, file) < kn ? 0 : -1;
+}
+
+int cgroup_merge_notes(int svcfd, const char *old, const char *fresh, char *out, size_t cap) {
+    size_t used = 0;
+    if (!cap) return -1;
+    out[0] = 0;
+    for (int pass = 0; pass < 2; pass++) {
+        const char *src = pass ? old : fresh;
+        for (const char *p = src; p && *p;) {
+            size_t l = strcspn(p, "\n");
+            char key[200];
+            int keep = !note_key(p, l, key, sizeof key);
+            if (keep && pass) {
+                /* an older note: only when nothing fresher was noted for it and its leaf still exists */
+                size_t kl = strlen(key);
+                for (const char *q = fresh; keep && q && *q;) {
+                    size_t ql = strcspn(q, "\n");
+                    if (ql >= kl && !strncmp(q, key, kl)) keep = 0;
+                    q += ql;
+                    if (*q == '\n') q++;
+                }
+                char sess[64], child[96];
+                if (keep && sscanf(key, "%63s %95s", sess, child) != 2) keep = 0;
+                if (keep) { int lfd = note_leaf(svcfd, sess, child); if (lfd < 0) keep = 0; else close(lfd); }
+            }
+            if (keep) {
+                if (used + l + 2 > cap) return -1;
+                memcpy(out + used, p, l);
+                used += l;
+                out[used++] = '\n';
+                out[used] = 0;
+            }
+            p += l;
+            if (*p == '\n') p++;
+        }
+    }
+    return 0;
 }
 
 /* Service root: its own cgroup, or its parent if we're in the "supervisor" leaf created by
@@ -341,12 +400,37 @@ int cgroup_service_release(void) {
     int fd = open(svc, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (fd < 0) return -1;
     mkdir("/run/lordos", 0755);
+    /* Notes from an earlier start that lord-sessiond never put back (it failed before cgroup_service_init, or a
+     * limit didn't take) are kept: this release can't see those limits any more, their controllers being off
+     * already. The fresh notes win for a limit noted in both; notes for leaves that are gone are dropped. */
+    static char old[CG_NOTES_MAX], fresh[CG_NOTES_MAX], merged[CG_NOTES_MAX];
+    old[0] = fresh[0] = 0;
+    int ofd = open(CG_SAVED_LIMITS, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    struct stat st;
+    if (ofd >= 0 && !fstat(ofd, &st) && st.st_uid == 0 && S_ISREG(st.st_mode)) {
+        ssize_t n = read(ofd, old, sizeof old - 1);
+        old[n > 0 ? n : 0] = 0;
+    }
+    if (ofd >= 0) close(ofd);
+    /* the fresh notes go through a memory file, then the merge decides what is written */
+    int mfd = memfd_create("cgroup-notes", MFD_CLOEXEC);
+    int r = cgroup_release_at(fd, mfd);
+    if (mfd >= 0) {
+        ssize_t n = pread(mfd, fresh, sizeof fresh - 1, 0);
+        fresh[n > 0 ? n : 0] = 0;
+        close(mfd);
+    }
+    if (cgroup_merge_notes(fd, old, fresh, merged, sizeof merged)) {
+        fprintf(stderr, "cgroup: too many limits to note; the earlier notes stay\n");
+        close(fd);
+        return r;
+    }
+    close(fd);
     unlink(CG_SAVED_LIMITS ".new");
     int out = open(CG_SAVED_LIMITS ".new", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
-    int r = cgroup_release_at(fd, out);
-    close(fd);
     if (out >= 0) {
-        int ok = !fsync(out);
+        size_t len = strlen(merged);
+        int ok = write(out, merged, len) == (ssize_t)len && !fsync(out);
         close(out);
         if (!ok || rename(CG_SAVED_LIMITS ".new", CG_SAVED_LIMITS)) unlink(CG_SAVED_LIMITS ".new");
     }
@@ -380,17 +464,19 @@ int cgroup_service_init(void) {
         close(sfd);
     }
     /* and the limits noted then (only root writes the file, in root's /run/lordos) */
-    char saved[16384];
+    static char saved[CG_NOTES_MAX];
     int sv = open(CG_SAVED_LIMITS, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     struct stat st;
     if (sv >= 0 && dir && !fstat(sv, &st) && st.st_uid == 0 && S_ISREG(st.st_mode)) {
         ssize_t n = read(sv, saved, sizeof saved - 1);
         saved[n > 0 ? n : 0] = 0;
-        int put = cgroup_restore_at(dirfd(dir), saved);
+        int failed = 0, put = n >= 0 ? cgroup_restore_at(dirfd(dir), saved, &failed) : 0;
         if (put) fprintf(stderr, "cgroup: %d limit(s) of the sessions that stayed put back\n", put);
+        /* gone only once every limit is back: otherwise the next start tries again */
+        if (n >= 0 && !failed) unlink(CG_SAVED_LIMITS);
+        else fprintf(stderr, "cgroup: %d limit(s) not put back; %s stays for the next start\n", failed, CG_SAVED_LIMITS);
     }
     if (sv >= 0) close(sv);
-    unlink(CG_SAVED_LIMITS);
     if (dir) closedir(dir);
     return 0;
 }

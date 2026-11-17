@@ -390,7 +390,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   pids` on for the sessions, and a cgroup with controllers on takes no process. `lordos.service` now runs
   `lord-sessiond --release-cgroups` first (ExecStartPre): it notes the limits of the sessions' leaves and app scopes
   in `/run/lordos/cgroup-limits`, turns the controllers off in each session and then in the root, and the new
-  lord-sessiond turns them on again and puts the limits back (`server/src/sec/cgroup.c`, tested in
+  lord-sessiond turns them on again and puts the limits back; notes not yet put back (two failed starts in a row, a limit refused) are kept and merged, never replaced, and the file goes only once every limit is back (`server/src/sec/cgroup.c`, tested in
   `build/cgroup-restart-test`; the kernel's side checked in a delegated scope). Debian 13 ships systemd 257, which
   wasn't affected and works the same; the unit hasn't been run on 258 or later yet.
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session

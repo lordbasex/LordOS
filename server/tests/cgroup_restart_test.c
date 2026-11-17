@@ -109,14 +109,58 @@ int main(void) {
     /* a second run (nothing on any more) has nothing to do and succeeds */
     CHECK(cgroup_release_at(svc, -1) == 0, "second release");
 
+    /* Two releases with no restore between (lord-sessiond failed before cgroup_service_init): the second can't see
+     * the limits any more (their files went with the controllers), so its notes must not replace the first's. */
+    {
+        static const char *gone[] = { "lordos-session-1000/server/cpu.weight", "lordos-session-1000/app-lordos-lpk-notes.scope/memory.high",
+                                      "lordos-session-1000/app-lordos-lpk-notes.scope/memory.max", "lordos-session-1000/app-lordos-lpk-notes.scope/cpu.max",
+                                      "lordos-session-1001/server/cpu.weight" };
+        char p[512];
+        for (size_t i = 0; i < sizeof gone / sizeof *gone; i++) { snprintf(p, sizeof p, "%s/%s", root, gone[i]); unlink(p); }
+        char fresh_path[300];
+        snprintf(fresh_path, sizeof fresh_path, "%s.fresh", root);
+        int fo = open(fresh_path, O_RDWR | O_CREAT | O_TRUNC, 0600);
+        CHECK(cgroup_release_at(svc, fo) == 0, "release without the limit files");
+        char fresh[4096] = "";
+        ssize_t fn = pread(fo, fresh, sizeof fresh - 1, 0);
+        fresh[fn > 0 ? fn : 0] = 0;
+        close(fo);
+        unlink(fresh_path);
+        CHECK(fresh[0] == 0, "the second release saw limits: %s", fresh);
+        static char merged[CG_NOTES_MAX];
+        CHECK(cgroup_merge_notes(svc, saved, fresh, merged, sizeof merged) == 0, "merge");
+        CHECK(!strcmp(merged, saved), "the first notes were lost:\n%s", merged);
+        /* a fresher value wins; a note for a leaf that is gone is dropped; a note that doesn't parse is dropped */
+        const char *older = "lordos-session-1000 app-lordos-lpk-notes.scope memory.max 1\n"
+                            "lordos-session-1000 app-lordos-gone.scope memory.max 7\n"
+                            "lordos-session-1000 server cgroup.procs 1\n"
+                            "lordos-session-1001 server cpu.weight 1000\n";
+        const char *newer = "lordos-session-1000 app-lordos-lpk-notes.scope memory.max 536870912\n";
+        CHECK(cgroup_merge_notes(svc, older, newer, merged, sizeof merged) == 0, "merge 2");
+        CHECK(!strcmp(merged, "lordos-session-1000 app-lordos-lpk-notes.scope memory.max 536870912\n"
+                              "lordos-session-1001 server cpu.weight 1000\n"), "merged:\n%s", merged);
+        char tiny[16];
+        CHECK(cgroup_merge_notes(svc, saved, "", tiny, sizeof tiny) == -1, "an overflow must refuse (old file kept)");
+    }
+
+    /* a limit that is refused counts as failed (the notes file stays for the next start) */
+    {
+        dir("lordos-session-1001/app-lordos-x.scope");
+        dir("lordos-session-1001/app-lordos-x.scope/memory.max");     /* a directory: the write fails */
+        int failed = -1;
+        int put = cgroup_restore_at(svc, "lordos-session-1001 app-lordos-x.scope memory.max 1\n"
+                                         "lordos-session-1001 app-lordos-gone.scope memory.max 1\n", &failed);
+        CHECK(put == 0 && failed == 1, "put %d failed %d (a gone leaf is no failure)", put, failed);
+    }
+
     /* back: the files are gone with the controllers on cgroupfs; here they are emptied */
     put("lordos-session-1000/server/cpu.weight", "100\n");
     put("lordos-session-1000/app-lordos-lpk-notes.scope/memory.high", "max\n");
     put("lordos-session-1000/app-lordos-lpk-notes.scope/memory.max", "max\n");
     put("lordos-session-1000/app-lordos-lpk-notes.scope/cpu.max", "max 100000\n");
     put("lordos-session-1001/server/cpu.weight", "100\n");
-    int put_back = cgroup_restore_at(svc, saved);
-    CHECK(put_back == 5, "%d values put back", put_back);
+    int put_failed = -1, put_back = cgroup_restore_at(svc, saved, &put_failed);
+    CHECK(put_back == 5 && put_failed == 0, "%d values put back, %d failed", put_back, put_failed);
     CHECK(!strcmp(get("lordos-session-1000/server/cpu.weight"), "1000"), "cpu.weight %s", get("lordos-session-1000/server/cpu.weight"));
     CHECK(!strcmp(get("lordos-session-1000/app-lordos-lpk-notes.scope/memory.high"), "268435456"), "memory.high");
     CHECK(!strcmp(get("lordos-session-1000/app-lordos-lpk-notes.scope/memory.max"), "536870912"), "memory.max");
@@ -132,7 +176,7 @@ int main(void) {
         "lordos-session-1000 server memory.max\n"
         "lordos-session-1000 gone.scope memory.max 1\n"
         "lordos-session-1000x server memory.max 1\n";
-    CHECK(cgroup_restore_at(svc, hostile) == 0, "a bad line was written");
+    CHECK(cgroup_restore_at(svc, hostile, NULL) == 0, "a bad line was written");
     CHECK(!strcmp(get("lordos-session-1000/server/memory.max"), "max\n"), "memory.max changed: %s", get("lordos-session-1000/server/memory.max"));
     CHECK(access(saved_path, F_OK) == 0, "saved");
 

@@ -503,7 +503,7 @@ without root, so `lord-sessiond` **delegates** a subtree to it:
   every non-default `memory.high`, `memory.max`, `cpu.max` and `cpu.weight` of the sessions' leaves and
   scopes, turns the controllers off in each session and then in the root (the kernel refuses the root
   first; disabling them in a session with live leaves is allowed), and the new `lord-sessiond` turns them
-  on again in `cgroup_service_init` and writes the noted limits back. The sessions run on throughout, their
+  on again in `cgroup_service_init` and writes the noted limits back. A release merges into notes not yet put back (`cgroup_merge_notes`: the fresh value wins, notes for gone leaves drop), since after a failed start the limits are no longer readable; the file is removed only when every limit took. The sessions run on throughout, their
   scopes unlimited for about a second. Checked on cgroup v2 in a delegated scope (the order, the lost
   limit, a process entering the root once the controllers are off) and in `build/cgroup-restart-test`; the
   unit itself not yet on systemd 258 or later.
