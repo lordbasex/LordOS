@@ -9,7 +9,7 @@
 // Help, as desktop apps do on a taskbar layout. Apps without menus of their own get no strip.
 // Settings → Desktop & Dock → Title bars can put the buttons at the start instead (close, minimize, maximize; the
 // icon and title follow them), and the snap layouts then open from there (useWindowButtons, issue #58).
-import { View, Text, Layer, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, t as tr } from '@lordos/sdk';
+import { View, Text, Layer, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, SeamCover, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LayoutGlyph } from '../glyphs.jsx';
 import { Menu } from './Menu.jsx';
@@ -22,7 +22,7 @@ const BTN_W = 44;
 // item; hovering another item while one is open moves to it, as menu bars do. From the keyboard: F10, or ⌥ pressed
 // and released alone, opens the focused window's first menu (sdk/shortcuts.js addMenuBarKeys), and ← and → move
 // between them (sdk/menunav.js barIndex).
-function MenuStrip({ t, win, focused, menus }) {
+function MenuStrip({ t, win, focused, menus, transparent }) {
   const [open, setOpen] = useState(null);           // { i, x, y, keys }
   const refs = useRef([]);
   const all = [
@@ -54,6 +54,8 @@ function MenuStrip({ t, win, focused, menus }) {
     <View onMouseDown={(e) => e.stopPropagation()}
       style={{ height: MENU_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 2,
         backgroundColor: focused ? t.titleBg : t.titleBgBlur, borderBottom: `1px solid ${t.separator}` }}>
+      {/* inside its bottom border: 2 reaches 1 px into the app (GitHub #162) */}
+      {transparent ? <SeamCover color={focused ? t.titleBg : t.titleBgBlur} below={2} above={0} /> : null}
       {all.map((m, i) => (
         <View key={i} ref={(inst) => { refs.current[i] = inst; }}
           onClick={() => setOpen((o) => (o?.i === i ? null : at(i)))}
@@ -119,9 +121,9 @@ function FrameButton({ t, focused, onClick, danger, children, anchor, onEnter, o
 
 // Subscribes on its own: the app's window must not redraw when its menus change. Notes and Mail set
 // them after every draw, and redrawing them here would never end.
-function AppMenuStrip({ t, win, focused }) {
+function AppMenuStrip({ t, win, focused, transparent }) {
   const menus = useMenusWithSpeech(win.id) || [];
-  return menus.length ? <MenuStrip t={t} win={win} focused={focused} menus={menus} /> : null;
+  return menus.length ? <MenuStrip t={t} win={win} focused={focused} menus={menus} transparent={transparent} /> : null;
 }
 
 export function Window({ win, t, focused, app }) {
@@ -229,12 +231,14 @@ export function Window({ win, t, focused, app }) {
         onDoubleClick={() => wm.toggleMaximize(win.id)} onContextMenu={titleMenu}
         style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', ...(atStart ? { paddingEnd: 12 } : { paddingStart: 12 }), gap: 8,
           backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
+        {/* a transparent app: under the bar and the next one's first row, so their edges let nothing through (GitHub #162) */}
+        {app.transparent ? <SeamCover color={focused ? t.titleBg : t.titleBgBlur} /> : null}
         {atStart ? buttons : null}
         {Icon ? <Icon size={16} /> : null}
         <Text style={{ flex: 1, fontSize: 12, color: focused ? t.text : t.textDim, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{windowTitle(win)}</Text>
         {atStart ? null : buttons}
       </View>
-      <AppMenuStrip t={t} win={win} focused={focused} />
+      <AppMenuStrip t={t} win={win} focused={focused} transparent={!!app.transparent} />
       <View style={{ flex: 1 }}><AppHost id={win.id} focused={focused} /></View>
       {/* a web app's profile: a thin strip in its color on top of the frame */}
       {windowAccent(win) ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: windowAccent(win), pointerEvents: 'none' }} /> : null}

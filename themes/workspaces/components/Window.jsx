@@ -11,7 +11,7 @@
 // entry in the window list changes (index.jsx keeps the tokens object stable).
 import {
   View, Text, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, useMenusWithSpeech, getApp, appGroup, windowMenuItems,
-  solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, desktopList, desktopName, activeDesktop, useStore, t as tr,
+  solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, desktopList, desktopName, activeDesktop, useStore, SeamCover, t as tr,
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LockGlyph, ActivityIcon } from '../glyphs.jsx';
@@ -27,7 +27,7 @@ const BTN = 28;
 // the shell started a moment ago: the windows coming back (session restore, a theme switch) don't zoom in
 const started = Date.now();
 
-function MenuStrip({ t, win, focused, menus }) {
+function MenuStrip({ t, win, focused, menus, transparent }) {
   const [open, setOpen] = useState(null);
   const refs = useRef([]);
   const all = [
@@ -56,6 +56,8 @@ function MenuStrip({ t, win, focused, menus }) {
     <View onMouseDown={(e) => e.stopPropagation()}
       style={{ height: MENU_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 2,
         backgroundColor: focused ? t.titleBg : t.titleBgBlur, borderBottom: `1px solid ${t.separator}` }}>
+      {/* inside its bottom border: 2 reaches 1 px into the app (GitHub #162) */}
+      {transparent ? <SeamCover color={focused ? t.titleBg : t.titleBgBlur} below={2} above={0} /> : null}
       {all.map((m, i) => (
         <View key={i} ref={(inst) => { refs.current[i] = inst; }}
           onClick={() => setOpen((o) => (o?.i === i ? null : at(i)))}
@@ -70,9 +72,9 @@ function MenuStrip({ t, win, focused, menus }) {
 }
 
 // subscribes on its own: an app that sets its menus after every draw must not redraw the window
-function AppMenuStrip({ t, win, focused }) {
+function AppMenuStrip({ t, win, focused, transparent }) {
   const menus = useMenusWithSpeech(win.id) || [];
-  return menus.length ? <MenuStrip t={t} win={win} focused={focused} menus={menus} /> : null;
+  return menus.length ? <MenuStrip t={t} win={win} focused={focused} menus={menus} transparent={transparent} /> : null;
 }
 
 function FrameButton({ t, focused, onClick, danger, children, label, onHover }) {
@@ -226,6 +228,8 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
       }}
         onDoubleClick={() => { if (!locked) wm.toggleMaximize(win.id); }} onContextMenu={(e) => { if (!locked) setMenu({ x: e.x, y: e.y }); }}
         style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 8, backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
+        {/* a transparent app: under the bar and the next one's first row, so their edges let nothing through (GitHub #162) */}
+        {app.transparent ? <SeamCover color={focused ? t.titleBg : t.titleBgBlur} /> : null}
         {atStart ? buttons : <View style={{ width: 4 }} />}
         {group ? (
           <View title={desktopName(win.desktop)} style={{ width: 16, height: 16, borderRadius: 5, backgroundColor: gColor, alignItems: 'center', justifyContent: 'center' }}>
@@ -237,7 +241,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
         {tight ? <View title={tr('shell.ws.layout.tight')} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#E59A12' }} /> : null}
         {atStart ? <View style={{ width: 4 }} /> : buttons}
       </View>
-      <AppMenuStrip t={t} win={win} focused={focused} />
+      <AppMenuStrip t={t} win={win} focused={focused} transparent={!!app.transparent} />
       <View style={{ flex: 1 }}><AppHost id={win.id} focused={focused} /></View>
       {windowAccent(win) ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: windowAccent(win), pointerEvents: 'none' }} /> : null}
       {menu && <Menu t={t} x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={items()} />}

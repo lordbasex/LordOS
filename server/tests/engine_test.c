@@ -436,6 +436,63 @@ static void test_borders(void) {
     CHECK(in->x == 1 && in->y == 0 && in->w == 49 && in->h == 28, "content box %g %g %g %g", in->x, in->y, in->w, in->h);
 }
 
+/* GitHub #162: a transparent app's frame (the Terminal, as themes/default draws it): a border, the title bar, a 1 px
+ * separator and the app's opaque tab bar, over nothing. At 125, 150 and 175 % those edges fall inside a pixel that
+ * each box covers only in part, so the row let what is below through (a quarter at 150 %). sdk/windowshell.jsx's
+ * SeamCover, the title bar's first child from 1 px outside it to 2 px under it, makes every pixel down to the tab bar
+ * opaque. Without it the same frame must show the hole (or this test proves nothing). */
+static int frame_holes(float k, int cover) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    Node *win = view(root);
+    ss(win, "position", "absolute");
+    sn(win, "left", 10); sn(win, "top", 10); sn(win, "width", 100); sn(win, "height", 120);
+    sn(win, "borderWidth", 1); sn(win, "borderColor", 0xff3a3a40); sn(win, "borderRadius", 12); ss(win, "overflow", "hidden");
+    Node *title = view(win);
+    sn(title, "height", 40); sn(title, "backgroundColor", 0xff2b2b30);
+    if (cover) {
+        Node *c = view(title);
+        ss(c, "position", "absolute");
+        sn(c, "left", -1); sn(c, "right", -1); sn(c, "top", -1); sn(c, "bottom", -2); sn(c, "backgroundColor", 0xff2b2b30);
+    }
+    Node *sep = view(win);
+    sn(sep, "height", 1); sn(sep, "backgroundColor", 0xff3a3a40);
+    Node *tabs = view(win);
+    sn(tabs, "height", 36); sn(tabs, "backgroundColor", 0xff26262b);
+    Node *pane = view(win);
+    sn(pane, "flexGrow", 1); sn(pane, "backgroundColor", 0x80101010);     /* the terminal, see-through by design */
+    int w = (int)ceilf(140 * k), h = (int)ceilf(160 * k);
+    uint32_t *px = calloc((size_t)w * h, 4);
+    Canvas c;
+    canvas_init(&c, px, w, h, w);
+    PaintView keep = paint_view;
+    paint_view = (PaintView){ 0, 0, k, 0, 0, 0 };
+    layout_root(root, 140, 160);
+    paint_damage(root);
+    ui.damage = (Box){ 0, 0, 140, 160 };
+    paint_root_clear(&c, root, 0);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    paint_view = keep;
+    /* a column through the middle, from the window's top edge to the tab bar's last row: each pixel opaque */
+    int holes = 0, x = (int)(60 * k);
+    for (int y = (int)ceilf(10 * k); y < (int)floorf((10 + 1 + 40 + 1 + 36) * k); y++)
+        if (px[(size_t)y * w + x] >> 24 != 255) holes++;
+    free(px);
+    return holes;
+}
+static void test_frame_seams(void) {
+    static const float ks[] = { 1, 1.25f, 1.5f, 1.75f, 2 };
+    int before = 0;
+    for (int i = 0; i < 5; i++) {
+        int open = frame_holes(ks[i], 0), covered = frame_holes(ks[i], 1);
+        before += open;
+        CHECK(!covered, "frame seams at %g: %d see-through pixels with the cover", ks[i], covered);
+    }
+    CHECK(before > 0, "frame seams: the frame without a cover showed no hole, so the test checks nothing");
+    printf("frame seams: a transparent window's title bar, separator and tab bar let nothing through at 125-175 %% (%d pixels without the cover)\n", before);
+}
+
 static void test_logical(void) {
     ui_reset();
     Node *root = view(NULL);
@@ -3616,6 +3673,7 @@ int main(int argc, char **argv) {
     test_scaled_caret();
     test_covered();
     test_borders();
+    test_frame_seams();
     test_logical();
     test_transform_math();
     test_transform_paint_hit();

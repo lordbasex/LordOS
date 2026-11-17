@@ -241,7 +241,10 @@ Inside it:
 - **`<AppHost id={w.id} focused={…} />`** for the content, in a `flex: 1` box;
 - no background under the content when `getApp(w.id).transparent` (the Terminal). Such a window has
   nothing behind its border either: draw the border with `solidOver(line, titleBg)` so it stays
-  opaque (both themes do);
+  opaque (both themes do). Put **`<SeamCover color={titleBg} below={…} />`** (from `@lordos/sdk`) first in its title
+  bar, and in any bar under it: at 125 %, 150 % or 175 % the edges between the border, the bars and the app's first
+  row fall inside a pixel, and without it that row lets the desktop through (GitHub #162). `below` reaches past the
+  bar into what follows it (the default theme: 2, its 1 px separator and 1 px of the app);
 - the title with `windowTitle(w)` (apps change it, for example the Terminal);
 - buttons that `stopPropagation()` on mouse down, so pressing them doesn't start a move.
 

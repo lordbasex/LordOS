@@ -374,6 +374,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Terminal: no see-through line under the title bar at 125 % or 150 % (GitHub #162; all themes).** The Terminal's
+  window is transparent (its background opacity), so nothing is painted behind its frame. At a fractional scale the
+  edges where the frame's border, the title bar, the separator (Lord Classic and Lord Workspaces: the menu strip) and
+  the Terminal's tab bar meet fall inside a pixel; each box covered only part of that pixel, and the row let a quarter
+  of the desktop through, a thin line with the wallpaper's text showing across the window while it moved. At 100 % and
+  200 % the edges are whole pixels, which is why it was not seen there. The frame of a transparent app now paints, first,
+  one box in the bar's color under those edges (`SeamCover`, `sdk/windowshell.jsx`, used by the three themes' window
+  frames), from under the border to 1 px into the app, so every pixel there is opaque; opaque windows have their own
+  background behind the seams and don't change. `engine-test` draws such a frame at 100, 125, 150, 175 and 200 %:
+  without the cover it finds the see-through pixels, with it none.
 - **Notes: the Read view breaks lines where the Edit view does (GitHub #169).** Reading a note drew it as plain
   markdown, which joins the lines of a paragraph: two lines typed one under the other ran together as one, so the same
   note looked different in Read and Edit. The reading view now keeps a single line break as a line break (each typed
