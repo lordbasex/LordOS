@@ -668,6 +668,7 @@
   "ws.atlas.security": "Turvallisuus",
   "spotlight.section.activities": "Aktiviteetit",
   "spotlight.section.windows": "Avoimet ikkunat",
+  "spotlight.section.recent": "Viimeisimmät tiedostot",
   "theme.workspaces.description": "Aktiviteetit omine sovelluksineen ja asetteluineen, kontekstipalkki, ruudutus näytöittäin ja kolme tehostetyyliä.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "Näytä sivupalkki",

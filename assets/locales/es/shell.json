@@ -668,6 +668,7 @@
   "ws.atlas.security": "Seguridad",
   "spotlight.section.activities": "Actividades",
   "spotlight.section.windows": "Ventanas abiertas",
+  "spotlight.section.recent": "Archivos recientes",
   "theme.workspaces.description": "Actividades con sus propias apps y disposiciones, una columna de contexto, mosaico por pantalla y tres estilos de efectos.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "Mostrar barra lateral",

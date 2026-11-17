@@ -661,6 +661,7 @@
   "ws.atlas.security": "보안",
   "spotlight.section.activities": "활동",
   "spotlight.section.windows": "열린 창",
+  "spotlight.section.recent": "최근 파일",
   "theme.workspaces.description": "고유한 앱과 레이아웃을 가진 활동, 컨텍스트 막대, 디스플레이별 타일 배치, 세 가지 효과 스타일.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "사이드바 보기",

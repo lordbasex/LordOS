@@ -668,6 +668,7 @@
   "ws.atlas.security": "Sicherheit",
   "spotlight.section.activities": "Aktivitäten",
   "spotlight.section.windows": "Offene Fenster",
+  "spotlight.section.recent": "Zuletzt geänderte Dateien",
   "theme.workspaces.description": "Aktivitäten mit eigenen Apps und Layouts, eine Kontextleiste, Kacheln pro Bildschirm und drei Effektstile.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "Seitenleiste einblenden",

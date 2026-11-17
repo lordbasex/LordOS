@@ -668,6 +668,7 @@
   "ws.atlas.security": "Seguretat",
   "spotlight.section.activities": "Activitats",
   "spotlight.section.windows": "Finestres obertes",
+  "spotlight.section.recent": "Fitxers recents",
   "theme.workspaces.description": "Activitats amb les seves apps i disposicions, una columna de context, mosaic per pantalla i tres estils d’efectes.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "Mostra la barra lateral",

@@ -661,6 +661,7 @@
   "ws.atlas.security": "Keamanan",
   "spotlight.section.activities": "Aktivitas",
   "spotlight.section.windows": "Jendela terbuka",
+  "spotlight.section.recent": "File terbaru",
   "theme.workspaces.description": "Aktivitas dengan aplikasi dan tata letaknya sendiri, bilah konteks, petak per layar, dan tiga gaya efek.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "Tampilkan bilah samping",

@@ -668,6 +668,7 @@
   "ws.atlas.security": "Säkerhet",
   "spotlight.section.activities": "Aktiviteter",
   "spotlight.section.windows": "Öppna fönster",
+  "spotlight.section.recent": "Senaste filer",
   "theme.workspaces.description": "Aktiviteter med egna appar och layouter, en kontextlist, sida vid sida per skärm och tre effektstilar.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "Visa sidofält",

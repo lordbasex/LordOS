@@ -16,6 +16,7 @@ import { useLauncherApps, launchApp } from './apps.js';
 import { isAppOff } from './appsoff.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
 import { logOut } from './sessionrestore.jsx';
+import { dndActive, notifyPrefs } from './notify.js';
 import { TextInput, focusToken, restoreFocus } from './components.jsx';
 import * as fs from './fs.js';
 
@@ -227,6 +228,19 @@ function revealFile(f) {
   wm.open('files', { new: true, args: { path: parent, select: f.name } });
 }
 
+// ---- recent files: the home folder's files changed in the last 30 days (lord.fs.recent walks the folder: read
+// once a minute at most, when a search is typed) ----
+
+let recentCache = { at: 0, list: [] };
+function recentFiles() {
+  if (Date.now() - recentCache.at > 60000) {
+    let list = [];
+    try { list = typeof lord !== 'undefined' && lord.fs?.recent ? fs.recent(200, 30) || [] : []; } catch (e) { list = []; }
+    recentCache = { at: Date.now(), list: list.filter((f) => f && f.name && !f.dir) };
+  }
+  return recentCache.list;
+}
+
 // ---- notes (Notes app: ~/Notes/<note>/nota.md; ~/Notas before 0.7.0) ----
 
 let notesCache = { at: 0, list: [] };
@@ -297,9 +311,12 @@ function buildResults(raw, apps) {
     .map((x) => ({ key: `settings:${x.id}`, score: x.s + usageBoost(`settings:${x.id}`), title: x.name, subtitle: t('shell.spotlight.inSettings'), glyph: '⚙',
       run: () => wm.open('settings', { args: { section: x.id } }) })));
 
-  // system actions
+  // system actions: only safe ones (they change a preference or ask first), never a command
+  const hasSession = typeof lord !== 'undefined' && typeof lord.session !== 'undefined' && lord.session.managed();
   const actions = [
     { id: 'dark', name: t('shell.spotlight.action.dark'), run: () => settings.set({ mode: settings.get().mode === 'dark' ? 'light' : 'dark' }) },
+    { id: 'dnd', name: t('shell.classic.dnd'), run: () => settings.set((x) => ({ ...x, notifications: { ...notifyPrefs(x), dnd: !dndActive() } })) },
+    ...(hasSession ? [{ id: 'lock', name: t('shell.menu.lock'), run: () => lord.session.lock() }] : []),
     { id: 'logout', name: t('shell.menu.logout'), run: () => logOut() },
   ];
   add('actions', actions.map((x) => ({ ...x, s: best(q, x.name) })).filter((x) => x.s >= 40)
@@ -311,6 +328,13 @@ function buildResults(raw, apps) {
     .filter((x) => x.s > 15).map((x) => ({ ...x, s: x.s + usageBoost(`file:${x.f.path}`) - (x.f.dir ? 0 : 1) }))
     .sort((a, b) => b.s - a.s).slice(0, 6)
     .map(({ f, s: sc }) => ({ key: `file:${f.path}`, score: sc * 0.8, title: f.name, subtitle: f.path.replace(fs.home(), '~'), glyph: f.dir ? '📁' : IMG.test(f.name) ? '🖼' : '📄',
+      preview: { kind: 'file', file: f }, run: () => openFile(f), reveal: () => revealFile(f) })));
+
+  // recent files (changed in the last 30 days), the ones the index search above didn't already list
+  const listed = new Set((sections.find((x) => x.id === 'files')?.items || []).map((x) => x.key));
+  add('recent', recentFiles().map((f) => ({ f, s: Math.max(score(stem(f.name), q), score(f.name, q, false) * 0.3) }))
+    .filter((x) => x.s > 15 && !listed.has(`file:${x.f.path}`)).sort((a, b) => b.s - a.s || (b.f.mtime || 0) - (a.f.mtime || 0)).slice(0, 4)
+    .map(({ f, s: sc }) => ({ key: `file:${f.path}`, score: sc * 0.75, title: f.name, subtitle: f.path.replace(fs.home(), '~'), glyph: IMG.test(f.name) ? '🖼' : '📄',
       preview: { kind: 'file', file: f }, run: () => openFile(f), reveal: () => revealFile(f) })));
 
   // notes

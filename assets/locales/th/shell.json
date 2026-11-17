@@ -661,6 +661,7 @@
   "ws.atlas.security": "ความปลอดภัย",
   "spotlight.section.activities": "กิจกรรม",
   "spotlight.section.windows": "หน้าต่างที่เปิดอยู่",
+  "spotlight.section.recent": "ไฟล์ล่าสุด",
   "theme.workspaces.description": "กิจกรรมที่มีแอปและเลย์เอาต์ของตัวเอง แถบบริบท การจัดเรียงต่อจอ และเอฟเฟกต์สามรูปแบบ",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "แสดงแถบด้านข้าง",

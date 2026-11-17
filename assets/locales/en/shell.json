@@ -668,6 +668,7 @@
   "ws.atlas.security": "Security",
   "spotlight.section.activities": "Activities",
   "spotlight.section.windows": "Open windows",
+  "spotlight.section.recent": "Recent files",
   "theme.workspaces.description": "Activities with their own apps and layouts, a Context Spine, tiling per display and three effects styles.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "Show sidebar",

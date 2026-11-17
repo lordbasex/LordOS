@@ -668,6 +668,7 @@
   "ws.atlas.security": "Güvenlik",
   "spotlight.section.activities": "Etkinlikler",
   "spotlight.section.windows": "Açık pencereler",
+  "spotlight.section.recent": "Son dosyalar",
   "theme.workspaces.description": "Kendi uygulamaları ve düzenleri olan etkinlikler, bir bağlam şeridi, ekran başına döşeme ve üç efekt stili.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "Kenar çubuğunu göster",

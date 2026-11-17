@@ -668,6 +668,7 @@
   "ws.atlas.security": "Сигурност",
   "spotlight.section.activities": "Дейности",
   "spotlight.section.windows": "Отворени прозорци",
+  "spotlight.section.recent": "Скорошни файлове",
   "theme.workspaces.description": "Дейности със свои приложения и подредби, контекстна лента, плочки за всеки екран и три стила на ефектите.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "Показване на страничната лента",

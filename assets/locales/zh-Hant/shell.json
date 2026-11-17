@@ -661,6 +661,7 @@
   "ws.atlas.security": "安全性",
   "spotlight.section.activities": "活動",
   "spotlight.section.windows": "開啟的視窗",
+  "spotlight.section.recent": "最近的檔案",
   "theme.workspaces.description": "擁有各自 App 和版面的活動、情境側欄、依顯示器並排，以及三種效果樣式。",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "顯示側邊欄",

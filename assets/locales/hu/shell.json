@@ -668,6 +668,7 @@
   "ws.atlas.security": "Biztonság",
   "spotlight.section.activities": "Tevékenységek",
   "spotlight.section.windows": "Nyitott ablakok",
+  "spotlight.section.recent": "Legutóbbi fájlok",
   "theme.workspaces.description": "Tevékenységek saját appokkal és elrendezésekkel, kontextussáv, kijelzőnkénti csempézés és három effektusstílus.",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "Oldalsáv megjelenítése",

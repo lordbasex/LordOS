@@ -661,6 +661,7 @@
   "ws.atlas.security": "セキュリティ",
   "spotlight.section.activities": "アクティビティ",
   "spotlight.section.windows": "開いているウインドウ",
+  "spotlight.section.recent": "最近のファイル",
   "theme.workspaces.description": "専用のアプリとレイアウトを持つアクティビティ、コンテキストバー、ディスプレイごとのタイル配置、3つのエフェクトスタイル。",
   "theme.workspaces.name": "Lord Workspaces",
   "sidebar.show": "サイドバーを表示",
