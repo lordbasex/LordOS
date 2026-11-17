@@ -199,6 +199,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Lord Workspaces: the Calendar widget, redrawn, with styles to choose from.** The day and the month in red, today
+  in a red circle, weekends dimmed and the week from the language's first weekday. Small: "Day" (the default: the day,
+  its first event and what comes next), "Month" or "Day and weather". Medium: "Day and month" (the default), "Agenda"
+  (today and tomorrow) or "Busy days" (the month shaded by how many events each day has). Large: "Agenda and month"
+  (the default) or "Month" (today's events under it). The space is always used: with nothing today it says "No
+  events today" and what comes next ("Tomorrow: Dentist, 09:00", or nothing in the next 7 days); with more events
+  than fit, "+N more today". The style is in the widget's menu. Events are asked again every 5 minutes and at once
+  when a calendar changes. New strings in all 35 languages.
+
 - **Lord Workspaces: the widget picker is a centred panel with search and categories.** It used to open near the
   top of the display and was cut off at the bottom when the catalog was taller than the screen. Now it sits in the
   middle of the display's work area, as tall as fits (up to 720 px), with a search field (name and description in

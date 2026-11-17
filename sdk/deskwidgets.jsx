@@ -39,7 +39,7 @@ import { events, reminders, usePimQuery } from './calendar.js';
 import { useFan } from './cooling.jsx';
 import { battery } from './hardware.jsx';
 import { clipboard, clipboardHistory } from './clipboard.js';
-import { wifiBars } from './menubarmodel.js';
+import { wifiBars, monthCells, weekStartFor } from './menubarmodel.js';
 import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect } from './widgetgrid.js';
 import { useSound, useSpectrumSource } from './sound.js';
 import { sourceOf, appsPlaying, colorsOf, gainOf, PALETTE_ORDER } from './soundwavemodel.js';
@@ -500,86 +500,222 @@ function SystemBody({ w, L }) {
 }
 
 // ---- calendar ----
+// Styles (the widget's menu, w.opts.style), as in the approved mockups: small 'day' (the default: the day and what is
+// next), 'month' or 'weather' (the day with the forecast); medium 'daymonth' (the default: the day and its events
+// beside the month), 'agenda' (today and the next days) or 'busy' (the month shaded by how many events each day has);
+// large 'agendamonth' (the default: the day and its events over the month) or 'month' (the month with today's events
+// under it). The space is always used: with no events it says so and shows what comes next.
+const CAL_RED = '#E5484D';
+const CAL_STYLES = { s: ['day', 'month', 'weather'], m: ['daymonth', 'agenda', 'busy'], l: ['agendamonth', 'month'] };
+const calStyle = (w) => { const ok = CAL_STYLES[w.size] || CAL_STYLES.s; return ok.includes(w.opts?.style) ? w.opts.style : ok[0]; };
 const ymd = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const dayStart = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+// the events from today on, for days ahead; asked again every 5 minutes and at once when the calendars change
+// (usePimQuery follows them)
 function useEventsAhead(now, days) {
   return usePimQuery(async () => {
     try {
-      const from = new Date(now); from.setHours(0, 0, 0, 0);
-      const occ = await events.range(from.getTime(), from.getTime() + days * 86400000);
+      const from = dayStart(now);
+      const occ = await events.range(from, from + days * 86400000);
       return (occ || []).filter((o) => (o.end || o.start) >= now - 60000).sort((a, b) => a.start - b.start);
     } catch (e) { return []; }
-  }, [Math.floor(now / 3600000), days]) || [];
+  }, [Math.floor(now / 300000), days]) || [];
 }
-function MonthGrid({ L, now, busy, cell }) {
-  const d0 = new Date(now), y = d0.getFullYear(), m = d0.getMonth();
-  const first = new Date(y, m, 1), days = new Date(y, m + 1, 0).getDate();
-  const cells = [];
-  for (let i = 0; i < first.getDay(); i++) cells.push(null);
-  for (let d = 1; d <= days; d++) cells.push(d);
+const evKey = (e) => `${e.uid}${e.occ || ''}`;
+const evTime = (e) => (e.allDay ? t('shell.widgets.calendar.allDay') : `${formatTime(new Date(e.start))} – ${formatTime(new Date(e.end || e.start))}`);
+const todayOf = (ev, now) => { const a = dayStart(now), b = a + 86400000; return ev.filter((e) => e.start < b && (e.end || e.start) >= a); };
+// "Tomorrow: Dentist, 09:00", "Thursday: …", or nothing in the week
+function nextLine(ev, now) {
+  const tomorrow = dayStart(now) + 86400000;
+  const n = ev.find((e) => e.start >= tomorrow);
+  if (!n || n.start >= tomorrow + 6 * 86400000) return t('shell.widgets.calendar.nothingWeek');
+  const d = new Date(n.start);
+  const when = n.start < tomorrow + 86400000 ? t('shell.widgets.calendar.tomorrow') : weekdayName(d.getDay(), false);
+  return t('shell.widgets.calendar.next', { when, title: n.title, time: n.allDay ? t('shell.widgets.calendar.allDay') : formatTime(d) });
+}
+function CalTag({ children, color = CAL_RED, size = 11 }) {
+  return <Text style={{ fontSize: size, fontWeight: 700, color, textAlign: 'start', whiteSpace: 'nowrap' }}>{String(children).toLocaleUpperCase()}</Text>;
+}
+function DayBlock({ L, d, size = 46 }) {
   return (
-    <View style={{ direction: 'ltr' }}>
-      <View style={{ flexDirection: 'row' }}>{[0, 1, 2, 3, 4, 5, 6].map((wd) => <Text key={wd} style={{ width: cell, fontSize: 10, fontWeight: 600, textAlign: 'center', color: L.faint }}>{weekdayName(wd).slice(0, 1).toUpperCase()}</Text>)}</View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-        {cells.map((d, i) => {
-          const today = d === d0.getDate(), has = d && busy.has(ymd(new Date(y, m, d)));
-          return (
-            <View key={i} style={{ width: cell, height: cell - 4, alignItems: 'center', justifyContent: 'center' }}>
-              {d ? <View style={{ width: cell - 8, height: cell - 8, borderRadius: (cell - 8) / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: today ? '#E5484D' : 'transparent' }}>
-                <Text style={{ fontSize: 11.5, fontWeight: today ? 700 : 500, color: today ? '#ffffff' : L.text }}>{String(d)}</Text>
-                {has && !today ? <View style={{ position: 'absolute', bottom: 0, width: 4, height: 4, borderRadius: 2, backgroundColor: L.accent }} /> : null}
-              </View> : null}
-            </View>
-          );
-        })}
-      </View>
+    <View>
+      <CalTag>{weekdayName(d.getDay(), false)}</CalTag>
+      <Text style={{ fontSize: size, fontWeight: 400, color: L.text, textAlign: 'start', lineHeight: size * 1.08 }}>{String(d.getDate())}</Text>
     </View>
   );
 }
-function EventRow({ L, e }) {
+function EventRow({ L, e, compact }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center', minHeight: 30 }}>
+    <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center', minHeight: compact ? 26 : 30 }}>
       <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: e.color || L.accent }} />
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 12.5, fontWeight: 600, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{e.title}</Text>
-        <Sub L={L}>{e.allDay ? t('shell.widgets.calendar.allDay') : `${formatTime(new Date(e.start))} – ${formatTime(new Date(e.end || e.start))}`}</Sub>
+        <Text style={{ fontSize: compact ? 12 : 12.5, fontWeight: 600, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{e.title}</Text>
+        <Sub L={L}>{evTime(e)}</Sub>
       </View>
     </View>
   );
 }
+// nothing today: says so, and what comes next
+function NoneToday({ L, ev, now }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: 7, alignItems: 'center', minHeight: 30 }}>
+      <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: L.track }} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontSize: 12.5, fontWeight: 600, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{t('shell.widgets.calendar.noToday')}</Text>
+        <Sub L={L}>{nextLine(ev, now)}</Sub>
+      </View>
+    </View>
+  );
+}
+// today's events, at most max; the last line says how many more there are
+function TodayList({ L, ev, now, max, compact }) {
+  const today = todayOf(ev, now);
+  if (!today.length) return <NoneToday L={L} ev={ev} now={now} />;
+  const more = today.length - max;
+  const list = more > 0 ? today.slice(0, max - 1) : today;
+  return (
+    <View style={{ gap: compact ? 4 : 6 }}>
+      {list.map((e) => <EventRow key={evKey(e)} L={L} e={e} compact={compact} />)}
+      {more > 0 ? <Sub L={L}>{t('shell.widgets.calendar.more', { count: more + 1 })}</Sub> : null}
+    </View>
+  );
+}
+// The month: weeks from the language's first weekday, weekends dimmed, today in a red circle, a dot on a day with
+// events (or, with heat, the day shaded by how many). fill: the weeks spread over the height there is.
+function MonthGrid({ L, now, busy, font = 11, heat, fill }) {
+  const d0 = new Date(now), y = d0.getFullYear(), m = d0.getMonth();
+  const first = weekStartFor(locale.get().lang);
+  const cells = monthCells(y, m, first);
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  const wds = [0, 1, 2, 3, 4, 5, 6].map((i) => (i + first) % 7);
+  const dot = font * 1.95;
+  return (
+    <View style={{ direction: 'ltr', flex: fill ? 1 : undefined, justifyContent: fill ? 'space-between' : 'flex-start', gap: fill ? 0 : 1 }}>
+      <View style={{ flexDirection: 'row' }}>
+        {wds.map((wd) => <Text key={wd} style={{ flex: 1, fontSize: Math.max(9, font - 2), fontWeight: 700, textAlign: 'center', color: L.faint }}>{weekdayName(wd).slice(0, 1).toLocaleUpperCase()}</Text>)}
+      </View>
+      {weeks.map((wk, r) => (
+        <View key={r} style={{ flexDirection: 'row' }}>
+          {wk.map((d, i) => {
+            const wd = wds[i], today = d === d0.getDate(), n = d ? busy.get(ymd(new Date(y, m, d))) || 0 : 0;
+            const shade = heat && n && !today ? `rgba(229,72,77,${n >= 3 ? 0.55 : n === 2 ? 0.4 : 0.25})` : 'transparent';
+            return (
+              <View key={i} style={{ flex: 1, height: dot + 1, alignItems: 'center', justifyContent: 'center' }}>
+                {d ? (
+                  <View style={{ width: heat ? dot + 4 : dot, height: dot, borderRadius: today ? dot / 2 : 6, alignItems: 'center', justifyContent: 'center', backgroundColor: today ? CAL_RED : shade }}>
+                    <Text style={{ fontSize: font, fontWeight: today ? 700 : 600, color: today ? '#ffffff' : wd === 0 || wd === 6 ? L.dim : L.text }}>{String(d)}</Text>
+                    {n && !today && !heat ? <View style={{ position: 'absolute', bottom: 0, width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: L.accent }} /> : null}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+const Rule = ({ L }) => <View style={{ height: 1, backgroundColor: L.track, marginVertical: 8 }} />;
 function CalendarBody({ w, L }) {
   const now = useMinute();
   const d = new Date(now);
-  const ev = useEventsAhead(now, w.size === 'l' ? 31 : 2);
-  const busy = new Set(ev.map((o) => ymd(new Date(o.start))));
-  const dayBlock = (
-    <View style={{ gap: 0 }}>
-      <Text style={{ fontSize: 12, fontWeight: 700, color: '#E5484D', textAlign: 'start' }}>{weekdayName(d.getDay(), false).toUpperCase()}</Text>
-      <Big L={L} size={44}>{String(d.getDate())}</Big>
-    </View>
-  );
+  const style = calStyle(w);
+  const ev = useEventsAhead(now, style === 'busy' || style === 'month' || style === 'agendamonth' ? 42 : 8);
+  const busy = new Map();
+  for (const o of ev) { const k = ymd(new Date(o.start)); busy.set(k, (busy.get(k) || 0) + 1); }
+  const monthTitle = (withYear) => <CalTag>{withYear ? `${monthName(d.getMonth())} ${d.getFullYear()}` : monthName(d.getMonth())}</CalTag>;
+  if (style === 'month' && w.size === 's') {
+    return <View style={{ flex: 1, gap: 4 }}>{monthTitle(false)}<MonthGrid L={L} now={now} busy={busy} font={10} fill /></View>;
+  }
+  if (style === 'weather') return <CalendarWeather L={L} d={d} />;
   if (w.size === 's') {
+    const today = todayOf(ev, now);
+    return (
+      <View style={{ flex: 1, gap: 6 }}>
+        <DayBlock L={L} d={d} size={48} />
+        {today[0] ? <EventRow L={L} e={today[0]} compact /> : <Quiet L={L} text={t('shell.widgets.calendar.noEvents')} />}
+        <Sub L={L}>{today.length > 1 ? t('shell.widgets.calendar.more', { count: today.length - 1 }) : nextLine(ev, now)}</Sub>
+      </View>
+    );
+  }
+  if (style === 'agenda') {
+    const tomorrow = dayStart(now) + 86400000;
+    const later = ev.filter((e) => e.start >= tomorrow && e.start < tomorrow + 86400000).slice(0, 1);
     return (
       <View style={{ flex: 1, gap: 4 }}>
-        {dayBlock}
-        {ev[0] ? <EventRow L={L} e={ev[0]} /> : <Quiet L={L} text={t('shell.widgets.calendar.noEvents')} />}
+        <CalTag size={10}>{`${t('shell.widgets.calendar.today')} · ${weekdayName(d.getDay(), false)} ${d.getDate()}`}</CalTag>
+        <TodayList L={L} ev={ev} now={now} max={2} compact />
+        {later.length ? <View style={{ gap: 4, marginTop: 2 }}><CalTag size={10} color={L.dim}>{t('shell.widgets.calendar.tomorrow')}</CalTag>{later.map((e) => <EventRow key={evKey(e)} L={L} e={e} compact />)}</View> : null}
+      </View>
+    );
+  }
+  if (style === 'busy') {
+    return (
+      <View style={{ flex: 1, flexDirection: 'row', gap: 14 }}>
+        <View style={{ width: 104 }}>{monthTitle(false)}<Text style={{ fontSize: 14, fontWeight: 600, color: L.text, textAlign: 'start', marginTop: 2 }}>{weekdayName(d.getDay(), false)}</Text>
+          <Text style={{ fontSize: 46, fontWeight: 400, color: L.text, textAlign: 'start', lineHeight: 50 }}>{String(d.getDate())}</Text></View>
+        <View style={{ flex: 1, minWidth: 0 }}><MonthGrid L={L} now={now} busy={busy} font={9.5} heat fill /></View>
       </View>
     );
   }
   if (w.size === 'm') {
     return (
       <View style={{ flex: 1, flexDirection: 'row', gap: 14 }}>
-        <View style={{ width: 96 }}>{dayBlock}<Sub L={L}>{monthName(d.getMonth())}</Sub></View>
-        <View style={{ flex: 1, gap: 2, minWidth: 0 }}>{ev.length ? ev.slice(0, 3).map((e) => <EventRow key={`${e.uid}${e.occ || ''}`} L={L} e={e} />) : <Quiet L={L} text={t('shell.widgets.calendar.noEvents')} />}</View>
+        <View style={{ width: 132, gap: 6 }}><DayBlock L={L} d={d} size={42} /><TodayList L={L} ev={ev} now={now} max={2} compact /></View>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>{monthTitle(false)}<MonthGrid L={L} now={now} busy={busy} font={9.5} fill /></View>
+      </View>
+    );
+  }
+  if (style === 'month') {
+    return (
+      <View style={{ flex: 1 }}>
+        {monthTitle(true)}
+        <View style={{ height: 4 }} />
+        <MonthGrid L={L} now={now} busy={busy} font={12.5} fill />
+        <Rule L={L} />
+        {todayOf(ev, now).length ? <CalTag size={10} color={L.dim}>{t('shell.widgets.calendar.today')}</CalTag> : null}
+        <View style={{ height: 4 }} />
+        <TodayList L={L} ev={ev} now={now} max={2} compact />
       </View>
     );
   }
   return (
-    <View style={{ flex: 1, gap: 6 }}>
-      <Head L={L} title={`${monthName(d.getMonth())} ${d.getFullYear()}`} />
-      <MonthGrid L={L} now={now} busy={busy} cell={44} />
-      {ev.slice(0, 2).map((e) => <EventRow key={`${e.uid}${e.occ || ''}`} L={L} e={e} />)}
+    <View style={{ flex: 1 }}>
+      <View style={{ flexDirection: 'row', gap: 14, alignItems: todayOf(ev, now).length ? 'flex-start' : 'center' }}>
+        <DayBlock L={L} d={d} size={46} />
+        <View style={{ flex: 1, minWidth: 0, paddingTop: 2 }}><TodayList L={L} ev={ev} now={now} max={3} compact /></View>
+      </View>
+      <Rule L={L} />
+      {monthTitle(true)}
+      <View style={{ height: 4 }} />
+      <MonthGrid L={L} now={now} busy={busy} font={11.5} fill />
     </View>
   );
+}
+// small, with the weather: the month, the weekday, the day and today's forecast where the person is (when the
+// weather widget's forecasts are turned on; without them, only the day)
+function CalendarWeather({ L, d }) {
+  const on = wxOn();
+  const here = localZone();
+  const data = useWeather(here ? [here] : [], on);
+  const cur = data[here];
+  return (
+    <View style={{ flex: 1, gap: 2 }}>
+      <CalTag>{monthName(d.getMonth())}</CalTag>
+      <Text style={{ fontSize: 15, fontWeight: 600, color: L.text, textAlign: 'start' }}>{weekdayName(d.getDay(), false)}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
+        <Text style={{ fontSize: 56, fontWeight: 400, color: L.text, textAlign: 'start', lineHeight: 60 }}>{String(d.getDate())}</Text>
+        {cur && cur.c != null ? <WxGlyph code={cur.c} day={cur.d} size={32} /> : null}
+      </View>
+      {cur && cur.t != null ? <Sub L={L}>{`${tempIn(cur.t, wxUnit())}° · ${cityName(here) || ''}`}</Sub> : null}
+    </View>
+  );
+}
+function calendarMenu(w) {
+  const cur = calStyle(w);
+  return [{ label: t('shell.widgets.calendar.style'), submenu: (CAL_STYLES[w.size] || CAL_STYLES.s).map((v) => ({
+    label: t(`shell.widgets.calendar.style.${v}`), checked: v === cur, onClick: () => setDeskWidget(w.id, { opts: { style: v } }) })) }];
 }
 
 // ---- now playing, read aloud ----
@@ -1434,6 +1570,7 @@ const KIND_SIZES = { video: ['m', 's', 'l', 'xl'], timer: ['s', 'm'], recent: ['
 export const kindSizes = (type) => KIND_SIZES[type] || null;
 const KIND_MENU = {
   soundwave: soundWaveMenu,
+  calendar: calendarMenu,
   video: (w) => [
     { label: t('shell.widgets.video.setup'), onClick: () => videoSetup.set({ widget: w, set: (p) => setDeskWidget(w.id, { opts: p }) }) },
     { label: t(w.opts?.muted === false ? 'shell.widgets.video.mute' : 'shell.widgets.video.unmute'), onClick: () => setDeskWidget(w.id, { opts: { muted: w.opts?.muted !== false ? false : true } }) },
