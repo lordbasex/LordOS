@@ -12,6 +12,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Screenshots: another capture without closing the markup editor (GitHub #166).** The markup
+  editor's toolbar has **New Screenshot** (also Ctrl+N): it brings the capture panel back (entire screen, window,
+  selection, color, text, record), and the editor stays open with its picture, so you can take as many captures as
+  you need and mark each one up. Before, the panel closed at the capture and only closing the editor and opening
+  Screenshots again gave another one. (`apps/screenshots/editor.jsx` `onNewCapture`, the `screenshots.newCapture` text
+  in every language.) Checked in `screenshots_newcapture_scene.mjs`.
 - **Settings → Users: a picture for your account, chosen and fitted** (all themes). "Choose image…" opens the file
   chooser instead of a path to type; the picture (any size or format lord-media reads, turned upright) shows in a
   circle, the slider zooms and dragging places it; Save cuts that square from the full picture, scales it to 512 × 512
