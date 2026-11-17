@@ -3270,8 +3270,8 @@ static void test_image_cache(void) {
 
     /* a thumbnail: empty at first, shared, decoded off this thread to fit, its node repainted */
     Node *nd = node_new(NODE_IMAGE), *nd2 = node_new(NODE_IMAGE);
-    nd->img = image_get_thumb(real, 128);
-    nd2->img = image_get_thumb(real, 128);
+    nd->img = image_get_thumb(real, 128, NULL);
+    nd2->img = image_get_thumb(real, 128, NULL);
     CHECK(nd->img && nd->img == nd2->img, "two nodes share one thumbnail");
     int w = -1, h = -1;
     if (nd->img) image_size(nd->img, &w, &h);
@@ -3286,7 +3286,7 @@ static void test_image_cache(void) {
 
     /* a file that isn't a picture: the thumbnail fails, nothing retried, nothing kept but the entry */
     Node *bad = node_new(NODE_IMAGE);
-    bad->img = image_get_thumb("/proc/self/status", 128);
+    bad->img = image_get_thumb("/proc/self/status", 128, NULL);
     wait_thumbs(1);
     if (bad->img) image_size(bad->img, &w, &h);
     CHECK(bad->img && w == 0 && h == 0, "a file that doesn't decode stays empty");
@@ -3295,11 +3295,41 @@ static void test_image_cache(void) {
     /* still decoding when its node goes: dropped at once (a folder left before its pictures were made) */
     char many[64][PATH_MAX + 16];
     Image *pend[64];
-    for (int i = 0; i < 64; i++) { snprintf(many[i], sizeof many[i], "%s#%d", real, i); pend[i] = image_get_thumb(many[i], 64); }
+    for (int i = 0; i < 64; i++) { snprintf(many[i], sizeof many[i], "%s#%d", real, i); pend[i] = image_get_thumb(many[i], 64, NULL); }
     for (int i = 0; i < 64; i++) image_release(pend[i]);
     wait_thumbs(64);
     image_cache_stats(&n, &idle, &b);
     CHECK(n <= n0 + 1 + 1 + 64 && b - b0 == 128 * 72 * 4, "thumbnails dropped while decoding hold no pixels (%d cached)", n - n0);
+
+    /* a picture replaced under the same name (GitHub #180): another version is another thumbnail, decoded again, and
+     * the old version's, shown by nobody, goes */
+    {
+        int c0, i0, c1, i1, c2, i2;
+        size_t b1;
+        image_cache_stats(&c0, &i0, &b1);
+        Image *v1 = image_get_thumb(real, 96, "1700000000000.1000");
+        Image *v1b = image_get_thumb(real, 96, "1700000000000.1000");
+        CHECK(v1 && v1 == v1b, "the same version shares one thumbnail");
+        if (v1b) image_release(v1b);
+        wait_thumbs(1);
+        Image *v2 = image_get_thumb(real, 96, "1700000000999.2000");
+        CHECK(v2 && v2 != v1, "another version of the file: its own thumbnail");
+        int w2 = -1, h2 = -1;
+        if (v2) image_size(v2, &w2, &h2);
+        CHECK(w2 == 0 && h2 == 0, "the new version is decoded again, not the old pixels: %dx%d", w2, h2);
+        image_cache_stats(&c1, &i1, &b1);
+        CHECK(c1 == c0 + 2, "both versions cached while the old one is shown: %d", c1 - c0);
+        CHECK(wait_thumbs(1) == 1, "the new version is decoded");
+        image_release(v1);
+        image_release(v2);
+        Image *v3 = image_get_thumb(real, 96, "1700000005000.3000");
+        image_cache_stats(&c2, &i2, &b1);
+        CHECK(c2 == c0 + 1, "older versions nobody shows are dropped: %d cached", c2 - c0);
+        Image *none = image_get_thumb(real, 96, NULL);
+        CHECK(none && none != v3, "no version is its own entry");
+        image_release(v3);                     /* still decoding: dropped at once, nothing left of this block */
+        if (none) image_release(none);
+    }
 
     int idle1;
     image_cache_stats(&n, &idle1, &b);

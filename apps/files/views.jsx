@@ -273,7 +273,7 @@ export function Preview({ e, big = false, name, noRead = false }) {
   if (!e) return null;
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, padding: 16 }}>
-      {isImage(e) && !noRead ? <Image src={thumbSrc(e.path, big ? 1024 : 512)} style={{ width: '100%', flex: 1, objectFit: 'contain', borderRadius: 6 }} />
+      {isImage(e) && !noRead ? <Image src={thumbSrc(e.path, big ? 1024 : 512, e)} style={{ width: '100%', flex: 1, objectFit: 'contain', borderRadius: 6 }} />
         : text != null ? (
           <View style={{ alignSelf: 'stretch', flex: 1, borderRadius: 8, backgroundColor: t.mode === 'dark' ? '#16161a' : '#fbfbfd', border: `1px solid ${t.separator}`, padding: 12, overflow: 'hidden', direction: 'ltr' }}>
             <Text style={{ fontFamily: 'monospace', fontSize: big ? 12 : 10, color: t.text, lineHeight: big ? 17 : 14 }}>{text.split('\n').slice(0, big ? 200 : 60).join('\n')}</Text>

@@ -300,7 +300,8 @@ int   text_direction(const char *s);                       /* 1 if the first str
 #define IMG_QUEUE_MAX 8192                  /* thumbnails waiting; more are not made */
 #define IMG_THUMB_MAX 2048                  /* the largest thumbnail side */
 Image *image_get(const char *path);          /* adds a holder: image_release when done */
-Image *image_get_thumb(const char *path, int max);   /* decoded off this thread, to fit max x max; empty until then */
+#define IMG_STAMP_MAX 40                    /* a thumbnail's file version ("<mtime>.<size>") */
+Image *image_get_thumb(const char *path, int max, const char *stamp);   /* decoded off this thread, to fit max x max; empty until then */
 int    image_async_fd(void);                 /* readable when thumbnails are ready (-1 before the first) */
 int    image_async_dispatch(void);           /* puts them in; repaints their nodes; how many */
 void   image_thumb_size(int w, int h, int max, int *tw, int *th);

@@ -377,6 +377,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   takes the column of the item last clicked (while selected), else the deepest column with a selection, as Finder
   does (`columnAll` in `apps/files/colview.js`, tested by `files-colview-test`). In the list view with unfolded folders
   it selects every row shown, their items too, instead of only the top level. The Edit menu's Select All does the same.
+- **Files: a picture replaced by another one under the same name shows the new one** in its icon, the preview pane
+  and Quick Preview (GitHub #180). lord-server kept decoded thumbnails by path only, and an idle one stays cached for
+  coming back, so deleting `photo.jpg` and downloading another `photo.jpg` kept showing the first picture until
+  lord-server restarted (closing Files didn't help; opening it in Photos did). A thumbnail's src now carries the file's
+  version as listed, `thumb:<px>:<mtime>.<size>:<path>` (`thumbSrc(path, size, file)` in `sdk/filekinds.js`), and
+  `image_get_thumb` keeps thumbnails by path, size and that version, dropping the older versions nobody shows. The
+  version comes from the listing so lord-server never stats on its thread (a slow share would block it). Tested in
+  `engine-test` (`test_image_cache`) and `filekinds_test.mjs`. Files still shows a change made by another program
+  when the folder is listed again (opening it again or any change made in Files).
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.
