@@ -55,7 +55,7 @@ static void scale_tests(void) {
     CHECK(lw == 1280 && lh == 720);
     out_logical_size(1920, 1080, 133, &lw, &lh);                   /* invalid → 100 */
     CHECK(lw == 1920 && lh == 1080);
-    out_logical_size(1280, 800, 75, &lw, &lh);                     /* GitHub #158: a MacBook's 1280 × 800 at 75 % */
+    out_logical_size(1280, 800, 75, &lw, &lh);                     /* GitHub #158: a 1280 × 800 laptop at 75 % */
     CHECK(lw == 1707 && lh == 1067);
     out_logical_size(1280, 800, 80, &lw, &lh);
     CHECK(lw == 1600 && lh == 1000);

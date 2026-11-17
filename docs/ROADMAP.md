@@ -845,7 +845,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [ ] **Later, from GitHub suggestions** (maintainer's decisions 2026-11-15, "más adelante"):
   - [x] Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)), in development for 0.8.8.10:
     75 % and 80 % only, never 50 % (docs/DISPLAYS.md, "Below 100 %"); Wayland and X11 clients stay at 100 % and are drawn
-    smaller. Still to check with a screenshot on the VM and on a real 1280 × 800 MacBook.
+    smaller. Still to check with a screenshot on the VM and on a real 1280 × 800 laptop.
   - Lord Flow personalisation ([#151](https://github.com/lordbasex/LordOS/issues/151)): the menu bar at the bottom,
     window-button size, hiding the tiling submenu.
   - Copy and paste with a VMware host ([#76](https://github.com/lordbasex/LordOS/issues/76)): start Debian's

@@ -64,7 +64,7 @@ display with most of a window.
 
 ## Below 100 % (0.8.8.10, GitHub #158)
 
-A scale below 100 % gives a display more logical pixels than it has: a MacBook's 1280 × 800 at 75 % is a 1707 × 1067
+A scale below 100 % gives a display more logical pixels than it has: a 1280 × 800 laptop at 75 % is a 1707 × 1067
 desktop, at 80 % 1600 × 1000. Only **75 and 80 %** are accepted (`OUT_SCALE_SMALL_A`/`_B` in `server/src/outputs.h`,
 `out_scale_valid`); 50–70 % and 85–90 % are not, nothing rounds to them (`out_scale_round` stays at 100 and above) and
 the recommended scale never goes there. Settings → Displays offers them while the desktop stays within 2560 × 1600

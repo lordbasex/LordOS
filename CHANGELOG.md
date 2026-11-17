@@ -14,12 +14,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 - **Display scaling at 75 % and 80 %, for more space on small screens** (GitHub #158; all themes). Settings → Displays
   offers them before 100 % on displays whose desktop stays within 2560 × 1600 logical (1280 × 800, 1366 × 768, 1080p,
-  1200p, also rotated): a MacBook's 1280 × 800 at 75 % is a 1707 × 1067 desktop. They show as one more tile ("more
+  1200p, also rotated): a 1280 × 800 laptop at 75 % is a 1707 × 1067 desktop. They show as one more tile ("more
   space") and in the list, with a note saying the desktop's size and that Linux apps look a little softer. lord-server
   accepts exactly 75 and 80 (`out_scale_valid`; 50–70 % stay refused, and nothing is recommended or rounded below
   100); its drawing already handled a scale below 1 (a mirrored smaller display). Wayland clients are asked for 100 %
   (`client_pct` in `wl.c`) and X11 apps get 100 %, and LordOS draws both smaller; the pointer keeps its size. Not yet
-  checked on the VM or a real MacBook. (`server/src/outputs.c`, `outputs.h`, `server/src/wl/wl.c`,
+  checked on the VM or a real 1280 × 800 laptop. (`server/src/outputs.c`, `outputs.h`, `server/src/wl/wl.c`,
   `server/src/hw/display.c`, `sdk/displaylayout.js`, `apps/settings/Displays.jsx`, `docs/DISPLAYS.md`; tests in
   `build/outputs-test`, `build/engine-test` `test_scale_below_100`, `server/tests/display_layout_test.mjs`)
 - **Settings → Network → Wi-Fi shows which network you are on, and manages saved ones** (GitHub #167). The list is
