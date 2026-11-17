@@ -1794,6 +1794,58 @@ static void test_sound_wave(void) {
     wave_source(NULL);
 }
 
+/* Paint order and the blur cache (0.8.8.10): three frosted cards 16 px apart in a row, as Lord Workspaces' widgets.
+ * A ring changing near the edge of a card painted above its neighbour leaves the neighbour's blur alone (the change
+ * is not under it); the same change in a card painted below blurs the neighbour again; a card raised with zIndex is
+ * handled as unsure. Every frame equals a full repaint. */
+static void test_blur_order(void) {
+    enum { W = 700, H = 260 };
+    paint_multi_damage = 1;
+    ui_reset();
+    paint_blur_cache_reset();
+    paint_nviews = 1;
+    paint_views[0] = (PaintViewBox){ { 0, 0, W, H }, 0, 0, 1, 0, 0, 0 };
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff102030);
+    for (int i = 0; i < 14; i++) box_in(root, (float)(i * 50), 0, 22, H, i % 2 ? 0xffc04060 : 0xff40a0c0);
+    Node *card[3], *ring[3];
+    for (int i = 0; i < 3; i++) {
+        card[i] = box_in(root, 20 + i * (200 + 16), 40, 200, 170, 0x60ffffff);
+        sn(card[i], "backdropBlur", 30);
+        sn(card[i], "borderRadius", 22);
+        ss(card[i], "overflow", "hidden");
+        ring[i] = box_in(card[i], 4, 60, 10, 40, 0xffffffff);      /* by its left edge: inside the left card's margin */
+    }
+    sn(ring[1], "left", 186);                           /* the middle one by its right edge: under the right card's margin */
+    paint_blur_cache_on = 1;
+    render(root, W, H);
+    float card_area = 200.0f * 170.0f;
+    int bad = 0, kept = 0, reblur = 0;
+    for (int f = 0; f < 30; f++) {
+        int which = f % 3 == 2 ? 1 : 2;                 /* mostly the right card (above the middle one); sometimes the middle (below the right one) */
+        if (f == 20) sn(card[0], "zIndex", 1);          /* the left card raised above the others */
+        sn(ring[which], "backgroundColor", f % 2 ? 0xffffffff : 0xff80ff80);
+        layout_root(root, W, H);
+        int n = 0;
+        float area = 0;
+        paint_blur_cache_on = 1;
+        int r = paint_partial(root, W, H, &n, &area);
+        paint_blur_cache_on = 0;
+        if (r < 0) { bad++; continue; }
+        int where = 0, worst = full_differs(root, W, H, &where);
+        if (worst > 2) { if (bad < 3) printf("  blur order frame %d: differs by %d at %d,%d\n", f, worst, where % W, where / W); bad++; }
+        if (f < 20 && f > 1) { if (which == 2) kept += area < card_area * 0.2f; else reblur += area >= card_area; }
+    }
+    CHECK(!bad, "blur order: %d frames differ from a full repaint", bad);
+    CHECK(kept >= 11, "blur order: a change above a neighbour leaves its blur (%d frames)", kept);
+    CHECK(reblur >= 5, "blur order: a change below a neighbour blurs it again (%d frames)", reblur);
+    printf("blur order: %d of 12 changes above a neighbour stayed small, %d below re-blurred it\n", kept, reblur);
+    paint_blur_cache_on = 0;
+    paint_nviews = 0;
+    paint_blur_cache_reset();
+}
+
 static void test_damage_fuzz(void) {
     int seeds = getenv("FUZZ_SEEDS") ? atoi(getenv("FUZZ_SEEDS")) : 12, multi = 0, failed = 0;
     for (int seed = 0; seed < seeds; seed++) {
@@ -3562,6 +3614,7 @@ int main(int argc, char **argv) {
     test_damage_pipeline();
     test_blur_cache();
     test_sound_wave();
+    test_blur_order();
     test_damage_fuzz();
     CHECK(!gc_all.bad && gc_all.frames > 1000 && gc_all.partial > gc_all.frames / 2, "scissor: %d frames, %d partial, %d differ", gc_all.frames, gc_all.partial, gc_all.bad);
     printf("scissor over the damage pipeline and fuzz: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);

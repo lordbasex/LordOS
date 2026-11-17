@@ -1545,7 +1545,61 @@ static void blur_to_cache(Canvas *c, const Node *n, float x, float y, float w, f
 static uint64_t dw_anc[DW_ANC];
 static int dw_nanc;
 static uint64_t dw_cur;
-static void bc_hook(Box b) { bc_damage(b, dw_cur, dw_anc, dw_nanc < DW_ANC ? dw_nanc : DW_ANC); }
+
+/* Paint order (0.8.8.10). A change painted above a blurred node is not in what it blurs, so it keeps its cache:
+ * the Workspaces widgets sit 16 px apart, inside each other's sampling margin, and a ring changing every 3 s in one
+ * card used to blur the next one again, which grew the damage over the next, and so on over the whole column.
+ * Paint order is each parent's children in tree order, stable by zIndex (node.c); two nodes compare at the children
+ * of their deepest common ancestor. Each damage of the walk is kept with the path to its node (serial, zIndex, place
+ * among its siblings), each kept blur notes its own path when the walk passes it, and after the walk a damage near a
+ * blur invalidates it unless it comes from inside it or from above it. Anything unsure invalidates, as before: a path
+ * deeper than BC_DEPTH, more than BC_EVENTS damages, a blur the walk didn't reach, or a child of the common ancestor
+ * whose style changed (a zIndex) or whose place among its siblings changed this frame. */
+#define BC_DEPTH 48
+#define BC_EVENTS 256
+typedef struct { uint64_t s; float z; uint32_t ix; uint8_t moved; } BcStep;
+typedef struct { Box b; int depth; BcStep p[BC_DEPTH]; } BcEvent;
+static BcStep dw_path[DW_ANC], dw_me;
+static uint32_t dw_next_ix;
+static BcEvent bc_ev[BC_EVENTS];
+static int bc_nev;
+static unsigned bc_walk;
+typedef struct { unsigned walk; int depth; BcStep p[BC_DEPTH]; } BcPath;
+static BcPath bc_path[BC_MAX];                  /* parallel to bcache: each kept blur's path this walk */
+
+static void bc_hook(Box b) {
+    int nanc = dw_nanc < DW_ANC ? dw_nanc : DW_ANC;
+    if (nanc + 1 > BC_DEPTH || dw_nanc > DW_ANC || bc_nev >= BC_EVENTS) { bc_damage(b, dw_cur, dw_anc, nanc); return; }
+    BcEvent *e = &bc_ev[bc_nev++];
+    e->b = b;
+    e->depth = nanc + 1;
+    memcpy(e->p, dw_path, (size_t)nanc * sizeof *e->p);
+    e->p[nanc] = dw_me;
+}
+
+/* after the walk: what each damage does to the kept blurs near it */
+static void bc_settle(void) {
+    for (int v = 0; v < bc_nev; v++) {
+        const BcEvent *ev = &bc_ev[v];
+        for (int i = 0; i < BC_MAX; i++) {
+            BlurCache *e = &bcache[i];
+            if (!e->valid || !bc_meets(bc_near(e->box, e->blur), ev->b)) continue;
+            const BcPath *bp = &bc_path[i];
+            if (bp->walk != bc_walk || bp->depth <= 0) { e->valid = 0; continue; }
+            int l = 0, m = ev->depth < bp->depth ? ev->depth : bp->depth;
+            while (l < m && ev->p[l].s == bp->p[l].s) l++;
+            if (l == bp->depth) {                   /* the blurred node itself (invalid) or inside it (its own) */
+                if (ev->depth == bp->depth) e->valid = 0;
+                continue;
+            }
+            if (l == ev->depth || l == 0) { e->valid = 0; continue; }   /* an ancestor of it: below */
+            const BcStep *x = &ev->p[l], *y = &bp->p[l];
+            int above = !x->moved && !y->moved && (x->z > y->z || (x->z == y->z && x->ix > y->ix));
+            if (!above) e->valid = 0;
+        }
+    }
+    bc_nev = 0;
+}
 
 static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Box clip, int ord) {
     if (n->type == NODE_RAW) {
@@ -1557,6 +1611,19 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
     int dirty = parent_dirty || n->paint_dirty;
     Box cur = vis ? box_and(screen_box(n), clip) : (Box){0, 0, 0, 0};
     dw_cur = n->serial;
+    /* its step in paint order (bc_settle): a style change (a zIndex) or a new place among its siblings is unsure */
+    uint32_t my_ix = dw_next_ix;
+    BcStep me = { n->serial, n->s.z_index, my_ix, (uint8_t)(n->paint_dirty || n->walk_ix != my_ix || n->prev_box.x1 <= n->prev_box.x0) };
+    n->walk_ix = my_ix;
+    dw_me = me;
+    if (vis && n->s.backdrop_blur >= 1)
+        for (int i = 0; i < BC_MAX; i++) {
+            if (!bcache[i].px || bcache[i].id != n->serial) continue;
+            BcPath *bp = &bc_path[i];
+            bp->walk = bc_walk;
+            bp->depth = dw_nanc + 1 <= BC_DEPTH && dw_nanc <= DW_ANC ? dw_nanc + 1 : -1;
+            if (bp->depth > 0) { memcpy(bp->p, dw_path, (size_t)dw_nanc * sizeof *bp->p); bp->p[dw_nanc] = me; }
+        }
     TfSig *outer_sig = walk_sig, sig;
     if (walk_sig && vis) {
         sig_node(walk_sig, n, 0);
@@ -1614,9 +1681,11 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
                 if (e->nown < BC_OWN) e->own[e->nown++] = cur;
                 else e->nown = BC_OWN + 1;          /* too many: none of them counts */
             }
-    if (dw_nanc < DW_ANC) dw_anc[dw_nanc] = n->serial;
+    if (dw_nanc < DW_ANC) { dw_anc[dw_nanc] = n->serial; dw_path[dw_nanc] = me; }
     dw_nanc++;
+    uint32_t cix = 0;
     for (Node *c = n->first; c; c = c->next) {
+        dw_next_ix = cix++;
         int co = ord;
         if (ord == ORD_PATH) {
             if (!p) co = ORD_BEFORE;
@@ -1627,6 +1696,7 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
     }
     dw_nanc--;
     dw_cur = n->serial;
+    dw_me = me;
     if (walk_sig == &sig) {
         tf_check(n, &sig);
         /* The raster's kind changed (a blur, a terminal or an app window came into the subtree or
@@ -1918,9 +1988,13 @@ int paint_damage(Node *root) {
     if (layer.want || bc_direct) bc_drop_all();
     for (int i = 0; i < BC_MAX; i++) bcache[i].nown = 0;
     dw_nanc = 0;
+    dw_next_ix = 0;
+    bc_nev = 0;
+    bc_walk++;
     damage_hook = bc_hook;
     if (root) damage_walk(root, 0, 1, 0, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, ord);
     damage_hook = NULL;
+    bc_settle();
     for (int r = 0; r < bc_ext.n; r++)
         for (int i = 0; i < BC_MAX; i++) {
             BlurCache *e = &bcache[i];
