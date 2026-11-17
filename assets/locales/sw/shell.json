@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Hakuna kilichofunguliwa · zilizobandikwa: {apps}",
   "ws.peek.empty": "Hakuna kilichofunguliwa",
   "ws.peek.minimized": "Imepunguzwa",
+  "ws.atlas.tiling": "Mpangilio wa madirisha",
+  "ws.atlas.security": "Usalama",
   "spotlight.section.activities": "Shughuli",
   "spotlight.section.windows": "Madirisha yaliyo wazi",
   "theme.workspaces.description": "Shughuli zenye programu na mipangilio yake, upau wa muktadha, vigae kwa kila skrini na mitindo mitatu ya athari.",

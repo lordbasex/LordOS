@@ -657,6 +657,8 @@
   "ws.peek.pinned": "Tidak ada yang terbuka · disematkan: {apps}",
   "ws.peek.empty": "Tidak ada yang terbuka",
   "ws.peek.minimized": "Diminimalkan",
+  "ws.atlas.tiling": "Penataan jendela",
+  "ws.atlas.security": "Keamanan",
   "spotlight.section.activities": "Aktivitas",
   "spotlight.section.windows": "Jendela terbuka",
   "theme.workspaces.description": "Aktivitas dengan aplikasi dan tata letaknya sendiri, bilah konteks, petak per layar, dan tiga gaya efek.",

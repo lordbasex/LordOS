@@ -116,6 +116,16 @@ check('spine: the activity in view first, the new one next among the recent', st
 check('spine: the recent activity by name', [...texts].filter(([id, x]) => x === sdk.desktopName(nd) && attached(id)).length >= 1, true);
 check('back: the tiles kept', [a, b, c].map(frameOf), tileRects('split', plan(M).work, 3, 2 / 3));
 
+// the Control Atlas: a section each for the look, tiling, activities, displays, sound, network, energy and security
+state.panel.set({ name: 'control', display: M.id });
+await flush();
+const shownText = (v) => [...texts].some(([id, x]) => x === v && attached(id));
+check('control atlas: its sections', [sdk.t('settings.section.appearance'), sdk.t('shell.ws.atlas.tiling'), sdk.t('shell.ws.spine.activities'), sdk.t('settings.section.displays'),
+  sdk.t('settings.section.sound')].map(shownText), [true, true, true, true, true]);
+check('control atlas: the layout in view named', shownText(sdk.t(`shell.ws.layout.${tiler.layoutOf(desk, 'DP-2').layout}`)), true);
+state.panel.set(null);
+await flush();
+
 // Search on the display it opens for (the one under the pointer)
 state.panel.set({ name: 'search', mode: 'apps', display: L.id });
 await flush();

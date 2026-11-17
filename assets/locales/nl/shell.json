@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Niets geopend · vastgezet: {apps}",
   "ws.peek.empty": "Niets geopend",
   "ws.peek.minimized": "Geminimaliseerd",
+  "ws.atlas.tiling": "Vensterindeling",
+  "ws.atlas.security": "Beveiliging",
   "spotlight.section.activities": "Activiteiten",
   "spotlight.section.windows": "Open vensters",
   "theme.workspaces.description": "Activiteiten met eigen apps en indelingen, een contextkolom, tegelen per scherm en drie effectstijlen.",

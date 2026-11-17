@@ -664,6 +664,8 @@
   "ws.peek.pinned": "کچھ کھلا نہیں · پن کردہ: {apps}",
   "ws.peek.empty": "کچھ کھلا نہیں",
   "ws.peek.minimized": "چھوٹا کیا گیا",
+  "ws.atlas.tiling": "ونڈوز کی ترتیب",
+  "ws.atlas.security": "سیکیورٹی",
   "spotlight.section.activities": "سرگرمیاں",
   "spotlight.section.windows": "کھلی ونڈوز",
   "theme.workspaces.description": "اپنی ایپس اور ترتیبوں والی سرگرمیاں، سیاق کی پٹی، ہر ڈسپلے پر ٹائلنگ اور اثرات کے تین انداز۔",

@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Açık bir şey yok · sabitlenenler: {apps}",
   "ws.peek.empty": "Açık bir şey yok",
   "ws.peek.minimized": "Simge durumunda",
+  "ws.atlas.tiling": "Pencere döşeme",
+  "ws.atlas.security": "Güvenlik",
   "spotlight.section.activities": "Etkinlikler",
   "spotlight.section.windows": "Açık pencereler",
   "theme.workspaces.description": "Kendi uygulamaları ve düzenleri olan etkinlikler, bir bağlam şeridi, ekran başına döşeme ve üç efekt stili.",

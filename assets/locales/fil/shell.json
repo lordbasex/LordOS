@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Walang bukas · naka-pin: {apps}",
   "ws.peek.empty": "Walang bukas",
   "ws.peek.minimized": "Naka-minimize",
+  "ws.atlas.tiling": "Pag-aayos ng mga window",
+  "ws.atlas.security": "Seguridad",
   "spotlight.section.activities": "Mga aktibidad",
   "spotlight.section.windows": "Mga bukas na window",
   "theme.workspaces.description": "Mga aktibidad na may sariling app at layout, bar ng konteksto, tiling bawat display at tatlong istilo ng epekto.",

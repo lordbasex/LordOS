@@ -664,6 +664,8 @@
   "ws.peek.pinned": "কিছুই খোলা নেই · পিন করা: {apps}",
   "ws.peek.empty": "কিছুই খোলা নেই",
   "ws.peek.minimized": "ছোট করা",
+  "ws.atlas.tiling": "উইন্ডো সাজানো",
+  "ws.atlas.security": "নিরাপত্তা",
   "spotlight.section.activities": "কার্যক্রম",
   "spotlight.section.windows": "খোলা উইন্ডো",
   "theme.workspaces.description": "নিজস্ব অ্যাপ ও বিন্যাসসহ কার্যক্রম, প্রসঙ্গ বার, প্রতি ডিসপ্লেতে টাইলিং এবং তিনটি প্রভাবের ধরন।",

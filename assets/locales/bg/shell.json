@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Нищо не е отворено · закачени: {apps}",
   "ws.peek.empty": "Нищо не е отворено",
   "ws.peek.minimized": "Минимизиран",
+  "ws.atlas.tiling": "Подреждане на прозорци",
+  "ws.atlas.security": "Сигурност",
   "spotlight.section.activities": "Дейности",
   "spotlight.section.windows": "Отворени прозорци",
   "theme.workspaces.description": "Дейности със свои приложения и подредби, контекстна лента, плочки за всеки екран и три стила на ефектите.",

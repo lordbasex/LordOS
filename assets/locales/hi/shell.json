@@ -664,6 +664,8 @@
   "ws.peek.pinned": "कुछ भी खुला नहीं · पिन किए गए: {apps}",
   "ws.peek.empty": "कुछ भी खुला नहीं",
   "ws.peek.minimized": "छोटा किया गया",
+  "ws.atlas.tiling": "विंडो व्यवस्था",
+  "ws.atlas.security": "सुरक्षा",
   "spotlight.section.activities": "गतिविधियाँ",
   "spotlight.section.windows": "खुली विंडो",
   "theme.workspaces.description": "अपने ऐप्स और लेआउट वाली गतिविधियाँ, संदर्भ पट्टी, हर डिस्प्ले पर टाइलिंग और तीन प्रभाव शैलियाँ।",

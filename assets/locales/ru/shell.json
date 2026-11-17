@@ -671,6 +671,8 @@
   "ws.peek.pinned": "Ничего не открыто · закреплены: {apps}",
   "ws.peek.empty": "Ничего не открыто",
   "ws.peek.minimized": "Свёрнуто",
+  "ws.atlas.tiling": "Расположение окон",
+  "ws.atlas.security": "Безопасность",
   "spotlight.section.activities": "Занятия",
   "spotlight.section.windows": "Открытые окна",
   "theme.workspaces.description": "Занятия со своими приложениями и раскладками, контекстная панель, плитки на каждом экране и три стиля эффектов.",

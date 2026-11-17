@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Rien d’ouvert · épinglées : {apps}",
   "ws.peek.empty": "Rien d’ouvert",
   "ws.peek.minimized": "Réduite",
+  "ws.atlas.tiling": "Mosaïque de fenêtres",
+  "ws.atlas.security": "Sécurité",
   "spotlight.section.activities": "Activités",
   "spotlight.section.windows": "Fenêtres ouvertes",
   "theme.workspaces.description": "Des activités avec leurs apps et leurs dispositions, une colonne de contexte, des fenêtres en mosaïque par écran et trois styles d’effets.",

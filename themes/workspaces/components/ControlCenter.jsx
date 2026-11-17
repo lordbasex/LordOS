@@ -1,18 +1,24 @@
-// The Control Center (a popover from the spine's button, unfolding from it): a live preview of the desktop drawn with
-// the current choices, then the look (dark mode, the effects style Opaque / Translucent / Crystal, Reduce motion, the
-// accent, the wallpaper) and the quick settings Lord Flow's Control Center has: Do Not Disturb, Night Light, Bluetooth,
-// Wi-Fi (its state; a click opens Settings → Network → Wi-Fi), the screen's brightness, the volume and the power mode.
-// Everything comes from the SDK's stores (sound, Bluetooth, Night Light, notifications, power profiles); the Wi-Fi
-// state is read once when it opens, nothing polls.
+// The Control Center, the theme's Control Atlas (a popover from the spine's button, unfolding from it): a live preview
+// of the desktop drawn with the current choices, then a section each for Appearance (dark mode, Reduce motion, the
+// effects style Opaque / Translucent / Crystal, the accent, the wallpaper), Window tiling (the layout of the activity in
+// view on this display, the padlock), Activities (each one with its window count, New activity, Edit), Displays (Night
+// Light, brightness, the displays connected, the spine on every display), Sound (volume, Do Not Disturb), Network
+// (Wi-Fi, Bluetooth), Energy (the power mode) and Security (the firewall's mode, Lock Screen, Privacy). Every change
+// shows at once in the preview or on the desktop itself. Nothing here is a second copy of a device's settings: the
+// controls call the SDK (sound, Bluetooth, Night Light, notifications, power profiles, the firewall), and each section's
+// title opens its page in Settings. The Wi-Fi and firewall states are read once when it opens, nothing polls.
 import {
   View, Text, Image, Slider, Segmented, ScrollView, useSettings, settings, wm, addListener, useSound, defaultSink, sound, useBluetooth, setBluetoothPower,
   nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiBars, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, screenDisplays, usePowerProfiles, admin, t as tr,
-  MoonGlyph, SunGlyph, ContrastGlyph, BluetoothGlyph, SignalGlyph,
+  MoonGlyph, SunGlyph, ContrastGlyph, BluetoothGlyph, SignalGlyph, useStore, desktopList, desktopName, activeDesktop, switchDesktop, windows, getApp, firewall, session,
 } from '@lordos/sdk';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Surface, Crystal } from './Surface.jsx';
-import { SpeakerGlyph, Chevron } from '../glyphs.jsx';
-import { wsPrefs, optPatch, SURFACES, effectiveSurface } from '../model/activities.js';
+import { SpeakerGlyph, Chevron, LayoutMini, LAYOUT_CELLS, LockGlyph, ActivityIcon, PlusGlyph } from '../glyphs.jsx';
+import { wsPrefs, optPatch, SURFACES, effectiveSurface, MAX_ACTIVITIES } from '../model/activities.js';
+import { LAYOUTS } from '../model/layouts.js';
+import { layoutOf, setLayout, keyOfDisplay, isLocked, setLocked } from '../tiler.js';
+import { activities, newActivity } from '../state.js';
 import { tween, EASE } from '../motion.js';
 
 export const CC_W = 360;
@@ -41,6 +47,143 @@ function Switch({ t, on, label, detail, glyph, onToggle, onMore }) {
         </View>
       ) : null}
     </View>
+  );
+}
+
+// A section's title; a click opens its page in Settings.
+function Head({ t, label, onClick }) {
+  return (
+    <View onClick={onClick} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, paddingHorizontal: 2 }}>
+      <Text style={{ fontSize: 11, fontWeight: 700, color: t.textDim, letterSpacing: 0.3, textAlign: 'start' }}>{label}</Text>
+      {onClick ? <Chevron color={t.textDim} size={3.5} dir="right" /> : null}
+    </View>
+  );
+}
+
+// Window tiling: the layout of the activity in view on this display, and its padlock.
+function TilingTile({ t, display }) {
+  const desk = useStore(activeDesktop);
+  useStore(activities);
+  const key = keyOfDisplay(display);
+  const cur = layoutOf(desk, key).layout;
+  const locked = isLocked(desk, key);
+  return (
+    <Tile t={t} style={{ gap: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 6, direction: 'ltr' }}>
+        {LAYOUTS.map((l) => (
+          <View key={l} onClick={() => setLayout(desk, key, l)} title={tr(`shell.ws.layout.${l}`)}
+            style={{ flex: 1, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: l === cur ? t.accent : t.control }}>
+            <LayoutMini cells={LAYOUT_CELLS[l]} w={30} h={20} color={l === cur ? t.onAccent : t.text} fill={l === cur ? t.onAccent : t.text} active />
+          </View>
+        ))}
+      </View>
+      <Text style={{ fontSize: 11, color: t.textDim, textAlign: 'start' }}>{tr(`shell.ws.layout.${cur}`)}</Text>
+      {cur !== 'free' ? (
+        <View onClick={() => setLocked(desk, key, !locked)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 }}>
+          <LockGlyph color={locked ? t.accent : t.textDim} size={12} open={!locked} />
+          <Text style={{ fontSize: 12, color: t.text, textAlign: 'start' }}>{tr(locked ? 'shell.ws.lock.off' : 'shell.ws.lock.on')}</Text>
+        </View>
+      ) : null}
+    </Tile>
+  );
+}
+
+const ownWin = (w) => !w.pip && !(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'));
+// Activities: each one (its mark, name and windows; a click goes there), New activity and Edit.
+function ActivitiesTile({ t, onClose, onEdit }) {
+  const list = useStore(desktopList);
+  const desk = useStore(activeDesktop);
+  const meta = useStore(activities);
+  const counts = JSON.parse(useStore(windows, (all) => { const c = {}; for (const w of all) if (ownWin(w)) c[w.desktop] = (c[w.desktop] || 0) + 1; return JSON.stringify(c); }));
+  return (
+    <Tile t={t} style={{ gap: 2, padding: 6 }}>
+      {list.map((id) => {
+        const m = meta[id] || { icon: 'spark', color: t.accent };
+        return (
+          <View key={id} onClick={() => switchDesktop(id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, height: 30, paddingHorizontal: 6, borderRadius: 8,
+            backgroundColor: id === desk ? t.itemHover : 'transparent' }}>
+            <View style={{ width: 18, height: 18, borderRadius: 5, backgroundColor: m.color, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIcon icon={m.icon} color="#ffffff" bg={m.color} size={10} />
+            </View>
+            <Text style={{ flex: 1, fontSize: 12, fontWeight: id === desk ? 700 : 500, color: t.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{desktopName(id)}</Text>
+            <Text style={{ fontSize: 11, color: t.textDim }}>{counts[id] || 0}</Text>
+          </View>
+        );
+      })}
+      <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+        <View onClick={() => { if (list.length < MAX_ACTIVITIES) newActivity(); }} style={{ flex: 1, height: 28, borderRadius: 8, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: t.control, opacity: list.length < MAX_ACTIVITIES ? 1 : 0.45 }}>
+          <PlusGlyph color={t.text} size={10} />
+          <Text style={{ fontSize: 11.5, fontWeight: 600, color: t.text }}>{tr('shell.ws.activity.new')}</Text>
+        </View>
+        <View onClick={() => { onClose(); onEdit(desk); }} style={{ flex: 1, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: t.control }}>
+          <Text style={{ fontSize: 11.5, fontWeight: 600, color: t.text }}>{tr('shell.ws.activity.editTitle')}</Text>
+        </View>
+      </View>
+    </Tile>
+  );
+}
+
+// Displays: Night Light and brightness, then the displays connected and whether the spine shows on each.
+function DisplaysTile({ t, s, set, onClose, bl, night }) {
+  const list = screenDisplays();
+  return (
+    <>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Switch t={t} on={night} label={tr('shell.classic.nightLight')} glyph={(c) => <SunGlyph color={c} size={14} />}
+          onToggle={() => setNightManual(!night)} onMore={() => openSettings(onClose, 'displays')} />
+      </View>
+      <Tile t={t} style={{ gap: 8 }}>
+        {bl ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, direction: 'ltr' }}>
+            <View style={{ width: 24, alignItems: 'center' }}><SunGlyph color={t.textDim} size={13} /></View>
+            <Slider value={bl.fraction} width={250} onChange={bl.set} />
+            <Text style={{ fontSize: 11, color: t.textDim, width: 38, textAlign: 'end' }}>{`${Math.round(bl.fraction * 100)} %`}</Text>
+          </View>
+        ) : null}
+        {list.map((d) => (
+          <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ width: 18, height: 12, borderRadius: 2, border: `1.5px solid ${d.main ? t.accent : t.textDim}` }} />
+            <Text style={{ flex: 1, fontSize: 12, color: t.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{[d.name, d.connector].filter(Boolean).join(' · ') || String(d.id)}</Text>
+            <Text style={{ fontSize: 11, color: t.textDim, direction: 'ltr' }}>{`${d.w}×${d.h}`}</Text>
+          </View>
+        ))}
+        {list.length > 1 ? (
+          <View onClick={() => set(optPatch(settings.get(), 'spineEvery', !wsPrefs(s).spineEvery))} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ width: 16, height: 16, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: wsPrefs(s).spineEvery ? t.accent : t.control }}>
+              {wsPrefs(s).spineEvery ? <Text style={{ fontSize: 11, fontWeight: 700, color: t.onAccent }}>✓</Text> : null}
+            </View>
+            <Text style={{ flex: 1, fontSize: 12, color: t.text, textAlign: 'start' }}>{tr('shell.ws.opt.spineEvery')}</Text>
+          </View>
+        ) : null}
+      </Tile>
+    </>
+  );
+}
+
+// Security: the firewall's mode (read when the panel opens), Lock Screen.
+function SecurityTile({ t }) {
+  const [mode, setMode] = useState(() => (firewall.available() ? firewall.state().mode || 'silent' : null));
+  const managed = session.managed();
+  if (!mode && !managed) return null;
+  return (
+    <Tile t={t} style={{ gap: 8 }}>
+      {mode ? (
+        <>
+          <Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('monitor.status.mode')}</Text>
+          <Segmented small value={mode === 'ask' ? 'silent' : mode} onChange={(m) => { if (firewall.setMode(m) !== false) setMode(m); }}
+            options={[['silent', tr('firewall.mode.silent')], ['deny', tr('firewall.mode.deny')], ['off', tr('firewall.mode.off')]]} />
+          <Text style={{ fontSize: 11, color: t.textDim, textAlign: 'start' }}>
+            {tr(mode === 'deny' ? 'firewall.mode.denyHint' : mode === 'off' ? 'firewall.mode.offHint' : 'firewall.mode.silentHint')}</Text>
+        </>
+      ) : null}
+      {managed ? (
+        <View onClick={() => session.lock()} style={{ height: 28, borderRadius: 8, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: t.control }}>
+          <LockGlyph color={t.text} size={12} />
+          <Text style={{ fontSize: 11.5, fontWeight: 600, color: t.text }}>{tr('shell.menu.lock')}</Text>
+        </View>
+      ) : null}
+    </Tile>
   );
 }
 
@@ -106,7 +249,7 @@ function PowerRow({ t, onClose }) {
 }
 
 // anchor: { x, y, bottom } the spine button's box (the panel unfolds from it); area: its display
-export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome }) {
+export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome, onEdit = () => {} }) {
   const [s, set] = useSettings();
   const ref = useRef(null);
   const prefs = wsPrefs(s);
@@ -140,6 +283,7 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome }) {
       backgroundColor: t.panelBg, ...(t.panelBlur ? { backdropFilter: `blur(${t.panelBlur}px)` } : null) }}>
       <ScrollView style={{ flex: 1 }} contentStyle={{ padding: 12, gap: 10 }}>
         <Preview t={t} accent={t.accent} />
+        <Head t={t} label={tr('settings.section.appearance')} onClick={() => openSettings(onClose, 'appearance')} />
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Switch t={t} on={s.mode === 'dark'} label={tr('shell.cc.dark')} glyph={(c) => <ContrastGlyph color={c} size={14} />}
             onToggle={() => set({ mode: s.mode === 'dark' ? 'light' : 'dark' })} onMore={() => openSettings(onClose, 'appearance')} />
@@ -161,33 +305,6 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome }) {
             ))}
           </View>
         </Tile>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Switch t={t} on={dnd} label={tr('shell.classic.dnd')} glyph={(c, bg) => <MoonGlyph color={c} bg={bg} size={14} />}
-            onToggle={() => settings.set((x) => ({ ...x, notifications: { ...notifyPrefs(x), dnd: !dnd } }))} onMore={() => openSettings(onClose, 'notifications')} />
-          <Switch t={t} on={night} label={tr('shell.classic.nightLight')} glyph={(c) => <SunGlyph color={c} size={14} />}
-            onToggle={() => setNightManual(!night)} onMore={() => openSettings(onClose, 'displays')} />
-        </View>
-        {radios.length || bt?.adapter ? (
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {radios.length ? <Switch t={t} on={false} label={tr('shell.cc.wifi')} detail={wifi ? wifi.name : tr('shell.cc.notConnected')}
-              glyph={(c) => <SignalGlyph color={c} size={14} level={wifi ? wifiBars(wifi.signal) : 0} off={!wifi} />}
-              onToggle={() => openSettings(onClose, 'network', 'wifi')} onMore={() => openSettings(onClose, 'network', 'wifi')} /> : null}
-            {bt?.adapter ? <Switch t={t} on={!!bt.adapter.powered} label={tr('shell.cc.bluetooth')} glyph={(c) => <BluetoothGlyph color={c} size={14} />}
-              onToggle={() => setBluetoothPower(!bt.adapter.powered)} onMore={() => openSettings(onClose, 'bluetooth')} /> : null}
-          </View>
-        ) : null}
-        {soundOn || bl ? <Tile t={t} style={{ gap: 10 }}>
-          {soundOn ? <View onClick={() => openSettings(onClose, 'sound')}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('shell.cc.sound')}</Text></View> : null}
-          <SoundRow t={t} />
-          {bl ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, direction: 'ltr' }}>
-              <View style={{ width: 24, alignItems: 'center' }}><SunGlyph color={t.textDim} size={13} /></View>
-              <Slider value={bl.fraction} width={250} onChange={bl.set} />
-              <Text style={{ fontSize: 11, color: t.textDim, width: 38, textAlign: 'end' }}>{`${Math.round(bl.fraction * 100)} %`}</Text>
-            </View>
-          ) : null}
-        </Tile> : null}
-        <PowerRow t={t} onClose={onClose} />
         <Tile t={t} style={{ gap: 8 }}>
           <View onClick={() => openSettings(onClose, 'wallpaper')}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('shell.cc.wallpaper')}</Text></View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -199,6 +316,31 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome }) {
             ))}
           </View>
         </Tile>
+        <Head t={t} label={tr('shell.ws.atlas.tiling')} onClick={() => openSettings(onClose, 'dock')} />
+        <TilingTile t={t} display={area} />
+        <Head t={t} label={tr('shell.ws.spine.activities')} onClick={() => openSettings(onClose, 'dock')} />
+        <ActivitiesTile t={t} onClose={onClose} onEdit={onEdit} />
+        <Head t={t} label={tr('settings.section.displays')} onClick={() => openSettings(onClose, 'displays')} />
+        <DisplaysTile t={t} s={s} set={set} onClose={onClose} bl={bl} night={night} />
+        <Head t={t} label={tr('settings.section.sound')} onClick={() => openSettings(onClose, 'sound')} />
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Switch t={t} on={dnd} label={tr('shell.classic.dnd')} glyph={(c, bg) => <MoonGlyph color={c} bg={bg} size={14} />}
+            onToggle={() => settings.set((x) => ({ ...x, notifications: { ...notifyPrefs(x), dnd: !dnd } }))} onMore={() => openSettings(onClose, 'notifications')} />
+        </View>
+        {soundOn ? <Tile t={t} style={{ gap: 10 }}><SoundRow t={t} /></Tile> : null}
+        {radios.length || bt?.adapter ? <Head t={t} label={tr('settings.section.network')} onClick={() => openSettings(onClose, 'network')} /> : null}
+        {radios.length || bt?.adapter ? (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {radios.length ? <Switch t={t} on={false} label={tr('shell.cc.wifi')} detail={wifi ? wifi.name : tr('shell.cc.notConnected')}
+              glyph={(c) => <SignalGlyph color={c} size={14} level={wifi ? wifiBars(wifi.signal) : 0} off={!wifi} />}
+              onToggle={() => openSettings(onClose, 'network', 'wifi')} onMore={() => openSettings(onClose, 'network', 'wifi')} /> : null}
+            {bt?.adapter ? <Switch t={t} on={!!bt.adapter.powered} label={tr('shell.cc.bluetooth')} glyph={(c) => <BluetoothGlyph color={c} size={14} />}
+              onToggle={() => setBluetoothPower(!bt.adapter.powered)} onMore={() => openSettings(onClose, 'bluetooth')} /> : null}
+          </View>
+        ) : null}
+        <PowerRow t={t} onClose={onClose} />
+        {firewall.available() || session.managed() ? <Head t={t} label={tr('shell.ws.atlas.security')} onClick={() => openSettings(onClose, 'privacy')} /> : null}
+        <SecurityTile t={t} />
         <View onClick={() => openSettings(onClose, 'appearance')} style={{ height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: t.hover, border: `1px solid ${t.separator}` }}>
           <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.menu.settings')}</Text>
         </View>

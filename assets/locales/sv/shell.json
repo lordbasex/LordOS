@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Inget öppet · fästa: {apps}",
   "ws.peek.empty": "Inget öppet",
   "ws.peek.minimized": "Minimerat",
+  "ws.atlas.tiling": "Fönsterlayout",
+  "ws.atlas.security": "Säkerhet",
   "spotlight.section.activities": "Aktiviteter",
   "spotlight.section.windows": "Öppna fönster",
   "theme.workspaces.description": "Aktiviteter med egna appar och layouter, en kontextlist, sida vid sida per skärm och tre effektstilar.",

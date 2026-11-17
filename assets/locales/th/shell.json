@@ -657,6 +657,8 @@
   "ws.peek.pinned": "ไม่มีสิ่งที่เปิดอยู่ · ปักหมุด: {apps}",
   "ws.peek.empty": "ไม่มีสิ่งที่เปิดอยู่",
   "ws.peek.minimized": "ย่อแล้ว",
+  "ws.atlas.tiling": "การจัดหน้าต่าง",
+  "ws.atlas.security": "ความปลอดภัย",
   "spotlight.section.activities": "กิจกรรม",
   "spotlight.section.windows": "หน้าต่างที่เปิดอยู่",
   "theme.workspaces.description": "กิจกรรมที่มีแอปและเลย์เอาต์ของตัวเอง แถบบริบท การจัดเรียงต่อจอ และเอฟเฟกต์สามรูปแบบ",

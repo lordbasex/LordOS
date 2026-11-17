@@ -657,6 +657,8 @@
   "ws.peek.pinned": "沒有開啟的內容 · 已釘選：{apps}",
   "ws.peek.empty": "沒有開啟的內容",
   "ws.peek.minimized": "已最小化",
+  "ws.atlas.tiling": "視窗並排",
+  "ws.atlas.security": "安全性",
   "spotlight.section.activities": "活動",
   "spotlight.section.windows": "開啟的視窗",
   "theme.workspaces.description": "擁有各自 App 和版面的活動、情境側欄、依顯示器並排，以及三種效果樣式。",

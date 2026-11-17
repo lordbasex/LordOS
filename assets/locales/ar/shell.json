@@ -692,6 +692,8 @@
   "ws.peek.pinned": "لا شيء مفتوح · المثبّتة: {apps}",
   "ws.peek.empty": "لا شيء مفتوح",
   "ws.peek.minimized": "مصغّرة",
+  "ws.atlas.tiling": "ترتيب النوافذ",
+  "ws.atlas.security": "الأمان",
   "spotlight.section.activities": "الأنشطة",
   "spotlight.section.windows": "النوافذ المفتوحة",
   "theme.workspaces.description": "أنشطة بتطبيقاتها وتخطيطاتها الخاصة، وشريط سياق، ورصف لكل شاشة، وثلاثة أنماط للتأثيرات.",

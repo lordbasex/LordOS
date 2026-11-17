@@ -671,6 +671,8 @@
   "ws.peek.pinned": "Nic nie jest otwarte · przypięte: {apps}",
   "ws.peek.empty": "Nic nie jest otwarte",
   "ws.peek.minimized": "Zminimalizowane",
+  "ws.atlas.tiling": "Układ okien",
+  "ws.atlas.security": "Bezpieczeństwo",
   "spotlight.section.activities": "Aktywności",
   "spotlight.section.windows": "Otwarte okna",
   "theme.workspaces.description": "Aktywności z własnymi aplikacjami i układami, kolumna kontekstu, kafelkowanie na każdym ekranie i trzy style efektów.",

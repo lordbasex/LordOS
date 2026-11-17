@@ -671,6 +671,8 @@
   "ws.peek.pinned": "Nieko neatidaryta · prisegta: {apps}",
   "ws.peek.empty": "Nieko neatidaryta",
   "ws.peek.minimized": "Sumažintas",
+  "ws.atlas.tiling": "Langų išdėstymas",
+  "ws.atlas.security": "Sauga",
   "spotlight.section.activities": "Veiklos",
   "spotlight.section.windows": "Atviri langai",
   "theme.workspaces.description": "Veiklos su savomis programėlėmis ir išdėstymais, konteksto juosta, langų dėliojimas kiekviename ekrane ir trys efektų stiliai.",

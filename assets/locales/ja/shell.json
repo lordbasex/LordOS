@@ -657,6 +657,8 @@
   "ws.peek.pinned": "開いているものなし · ピン留め: {apps}",
   "ws.peek.empty": "開いているものなし",
   "ws.peek.minimized": "最小化",
+  "ws.atlas.tiling": "ウインドウの配置",
+  "ws.atlas.security": "セキュリティ",
   "spotlight.section.activities": "アクティビティ",
   "spotlight.section.windows": "開いているウインドウ",
   "theme.workspaces.description": "専用のアプリとレイアウトを持つアクティビティ、コンテキストバー、ディスプレイごとのタイル配置、3つのエフェクトスタイル。",

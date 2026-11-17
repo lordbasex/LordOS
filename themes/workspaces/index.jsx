@@ -284,7 +284,7 @@ function App() {
           <Layer name="overlay"><Search key={panelDisplay.id} t={t} display={panelDisplay} onClose={() => panel.set(null)} isOnChrome={isOnChrome} /></Layer>
         ) : null}
         {open?.name === 'control' ? (
-          <Layer name="popover"><ControlCenter t={t} anchor={controlAnchor()} area={panelDisplay} rtl={rtl} onClose={() => panel.set(null)} isOnChrome={isOnChrome} /></Layer>
+          <Layer name="popover"><ControlCenter t={t} anchor={controlAnchor()} area={panelDisplay} rtl={rtl} onClose={() => panel.set(null)} isOnChrome={isOnChrome} onEdit={H.edit} /></Layer>
         ) : null}
         {open?.name === 'notif' && main?.plan.top ? (
           <Layer name="popover">

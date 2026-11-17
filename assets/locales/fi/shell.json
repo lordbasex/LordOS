@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Mitään ei ole auki · kiinnitetyt: {apps}",
   "ws.peek.empty": "Mitään ei ole auki",
   "ws.peek.minimized": "Pienennetty",
+  "ws.atlas.tiling": "Ikkunoiden asettelu",
+  "ws.atlas.security": "Turvallisuus",
   "spotlight.section.activities": "Aktiviteetit",
   "spotlight.section.windows": "Avoimet ikkunat",
   "theme.workspaces.description": "Aktiviteetit omine sovelluksineen ja asetteluineen, kontekstipalkki, ruudutus näytöittäin ja kolme tehostetyyliä.",

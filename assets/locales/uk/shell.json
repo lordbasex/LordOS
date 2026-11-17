@@ -671,6 +671,8 @@
   "ws.peek.pinned": "Нічого не відкрито · закріплені: {apps}",
   "ws.peek.empty": "Нічого не відкрито",
   "ws.peek.minimized": "Згорнуто",
+  "ws.atlas.tiling": "Розташування вікон",
+  "ws.atlas.security": "Безпека",
   "spotlight.section.activities": "Заняття",
   "spotlight.section.windows": "Відкриті вікна",
   "theme.workspaces.description": "Заняття зі своїми застосунками й розкладками, контекстна панель, плитки на кожному екрані та три стилі ефектів.",

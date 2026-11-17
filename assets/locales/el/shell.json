@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Τίποτα ανοιχτό · καρφιτσωμένες: {apps}",
   "ws.peek.empty": "Τίποτα ανοιχτό",
   "ws.peek.minimized": "Ελαχιστοποιημένο",
+  "ws.atlas.tiling": "Παράθεση παραθύρων",
+  "ws.atlas.security": "Ασφάλεια",
   "spotlight.section.activities": "Δραστηριότητες",
   "spotlight.section.windows": "Ανοιχτά παράθυρα",
   "theme.workspaces.description": "Δραστηριότητες με δικές τους εφαρμογές και διατάξεις, στήλη πλαισίου, πλακίδια ανά οθόνη και τρία στιλ εφέ.",

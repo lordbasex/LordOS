@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Niente di aperto · fissate: {apps}",
   "ws.peek.empty": "Niente di aperto",
   "ws.peek.minimized": "Ridotta",
+  "ws.atlas.tiling": "Affiancamento finestre",
+  "ws.atlas.security": "Sicurezza",
   "spotlight.section.activities": "Attività",
   "spotlight.section.windows": "Finestre aperte",
   "theme.workspaces.description": "Attività con le proprie app e disposizioni, una colonna di contesto, finestre affiancate per schermo e tre stili di effetti.",

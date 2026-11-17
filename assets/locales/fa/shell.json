@@ -664,6 +664,8 @@
   "ws.peek.pinned": "چیزی باز نیست · سنجاق‌شده: {apps}",
   "ws.peek.empty": "چیزی باز نیست",
   "ws.peek.minimized": "کوچک‌شده",
+  "ws.atlas.tiling": "چیدمان پنجره‌ها",
+  "ws.atlas.security": "امنیت",
   "spotlight.section.activities": "فعالیت‌ها",
   "spotlight.section.windows": "پنجره‌های باز",
   "theme.workspaces.description": "فعالیت‌هایی با برنامه‌ها و چیدمان‌های خودشان، نوار زمینه، چیدن پنجره‌ها برای هر نمایشگر و سه سبک جلوه.",

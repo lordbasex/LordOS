@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Res obert · fixades: {apps}",
   "ws.peek.empty": "Res obert",
   "ws.peek.minimized": "Minimitzada",
+  "ws.atlas.tiling": "Mosaic de finestres",
+  "ws.atlas.security": "Seguretat",
   "spotlight.section.activities": "Activitats",
   "spotlight.section.windows": "Finestres obertes",
   "theme.workspaces.description": "Activitats amb les seves apps i disposicions, una columna de context, mosaic per pantalla i tres estils d’efectes.",

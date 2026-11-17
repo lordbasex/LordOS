@@ -657,6 +657,8 @@
   "ws.peek.pinned": "没有打开的内容 · 已固定：{apps}",
   "ws.peek.empty": "没有打开的内容",
   "ws.peek.minimized": "已最小化",
+  "ws.atlas.tiling": "窗口平铺",
+  "ws.atlas.security": "安全",
   "spotlight.section.activities": "活动",
   "spotlight.section.windows": "打开的窗口",
   "theme.workspaces.description": "拥有各自应用和布局的活动、情境侧栏、按显示器平铺以及三种效果样式。",

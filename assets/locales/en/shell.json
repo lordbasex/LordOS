@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Nothing open · pinned: {apps}",
   "ws.peek.empty": "Nothing open",
   "ws.peek.minimized": "Minimized",
+  "ws.atlas.tiling": "Window tiling",
+  "ws.atlas.security": "Security",
   "spotlight.section.activities": "Activities",
   "spotlight.section.windows": "Open windows",
   "theme.workspaces.description": "Activities with their own apps and layouts, a Context Spine, tiling per display and three effects styles.",

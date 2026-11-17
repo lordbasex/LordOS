@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Semmi sincs megnyitva · rögzítve: {apps}",
   "ws.peek.empty": "Semmi sincs megnyitva",
   "ws.peek.minimized": "Kis méretre állítva",
+  "ws.atlas.tiling": "Ablakok elrendezése",
+  "ws.atlas.security": "Biztonság",
   "spotlight.section.activities": "Tevékenységek",
   "spotlight.section.windows": "Nyitott ablakok",
   "theme.workspaces.description": "Tevékenységek saját appokkal és elrendezésekkel, kontextussáv, kijelzőnkénti csempézés és három effektusstílus.",

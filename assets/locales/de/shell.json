@@ -664,6 +664,8 @@
   "ws.peek.pinned": "Nichts geöffnet · angeheftet: {apps}",
   "ws.peek.empty": "Nichts geöffnet",
   "ws.peek.minimized": "Minimiert",
+  "ws.atlas.tiling": "Fensteranordnung",
+  "ws.atlas.security": "Sicherheit",
   "spotlight.section.activities": "Aktivitäten",
   "spotlight.section.windows": "Offene Fenster",
   "theme.workspaces.description": "Aktivitäten mit eigenen Apps und Layouts, eine Kontextleiste, Kacheln pro Bildschirm und drei Effektstile.",

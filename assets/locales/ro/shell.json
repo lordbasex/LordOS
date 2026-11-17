@@ -671,6 +671,8 @@
   "ws.peek.pinned": "Nimic deschis · fixate: {apps}",
   "ws.peek.empty": "Nimic deschis",
   "ws.peek.minimized": "Minimizată",
+  "ws.atlas.tiling": "Aranjarea ferestrelor",
+  "ws.atlas.security": "Securitate",
   "spotlight.section.activities": "Activități",
   "spotlight.section.windows": "Ferestre deschise",
   "theme.workspaces.description": "Activități cu propriile aplicații și aranjamente, o coloană de context, așezare pe fiecare ecran și trei stiluri de efecte.",
