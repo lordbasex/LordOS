@@ -30,7 +30,7 @@ import { wsPrefs, optPatch, effectiveSurface, needsOnboarding } from './model/ac
 import { minimizeStarts } from '../default/minimize.js';
 import { startGroups, groupHidden, showGroup } from './state.js';
 import { activities, panel, deleting, startActivities, updateActivity, setUpActivity, activityOf, noteLaunch, newActivity } from './state.js';
-import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked } from './tiler.js';
+import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked, aimLaunch } from './tiler.js';
 import { startMagnet } from './magnet.js';
 import { barFocus, setBarItems, enterBars, leaveBars, barKey } from './barfocus.js';
 import { recentActivities } from './state.js';
@@ -80,7 +80,7 @@ const H = {
   crown: (e) => crownMenu.set({ x: e.x + 8, y: e.y + 8 }),
   activities: () => { panel.set(null); toggleOverview(); },
   apps: (e) => { if (e) noteLaunch(e.x, e.y); panel.set((p) => (p?.name === 'search' && p.mode === 'apps' ? null : { name: 'search', mode: 'apps', display: pointerDisplay().id })); },
-  files: (e) => { if (e) noteLaunch(e.x, e.y); launchApp('files'); },
+  files: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay()); launchApp('files'); },
   control: () => panel.set((p) => (p?.name === 'control' ? null : { name: 'control', display: pointerDisplay().id })),
   notif: () => panel.set((p) => (p?.name === 'notif' ? null : { name: 'notif', display: mainDisplay().id })),
   volume: () => panel.set((p) => (p?.name === 'volume' ? null : { name: 'volume', display: mainDisplay().id })),

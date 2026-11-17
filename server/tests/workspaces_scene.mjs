@@ -717,4 +717,26 @@ check('idle again: still no timer every second', intervals(1000), 0);
   check('group: removed, every window back in the activity', [state.groupsOf(desk).length, [a, b, c].every((id) => !sdk.wm.get(id).minimized), state.windowGroups.get().get(c), state.groupHidden.get().size], [0, true, null, 0]);
 }
 
+// launched from a display (its frame's + or Add window, its pinned apps, Search opened there): the window shows on it,
+// whatever display the app's saved layout names or where it first appeared
+{
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  await flush();
+  tiler.aimLaunch(L);
+  const la = sdk.wm.open('extra2', { frame: { x: M.x + 200, y: 200, w: 500, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('aim: a tiled display takes the new window', sdk.displayFor(frameOf(la))?.id, L.id);
+  tiler.setLayout(desk, 'DP-1', 'free');
+  await flush();
+  tiler.aimLaunch(L);
+  const lb = sdk.wm.open('extra3', { frame: { x: M.x + 300, y: 250, w: 500, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('aim: a free display too, in its middle', sdk.displayFor(frameOf(lb))?.id, L.id);
+  const lc = sdk.wm.open('extra4', { frame: { x: M.x + 300, y: 250, w: 500, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('aim: only the launch it was for', sdk.displayFor(frameOf(lc))?.id, M.id);
+  for (const id of [la, lb, lc]) sdk.wm.close(id, true);
+  await flush();
+}
+
 process.exit(0);

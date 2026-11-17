@@ -196,6 +196,10 @@ displays do. Nothing runs per frame, nothing polls.
 
 ## Several displays
 
+**Where a new window opens.** Launched from a display (its frame's + and Add window, its pinned apps, Files on the
+spine, Search opened on it), the app's next new window goes to that display, in its tiles or, with the free layout, in
+its middle; whatever display the app's saved layout names or where another has room (`aimLaunch`, `tiler.js`).
+
 The maintainer's main case is one activity spanning all his monitors (three 1080p displays daily), and that is the
 default:
 

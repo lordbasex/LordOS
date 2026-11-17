@@ -11,7 +11,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { ActivityIcon, PlusGlyph, SaveGlyph, MoveGlyph, LockGlyph, LayoutMini, LAYOUT_CELLS } from '../glyphs.jsx';
 import { LAYOUTS, splitterAt, ratioFrom, TILE_GAP } from '../model/layouts.js';
-import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled } from '../tiler.js';
+import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled, aimLaunch } from '../tiler.js';
 import { Surface } from './Surface.jsx';
 import { noteLaunch, groupHidden, activities } from '../state.js';
 
@@ -190,7 +190,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
         {pins.length ? (
           <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 3, borderRadius: 12, backgroundColor: t.chipBg }}>
             {pins.map((a) => (
-              <View key={a.id} title={a.name} onClick={(e) => { noteLaunch(e.x, e.y); launchApp(a.id); }}
+              <View key={a.id} title={a.name} onClick={(e) => { noteLaunch(e.x, e.y); aimLaunch(d); launchApp(a.id); }}
                 style={{ width: 26, height: 26, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }}>
                 <a.Icon size={18} />
               </View>
@@ -250,7 +250,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
                 </View>
               ) : null}
               {pins.length ? (
-                <View onClick={(e) => { noteLaunch(e.x, e.y); for (const a of pins) launchApp(a.id); }}
+                <View onClick={(e) => { noteLaunch(e.x, e.y); aimLaunch(d, pins.length); for (const a of pins) launchApp(a.id); }}
                   style={{ height: 32, paddingHorizontal: 14, borderRadius: 10, justifyContent: 'center', backgroundColor: t.hover, border: `1px solid ${t.separator}` }}>
                   <Text style={{ fontSize: 12.5, fontWeight: 600, color: t.frameText }}>{tr('shell.ws.empty.openPins')}</Text>
                 </View>

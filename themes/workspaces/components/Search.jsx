@@ -8,6 +8,7 @@ import {
   View, Text, Image, ScrollView, SearchField, addListener, useStore, useLauncherApps, launchApp, searchEverything, tOptional, desktopList, desktopName,
   activeDesktop, switchDesktop, compareNames, t as tr,
 } from '@lordos/sdk';
+import { aimLaunch } from '../tiler.js';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Surface } from './Surface.jsx';
 import { ActivityIcon, FolderGlyph, PageGlyph, SearchGlyph } from '../glyphs.jsx';
@@ -81,6 +82,8 @@ export function Search({ t, display, onClose, isOnChrome }) {
     if (e) noteLaunch(e.x, e.y);
     else noteLaunch(display.x + display.w / 2, display.y + display.h * 0.3);
     onClose();
+    // an app opened from here shows on this display (the one the panel opened on), wherever there is room
+    if (entry.app || String(entry.it?.key || '').startsWith('app:')) aimLaunch(display);
     if (entry.app) launchApp(entry.app.id);
     else searchEverything.run(entry.it);
   };

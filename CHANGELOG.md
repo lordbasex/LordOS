@@ -39,6 +39,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     unchanged): the arrows, Tab, Home and End go from one control to the next with a visible ring, Enter or Space
     presses it, Escape gives the keyboard back. ❖1…❖9 show activity 1 to 9; ❖Tab and ❖⇧Tab, the next and the previous
     activity, when Settings → Keyboard puts the app switcher on ⌥Tab.
+  - **An app opens on the display it was asked from:** a display's frame + and Add window (through Search), its
+    pinned apps, Files on the spine and Search opened on a display send the next new window (or as many as were
+    launched) to that display, whatever display the app's saved layout names or where another display has room; with
+    a free layout it opens in that display's middle (`aimLaunch` in `tiler.js`, for 30 s).
   - **The status cluster:** the speaker opens its own panel where the notifications do (the level with a slider and
     mute, the outputs when there are several, Sound settings) instead of the Control Center; the status items' panels
     (Cloud, Cleaner…) open there too, under the band at its far edge (`setStatusPanelPlacer` in `sdk/statusitems.js`;

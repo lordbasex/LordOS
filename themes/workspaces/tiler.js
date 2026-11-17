@@ -18,7 +18,7 @@
 // and an app that answers with another size (a minimum size, a character grid) keeps it and stays in its tile
 // (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
 // changes the windows meanwhile: past that the pass waits a second.
-import { windows, locksChanged, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore } from '@lordos/sdk';
+import { windows, locksChanged, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm } from '@lordos/sdk';
 import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn, dropInto, slotAt, dropSlot, slotLimits, trimSlots } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { activities, activityOf, updateActivity } from './state.js';
@@ -31,6 +31,15 @@ const order = new Map();             // `${desk}|${dkey}` → the tiles' slots i
 const hints = new Map();             // window id → { dk, x, y, t }: where the person dropped it, as the target preview showed
 const slotAsks = new Map();          // window id → { dk, at }: put it in slot `at` of display dk (the layout flyout)
 const lastMin = new Map();
+// Where the next windows launched from a display go (its frame's + and Add window, its pinned apps, Search opened on
+// it): that display, whatever display the app's saved layout names and wherever there is free room. n windows, the
+// ones that weren't open at the time, within AIM_MS (a Linux app can take a while to show its first window).
+let aim = null;                      // { dk, n, before: Set of window ids, t }
+const AIM_MS = 30000;
+export function aimLaunch(display, n = 1) {
+  if (!display) return;
+  aim = { dk: keyOfDisplay(display), n: Math.max(1, n), before: new Set(windows.get().map((w) => w.id)), t: Date.now() };
+}
 const prefer = new Set();            // windows to show in their slot at the next pass (maximized into One at a time)           // window id → minimized at the last pass (a window brought back takes its slot again)
 // windows whose tile is smaller than their minimum size (the frame says so), and a revision for the UI
 export const tiled = createStore({ rev: 0, tight: [], counts: {}, holes: {} });
@@ -227,6 +236,19 @@ export function retile() {
     // a floating window belongs to the display it is on now (a new layout there takes it back)
     if (floating.has(w.id)) { home.set(w.id, keyOfDisplay(displayFor(wFrame(w)))); continue; }
     let dk = home.get(w.id);
+    if (!dk && aim && !aim.before.has(w.id) && now - aim.t < AIM_MS && keys.includes(aim.dk)) {
+      // launched from that display: it goes there (with a free layout, to its middle)
+      dk = aim.dk;
+      aim.before.add(w.id);
+      if (--aim.n <= 0) aim = null;
+      home.set(w.id, dk);
+      const d = disp[keys.indexOf(dk)], f = wFrame(w);
+      if (layoutOf(desk, dk).layout === 'free' && keyOfDisplay(displayFor(f)) !== dk) {
+        const a = workAreaOf(d), fw = Math.min(f.w, a.w), fh = Math.min(f.h, a.h);
+        const to = { x: Math.round(a.x + (a.w - fw) / 2), y: Math.round(a.y + (a.h - fh) / 2), w: fw, h: fh };
+        setTimeout(() => wm.setFrame(w.id, to), 0);
+      }
+    }
     if (!dk || !keys.includes(dk)) {
       dk = homeFor(launcherIdOf(w), saved, keys) || keyOfDisplay(displayFor(wFrame(w)));
       if (!keys.includes(dk)) dk = mk;
