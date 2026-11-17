@@ -226,7 +226,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
         style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 8, backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
         {atStart ? buttons : <View style={{ width: 4 }} />}
         {group ? (
-          <View title={desktopName(win.desktop)} style={{ width: 16, height: 16, borderRadius: 5, backgroundColor: gColor, alignItems: 'center', justifyContent: 'center', opacity: focused ? 1 : 0.7 }}>
+          <View title={desktopName(win.desktop)} style={{ width: 16, height: 16, borderRadius: 5, backgroundColor: gColor, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIcon icon={gIcon} color="#ffffff" bg={gColor} size={9} />
           </View>
         ) : null}

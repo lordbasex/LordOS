@@ -13,7 +13,7 @@ import { ActivityIcon, PlusGlyph, SaveGlyph, MoveGlyph, LockGlyph, LayoutMini, L
 import { LAYOUTS, splitterAt, ratioFrom, TILE_GAP } from '../model/layouts.js';
 import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled } from '../tiler.js';
 import { Surface } from './Surface.jsx';
-import { noteLaunch, groupHidden } from '../state.js';
+import { noteLaunch, groupHidden, activities } from '../state.js';
 
 const alpha = (hex, a) => `${hex}${Math.round(a * 255).toString(16).padStart(2, '0')}`;
 
@@ -98,6 +98,17 @@ const FrameBox = memo(function FrameBox({ t, f }) {
 // minimized window keeps its frame, so it stays on the display it was on and comes back there.
 const minimizedOn = (desk, d, hid) => (ws) => ws.filter((w) => w.desktop === desk && w.minimized && !w.pip && !hid.has(w.id) && tileable({ ...w, minimized: false, maximized: false })
   && displayFor(w)?.id === d.id).map((w) => w.id).join('\n');
+// The icon of one activity in the frame header (in its colour), redrawn only when that activity's icon or colour changes.
+const HeaderIcon = memo(function HeaderIcon({ id, t, shown }) {
+  const k = useStore(activities, (m) => (m[id] ? `${m[id].icon}|${m[id].color}` : 'spark|#7C5CFF'));
+  const [icon, color] = k.split('|');
+  return (
+    <View style={{ display: shown ? 'flex' : 'none', width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: alpha(color, 0.22) }}>
+      <ActivityIcon icon={icon} color={color} bg={t.solidBg} size={14} />
+    </View>
+  );
+});
+
 // where each display's tray is, for the minimize effect (index.jsx): display id → the tray's node
 export const trayNodes = new Map();
 
@@ -127,6 +138,7 @@ function MinimizedTray({ t, d, ids }) {
 const countOn = (desk, d) => (ws) => ws.filter((w) => w.desktop === desk && !w.minimized && !w.fullscreen && !w.pip && tileable({ ...w, maximized: false }) && displayFor(w)?.id === d.id).length;
 
 export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, desk, meta, multi, canMove, onAddWindow, onAddWidget, onAddWebApp, onEdit, showEmpty }) {
+  const deskList = useStore(desktopList);
   const count = useStore(windows, countOn(desk, d));
   const hid = useStore(groupHidden);           // windows another group hid aren't in the tray (state.js, groups)
   const minIds = useStore(windows, minimizedOn(desk, d, hid));
@@ -167,9 +179,8 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
       <FrameBox t={t} f={f} />
       <View style={{ position: 'absolute', left: hd.x, top: hd.y, width: hd.w, height: hd.h, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4, pointerEvents: 'box-none' }}>
         <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 8, paddingStart: 4, paddingEnd: 12, borderRadius: 12, backgroundColor: t.chipBg, flexShrink: 1, minWidth: 0 }}>
-          <View style={{ width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: alpha(meta.color, 0.22) }}>
-            <ActivityIcon icon={meta.icon} color={meta.color} bg={t.solidBg} size={14} />
-          </View>
+          {/* every activity's icon stays drawn, the one in view shown: a switch changes two styles, not the glyph's nodes */}
+          {deskList.map((id) => <HeaderIcon key={id} id={id} t={t} shown={id === desk} />)}
           <View onDoubleClick={() => onEdit(desk)} style={{ flexShrink: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 14, fontWeight: 700, color: t.frameText, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>
               {multi ? tr('shell.ws.frame.onDisplay', { activity: desktopName(desk), display: dname || d.name || String(d.id) }) : desktopName(desk)}

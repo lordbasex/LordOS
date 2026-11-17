@@ -37,13 +37,14 @@ const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, an
   );
 });
 
-// The activity in view and the recent ones: each one's icon on a tile of its colour.
+// The activity in view and the recent ones: each one's icon on a tile of its colour. One keyed list, so a switch moves
+// two tiles and changes a few styles (size, ring) instead of drawing icons again (docs/WORKSPACES.md, "Performance").
 function ActivityTile({ t, id, size, ring }) {
   const m = activityOf(id);
   return (
     <View style={{ width: size, height: size, borderRadius: size * 0.3, backgroundColor: m.color, alignItems: 'center', justifyContent: 'center',
-      ...(ring ? { border: `2px solid ${t.solidBg}`, boxShadow: `0 0 0 2px ${m.color}` } : null) }}>
-      <ActivityIcon icon={m.icon} color="#ffffff" bg={m.color} size={Math.round(size * 0.55)} />
+      border: `2px solid ${ring ? t.text : m.color}` }}>
+      <ActivityIcon icon={m.icon} color="#ffffff" bg={m.color} size={12} />
     </View>
   );
 }
@@ -52,16 +53,15 @@ const Activities = memo(function Activities({ t, expanded, room, desk, onEditAct
   useStore(activities);
   useStore(desktopNames);
   const recent = useStore(recentActivities).filter((id) => id !== desk).slice(0, room);
+  const order = [desk, ...recent];
   return (
     <>
-      <Item t={t} expanded={expanded} fid="current" label={desktopName(desk)} active={false} onClick={() => onEditActivity(desk)}
-        glyph={() => <ActivityTile t={t} id={desk} size={22} ring />} />
-      {recent.length ? <Text style={{ fontSize: 9, fontWeight: 700, color: t.textDim, marginTop: 4, letterSpacing: 0.4, opacity: expanded ? 1 : 0, height: expanded ? 'auto' : 2 }}>
-        {expanded ? tr('shell.ws.spine.recent') : ''}</Text> : null}
-      {recent.map((id) => (
-        <Item key={id} t={t} expanded={expanded} small fid={`recent:${id}`} label={desktopName(id)} active={false} onClick={() => onActivity(id)}
-          glyph={() => <ActivityTile t={t} id={id} size={18} />} />
-      ))}
+      {order.flatMap((id, i) => [
+        <Item key={id} t={t} expanded={expanded} small fid={i === 0 ? 'current' : `recent:${id}`} label={desktopName(id)} active={false}
+          onClick={() => (i === 0 ? onEditActivity(id) : onActivity(id))} glyph={() => <ActivityTile t={t} id={id} size={20} ring={i === 0} />} />,
+        ...(i === 0 && recent.length && expanded ? [<Text key="recent-label" style={{ fontSize: 9, fontWeight: 700, color: t.textDim, marginTop: 4, letterSpacing: 0.4 }}>
+          {tr('shell.ws.spine.recent')}</Text>] : []),
+      ])}
       <View style={{ alignSelf: 'stretch', height: 1, marginHorizontal: 14, marginVertical: 6, backgroundColor: t.barSeparator }} />
     </>
   );

@@ -345,8 +345,8 @@ windows; numbers, not checks):
 |---|---|---|---|
 | A window's title, ×10 | 10 | 10 | 10 |
 | The window in front, ×10 | 160 | 290 | 210 |
-| A window opened and closed | 206 | 247 | 233 |
-| Desktop / activity switches, ×4 | 44 | 68 | 352 |
+| A window opened and closed | 206 | 247 | 287 |
+| Desktop / activity switches, ×4 | 44 | 68 | 212 (352 in 0.8.8.10's first drafts) |
 | Intervals alive at rest | 250 ms, 1 s (the clock), 2 s | 250 ms, 1 s (the clock), 2 s, 5 s (the network glyph) | 250 ms (the SDK's) |
 | Timer wake-ups per minute at rest | 330 | 342 | 240 (+1 for the clock) |
 
@@ -361,8 +361,11 @@ What these say:
 - **Activity switches** cost about the same as a desktop switch in Lord Flow and Lord Classic (within their run-to-run
   spread), with the glide added after the windows' slide; they don't beat them yet. Earlier drafts were several times as costly (scaling the display-sized group frame, a scrim
   over the work area, changes inside the spine's blur margin); each of those was measured and removed.
-- **In native calls** a switch costs more than in Flow and Classic: the header shows the activity's name, icon, pins
-  and layout, which change with it.
+- **In native calls** a switch costs more than in Flow and Classic: the spine, the strip and the frame header show the
+  activity in view (its icon, name, pins and layout), so they change with it. What changes is kept to styles: every
+  activity's icon stays drawn in the header and only the one in view shows, the spine's activities are one keyed list
+  (a switch moves two tiles and recolours their outline), a pill's window count is hidden rather than removed. That
+  took a switch from 352 calls ×4 to 212, though the spine now also shows the recent activities.
 
 ## Changed from the proposal
 

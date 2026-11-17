@@ -149,11 +149,10 @@ const Pill = memo(function Pill({ t, id, active, glide, name, meta, count, onMen
         backgroundColor: active ? (glide ? 'transparent' : t.accent) : hover ? t.itemHover : 'transparent' }}>
       <ActivityIcon icon={meta.icon} color={active ? t.onAccent : meta.color} bg={active ? t.accent : t.solidBg} size={13} />
       <Text style={{ fontSize: 12.5, fontWeight: 600, color: fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{name}</Text>
-      {!active && count ? (
-        <View style={{ minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: t.itemHover, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 10, fontWeight: 700, color: t.textDim }}>{count}</Text>
-        </View>
-      ) : null}
+      {/* kept drawn and hidden on the pill in view: a switch changes its display, not its nodes */}
+      <View style={{ display: !active && count ? 'flex' : 'none', minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: t.itemHover, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontSize: 10, fontWeight: 700, color: t.textDim }}>{count || ''}</Text>
+      </View>
       <FocusRing t={t} fid={`pill:${id}`} radius={BAR_ITEM / 2} />
     </View>
   );
