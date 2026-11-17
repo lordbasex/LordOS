@@ -663,6 +663,8 @@
   "ws.search.activitySub": "Дейност {pos} · отворени прозорци: {n}",
   "ws.shortcuts.spine": "Свий или разгъни контекстната лента",
   "ws.shortcuts.bars": "Преместване на клавиатурата към страничната лента и лентата с дейности",
+  "ws.shortcuts.activityN": "Към дейност от 1 до 9",
+  "ws.shortcuts.activityTab": "Следваща или предишна дейност",
   "ws.peek.windows": "Прозорци: {n}",
   "ws.peek.more": "Още прозорци: {n}",
   "ws.peek.pinned": "Нищо не е отворено · закачени: {apps}",

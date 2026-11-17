@@ -691,6 +691,8 @@
   "ws.search.activitySub": "النشاط {pos} · النوافذ المفتوحة: {n}",
   "ws.shortcuts.spine": "طي شريط السياق أو توسيعه",
   "ws.shortcuts.bars": "نقل لوحة المفاتيح إلى الشريط الجانبي وشريط الأنشطة",
+  "ws.shortcuts.activityN": "الانتقال إلى النشاط من 1 إلى 9",
+  "ws.shortcuts.activityTab": "النشاط التالي أو السابق",
   "ws.peek.windows": "النوافذ: {n}",
   "ws.peek.more": "نوافذ أخرى: {n}",
   "ws.peek.pinned": "لا شيء مفتوح · المثبّتة: {apps}",

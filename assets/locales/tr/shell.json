@@ -663,6 +663,8 @@
   "ws.search.activitySub": "Etkinlik {pos} · açık pencere: {n}",
   "ws.shortcuts.spine": "Bağlam şeridini daralt veya genişlet",
   "ws.shortcuts.bars": "Klavyeyi yan çubuğa ve etkinlik çubuğuna taşı",
+  "ws.shortcuts.activityN": "1–9. etkinliğe git",
+  "ws.shortcuts.activityTab": "Sonraki veya önceki etkinlik",
   "ws.peek.windows": "Pencereler: {n}",
   "ws.peek.more": "Diğer pencereler: {n}",
   "ws.peek.pinned": "Açık bir şey yok · sabitlenenler: {apps}",

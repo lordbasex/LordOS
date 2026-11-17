@@ -670,6 +670,8 @@
   "ws.search.activitySub": "Заняття {pos} · відкритих вікон: {n}",
   "ws.shortcuts.spine": "Згорнути або розгорнути контекстну панель",
   "ws.shortcuts.bars": "Перевести клавіатуру на бічну панель і панель занять",
+  "ws.shortcuts.activityN": "Перейти до заняття 1–9",
+  "ws.shortcuts.activityTab": "Наступне або попереднє заняття",
   "ws.peek.windows": "Вікна: {n}",
   "ws.peek.more": "Ще вікна: {n}",
   "ws.peek.pinned": "Нічого не відкрито · закріплені: {apps}",

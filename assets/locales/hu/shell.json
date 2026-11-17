@@ -663,6 +663,8 @@
   "ws.search.activitySub": "{pos}. tevékenység · nyitott ablakok: {n}",
   "ws.shortcuts.spine": "A kontextussáv összecsukása vagy kinyitása",
   "ws.shortcuts.bars": "Billentyűzet áthelyezése az oldalsávra és a tevékenységsávra",
+  "ws.shortcuts.activityN": "Ugrás az 1–9. tevékenységre",
+  "ws.shortcuts.activityTab": "Következő vagy előző tevékenység",
   "ws.peek.windows": "Ablakok: {n}",
   "ws.peek.more": "További ablakok: {n}",
   "ws.peek.pinned": "Semmi sincs megnyitva · rögzítve: {apps}",

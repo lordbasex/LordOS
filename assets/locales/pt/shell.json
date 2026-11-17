@@ -663,6 +663,8 @@
   "ws.search.activitySub": "Atividade {pos} · janelas abertas: {n}",
   "ws.shortcuts.spine": "Recolher ou expandir a coluna de contexto",
   "ws.shortcuts.bars": "Levar o teclado para o Spine e a barra de atividades",
+  "ws.shortcuts.activityN": "Ir para a atividade 1 a 9",
+  "ws.shortcuts.activityTab": "Atividade seguinte ou anterior",
   "ws.peek.windows": "Janelas: {n}",
   "ws.peek.more": "Mais janelas: {n}",
   "ws.peek.pinned": "Nada aberto · fixados: {apps}",

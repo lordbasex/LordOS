@@ -670,6 +670,8 @@
   "ws.search.activitySub": "Activitatea {pos} · ferestre deschise: {n}",
   "ws.shortcuts.spine": "Restrânge sau extinde coloana de context",
   "ws.shortcuts.bars": "Mută tastatura pe bara laterală și pe bara de activități",
+  "ws.shortcuts.activityN": "Mergi la activitatea 1–9",
+  "ws.shortcuts.activityTab": "Activitatea următoare sau anterioară",
   "ws.peek.windows": "Ferestre: {n}",
   "ws.peek.more": "Alte ferestre: {n}",
   "ws.peek.pinned": "Nimic deschis · fixate: {apps}",

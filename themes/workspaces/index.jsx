@@ -91,10 +91,22 @@ const H = {
   closePanel: () => panel.set(null),
 };
 
+const DIGITS = { 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 9: 8, 10: 9 };     // evdev codes of the digits row
+function stepActivity(dir) {
+  const list = desktopList.get(), i = list.indexOf(activeDesktop.get());
+  if (list.length > 1) switchDesktop(list[(i + dir + list.length) % list.length]);
+}
 const table = [
   { id: 'search', keys: ['Meta+Space'], run: () => openSearch(), label: 'shell.shortcuts.search', group: 'system' },
   { id: 'searchCtrl', keys: ['Ctrl+Space'], run: () => openSearch(), when: notInTerminal, label: 'shell.shortcuts.search', group: 'system' },
   { id: 'spine', keys: ['Meta+Alt+D'], run: toggleSpine, label: 'shell.ws.shortcuts.spine', group: 'system' },
+  // ❖1…❖9: the activity at that position; ❖Tab and ❖⇧Tab, the next and the previous one, while the app switcher is on ⌥Tab
+  // only (Settings → Keyboard): the proposal's ❖Tab for activities, by choice
+  { id: 'activityN', keys: ['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((n) => `Meta+${n}`), show: ['❖1…9'],
+    run: (e) => { const id = desktopList.get()[DIGITS[e.code] - 1]; if (id != null) switchDesktop(id); },
+    label: 'shell.ws.shortcuts.activityN', group: 'desktops' },
+  { id: 'activityTab', keys: ['Meta+Tab', 'Meta+Shift+Tab'], run: (e) => stepActivity(e.shift ? -1 : 1), when: () => !switcherKeys('meta').includes('Meta+Tab'),
+    listed: () => !switcherKeys('meta').includes('Meta+Tab'), label: 'shell.ws.shortcuts.activityTab', group: 'desktops' },
   { id: 'bars', keys: ['Ctrl+F2'], run: () => { panel.set(null); enterBars(); }, label: 'shell.ws.shortcuts.bars', group: 'system' },
   { id: 'switchApps', keys: switcherKeys('meta'), run: (e) => openSwitcher(switcherHold(e), e.shift), label: 'shell.shortcuts.switchApps', group: 'windows' },
   { id: 'cycleWindows', keys: ['Meta+`', 'Meta+Shift+`'], run: (e) => cycleAppWindows(e.shift), label: 'shell.shortcuts.cycleWindows', group: 'windows' },

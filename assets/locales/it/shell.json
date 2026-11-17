@@ -663,6 +663,8 @@
   "ws.search.activitySub": "Attività {pos} · finestre aperte: {n}",
   "ws.shortcuts.spine": "Comprimi o espandi la colonna di contesto",
   "ws.shortcuts.bars": "Sposta la tastiera sulla barra laterale e sulla barra delle attività",
+  "ws.shortcuts.activityN": "Vai all’attività da 1 a 9",
+  "ws.shortcuts.activityTab": "Attività successiva o precedente",
   "ws.peek.windows": "Finestre: {n}",
   "ws.peek.more": "Altre finestre: {n}",
   "ws.peek.pinned": "Niente di aperto · fissate: {apps}",

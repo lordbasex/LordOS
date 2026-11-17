@@ -43,10 +43,15 @@ static const Grab flow_desktops[] = {
     { KG_CTRL, 0, KEY_UP, KG_TAKE }, { KG_CTRL, 0, KEY_DOWN, KG_TAKE },
 };
 
-/* Lord Workspaces: Lord Flow's table (`workspaces` = flow, `workspaces-desktops` = flow-desktops) and ⌃F2, which moves
- * the keyboard to the Context Spine and the activity strip (the bars' own focus, themes/workspaces/barfocus.js). */
+/* Lord Workspaces: Lord Flow's table (`workspaces` = flow, `workspaces-desktops` = flow-desktops), ⌃F2, which moves
+ * the keyboard to the Context Spine and the activity strip (the bars' own focus, themes/workspaces/barfocus.js), and
+ * ❖1…❖9, the activity at that position. With the app switcher on ⌥Tab only (Settings → Keyboard, "+tab-alt"), ❖Tab
+ * and ❖⇧Tab are the theme's too: the next and the previous activity (keygrab_match). */
 static const Grab workspaces_extra[] = {
     { KG_CTRL, 0, KEY_F2, KG_TAKE },
+    { KG_META, 0, KEY_1, KG_TAKE }, { KG_META, 0, KEY_2, KG_TAKE }, { KG_META, 0, KEY_3, KG_TAKE },
+    { KG_META, 0, KEY_4, KG_TAKE }, { KG_META, 0, KEY_5, KG_TAKE }, { KG_META, 0, KEY_6, KG_TAKE },
+    { KG_META, 0, KEY_7, KG_TAKE }, { KG_META, 0, KEY_8, KG_TAKE }, { KG_META, 0, KEY_9, KG_TAKE },
 };
 static const Grab classic[] = {
     { KG_ALT, 0, KEY_TAB, KG_HOLD },
@@ -128,7 +133,7 @@ char keygrab_letter(int code, const char *base) {
 int keygrab_match(int code, char letter, unsigned mods) {
     if (tab_set && code == KEY_TAB) {
         unsigned m = mods & (unsigned)~KG_SHIFT;
-        if (m == KG_META) return tab_meta ? KG_HOLD : KG_PASS;
+        if (m == KG_META) return tab_meta ? KG_HOLD : extra ? KG_TAKE : KG_PASS;   /* Workspaces: the activities */
         if (m == KG_ALT) return tab_alt ? KG_HOLD : KG_PASS;
     }
     if (tab_set && tab_meta && table == classic && letter == 'w' && mods == KG_META) return KG_TAKE;   /* the Overview moves here */

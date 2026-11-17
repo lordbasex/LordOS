@@ -663,6 +663,8 @@
   "ws.search.activitySub": "Activitat {pos} · finestres obertes: {n}",
   "ws.shortcuts.spine": "Plega o desplega la columna de context",
   "ws.shortcuts.bars": "Porta el teclat a la barra lateral i a la barra d’activitats",
+  "ws.shortcuts.activityN": "Ves a l’activitat 1 a 9",
+  "ws.shortcuts.activityTab": "Activitat següent o anterior",
   "ws.peek.windows": "Finestres: {n}",
   "ws.peek.more": "Més finestres: {n}",
   "ws.peek.pinned": "Res obert · fixades: {apps}",

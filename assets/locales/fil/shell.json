@@ -663,6 +663,8 @@
   "ws.search.activitySub": "Aktibidad {pos} · bukas na window: {n}",
   "ws.shortcuts.spine": "Paliitin o palakihin ang bar ng konteksto",
   "ws.shortcuts.bars": "Ilipat ang keyboard sa gilid na bar at sa bar ng mga aktibidad",
+  "ws.shortcuts.activityN": "Pumunta sa aktibidad 1 hanggang 9",
+  "ws.shortcuts.activityTab": "Susunod o naunang aktibidad",
   "ws.peek.windows": "Mga window: {n}",
   "ws.peek.more": "Iba pang window: {n}",
   "ws.peek.pinned": "Walang bukas · naka-pin: {apps}",

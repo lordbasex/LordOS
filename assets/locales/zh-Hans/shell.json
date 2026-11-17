@@ -656,6 +656,8 @@
   "ws.search.activitySub": "活动 {pos} · 打开的窗口：{n}",
   "ws.shortcuts.spine": "收起或展开情境侧栏",
   "ws.shortcuts.bars": "将键盘焦点移到侧栏和活动栏",
+  "ws.shortcuts.activityN": "前往活动 1 至 9",
+  "ws.shortcuts.activityTab": "下一个或上一个活动",
   "ws.peek.windows": "窗口：{n}",
   "ws.peek.more": "更多窗口：{n}",
   "ws.peek.pinned": "没有打开的内容 · 已固定：{apps}",

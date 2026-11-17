@@ -107,9 +107,18 @@ int main(void) {
     CHECK(keygrab_match(KEY_F2, 0, KG_CTRL) == KG_TAKE);
     CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_HOLD);
     CHECK(keygrab_match(KEY_LEFT, 0, KG_CTRL) == KG_PASS);
+    CHECK(keygrab_match(KEY_3, 0, KG_META) == KG_TAKE);
     CHECK(keygrab_set("workspaces-desktops+tab-meta"));
     CHECK(keygrab_match(KEY_F2, 0, KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_HOLD);
     CHECK(keygrab_match(KEY_LEFT, 0, KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_set("workspaces+tab-alt"));                       /* the switcher on ⌥Tab: ❖Tab is the activities' */
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_TAKE);
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META | KG_SHIFT) == KG_TAKE);
+    CHECK(keygrab_match(KEY_TAB, 0, KG_ALT) == KG_HOLD);
+    CHECK(keygrab_set("flow+tab-alt"));
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_PASS);
+    CHECK(keygrab_match(KEY_3, 0, KG_META) == KG_PASS);
     CHECK(keygrab_set("flow"));
     CHECK(keygrab_match(KEY_F2, 0, KG_CTRL) == KG_PASS);
     CHECK(!keygrab_set("workspacesx"));

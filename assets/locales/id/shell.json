@@ -656,6 +656,8 @@
   "ws.search.activitySub": "Aktivitas {pos} · jendela terbuka: {n}",
   "ws.shortcuts.spine": "Ciutkan atau bentangkan bilah konteks",
   "ws.shortcuts.bars": "Pindahkan keyboard ke bilah samping dan bilah aktivitas",
+  "ws.shortcuts.activityN": "Buka aktivitas 1 sampai 9",
+  "ws.shortcuts.activityTab": "Aktivitas berikutnya atau sebelumnya",
   "ws.peek.windows": "Jendela: {n}",
   "ws.peek.more": "Jendela lainnya: {n}",
   "ws.peek.pinned": "Tidak ada yang terbuka · disematkan: {apps}",

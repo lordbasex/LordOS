@@ -663,6 +663,8 @@
   "ws.search.activitySub": "কার্যক্রম {pos} · খোলা উইন্ডো: {n}",
   "ws.shortcuts.spine": "প্রসঙ্গ বার গুটিয়ে নিন বা প্রসারিত করুন",
   "ws.shortcuts.bars": "কিবোর্ড পাশের বার ও কার্যকলাপ বারে নিন",
+  "ws.shortcuts.activityN": "১ থেকে ৯ নম্বর কার্যকলাপে যান",
+  "ws.shortcuts.activityTab": "পরের বা আগের কার্যকলাপ",
   "ws.peek.windows": "উইন্ডো: {n}",
   "ws.peek.more": "আরও উইন্ডো: {n}",
   "ws.peek.pinned": "কিছুই খোলা নেই · পিন করা: {apps}",

@@ -656,6 +656,8 @@
   "ws.search.activitySub": "กิจกรรม {pos} · หน้าต่างที่เปิด: {n}",
   "ws.shortcuts.spine": "ยุบหรือขยายแถบบริบท",
   "ws.shortcuts.bars": "ย้ายแป้นพิมพ์ไปที่แถบด้านข้างและแถบกิจกรรม",
+  "ws.shortcuts.activityN": "ไปที่กิจกรรม 1 ถึง 9",
+  "ws.shortcuts.activityTab": "กิจกรรมถัดไปหรือก่อนหน้า",
   "ws.peek.windows": "หน้าต่าง: {n}",
   "ws.peek.more": "หน้าต่างเพิ่มเติม: {n}",
   "ws.peek.pinned": "ไม่มีสิ่งที่เปิดอยู่ · ปักหมุด: {apps}",

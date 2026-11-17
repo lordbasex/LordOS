@@ -670,6 +670,8 @@
   "ws.search.activitySub": "Veikla {pos} · atvirų langų: {n}",
   "ws.shortcuts.spine": "Suskleisti arba išskleisti konteksto juostą",
   "ws.shortcuts.bars": "Perkelti klaviatūrą į šoninę juostą ir veiklų juostą",
+  "ws.shortcuts.activityN": "Pereiti į 1–9 veiklą",
+  "ws.shortcuts.activityTab": "Kita arba ankstesnė veikla",
   "ws.peek.windows": "Langai: {n}",
   "ws.peek.more": "Daugiau langų: {n}",
   "ws.peek.pinned": "Nieko neatidaryta · prisegta: {apps}",

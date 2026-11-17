@@ -663,6 +663,8 @@
   "ws.search.activitySub": "Aktivitet {pos} · öppna fönster: {n}",
   "ws.shortcuts.spine": "Fäll ihop eller ut kontextlisten",
   "ws.shortcuts.bars": "Flytta tangentbordet till sidofältet och aktivitetsfältet",
+  "ws.shortcuts.activityN": "Gå till aktivitet 1 till 9",
+  "ws.shortcuts.activityTab": "Nästa eller föregående aktivitet",
   "ws.peek.windows": "Fönster: {n}",
   "ws.peek.more": "Fler fönster: {n}",
   "ws.peek.pinned": "Inget öppet · fästa: {apps}",

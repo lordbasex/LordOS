@@ -656,6 +656,8 @@
   "ws.search.activitySub": "Aktiviti {pos} · tetingkap terbuka: {n}",
   "ws.shortcuts.spine": "Kuncupkan atau kembangkan bar konteks",
   "ws.shortcuts.bars": "Alihkan papan kekunci ke bar sisi dan bar aktiviti",
+  "ws.shortcuts.activityN": "Pergi ke aktiviti 1 hingga 9",
+  "ws.shortcuts.activityTab": "Aktiviti seterusnya atau sebelumnya",
   "ws.peek.windows": "Tetingkap: {n}",
   "ws.peek.more": "Lagi tetingkap: {n}",
   "ws.peek.pinned": "Tiada yang dibuka · disemat: {apps}",

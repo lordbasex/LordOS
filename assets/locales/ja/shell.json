@@ -656,6 +656,8 @@
   "ws.search.activitySub": "アクティビティ {pos} · 開いているウインドウ：{n}",
   "ws.shortcuts.spine": "コンテキストバーを折りたたむ／広げる",
   "ws.shortcuts.bars": "キーボード操作をサイドバーとアクティビティバーへ移す",
+  "ws.shortcuts.activityN": "アクティビティ 1〜9 へ移動",
+  "ws.shortcuts.activityTab": "次または前のアクティビティ",
   "ws.peek.windows": "ウインドウ: {n}",
   "ws.peek.more": "ほかのウインドウ: {n}",
   "ws.peek.pinned": "開いているものなし · ピン留め: {apps}",

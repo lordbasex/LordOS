@@ -670,6 +670,8 @@
   "ws.search.activitySub": "Aktywność {pos} · otwarte okna: {n}",
   "ws.shortcuts.spine": "Zwiń lub rozwiń kolumnę kontekstu",
   "ws.shortcuts.bars": "Przenieś klawiaturę na pasek boczny i pasek aktywności",
+  "ws.shortcuts.activityN": "Przejdź do aktywności 1–9",
+  "ws.shortcuts.activityTab": "Następna lub poprzednia aktywność",
   "ws.peek.windows": "Okna: {n}",
   "ws.peek.more": "Więcej okien: {n}",
   "ws.peek.pinned": "Nic nie jest otwarte · przypięte: {apps}",

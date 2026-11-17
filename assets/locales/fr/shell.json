@@ -663,6 +663,8 @@
   "ws.search.activitySub": "Activité {pos} · fenêtres ouvertes : {n}",
   "ws.shortcuts.spine": "Replier ou déplier la colonne de contexte",
   "ws.shortcuts.bars": "Placer le clavier sur la colonne latérale et la barre des activités",
+  "ws.shortcuts.activityN": "Aller à l’activité 1 à 9",
+  "ws.shortcuts.activityTab": "Activité suivante ou précédente",
   "ws.peek.windows": "Fenêtres : {n}",
   "ws.peek.more": "Autres fenêtres : {n}",
   "ws.peek.pinned": "Rien d’ouvert · épinglées : {apps}",
