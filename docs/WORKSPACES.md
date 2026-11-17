@@ -11,8 +11,8 @@ performs against the other two themes and what is left for the compositor.
 
 | Piece | What it is | Where |
 |---|---|---|
-| **Context Spine** | The rail at the start of the main display: the LordOS crown (the system menu: About, Settings, Lock, Switch User, Log Out, Restart, Shut Down), the **activity in view** (its icon on a tile of its colour; a click edits it) and the **recent** ones (one to three, as the height allows; a click goes there), **Activities** (the Overview), **Apps** (the search panel with every app), **Files**, and at the bottom **Notifications**, **Settings**, the **Control Center** and the button that collapses it to icons. It collapses by itself below 1440 px while its setting is Automatic. It reserves its width in the work area. | `components/Spine.jsx` |
-| **Activity strip** | A pill per activity (its icon in its colour; the one in view under an accent that glides to the next one on a switch; the others with their window count, and a summary of their windows when the pointer rests on them half a second, the **Focus Surface**), the **groups** of the activity in view as chips beside its pill, **+ New**, and "Activity 2 of 4 · up to 9". On a narrow display the other pills show only their icon. Click switches, double click renames in place, right click: Rename, Icon, colour and apps…, Delete activity… (asked first, in the page). | `components/TopBar.jsx` |
+| **Context Spine** | The rail at the start of the main display: the LordOS crown (the system menu: About, Settings, Lock, Switch User, Log Out, Restart, Shut Down), the **activity in view** (its icon, in the spine's glyph colour on a highlight; a click edits it) and the **recent** ones (one to three, as the height allows; a click goes there), **Activities** (the Overview), **Apps** (the search panel with every app), **Files**, and at the bottom **Notifications**, **Settings**, the **Control Center** and the button that collapses it to icons. It collapses by itself below 1440 px while its setting is Automatic. It reserves its width in the work area. | `components/Spine.jsx` |
+| **Activity strip** | A pill per activity (its icon in its colour; the one in view under an accent that glides to the next one on a switch; the others show a summary of their windows when the pointer rests on them half a second, the **Focus Surface**), the **groups** of the activity in view as chips beside its pill, **+ New**, and "Activity 2 of 4 · up to 9". On a narrow display the other pills show only their icon. Click switches, double click renames in place, right click: Rename, Icon, colour and apps…, Delete activity… (asked first, in the page). | `components/TopBar.jsx` |
 | **Status cluster** | Privacy indicators, the status items (network, Cleaner, Cloud, keyboard…), the volume, notifications with an unread dot, and the date and time (the clock wakes once a minute). | `components/TopBar.jsx` |
 | **Group frame** | Per display, a frame in the accent around the work area; its header holds the activity's name (and the display's, with several), its pinned apps and the actions **Change layout**, **Add window**, **Save layout** and **Move to another activity**. With no window on a display, a short empty state offers Add window and Open pinned apps. | `components/GroupFrame.jsx` |
 | **Windows** | A 36 px title bar (icon and title at the start, minimize, maximize and close as real 28 px targets with a glyph, at the end or first with Settings → Desktop & Dock → Title bars → Left). An app's own menus in a strip under it with Window and Help (there is no global menu bar; F10 or the left ⌥ alone opens the first one). Linux apps that draw their own bar (`args.csd`) get no frame and the theme's window menu where they ask for one. The title starts with the window's activity mark (its icon in its colour, named on hover). Right click on a title: Tile or Float this window, Move to another activity, Move to group, Minimize, Maximize, Close. | `components/Window.jsx` |
@@ -50,8 +50,7 @@ Removing a group moves its windows to the activity's own. The chips sit beside t
 renames, right click removes), "New group in this activity" is on the pill's menu, "Move to group" on a window's, and
 Search lists the groups as activities.
 
-**Focus Surface.** The other activities show as summaries: each pill counts its windows (one selector over the windows
-store, so the strip re-renders when a count changes, not on a title), and resting the pointer on one shows its windows
+**Focus Surface.** The other activities show as summaries: resting the pointer on one's pill shows its windows
 (by app and title, minimized ones last, at most six) or its pinned apps; a click on a window goes to it.
 
 ## Tiling
@@ -376,7 +375,7 @@ windows; numbers, not checks):
 | A window's title, ×10 | 10 | 10 | 10 |
 | The window in front, ×10 | 160 | 290 | 210 |
 | A window opened and closed | 206 | 247 | 287 |
-| Desktop / activity switches, ×4 | 44 | 68 | 212 (352 in 0.8.8.10's first drafts) |
+| Desktop / activity switches, ×4 | 44 | 68 | 244 (352 in 0.8.8.10's first drafts) |
 | Intervals alive at rest | 250 ms, 1 s (the clock), 2 s | 250 ms, 1 s (the clock), 2 s, 5 s (the network glyph) | 250 ms (the SDK's) |
 | Timer wake-ups per minute at rest | 330 | 342 | 240 (+1 for the clock) |
 
@@ -394,8 +393,8 @@ What these say:
 - **In native calls** a switch costs more than in Flow and Classic: the spine, the strip and the frame header show the
   activity in view (its icon, name, pins and layout), so they change with it. What changes is kept to styles: every
   activity's icon stays drawn in the header and only the one in view shows, the spine's activities are one keyed list
-  (a switch moves two tiles and recolours their outline), a pill's window count is hidden rather than removed. That
-  took a switch from 352 calls ×4 to 212, though the spine now also shows the recent activities.
+  (a switch moves two items and changes their colour). That
+  took a switch from 352 calls ×4 to 244, though the spine now also shows the recent activities.
 
 ## Changed from the proposal
 

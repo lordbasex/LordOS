@@ -106,7 +106,7 @@ export const ShortcutsHelp = memo(function ShortcutsHelp({ t }) {
       <View onClick={(e) => e?.stopPropagation?.()} style={{ position: 'absolute', left: d.x + (d.w - w) / 2, top: d.y + (d.h - h) / 2, width: w, height: h, padding: 22, gap: 10,
         borderRadius: 18, backgroundColor: t.popupBg, border: `1px solid ${t.mat.border}`, boxShadow: t.shadow }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <LifebuoyGlyph size={22} bg={t.popupBg} />
+          <LifebuoyGlyph size={22} color={t.text} bg={t.popupBg} />
           <Text style={{ fontSize: 19, fontWeight: 700, color: t.text, textAlign: 'start' }}>{tr('shell.ws.help.title')}</Text>
         </View>
         <Text style={{ fontSize: 12.5, color: t.textDim, textAlign: 'start' }}>{tr('shell.ws.help.sub')}</Text>

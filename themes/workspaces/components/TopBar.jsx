@@ -6,8 +6,8 @@
 // that shows under the pointer, glyphs in the spine's colour, thin lines between groups (components/BarButton.jsx).
 // An activity's icon keeps its own colour (Edit activity).
 // A pill: click switches; double click renames in place (Enter keeps, Esc drops); right click: rename, icon and colour,
-// delete (asked first, in the page). The other activities are summed up (the Focus Surface): each pill counts its
-// windows, and resting the pointer on one shows what it holds (its windows by app and title, or its pinned apps when
+// delete (asked first, in the page). The other activities are summed up (the Focus Surface): resting the pointer on
+// one's pill shows what it holds (its windows by app and title, or its pinned apps when
 // it has none); a click on a window there goes to it. The clock re-renders only its own text, once a minute (sharedTicker).
 import {
   View, Text, TextInput, useStore, desktopList, desktopNames, desktopName, activeDesktop, renameDesktop, switchDesktop, formatTime, formatDate,
@@ -72,8 +72,6 @@ function peekSoon(id, pill) {
 }
 function peekEnd(ms = 160) { clearTimeout(peekTimer); peekTimer = setTimeout(() => peek.set(null), ms); }
 const own = (w) => !(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'));
-// how many windows each activity has, as one string (the strip re-renders when a count changes, not on a title)
-const countsOf = (list) => { const c = {}; for (const w of list) if (own(w) && !w.pip) c[w.desktop] = (c[w.desktop] || 0) + 1; return JSON.stringify(c); };
 
 function PeekRow({ t, w, onPick }) {
   const [hover, setHover] = useState(false);
@@ -126,7 +124,7 @@ export const ActivityPeek = memo(function ActivityPeek({ t }) {
   );
 });
 
-const Pill = memo(function Pill({ t, id, active, glide, name, meta, count, onMenu, pillRef, compact }) {
+const Pill = memo(function Pill({ t, id, active, glide, name, meta, onMenu, pillRef, compact }) {
   const [hover, setHover] = useState(false);
   const self = useRef(null);
   const ref = (n) => { self.current = n; pillRef(n); };
@@ -150,10 +148,6 @@ const Pill = memo(function Pill({ t, id, active, glide, name, meta, count, onMen
       <ActivityIcon icon={meta.icon} color={active ? t.onAccent : meta.color} bg={active ? t.accent : t.solidBg} size={13} />
       {/* a narrow display: the other activities by icon only (the name on hover), so every pill stays on screen */}
       <Text style={{ display: compact && !active ? 'none' : 'flex', fontSize: 12.5, fontWeight: 600, color: fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{name}</Text>
-      {/* kept drawn and hidden on the pill in view: a switch changes its display, not its nodes */}
-      <View style={{ display: !active && count ? 'flex' : 'none', minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: t.itemHover, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontSize: 10, fontWeight: 700, color: t.textDim }}>{count || ''}</Text>
-      </View>
       <FocusRing t={t} fid={`pill:${id}`} radius={BAR_ITEM / 2} />
     </View>
   );
@@ -228,7 +222,6 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
   const active = useStore(activeDesktop);
   const meta = useStore(activities);
   const names = useStore(desktopNames);
-  const counts = JSON.parse(useStore(windows, countsOf));
   // the room the names need (pills of about 130 px, the "+ New" button and the position) against the strip's width
   const compact = rect.w < list.length * 130 + 260;
   const [menu, setMenu] = useState(null);
@@ -267,7 +260,7 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
       {pos ? <View ref={glider} style={{ position: 'absolute', left: pos.x, top: (H - BAR_ITEM) / 2 - 1, width: pos.w, height: BAR_ITEM, borderRadius: BAR_ITEM / 2, backgroundColor: t.accent, pointerEvents: 'none', transformOrigin: 'left center' }} /> : null}
       {list.map((id) => (
         <Fragment key={id}>
-          <Pill t={t} id={id} active={id === active} glide={!!pos} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }} count={counts[id] || 0}
+          <Pill t={t} id={id} active={id === active} glide={!!pos} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }}
             pillRef={pillRefFor(pills.current, id)} onMenu={(d, e) => setMenu({ id: d, x: e.x, y: e.y })} compact={compact} />
           {id === active && meta[id]?.groups?.length ? <Groups t={t} desk={id} meta={meta[id]} name={desktopName(id)} /> : null}
         </Fragment>

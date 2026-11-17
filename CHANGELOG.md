@@ -13,11 +13,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 
 - **Lord Workspaces: the rest of its proposal.** Checked item by item against the theme's design document:
-  - **Context Spine:** under the crown, the activity in view (its icon on a tile of its colour; a click edits it) and
+  - **Context Spine:** under the crown, the activity in view (its icon, in the spine's glyph colour; a click edits it) and
     the activities used just before it (one to three, as the display's height allows; a click goes there); at the
     bottom, Notifications and Settings beside the Control Center.
-  - **Focus Surface:** each other activity's pill in the strip counts its windows, and resting the pointer on it for
-    half a second shows what it holds (its windows by app and title, the minimized ones last, or its pinned apps when
+  - **Focus Surface:** resting the pointer for half a second on another activity's pill in the strip shows what it holds (its windows by app and title, the minimized ones last, or its pinned apps when
     it has none); a click on a window goes to it. On a narrow display the other pills show only their icon, so every
     activity stays reachable.
   - **Groups (the proposal's Activity Islands, and its way past nine):** up to three more activities inside one, on the
@@ -40,7 +39,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     unchanged): the arrows, Tab, Home and End go from one control to the next with a visible ring, Enter or Space
     presses it, Escape gives the keyboard back. ❖1…❖9 show activity 1 to 9; ❖Tab and ❖⇧Tab, the next and the previous
     activity, when Settings → Keyboard puts the app switcher on ⌥Tab.
-  - **The shortcuts' help:** a lifebuoy on the spine (also ❖/ and "Keyboard Shortcuts…" in the crown's menu) opens a
+  - **The shortcuts' help:** a lifebuoy on the spine (in the glyph colour of the other items) (also ❖/ and "Keyboard Shortcuts…" in the crown's menu) opens a
     sheet with every shortcut that works now, read from the SDK's own list (the one Settings → Keyboard shows): the
     theme's marked THEME and the ones every theme shares (Search, the clipboard, Screenshots' captures…), each key on
     its own keycap; then what the pointer and the touchpad do here. A search field, a filter by group, a button to
@@ -287,9 +286,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
-- **Lord Workspaces: a cheaper activity switch.** 212 native calls for four switches instead of 352 (one display, three
+- **Lord Workspaces: a cheaper activity switch.** 244 native calls for four switches instead of 352 (one display, three
   windows, `server/tests/theme_cost_scene.mjs`): every activity's icon stays drawn in the frame header with only the
-  one in view shown, the spine's activities are one keyed list, a pill's window count is hidden rather than removed.
+  one in view shown, the spine's activities are one keyed list, the activities' icons in the spine change only their colour.
 - **Shortcuts:** F2 has a name in the SDK's key table (`sdk/shortcuts.js`), so a theme can use it.
 - **Lord Workspaces: the Calendar widget, redrawn, with styles to choose from.** The day and the month in red, today
   in a red circle, weekends dimmed and the week from the language's first weekday. Small: "Day" (the default: the day,

@@ -16,20 +16,20 @@ import { activities, recentActivities, activityOf } from '../state.js';
 import { spineRecentRoom } from '../model/activities.js';
 import { tween, EASE } from '../motion.js';
 
-const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, anchor, small, fid }) {
+const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, anchor, small, fid, current }) {
   const [hover, setHover] = useState(false);
   const icon = useRef(null);
   const spring = (to, ms = 200) => {
     const n = icon.current?.id;
     if (n) tween(n, { scaleX: [to === 1 ? 1.08 : 1, to], scaleY: [to === 1 ? 1.08 : 1, to] }, { ms, ease: EASE.spring, clear: to === 1 });
   };
-  const fg = active ? t.onAccent : hover ? t.iconFgHover : t.iconFg;
+  const fg = active ? t.onAccent : hover || current ? t.iconFgHover : t.iconFg;
   return (
     <View ref={anchor} onClick={(e) => onClick(e)} title={expanded ? undefined : label}
       onMouseEnter={() => { setHover(true); spring(1.08, 180); }} onMouseLeave={() => { setHover(false); spring(1, 220); }}
       onMouseDown={() => spring(0.92, 120)} onMouseUp={() => spring(1.08, 160)}
       style={{ alignSelf: 'stretch', marginHorizontal: 6, paddingVertical: small ? 5 : expanded ? 8 : 10, borderRadius: 12, alignItems: 'center', gap: 4,
-        backgroundColor: active ? t.accent : hover ? t.itemHover : 'transparent' }}>
+        backgroundColor: active ? t.accent : hover || current ? t.itemHover : 'transparent' }}>
       <View ref={icon} style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>{glyph(fg, active ? t.accent : t.solidBg)}</View>
       {expanded ? <Text style={{ fontSize: 10.5, fontWeight: 600, color: fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 70, textAlign: 'center' }}>{label}</Text> : null}
       {fid ? <FocusRing t={t} fid={fid} /> : null}
@@ -39,14 +39,11 @@ const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, an
 
 // The activity in view and the recent ones: each one's icon on a tile of its colour. One keyed list, so a switch moves
 // two tiles and changes a few styles (size, ring) instead of drawing icons again (docs/WORKSPACES.md, "Performance").
-function ActivityTile({ t, id, size, ring }) {
+// An activity's icon in the spine: the spine's glyph colour like its other items (the activity's own colour is on its
+// pill and its windows), brighter for the one in view.
+function ActivityGlyph({ id, color, bg }) {
   const m = activityOf(id);
-  return (
-    <View style={{ width: size, height: size, borderRadius: size * 0.3, backgroundColor: m.color, alignItems: 'center', justifyContent: 'center',
-      border: `2px solid ${ring ? t.text : m.color}` }}>
-      <ActivityIcon icon={m.icon} color="#ffffff" bg={m.color} size={12} />
-    </View>
-  );
+  return <ActivityIcon icon={m.icon} color={color} bg={bg} size={18} />;
 }
 
 const Activities = memo(function Activities({ t, expanded, room, desk, onEditActivity, onActivity }) {
@@ -57,8 +54,8 @@ const Activities = memo(function Activities({ t, expanded, room, desk, onEditAct
   return (
     <>
       {order.flatMap((id, i) => [
-        <Item key={id} t={t} expanded={expanded} small fid={i === 0 ? 'current' : `recent:${id}`} label={desktopName(id)} active={false}
-          onClick={() => (i === 0 ? onEditActivity(id) : onActivity(id))} glyph={() => <ActivityTile t={t} id={id} size={20} ring={i === 0} />} />,
+        <Item key={id} t={t} expanded={expanded} small current={i === 0} fid={i === 0 ? 'current' : `recent:${id}`} label={desktopName(id)} active={false}
+          onClick={() => (i === 0 ? onEditActivity(id) : onActivity(id))} glyph={(c, bg) => <ActivityGlyph id={id} color={c} bg={bg} />} />,
         ...(i === 0 && recent.length && expanded ? [<Text key="recent-label" style={{ fontSize: 9, fontWeight: 700, color: t.textDim, marginTop: 4, letterSpacing: 0.4 }}>
           {tr('shell.ws.spine.recent')}</Text>] : []),
       ])}
@@ -86,7 +83,7 @@ export const Spine = memo(function Spine({ t, rect, mode, rtl, active, desk, unr
         glyph={(c) => <FolderGlyph color={c} size={20} />} />
       <View style={{ flex: 1 }} />
       <Item t={t} expanded={expanded} fid="help" label={tr('shell.ws.spine.help')} active={active.help} onClick={onHelp}
-        glyph={(c, bg) => <LifebuoyGlyph size={18} bg={active.help ? t.accent : t.solidBg} />} />
+        glyph={(c, bg) => <LifebuoyGlyph size={18} color={c} bg={bg} />} />
       <Item t={t} expanded={expanded} fid="notif" label={tr('shell.ws.notif.title')} active={active.notif} onClick={onNotif}
         glyph={(c) => <BellGlyph color={c} size={18} dot={unread ? (active.notif ? t.onAccent : t.accent) : null} />} />
       <Item t={t} expanded={expanded} fid="settings" label={tr('shell.ws.spine.settings')} active={false} onClick={onSettings}

@@ -199,13 +199,14 @@ export function ActivityIcon({ icon, color, bg = 'transparent', size = 14 }) {
   return <G color={color} bg={bg} size={size} />;
 }
 
-// A lifebuoy (the shortcuts' help): a red ring with four white bands, drawn with nodes. bg: the colour behind it.
-export function LifebuoyGlyph({ size = 18, bg }) {
-  const band = (deg) => <View key={deg} style={{ position: 'absolute', left: size * 0.39, top: -size * 0.05, width: size * 0.22, height: size * 1.1, backgroundColor: '#FFFFFF', transform: `rotate(${deg}deg)` }} />;
+// A lifebuoy (the shortcuts' help): a ring in the glyph colour cut by four bands of the background, like the other
+// glyphs of the bars (one colour). bg: the colour behind it.
+export function LifebuoyGlyph({ size = 18, color, bg }) {
+  const band = (deg) => <View key={deg} style={{ position: 'absolute', left: size * 0.41, top: -size * 0.05, width: size * 0.18, height: size * 1.1, backgroundColor: bg, transform: `rotate(${deg}deg)` }} />;
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#E5484D' }}>
+    <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: color }}>
       {[45, 135].map(band)}
-      <View style={{ position: 'absolute', left: size * 0.3, top: size * 0.3, width: size * 0.4, height: size * 0.4, borderRadius: size, backgroundColor: bg }} />
+      <View style={{ position: 'absolute', left: size * 0.28, top: size * 0.28, width: size * 0.44, height: size * 0.44, borderRadius: size, backgroundColor: bg }} />
     </View>
   );
 }
