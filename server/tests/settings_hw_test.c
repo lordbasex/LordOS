@@ -142,6 +142,31 @@ static void test_modes(void) {
     CHECK(mode_preferred(modes, 0) == -1);
     modes[0].type = 0;
     CHECK(mode_preferred(modes, n) == 4);                /* largest without a preferred one */
+    /* GitHub #173: the panel's physical shape decides when the preferred mode doesn't fit it */
+    struct drm_mode_modeinfo uw[] = {
+        mk(3840, 2160, 533250, 4000, 2222, 1, 0),   /* preferred, 16:9: 60 Hz */
+        mk(3440, 1440, 319750, 3600, 1481, 0, 0),   /* 21:9, ~60 Hz */
+        mk(3440, 1440, 543500, 3600, 1481, 0, 0),   /* 21:9, ~100 Hz */
+        mk(2560, 1080, 185580, 2720, 1111, 0, 0),   /* 21:9, smaller */
+        mk(1920, 1080, 148500, 2200, 1125, 0, 0),
+    };
+    int nu = (int)(sizeof uw / sizeof uw[0]);
+    CHECK(mode_native(uw, nu, 800, 335) == 2);           /* a 34" ultrawide: 3440 × 1440, the faster one */
+    CHECK(mode_native(uw, nu, 597, 336) == 0);           /* a real 16:9 panel keeps its preferred mode */
+    CHECK(mode_native(uw, nu, 0, 0) == 0);               /* no size in the EDID */
+    CHECK(mode_native(uw, nu, 16, 9) == 0);              /* an aspect stored as a size, or a projector: ignored */
+    CHECK(mode_native(uw, nu, 1600, 335) == 0);          /* no mode of that shape: the preferred one */
+    CHECK(mode_native(uw, 0, 800, 335) == -1);
+    struct drm_mode_modeinfo lap[] = {
+        mk(2880, 1800, 593000, 3040, 1830, 1, 0),   /* a 16:10 laptop panel */
+        mk(1920, 1200, 154000, 2080, 1235, 0, 0),
+        mk(1920, 1080, 148500, 2200, 1125, 0, 0),
+    };
+    CHECK(mode_native(lap, 3, 302, 189) == 0);           /* 1.598 against 1.6: within 8 %, kept */
+    lap[0].flags = DRM_MODE_FLAG_INTERLACE;              /* never an interlaced mode for the shape */
+    lap[0].type = 0;
+    lap[2].type = DRM_MODE_TYPE_PREFERRED;
+    CHECK(mode_native(lap, 3, 302, 189) == 1);           /* 16:9 preferred on a 16:10 panel: 10 % off → 1920 × 1200 */
 }
 
 static void test_night(void) {

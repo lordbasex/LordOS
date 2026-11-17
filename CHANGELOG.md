@@ -345,6 +345,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **A display opens at its panel's shape when its EDID prefers another one; the login screen isn't stretched on an
+  ultrawide** (GitHub #173). With nothing saved (always on the login screen) a display used the EDID's preferred mode,
+  and some 3440 × 1440 ultrawides prefer 3840 × 2160 on some inputs, so the monitor stretched 16:9 over 21:9 at every
+  boot. Now the preferred mode is used only when its shape is within 8 % of the panel's physical one (the EDID's size
+  in mm); otherwise the largest progressive mode within 3 % of that shape wins (`mode_native`), and Settings → Displays
+  calls that one native. A saved mode still wins in a session. The login screen's picture is drawn once per display,
+  each covering its own display, instead of one picture over the whole desktop that showed a slice of it on each
+  display. (`server/src/hw/modes.c`, `display.c`, `themes/greeter/index.jsx`; `build/settings-hw-test`)
 - **Cleaner's panel by the clock wears the theme's colours** (all themes): its cards, bars and button take the shell's
   tokens (`shellPalette` in `sdk/cleanertheme.js`), like the bar's other panels; the Cleaner window keeps the look chosen
   in Cleaner → Settings.

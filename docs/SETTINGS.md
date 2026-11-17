@@ -99,8 +99,12 @@ timer that sleeps until the next change (30 s steps only during the 30-minute fa
   follow the recommended one; files with 1 or 2 are read as 100 and 200 %); `x`, `y` place the display
   relative to the main one. `kms.c` asks `display_pick()` (registered with `kms_set_picker`) every
   time `lord-sessiond` lends the monitor to the session, so the main display's saved mode is used
-  from the first frame; the other displays open right after. The greeter always uses the preferred
-  mode.
+  from the first frame; the other displays open right after. The greeter (and a display with nothing saved) uses the
+  display's native mode (`mode_native`, `server/src/hw/modes.c`): the EDID's preferred mode, unless its shape is more
+  than 8 % off the panel's physical one (the EDID size in mm, both sides at least 10 cm) and a progressive mode within
+  3 % of that shape exists; then the largest such mode. A 34" 3440 × 1440 ultrawide whose EDID prefers 3840 × 2160
+  opens at 3440 × 1440 instead of being stretched to 16:9 (GitHub #173). Settings → Displays names that mode "native".
+  The login screen draws its picture once per display, each covering its own display (`themes/greeter`).
 - **Main display.** "Use as Main Display" moves the Dock (and the menu bar, when it is not on every display) to another display (no
   modeset; the arrangement stays). A plugged display is added and an unplugged one removed (DRM
   uevent → `display_hotplug()` → resync); its windows go to the main display.

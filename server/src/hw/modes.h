@@ -15,6 +15,10 @@ int mode_refresh_mhz(const struct drm_mode_modeinfo *m);
 int mode_pick(const struct drm_mode_modeinfo *modes, int n, int w, int h, int refresh_mhz);
 /* Index of the preferred mode (DRM_MODE_TYPE_PREFERRED), or the largest one. -1 if n == 0. */
 int mode_preferred(const struct drm_mode_modeinfo *modes, int n);
+/* The mode a display opens at when nothing is saved: the preferred one, unless its shape is more than 8 % off the
+ * panel's physical one (mm_w × mm_h from the EDID, both at least 10 cm) and a progressive mode within 3 % of it
+ * exists; then the largest such mode (highest refresh on a tie). GitHub #173. -1 if n == 0. */
+int mode_native(const struct drm_mode_modeinfo *modes, int n, int mm_w, int mm_h);
 /* Distinct resolutions, largest area first: out[i] = index of the highest-refresh mode of
  * that size. Returns how many (≤ max). */
 int mode_resolutions(const struct drm_mode_modeinfo *modes, int n, int *out, int max);
