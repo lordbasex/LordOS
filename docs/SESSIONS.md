@@ -171,7 +171,8 @@ For those who boot to a text console and start the desktop by hand:
   removed once used), and lord-sessiond reads the caller from the socket itself (`SO_PEERCRED`), its controlling
   terminal from `/proc/<pid>/stat`, the console in front (`VT_GETSTATE`) and that console's owner, and accepts only
   someone logged in on the console in front, typing there (`startlogin.h`, tested by `tests/startlogin_test.c`): never
-  a terminal window, ssh, a cron job or another console. Then it stops `lordos-text-login.service` (its agetty,
+  a terminal window, ssh, a cron job or another console; and tty1 must be the caller's or nobody's, never someone
+  else's console session. Then it stops `lordos-text-login.service` (its agetty,
   restarting, would reset tty1 to text; a console session on tty1 ends with it), takes the monitor, brings tty1 to the
   front and shows the login screen with that user chosen. You sign in with your password and get the whole session:
   administrator's actions, the keyring unlocked, Lock Screen, the apps' cgroups and firewall. The next boot is text

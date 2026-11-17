@@ -1140,6 +1140,10 @@ static void start_request(void) {
         snprintf(path, sizeof path, "/dev/tty%d", active);
         uid_t owner = active > 0 && !stat(path, &ts) ? ts.st_uid : (uid_t)-1;
         int vt = startlogin_check(cr.uid, tty_nr, active, owner);
+        /* tty1 is about to be taken (its text login stopped, a console session there ended): only if it is the caller's
+         * or nobody's, never someone else's console session */
+        struct stat t1;
+        if (vt > 0 && (stat("/dev/tty1", &t1) || (t1.st_uid != 0 && t1.st_uid != cr.uid))) vt = SL_NOT_ITS_OWNER;
         struct passwd *pw = vt > 0 ? getpwuid(cr.uid) : NULL;
         if (vt > 0 && pw && sd_user_allowed(pw, 0) && text_now) {
             sd_log("text mode: %s asked for the login screen from tty%d", pw->pw_name, vt);
