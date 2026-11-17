@@ -161,7 +161,7 @@ export function startDeskWidgets() {
         if (r) (byType[w.type] ||= []).push({ id: w.id, x: r.x, y: r.y, w: r.w, h: r.h, size: w.size, kind: w.type, opts: w.opts || {}, dk: dkOf(d) });
       }
     }
-    for (const type of Object.keys(BODIES)) setWidgets(`ws-${type}`, byType[type] || []);
+    for (const type of PAINT_ORDER) setWidgets(`ws-${type}`, byType[type] || []);
     const per = {};
     for (const list of Object.values(byType)) for (const w of list) per[w.dk] = (per[w.dk] || 0) + 1;
     // replaced, not merged (a store merges an object into an object): a display left with none drops out
@@ -1407,6 +1407,13 @@ const VideoKind = ({ w }) => <VideoBody w={w} setOpts={(p) => setDeskWidget(w.id
 const BODIES = { video: VideoKind, timer: TimerBody, recent: RecentBody, updates: UpdatesBody, launcher: LauncherBody, vpn: VpnBody, weather: WeatherBody, clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
   battery: BatteryBody, reminders: RemindersBody, clipboard: ClipboardBody, claude: ClaudeBody, nowplaying: NowPlayingBody, readaloud: ReadAloudBody,
   soundwave: SoundWaveBody };
+// The order the kinds are painted in (widgets.js draws the types in the order they were first published): the ones
+// that never change on their own first, the ones that do (a clock, a reading every few seconds, a video, the sound wave)
+// last, the busiest at the end. Each card's frosted glass blurs what is painted under it within ~45 px (cards sit 16 px
+// apart): a number changing in a card painted above its neighbours never makes them blur again (paint.c's blur cache),
+// so changes stay inside their own card (0.8.8.10). Kinds not listed go between the two groups.
+const LIVE_KINDS = ['clock', 'timer', 'vpn', 'battery', 'temps', 'disks', 'system', 'network', 'claude', 'nowplaying', 'video', 'soundwave'];
+const PAINT_ORDER = [...Object.keys(BODIES).filter((k) => !LIVE_KINDS.includes(k)), ...LIVE_KINDS.filter((k) => k in BODIES)];
 const KIND_SIZES = { video: ['m', 's', 'l', 'xl'], timer: ['s', 'm'], recent: ['m', 'l'], updates: ['s', 'm'], launcher: ['s', 'm', 'l'], vpn: ['s', 'm', 'l'], weather: ['s', 'm', 'l'], clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
   temps: ['s', 'm', 'l'], battery: ['s', 'm'], reminders: ['s', 'm', 'l'], clipboard: ['m', 'l'], claude: ['s', 'm', 'l'], nowplaying: ['m'], readaloud: ['s', 'm'],
   soundwave: ['w', 'm', 'l', 'xl'] };

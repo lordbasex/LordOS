@@ -2068,6 +2068,49 @@ static void cover_walk(Node *n, Box d, Box clip, int *found) {
     for (int i = 0; i < k; i++) cover_walk(kids[i], d, inner, found);
 }
 
+/* Whether node `target`'s box is hidden behind something opaque painted after it (paint_node_covered): a walk in
+ * paint order that, once past the target (and its subtree), looks for an opaque node holding the whole box, with the
+ * same rules as cover_walk (no transparency, no blur, no gradient, inside the rounded corners and the clipping
+ * ancestors). */
+static void cover_after(Node *n, const Node *target, Box d, Box clip, int *seen, int *found) {
+    if (*found) return;
+    if (n == target) { *seen = 1; return; }
+    const Style *s = &n->s;
+    if (n->type == NODE_RAW || s->display_none || s->opacity < 0.999f || n->own_tf || n->has_tf) {
+        /* not a cover, but the target may be inside: walk it for the order only */
+        if (!*seen && n->type != NODE_RAW && !s->display_none) {
+            Node *kids[MAX_KIDS];
+            int k = node_children_ordered(n, kids, MAX_KIDS);
+            Box none = { 0, 0, 0, 0 };
+            for (int i = 0; i < k && !*seen; i++) cover_after(kids[i], target, d, none, seen, found);
+        }
+        return;
+    }
+    Box box = box_and((Box){ n->ax, n->ay, n->ax + n->w, n->ay + n->h }, clip);
+    if (*seen && (s->bg >> 24) == 0xff && !s->has_gradient && s->backdrop_blur < 1) {
+        float k = s->radius * 0.3f;
+        Box in = { box.x0 + k, box.y0 + k, box.x1 - k, box.y1 - k };
+        if (d.x0 >= in.x0 && d.y0 >= in.y0 && d.x1 <= in.x1 && d.y1 <= in.y1) { *found = 1; return; }
+    }
+    if (n->type == NODE_TEXT) return;
+    Box inner = s->overflow_hidden ? box : clip;
+    float rr = node_edges_plain(n) ? s->radius : max4(s->ext->r.rad);
+    if (s->overflow_hidden && rr > 0) inner = (Box){ inner.x0 + rr, inner.y0 + rr, inner.x1 - rr, inner.y1 - rr };
+    Node *kids[MAX_KIDS];
+    int k = node_children_ordered(n, kids, MAX_KIDS);
+    for (int i = 0; i < k && !*found; i++) cover_after(kids[i], target, d, inner, seen, found);
+}
+
+int paint_node_covered(const Node *target) {
+    Node *root = ui.root;
+    if (!root || !target || target == root) return 0;
+    Box d = { floorf(target->ax), floorf(target->ay), ceilf(target->ax + target->w), ceilf(target->ay + target->h) };
+    if (d.x1 <= d.x0 || d.y1 <= d.y0) return 0;
+    int seen = 0, found = 0;
+    cover_after(root, target, d, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, &seen, &found);
+    return seen && found;
+}
+
 static int opaque_cover_node(Node *root) {
     int found = 0;
     if (ui.damage.x1 > ui.damage.x0) cover_walk(root, ui.damage, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, &found);

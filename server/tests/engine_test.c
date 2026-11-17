@@ -1788,6 +1788,26 @@ static void test_sound_wave(void) {
         }
     }
     CHECK(!bad, "sound wave: %d frames differ from a full repaint", bad);
+    /* behind an opaque window it isn't drawn at all; uncovered, it is again */
+    Node *win = box_in(root, 50, 80, 900, 300, 0xff202024);
+    layout_root(root, W, H);
+    render(root, W, H);
+    int before = ui.dlist.n;
+    for (int i = 0; i < 1600; i++) { buf[i] = (float)(0.4 * sin(ph)); ph += 2 * M_PI * 220 / 48000; }
+    spectrum_feed(&sp, buf, 1600);
+    ui.damage = (Box){ 0, 0, 0, 0 }; ui.dlist.n = 0;
+    wave_tick();
+    CHECK(ui.damage.x1 <= ui.damage.x0, "sound wave: behind an opaque window a new spectrum damages nothing (%g,%g %gx%g)",
+          ui.damage.x0, ui.damage.y0, ui.damage.x1 - ui.damage.x0, ui.damage.y1 - ui.damage.y0);
+    sn(win, "backgroundColor", 0xc0202024);             /* a translucent window: the wave shows through, so it is drawn */
+    layout_root(root, W, H);
+    paint_damage(root);
+    ui.damage = (Box){ 0, 0, 0, 0 }; ui.dlist.n = 0;
+    spectrum_feed(&sp, buf, 1600);
+    wave_tick();
+    CHECK(ui.damage.x1 > ui.damage.x0, "sound wave: behind a translucent window it is still drawn");
+    (void)before;
+    node_destroy(win);
     printf("sound wave: 60 frames lifted, dragged, resized and recreated\n");
     node_destroy(root);
     ui.root = NULL;

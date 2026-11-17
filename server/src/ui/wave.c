@@ -335,6 +335,8 @@ void wave_tick(void) {
             shown[i].id = 0;
             continue;
         }
+        /* behind an opaque window: nothing would show, so nothing is drawn (uncovering it repaints it, up to date) */
+        if (paint_node_covered(n)) continue;
         damage_add((Box){ floorf(n->ax), floorf(n->ay), ceilf(n->ax + n->w), ceilf(n->ay + n->h) });
         ui.dirty = 1;
     }
