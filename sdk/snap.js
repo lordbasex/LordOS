@@ -64,3 +64,7 @@ export function dwellZone(zone, dwell, now, ms = SNAP_DWELL_MS) {
   if (!dwell || dwell.side !== zone) return { zone, dwell: { side: zone, t: now } };
   return { zone: now - dwell.t >= ms ? `${zone}-third` : zone, dwell };
 }
+
+// Whether dragging a window to an edge snaps it: the theme turns it on (configureWindows({ snap: true })) and the
+// person may turn it off in Settings → Desktop & Dock → Windows (settings.windowSnap, default on; GitHub #182).
+export const snapAllowed = (themeOn, s) => !!themeOn && !(s && s.windowSnap === false);

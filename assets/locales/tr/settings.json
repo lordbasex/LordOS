@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Görev çubuğunu varsayılanlara sıfırla",
   "dock.right": "Sağ",
   "dock.sidesHint": "Sol ve sağ ekranın kenarlarıdır: sağdan sola yazılan bir dilde yer değiştirmezler.",
+  "dock.snap.label": "Pencereleri ekran kenarlarına yasla",
+  "dock.snap.footer": "Bir pencereyi ekranın o yarısını doldurması için sol ya da sağ kenara, çeyreğini doldurması için bir köşeye yakın, tüm ekranı doldurması için üst kenara sürükleyin. Oradan çekince eski boyutuna döner.",
   "dock.size": "Boyut",
   "dock.small": "Küçük",
   "dock.taskbar": "Görev çubuğu konumu",

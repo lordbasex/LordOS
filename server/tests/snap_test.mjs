@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { SNAP_ZONES, snapRect, zoneAt, snapNext, SNAP_EDGE, dwellZone, SNAP_DWELL_MS } = await import(path.join(here, '../../sdk/snap.js'));
+const { SNAP_ZONES, snapRect, zoneAt, snapNext, SNAP_EDGE, dwellZone, SNAP_DWELL_MS, snapAllowed } = await import(path.join(here, '../../sdk/snap.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -85,6 +85,13 @@ eq('unknown direction', snapNext('left', 'sideways'), null);
   eq('dwell: the top edge never becomes a third', [r.zone, r.dwell], ['max', null]);
   eq('dwell: the third zones exist', ['left-third', 'right-third'].every((z) => SNAP_ZONES.includes(z)), true);
 }
+
+// the person's switch (Settings → Desktop & Dock → Windows, settings.windowSnap; GitHub #182)
+eq('allowed: the theme snaps, no setting yet', snapAllowed(true, {}), true);
+eq('allowed: the theme snaps, setting on', snapAllowed(true, { windowSnap: true }), true);
+eq('allowed: turned off by the person', snapAllowed(true, { windowSnap: false }), false);
+eq('allowed: a theme without snapping ignores the setting', snapAllowed(false, { windowSnap: true }), false);
+eq('allowed: no settings at all', snapAllowed(true, null), true);
 
 console.log(`snap-test: ${n - bad}/${n} ok`);
 process.exit(bad ? 1 : 0);

@@ -152,6 +152,20 @@ function WindowsSection({ classic, plain }) {
   );
 }
 
+// Dragging a window to an edge of the screen snaps it (0.8.8.10, GitHub #182; sdk/snap.js snapAllowed): every theme
+// that snaps follows this switch, on by default.
+function SnapSection() {
+  const { t: tr } = useLocale();
+  const [s, set] = useSettings();
+  return (
+    <Section footer={tr('settings.dock.snap.footer')}>
+      <SettingRow label={tr('settings.dock.snap.label')}>
+        <Toggle small on={s.windowSnap !== false} onChange={(windowSnap) => set({ windowSnap })} />
+      </SettingRow>
+    </Section>
+  );
+}
+
 export function DockSettings() {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
@@ -166,6 +180,7 @@ export function DockSettings() {
       <Stack>
         <DesktopsSection tr={tr} />
         <ThemeOptions theme={info} />
+        <SnapSection />
         <WindowsSection plain />
       </Stack>
     );
@@ -185,6 +200,7 @@ export function DockSettings() {
           </Section>
         ) : null}
         <MenuBarSection classic />
+        <SnapSection />
         <WindowsSection classic />
         <ResetDock classic />
       </Stack>
@@ -220,6 +236,7 @@ export function DockSettings() {
       </Section>
       <MenuBarSection />
       <ControlCenterSection />
+      <SnapSection />
       <WindowsSection />
       <ResetDock />
     </Stack>

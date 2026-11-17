@@ -93,7 +93,8 @@ Default's shapes.
 
 Two switches a taskbar theme usually wants: `configureWindows({ snap: true })` turns on window
 snapping (drag to the edges, `wm.snap`, `wm.snapKey`, and `snapPreview` to draw the preview; see
-`docs/WINDOWS.md`, "Snapping"), and `setBannerPlacement('bottom')` shows notification banners above
+`docs/WINDOWS.md`, "Snapping"; the person's switch in Settings → Desktop & Dock, `settings.windowSnap`, applies on
+top of it), and `setBannerPlacement('bottom')` shows notification banners above
 a bottom taskbar instead of below a menu bar.
 
 ## Native components

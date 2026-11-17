@@ -75,6 +75,8 @@
   "dock.resetTaskbar": "将任务栏恢复为默认设置",
   "dock.right": "右侧",
   "dock.sidesHint": "左和右指屏幕的两侧：在从右到左书写的语言中不会互换。",
+  "dock.snap.label": "将窗口贴靠到屏幕边缘",
+  "dock.snap.footer": "将窗口拖到左边缘或右边缘可占满该半边屏幕，拖到角落附近可占四分之一，拖到上边缘可占满整个屏幕。拖离后窗口会恢复原来的大小。",
   "dock.size": "大小",
   "dock.small": "小",
   "dock.taskbar": "任务栏位置",

@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Ripristina la barra delle applicazioni ai valori predefiniti",
   "dock.right": "A destra",
   "dock.sidesHint": "Sinistra e destra sono i lati dello schermo: non si invertono in una lingua da destra a sinistra.",
+  "dock.snap.label": "Aggancia le finestre ai bordi dello schermo",
+  "dock.snap.footer": "Trascina una finestra sul bordo sinistro o destro per occupare quella metà dello schermo, vicino a un angolo per occuparne un quarto, o sul bordo superiore per occupare tutto lo schermo. Spostandola via torna alla sua dimensione.",
   "dock.size": "Dimensione",
   "dock.small": "Piccolo",
   "dock.taskbar": "Posizione della barra delle applicazioni",

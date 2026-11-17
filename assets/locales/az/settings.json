@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Tapşırıq panelini standart vəziyyətə qaytar",
   "dock.right": "Sağ",
   "dock.sidesHint": "Sol və sağ ekranın tərəfləridir: sağdan sola yazılan dildə yerlərini dəyişmir.",
+  "dock.snap.label": "Pəncərələri ekranın kənarlarına yapışdır",
+  "dock.snap.footer": "Pəncərəni ekranın həmin yarısını tutması üçün sol və ya sağ kənara, dörddə birini tutması üçün küncə yaxın, bütün ekranı tutması üçün yuxarı kənara sürükləyin. Oradan çəkdikdə öz ölçüsünə qayıdır.",
   "dock.size": "Ölçü",
   "dock.small": "Kiçik",
   "dock.taskbar": "Tapşırıq panelinin mövqeyi",

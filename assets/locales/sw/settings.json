@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Rejesha upau wa kazi kwenye chaguo-msingi",
   "dock.right": "Kulia",
   "dock.sidesHint": "Kushoto na kulia ni pande za skrini: hazibadilishani katika lugha inayoandikwa kutoka kulia kwenda kushoto.",
+  "dock.snap.label": "Panga madirisha kwenye kingo za skrini",
+  "dock.snap.footer": "Buruta dirisha hadi ukingo wa kushoto au kulia ili lijaze nusu hiyo ya skrini, karibu na kona ili lijaze robo, au hadi ukingo wa juu ili lijaze skrini nzima. Ukiliburuta mbali, linarudi kwenye ukubwa wake.",
   "dock.size": "Ukubwa",
   "dock.small": "Ndogo",
   "dock.taskbar": "Mahali pa upau wa kazi",

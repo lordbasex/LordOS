@@ -384,7 +384,12 @@ still the Dock's blur.
 
 ## Snapping (0.8.3)
 
-A theme turns it on with `configureWindows({ snap: true })` (Lord Classic does; Lord Flow doesn't).
+A theme turns it on with `configureWindows({ snap: true })` (Lord Classic and Lord Workspaces do, and Lord Flow since
+0.8.8.10, GitHub #182). The person can turn dragging to the edges off in **Settings → Desktop & Dock → Snap windows to
+the screen edges** (`settings.windowSnap`, on by default; `snapAllowed` in `snap.js`, `snapEnabled()` and
+`snapZoneAt()` in `windows.js` return false and null then); `wm.snap`, `wm.snapKey` and the menus' layouts keep
+working. In Lord Flow a maximized window dragged out by its bar (the JS drag in its `Window.jsx`) snaps on release too,
+as in Lord Classic; Lord Flow has no Super+arrows for it (❖ is ⌘ there, and ❖← / ❖→ move the text cursor).
 The geometry is in `sdk/snap.js` (no runtime imports, tested by `server/tests/snap_test.mjs`), the
 window side in `sdk/windows.js`.
 

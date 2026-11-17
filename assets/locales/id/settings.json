@@ -75,6 +75,8 @@
   "dock.resetTaskbar": "Kembalikan bilah tugas ke bawaan",
   "dock.right": "Kanan",
   "dock.sidesHint": "Kiri dan kanan adalah sisi layar: tidak tertukar dalam bahasa kanan-ke-kiri.",
+  "dock.snap.label": "Tempelkan jendela ke tepi layar",
+  "dock.snap.footer": "Seret jendela ke tepi kiri atau kanan untuk mengisi separuh layar itu, dekat sudut untuk mengisi seperempat, atau ke tepi atas untuk mengisi seluruh layar. Menyeretnya menjauh mengembalikan ukurannya.",
   "dock.size": "Ukuran",
   "dock.small": "Kecil",
   "dock.taskbar": "Posisi bilah tugas",

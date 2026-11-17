@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Restableix la barra de tasques als valors per defecte",
   "dock.right": "Dreta",
   "dock.sidesHint": "Esquerra i dreta són costats de la pantalla: no s’intercanvien en una llengua de dreta a esquerra.",
+  "dock.snap.label": "Ajusta les finestres a les vores de la pantalla",
+  "dock.snap.footer": "Arrossega una finestra a la vora esquerra o dreta perquè ocupi aquella meitat de la pantalla, a prop d’una cantonada perquè n’ocupi un quart, o a la vora superior perquè ocupi tota la pantalla. Si l’allunyes, recupera la seva mida.",
   "dock.size": "Mida",
   "dock.small": "Petit",
   "dock.taskbar": "Posició de la barra de tasques",

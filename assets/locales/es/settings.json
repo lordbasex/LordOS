@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Restablecer la barra de tareas",
   "dock.right": "Derecha",
   "dock.sidesHint": "Izquierda y derecha son lados de la pantalla: no cambian con un idioma de derecha a izquierda.",
+  "dock.snap.label": "Acomodar ventanas en los bordes de la pantalla",
+  "dock.snap.footer": "Arrastrá una ventana al borde izquierdo o derecho para que ocupe esa mitad de la pantalla, cerca de una esquina para que ocupe un cuarto, o al borde de arriba para que ocupe toda la pantalla. Al sacarla de ahí vuelve a su tamaño.",
   "dock.size": "Tamaño",
   "dock.small": "Chico",
   "dock.taskbar": "Posición de la barra de tareas",

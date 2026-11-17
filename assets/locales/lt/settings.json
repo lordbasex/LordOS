@@ -85,6 +85,8 @@
   "dock.resetTaskbar": "Atkurti numatytąją užduočių juostą",
   "dock.right": "Dešinėje",
   "dock.sidesHint": "Kairė ir dešinė yra ekrano pusės: jos nesukeičiamos kalbose, rašomose iš dešinės į kairę.",
+  "dock.snap.label": "Prikabinti langus prie ekrano kraštų",
+  "dock.snap.footer": "Nutempkite langą prie kairiojo ar dešiniojo krašto, kad jis užimtų tą ekrano pusę, prie kampo – ketvirtį, arba prie viršutinio krašto – visą ekraną. Patraukus jį šalin, jis atgauna savo dydį.",
   "dock.size": "Dydis",
   "dock.small": "Mažas",
   "dock.taskbar": "Užduočių juostos vieta",

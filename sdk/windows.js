@@ -10,7 +10,8 @@ import { createStore, useStore } from './store.js';
 import { appName, t } from './i18n.js';
 import { webAppOfWindow } from './webapps.js';
 import { webWindowTitles, profileHex } from './webappsmodel.js';
-import { SNAP_ZONES, snapRect, zoneAt, snapNext, dwellZone, SNAP_DWELL_MS } from './snap.js';
+import { SNAP_ZONES, snapRect, zoneAt, snapNext, dwellZone, SNAP_DWELL_MS, snapAllowed } from './snap.js';
+import { settings } from './settings.js';
 import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo } from './desktopmodel.js';
 
 export { SNAP_ZONES, snapRect };
@@ -158,7 +159,7 @@ export const appMenus = createStore({});
 // chrome: what the theme's frame adds around the content (borders and title bar);
 // used to open Linux app windows at the size they requested.
 // snap: true turns on window snapping (dragging a window to an edge of the screen, see "Snapping"
-// below); the Classic theme does.
+// below); Lord Flow, Lord Classic and Lord Workspaces do. The person can still turn it off (settings.windowSnap).
 // locked: (window) => true for a window the person has locked in place (Lord Workspaces' padlock): the person's own
 // ways to move, resize, maximize, minimize, snap or close it refuse (see "Locked windows" below).
 // snapThirds: true (Lord Workspaces) turns a left or right half into a third after the pointer rests on that edge for
@@ -271,7 +272,8 @@ function frameRef(id, inset = 0) {
 // A window dragged to the left or right edge of a display takes that half of its work area; near the
 // top or bottom of that edge, a quarter; to the top edge, the whole area (maximized). The theme turns
 // it on (configureWindows({ snap: true })), draws the preview from `snapPreview` and may offer the
-// layouts with wm.snap(id, zone). While a window is moved in C, the SDK only reads the pointer a few
+// layouts with wm.snap(id, zone). The person turns dragging to the edges off in Settings → Desktop & Dock →
+// Windows (settings.windowSnap, GitHub #182); wm.snap, wm.snapKey and the menus' layouts keep working. While a window is moved in C, the SDK only reads the pointer a few
 // times per second (lord.wm.pointer), never per frame.
 let snapOn = false;
 let thirdsOn = false;
@@ -281,9 +283,11 @@ export { SNAP_DWELL_MS };
 export const moveGrab = createStore(null);
 // { id, zone, rect: { x, y, w, h } } while a dragged window would snap, else null
 export const snapPreview = createStore(null);
-export const snapEnabled = () => snapOn;
-// The zone under the pointer at (x, y), or null (the rules are in snap.js, zoneAt).
+// the theme snaps and the person didn't turn it off (snap.js snapAllowed)
+export const snapEnabled = () => snapAllowed(snapOn, settings.get());
+// The zone under the pointer at (x, y), or null (the rules are in snap.js, zoneAt); always null with snapping off.
 export function snapZoneAt(x, y) {
+  if (!snapEnabled()) return null;
   const d = displayAt(x, y);
   return d ? zoneAt(x, y, workAreaOf(d)) : null;
 }
@@ -311,7 +315,7 @@ let previewTimer = 0;
 function watchSnap(id) {
   clearInterval(previewTimer);
   previewTimer = 0;
-  if (!snapOn || typeof lord === 'undefined' || !lord.wm || typeof lord.wm.pointer !== 'function') return;
+  if (!snapEnabled() || typeof lord === 'undefined' || !lord.wm || typeof lord.wm.pointer !== 'function') return;
   let dwell = null;                 // { side, t }: the pointer on a left or right edge since t (snapThirds)
   previewTimer = setInterval(() => {
     const p = lord.wm.pointer();
@@ -350,7 +354,7 @@ globalThis.__lordWm = (type, d) => {
   if (shown) snapPreview.set(null);
   if (!d.dx && !d.dy && !d.dw && !d.dh) return;      // it was a click on the bar
   const nx = Math.round(f.x + d.dx), ny = Math.round(f.y + d.dy);
-  if (snapOn && !edges && typeof lord !== 'undefined' && lord.wm && typeof lord.wm.pointer === 'function') {
+  if (snapEnabled() && !edges && typeof lord !== 'undefined' && lord.wm && typeof lord.wm.pointer === 'function') {
     const p = lord.wm.pointer();
     const at = snapZoneAt(p.x, p.y);
     const zone = thirdsOn && at && shown && shown.id === id && /third/.test(shown.zone) && at === shown.zone.replace('-third', '') ? shown.zone : at;

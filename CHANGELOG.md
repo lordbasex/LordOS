@@ -12,6 +12,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Window snapping in Lord Flow, and a switch for it** (GitHub #182; all themes). Dragging a window to the left or
+  right edge of a display fills that half of its work area, near a corner a quarter, and to the top edge the whole area
+  (maximized), with a rounded preview in the accent's color under the window while dragging. Dragging it away gives it
+  back the size it had. Lord Classic and Lord Workspaces already did this; Lord Flow now does too (`configureWindows({
+  snap: true })`), including a maximized window dragged out by its bar. **Settings → Desktop & Dock → Snap windows to
+  the screen edges** (on by default, `settings.windowSnap`, a new key with no migration) turns dragging to the edges off
+  in every theme; the window menus' layouts and Lord Classic's ❖ arrows keep working. Workspaces' thirds are unchanged.
+  (`sdk/snap.js` `snapAllowed`, `sdk/windows.js`, `themes/default/index.jsx`, `themes/default/components/Window.jsx`,
+  `apps/settings/Dock.jsx`; `server/tests/snap_test.mjs`)
 - **Settings → Users: a picture for your account, chosen and fitted** (all themes). "Choose image…" opens the file
   chooser instead of a path to type; the picture (any size or format lord-media reads, turned upright) shows in a
   circle, the slider zooms and dragging places it; Save cuts that square from the full picture, scales it to 512 × 512
