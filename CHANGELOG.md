@@ -12,6 +12,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Lord Workspaces: a Devices widget.** The battery of everything connected in one card, as rings with the kind's
+  drawing: the computer (when it has a battery), mice and keyboards on a Logitech receiver or over Bluetooth
+  (`/sys/class/power_supply`, scope Device) and headphones and the rest that BlueZ reports a battery for. A device
+  seen both ways is listed once. A device that gives only a level (a Logitech MX over HID++ in the kernel) shows the
+  level ("Normal", "Low"…) and a ring filled roughly. Green, yellow under 30 %, red under 15 %; a bolt while charging.
+  Small: four rings; medium: a row of rings, or the warning when one is under 15 % and not charging; large: a list
+  with names, connection and bars. No timer: the kernel's and BlueZ's change notices keep it current. No external
+  app needed. `lord.power.state()` now carries each supply's `level` (capacity_level). Strings in all 35 languages.
+
 - **One wallpaper per display, in every theme.** Settings → Wallpaper gains a display selector (all displays or one,
   named by model plus connector when monitors share a model); a display's own picture is kept in a new settings key,
   `wallpapers` (`{ [connector]: id }`, no migration: an absent key is the old behaviour). Lord Flow, Lord Classic and

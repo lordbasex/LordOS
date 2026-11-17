@@ -17,6 +17,8 @@ typedef struct {
     int present;
     int percent;                /* 0..100, -1 unknown */
     char status[16];            /* Charging, Discharging, Full, Not charging, Unknown */
+    char level[16];             /* capacity_level, for a battery that gives no percentage (a Logitech mouse over HID++:
+                                 * Critical, Low, Normal, High, Full); "" when there is none */
     int minutes_left;           /* to empty (discharging) or to full (charging); -1 unknown */
     int health;                 /* full / design capacity, percent; -1 unknown */
     int cycles;                 /* -1 unknown */

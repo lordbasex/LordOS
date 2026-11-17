@@ -406,6 +406,13 @@ await flush();
     for (let n = parents.get(id); n; n = parents.get(n)) { const st = styles.get(n); if (st?.position === 'absolute' && st.left >= D.x && st.left < D.x + D.w) return true; }
     return false;
   });
+  {
+    const dv = sdk.addDeskWidget('devices', 'm', R);
+    for (let i = 0; i < 3; i++) await flush();
+    check('widgets: Devices with nothing that has a battery says so', shownT(sdk.t('shell.widgets.devices.none')), 1);
+    sdk.removeDeskWidget(dv);
+    for (let i = 0; i < 3; i++) await flush();
+  }
   const c1 = sdk.addDeskWidget('clock', 's', R);
   const c2 = sdk.addDeskWidget('calendar', 'l', R);
   for (let i = 0; i < 2; i++) await flush();

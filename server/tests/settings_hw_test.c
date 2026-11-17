@@ -319,6 +319,19 @@ static void test_power(void) {
     CHECK(!strcmp(b->name, "BAT0") && b->health == 87 && b->cycles == 312 && fabs(b->watts - 7) < 1e-9);
     CHECK(!strcmp(b->technology, "Li-poly") && !strcmp(b->model, "5B10W13930"));
     CHECK(ps.s[2].device_scope && ps.s[2].percent == 90);
+    /* a Logitech keyboard over HID++ that gives only a level: no percentage, its level kept; "Unknown" is none */
+    wfile(dir, "hidpp_battery_1", "type", "Battery");
+    wfile(dir, "hidpp_battery_1", "scope", "Device");
+    wfile(dir, "hidpp_battery_1", "capacity_level", "Low");
+    wfile(dir, "hidpp_battery_1", "model_name", "MX Keys Wireless Keyboard");
+    wfile(dir, "hidpp_battery_0", "capacity_level", "Unknown");
+    CHECK(power_read(dir, &ps) == 4);
+    CHECK(ps.s[3].device_scope && ps.s[3].percent == -1 && !strcmp(ps.s[3].level, "Low") && !ps.s[2].level[0]);
+    CHECK(ps.has_battery && ps.percent == 42);          /* the devices still don't count as the system battery */
+    { char jj[4096]; power_json(&ps, jj, sizeof jj); CHECK(strstr(jj, "\"level\":\"Low\"") != NULL); }
+    { char pp[512]; snprintf(pp, sizeof pp, "%s/hidpp_battery_1", dir); char q[600];
+      const char *fl[] = { "type", "scope", "capacity_level", "model_name" };
+      for (int i = 0; i < 4; i++) { snprintf(q, sizeof q, "%s/%s", pp, fl[i]); unlink(q); } rmdir(pp); }
 
     /* charging with charge_* / current_now, time to full */
     wfile(dir, "AC", "online", "1");

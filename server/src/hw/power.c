@@ -48,6 +48,8 @@ static void read_one(const char *root, const char *dev, PowerSupply *s) {
     s->watts = -1;
     if (!s->battery) return;
     if (attr(root, dev, "status", s->status, sizeof s->status)) snprintf(s->status, sizeof s->status, "Unknown");
+    attr(root, dev, "capacity_level", s->level, sizeof s->level);
+    if (!strcmp(s->level, "Unknown")) s->level[0] = 0;
     attr(root, dev, "model_name", s->model, sizeof s->model);
     attr(root, dev, "manufacturer", s->vendor, sizeof s->vendor);
     attr(root, dev, "technology", s->technology, sizeof s->technology);
@@ -143,6 +145,8 @@ size_t power_json(const PowerState *ps, char *out, size_t n) {
         w(&o, ",\"battery\":%s,\"device\":%s,\"online\":%s,\"present\":%s,\"percent\":%d,\"status\":",
           s->battery ? "true" : "false", s->device_scope ? "true" : "false", s->online ? "true" : "false", s->present ? "true" : "false", s->percent);
         wq(&o, s->status);
+        w(&o, ",\"level\":");
+        wq(&o, s->level);
         w(&o, ",\"minutesLeft\":%d,\"health\":%d,\"cycles\":%d,\"watts\":%.2f,\"model\":", s->minutes_left, s->health, s->cycles, s->watts);
         wq(&o, s->model);
         w(&o, ",\"vendor\":");

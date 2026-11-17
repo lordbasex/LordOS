@@ -111,6 +111,11 @@ function KindGlyph({ type, t }) {
       <View style={{ width: 3, height: 7, borderRadius: 1, backgroundColor: dim }} />
     </View>
   );
+  if (type === 'devices') return (
+    <View style={{ width: 34, height: 34, flexDirection: 'row', flexWrap: 'wrap', gap: 4, direction: 'ltr' }}>
+      {['#3dd68c', '#3dd68c', '#f5b43c', '#3dd68c'].map((c, i) => <View key={i} style={{ width: 15, height: 15, borderRadius: 8, border: `2.5px solid ${c}` }} />)}
+    </View>
+  );
   if (type === 'reminders') return (
     <View style={{ width: 34, height: 34, gap: 5, justifyContent: 'center' }}>
       {[0, 1, 2].map((i) => <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, direction: 'ltr' }}><View style={{ width: 7, height: 7, borderRadius: 4, border: `1.5px solid ${a}` }} /><View style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: dim }} /></View>)}

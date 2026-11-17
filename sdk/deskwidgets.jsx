@@ -37,7 +37,8 @@ import { NowPlayingTile } from './media.js';
 import { speak, stopSpeaking, speakAvailable } from './voice.js';
 import { events, reminders, usePimQuery } from './calendar.js';
 import { useFan } from './cooling.jsx';
-import { battery } from './hardware.jsx';
+import { battery, bluetooth } from './hardware.jsx';
+import { devicesFrom, fractionOf, toneOf as deviceTone } from './devicesmodel.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
 import { wifiBars, monthCells, weekStartFor } from './menubarmodel.js';
 import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect } from './widgetgrid.js';
@@ -881,6 +882,104 @@ function BatteryBody({ w, L }) {
   );
 }
 
+// ---- devices: the battery of the computer, mice, keyboards, headsets (sdk/devicesmodel.js) ----
+// No timer: lord.power and lord.bt send their changes (a power_supply uevent, a BlueZ signal), so the list is as
+// fresh as the kernel's and costs nothing at rest. lord-hidpp's exact Logitech percentages come through the shared
+// feed once a minute while a Devices widget is in view.
+const hidppRead = () => { try { return lord.hidpp?.batteries ? lord.hidpp.batteries() || [] : []; } catch (e) { return []; } };
+function useDevices() {
+  const pw = useStore(battery), bt = useStore(bluetooth);
+  const hp = useFeed('hidpp', hidppRead, 60000);
+  return devicesFrom(pw, bt, hp);
+}
+// a small drawing of each kind, in plain views (no SVG in the renderer)
+function DeviceGlyph({ kind, size, color }) {
+  const u = size / 24, line = Math.max(1.5, 1.8 * u);
+  const b = (st) => <View style={{ position: 'absolute', ...st }} />;
+  const box = { width: size, height: size, direction: 'ltr' };
+  if (kind === 'laptop') return <View style={box}>{b({ left: 5 * u, top: 6 * u, width: 14 * u, height: 9 * u, borderRadius: 1.5 * u, border: `${line}px solid ${color}` })}{b({ left: 3 * u, top: 17 * u, width: 18 * u, height: line, borderRadius: line, backgroundColor: color })}</View>;
+  if (kind === 'mouse') return <View style={box}>{b({ left: 7 * u, top: 3.5 * u, width: 10 * u, height: 17 * u, borderRadius: 5 * u, border: `${line}px solid ${color}` })}{b({ left: 12 * u - line / 2, top: 6.5 * u, width: line, height: 3.5 * u, borderRadius: line, backgroundColor: color })}</View>;
+  if (kind === 'keyboard') return <View style={box}>{b({ left: 3 * u, top: 7 * u, width: 18 * u, height: 10 * u, borderRadius: 2 * u, border: `${line}px solid ${color}` })}{[6.5, 10, 13.5, 17].map((x) => <View key={x} style={{ position: 'absolute', left: x * u - 0.5 * u, top: 10 * u, width: 1.6 * u, height: 1.6 * u, borderRadius: u, backgroundColor: color }} />)}{b({ left: 7 * u, top: 13.6 * u, width: 10 * u, height: line, borderRadius: line, backgroundColor: color })}</View>;
+  if (kind === 'headset') return <View style={box}>{b({ left: 5 * u, top: 4 * u, width: 14 * u, height: 14 * u, borderRadius: 7 * u, border: `${line}px solid ${color}`, borderBottomColor: 'transparent' })}{b({ left: 4 * u, top: 13 * u, width: 4 * u, height: 7 * u, borderRadius: 1.5 * u, backgroundColor: color })}{b({ left: 16 * u, top: 13 * u, width: 4 * u, height: 7 * u, borderRadius: 1.5 * u, backgroundColor: color })}</View>;
+  if (kind === 'gamepad') return <View style={box}>{b({ left: 3 * u, top: 7 * u, width: 18 * u, height: 11 * u, borderRadius: 5 * u, border: `${line}px solid ${color}` })}{b({ left: 7 * u, top: 11.5 * u, width: 4 * u, height: line, backgroundColor: color })}{b({ left: 9 * u - line / 2, top: 9.5 * u, width: line, height: 4 * u, backgroundColor: color })}</View>;
+  if (kind === 'pen') return <View style={box}>{b({ left: 11 * u, top: 2 * u, width: 2.6 * u, height: 18 * u, borderRadius: 1.3 * u, backgroundColor: color, transform: 'rotate(35deg)' })}</View>;
+  if (kind === 'phone') return <View style={box}>{b({ left: 7 * u, top: 3 * u, width: 10 * u, height: 18 * u, borderRadius: 2.5 * u, border: `${line}px solid ${color}` })}</View>;
+  return <View style={box}>{b({ left: 4 * u, top: 8 * u, width: 15 * u, height: 8 * u, borderRadius: 2 * u, border: `${line}px solid ${color}` })}{b({ left: 19.5 * u, top: 10.5 * u, width: 1.8 * u, height: 3 * u, borderRadius: u, backgroundColor: color })}</View>;
+}
+const toneColor = (L, d) => ({ ok: L.ok, warn: L.warn, crit: L.crit }[deviceTone(d)]);
+const deviceName = (d) => (d.kind === 'laptop' && !d.name ? t('shell.widgets.devices.computer') : d.name);
+// "85 %", "⚡100 %", or the level's word when there is no percentage
+const deviceValue = (d) => `${d.charging ? '⚡' : ''}${d.percent >= 0 ? `${d.percent} %` : d.level ? t(`shell.widgets.devices.level.${d.level}`) : '—'}`;
+function DeviceRing({ L, d, size, ticks = 32 }) {
+  return (
+    <TickRing L={L} size={size} value={fractionOf(d)} color={toneColor(L, d)} ticks={ticks}>
+      <DeviceGlyph kind={d.kind} size={size * 0.38} color={L.text} />
+    </TickRing>
+  );
+}
+function DevicesBody({ w, L }) {
+  const list = useDevices();
+  if (!list.length) {
+    return <View style={{ flex: 1 }}><Head L={L} title={t('shell.widgets.devices.name')} /><Quiet L={L} text={t('shell.widgets.devices.none')} /></View>;
+  }
+  if (w.size === 's') {
+    return (
+      <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', alignContent: 'space-around' }}>
+        {list.slice(0, 4).map((d) => (
+          <View key={d.id} style={{ width: '50%', alignItems: 'center', gap: 2 }}>
+            <DeviceRing L={L} d={d} size={list.length > 2 ? 52 : 70} ticks={24} />
+            <Text style={{ fontSize: 10.5, fontWeight: 650, color: L.text, whiteSpace: 'nowrap' }}>{deviceValue(d)}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
+  if (w.size === 'm') {
+    // one running low and not charging takes the card: the warning, with its name
+    const low = list.find((d) => deviceTone(d) === 'crit');
+    if (low) {
+      return (
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          <DeviceRing L={L} d={low} size={96} ticks={36} />
+          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+            <Text style={{ fontSize: 11, fontWeight: 700, color: L.crit, textAlign: 'start' }}>{t('shell.widgets.devices.low').toLocaleUpperCase()}</Text>
+            <Text style={{ fontSize: 17, fontWeight: 650, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{deviceName(low)}</Text>
+            <Sub L={L}>{deviceValue(low)}</Sub>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
+        {list.slice(0, 4).map((d) => (
+          <View key={d.id} style={{ alignItems: 'center', gap: 8 }}>
+            <DeviceRing L={L} d={d} size={66} />
+            <Text style={{ fontSize: 12.5, fontWeight: 650, color: L.text, whiteSpace: 'nowrap' }}>{deviceValue(d)}</Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
+  return (
+    <View style={{ flex: 1, gap: 10 }}>
+      <Head L={L} title={t('shell.widgets.devices.name')} />
+      {list.slice(0, 5).map((d) => (
+        <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <DeviceRing L={L} d={d} size={44} ticks={24} />
+          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Text style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{deviceName(d)}</Text>
+              <Text style={{ fontSize: 13.5, fontWeight: 600, color: L.text }}>{deviceValue(d)}</Text>
+            </View>
+            <Sub L={L}>{t(`shell.widgets.devices.via.${d.via}`)}</Sub>
+            <Bar L={L} value={fractionOf(d)} color={toneColor(L, d)} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // ---- reminders ----
 function RemindersBody({ w, L }) {
   const items = usePimQuery(async () => {
@@ -1555,7 +1654,7 @@ const VideoKind = ({ w }) => <VideoBody w={w} setOpts={(p) => setDeskWidget(w.id
 
 // ---- the kinds: their sizes (the first is the default), bodies and menu entries ----
 const BODIES = { video: VideoKind, timer: TimerBody, recent: RecentBody, updates: UpdatesBody, launcher: LauncherBody, vpn: VpnBody, weather: WeatherBody, clock: ClockBody, calendar: CalendarBody, system: SystemBody, network: NetworkBody, disks: DisksBody, temps: TempsBody,
-  battery: BatteryBody, reminders: RemindersBody, clipboard: ClipboardBody, claude: ClaudeBody, nowplaying: NowPlayingBody, readaloud: ReadAloudBody,
+  battery: BatteryBody, devices: DevicesBody, reminders: RemindersBody, clipboard: ClipboardBody, claude: ClaudeBody, nowplaying: NowPlayingBody, readaloud: ReadAloudBody,
   soundwave: SoundWaveBody };
 // The order the kinds are painted in (widgets.js draws the types in the order they were first published): the ones
 // that never change on their own first, the ones that do (a clock, a reading every few seconds, a video, the sound wave)
@@ -1565,7 +1664,7 @@ const BODIES = { video: VideoKind, timer: TimerBody, recent: RecentBody, updates
 const LIVE_KINDS = ['clock', 'timer', 'vpn', 'battery', 'temps', 'disks', 'system', 'network', 'claude', 'nowplaying', 'video', 'soundwave'];
 const PAINT_ORDER = [...Object.keys(BODIES).filter((k) => !LIVE_KINDS.includes(k)), ...LIVE_KINDS.filter((k) => k in BODIES)];
 const KIND_SIZES = { video: ['m', 's', 'l', 'xl'], timer: ['s', 'm'], recent: ['m', 'l'], updates: ['s', 'm'], launcher: ['s', 'm', 'l'], vpn: ['s', 'm', 'l'], weather: ['s', 'm', 'l'], clock: ['s', 'm', 'l', 'w'], calendar: ['s', 'm', 'l'], system: ['s', 'm', 'l'], network: ['s', 'm'], disks: ['s', 'm', 'l'],
-  temps: ['s', 'm', 'l'], battery: ['s', 'm'], reminders: ['s', 'm', 'l'], clipboard: ['m', 'l'], claude: ['s', 'm', 'l'], nowplaying: ['m'], readaloud: ['s', 'm'],
+  temps: ['s', 'm', 'l'], battery: ['s', 'm'], devices: ['m', 's', 'l'], reminders: ['s', 'm', 'l'], clipboard: ['m', 'l'], claude: ['s', 'm', 'l'], nowplaying: ['m'], readaloud: ['s', 'm'],
   soundwave: ['w', 'm', 'l', 'xl'] };
 export const kindSizes = (type) => KIND_SIZES[type] || null;
 const KIND_MENU = {
