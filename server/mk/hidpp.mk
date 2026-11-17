@@ -19,8 +19,3 @@ build/hidpp-test: tests/hidpp_test.c src/hw/hidpp.c src/hw/hidpp.h src/hw/hidpps
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/hidpp_test.c src/hw/hidpp.c src/hw/hidppsvc.c -lpthread
 	./$@ || (rm -f $@; exit 1)
-
-# a diagnostic build that tells every step on stderr; never installed (make build/lord-hidpp-debug, run with sudo)
-build/lord-hidpp-debug: $(LORD_HIDPP_SRC) src/hw/hidpp.h src/sec/sandbox.h src/sec/cgroup.h
-	@mkdir -p build
-	$(CC) $(CPPFLAGS) -DHIDPP_DEBUG $(CFLAGS) $(WARN) -std=c11 -o $@ $(LORD_HIDPP_SRC) -lpthread

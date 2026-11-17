@@ -105,9 +105,6 @@ int main(int argc, char **argv) {
 
     for (int i = 0; i < n; i++) {
         HidppBattery b;
-#ifdef HIDPP_DEBUG
-        fprintf(stderr, "hidraw%d:\n", nums[i]);
-#endif
         /* status 3: charging with no level ("<n> 0 3") */
         if (hidpp_battery(fds[i], 400, &b) == 0) printf("%d %d %d\n", nums[i], b.percent < 0 ? 0 : b.percent, b.percent < 0 ? 3 : b.status);
         close(fds[i]);
