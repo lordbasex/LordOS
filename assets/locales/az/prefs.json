@@ -120,6 +120,7 @@
   "display.rotationHint": "Döndərilmiş ekran CPU tərəfindən qurulur.",
   "display.scale": "Miqyas",
   "display.scaleHint": "Mətn, ikonlar və şəkillər displeyin öz ayırdetmə qabiliyyətində çəkilir, buna görə hər miqyas kəskin qalır. Kəsr miqyaslamalı Linux tətbiqləri də onda çəkilir.",
+  "display.scaleSmallHint": "100 %-dən aşağı iş masası {w} × {h} olur, ekrandan böyükdür, ona görə də mətn və idarəetmə elementləri kiçilir. Linux tətbiqləri 100 %-də çəkilir və LordOS onları kiçildir, ona görə də bir az daha yumşaq görünürlər.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (tövsiyə olunur)",
   "display.x11": "X11 tətbiqləri",

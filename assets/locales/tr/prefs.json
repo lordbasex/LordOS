@@ -120,6 +120,7 @@
   "display.rotationHint": "Döndürülmüş bir ekran CPU tarafından oluşturulur.",
   "display.scale": "Ölçek",
   "display.scaleHint": "Metin, simgeler ve resimler ekranın kendi çözünürlüğünde çizilir, böylece her ölçek keskin kalır. Kesirli ölçeklemeyi destekleyen Linux uygulamaları da bu ölçekte çizer.",
+  "display.scaleSmallHint": "%100’ün altında masaüstü {w} × {h} olur, ekrandan büyüktür, bu yüzden metin ve denetimler küçülür. Linux uygulamaları %100’de çizilir ve LordOS onları küçültür, bu yüzden biraz daha yumuşak görünürler.",
   "display.scaleN": "%{n}",
   "display.scaleRecommended": "%{n} (önerilen)",
   "display.x11": "X11 uygulamaları",

@@ -171,8 +171,8 @@ static void load(void) {
         s->scale = out_scale_valid(sc) ? sc : 0;            /* 0 = the recommended one */
         if (sc && !s->scale) {                              /* out of range or off the 25 % steps: the nearest one */
             s->scale = out_scale_round(sc / 100.0);
-            fprintf(stderr, "displays: %s: scale %d %% is not one of %d–%d %% in %d %% steps, using %d %%\n", s->id, sc,
-                    OUT_SCALE_MIN, OUT_SCALE_MAX, OUT_SCALE_STEP, s->scale);
+            fprintf(stderr, "displays: %s: scale %d %% is not %d, %d or %d–%d %% in %d %% steps, using %d %%\n", s->id, sc,
+                    OUT_SCALE_SMALL_A, OUT_SCALE_SMALL_B, OUT_SCALE_MIN, OUT_SCALE_MAX, OUT_SCALE_STEP, s->scale);
         }
         const JVal *px = json_get(v, "x"), *py = json_get(v, "y");
         if (px && py && px->type == J_NUM && py->type == J_NUM) {

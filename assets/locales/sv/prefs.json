@@ -120,6 +120,7 @@
   "display.rotationHint": "En roterad skärm sammanställs av processorn.",
   "display.scale": "Skala",
   "display.scaleHint": "Text, ikoner och bilder ritas med skärmens egen upplösning, så varje skala förblir skarp. Linux-appar med bråkskalning återges också med den.",
+  "display.scaleSmallHint": "Under 100 % är skrivbordet {w} × {h}, större än skärmen, så text och kontroller blir mindre. Linux-appar ritas i 100 % och LordOS förminskar dem, så de ser lite mjukare ut.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (rekommenderad)",
   "display.x11": "X11-appar",

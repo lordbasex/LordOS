@@ -120,6 +120,7 @@
   "display.rotationHint": "Skrini iliyozungushwa huundwa na CPU.",
   "display.scale": "Kipimo",
   "display.scaleHint": "Maandishi, aikoni na picha huchorwa kwa ubora wa skrini yenyewe, kwa hiyo kila kipimo kinabaki dhahiri. Programu za Linux zenye kipimo cha sehemu pia huchora kwacho.",
+  "display.scaleSmallHint": "Chini ya 100 % eneo-kazi ni {w} × {h}, kubwa kuliko skrini, kwa hiyo maandishi na vidhibiti ni vidogo. Programu za Linux huchorwa kwa 100 % na LordOS huzipunguza, kwa hiyo huonekana zisizo kali kidogo.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (inapendekezwa)",
   "display.x11": "Programu za X11",

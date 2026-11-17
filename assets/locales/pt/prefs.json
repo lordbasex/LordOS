@@ -120,6 +120,7 @@
   "display.rotationHint": "Com a tela girada, a composição é feita pela CPU.",
   "display.scale": "Escala",
   "display.scaleHint": "Textos, ícones e imagens são desenhados na resolução da tela, então toda escala fica nítida. Apps Linux com escala fracionária também são desenhados assim.",
+  "display.scaleSmallHint": "Abaixo de 100 % a área de trabalho tem {w} × {h}, mais que a tela, então o texto e os controles ficam menores. Os apps do Linux são desenhados a 100 % e o LordOS os reduz, então ficam um pouco menos nítidos.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (recomendado)",
   "display.x11": "Apps X11",

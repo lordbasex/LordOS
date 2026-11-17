@@ -121,6 +121,7 @@
   "display.rotationHint": "Un ecran rotit este compus de procesor.",
   "display.scale": "Scalare",
   "display.scaleHint": "Textul, pictogramele și imaginile sunt desenate la rezoluția proprie a afișajului, așa că orice scalare rămâne clară. Aplicațiile Linux cu scalare fracționară se redau și ele la ea.",
+  "display.scaleSmallHint": "Sub 100 % desktopul are {w} × {h}, mai mult decât ecranul, așa că textul și controalele sunt mai mici. Aplicațiile Linux se desenează la 100 % și LordOS le micșorează, așa că arată puțin mai puțin clar.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (recomandat)",
   "display.x11": "Aplicații X11",

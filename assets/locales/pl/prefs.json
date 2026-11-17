@@ -122,6 +122,7 @@
   "display.rotationHint": "Obrócony ekran jest składany przez procesor.",
   "display.scale": "Skala",
   "display.scaleHint": "Tekst, ikony i obrazy są rysowane w natywnej rozdzielczości ekranu, więc każda skala pozostaje ostra. Aplikacje Linuksa obsługujące skalowanie ułamkowe też renderują w tej skali.",
+  "display.scaleSmallHint": "Poniżej 100 % pulpit ma {w} × {h}, więcej niż ekran, więc tekst i elementy sterujące są mniejsze. Aplikacje Linuksa rysują się w 100 %, a LordOS je pomniejsza, więc wyglądają nieco mniej ostro.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (zalecana)",
   "display.x11": "Aplikacje X11",

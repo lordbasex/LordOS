@@ -1,7 +1,8 @@
 # Several displays and sharp HiDPI
 
 LordOS drives every connected display at once, as one desktop (**extend**) or showing the same
-picture (**mirror**), and draws each display at its own scale — 100 to 300 % in 25 % steps (the recommended one at most 200 %) — with
+picture (**mirror**), and draws each display at its own scale — 100 to 300 % in 25 % steps (the recommended one at most 200 %),
+and 75 or 80 % for more space on a small screen (0.8.8.10, GitHub #158; see "Below 100 %") — with
 text, vectors and images rasterized at the display's real resolution. A 4K panel at 150 % next to
 a 1080p one at 100 % is sharp on both. Tested on VM 118 (`lordos-notes`) with two virtio-gpu heads
 (1280×800 and 2560×1600), on the CPU path and on the GPU path (Mesa llvmpipe forced).
@@ -60,6 +61,33 @@ The math is in `server/src/outputs.c` (pure functions, `build/outputs-test`, 131
 rounding and the recommended scale, logical ↔ physical, damage rectangles, mirrored views,
 snapping, checking a dropped position (`out_fits`) and a whole arrangement (`out_valid`), fixing overlaps after a change, normalizing, the pointer across displays and the
 display with most of a window.
+
+## Below 100 % (0.8.8.10, GitHub #158)
+
+A scale below 100 % gives a display more logical pixels than it has: a MacBook's 1280 × 800 at 75 % is a 1707 × 1067
+desktop, at 80 % 1600 × 1000. Only **75 and 80 %** are accepted (`OUT_SCALE_SMALL_A`/`_B` in `server/src/outputs.h`,
+`out_scale_valid`); 50–70 % and 85–90 % are not, nothing rounds to them (`out_scale_round` stays at 100 and above) and
+the recommended scale never goes there. Settings → Displays offers them while the desktop stays within 2560 × 1600
+logical (`scaleChoices` in `sdk/displaylayout.js`: a 1080p, 1200p, 1366 × 768 or 1280 × 800 display, also rotated; not
+1440p or 4K, whose desktop would be larger than the UI engine is measured for) and shows one of them as an extra tile
+before the others (the current one, else 75 %), with a note under the tiles when one is chosen.
+
+What it takes in lord-server: nothing new in the drawing. The transform (`physical = (logical − origin) × k`) was
+already used with k < 1 by a mirrored display smaller than the main one; layout, text, images, blurs and damage use the
+same `k` (`paint_view.k`). What stays at 100 %:
+
+- **Wayland clients** are asked for 100 % (`wp_fractional_scale_v1` 120, `preferred_buffer_scale` 1; `client_pct` in
+  `wl.c`) and LordOS draws their buffers smaller (bilinear), since several toolkits don't handle a preferred scale below
+  1. They look a little softer than LordOS's own UI, which is rasterized at the display's pixels.
+- **X11 apps** get 100 % (`xws_pick` clamps to `XWS_MIN`, no `Xft.dpi`) and are drawn smaller the same way.
+- **The pointer** keeps its 32 px size (`cursor_effective_pct` never goes below 100).
+- `wl_output.scale` is 1 and `xdg_output`'s logical size is the larger desktop size.
+
+Tests: `build/outputs-test` (75 and 80 valid, 50/70/85/90 not, the logical sizes, a 75 % view covering its whole frame
+and one logical pixel still covering a physical one), `build/engine-test` `test_scale_below_100` (75 and 80 %: the first
+frame reaches the last row and column, and 40 partial repaints with moving shadowed windows, text, a blurred bar and
+hidden boxes match a full repaint), `server/tests/display_layout_test.mjs` (the choices and tiles). Not yet checked on
+the VM or real hardware with a screenshot.
 
 ## Numbers, identify and snapping (Settings → Displays)
 

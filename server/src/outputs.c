@@ -8,6 +8,7 @@
 /* ---- scale ---- */
 
 int out_scale_valid(int pct) {
+    if (pct == OUT_SCALE_SMALL_A || pct == OUT_SCALE_SMALL_B) return 1;
     return pct >= OUT_SCALE_MIN && pct <= OUT_SCALE_MAX && (pct - OUT_SCALE_MIN) % OUT_SCALE_STEP == 0;
 }
 

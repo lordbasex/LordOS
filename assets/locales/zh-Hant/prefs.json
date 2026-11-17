@@ -119,6 +119,7 @@
   "display.rotationHint": "旋轉的螢幕由 CPU 合成。",
   "display.scale": "縮放",
   "display.scaleHint": "文字、圖示和影像會以顯示器本身的解析度繪製，所以任何縮放比例都保持清晰。支援分數縮放的 Linux App 也會以該比例繪製。",
+  "display.scaleSmallHint": "低於 100 % 時桌面為 {w} × {h}，比顯示器大，因此文字和控制項會變小。Linux 應用程式以 100 % 繪製，再由 LordOS 縮小，所以看起來稍微柔和一些。",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} %（建議）",
   "display.x11": "X11 App",

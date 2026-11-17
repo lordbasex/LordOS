@@ -120,6 +120,7 @@
   "display.rotationHint": "Con la pantalla girada se compone por CPU.",
   "display.scale": "Escala",
   "display.scaleHint": "Los textos, íconos e imágenes se dibujan a la resolución de la pantalla, así que todas las escalas se ven nítidas. Las apps de Linux con escala fraccional también se dibujan así.",
+  "display.scaleSmallHint": "Por debajo de 100 % el escritorio mide {w} × {h}, más que la pantalla, así que el texto y los controles se ven más chicos. Las apps de Linux se dibujan a 100 % y LordOS las achica, así que se ven un poco menos nítidas.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (recomendado)",
   "display.x11": "Apps X11",

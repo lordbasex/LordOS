@@ -120,6 +120,7 @@
   "display.rotationHint": "Un écran pivoté est composé par le CPU.",
   "display.scale": "Échelle",
   "display.scaleHint": "Le texte, les icônes et les images sont dessinés à la résolution propre de l’écran : chaque échelle reste donc nette. Les apps Linux compatibles avec la mise à l’échelle fractionnaire s’y affichent aussi.",
+  "display.scaleSmallHint": "En dessous de 100 %, le bureau fait {w} × {h}, plus que l’écran : le texte et les commandes sont plus petits. Les apps Linux se dessinent à 100 % et LordOS les réduit, elles sont donc un peu moins nettes.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (recommandée)",
   "display.x11": "Apps X11",
