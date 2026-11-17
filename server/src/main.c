@@ -1232,6 +1232,18 @@ static void vt_signal(Server *s) {
     }
 }
 
+/* Ctrl and Alt as the kernel has them on one keyboard right now (EVIOCGKEY); 0 when it can't be asked */
+static int zap_held(int fd, int *ctrl, int *alt) {
+    unsigned char keys[KEY_MAX / 8 + 1];
+    memset(keys, 0, sizeof keys);
+    if (fd < 0 || ioctl(fd, EVIOCGKEY(sizeof keys), keys) < 0) return 0;
+#define HELD(k) ((keys[(k) / 8] >> ((k) % 8)) & 1)
+    *ctrl = HELD(KEY_LEFTCTRL) || HELD(KEY_RIGHTCTRL);
+    *alt = HELD(KEY_LEFTALT) || HELD(KEY_RIGHTALT);
+#undef HELD
+    return 1;
+}
+
 static void on_input(void *ud, const InputDevice *d, const struct input_event *ev) {
     Server *s = ud;
     if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) display_input(now_ms());
@@ -1287,7 +1299,19 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->code == KEY_LEFTCTRL || ev->code == KEY_RIGHTCTRL) s->ctrl = ev->value != 0;
         if (ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) s->alt = ev->value != 0;
         if (ev->code == KEY_LEFTSHIFT || ev->code == KEY_RIGHTSHIFT) s->shift = ev->value != 0;
-        if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt) s->quit = 1;
+        /* Ctrl+Alt+Backspace ends the session at once. The modifiers are tracked from every keyboard and a release can
+         * be lost (another console, a keyboard that sleeps or reconnects), so the kernel is asked whether Ctrl and Alt
+         * are really held on this keyboard: a stale state must never end a session on a lone Backspace. */
+        if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt) {
+            int ctrl = 0, alt = 0;
+            if (zap_held(d->fd, &ctrl, &alt) && ctrl && alt) {
+                fprintf(stderr, "lord-server: Ctrl+Alt+Backspace on %s: ending the session\n", d->name);
+                s->quit = 1;
+            } else {
+                fprintf(stderr, "lord-server: Backspace on %s with Ctrl and Alt noted but not held: the session goes on\n", d->name);
+                s->ctrl = ctrl; s->alt = alt;
+            }
+        }
         /* ends a share with no JavaScript in the way; only here, on the physical keyboard: what the API or
          * the remote desktop injects doesn't pass through on_input (docs/SHORTCUTS.md) */
         if (ev->code == KEY_ESC && ev->value == 1 && s->ctrl && s->alt && s->shift && share_user_stop()) break;
@@ -2999,7 +3023,13 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        if (pfd[1].revents & POLLIN) break;
+        if (pfd[1].revents & POLLIN) {                 /* SIGINT or SIGTERM: who sent it, for the log */
+            struct signalfd_siginfo si;
+            if (read(pfd[1].fd, &si, sizeof si) == (ssize_t)sizeof si)
+                fprintf(stderr, "lord-server: %s from pid %u (uid %u): ending the session\n",
+                        si.ssi_signo == SIGTERM ? "SIGTERM" : "SIGINT", si.ssi_pid, si.ssi_uid);
+            break;
+        }
         int vt_moved = vt_sfd >= 0 && (pfd[vt_i].revents & POLLIN);
         if (vt_moved) vt_signal(&s);           /* the input list changed: this pass's poll entries are stale */
         /* the watchdog's other half (wdog.h): a display whose page flip never completes leaves the desktop
@@ -3087,6 +3117,7 @@ int main(int argc, char **argv) {
      * so closing the apps and unmounting the cloud folders below happens off the screen instead of behind a frozen
      * desktop for seconds */
     wdog_stop();                          /* closing the apps below may take seconds by design */
+    if (ui.quit_requested) fprintf(stderr, "lord-server: the theme asked to log out\n");
     if (ui.quit_requested && !s.headless) mirror_session("{\"a\":\"logout\"}");
     js_before_exit();                     /* what is open goes to settings.json, marked clean */
     wl_close_all(LOGOUT_CLOSE_MS);        /* the apps close as if the user did it, before wl_stop() */

@@ -439,6 +439,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A session could end on a lone Backspace.** Ctrl+Alt+Backspace (end the session at once) read Ctrl and Alt from
+  a state kept across every keyboard; a lost release (another console, a keyboard that sleeps or reconnects) left them
+  "held", and the next Backspace ended the session with no trace in any log (seen while watching a video). The kernel
+  is now asked whether Ctrl and Alt are really held on the keyboard that sent the Backspace (`EVIOCGKEY`); if not, the
+  session goes on and the state is corrected. lord-server also logs why a session ends: the key and its keyboard, a
+  SIGTERM/SIGINT with the sender's pid and uid, or the theme's Log Out.
 - **Firefox in full screen showed nothing without a GPU** (virtual machines, `LORD_GPU=0`): the CPU path copied only the
   fullscreen window's own buffer, and Firefox draws its page in a subsurface and leaves that buffer clear, so the
   desktop showed through while Firefox had the keys. The CPU path now paints the window with its subsurfaces, scaled
