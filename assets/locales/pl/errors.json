@@ -235,6 +235,7 @@
   "fs.notRegular": "To nie jest zwykły plik (czy to dowiązanie?)",
   "fs.openFailed": "Nie udało się otworzyć pliku: {errno}",
   "fs.outsideHome": "To miejsce jest poza katalogiem domowym lub jest nieprawidłowe",
+  "fs.nameTooLong": "Nazwa jest za długa (maks. {max} bajtów; litery z ogonkami i niełacińskie zajmują po 2 do 4)",
   "fs.protected": "Ten folder jest chroniony",
   "fs.systemFolder": "Pliki nie pokazują wewnętrznych folderów systemu (/proc, /sys, /dev i /run)",
   "fs.tooLarge": "Plik jest za duży (maks. {max})",

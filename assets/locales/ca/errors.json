@@ -235,6 +235,7 @@
   "fs.notRegular": "No és un fitxer normal (és un enllaç?)",
   "fs.openFailed": "No s’ha pogut obrir el fitxer: {errno}",
   "fs.outsideHome": "Aquesta ubicació és fora de la carpeta personal o no és vàlida",
+  "fs.nameTooLong": "El nom és massa llarg (màx. {max} bytes; les lletres accentuades i no llatines ocupen de 2 a 4 cadascuna)",
   "fs.protected": "Aquesta carpeta està protegida",
   "fs.systemFolder": "Fitxers no mostra les carpetes internes del sistema (/proc, /sys, /dev i /run)",
   "fs.tooLarge": "El fitxer és massa gran (màx. {max})",

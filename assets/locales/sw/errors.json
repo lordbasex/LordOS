@@ -235,6 +235,7 @@
   "fs.notRegular": "Si faili ya kawaida (je, ni kiungo?)",
   "fs.openFailed": "Haikuweza kufungua faili: {errno}",
   "fs.outsideHome": "Mahali hapo ni nje ya folda yako ya nyumbani au si sahihi",
+  "fs.nameTooLong": "Jina ni refu mno (upeo {max} baiti; herufi zenye alama na zisizo za Kilatini huchukua 2 hadi 4 kila moja)",
   "fs.protected": "Folda hiyo imelindwa",
   "fs.systemFolder": "Faili haionyeshi folda za ndani za mfumo (/proc, /sys, /dev na /run)",
   "fs.tooLarge": "Faili ni kubwa mno (upeo {max})",

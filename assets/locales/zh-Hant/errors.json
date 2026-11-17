@@ -235,6 +235,7 @@
   "fs.notRegular": "這不是一般檔案（是連結嗎？）",
   "fs.openFailed": "無法打開檔案：{errno}",
   "fs.outsideHome": "該位置不在你的個人資料夾內，或無效",
+  "fs.nameTooLong": "名稱太長（最多 {max} 位元組；中文等非拉丁字元每個佔 2 到 4 位元組）",
   "fs.protected": "該資料夾受保護",
   "fs.systemFolder": "「檔案」不會顯示系統的內部資料夾（/proc、/sys、/dev 與 /run）",
   "fs.tooLarge": "檔案太大（上限 {max}）",

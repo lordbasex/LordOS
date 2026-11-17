@@ -386,6 +386,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   version comes from the listing so lord-server never stats on its thread (a slow share would block it). Tested in
   `engine-test` (`test_image_cache`) and `filekinds_test.mjs`. Files still shows a change made by another program
   when the folder is listed again (opening it again or any change made in Files).
+- **Files: long file names** (GitHub #102). A name past what Linux file systems take for one name (255 bytes, fewer
+  letters when they have accents or are not Latin) was refused by `lord.fs` with "That location is outside your home
+  folder or is not valid"; renaming, New Folder, moving to the Trash and every other `lord.fs` write now say the name
+  is too long and what the limit is (`fs.nameTooLong`, in all 35 languages; `fsops_name_too_long` in
+  `server/src/fsops.c`, used by `js_sys.c` and `fsasync.c`). And a long name copied or duplicated next to itself
+  became "<name> 2.<ext>", past the limit, so the copy failed: the free names Files gives copies, duplicates, new
+  folders, extracted folders and archives now shorten the stem, whole characters only, keeping the number and the
+  extension (`apps/files/names.js`). Tested by `files-names-test` and `fsops-test`.
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.

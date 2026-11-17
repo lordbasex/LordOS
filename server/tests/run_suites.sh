@@ -381,6 +381,9 @@ EOF
     # color tags and comments: the last tag and an emptied comment are removed (apps/files/tags.js, GitHub #181)
     if have node; then run "files-tags-test (apps/files/tags.js)" node tests/files_tags_test.mjs
     else skip "files-tags-test" "node"; fi
+    # the free names of copies, duplicates and new folders fit 255 bytes (apps/files/names.js, GitHub #102)
+    if have node; then run "files-names-test (apps/files/names.js)" node tests/files_names_test.mjs
+    else skip "files-names-test" "node"; fi
     # menus from the keyboard: arrows, type-ahead, the submenu's side and the safe triangle (sdk/menunav.js)
     if have node; then run "menu-nav-test (sdk/menunav.js)" node tests/menu_nav_test.mjs
     else skip "menu-nav-test" "node"; fi

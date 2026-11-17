@@ -235,6 +235,7 @@
   "fs.notRegular": "它不是普通文件（是链接吗？）",
   "fs.openFailed": "无法打开文件：{errno}",
   "fs.outsideHome": "该位置在你的个人文件夹之外或无效",
+  "fs.nameTooLong": "名称太长（最多 {max} 字节；中文等非拉丁字符每个占 2 到 4 字节）",
   "fs.protected": "该文件夹受保护",
   "fs.systemFolder": "“文件”不显示系统的内部文件夹（/proc、/sys、/dev 和 /run）",
   "fs.tooLarge": "文件太大（最大 {max}）",

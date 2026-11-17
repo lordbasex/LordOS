@@ -235,6 +235,7 @@
   "fs.notRegular": "Ia bukan fail biasa (adakah ia pautan?)",
   "fs.openFailed": "Tidak dapat membuka fail: {errno}",
   "fs.outsideHome": "Lokasi itu berada di luar folder rumah anda atau tidak sah",
+  "fs.nameTooLong": "Nama terlalu panjang (maks. {max} bait; huruf beraksen dan bukan Latin mengambil 2 hingga 4 setiap satu)",
   "fs.protected": "Folder itu dilindungi",
   "fs.systemFolder": "Fail tidak menunjukkan folder dalaman sistem (/proc, /sys, /dev dan /run)",
   "fs.tooLarge": "Fail terlalu besar (maks. {max})",

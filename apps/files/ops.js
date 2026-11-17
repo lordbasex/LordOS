@@ -5,6 +5,7 @@ import { kindOf, mimesOf, appOpens, isTextual, isImage, isProgram } from './kind
 import { pasteFrom, offerable } from './clipfiles.js';
 import { createJobQueue } from './jobqueue.js';
 import { toggledTags, withComment, movedKey } from './tags.js';
+import { freeNameOf } from './names.js';
 
 // Changes every time something changed on disk (a copy finished, the trash…): the views reload.
 export const fsVersion = createStore(0);
@@ -33,15 +34,7 @@ export const canPaste = (inside) => !!pasteFrom(inside, outside());
 
 // Free name in a folder: "photo.png" → "photo 2.png", "photo 3.png"…
 export function freeName(dir, name, existing) {
-  const taken = existing || new Set(lord.fs.list(dir).map((e) => e.name));
-  if (!taken.has(name)) return name;
-  const m = /^(.*?)(\.[^.]+)?$/.exec(name);
-  const stem = m[1].replace(/ \d+$/, ''), ext = m[2] || '';
-  for (let i = 2; i < 10000; i++) {
-    const n = `${stem} ${i}${ext}`;
-    if (!taken.has(n)) return n;
-  }
-  return `${stem} ${Date.now()}${ext}`;
+  return freeNameOf(existing || new Set(lord.fs.list(dir).map((e) => e.name)), name);      // within 255 bytes (#102)
 }
 
 // ---- copy / move jobs (server threads) ----

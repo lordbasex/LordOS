@@ -235,6 +235,7 @@
   "fs.notRegular": "Hindi ito karaniwang file (link ba ito?)",
   "fs.openFailed": "Hindi mabuksan ang file: {errno}",
   "fs.outsideHome": "Nasa labas ng iyong home folder ang lokasyong iyan o hindi ito wasto",
+  "fs.nameTooLong": "Masyadong mahaba ang pangalan (max. {max} byte; ang mga titik na may tuldik at hindi Latin ay tig-2 hanggang 4)",
   "fs.protected": "Protektado ang folder na iyan",
   "fs.systemFolder": "Hindi ipinapakita ng Mga File ang mga internal na folder ng system (/proc, /sys, /dev at /run)",
   "fs.tooLarge": "Masyadong malaki ang file (max. {max})",
