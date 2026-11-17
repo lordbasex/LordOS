@@ -575,6 +575,8 @@
   "widgets.devices.none": "Pilli cihaz yok",
   "widgets.devices.computer": "Bu bilgisayar",
   "widgets.devices.low": "Pil zayıf",
+  "widgets.devices.unknown": "Veri yok",
+  "widgets.devices.charging": "şarj oluyor",
   "widgets.devices.level.critical": "Kritik",
   "widgets.devices.level.low": "Düşük",
   "widgets.devices.level.normal": "Normal",

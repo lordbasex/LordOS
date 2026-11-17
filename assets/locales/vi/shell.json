@@ -568,6 +568,8 @@
   "widgets.devices.none": "Không có thiết bị dùng pin",
   "widgets.devices.computer": "Máy tính này",
   "widgets.devices.low": "Pin yếu",
+  "widgets.devices.unknown": "Không có dữ liệu",
+  "widgets.devices.charging": "đang sạc",
   "widgets.devices.level.critical": "Nguy hiểm",
   "widgets.devices.level.low": "Thấp",
   "widgets.devices.level.normal": "Bình thường",

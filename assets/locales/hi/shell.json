@@ -575,6 +575,8 @@
   "widgets.devices.none": "बैटरी वाला कोई डिवाइस नहीं",
   "widgets.devices.computer": "यह कंप्यूटर",
   "widgets.devices.low": "बैटरी कम",
+  "widgets.devices.unknown": "कोई डेटा नहीं",
+  "widgets.devices.charging": "चार्ज हो रहा है",
   "widgets.devices.level.critical": "गंभीर",
   "widgets.devices.level.low": "कम",
   "widgets.devices.level.normal": "सामान्य",

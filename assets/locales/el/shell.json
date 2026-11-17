@@ -575,6 +575,8 @@
   "widgets.devices.none": "Καμία συσκευή με μπαταρία",
   "widgets.devices.computer": "Αυτός ο υπολογιστής",
   "widgets.devices.low": "Χαμηλή μπαταρία",
+  "widgets.devices.unknown": "Χωρίς δεδομένα",
+  "widgets.devices.charging": "φορτίζει",
   "widgets.devices.level.critical": "Κρίσιμη",
   "widgets.devices.level.low": "Χαμηλή",
   "widgets.devices.level.normal": "Κανονική",

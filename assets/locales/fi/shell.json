@@ -575,6 +575,8 @@
   "widgets.devices.none": "Ei akullisia laitteita",
   "widgets.devices.computer": "Tämä tietokone",
   "widgets.devices.low": "Akku vähissä",
+  "widgets.devices.unknown": "Ei tietoja",
+  "widgets.devices.charging": "latautuu",
   "widgets.devices.level.critical": "Kriittinen",
   "widgets.devices.level.low": "Matala",
   "widgets.devices.level.normal": "Normaali",

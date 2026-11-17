@@ -575,6 +575,8 @@
   "widgets.devices.none": "Walang device na may baterya",
   "widgets.devices.computer": "Itong computer",
   "widgets.devices.low": "Mahina ang baterya",
+  "widgets.devices.unknown": "Walang data",
+  "widgets.devices.charging": "nagcha-charge",
   "widgets.devices.level.critical": "Kritikal",
   "widgets.devices.level.low": "Mababa",
   "widgets.devices.level.normal": "Normal",

@@ -575,6 +575,8 @@
   "widgets.devices.none": "Hakuna kifaa chenye betri",
   "widgets.devices.computer": "Kompyuta hii",
   "widgets.devices.low": "Betri iko chini",
+  "widgets.devices.unknown": "Hakuna data",
+  "widgets.devices.charging": "inachaji",
   "widgets.devices.level.critical": "Hatari",
   "widgets.devices.level.low": "Chini",
   "widgets.devices.level.normal": "Kawaida",

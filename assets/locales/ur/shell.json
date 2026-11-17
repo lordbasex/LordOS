@@ -575,6 +575,8 @@
   "widgets.devices.none": "بیٹری والا کوئی آلہ نہیں",
   "widgets.devices.computer": "یہ کمپیوٹر",
   "widgets.devices.low": "بیٹری کم ہے",
+  "widgets.devices.unknown": "کوئی ڈیٹا نہیں",
+  "widgets.devices.charging": "چارج ہو رہا ہے",
   "widgets.devices.level.critical": "نازک",
   "widgets.devices.level.low": "کم",
   "widgets.devices.level.normal": "معمول",

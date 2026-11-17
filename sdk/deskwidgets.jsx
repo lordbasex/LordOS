@@ -38,7 +38,7 @@ import { speak, stopSpeaking, speakAvailable } from './voice.js';
 import { events, reminders, usePimQuery } from './calendar.js';
 import { useFan } from './cooling.jsx';
 import { battery, bluetooth } from './hardware.jsx';
-import { devicesFrom, fractionOf, toneOf as deviceTone } from './devicesmodel.js';
+import { devicesFrom, fractionOf, shortName, toneOf as deviceTone } from './devicesmodel.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
 import { wifiBars, monthCells, weekStartFor } from './menubarmodel.js';
 import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect } from './widgetgrid.js';
@@ -908,13 +908,32 @@ function DeviceGlyph({ kind, size, color }) {
 }
 const toneColor = (L, d) => ({ ok: L.ok, warn: L.warn, crit: L.crit }[deviceTone(d)]);
 const deviceName = (d) => (d.kind === 'laptop' && !d.name ? t('shell.widgets.devices.computer') : d.name);
-// "85 %", "⚡100 %", or the level's word when there is no percentage
-const deviceValue = (d) => `${d.charging ? '⚡' : ''}${d.percent >= 0 ? `${d.percent} %` : d.level ? t(`shell.widgets.devices.level.${d.level}`) : '—'}`;
+const deviceShort = (d) => (d.kind === 'laptop' && !d.name ? t('shell.widgets.devices.computer') : shortName(d.name));
+// "85 %", "⚡100 %", the level's word when there is no percentage, "No data" with neither
+const deviceValue = (d) => `${d.charging ? '⚡' : ''}${d.percent >= 0 ? `${d.percent} %` : d.level ? t(`shell.widgets.devices.level.${d.level}`) : t('shell.widgets.devices.unknown')}`;
+// "Logitech · charging"
+const deviceVia = (d) => `${t(`shell.widgets.devices.via.${d.via}`)}${d.charging ? ` · ${t('shell.widgets.devices.charging')}` : ''}`;
 function DeviceRing({ L, d, size, ticks = 32 }) {
   return (
     <TickRing L={L} size={size} value={fractionOf(d)} color={toneColor(L, d)} ticks={ticks}>
       <DeviceGlyph kind={d.kind} size={size * 0.38} color={L.text} />
     </TickRing>
+  );
+}
+const ValueText = ({ L, d, size }) => (
+  <Text style={{ fontSize: size, fontWeight: 650, color: deviceTone(d) === 'ok' ? L.text : toneColor(L, d), whiteSpace: 'nowrap' }}>{deviceValue(d)}</Text>
+);
+// a device as a row: its ring, then its name and value (and how it connects, when there is room)
+function DeviceRow({ L, d, ring, nameSize, via }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 }}>
+      <DeviceRing L={L} d={d} size={ring} ticks={ring >= 56 ? 32 : 24} />
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text style={{ fontSize: nameSize, fontWeight: 600, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{deviceShort(d)}</Text>
+        <ValueText L={L} d={d} size={nameSize + 1} />
+        {via ? <Sub L={L}>{deviceVia(d)}</Sub> : null}
+      </View>
+    </View>
   );
 }
 function DevicesBody({ w, L }) {
@@ -923,12 +942,26 @@ function DevicesBody({ w, L }) {
     return <View style={{ flex: 1 }}><Head L={L} title={t('shell.widgets.devices.name')} /><Quiet L={L} text={t('shell.widgets.devices.none')} /></View>;
   }
   if (w.size === 's') {
+    // one: a large ring with its name; two: a row each; three or four: a 2×2 of rings with their values
+    if (list.length === 1) {
+      const d = list[0];
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <DeviceRing L={L} d={d} size={88} ticks={36} />
+          <Text style={{ fontSize: 12, fontWeight: 600, color: L.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{deviceShort(d)}</Text>
+          <ValueText L={L} d={d} size={13} />
+        </View>
+      );
+    }
+    if (list.length === 2) {
+      return <View style={{ flex: 1, justifyContent: 'space-evenly' }}>{list.map((d) => <DeviceRow key={d.id} L={L} d={d} ring={50} nameSize={12} />)}</View>;
+    }
     return (
-      <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', alignContent: 'space-around' }}>
+      <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'space-between' }}>
         {list.slice(0, 4).map((d) => (
-          <View key={d.id} style={{ width: '50%', alignItems: 'center', gap: 2 }}>
-            <DeviceRing L={L} d={d} size={list.length > 2 ? 52 : 70} ticks={24} />
-            <Text style={{ fontSize: 10.5, fontWeight: 650, color: L.text, whiteSpace: 'nowrap' }}>{deviceValue(d)}</Text>
+          <View key={d.id} style={{ width: '50%', alignItems: 'center', gap: 3 }}>
+            <DeviceRing L={L} d={d} size={46} ticks={24} />
+            <ValueText L={L} d={d} size={10.5} />
           </View>
         ))}
       </View>
@@ -943,39 +976,54 @@ function DevicesBody({ w, L }) {
           <DeviceRing L={L} d={low} size={96} ticks={36} />
           <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
             <Text style={{ fontSize: 11, fontWeight: 700, color: L.crit, textAlign: 'start' }}>{t('shell.widgets.devices.low').toLocaleUpperCase()}</Text>
-            <Text style={{ fontSize: 17, fontWeight: 650, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{deviceName(low)}</Text>
-            <Sub L={L}>{deviceValue(low)}</Sub>
+            <Text style={{ fontSize: 17, fontWeight: 650, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{deviceShort(low)}</Text>
+            <Sub L={L}>{`${deviceValue(low)} · ${deviceVia(low)}`}</Sub>
+            {list.length > 1 ? <Sub L={L}>{list.filter((d) => d !== low).slice(0, 2).map((d) => `${deviceShort(d)} ${deviceValue(d)}`).join(' · ')}</Sub> : null}
           </View>
+        </View>
+      );
+    }
+    // up to two: side by side as rows, with their names; three or four: rings with name and value under
+    if (list.length <= 2) {
+      return (
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          {list.map((d) => <View key={d.id} style={{ flex: 1, minWidth: 0 }}><DeviceRow L={L} d={d} ring={64} nameSize={13} via /></View>)}
         </View>
       );
     }
     return (
       <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
         {list.slice(0, 4).map((d) => (
-          <View key={d.id} style={{ alignItems: 'center', gap: 8 }}>
-            <DeviceRing L={L} d={d} size={66} />
-            <Text style={{ fontSize: 12.5, fontWeight: 650, color: L.text, whiteSpace: 'nowrap' }}>{deviceValue(d)}</Text>
+          <View key={d.id} style={{ alignItems: 'center', gap: 4, width: 74 }}>
+            <DeviceRing L={L} d={d} size={58} />
+            <ValueText L={L} d={d} size={12.5} />
+            <Text style={{ fontSize: 10.5, color: L.dim, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 74 }}>{deviceShort(d)}</Text>
           </View>
         ))}
       </View>
     );
   }
+  // large: a list with names, connection and bars, spread over the card
+  const rows = list.slice(0, 5);
+  const big = rows.length <= 3;
   return (
-    <View style={{ flex: 1, gap: 10 }}>
+    <View style={{ flex: 1, gap: 6 }}>
       <Head L={L} title={t('shell.widgets.devices.name')} />
-      {list.slice(0, 5).map((d) => (
-        <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <DeviceRing L={L} d={d} size={44} ticks={24} />
-          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Text style={{ flex: 1, fontSize: 13.5, fontWeight: 600, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{deviceName(d)}</Text>
-              <Text style={{ fontSize: 13.5, fontWeight: 600, color: L.text }}>{deviceValue(d)}</Text>
+      <View style={{ flex: 1, justifyContent: rows.length >= 3 ? 'space-evenly' : 'flex-start', gap: rows.length >= 3 ? 0 : 18, paddingTop: rows.length >= 3 ? 0 : 6 }}>
+        {rows.map((d) => (
+          <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <DeviceRing L={L} d={d} size={big ? 54 : 44} ticks={28} />
+            <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+                <Text style={{ flex: 1, fontSize: big ? 14.5 : 13.5, fontWeight: 600, color: L.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{deviceShort(d)}</Text>
+                <ValueText L={L} d={d} size={big ? 16 : 14} />
+              </View>
+              <Sub L={L}>{deviceVia(d)}</Sub>
+              <Bar L={L} value={fractionOf(d)} color={toneColor(L, d)} />
             </View>
-            <Sub L={L}>{t(`shell.widgets.devices.via.${d.via}`)}</Sub>
-            <Bar L={L} value={fractionOf(d)} color={toneColor(L, d)} />
           </View>
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   );
 }

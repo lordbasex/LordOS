@@ -568,6 +568,8 @@
   "widgets.devices.none": "Tidak ada perangkat berbaterai",
   "widgets.devices.computer": "Komputer ini",
   "widgets.devices.low": "Baterai lemah",
+  "widgets.devices.unknown": "Tidak ada data",
+  "widgets.devices.charging": "mengisi daya",
   "widgets.devices.level.critical": "Kritis",
   "widgets.devices.level.low": "Rendah",
   "widgets.devices.level.normal": "Normal",

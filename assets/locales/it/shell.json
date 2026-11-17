@@ -575,6 +575,8 @@
   "widgets.devices.none": "Nessun dispositivo con batteria",
   "widgets.devices.computer": "Questo computer",
   "widgets.devices.low": "Batteria scarica",
+  "widgets.devices.unknown": "Nessun dato",
+  "widgets.devices.charging": "in carica",
   "widgets.devices.level.critical": "Critica",
   "widgets.devices.level.low": "Bassa",
   "widgets.devices.level.normal": "Normale",

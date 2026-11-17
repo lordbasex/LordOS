@@ -575,6 +575,8 @@
   "widgets.devices.none": "Nincs akkumulátoros eszköz",
   "widgets.devices.computer": "Ez a számítógép",
   "widgets.devices.low": "Alacsony töltöttség",
+  "widgets.devices.unknown": "Nincs adat",
+  "widgets.devices.charging": "töltődik",
   "widgets.devices.level.critical": "Kritikus",
   "widgets.devices.level.low": "Alacsony",
   "widgets.devices.level.normal": "Normál",

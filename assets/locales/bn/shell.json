@@ -575,6 +575,8 @@
   "widgets.devices.none": "ব্যাটারিযুক্ত কোনো ডিভাইস নেই",
   "widgets.devices.computer": "এই কম্পিউটার",
   "widgets.devices.low": "ব্যাটারি কম",
+  "widgets.devices.unknown": "কোনো তথ্য নেই",
+  "widgets.devices.charging": "চার্জ হচ্ছে",
   "widgets.devices.level.critical": "সংকটজনক",
   "widgets.devices.level.low": "কম",
   "widgets.devices.level.normal": "স্বাভাবিক",

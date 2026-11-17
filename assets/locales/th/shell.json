@@ -568,6 +568,8 @@
   "widgets.devices.none": "ไม่มีอุปกรณ์ที่มีแบตเตอรี่",
   "widgets.devices.computer": "คอมพิวเตอร์เครื่องนี้",
   "widgets.devices.low": "แบตเตอรี่ต่ำ",
+  "widgets.devices.unknown": "ไม่มีข้อมูล",
+  "widgets.devices.charging": "กำลังชาร์จ",
   "widgets.devices.level.critical": "วิกฤต",
   "widgets.devices.level.low": "ต่ำ",
   "widgets.devices.level.normal": "ปกติ",

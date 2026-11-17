@@ -568,6 +568,8 @@
   "widgets.devices.none": "Tiada peranti berbateri",
   "widgets.devices.computer": "Komputer ini",
   "widgets.devices.low": "Bateri lemah",
+  "widgets.devices.unknown": "Tiada data",
+  "widgets.devices.charging": "mengecas",
   "widgets.devices.level.critical": "Kritikal",
   "widgets.devices.level.low": "Rendah",
   "widgets.devices.level.normal": "Biasa",

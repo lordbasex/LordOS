@@ -575,6 +575,8 @@
   "widgets.devices.none": "Няма устройства с батерия",
   "widgets.devices.computer": "Този компютър",
   "widgets.devices.low": "Изтощена батерия",
+  "widgets.devices.unknown": "Няма данни",
+  "widgets.devices.charging": "зарежда се",
   "widgets.devices.level.critical": "Критична",
   "widgets.devices.level.low": "Ниска",
   "widgets.devices.level.normal": "Нормална",

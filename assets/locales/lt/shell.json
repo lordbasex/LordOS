@@ -582,6 +582,8 @@
   "widgets.devices.none": "Nėra įrenginių su baterija",
   "widgets.devices.computer": "Šis kompiuteris",
   "widgets.devices.low": "Senka baterija",
+  "widgets.devices.unknown": "Nėra duomenų",
+  "widgets.devices.charging": "kraunama",
   "widgets.devices.level.critical": "Kritinė",
   "widgets.devices.level.low": "Žema",
   "widgets.devices.level.normal": "Įprasta",

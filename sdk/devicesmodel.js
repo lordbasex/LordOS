@@ -26,6 +26,15 @@ export function kindOf(icon, name) {
   return 'other';
 }
 
+// a name that fits under a ring: the vendor and the generic words out ("Wireless Mouse MX Master 3" → "MX Master 3",
+// "MX Keys Wireless Keyboard" → "MX Keys"); the full name when nothing is left
+export function shortName(name) {
+  const full = String(name || '').trim();
+  const s = full.replace(/\b(logitech|logi|wireless|bluetooth|mouse|keyboard|headset|headphones|receiver|usb|inalámbrico|ratón|teclado)\b/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
+  return s.length >= 2 ? s : full;
+}
+
 const LEVEL_FRACTION = { critical: 0.08, low: 0.2, normal: 0.6, high: 0.85, full: 1 };
 // how full the ring is: the percentage, or roughly from the level
 export const fractionOf = (d) => (d.percent >= 0 ? d.percent / 100 : LEVEL_FRACTION[d.level] ?? 0);

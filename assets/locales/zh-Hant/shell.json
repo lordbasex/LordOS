@@ -568,6 +568,8 @@
   "widgets.devices.none": "沒有含電池的裝置",
   "widgets.devices.computer": "這部電腦",
   "widgets.devices.low": "電量低",
+  "widgets.devices.unknown": "無資料",
+  "widgets.devices.charging": "充電中",
   "widgets.devices.level.critical": "嚴重不足",
   "widgets.devices.level.low": "低",
   "widgets.devices.level.normal": "正常",

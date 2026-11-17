@@ -582,6 +582,8 @@
   "widgets.devices.none": "Brak urządzeń z baterią",
   "widgets.devices.computer": "Ten komputer",
   "widgets.devices.low": "Niski poziom baterii",
+  "widgets.devices.unknown": "Brak danych",
+  "widgets.devices.charging": "ładowanie",
   "widgets.devices.level.critical": "Krytyczny",
   "widgets.devices.level.low": "Niski",
   "widgets.devices.level.normal": "Normalny",

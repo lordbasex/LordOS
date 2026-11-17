@@ -20,8 +20,9 @@
 
 #define HIDPP_KEEP 12
 #define HIDPP_EVERY 60          /* seconds between runs */
+#define HIDPP_KEEP_S 3600       /* a device asleep (a keyboard not typed on) keeps its last answer this long */
 
-typedef struct { char supply[32]; int percent, status; } Answer;
+typedef struct { char supply[32]; int percent, status; time_t at; } Answer;
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static Answer kept[HIDPP_KEEP];
 static int nkept, running;
@@ -133,10 +134,21 @@ static void *run(void *arg) {
         }
     }
     pthread_mutex_lock(&lock);
-    memcpy(kept, got, sizeof got[0] * (size_t)ngot);
-    nkept = ngot;
+    time_t now = time(NULL);
+    /* a device that answered replaces its old answer; one that didn't (asleep) keeps it for an hour */
+    for (int i = 0; i < ngot; i++) {
+        got[i].at = now;
+        int j = 0;
+        while (j < nkept && strcmp(kept[j].supply, got[i].supply)) j++;
+        if (j < nkept) kept[j] = got[i];
+        else if (nkept < HIDPP_KEEP) kept[nkept++] = got[i];
+    }
+    for (int j = 0; j < nkept;) {
+        if (now - kept[j].at > HIDPP_KEEP_S || kept[j].at > now) kept[j] = kept[--nkept];
+        else j++;
+    }
     running = 0;
-    ran_at = time(NULL);
+    ran_at = now;
     pthread_mutex_unlock(&lock);
     return NULL;
 }
@@ -156,8 +168,9 @@ size_t hidpp_json(char *out, size_t n) {
     size_t o = 0;
     o += (size_t)snprintf(out + o, n - o, "[");
     for (int i = 0; i < nkept && o < n; i++)
-        o += (size_t)snprintf(out + o, n - o, "%s{\"supply\":\"%s\",\"percent\":%d,\"charging\":%s,\"full\":%s}", i ? "," : "",
-                              kept[i].supply, kept[i].percent, kept[i].status == 1 ? "true" : "false", kept[i].status == 2 ? "true" : "false");
+        o += (size_t)snprintf(out + o, n - o, "%s{\"supply\":\"%s\",\"percent\":%d,\"charging\":%s,\"full\":%s,\"age\":%ld}", i ? "," : "",
+                              kept[i].supply, kept[i].percent, kept[i].status == 1 ? "true" : "false", kept[i].status == 2 ? "true" : "false",
+                              (long)(now - kept[i].at));
     if (o < n) o += (size_t)snprintf(out + o, n - o, "]");
     pthread_mutex_unlock(&lock);
     return o < n ? o : n - 1;

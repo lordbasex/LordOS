@@ -1,7 +1,7 @@
 // The Devices widget's list (sdk/devicesmodel.js): the computer, the kernel's device batteries and BlueZ's, once
 // each, with their kind, and lord-hidpp's percentages filling in the Logitech devices that give only a level.
 import assert from 'node:assert/strict';
-import { devicesFrom, kindOf, fractionOf, toneOf } from '../../sdk/devicesmodel.js';
+import { devicesFrom, kindOf, fractionOf, toneOf, shortName } from '../../sdk/devicesmodel.js';
 
 // kinds, from BlueZ's icon or the name
 assert.equal(kindOf('input-mouse', ''), 'mouse');
@@ -51,6 +51,13 @@ assert.equal(toneOf({ percent: -1, level: 'critical' }), 'crit');
 const bySupply = devicesFrom(power, bt, [{ supply: 'hidpp_battery_0', percent: 85, charging: false, full: false }, { supply: 'hidpp_battery_1', percent: 40, charging: true }, { supply: 'hidpp_battery_9', percent: 1 }]);
 assert.deepEqual(bySupply.filter((d) => d.via === 'logitech').map((d) => [d.name, d.percent, d.charging]),
   [['Wireless Mouse MX Master 3', 85, false], ['MX Keys Wireless Keyboard', 40, true]]);
+
+// short names under a ring
+assert.equal(shortName('Wireless Mouse MX Master 3'), 'MX Master 3');
+assert.equal(shortName('MX Keys Wireless Keyboard'), 'MX Keys');
+assert.equal(shortName('Logitech K380'), 'K380');
+assert.equal(shortName('Keyboard'), 'Keyboard', 'nothing left: the full name');
+assert.equal(shortName('AirPods Pro'), 'AirPods Pro');
 
 // nothing at all
 assert.deepEqual(devicesFrom(null, null, null), []);

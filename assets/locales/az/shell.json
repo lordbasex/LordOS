@@ -575,6 +575,8 @@
   "widgets.devices.none": "Batareyalı cihaz yoxdur",
   "widgets.devices.computer": "Bu kompüter",
   "widgets.devices.low": "Batareya zəifdir",
+  "widgets.devices.unknown": "Məlumat yoxdur",
+  "widgets.devices.charging": "enerji yığır",
   "widgets.devices.level.critical": "Kritik",
   "widgets.devices.level.low": "Aşağı",
   "widgets.devices.level.normal": "Normal",

@@ -568,6 +568,8 @@
   "widgets.devices.none": "没有带电池的设备",
   "widgets.devices.computer": "这台电脑",
   "widgets.devices.low": "电量低",
+  "widgets.devices.unknown": "无数据",
+  "widgets.devices.charging": "正在充电",
   "widgets.devices.level.critical": "严重不足",
   "widgets.devices.level.low": "低",
   "widgets.devices.level.normal": "正常",
