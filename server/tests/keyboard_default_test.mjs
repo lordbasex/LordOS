@@ -68,7 +68,7 @@ eq('a chosen list is kept', s.keyboard.active(), { layout: 'latam', variant: '' 
 s = await session(JSON.stringify({ schema: 4, keyboard: 'br' }), { layouts: 'us', variants: '' });
 eq('a pre-M5 choice other than the default is kept', s.keyboard.active(), { layout: 'br', variant: '' });
 
-eq('migration 4: latam without a list', migrateSettings({ schema: 3, keyboard: 'latam', keyboards: null }), { schema: 4, keyboard: null, keyboards: null });
+eq('migration 4: latam without a list', migrateSettings({ schema: 3, keyboard: 'latam', keyboards: null }), { schema: 5, keyboard: null, keyboards: null });
 eq('migration 4: latam with a list', migrateSettings({ schema: 3, keyboard: 'latam', keyboards: [{ layout: 'latam' }] }).keyboard, 'latam');
 eq('migration 4: runs once', migrateSettings({ schema: 4, keyboard: 'latam', keyboards: null }).keyboard, 'latam');
 

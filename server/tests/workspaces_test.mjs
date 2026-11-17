@@ -61,7 +61,7 @@ const MOCK = `globalThis.__lordTest = (() => {
   for (const ns of ${JSON.stringify([...NS])}) if (!(ns in base)) base[ns] = undefined;
   const noop = () => undefined;
   globalThis.lord = new Proxy(base, { get: (o, k) => (k in o ? o[k] : typeof k === 'string' ? noop : undefined) });
-  return { styles, texts, parents, removed, layouts, counts, props };
+  return { styles, texts, parents, removed, layouts, counts, props, saved: () => saved };
 })();`;
 
 const dir = mkdtempSync(path.join(tmpdir(), 'lord-workspaces-'));

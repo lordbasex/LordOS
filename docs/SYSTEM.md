@@ -922,7 +922,9 @@ Users, the system apps, and where help is), with "Skip", "Back" and "Next".
 
 - It opens by itself **the first time** the session starts: `startShell` calls `maybeStartTour()`,
   which writes `welcomeShown: true` to the settings before opening it (it doesn't come back even if
-  the window is closed). It doesn't appear on the live system, where the installer opens instead.
+  the window is closed). It doesn't appear on the live system, where the installer opens instead. On a new
+  account's first session it waits for the first-start desktop chooser (0.8.9, `SETTINGS.md`, "First start") and
+  opens when the person presses Start.
 - It can be watched again from the Help sidebar or the Help menu.
 - Its texts live in `assets/locales/<lang>/help.json` (`help.tour.<n>.title|body`).
 

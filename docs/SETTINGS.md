@@ -574,6 +574,54 @@ that day, or the chosen app (Thunderbird…) as it starts.
 **Show Keyboard**, and how to open it: the button next to the clock or ❖⌃K. It never opens by itself. See
 [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md).
 
+## First start: choose your desktop (0.8.9)
+
+The first session of a new account on an installed system opens a three-step chooser over the desktop, in the
+language chosen in the installer. It never appears on the live system, on the OVA image's first boot (the installer
+runs there), on the login screen, or for anyone who has already used LordOS.
+
+1. **Choose your desktop**: a panel over the dimmed desktop with the crown, and three cards, Lord Flow, Lord Classic and
+   Lord Workspaces (a real picture of each, its name and the theme's own description). Their order is random every
+   time it starts; none is chosen and none is marked as recommended, so **See it live** waits for a choice.
+2. **Live**: the chosen desktop is applied for real with the same live switch as Settings → Appearance → Desktop style
+   (`themes.use`, which discards the JS context). The panel becomes a small box (330 px) on the end side of the work
+   area, about mid-height, never over the Dock, the Classic taskbar or the Workspaces spine and band. Its grip drags it
+   anywhere inside the work area of the display under it. It lists the three names with a ✓ on the current one (a click
+   switches live) and has **Back** and **Use this**.
+3. **Change it whenever you like**: names the chosen desktop and shows a drawn replica of Settings → Appearance in the
+   person's language, with Desktop style ringed in amber and the chosen one selected, and the path Settings →
+   Appearance → Desktop style. **Back** and **Start**.
+
+**Back** works on every step; going from 2 to 1 keeps the pick and the theme already applied (nothing is switched
+back), and a new pick switches again when the person goes on. Keys: Tab goes round the controls (the chooser is in the
+modal layer, so it has the keyboard), Space and Enter press the focused one, Enter alone presses the main button and
+Escape is Back. "Welcome to LordOS" (`SYSTEM.md`) and Lord Workspaces' activity onboarding wait until it is done.
+
+How it works:
+
+- `sdk/firststartmodel.js` (pure, `server/tests/firststart_model_test.mjs`) decides who sees it and the steps;
+  `sdk/firststart.jsx` draws it. `startShell` calls `startFirstStart()`, and `<FirstStart>` is mounted in the modal
+  layer by the SDK for every theme. Once it is done it draws nothing and leaves no listener or timer.
+- **Who sees it**: `settings.desktopChosen` is `false` and `lord.system.info()` is neither `live` nor `firstAccount`. A
+  new account has no settings file, or the small one the installer, the OVA's first boot or Settings → Users write
+  (language, keyboard). Settings migration 5 (`sdk/settings.js` `MIGRATIONS`, `markExistingUser`) sets
+  `desktopChosen: true` on a file that shows an earlier session: the welcome tour was shown (`welcomeShown`), a
+  session saved its windows (`sessionSaved`), or a desktop style was chosen (`theme`). So nobody who upgrades sees it,
+  and neither does an unattended first boot that already named a theme.
+- **Across the live switch**: the step, the pick, the cards' order and where the box was left are kept in
+  `settings.firstStart` and saved before `themes.use` (which writes the settings synchronously); the new theme's
+  `startShell` resumes from there. The saved state is checked (`cleanState`): a desktop uninstalled since, an order
+  that isn't the three desktops or an odd step starts the chooser over. If the switch fails the theme stays and the
+  chooser goes back to step 1. **Start** sets `desktopChosen: true` and clears `firstStart`; the theme is already the
+  chosen one, so it is never left half switched.
+- The card pictures are `assets/desktops/<theme id>.jpg` (640 × 400, about 40 KB each, captures of the three desktops
+  on the test VM), installed by `tools/iso/mkdeb.sh` with the other assets. The crown is
+  `assets/icons/lordos-crown-512.png`. Desktop style's drawn pictures moved from Settings to
+  `sdk/stylethumb.jsx` (`DesktopStyleThumb`) so the replica and Settings draw the same ones.
+- Tests: `server/tests/firststart_model_test.mjs`, and `firststart_scene.mjs` over each theme
+  (`node tests/workspaces_test.mjs firststart_scene.mjs <default|classic|workspaces>`): the whole wizard, the switch
+  and the resume, the drag kept inside the work area, Escape and Enter, and nothing left once it is done.
+
 ## Appearance: «Browsers: tabs in the title bar»
 
 Not a hardware page, but its native side lives here too: `hw/brframe.c`, exposed as
