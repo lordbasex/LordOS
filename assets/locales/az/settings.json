@@ -716,5 +716,6 @@
   "ai.pv.freeKeepGoing": "{s} san… davam edin, bir az da.",
   "ai.pv.freeEnough": "{s} san · bu kifayətdir: istədiyiniz vaxt Hazırdır düyməsinə basın (30-da özü dayanır).",
   "ai.pv.freeShort": "Kifayət qədər nitq olmadı: bir az daha uzun, ən azı 15 saniyə danışın.",
-  "ai.pv.noMic": "Mikrofondan səs gəlmir. Onun qoşulduğunu və səsinin bağlı olmadığını yoxlayın (Parametrlər → Səs), sonra yenidən cəhd edin."
+  "ai.pv.noMic": "Mikrofondan səs gəlmir. Onun qoşulduğunu və səsinin bağlı olmadığını yoxlayın (Parametrlər → Səs), sonra yenidən cəhd edin.",
+  "section.battery": "Batareya"
 }

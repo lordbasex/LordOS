@@ -275,6 +275,7 @@ EOF
     if have node; then run "poll-same-test (sdk/samevalue.js)" node tests/poll_same_test.mjs; else skip "poll-same-test" node; fi
     if have node; then run "widget-feed-test (sdk/widgetfeedmodel.js)" node tests/widget_feed_test.mjs; else skip "widget-feed-test" node; fi
     if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi
+    if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
     if have node; then run "weather-model-test (sdk/weathermodel.js)" node tests/weather_model_test.mjs; else skip "weather-model-test" node; fi
     if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi
     if have node; then run "claude-widget-model-test (sdk/claudewidgetmodel.js)" node tests/claude_widget_model_test.mjs; else skip "claude-widget-model-test" node; fi
@@ -481,6 +482,7 @@ EOF
     # (0.8.8.9) the trademark notice of the Store's Web apps section and of each web app's page
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-trademark-scene (apps/store/trademark.js)" node tests/textfield_menu_test.mjs store_trademark_scene.mjs
+        run "battery-settings-scene (apps/settings/Battery.jsx)" node tests/textfield_menu_test.mjs battery_settings_scene.mjs
     else skip "store-trademark-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then

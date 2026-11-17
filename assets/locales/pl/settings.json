@@ -723,5 +723,6 @@
   "ai.pv.freeKeepGoing": "{s} s… mów dalej, jeszcze trochę.",
   "ai.pv.freeEnough": "{s} s · wystarczy: naciśnij Gotowe, kiedy chcesz (zatrzyma się samo po 30).",
   "ai.pv.freeShort": "Za mało mowy: mów trochę dłużej, co najmniej 15 sekund.",
-  "ai.pv.noMic": "Z mikrofonu nie dochodzi żaden dźwięk. Sprawdź, czy jest podłączony i niewyciszony (Ustawienia → Dźwięk), i spróbuj ponownie."
+  "ai.pv.noMic": "Z mikrofonu nie dochodzi żaden dźwięk. Sprawdź, czy jest podłączony i niewyciszony (Ustawienia → Dźwięk), i spróbuj ponownie.",
+  "section.battery": "Bateria"
 }

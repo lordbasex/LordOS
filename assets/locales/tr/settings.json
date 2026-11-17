@@ -716,5 +716,6 @@
   "ai.pv.freeKeepGoing": "{s} sn… devam edin, biraz daha.",
   "ai.pv.freeEnough": "{s} sn · bu kadarı yeterli: istediğiniz zaman Bitti’ye basın (30’da kendiliğinden durur).",
   "ai.pv.freeShort": "Yeterli konuşma yoktu: biraz daha uzun, en az 15 saniye konuşun.",
-  "ai.pv.noMic": "Mikrofondan ses gelmiyor. Takılı ve sessize alınmamış olduğunu denetleyin (Ayarlar → Ses), sonra yeniden deneyin."
+  "ai.pv.noMic": "Mikrofondan ses gelmiyor. Takılı ve sessize alınmamış olduğunu denetleyin (Ayarlar → Ses), sonra yeniden deneyin.",
+  "section.battery": "Pil"
 }

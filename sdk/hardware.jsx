@@ -33,6 +33,7 @@ import { admin } from './admin.js';
 import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { Overlay } from './layers.js';
 import { devicesFrom, fractionOf, toneOf as deviceTone } from './devicesmodel.js';
+import { batteryStep, batteryPrefs } from './batterypolicy.js';
 import { TextInput, Toggle } from './components.jsx';
 import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
 import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu, webInspectAsk, answerWebInspect } from './webapps.js';
@@ -341,11 +342,42 @@ function checkLow(b) {
   if (!b || !b.hasBattery) return;
   if (b.charging || b.onAC) { lowNotified = 100; return; }
   if (!powerPrefs().lowBattery || b.percent < 0) return;
-  const level = b.percent <= 5 ? 5 : b.percent <= 10 ? 10 : b.percent <= 20 ? 20 : 100;
+  // 10 % and 5 %; the earlier mark (20 % by default) is Settings → Battery's "plug in" notice (batterypolicy.js)
+  const level = b.percent <= 5 ? 5 : b.percent <= 10 ? 10 : 100;
   if (level >= lowNotified || level === 100) return;
   lowNotified = level;
   notify({ app: 'settings', title: t(level === 5 ? 'prefs.power.criticalTitle' : 'prefs.power.lowTitle'),
     body: t('prefs.power.lowBody', { pct: b.percent }), sticky: level === 5 });
+}
+
+// Settings → Battery's choices applied as the battery changes (sdk/batterypolicy.js): the admin actions only in an
+// administrator's session, the notices for everyone. At the start, the person's thresholds are set again (some laptops
+// forget them at every boot).
+let policyMem = {}, policyStarted = false;
+const systemBat = (b) => (b?.hasBattery ? (b.supplies || []).find((x) => x.battery && !x.device && x.present !== false) || null : null);
+function policyTick() {
+  const b = battery.get();
+  const s = settings.get();
+  const raw = s.power?.battery || null;
+  const bat = systemBat(b);
+  let hp = [];
+  try { hp = lord.hidpp?.batteries ? lord.hidpp.batteries() || [] : []; } catch (e) { hp = []; }
+  const r = batteryStep(bat, raw, devicesFrom(b, bluetooth.get(), hp), policyMem);
+  policyMem = r.mem;
+  const canAdmin = (() => { try { return lord.admin?.available?.(); } catch (e) { return false; } })();
+  const run = (a, arg) => { if (canAdmin) admin.run(a, arg, null, { quiet: true }).catch(() => {}); };
+  if (!policyStarted && bat && raw) {
+    policyStarted = true;
+    const p = batteryPrefs(raw);
+    if (bat.endThreshold >= 0 && !p.fullOnce && (bat.endThreshold !== p.limit || (bat.startThreshold >= 0 && bat.startThreshold !== p.resume))) run('battery-thresholds', `${p.resume} ${p.limit}`);
+  }
+  if (r.behaviour) run('battery-behaviour', r.behaviour);
+  if (r.thresholds) run('battery-thresholds', r.thresholds.join(' '));
+  for (const n of r.notify) {
+    if (n.id === 'plug' && !powerPrefs().lowBattery) continue;
+    notify({ app: 'settings', title: t('prefs.battery.noticeTitle'), body: t(n.key, n.vars) });
+  }
+  if (r.done.length) settings.set({ power: { ...(s.power || {}), battery: { ...(raw || {}), ...Object.fromEntries(r.done.map((k) => [k, false])) } } });
 }
 
 export function BatteryGlyph({ percent, charging, color, width = 24 }) {
@@ -718,10 +750,11 @@ globalThis.__lordHw = (kind, data) => {
       const wasAC = battery.get()?.onAC;
       battery.set(data);
       checkLow(data);
+      policyTick();
       if (data?.onAC !== wasAC) applyIdle();
       break;
     }
-    case 'bt': case 'bt-prompt': bluetooth.set(data); break;
+    case 'bt': case 'bt-prompt': bluetooth.set(data); policyTick(); break;
     case 'bt-result': for (const fn of btResults) { try { fn(data); } catch (e) { console.log(`bt: ${e}`); } } break;
     case 'ppd': powerProfiles.set(data); break;
     case 'ppd-result': for (const fn of ppdResults) { try { fn(data); } catch (e) { console.log(`ppd: ${e}`); } } break;
@@ -769,4 +802,5 @@ export function startHardware() {
   });
   registerStatusItem('battery', BatteryStatus, 5);
   checkLow(battery.get());
+  policyTick();
 }

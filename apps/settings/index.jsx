@@ -2,12 +2,13 @@
 // icons, and the open page under a title bar) plus the appearance, wallpaper, language and region,
 // keyboard, themes and session pages. The other pages are in their own files; all of them are built
 // from ./ui.jsx (docs/DESIGN.md, "Settings").
+import { BatterySettings } from './Battery.jsx';
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionCountry,
-  useSidebar, SidebarToggle, SidebarOverlay,
+  useSidebar, SidebarToggle, SidebarOverlay, battery, deviceList,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
@@ -897,13 +898,15 @@ const GROUPS = [
   [['general', General, '#8e8e93', 'i'], ['appearance', Appearance, '#3a3a3c', '◐'], ['wallpaper', Wallpapers, '#30b0c7', '▣'], ['dock', DockSettings, '#3a3a3c', '▁'], ['displays', DisplaysSettings, '#0a84ff', '▭']],
   [['network', NetworkSettings, '#0a84ff', '⇅'], ['bluetooth', BluetoothSettings, '#0a84ff', 'ᛒ'], ['sound', SoundSettings, '#ff375f', '♪'], ['notifications', NotificationsSettings, '#ff3b30', '◉'], ['printers', PrintersSettings, '#636366', '⎙'], ['clipboard', ClipboardSettings, '#5e5ce6', '⎘'], ['sharing', SharingSettings, '#34c759', '⇄'], ['cloud', CloudSettings, '#0a84ff', '☁']],
   [['language', LanguageRegion, '#30b0c7', 'A'], ['datetime', DateTimeSettings, '#0a84ff', '◷'], ['keyboard', Keyboard, '#8e8e93', '⌨'], ['trackpad', TrackpadSettings, '#8e8e93', '▭'], ['defaultapps', DefaultAppsSettings, '#8e8e93', '◫'], ['webapps', WebAppsSettings, '#5e5ce6', '◎'], ['ai', AISettings, '#bf5af2', '✦']],
-  [['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
+  [['battery', BatterySettings, '#30d158', '▮'], ['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
 ];
 const SECTIONS = GROUPS.flat();
 // Board firmware
 // only on a BCM2712 board (Raspberry Pi 5, 500, CM5: lord.system.info().board)
 const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
-const sectionShown = (id, hasPad, pi5 = isPi5()) => id !== 'firmware' || pi5;
+// Battery: on a computer with one, or when something connected has a battery (docs/BATTERY.md)
+const hasAnyBattery = () => { try { return !!battery.get()?.hasBattery || deviceList().length > 0; } catch (e) { return false; } };
+const sectionShown = (id, hasPad, pi5 = isPi5()) => (id !== 'firmware' || pi5) && (id !== 'battery' || hasAnyBattery());
 
 // The Dock's right-click menu lists every section, in the sidebar's order and with its names; one
 // opens Settings on that page (sdk/dock.js, quick actions). Built from SECTIONS, so it never drifts.

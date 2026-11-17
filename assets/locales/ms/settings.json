@@ -709,5 +709,6 @@
   "ai.pv.freeKeepGoing": "{s} s… teruskan, sedikit lagi.",
   "ai.pv.freeEnough": "{s} s · itu sudah memadai: tekan Selesai bila-bila masa (ia berhenti sendiri pada 30).",
   "ai.pv.freeShort": "Pertuturan tidak mencukupi: bercakap sedikit lebih lama, sekurang-kurangnya 15 saat.",
-  "ai.pv.noMic": "Tiada bunyi datang dari mikrofon. Pastikan ia dipalamkan dan tidak diredamkan (Tetapan → Bunyi), kemudian cuba lagi."
+  "ai.pv.noMic": "Tiada bunyi datang dari mikrofon. Pastikan ia dipalamkan dan tidak diredamkan (Tetapan → Bunyi), kemudian cuba lagi.",
+  "section.battery": "Bateri"
 }

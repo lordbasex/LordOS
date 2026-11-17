@@ -24,6 +24,9 @@ export function useDevices() {
   return devicesFrom(pw, bt, fresh && fresh.length >= (hp || []).length ? fresh : hp);
 }
 
+// the same list without a hook (Settings' sidebar decides whether Battery shows)
+export const deviceList = () => devicesFrom(battery.get(), bluetooth.get(), hidppRead());
+
 export const deviceName = (d) => (d.kind === 'laptop' && !d.name ? t('shell.widgets.devices.computer') : d.name);
 export const deviceShort = (d) => (d.kind === 'laptop' && !d.name ? t('shell.widgets.devices.computer') : shortName(d.name));
 // "85 %", "⚡100 %", the level's word, "Charging" with no level, "No data"

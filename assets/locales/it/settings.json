@@ -716,5 +716,6 @@
   "ai.pv.freeKeepGoing": "{s} s… continua, ancora un po’.",
   "ai.pv.freeEnough": "{s} s · basta così: premi Fatto quando vuoi (si ferma da solo a 30).",
   "ai.pv.freeShort": "Non c’era abbastanza parlato: parla un po’ di più, almeno 15 secondi.",
-  "ai.pv.noMic": "Dal microfono non arriva alcun suono. Controlla che sia collegato e non silenziato (Impostazioni → Suono), poi riprova."
+  "ai.pv.noMic": "Dal microfono non arriva alcun suono. Controlla che sia collegato e non silenziato (Impostazioni → Suono), poi riprova.",
+  "section.battery": "Batteria"
 }

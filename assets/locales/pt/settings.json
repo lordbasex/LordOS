@@ -716,5 +716,6 @@
   "ai.pv.freeKeepGoing": "{s} s… continue, só mais um pouco.",
   "ai.pv.freeEnough": "{s} s · já basta: pressione Pronto quando quiser (para sozinho aos 30).",
   "ai.pv.freeShort": "Não houve fala suficiente: fale um pouco mais, pelo menos 15 segundos.",
-  "ai.pv.noMic": "Não chega som do microfone. Verifique se está conectado e sem mudo (Ajustes → Som) e tente de novo."
+  "ai.pv.noMic": "Não chega som do microfone. Verifique se está conectado e sem mudo (Ajustes → Som) e tente de novo.",
+  "section.battery": "Bateria"
 }

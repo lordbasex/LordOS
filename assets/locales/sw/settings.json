@@ -716,5 +716,6 @@
   "ai.pv.freeKeepGoing": "Sekunde {s}… endelea, kidogo zaidi.",
   "ai.pv.freeEnough": "Sekunde {s} · inatosha: bonyeza Imekamilika wakati wowote (husimama yenyewe kwa 30).",
   "ai.pv.freeShort": "Usemaji haukutosha: zungumza kwa muda mrefu kidogo, angalau sekunde 15.",
-  "ai.pv.noMic": "Hakuna sauti inayotoka kwenye maikrofoni. Hakikisha imechomekwa na haijanyamazishwa (Mipangilio → Sauti), kisha ujaribu tena."
+  "ai.pv.noMic": "Hakuna sauti inayotoka kwenye maikrofoni. Hakikisha imechomekwa na haijanyamazishwa (Mipangilio → Sauti), kisha ujaribu tena.",
+  "section.battery": "Betri"
 }

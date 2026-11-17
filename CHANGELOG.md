@@ -12,6 +12,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Settings → Battery, for any laptop (all themes).** Like the iPhone's battery page and AlDente, through the kernel's
+  standard attributes (no vendor tool): the state with the plug-in, resume and limit marks; the daily use of the last
+  8 days and the level by hour; screen active and idle time on battery; the estimated use per app (each app's CPU on
+  battery); the battery's condition, maximum capacity, real cycles (counted by LordOS when the battery reports none),
+  manufacture date and first use; and optimized charging: charge limit, sailing mode, a "plug in" notice (default
+  20 %), full charge this time, pause charging, heat protection (40 °C) and discharge on power. Only an
+  administrator changes the charging (new closed admin actions `battery-thresholds` and `battery-behaviour`,
+  maintainer's approval 2026-11-17); what the laptop can't do shows disabled with why. The devices' batteries and
+  their notices (unplug at the limit, charge at the mark) are on the same page; without a laptop battery only they
+  show. The history is kept by lord-server in `~/.local/state/lordos/battery-history` (`lord.power.history()`), never
+  sent anywhere. Not yet tested on laptop hardware. See docs/BATTERY.md. Strings in all 35 languages.
+
 - **Weather: choose your city.** The weather widget's "Location…" searches an offline list of 34,000 cities
   (GeoNames' cities15000, CC BY 4.0, credited in About; `assets/geo/cities.tsv`, refreshed before each release by
   `tools/geo/fetch-cities.sh`): the search never leaves the computer, and lord-server takes the picked city's

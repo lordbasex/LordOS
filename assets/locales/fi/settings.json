@@ -716,5 +716,6 @@
   "ai.pv.freeKeepGoing": "{s} s… jatka vielä hetki.",
   "ai.pv.freeEnough": "{s} s · se riittää: paina Valmis milloin haluat (pysähtyy itsestään 30 sekunnissa).",
   "ai.pv.freeShort": "Puhetta ei ollut tarpeeksi: puhu hieman pidempään, vähintään 15 sekuntia.",
-  "ai.pv.noMic": "Mikrofonista ei tule ääntä. Tarkista, että se on kytketty eikä mykistetty (Asetukset → Ääni), ja yritä uudelleen."
+  "ai.pv.noMic": "Mikrofonista ei tule ääntä. Tarkista, että se on kytketty eikä mykistetty (Asetukset → Ääni), ja yritä uudelleen.",
+  "section.battery": "Akku"
 }

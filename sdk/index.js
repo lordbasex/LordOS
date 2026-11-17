@@ -82,7 +82,8 @@ export { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder } fr
 export { LordOSLogo, LordOSGlyph, LordOSWordmark } from './logo.js';
 export { Lumo, lumoSource } from './mascot.js';
 export { DesktopWidgets, registerWidgetType, setWidgets, desktopWidgets } from './widgets.js';
-export { useDevices, deviceName, deviceShort, deviceValue, deviceVia } from './devices.js';
+export { BATTERY_DEFAULTS, batteryPrefs, batteryStep } from './batterypolicy.js';
+export { useDevices, deviceList, deviceName, deviceShort, deviceValue, deviceVia } from './devices.js';
 export { devicesFrom, fractionOf as deviceFraction, toneOf as deviceTone, kindOf as deviceKind } from './devicesmodel.js';
 export { registerWidgetKind, widgetKinds, widgetCatalog, addDeskWidget, removeDeskWidget, setDeskWidget, resizeDeskWidget, startDeskWidgets, deskWidgetSize, kindSizes, WidgetDropTarget, widgetDrag, deskWidgetsShown, widgetDisplayKey } from './deskwidgets.jsx';
 export { Markdown, markdownHeadings, parseMarkdown, parseInline, toggleTask } from './markdown.jsx';

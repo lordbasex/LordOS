@@ -716,5 +716,6 @@
   "ai.pv.freeKeepGoing": "{s} s… continuez, encore un peu.",
   "ai.pv.freeEnough": "{s} s · c’est suffisant : appuyez sur Terminé quand vous voulez (arrêt automatique à 30).",
   "ai.pv.freeShort": "Pas assez de parole : parlez un peu plus longtemps, au moins 15 secondes.",
-  "ai.pv.noMic": "Aucun son ne provient du micro. Vérifiez qu’il est branché et non coupé (Réglages → Son), puis réessayez."
+  "ai.pv.noMic": "Aucun son ne provient du micro. Vérifiez qu’il est branché et non coupé (Réglages → Son), puis réessayez.",
+  "section.battery": "Batterie"
 }
