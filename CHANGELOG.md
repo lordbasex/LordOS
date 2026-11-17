@@ -368,6 +368,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Files: the last color tag of an item can be removed** (GitHub #181), and an emptied comment is removed too. The
+  tag and comment maps were handed to their store as an object, which the SDK's `createStore` merges into the old
+  one, so the path whose last tag was taken off came back with it until Files restarted. They are now set whole
+  (`store.set(() => map)`); the logic moved to `apps/files/tags.js`, tested by `files-tags-test`.
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.

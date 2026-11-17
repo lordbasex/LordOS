@@ -378,6 +378,9 @@ EOF
     # the column view: what is picked in a deeper column is selected (apps/files/colview.js, GitHub #100)
     if have node; then run "files-colview-test (apps/files/colview.js)" node tests/files_colview_test.mjs
     else skip "files-colview-test" "node"; fi
+    # color tags and comments: the last tag and an emptied comment are removed (apps/files/tags.js, GitHub #181)
+    if have node; then run "files-tags-test (apps/files/tags.js)" node tests/files_tags_test.mjs
+    else skip "files-tags-test" "node"; fi
     # menus from the keyboard: arrows, type-ahead, the submenu's side and the safe triangle (sdk/menunav.js)
     if have node; then run "menu-nav-test (sdk/menunav.js)" node tests/menu_nav_test.mjs
     else skip "menu-nav-test" "node"; fi

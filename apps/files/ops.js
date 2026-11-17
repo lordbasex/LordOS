@@ -4,6 +4,7 @@ import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, err
 import { kindOf, mimesOf, appOpens, isTextual, isImage, isProgram } from './kinds.js';
 import { pasteFrom, offerable } from './clipfiles.js';
 import { createJobQueue } from './jobqueue.js';
+import { toggledTags, withComment, movedKey } from './tags.js';
 
 // Changes every time something changed on disk (a copy finished, the trash…): the views reload.
 export const fsVersion = createStore(0);
@@ -105,14 +106,8 @@ export const tagStore = createStore((() => {
 })());
 export const tagsOf = (path) => tagStore.get()[path] || [];
 export function toggleTag(paths, color) {
-  const all = { ...tagStore.get() };
-  const on = paths.every((p) => (all[p] || []).includes(color));
-  for (const p of paths) {
-    const cur = new Set(all[p] || []);
-    if (on) cur.delete(color); else cur.add(color);
-    if (cur.size) all[p] = [...cur]; else delete all[p];
-  }
-  tagStore.set(all);
+  const all = toggledTags(tagStore.get(), paths, color);
+  tagStore.set(() => all);                 // whole, not merged: a removed last tag stays removed (#181)
   try { fs.mkdir('.local/share/lordos'); fs.write(TAGS_FILE, JSON.stringify(all, null, 1)); } catch (e) { /* no disk */ }
 }
 // Comments, kept like tags (~/.local/share/lordos/comments.json: path → text).
@@ -121,20 +116,18 @@ export const commentStore = createStore((() => {
   try { return JSON.parse(fs.read(COMMENTS_FILE)); } catch (e) { return {}; }
 })());
 export const commentOf = (path) => commentStore.get()[path] || '';
-export function setComment(path, text) {
-  const all = { ...commentStore.get() };
-  if (text.trim()) all[path] = text.slice(0, 500); else delete all[path];
-  commentStore.set(all);
+const saveComments = (all) => {
+  commentStore.set(() => all);
   try { fs.mkdir('.local/share/lordos'); fs.write(COMMENTS_FILE, JSON.stringify(all, null, 1)); } catch (e) { /* no disk */ }
-}
-// Moving or renaming keeps the tags.
+};
+export function setComment(path, text) { saveComments(withComment(commentStore.get(), path, text)); }
+// Moving or renaming keeps the tags and the comment.
 export function moveTags(from, to) {
-  if (commentOf(from)) { const text = commentOf(from); setComment(from, ''); setComment(to, text); }
-  const all = tagStore.get();
-  if (!all[from]) return;
-  const next = { ...all, [to]: all[from] };
-  delete next[from];
-  tagStore.set(next);
+  const comments = movedKey(commentStore.get(), from, to);
+  if (comments !== commentStore.get()) saveComments(comments);
+  const next = movedKey(tagStore.get(), from, to);
+  if (next === tagStore.get()) return;
+  tagStore.set(() => next);
   try { fs.write(TAGS_FILE, JSON.stringify(next, null, 1)); } catch (e) { /* no disk */ }
 }
 
