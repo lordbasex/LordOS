@@ -66,6 +66,7 @@
 #include "xdg-activation-v1-protocol.h"
 #include "xdgact.h"
 #include "dndgate.h"
+#include "seatbtn.h"
 #include "toolkitenv.h"
 #include "urilist.h"
 #include "tiutf8.h"
@@ -3389,6 +3390,7 @@ static struct {
     int xsrc;                           /* an X app's drag (xwm.c): no Source, its types in xsrc_mimes */
     uint32_t xacts;                     /* the actions that X app's drag allows */
     int xmoved;                         /* the pointer moved since it began: focus is where it is */
+    int button;                         /* the button whose press started it: its release drops (seatbtn.h) */
 } drag;
 /* An X app's drag: its MIME types (named by xwm), and which drag they belong to */
 static char xsrc_mimes[MAX_MIMES][256];
@@ -3397,7 +3399,7 @@ static unsigned xsrc_gen;
 /* The Wayland drag over (or dropped on) an X window, whose data xwm asks for (wlx_dnd_send): its Source, or
  * LordOS's paths (their generation); the X window's last status. */
 static struct { int on, dropped, accept; Source *src; unsigned lord; uint32_t action; } xdt;
-static int seat_held;                   /* buttons down, wherever they were pressed (a drag ends when none is) */
+static SeatBtn seat = { 0, -1 };        /* buttons down, wherever they were pressed (seatbtn.h: a drag ends at its button's release) */
 static int shift_down;                  /* Shift held: a Files drag into a Linux app may move (it copies otherwise) */
 /* the press a start_drag may name: its serials (one per wl_pointer of that client) and the surface it went to */
 static uint32_t press_serials[4];
@@ -3820,8 +3822,9 @@ static void dnd_drop(void) {
     dnd_end();
 }
 
-/* Pointer input while a drag runs: no app gets it, the surface under it gets the drag. The last release drops. */
-static int dnd_pointer(float x, float y, Node *hit, int nbuttons, const int *down) {
+/* Pointer input while a drag runs: no app gets it, the surface under it gets the drag. The release of the button
+ * that started it drops, and so does the release that leaves no button held (seatbtn.h). */
+static int dnd_pointer(float x, float y, Node *hit, int nbuttons, const int *down, const int *button) {
     float lx = 0, ly = 0;
     dnd_icon_damage();
     last_x = x;
@@ -3832,7 +3835,7 @@ static int dnd_pointer(float x, float y, Node *hit, int nbuttons, const int *dow
     int released = 0;
     for (int i = 0; i < nbuttons; i++) {
         buttons_held += down[i] ? 1 : -1;
-        if (!down[i] && !seat_held) released = 1;
+        if (sb_drag_released(&seat, drag.button, button[i], down[i])) released = 1;
     }
     if (buttons_held < 0) buttons_held = 0;
     if (released) {
@@ -3892,6 +3895,7 @@ static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resou
     memset(&drag, 0, sizeof drag);
     drag.on = 1;
     drag.client = c;
+    drag.button = seat.last;
     drag.src = src;
     drag.icon = icon;
     drag.contained = dnd_contained(c);
@@ -3924,7 +3928,7 @@ static void dnd_client_gone(struct wl_client *c) {
 }
 
 int wl_drag_files(const char *const *paths, int n) {
-    if (!dpy || drag.on || seat_held <= 0) return 0;
+    if (!dpy || drag.on || !sb_any(&seat)) return 0;
     if (n < 1 || n > URIL_MAX_PATHS) return 0;
     /* the same encoder as Files' copy to the clipboard (urilist.c) */
     size_t pl = 0, un = 0, tn = 0;
@@ -3941,6 +3945,7 @@ int wl_drag_files(const char *const *paths, int n) {
     lord_gen++;
     memset(&drag, 0, sizeof drag);
     drag.on = drag.lord = 1;
+    drag.button = seat.last;
     pointer_enter(NULL, 0, 0);          /* the window under it was only hovered: now the drag goes to it */
     return 1;
 }
@@ -3955,9 +3960,8 @@ int wl_drag_files_taken(void) {
 int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *down, const int *button, int wheel) {
     ptr_last_x = x; ptr_last_y = y;
     if (!dpy) return 0;
-    for (int i = 0; i < nbuttons; i++) seat_held += down[i] ? 1 : -1;
-    if (seat_held < 0) seat_held = 0;
-    if (drag.on && !drag.xsrc) return dnd_pointer(x, y, hit, nbuttons, down);
+    for (int i = 0; i < nbuttons; i++) sb_event(&seat, button[i], down[i]);
+    if (drag.on && !drag.xsrc) return dnd_pointer(x, y, hit, nbuttons, down, button);
     last_x = x;
     last_y = y;
     Surf *target = NULL;
@@ -4017,10 +4021,9 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
     return top && top->role == R_POPUP ? 2 : 1;
 }
 
-void wl_pointer_grab(int nbuttons, const int *down) {
+void wl_pointer_grab(int nbuttons, const int *down, const int *button) {
     if (!dpy) return;
-    for (int i = 0; i < nbuttons; i++) seat_held += down[i] ? 1 : -1;
-    if (seat_held < 0) seat_held = 0;
+    for (int i = 0; i < nbuttons; i++) sb_event(&seat, button[i], down[i]);
     dnd_cancel();                       /* a window move took the pointer: no drop at its release */
     pointer_enter(NULL, 0, 0);
     for (int i = 0; i < nbuttons; i++) buttons_held += down[i] ? 1 : -1;

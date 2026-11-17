@@ -30,7 +30,7 @@ double wl_frame_hidden(unsigned time_ms);
 int  wl_pointer(float x, float y, struct Node *hit, int moved, int nbuttons, const int *down, const int *button, int wheel);
 /* While lord-server moves or resizes a window (ui/grab.c): no app receives the pointer
  * (they are sent leave) and only the button count is tracked. */
-void wl_pointer_grab(int nbuttons, const int *down);
+void wl_pointer_grab(int nbuttons, const int *down, const int *button);
 /* 0: the key is the shell's; 1: it went to the focused app; 2: it went to the app as another key
  * (Lord Flow's ❖ → Ctrl): the shell is only told, so ❖ does not count as pressed alone. */
 int  wl_key(int code, int value, const KeyInfo *k);

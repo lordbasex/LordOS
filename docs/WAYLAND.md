@@ -288,8 +288,10 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   (`target`, `action`). The action is the target's preferred one, else copy, move or ask, in that order. A
   source without `set_actions` (before version 3) copies. A drag without a source stays inside the app that
   started it.
-- **The drop.** Releasing over a surface whose offer accepted a type (and agreed an action, from version 3)
-  sends `drop` and `dnd_drop_performed`. The offer keeps reading until the target calls `finish`, which
+- **The drop.** The release of the button that started the drag drops (and so does the release that leaves no
+  button held; the seat's buttons are a set, `seatbtn.h`, so a lost release or a press reported twice can't
+  keep a drag going, #176). Releasing over a surface whose offer accepted a type (and agreed an action, from
+  version 3) sends `drop` and `dnd_drop_performed`. The offer keeps reading until the target calls `finish`, which
   sends `dnd_finished`. A target that destroys the offer without finishing is cancelled (before version 3
   that counts as finished). Releasing anywhere else, or pressing Escape, cancels.
 - **The icon** (role "dnd icon") is drawn under the pointer above everything, moved by its `attach` offset
@@ -377,7 +379,8 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   than three types and `XdndTypeList`, positions, statuses, finished, type names, the X-Resource reply,
   who may hand files to LordOS, synthetic or mismatched `SelectionNotify` events and owners that changed
   before the read),
-  `build/dndgate-test` (also in it: a sandboxed root, a drop claimed only at its release), and
+  `build/dndgate-test` (also in it: a sandboxed root, a drop claimed only at its release), `build/seatbtn-test`
+  (also in it: the release that ends a drag with a lost release, a doubled press or another button down), and
   `build/dnd-client` inside a session. Without input it checks a serial that names no press, the
   protocol errors and that the compositor stays up. With two presses in its window it checks the offer, the
   actions, a second drag, the icon and the source destroyed mid-drag, receive, drop and finish; a third,

@@ -395,6 +395,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     answers every size with another one is asked once) and `workspaces_scene.mjs` (idempotent passes, a stubborn app
     stays tiled with a bounded number of changes).
   - *Search:* the Apps view no longer builds the home folder's file index; it starts with the first typed character.
+- **A drag and drop inside a Linux app could stay going after the mouse button was released (GitHub #176, #177).** In
+  Google Chrome a page's box dragged onto a canvas kept following the pointer and never dropped; in Firefox and Floorp
+  a tab dragged along the tab bar went back to its place. The compositor counted the seat's held buttons and ended a
+  drag only when that count went back to zero, so one press counted twice or one release that never arrived (two
+  devices reporting the same button, a kernel buffer overrun, a console or session switch with a button down) kept the
+  count above zero for good: from then on no Wayland drag ended at its release, only with Escape. The held buttons are
+  a set now (`server/src/wl/seatbtn.h`): a button's next release clears it, and a drag also ends at the release of the
+  button that started it, whatever another button looks like (as Weston does). Checked in `build/seatbtn-test` (in
+  `make -C server test`: a lost release, a doubled press, another button stuck down, a second button mid-drag).
 - **The real-time priority's demotion left the main thread at real time.** On `SIGXCPU` lord-server asked the kernel
   for `SCHED_OTHER` alone, which it refuses for a thread with `SCHED_RESET_ON_FORK` (the main one) without
   `CAP_SYS_NICE`: only the paint threads went back. It keeps the flag now (`par.c`).
