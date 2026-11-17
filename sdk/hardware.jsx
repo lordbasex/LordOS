@@ -381,7 +381,7 @@ function DevicesPanel({ power, bt }) {
   try { hp = lord.hidpp?.batteries ? lord.hidpp.batteries() || [] : []; } catch (e) { hp = []; }
   const list = devicesFrom(power, bt, hp);
   const tone = (d) => ({ ok: '#3dd68c', warn: '#f5b43c', crit: '#ff6b6e' }[deviceTone(d)]);
-  const value = (d) => `${d.charging ? '⚡' : ''}${d.percent >= 0 ? `${d.percent} %` : d.level ? t(`shell.widgets.devices.level.${d.level}`) : '—'}`;
+  const value = (d) => `${d.charging ? '⚡' : ''}${d.percent >= 0 ? `${d.percent} %` : d.level ? t(`shell.widgets.devices.level.${d.level}`) : d.charging ? t('shell.widgets.devices.chargingNow') : t('shell.widgets.devices.unknown')}`;
   return h(View, { style: { width: 280, padding: 14, gap: 10, borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`,
     boxShadow: '0 12px 36px rgba(0,0,0,0.35)' } },
   h(Text, { style: { fontSize: 13, fontWeight: 700, color: th.text, textAlign: 'start' } }, t('shell.widgets.devices.name')),

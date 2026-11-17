@@ -918,7 +918,7 @@ const toneColor = (L, d) => ({ ok: L.ok, warn: L.warn, crit: L.crit }[deviceTone
 const deviceName = (d) => (d.kind === 'laptop' && !d.name ? t('shell.widgets.devices.computer') : d.name);
 const deviceShort = (d) => (d.kind === 'laptop' && !d.name ? t('shell.widgets.devices.computer') : shortName(d.name));
 // "85 %", "⚡100 %", the level's word when there is no percentage, "No data" with neither
-const deviceValue = (d) => `${d.charging ? '⚡' : ''}${d.percent >= 0 ? `${d.percent} %` : d.level ? t(`shell.widgets.devices.level.${d.level}`) : t('shell.widgets.devices.unknown')}`;
+const deviceValue = (d) => `${d.charging ? '⚡' : ''}${d.percent >= 0 ? `${d.percent} %` : d.level ? t(`shell.widgets.devices.level.${d.level}`) : d.charging ? t('shell.widgets.devices.chargingNow') : t('shell.widgets.devices.unknown')}`;
 // "Logitech · charging"
 const deviceVia = (d) => `${t(`shell.widgets.devices.via.${d.via}`)}${d.charging ? ` · ${t('shell.widgets.devices.charging')}` : ''}`;
 function DeviceRing({ L, d, size, ticks = 32 }) {

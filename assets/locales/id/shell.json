@@ -570,6 +570,7 @@
   "widgets.devices.low": "Baterai lemah",
   "widgets.devices.unknown": "Tidak ada data",
   "widgets.devices.charging": "mengisi daya",
+  "widgets.devices.chargingNow": "Mengisi daya",
   "widgets.devices.level.critical": "Kritis",
   "widgets.devices.level.low": "Rendah",
   "widgets.devices.level.normal": "Normal",

@@ -584,6 +584,7 @@
   "widgets.devices.low": "Senka baterija",
   "widgets.devices.unknown": "Nėra duomenų",
   "widgets.devices.charging": "kraunama",
+  "widgets.devices.chargingNow": "Kraunama",
   "widgets.devices.level.critical": "Kritinė",
   "widgets.devices.level.low": "Žema",
   "widgets.devices.level.normal": "Įprasta",

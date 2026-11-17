@@ -570,6 +570,7 @@
   "widgets.devices.low": "バッテリー残量低下",
   "widgets.devices.unknown": "データなし",
   "widgets.devices.charging": "充電中",
+  "widgets.devices.chargingNow": "充電中",
   "widgets.devices.level.critical": "危険",
   "widgets.devices.level.low": "低",
   "widgets.devices.level.normal": "普通",

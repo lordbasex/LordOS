@@ -570,6 +570,7 @@
   "widgets.devices.low": "แบตเตอรี่ต่ำ",
   "widgets.devices.unknown": "ไม่มีข้อมูล",
   "widgets.devices.charging": "กำลังชาร์จ",
+  "widgets.devices.chargingNow": "กำลังชาร์จ",
   "widgets.devices.level.critical": "วิกฤต",
   "widgets.devices.level.low": "ต่ำ",
   "widgets.devices.level.normal": "ปกติ",

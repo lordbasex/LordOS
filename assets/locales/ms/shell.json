@@ -570,6 +570,7 @@
   "widgets.devices.low": "Bateri lemah",
   "widgets.devices.unknown": "Tiada data",
   "widgets.devices.charging": "mengecas",
+  "widgets.devices.chargingNow": "Mengecas",
   "widgets.devices.level.critical": "Kritikal",
   "widgets.devices.level.low": "Rendah",
   "widgets.devices.level.normal": "Biasa",

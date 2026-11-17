@@ -34,7 +34,7 @@ int hidpp_parse_line(const char *line, int *hidraw, int *percent, int *status) {
     int h, p, s;
     if (sscanf(line, "%d %d %d %c", &h, &p, &s, &extra) != 3) return -1;
     for (const char *c = line; *c; c++) if (!isdigit((unsigned char)*c) && *c != ' ' && *c != '\n') return -1;
-    if (h < 0 || h > 999 || p < 0 || p > 100 || s < 0 || s > 2) return -1;
+    if (h < 0 || h > 999 || p < 0 || p > 100 || s < 0 || s > 3 || (s == 3 && p)) return -1;
     *hidraw = h; *percent = p; *status = s;
     return 0;
 }
@@ -176,7 +176,7 @@ size_t hidpp_json(char *out, size_t n) {
     o += (size_t)snprintf(out + o, n - o, "[");
     for (int i = 0; i < nkept && o < n; i++)
         o += (size_t)snprintf(out + o, n - o, "%s{\"supply\":\"%s\",\"percent\":%d,\"charging\":%s,\"full\":%s,\"age\":%ld}", i ? "," : "",
-                              kept[i].supply, kept[i].percent, kept[i].status == 1 ? "true" : "false", kept[i].status == 2 ? "true" : "false",
+                              kept[i].supply, kept[i].status == 3 ? -1 : kept[i].percent, kept[i].status == 1 || kept[i].status == 3 ? "true" : "false", kept[i].status == 2 ? "true" : "false",
                               (long)(now - kept[i].at));
     if (o < n) o += (size_t)snprintf(out + o, n - o, "]");
     pthread_mutex_unlock(&lock);

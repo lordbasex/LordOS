@@ -76,11 +76,13 @@ export function devicesFrom(power, bt, hidpp) {
   // lord-hidpp's exact numbers for the Logitech devices that gave only a level: by the device's own power supply
   // (lord.hidpp.batteries() names it), or by name for an older answer without one
   for (const h of hidpp || []) {
-    if (!h || !(h.percent >= 0)) continue;
+    if (!h || !(h.percent >= 0) && !h.charging) continue;
     const key = fold(h.name);
     const d = h.supply ? out.find((x) => x.id === `ps:${h.supply}`)
       : key ? out.find((x) => x.via === 'logitech' && x.percent < 0 && (fold(x.name).includes(key) || key.includes(fold(x.name)))) : null;
-    if (d) { d.percent = Math.max(0, Math.min(100, Math.round(h.percent))); if (h.charging) d.charging = true; }
+    if (!d) continue;
+    if (h.percent >= 0) d.percent = Math.max(0, Math.min(100, Math.round(h.percent)));
+    if (h.charging) d.charging = true;                   // charging with no level (an MX Keys on its cable): just that
   }
   const rank = (k) => KINDS.indexOf(k);
   return out.sort((a, b) => rank(a.kind) - rank(b.kind) || a.name.localeCompare(b.name));

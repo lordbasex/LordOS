@@ -577,6 +577,7 @@
   "widgets.devices.low": "Batería baja",
   "widgets.devices.unknown": "Sin datos",
   "widgets.devices.charging": "cargando",
+  "widgets.devices.chargingNow": "Cargando",
   "widgets.devices.level.critical": "Crítica",
   "widgets.devices.level.low": "Baja",
   "widgets.devices.level.normal": "Normal",

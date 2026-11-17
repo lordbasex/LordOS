@@ -584,6 +584,7 @@
   "widgets.devices.low": "Baterie descărcată",
   "widgets.devices.unknown": "Fără date",
   "widgets.devices.charging": "se încarcă",
+  "widgets.devices.chargingNow": "Se încarcă",
   "widgets.devices.level.critical": "Critică",
   "widgets.devices.level.low": "Scăzută",
   "widgets.devices.level.normal": "Normală",

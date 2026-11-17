@@ -577,6 +577,7 @@
   "widgets.devices.low": "ব্যাটারি কম",
   "widgets.devices.unknown": "কোনো তথ্য নেই",
   "widgets.devices.charging": "চার্জ হচ্ছে",
+  "widgets.devices.chargingNow": "চার্জ হচ্ছে",
   "widgets.devices.level.critical": "সংকটজনক",
   "widgets.devices.level.low": "কম",
   "widgets.devices.level.normal": "স্বাভাবিক",

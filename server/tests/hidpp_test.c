@@ -19,7 +19,8 @@ static int fails, checks;
 typedef struct {
     int fd;
     int has1004, soc, has1000, has1001;
-    int noise;                       /* a notification and another program's answer before each of ours */
+    int noise;
+    int kb_charging;                 /* Battery Status: level 0, recharging (an MX Keys on its cable) */                       /* a notification and another program's answer before each of ours */
     uint16_t asked[32];              /* every feature id looked up */
     int nasked;
     int writes_other;                /* any request that isn't a lookup or one of the battery functions */
@@ -47,7 +48,7 @@ static void *device(void *arg) {
             r[4] = id == 0x1004 && d->has1004 ? 7 : id == 0x1000 && d->has1000 ? 8 : id == 0x1001 && d->has1001 ? 9 : 0;
         } else if (feat == 7 && fn == 0) { r[4] = 0x0F; r[5] = d->soc ? 0x02 : 0x00; }   /* capabilities */
         else if (feat == 7 && fn == 1) { r[4] = 64; r[5] = 0x04; r[6] = 1; }           /* 64 %, charging */
-        else if (feat == 8 && fn == 0) { r[4] = 85; r[5] = 50; r[6] = 0; }             /* 85 %, discharging */
+        else if (feat == 8 && fn == 0) { if (d->kb_charging) { r[4] = 0; r[5] = 0; r[6] = 1; } else { r[4] = 85; r[5] = 50; r[6] = 0; } }
         else if (feat == 9 && fn == 0) { r[4] = 3922 >> 8; r[5] = 3922 & 0xFF; r[6] = 0x80; }  /* 3.922 V, charging */
         else { d->writes_other++; uint8_t e[20] = { 0x11, 0x01, 0xFF, feat, q[3], 0x02 }; write(d->fd, e, 20); continue; }
         write(d->fd, r, 20);
@@ -82,6 +83,9 @@ int main(void) {
     /* Unified Battery with levels only (the MX Master 3 in the kernel): Battery Status gives the percentage */
     Dev l = { .has1004 = 1, .soc = 0, .has1000 = 1, .noise = 1 };
     CHECK(ask_battery(&l, &b) == 0 && b.percent == 85 && b.status == 0 && b.source == 0x1000);
+    /* charging with no level, as the maintainer's MX Keys answers: no number, but charging */
+    Dev kc = { .has1000 = 1, .kb_charging = 1 };
+    CHECK(ask_battery(&kc, &b) == 0 && b.percent == -1 && b.status == 1);
     /* only the voltage */
     Dev v = { .has1001 = 1 };
     CHECK(ask_battery(&v, &b) == 0 && b.source == 0x1001 && b.percent == 70 && b.status == 1);
@@ -112,7 +116,8 @@ int main(void) {
     int h, pc, st;
     CHECK(hidpp_parse_line("4 85 0", &h, &pc, &st) == 0 && h == 4 && pc == 85 && st == 0);
     CHECK(hidpp_parse_line("2 100 2\n", &h, &pc, &st) == 0 && st == 2);
-    const char *bad[] = { "", "4 85", "4 101 0", "4 85 3", "-1 5 0", "4 85 0 x", "4 8a 0", "1000 5 0", "4 85 0; rm", NULL };
+    CHECK(hidpp_parse_line("2 0 3", &h, &pc, &st) == 0 && st == 3);
+    const char *bad[] = { "", "4 85", "4 101 0", "4 85 3", "4 85 4", "-1 5 0", "4 85 0 x", "4 8a 0", "1000 5 0", "4 85 0; rm", NULL };
     for (int i = 0; bad[i]; i++) CHECK(hidpp_parse_line(bad[i], &h, &pc, &st) == -1);
     /* and finding the device's power supply in a fake sysfs, hidpp_battery_<n> only */
     char dir[] = "/tmp/hidpp-test-XXXXXX";

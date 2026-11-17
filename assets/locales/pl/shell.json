@@ -584,6 +584,7 @@
   "widgets.devices.low": "Niski poziom baterii",
   "widgets.devices.unknown": "Brak danych",
   "widgets.devices.charging": "ładowanie",
+  "widgets.devices.chargingNow": "Ładowanie",
   "widgets.devices.level.critical": "Krytyczny",
   "widgets.devices.level.low": "Niski",
   "widgets.devices.level.normal": "Normalny",

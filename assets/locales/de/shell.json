@@ -577,6 +577,7 @@
   "widgets.devices.low": "Akku schwach",
   "widgets.devices.unknown": "Keine Daten",
   "widgets.devices.charging": "lädt",
+  "widgets.devices.chargingNow": "Lädt",
   "widgets.devices.level.critical": "Kritisch",
   "widgets.devices.level.low": "Niedrig",
   "widgets.devices.level.normal": "Normal",

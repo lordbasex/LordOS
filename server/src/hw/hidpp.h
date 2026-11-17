@@ -15,7 +15,8 @@
 enum { HIDPP_SHORT = 0x10, HIDPP_LONG = 0x11, HIDPP_LONG_LEN = 20 };
 enum { HIDPP_SWID = 0x0A };          /* our software id: replies to the kernel's own questions are not ours */
 
-/* status: 0 discharging, 1 charging, 2 full, -1 unknown */
+/* percent: 0..100, or -1 for a device charging that gives no level then (an MX Keys on its cable);
+ * status: 0 discharging, 1 charging, 2 full, -1 unknown */
 typedef struct { int percent, status, source; } HidppBattery;   /* source: 0x1004, 0x1000 or 0x1001 */
 
 /* A long request for feature index feat, function fn, with up to 16 parameter bytes. */

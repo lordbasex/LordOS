@@ -577,6 +577,7 @@
   "widgets.devices.low": "Batterij bijna leeg",
   "widgets.devices.unknown": "Geen gegevens",
   "widgets.devices.charging": "laadt op",
+  "widgets.devices.chargingNow": "Laadt op",
   "widgets.devices.level.critical": "Kritiek",
   "widgets.devices.level.low": "Laag",
   "widgets.devices.level.normal": "Normaal",

@@ -577,6 +577,7 @@
   "widgets.devices.low": "Låg batterinivå",
   "widgets.devices.unknown": "Inga data",
   "widgets.devices.charging": "laddar",
+  "widgets.devices.chargingNow": "Laddar",
   "widgets.devices.level.critical": "Kritisk",
   "widgets.devices.level.low": "Låg",
   "widgets.devices.level.normal": "Normal",

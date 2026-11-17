@@ -570,6 +570,7 @@
   "widgets.devices.low": "Pin yếu",
   "widgets.devices.unknown": "Không có dữ liệu",
   "widgets.devices.charging": "đang sạc",
+  "widgets.devices.chargingNow": "Đang sạc",
   "widgets.devices.level.critical": "Nguy hiểm",
   "widgets.devices.level.low": "Thấp",
   "widgets.devices.level.normal": "Bình thường",

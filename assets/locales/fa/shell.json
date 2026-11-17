@@ -577,6 +577,7 @@
   "widgets.devices.low": "باتری ضعیف",
   "widgets.devices.unknown": "بدون داده",
   "widgets.devices.charging": "در حال شارژ",
+  "widgets.devices.chargingNow": "در حال شارژ",
   "widgets.devices.level.critical": "بحرانی",
   "widgets.devices.level.low": "کم",
   "widgets.devices.level.normal": "عادی",

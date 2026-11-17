@@ -52,6 +52,10 @@ const bySupply = devicesFrom(power, bt, [{ supply: 'hidpp_battery_0', percent: 8
 assert.deepEqual(bySupply.filter((d) => d.via === 'logitech').map((d) => [d.name, d.percent, d.charging]),
   [['Wireless Mouse MX Master 3', 85, false], ['MX Keys Wireless Keyboard', 40, true]]);
 
+// charging with no level: the device says it charges, its percentage stays unknown
+const kc = devicesFrom(power, bt, [{ supply: 'hidpp_battery_1', percent: -1, charging: true }]).find((d) => d.name.startsWith('MX Keys'));
+assert.deepEqual([kc.percent, kc.charging, toneOf(kc)], [-1, true, 'ok']);
+
 // short names under a ring
 assert.equal(shortName('Wireless Mouse MX Master 3'), 'MX Master 3');
 assert.equal(shortName('MX Keys Wireless Keyboard'), 'MX Keys');

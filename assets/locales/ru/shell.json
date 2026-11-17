@@ -584,6 +584,7 @@
   "widgets.devices.low": "Низкий заряд",
   "widgets.devices.unknown": "Нет данных",
   "widgets.devices.charging": "заряжается",
+  "widgets.devices.chargingNow": "Заряжается",
   "widgets.devices.level.critical": "Критический",
   "widgets.devices.level.low": "Низкий",
   "widgets.devices.level.normal": "Нормальный",

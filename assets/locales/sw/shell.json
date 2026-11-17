@@ -577,6 +577,7 @@
   "widgets.devices.low": "Betri iko chini",
   "widgets.devices.unknown": "Hakuna data",
   "widgets.devices.charging": "inachaji",
+  "widgets.devices.chargingNow": "Inachaji",
   "widgets.devices.level.critical": "Hatari",
   "widgets.devices.level.low": "Chini",
   "widgets.devices.level.normal": "Kawaida",

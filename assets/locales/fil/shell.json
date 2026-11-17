@@ -577,6 +577,7 @@
   "widgets.devices.low": "Mahina ang baterya",
   "widgets.devices.unknown": "Walang data",
   "widgets.devices.charging": "nagcha-charge",
+  "widgets.devices.chargingNow": "Nagcha-charge",
   "widgets.devices.level.critical": "Kritikal",
   "widgets.devices.level.low": "Mababa",
   "widgets.devices.level.normal": "Normal",

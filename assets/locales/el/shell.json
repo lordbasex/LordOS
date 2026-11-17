@@ -577,6 +577,7 @@
   "widgets.devices.low": "Χαμηλή μπαταρία",
   "widgets.devices.unknown": "Χωρίς δεδομένα",
   "widgets.devices.charging": "φορτίζει",
+  "widgets.devices.chargingNow": "Φορτίζει",
   "widgets.devices.level.critical": "Κρίσιμη",
   "widgets.devices.level.low": "Χαμηλή",
   "widgets.devices.level.normal": "Κανονική",

@@ -570,6 +570,7 @@
   "widgets.devices.low": "배터리 부족",
   "widgets.devices.unknown": "데이터 없음",
   "widgets.devices.charging": "충전 중",
+  "widgets.devices.chargingNow": "충전 중",
   "widgets.devices.level.critical": "위험",
   "widgets.devices.level.low": "낮음",
   "widgets.devices.level.normal": "보통",

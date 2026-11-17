@@ -6,6 +6,12 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef HIDPP_DEBUG
+#include <stdio.h>
+#define DBG(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define DBG(...) ((void)0)
+#endif
 
 void hidpp_request(uint8_t out[HIDPP_LONG_LEN], uint8_t feat, uint8_t fn, const uint8_t *params, int nparams) {
     memset(out, 0, HIDPP_LONG_LEN);
@@ -56,11 +62,13 @@ static long now_ms(void) {
 static int ask(int fd, int timeout_ms, uint8_t feat, uint8_t fn, const uint8_t *p, int np, uint8_t params[16]) {
     uint8_t req[HIDPP_LONG_LEN];
     hidpp_request(req, feat, fn, p, np);
-    if (write(fd, req, sizeof req) != (ssize_t)sizeof req) return 0;
+    ssize_t w = write(fd, req, sizeof req);
+    DBG("  ask feat %d fn %d: write %zd%s\n", feat, fn, w, w < 0 ? " (error)" : "");
+    if (w != (ssize_t)sizeof req) return 0;
     long end = now_ms() + timeout_ms;
     for (;;) {
         long left = end - now_ms();
-        if (left <= 0) return 0;
+        if (left <= 0) { DBG("  feat %d fn %d -> no answer\n", feat, fn); return 0; }
         struct pollfd pf = { fd, POLLIN, 0 };
         int r = poll(&pf, 1, (int)left);
         if (r < 0 && errno == EINTR) continue;
@@ -69,15 +77,18 @@ static int ask(int fd, int timeout_ms, uint8_t feat, uint8_t fn, const uint8_t *
         uint8_t rep[64];
         ssize_t n = read(fd, rep, sizeof rep);
         if (n <= 0) return 0;
+        DBG("    read %zd: %02x %02x %02x %02x %02x %02x %02x %02x\n", n, rep[0], rep[1], rep[2], rep[3], rep[4], rep[5], rep[6], rep[7]);
         int m = hidpp_match(rep, (int)n, feat, fn, params);
-        if (m) return m;
+        if (m) { DBG("  feat %d fn %d -> %s\n", feat, fn, m > 0 ? "answer" : "error"); return m; }
     }
 }
 
 /* the index of a feature through the root feature; 0 when the device doesn't have it */
 static int feature_index(int fd, int timeout_ms, uint16_t id) {
     uint8_t p[2] = { (uint8_t)(id >> 8), (uint8_t)id }, r[16];
-    return ask(fd, timeout_ms, 0x00, 0, p, 2, r) == 1 ? r[0] : 0;
+    int got = ask(fd, timeout_ms, 0x00, 0, p, 2, r) == 1 ? r[0] : 0;
+    DBG("  feature 0x%04x -> index %d\n", id, got);
+    return got;
 }
 
 int hidpp_battery(int fd, int timeout_ms, HidppBattery *b) {
@@ -90,9 +101,10 @@ int hidpp_battery(int fd, int timeout_ms, HidppBattery *b) {
         }
     }
     ix = feature_index(fd, timeout_ms, 0x1000);
-    if (ix > 0 && ask(fd, timeout_ms, (uint8_t)ix, 0, NULL, 0, r) == 1 && r[0] > 0 && r[0] <= 100) {
-        *b = (HidppBattery){ r[0], hidpp_status_1000(r[2]), 0x1000 };
-        return 0;
+    if (ix > 0 && ask(fd, timeout_ms, (uint8_t)ix, 0, NULL, 0, r) == 1 && r[0] <= 100) {
+        int st = hidpp_status_1000(r[2]);
+        if (r[0] > 0) { *b = (HidppBattery){ r[0], st, 0x1000 }; return 0; }
+        if (st == 1 || st == 2) { *b = (HidppBattery){ -1, st, 0x1000 }; return 0; }   /* charging: no level given then */
     }
     ix = feature_index(fd, timeout_ms, 0x1001);
     if (ix > 0 && ask(fd, timeout_ms, (uint8_t)ix, 0, NULL, 0, r) == 1) {

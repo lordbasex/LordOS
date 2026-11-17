@@ -605,6 +605,7 @@
   "widgets.devices.low": "البطارية منخفضة",
   "widgets.devices.unknown": "لا بيانات",
   "widgets.devices.charging": "يشحن",
+  "widgets.devices.chargingNow": "يشحن",
   "widgets.devices.level.critical": "حرجة",
   "widgets.devices.level.low": "منخفضة",
   "widgets.devices.level.normal": "عادية",

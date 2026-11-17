@@ -577,6 +577,7 @@
   "widgets.devices.low": "Low battery",
   "widgets.devices.unknown": "No data",
   "widgets.devices.charging": "charging",
+  "widgets.devices.chargingNow": "Charging",
   "widgets.devices.level.critical": "Critical",
   "widgets.devices.level.low": "Low",
   "widgets.devices.level.normal": "Normal",

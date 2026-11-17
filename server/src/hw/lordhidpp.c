@@ -10,7 +10,8 @@
  *   2. gives up the group for good (setresgid to the caller's) and checks it can't get it back;
  *   3. applies the helpers' sandbox (no network, no files, a syscall allowlist, no privileges);
  *   4. asks each device for its battery (hidpp.c: features 0x1004, 0x1000, 0x1001 and nothing else) and writes one
- *      line per answer to stdout: "<hidraw number> <percent> <status>" (status 0 discharging, 1 charging, 2 full).
+ *      line per answer to stdout: "<hidraw number> <percent> <status>" (status 0 discharging, 1 charging, 2 full,
+ *      3 charging without a level, its percent 0).
  * No names or other strings: lord-server finds the device from the number in sysfs itself. Takes no arguments
  * and reads no environment. */
 #include "hidpp.h"
@@ -104,7 +105,11 @@ int main(int argc, char **argv) {
 
     for (int i = 0; i < n; i++) {
         HidppBattery b;
-        if (hidpp_battery(fds[i], 400, &b) == 0) printf("%d %d %d\n", nums[i], b.percent, b.status);
+#ifdef HIDPP_DEBUG
+        fprintf(stderr, "hidraw%d:\n", nums[i]);
+#endif
+        /* status 3: charging with no level ("<n> 0 3") */
+        if (hidpp_battery(fds[i], 400, &b) == 0) printf("%d %d %d\n", nums[i], b.percent < 0 ? 0 : b.percent, b.percent < 0 ? 3 : b.status);
         close(fds[i]);
     }
     fflush(stdout);
