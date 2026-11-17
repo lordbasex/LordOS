@@ -1,7 +1,7 @@
 // files_colview_test.mjs — the column view's items as data: what is picked in a deeper column is part of the selection
 // (apps/files/colview.js, GitHub #100); every column scrolls instead of being dropped, and Back steps through the
-// columns (#133); where New Folder puts the folder (#134); why a folder is only browsed (#139).
-import { columnEntries, columnRange, byFolder, folderReadOnly, COL_W, COL_MIN, COL_MAX, COL_EXTRA, MAX_COL_WIDTHS, clampCol, colWidth, colWidthsWith, fitCol,
+// columns (#133); Select All takes the selection's column (#170); where New Folder puts the folder (#134); why a folder is only browsed (#139).
+import { columnEntries, columnRange, columnAll, byFolder, folderReadOnly, COL_W, COL_MIN, COL_MAX, COL_EXTRA, MAX_COL_WIDTHS, clampCol, colWidth, colWidthsWith, fitCol,
   PREVIEW_MIN, colStrip, chainFolder, chainStep, historyStep, newFolderDir, listEntries, readOnlyWhy } from '../../apps/files/colview.js';
 
 let ok = 0, bad = 0;
@@ -36,6 +36,18 @@ eq('range backwards', columnRange(pool, '/home/u/Pictures/Screenshots/s3.png', '
   ['/home/u/Pictures/Screenshots/s2.png', '/home/u/Pictures/Screenshots/s3.png']);
 eq('anchor in another column: just the clicked one', columnRange(pool, '/home/u/notes.txt', '/home/u/Pictures/Screenshots/s3.png'), ['/home/u/Pictures/Screenshots/s3.png']);
 eq('anchor gone', columnRange(pool, '/home/u/zzz', '/home/u/Pictures/a.png'), ['/home/u/Pictures/a.png']);
+
+// Select All (GitHub #170): the column the selection is in, not the first one
+const shots = ['/home/u/Pictures/Screenshots/s1.png', '/home/u/Pictures/Screenshots/s2.png', '/home/u/Pictures/Screenshots/s3.png'];
+eq('all: a file picked in the third column', paths(columnAll(pool, '/home/u/Pictures/Screenshots/s2.png', selected)), shots);
+eq('all: the anchor wins over a deeper selection', paths(columnAll(pool, '/home/u/Pictures/a.png', new Set(['/home/u/Pictures/a.png', shots[0]]))),
+  ['/home/u/Pictures/Screenshots', '/home/u/Pictures/a.png']);
+eq('all: anchor not selected, the deepest selected', paths(columnAll(pool, '/home/u/notes.txt', new Set(['/home/u/Pictures', shots[2]]))), shots);
+eq('all: anchor gone from the columns', paths(columnAll(pool, '/home/u/zzz', new Set(['/home/u/zzz', '/home/u/Pictures/a.png']))),
+  ['/home/u/Pictures/Screenshots', '/home/u/Pictures/a.png']);
+eq('all: nothing selected, the first column', paths(columnAll(pool, null, new Set())), ['/home/u/Pictures', '/home/u/notes.txt']);
+eq('all: the root folder', paths(columnAll([{ path: '/bin' }, { path: '/etc' }, { path: '/etc/x' }], null, new Set())), ['/bin', '/etc']);
+eq('all: empty', columnAll([], null, new Set()), []);
 
 // Duplicate: next to each item
 eq('by folder', byFolder(['/home/u/notes.txt', '/home/u/Pictures/Screenshots/s1.png', '/home/u/Pictures/Screenshots/s2.png']),

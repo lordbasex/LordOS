@@ -372,6 +372,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   tag and comment maps were handed to their store as an object, which the SDK's `createStore` merges into the old
   one, so the path whose last tag was taken off came back with it until Files restarted. They are now set whole
   (`store.set(() => map)`); the logic moved to `apps/files/tags.js`, tested by `files-tags-test`.
+- **Files: Select All (Ctrl+A / ⌘A) selects the column you are in** (GitHub #170). In the column view it always took
+  the first column's items, so picking a file in a subfolder and pressing Ctrl+A selected the parent's items. It now
+  takes the column of the item last clicked (while selected), else the deepest column with a selection, as Finder
+  does (`columnAll` in `apps/files/colview.js`, tested by `files-colview-test`). In the list view with unfolded folders
+  it selects every row shown, their items too, instead of only the top level. The Edit menu's Select All does the same.
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.
