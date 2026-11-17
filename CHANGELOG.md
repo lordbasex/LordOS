@@ -414,6 +414,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the rest comes down and the folders turn to kept; the path shows the error glyph meanwhile and is tried again after
   the hour, at the next mount, or when the person keeps a folder again. The kept entry itself failing is still the
   provider not answering (never set aside), and a check that finds the provider unreachable forgets what was set aside.
+  A path refused with another error (not a time out), which never stopped the pass but also left the entry "coming
+  down" for good, is set aside the same way, without the check.
   `cloud-test` checks the set (added, inside a failed folder, the hour, the limit).
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that

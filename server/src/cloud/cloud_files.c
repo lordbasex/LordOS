@@ -481,21 +481,24 @@ static int set_aside(const char *id, const char *rel) {
  * Invalid"), and the pass stopped there every time: nothing after it came down and every folder kept the "coming
  * down" arrow. So the path is set aside too: if the check finds the provider answering, the keeper is called back and
  * goes around it (set_aside) for an hour. Each path is set aside once, so the two can't call each other forever; a check
- * that finds the provider unreachable forgets them all (cloud.c, check_acc): they failed because of that. */
+ * that finds the provider unreachable forgets them all (cloud.c, check_acc): they failed because of that. A path that
+ * fails otherwise (refused, not a time out) never stopped the pass, but left the entry "coming down" for good: it is
+ * set aside the same way, without the check. */
 static void gave_up(const Snap *s, KeepPass *kp, int err, const char *rel) {
     kp->incomplete = 1;
-    if (kp->gave_up || !cloud_mount_gave_up(err)) return;
-    kp->gave_up = 1;
-    int added = 0;
+    if (kp->gave_up) return;
+    int timeout = cloud_mount_gave_up(err);
     pthread_mutex_lock(&cl_mu);
     Acc *a = cl_find(s->id);
     /* the kept entry itself failing is the provider, not one folder of it: never set aside */
     if (a && strcmp(rel, kp->root)) {
         cloud_fails_expire(&a->kfail, (long long)time(NULL));
-        added = cloud_fails_add(&a->kfail, rel, (long long)time(NULL)) == 1;
-        if (added) a->keeper_wait = 1;            /* the check calls the keeper back if the provider answers */
+        /* the check calls the keeper back if the provider answers */
+        if (cloud_fails_add(&a->kfail, rel, (long long)time(NULL)) == 1 && timeout) a->keeper_wait = 1;
     }
     pthread_mutex_unlock(&cl_mu);
+    if (!timeout) return;
+    kp->gave_up = 1;
     fprintf(stderr, "cloud: %s: the provider didn't answer through the mount: Keep on This Computer waits for it\n", s->id);
     cl_check_soon(s->id);
 }
