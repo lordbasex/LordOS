@@ -128,7 +128,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     sensitivity and what it shows in silence (nothing by default, it fades out; or one still line) from its
     right-click menu. **Pin to the bottom centre** for every widget (`opts.pin`,
     `widgetgrid.js pinnedRect`): centred along the bottom of its display, off the grid; dragging puts it back on the
-    grid. A new sound wave starts pinned there. Tests: `spectrum-test` (bands, silence, the lines' shape and bounds),
+    grid. A new sound wave starts pinned there. The wave isn't drawn while an opaque window covers it, and the widget kinds that change on their own are painted
+    after the still ones, so a changing number never makes a neighbour's frosted glass blur again. Tests: `spectrum-test` (bands, silence, the lines' shape and bounds),
     `soundwave-model-test` and the Workspaces scene. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
     playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
     windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
