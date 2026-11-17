@@ -198,6 +198,7 @@ EOF
     run "ipp-test" build/ipp-test
     run "tp-test" build/tp-test
     run "fan-test" build/fan-test
+    run "term-damage-test" build/term-damage-test
     run "freespace-test" build/freespace-test
     run "install-plan-test" build/install-plan-test
     # the firewall rule sheet's parser (sdk/fwrule.js) against the same cases as build/fwdest-test

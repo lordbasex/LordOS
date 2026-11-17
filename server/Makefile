@@ -666,6 +666,11 @@ ENGINE_SRC := src/gpu/gscissor.c src/gpu/gcontend.c src/ui/node.c src/ui/style.c
               src/ui/paint.c src/ui/otf.c src/ui/fonts.c src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c \
               src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/canvas.c
 test: build/engine-test
+# the terminal's damage (term.c term_damage): a real session fed like a TUI and at random, every frame painted in part
+# equal to a full repaint, and only the cells that changed repainted
+test: build/term-damage-test
+build/term-damage-test: tests/term_damage_test.c $(ENGINE_SRC) src/term/term.c src/term/term_paint.c src/term/hold.c src/term/pty.c src/term/pastefilter.c src/term/tcapture.c src/term/tsecret.c src/sec/cgroup.c build/obj/term/vt.o build/obj/ui/stb.o $(HDR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_damage_test.c $(ENGINE_SRC) src/term/term.c src/term/term_paint.c src/term/hold.c src/term/pty.c src/term/pastefilter.c src/term/tcapture.c src/term/tsecret.c src/sec/cgroup.c build/obj/term/vt.o build/obj/ui/stb.o -lm -lpthread
 build/engine-test: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR) tests/drag_golden_cpu.txt tests/drag_golden_gpu.txt
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
