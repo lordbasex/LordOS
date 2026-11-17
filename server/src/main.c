@@ -1106,6 +1106,9 @@ static void display_attach(const int *fds, int n, int flags) {
         o0->kms.fd = -1;
         if (card >= 0 && n <= PARK_MAX) {
             fprintf(stderr, "monitor: nothing connected to the card; waiting for a monitor (hotplug)\n");
+            /* the boot splash waits for our first frame (RP_DISPLAY_KEEP), which can't come with nothing connected: told
+             * now, so a headless boot (a Raspberry Pi with no monitor) doesn't wait for Plymouth's timeout (35 s) */
+            if (flags & RP_DISPLAY_KEEP) mirror_shown();
             parked_fd[0] = card;
             for (int i = 1; i < n; i++) parked_fd[i] = fds[i];
             parked_n = n;

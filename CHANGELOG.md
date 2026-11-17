@@ -368,6 +368,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
+  that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
+  can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.
 - **A fullscreen window took the mouse and the keyboard of every monitor (all themes).** With a YouTube video full
   screen on one display, the pointer did nothing on the others and every key went to the video until it left
   fullscreen. Now a fullscreen window owns its own display only (`server/src/wl/wl.c` `on_fs`): the pointer on another
