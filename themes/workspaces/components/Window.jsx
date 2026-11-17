@@ -3,22 +3,23 @@
 // under it, with Window and Help (there is no global menu bar: F10, or ⌥ pressed and released alone, opens the focused
 // window's first menu, sdk/shortcuts.js addMenuBarKeys). The buttons are real targets (28 px, a glyph that says what
 // they do, a fill on hover), never colour alone. Right click on the title: tile or float the window, move it to another
-// activity, minimize, maximize, close.
+// activity, minimize, maximize, close. The title starts with the window's group: its activity's icon in the activity's
+// colour, named on hover (the same mark as the activity's pill and spine tile).
 // A Linux app that draws its own bar (args.csd, decided on every render) gets no frame: the content with the shadow, and
 // the theme's window menu where it asks for one (w.windowMenu). Moving and resizing are lord-server's (<WindowShell>,
 // wm.beginMove); a maximized window is dragged out of its place by JS. Memoized: a window redraws only when its own
 // entry in the window list changes (index.jsx keeps the tokens object stable).
 import {
   View, Text, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, useMenusWithSpeech, getApp, appGroup, windowMenuItems,
-  solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, desktopList, desktopName, activeDesktop, t as tr,
+  solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, desktopList, desktopName, activeDesktop, useStore, t as tr,
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
-import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LockGlyph } from '../glyphs.jsx';
+import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LockGlyph, ActivityIcon } from '../glyphs.jsx';
 import { flyout, FLYOUT_DELAY } from './SnapTargets.jsx';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { setFloating, isFloating } from '../tiler.js';
 import { tween, EASE } from '../motion.js';
-import { launchOrigin } from '../state.js';
+import { launchOrigin, activities } from '../state.js';
 
 export const TITLE_H = 36;
 export const MENU_H = 26;
@@ -160,6 +161,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
     { label: tr('shell.classic.close'), hint: 'Alt+F4', onClick: () => wm.close(win.id) },
   ];
 
+  const group = useStore(activities, (m) => { const a = m[win.desktop]; return a ? `${a.icon}|${a.color}` : ''; });
   if (win.args?.csd || app.ownFrame) {
     const wmenu = win.windowMenu;
     return (
@@ -188,6 +190,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
   }
 
   const Icon = windowIcon(win);
+  const [gIcon, gColor] = group.split('|');
   const buttons = locked
     ? (
       // locked: minimize stays (another app can take the slot), then the padlock where maximize and close were
@@ -212,6 +215,11 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
         onDoubleClick={() => { if (!locked) wm.toggleMaximize(win.id); }} onContextMenu={(e) => { if (!locked) setMenu({ x: e.x, y: e.y }); }}
         style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 8, backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
         {atStart ? buttons : <View style={{ width: 4 }} />}
+        {group ? (
+          <View title={desktopName(win.desktop)} style={{ width: 16, height: 16, borderRadius: 5, backgroundColor: gColor, alignItems: 'center', justifyContent: 'center', opacity: focused ? 1 : 0.7 }}>
+            <ActivityIcon icon={gIcon} color="#ffffff" bg={gColor} size={9} />
+          </View>
+        ) : null}
         {Icon ? <Icon size={16} /> : null}
         <Text style={{ flex: 1, fontSize: 12.5, fontWeight: focused ? 600 : 500, color: focused ? t.text : t.textDim, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{windowTitle(win)}</Text>
         {tight ? <View title={tr('shell.ws.layout.tight')} style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#E59A12' }} /> : null}
