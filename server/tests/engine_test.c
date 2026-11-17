@@ -1995,6 +1995,34 @@ static void test_wrap_basis_height(void) {
     CHECK(fabsf(next->ay - (grid->ay + grid->h)) < 0.5f, "the next item follows the grid (y %g, grid ends at %g)", next->ay, grid->ay + grid->h);
 }
 
+/* A wrapping grid inside a column of width 100% and a maxWidth, in a wider space (Settings' pages: a 680 px column in a
+ * maximized window). Measuring the column used the whole width for its children, so the grid measured fewer lines than
+ * it lays out and everything that holds it (a ScrollView's content) came out short: the page could not scroll to its
+ * end (Settings → Wallpaper with Cyberpunk City HD's 11 pictures, 0.8.9). */
+static void test_wrap_in_max_width(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "width", 1000);
+    Node *content = view(root);                        /* a ScrollView's content: its height is measured */
+    ss(content, "alignItems", "center");
+    Node *col = view(content);
+    ss(col, "width", "100%"); sn(col, "maxWidth", 300);
+    Node *grid = view(col);
+    ss(grid, "flexDirection", "row"); ss(grid, "flexWrap", "wrap");
+    sn(grid, "gap", 10);
+    for (int i = 0; i < 6; i++) { Node *it = view(grid); sn(it, "width", 90); sn(it, "height", 50); }
+    Node *next = view(root);
+    sn(next, "height", 10);
+    layout_root(root, 1000, 2000);
+    /* 3 per line in 300 px (3 x 90 + 2 x 10 = 290): 2 lines */
+    float want = 50 * 2 + 10;
+    CHECK(fabsf(col->w - 300) < 0.5f, "column: %g wide, want 300", col->w);
+    CHECK(fabsf(grid->h - want) < 0.5f, "grid in a maxWidth column: %g high, want %g", grid->h, want);
+    CHECK(content->h >= want - 0.5f, "the content (%g) is shorter than the grid it holds (%g)", content->h, want);
+    CHECK(next->ay >= grid->ay + grid->h - 0.5f, "the next item (y %g) overlaps the grid (ends at %g)", next->ay, grid->ay + grid->h);
+}
+
 /* GPU path: a Linux window in a scaled node goes through the raster like the rest of the subtree, with
  * wl.c told the transform and asked to open the hole before the blend. It used to refuse the raster,
  * and the whole window was painted at full size: past the screen's edge in the Overview (Pi 5, 0.8.7). */
@@ -3913,6 +3941,7 @@ int main(int argc, char **argv) {
     printf("scissor over the damage pipeline and fuzz: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_grow_wrap_height();
     test_wrap_basis_height();
+    test_wrap_in_max_width();
     test_overlay_scrollbar();
     test_transform_restyle();
     test_image_cache();

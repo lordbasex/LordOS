@@ -499,6 +499,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Settings → Wallpaper could not scroll to its end in a wide window**: the layout measured a box's children with the
+  whole width even when the box had a `maxWidth` (Settings' 680 px column), so a wrapping grid in it (Cyberpunk City
+  HD's 11 pictures, three lines) measured one line and the page came out short. Measuring now bounds the children by
+  the box's `maxWidth`/`maxHeight`, as layout does (`layout.c`; `test_wrap_in_max_width` in engine-test). Any page
+  with a wrapping grid in a narrower column benefits.
+- **Lord Workspaces: Force Quit, About and Settings from the crown's menu open on the display of that menu**, and
+  ❖⌥Esc opens Force Quit on the pointer's display, instead of wherever the last window was.
 - **A session could end on a lone Backspace.** Ctrl+Alt+Backspace (end the session at once) read Ctrl and Alt from
   a state kept across every keyboard; a lost release (another console, a keyboard that sleeps or reconnects) left them
   "held", and the next Backspace ended the session with no trace in any log (seen while watching a video). The kernel

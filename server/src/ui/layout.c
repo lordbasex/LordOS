@@ -107,6 +107,12 @@ static void measure(Node *n, float aw, float ah, float *ow, float *oh) {
         } else {
             float iaw = !isnan(w) ? w - ph : !isnan(aw) ? aw - ph : NAN;
             float iah = !isnan(h) ? h - pv : !isnan(ah) ? ah - pv : NAN;
+            /* the box's maxWidth/maxHeight bound its children as layout will: a column of width 100% and
+             * maxWidth 680 in a wide window measured its children at the whole width, so a wrapping grid in it
+             * measured fewer lines than it lays out and the page came out short (Settings → Wallpaper, 0.8.9) */
+            float mxw = res(s->max_w, aw), mxh = res(s->max_h, ah);
+            if (!isnan(mxw) && (isnan(iaw) || mxw - ph < iaw)) iaw = mxw - ph < 0 ? 0 : mxw - ph;
+            if (!isnan(mxh) && (isnan(iah) || mxh - pv < iah)) iah = mxh - pv < 0 ? 0 : mxh - pv;
             int count = 0;
             float lim = s->row ? iaw : iah;                 /* with wrap: length of one line */
             int wrap = s->wrap && !isnan(lim);

@@ -110,7 +110,7 @@ const table = [
     label: 'shell.ws.shortcuts.activityN', group: 'desktops' },
   { id: 'activityTab', keys: ['Meta+Tab', 'Meta+Shift+Tab'], run: (e) => stepActivity(e.shift ? -1 : 1), when: () => !switcherKeys('meta').includes('Meta+Tab'),
     listed: () => !switcherKeys('meta').includes('Meta+Tab'), label: 'shell.ws.shortcuts.activityTab', group: 'desktops' },
-  { id: 'forceQuit', keys: ['Meta+Alt+Escape'], run: () => wm.open('forcequit'), when: () => !!getApp('forcequit'), label: 'shell.shortcuts.forceQuit', group: 'apps' },
+  { id: 'forceQuit', keys: ['Meta+Alt+Escape'], run: () => { aimLaunch(pointerDisplay()); wm.open('forcequit'); }, when: () => !!getApp('forcequit'), label: 'shell.shortcuts.forceQuit', group: 'apps' },
   { id: 'help', keys: ['Meta+/'], show: ['❖/'], run: () => H.help(), label: 'shell.ws.shortcuts.help', group: 'system' },
   { id: 'bars', keys: ['Ctrl+F2'], run: () => { panel.set(null); enterBars(`pill:${activeDesktop.get()}`); }, label: 'shell.ws.shortcuts.bars', group: 'system' },
   { id: 'switchApps', keys: switcherKeys('meta'), run: (e) => openSwitcher(switcherHold(e), e.shift), label: 'shell.shortcuts.switchApps', group: 'windows' },
@@ -295,13 +295,15 @@ function App() {
   };
   const leavingWins = leaving.map((id) => all.find((w) => w.id === id)).filter((w) => w && !mounted.includes(w));
   const tight = new Set(tiles.tight);
+  // what the crown's menu opens goes to the display that menu is on (the spine's), not to wherever the last window was
+  const openHere = (id) => { aimLaunch((crown && displayAt(crown.x, crown.y)) || mainDisplay()); wm.open(id); };
   const crownItems = [
-    { label: tr('shell.menu.about'), onClick: () => wm.open('about') },
-    { label: tr('shell.menu.settings'), onClick: () => wm.open('settings') },
+    { label: tr('shell.menu.about'), onClick: () => openHere('about') },
+    { label: tr('shell.menu.settings'), onClick: () => openHere('settings') },
     { label: tr('shell.ws.help.menu'), onClick: () => H.help() },
     '-',
     // as Lord Flow's menu: an app that doesn't answer is ended from here (❖⌥Esc)
-    ...(getApp('forcequit') ? [{ label: tr('shell.menu.forceQuit'), hint: '❖⌥Esc', onClick: () => wm.open('forcequit') }, '-'] : []),
+    ...(getApp('forcequit') ? [{ label: tr('shell.menu.forceQuit'), hint: '❖⌥Esc', onClick: () => openHere('forcequit') }, '-'] : []),
     ...(session.managed() ? [{ label: tr('shell.menu.lock'), onClick: () => session.lock() }, { label: tr('shell.menu.switchUser'), onClick: () => session.switchUser() }] : []),
     { label: tr('shell.menu.logout'), onClick: () => session.quit() },
     ...(session.canPower() ? ['-', { label: tr('shell.menu.restart'), onClick: () => session.restart() }, { label: tr('shell.menu.shutdown'), onClick: () => session.shutdown() }] : []),
