@@ -126,7 +126,7 @@ export const ActivityPeek = memo(function ActivityPeek({ t }) {
   );
 });
 
-const Pill = memo(function Pill({ t, id, active, glide, name, meta, count, onMenu, pillRef }) {
+const Pill = memo(function Pill({ t, id, active, glide, name, meta, count, onMenu, pillRef, compact }) {
   const [hover, setHover] = useState(false);
   const self = useRef(null);
   const ref = (n) => { self.current = n; pillRef(n); };
@@ -144,11 +144,12 @@ const Pill = memo(function Pill({ t, id, active, glide, name, meta, count, onMen
   return (
     <View ref={ref} onClick={() => { peek.set(null); switchDesktop(id); }} onDoubleClick={() => { setValue(name); renaming.set(id); }} onContextMenu={(e) => { peek.set(null); onMenu(id, e); }}
       onMouseEnter={() => { setHover(true); if (!active && self.current) peekSoon(id, self.current); }} onMouseLeave={() => { setHover(false); peekEnd(); }}
-      title={active ? name : undefined}
+      title={active || compact ? name : undefined}
       style={{ height: BAR_ITEM, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: BAR_ITEM / 2, maxWidth: 190,
         backgroundColor: active ? (glide ? 'transparent' : t.accent) : hover ? t.itemHover : 'transparent' }}>
       <ActivityIcon icon={meta.icon} color={active ? t.onAccent : meta.color} bg={active ? t.accent : t.solidBg} size={13} />
-      <Text style={{ fontSize: 12.5, fontWeight: 600, color: fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{name}</Text>
+      {/* a narrow display: the other activities by icon only (the name on hover), so every pill stays on screen */}
+      <Text style={{ display: compact && !active ? 'none' : 'flex', fontSize: 12.5, fontWeight: 600, color: fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{name}</Text>
       {/* kept drawn and hidden on the pill in view: a switch changes its display, not its nodes */}
       <View style={{ display: !active && count ? 'flex' : 'none', minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: t.itemHover, alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ fontSize: 10, fontWeight: 700, color: t.textDim }}>{count || ''}</Text>
@@ -228,6 +229,8 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
   const meta = useStore(activities);
   const names = useStore(desktopNames);
   const counts = JSON.parse(useStore(windows, countsOf));
+  // the room the names need (pills of about 130 px, the "+ New" button and the position) against the strip's width
+  const compact = rect.w < list.length * 130 + 260;
   const [menu, setMenu] = useState(null);
   // the accent under the pill in view: it glides to the next one on a switch (motion.js, left and width only, inside
   // this small surface), the pill's own fill until it has been measured once
@@ -256,7 +259,7 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
       }
     });
     return () => cancelFrame(raf);
-  }, [active, list.length, names]);
+  }, [active, list.length, names, compact]);
   const at = list.indexOf(active) + 1;
   const full = list.length >= MAX_ACTIVITIES;
   return (
@@ -265,17 +268,17 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
       {list.map((id) => (
         <Fragment key={id}>
           <Pill t={t} id={id} active={id === active} glide={!!pos} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }} count={counts[id] || 0}
-            pillRef={pillRefFor(pills.current, id)} onMenu={(d, e) => setMenu({ id: d, x: e.x, y: e.y })} />
+            pillRef={pillRefFor(pills.current, id)} onMenu={(d, e) => setMenu({ id: d, x: e.x, y: e.y })} compact={compact} />
           {id === active && meta[id]?.groups?.length ? <Groups t={t} desk={id} meta={meta[id]} name={desktopName(id)} /> : null}
         </Fragment>
       ))}
       <BarSeparator t={t} />
       <BarButton t={t} fid="new" disabled={full} title={tr('shell.ws.activity.new')} onClick={(e) => { noteLaunch(e.x, e.y); newActivity(); }}
         glyph={(c) => <PlusGlyph color={c} size={11} />}>
-        {(c) => <Text style={{ fontSize: 12.5, fontWeight: 500, color: c, whiteSpace: 'nowrap' }}>{tr('shell.ws.activity.newShort')}</Text>}
+        {compact ? null : (c) => <Text style={{ fontSize: 12.5, fontWeight: 500, color: c, whiteSpace: 'nowrap' }}>{tr('shell.ws.activity.newShort')}</Text>}
       </BarButton>
       <BarSeparator t={t} />
-      <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', paddingHorizontal: 8 }}>{tr('shell.ws.activity.position', { n: at, total: list.length, max: MAX_ACTIVITIES })}</Text>
+      {compact ? null : <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', paddingHorizontal: 8 }}>{tr('shell.ws.activity.position', { n: at, total: list.length, max: MAX_ACTIVITIES })}</Text>}
       {menu && <Menu t={t} x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={[
         { label: tr('shell.ws.activity.rename'), onClick: () => renaming.set(menu.id) },
         { label: tr('shell.ws.activity.edit'), onClick: () => onEdit(menu.id, menu) },
