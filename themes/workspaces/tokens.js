@@ -21,6 +21,9 @@ export const accents = {
   naranja: '#E2711A',
   verde: '#22A565',
   grafito: '#7A7891',
+  // the proposal's amber (origin.accent #F4AE48 / #A9650A): deeper in dark mode so the white text apps put on the
+  // accent keeps 3:1; with it the focus ring stays the brand's violet (origin.focus)
+  ambar: '#C27A12',
 };
 // The same hues one step deeper: text and white-on-accent fills in light mode keep 4.5:1 or close to it.
 export const deep = {
@@ -30,6 +33,7 @@ export const deep = {
   naranja: '#C2570C',
   verde: '#15803D',
   grafito: '#5D5B78',
+  ambar: '#A9650A',
 };
 
 export const BRAND_GRADIENT = 'linear-gradient(135deg, #B46CFF, #4F46E5)';
@@ -149,6 +153,7 @@ export function makeTheme({ mode, accent, effects, surface, contrast = false }, 
     spineShadow: 'none',
     shadowSoft: dark ? '0 4px 12px rgba(6,3,24,0.40)' : '0 4px 12px rgba(40,30,110,0.14)',
     onAccent: '#FFFFFF',
+    ...(name === 'ambar' ? { focusRing: dark ? '#7C5CFF' : '#5B3FE0' } : null),
     brandGradient: BRAND_GRADIENT,
   };
 }

@@ -191,7 +191,8 @@ for (const mode of ['dark', 'light']) {
   }
   eq(`${mode}: transparency off is opaque`, makeTheme({ mode, accent: 'azul', effects: false, surface: 'crystal' }).surface, 'opaque');
 }
-eq('the shared accent names', Object.keys(accents), ['azul', 'violeta', 'rosa', 'naranja', 'verde', 'grafito']);
+eq('the shared accent names, and the proposal\'s amber', Object.keys(accents), ['azul', 'violeta', 'rosa', 'naranja', 'verde', 'grafito', 'ambar']);
+eq('amber: the focus ring stays violet', [makeTheme({ mode: 'dark', accent: 'ambar' }).focusRing, makeTheme({ mode: 'light', accent: 'ambar' }).focusRing], ['#7C5CFF', '#5B3FE0']);
 eq('deep accents for every name', Object.keys(deep), Object.keys(accents));
 eq('brand violets', [accents.violeta, deep.violeta], ['#7C5CFF', '#5B3FE0']);
 eq('an unknown accent is the brand violet', makeTheme({ mode: 'dark', accent: 'x' }).accent, '#7C5CFF');
