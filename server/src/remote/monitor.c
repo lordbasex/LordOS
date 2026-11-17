@@ -106,6 +106,7 @@ int sd_mon_open(void) {
     char p[16];
     snprintf(p, sizeof p, "/dev/tty%d", OUR_VT);
     tty = open(p, O_RDWR | O_CLOEXEC | O_NOCTTY);
+    if (tty < 0) sd_log("text consoles: %s: %s", p, strerror(errno));
     struct vt_mode m = { .mode = VT_PROCESS, .relsig = SIGUSR1, .acqsig = SIGUSR2 };
     if (tty >= 0 && ioctl(tty, VT_SETMODE, &m)) { sd_log("text consoles: no process mode on tty%d: %s", OUR_VT, strerror(errno)); close(tty); tty = -1; }
     /* the text console stops drawing on top: ours (never whichever console is in front, a restart of the service while
@@ -126,7 +127,10 @@ int sd_mon_open(void) {
 
 /* Ctrl+Alt+Fn from the session or the login screen: the kernel switches once we release (sd_mon_vt_release). */
 int sd_mon_vt_switch(int n) {
-    if (tty < 0 || away || n < 1 || n > 12 || n == OUR_VT) return -1;
+    if (tty < 0 || away || n < 1 || n > 12 || n == OUR_VT) {
+        sd_log("text console %d not shown (%s)", n, tty < 0 ? "tty1 is not ours" : away ? "another console is in front" : "not a console to switch to");
+        return -1;
+    }
     if (ioctl(tty, VT_ACTIVATE, n)) { sd_log("text console %d: %s", n, strerror(errno)); return -1; }
     sd_log("text console %d asked for", n);
     return 0;

@@ -1020,7 +1020,7 @@ static void from_shown(int type, const char *j) {
     if (type == RP_SESSION && (shown == 'u' || shown == 'g') && strstr(j, "\"vt\"")) {
         char a[16] = "";
         jstr(j, "a", a, sizeof a);
-        if (!strcmp(a, "vt")) sd_mon_vt_switch(jint(j, "n", 0));
+        if (!strcmp(a, "vt")) sd_mon_vt_switch(jint(j, "n", 12));   /* jint's third: the most it takes */
         return;
     }
     if (type == RP_SESSION && shown == 'u') {
