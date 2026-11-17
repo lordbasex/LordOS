@@ -33,6 +33,24 @@ PaintView paint_view = { 0, 0, 1, 0, 0, 0 };
 static inline float VX(float x) { return (x - paint_view.x) * paint_view.k + paint_view.dx; }
 static inline float VY(float y) { return (y - paint_view.y) * paint_view.k + paint_view.dy; }
 
+static float reach_dev(int r) { return (float)canvas_blur_reach(r); }
+/* How far around its box a backdrop blur reads (canvas_blur_reach), in logical pixels: the widest of the scales it is
+ * painted at (the displays, the one being painted). Until 0.8.8.10 the margin was 2·blur + 1 everywhere: 61 px for the
+ * widgets' 30 instead of 45, so a change further from a frosted node than it can see still re-blurred it. */
+static float blur_reach(float blur) {
+    if (blur < 1) return 0;
+    /* the old, wider margin with the displays' scales unknown, and in the one-box mode (LORD_DAMAGE=one), whose
+     * growth passes were tuned to it (engine-test fuzz seed 259 there) */
+    if (paint_nviews <= 0 || !paint_multi_damage) return ceilf(blur * 2) + 1;
+    float best = reach_dev((int)(blur + 0.5f));
+    float ks[PAINT_VIEWS_MAX + 1];
+    int nk = 0;
+    for (int v = 0; v < paint_nviews && v < PAINT_VIEWS_MAX; v++) ks[nk++] = paint_views[v].k;
+    ks[nk++] = paint_view.k;
+    for (int i = 0; i < nk; i++) if (ks[i] > 0) { float m = reach_dev((int)(blur * ks[i] + 0.5f)) / ks[i]; if (m > best) best = m; }
+    return ceilf(best);
+}
+
 static uint32_t with_opacity(uint32_t argb, float op) {
     uint32_t a = (uint32_t)((argb >> 24) * op + 0.5f);
     return a << 24 | (argb & 0xffffff);
@@ -1039,7 +1057,8 @@ static long rect_area(Rect r) { return r.x1 > r.x0 && r.y1 > r.y0 ? (long)(r.x1 
 static void below_note_blur(float x, float y, float w, float h, int radius) {
     if (nbl_blur == BELOW_LIST_MAX) { bl_over = 1; return; }
     Rect b = { (int)floorf(x), (int)floorf(y), (int)ceilf(x + w), (int)ceilf(y + h) };
-    int m = 2 * radius + 2;                     /* canvas_backdrop_blur reads 2 * radius around it */
+    int m = 2 * radius + 2;                     /* canvas_backdrop_blur reads 2 * radius around it (the drag's copy keeps
+                                                 * the old, wider margin: its frames are pinned by drag_golden_*.txt) */
     bl_blur[nbl_blur] = b;
     bl_near[nbl_blur++] = (Rect){ b.x0 - m, b.y0 - m, b.x1 + m, b.y1 + m };
 }
@@ -1063,7 +1082,7 @@ static void below_damage(Box b) { dlist_add(&layer.bdmg, b); }
  * (blur_walk's margin) or of its image's bounds (a transform) */
 static void below_damage_node(const Node *n, Box cur) {
     float m = 0;
-    if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;
+    if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;    /* the drag's copy: the old margin */
     if (n->own_tf && m < 4) m = 4;
     Box p = n->prev_box;
     if (p.x1 > p.x0 && p.y1 > p.y0) below_damage((Box){ p.x0 - m, p.y0 - m, p.x1 + m, p.y1 + m });
@@ -1388,7 +1407,7 @@ static void gdrag_note_after(const Node *n, Box cur) {
     if (cur.x1 <= cur.x0 || cur.y1 <= cur.y0 || !node_paints(n)) return;
     if (gdrag_after_over) return;
     float m = 0;
-    if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;
+    if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;    /* GPU drag: the old margin */
     if (n->has_tf && m < 4) m = 4;
     Box b = { cur.x0 - m, cur.y0 - m, cur.x1 + m, cur.y1 + m };
     if (ngdrag_after) {                /* inside the box noted last (a child in its bar): meets D only if that one does */
@@ -1441,7 +1460,7 @@ int paint_nviews;
 static int bc_meets(Box a, Box b) { return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1; }
 static int bc_inside(Box in, Box out) { return in.x0 >= out.x0 && in.y0 >= out.y0 && in.x1 <= out.x1 && in.y1 <= out.y1; }
 static Box bc_near(Box b, float blur) {
-    float m = ceilf(blur * 2) + 1;
+    float m = blur_reach(blur);
     return (Box){ floorf(b.x0 - m), floorf(b.y0 - m), ceilf(b.x1 + m), ceilf(b.y1 + m) };
 }
 void paint_blur_cache_reset(void) {
@@ -1505,7 +1524,7 @@ static void blur_to_cache(Canvas *c, const Node *n, float x, float y, float w, f
     if (y1 > c->h) y1 = c->h;
     if (x1 <= x0 || y1 <= y0) return;
     /* every pixel canvas_backdrop_blur read was painted in this pass */
-    int m = radius * 2;
+    int m = (int)reach_dev(radius);
     int nx0 = x0 - m < 0 ? 0 : x0 - m, ny0 = y0 - m < 0 ? 0 : y0 - m;
     int nx1 = x1 + m > c->w ? c->w : x1 + m, ny1 = y1 + m > c->h ? c->h : y1 + m;
     if (nx0 < c->clip.x0 || ny0 < c->clip.y0 || nx1 > c->clip.x1 || ny1 > c->clip.y1) return;
@@ -1736,7 +1755,9 @@ static int box_meets(Box a, Box b) { return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 <
  * difference stayed until the next full repaint (engine-test test_damage_fuzz). */
 static Box blur_near(const Node *n) {
     Box b = n->prev_box;
-    float m = ceilf(n->s.backdrop_blur * 2) + 1;
+    /* while a window is dragged its copy of what is below has the old, wider margin (drag_golden_*.txt pins those
+     * frames); at rest, what the blur really reads */
+    float m = layer.want ? ceilf(n->s.backdrop_blur * 2) + 1 : blur_reach(n->s.backdrop_blur);
     Box near = { floorf(b.x0 - m), floorf(b.y0 - m), ceilf(b.x1 + m), ceilf(b.y1 + m) };
     if (ui.width > 0 && ui.height > 0) {        /* the canvas ends there: so does what it samples */
         near.x0 = fmaxf(near.x0, 0); near.y0 = fmaxf(near.y0, 0);

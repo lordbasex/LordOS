@@ -337,7 +337,7 @@ int   paint_damage_rects(Box *out, int max);
 /* damage gathered over several frames (a display whose flip was pending): the blur rule again,
  * on the tree as it is now (paint.c, main.c paint_out) */
 void  paint_damage_settle(DamageList *l);
-extern int paint_multi_damage;      /* 1: several rectangles (LORD_DAMAGE=multi, tests); 0 by default */
+extern int paint_multi_damage;      /* 1: several rectangles (the default since 0.8.8.10); 0: one box (LORD_DAMAGE=one) */
 extern int paint_tf_nocache;        /* tests: a reference paint that neither reads nor fills the
                                      * transformed subtrees' raster cache (engine-test) */
 void  paint_root(Canvas *c, Node *root);

@@ -7,6 +7,8 @@
  *
  *   make -C server NEON=1 build/canvas-test && server/build/canvas-test   (on the Raspberry Pi)
  */
+#include "../src/canvas.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,6 +106,37 @@ int main(void) {
     }
     printf("canvas-test: GPU drag model: %ld cases, %ld differ\n", gdragcases, gdragbad);
     fails += (int)gdragbad;
+
+    /* canvas_blur_reach: a white line at the reach or further never changes a backdrop blur's result (the compositor
+     * repaints and keeps blurs by that margin, paint.c), for every radius up to 60 and four alignments */
+    {
+        enum { W = 420, H = 320 };
+        uint32_t *a = malloc(W * H * 4), *b = malloc(W * H * 4);
+        int under = 0;
+        for (int r = 1; r <= 60 && a && b; r++) {
+            int reach = canvas_blur_reach(r);
+            for (int bx = 150; bx < 154; bx++)
+                for (int side = 0; side < 4; side++)
+                    for (int d = reach; d <= reach + 2; d++) {
+                        for (int i = 0; i < W * H; i++) a[i] = b[i] = 0xff202020u + (uint32_t)((i * 2654435761u) >> 28);
+                        int px = side == 0 ? bx - d : side == 1 ? bx + 59 + d : 0, py = side == 2 ? 120 - d : side == 3 ? 169 + d : 0;
+                        if (px < 0 || py < 0 || px >= W || py >= H) continue;
+                        if (side < 2) for (int y = 0; y < H; y++) b[y * W + px] = 0xffffffffu;
+                        else for (int x = 0; x < W; x++) b[py * W + x] = 0xffffffffu;
+                        Canvas ca, cb;
+                        canvas_init(&ca, a, W, H, W);
+                        canvas_init(&cb, b, W, H, W);
+                        canvas_backdrop_blur(&ca, (float)bx, 120, 60, 50, 0, r);
+                        canvas_backdrop_blur(&cb, (float)bx, 120, 60, 50, 0, r);
+                        for (int y = 120; y < 170; y++)
+                            for (int x = bx; x < bx + 60; x++)
+                                if (a[y * W + x] != b[y * W + x]) { if (under++ < 3) printf("blur reach: radius %d reads a line %d px away (reach %d)\n", r, d, reach); y = 170; break; }
+                    }
+        }
+        free(a); free(b);
+        printf("canvas-test: blur reach: %d radii under\n", under);
+        fails += under;
+    }
 
     /* time for one 1920×1080 screen with each (not a test: it measures) */
     static uint32_t big_s[1920], big_d[1920];
