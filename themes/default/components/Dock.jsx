@@ -8,7 +8,7 @@
 // precise position. The logic is the SDK's (sdk/dock.js: beginDockDrag, registerDockTarget, dock.*);
 // this file only draws it and says where things are. The Trash is always the last item.
 import {
-  View, Text, screen, appName, useLocale, addListener, t as tr, useStore, settings, dockDrag, dockPoof, beginDockDrag,
+  View, Text, Image, screen, appName, useLocale, addListener, t as tr, useStore, settings, dockDrag, dockPoof, beginDockDrag,
   registerDockTarget, dockDragJustEnded, refreshTrash, Layer, useDockCovered, dockBadgeMetrics,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -38,35 +38,11 @@ export function LaunchpadIcon({ size: s }) {
   );
 }
 
-// The Trash: a wire basket, empty or with crumpled papers. Light and dark versions.
-export function TrashIcon({ size: s, full, dark }) {
-  const body = dark ? 'linear-gradient(180deg, rgba(235,238,245,0.30), rgba(200,205,215,0.16))' : 'linear-gradient(180deg, rgba(255,255,255,0.85), rgba(215,220,230,0.65))';
-  const line = dark ? 'rgba(255,255,255,0.55)' : 'rgba(60,66,80,0.45)';
-  const w = s * 0.62, hh = s * 0.64, x = (s - w) / 2, y = s * 0.3;
-  return (
-    <View style={{ width: s, height: s }}>
-      {full && (
-        <>
-          <View style={{ position: 'absolute', left: x + w * 0.02, top: y - s * 0.24, width: w * 0.52, height: s * 0.32, borderRadius: s * 0.13,
-            backgroundColor: '#ffffff', border: '1px solid rgba(60,66,80,0.35)', transform: 'rotate(-14deg)' }} />
-          <View style={{ position: 'absolute', left: x + w * 0.4, top: y - s * 0.28, width: w * 0.56, height: s * 0.34, borderRadius: s * 0.08,
-            backgroundColor: '#e9f1ff', border: '1px solid rgba(60,66,80,0.35)', transform: 'rotate(12deg)' }}>
-            {[0.3, 0.5, 0.7].map((k) => <View key={k} style={{ position: 'absolute', left: w * 0.08, right: w * 0.1, top: s * 0.34 * k, height: 1, backgroundColor: 'rgba(60,90,160,0.45)' }} />)}
-          </View>
-        </>
-      )}
-      <View style={{ position: 'absolute', left: x, top: y, width: w, height: hh, borderBottomLeftRadius: s * 0.1, borderBottomRightRadius: s * 0.1,
-        borderTopLeftRadius: s * 0.04, borderTopRightRadius: s * 0.04, background: body, border: `1px solid ${line}`, overflow: 'hidden',
-        boxShadow: `0 ${s * 0.03}px ${s * 0.1}px rgba(0,0,0,0.25)` }}>
-        {[0.2, 0.4, 0.6, 0.8].map((k) => (
-          <View key={k} style={{ position: 'absolute', top: 0, bottom: 0, left: w * k - 0.5, width: 1, backgroundColor: line }} />
-        ))}
-        <View style={{ position: 'absolute', left: 0, right: 0, top: hh * 0.5, height: 1, backgroundColor: line }} />
-      </View>
-      <View style={{ position: 'absolute', left: x - s * 0.03, top: y - 1, width: w + s * 0.06, height: s * 0.05, borderRadius: s * 0.03,
-        backgroundColor: dark ? 'rgba(235,238,245,0.6)' : 'rgba(120,126,140,0.7)' }} />
-    </View>
-  );
+// The Trash: a smooth white bin with the crown in relief, and crumpled papers in LordOS's colours when it has
+// something (assets/icons/trash-*.png, drawn for LordOS; the 512 px one when the Dock magnifies past 256).
+// The same picture in light and dark mode.
+export function TrashIcon({ size: s, full }) {
+  return <Image src={`asset:icons/trash-${full ? 'full' : 'empty'}${s > 256 ? '-512' : ''}.png`} style={{ width: s, height: s }} />;
 }
 
 // Auto-hide: shows when the pointer touches the edge (after a short delay) and hides
@@ -429,7 +405,7 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
             onMouseUp={() => setTimeout(refreshTrash, 60)}
             style={{ position: 'absolute', ...place(i), width: sizes[i], height: sizes[i], borderRadius: sizes[i] * 0.22,
               backgroundColor: trashLit ? 'rgba(255,255,255,0.22)' : 'transparent' }}>
-            <TrashIcon size={sizes[i]} full={trashFull} dark={t.mode === 'dark'} />
+            <TrashIcon size={sizes[i]} full={trashFull} />
           </View>
         ) : (
           <View key={app.id} onClick={() => { if (!dockDragJustEnded()) onOpen(app.id); }} onContextMenu={() => onContext?.(app.id, anchor(i))}

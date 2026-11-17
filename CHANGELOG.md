@@ -359,6 +359,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **A new Trash in Lord Flow's Dock**, drawn for LordOS: a smooth white bin with the crown in relief, and crumpled
+  paper balls in LordOS's colours (violet, blue, amber, green) plus a lined sheet when it has something. The front of
+  the rim passes in front of the papers. It replaces the drawn wire basket; the same picture in light and dark mode,
+  at 256 px and 512 px for the magnified Dock (`assets/icons/trash-empty*.png`, `trash-full*.png`).
 - **Settings → Cloud says what "On this computer" counts, account by account (GitHub #184).** The line read "144 MB ·
   144 MB kept", and it wasn't clear that the first figure is everything the accounts have here and the second the kept
   part of it, nor what Free Up Space would do. It now reads "144 MB · 144 MB kept · 0 bytes can be freed"; with more
