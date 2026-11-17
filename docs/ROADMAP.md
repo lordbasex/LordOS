@@ -850,7 +850,8 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
     window-button size, hiding the tiling submenu.
   - Copy and paste with a VMware host ([#76](https://github.com/lordbasex/LordOS/issues/76)): start Debian's
     `vmware-user` only inside VMware (a new AGENTS.md exception), then LordOS → host through an authenticated X
-    requestor; never tested on a real VMware host yet.
+    requestor (`vmtoolsd -n vmusr` by X-Resource pid and `/proc/<pid>/exe`); the design is in WAYLAND.md, "Proposed for
+    guest → host", waiting for approval. Host → guest confirmed by the reporter on 0.8.8.8.
   - Mounting non-LordOS partitions automatically at startup ([#122](https://github.com/lordbasex/LordOS/issues/122),
     second step after mounting by hand).
 

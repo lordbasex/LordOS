@@ -345,6 +345,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **VMware copy and paste: what works and what is proposed** (GitHub #76, docs only). `docs/WAYLAND.md` "VMware Tools"
+  records the reporter's check on a VMware host (host → guest works on 0.8.8.8; guest → host from LordOS's own apps
+  doesn't), why `setsid vmware-user &` returns at once, and the design that would make guest → host work: starting
+  `vmware-user-suid-wrapper` only in a VMware guest, and answering LordOS's clipboard to `vmtoolsd -n vmusr` identified
+  by X-Resource pid and `/proc/<pid>/exe`. Both are new exceptions waiting for the maintainer's approval; nothing is
+  built.
 - **A display opens at its panel's shape when its EDID prefers another one; the login screen isn't stretched on an
   ultrawide** (GitHub #173). With nothing saved (always on the login screen) a display used the EDID's preferred mode,
   and some 3440 × 1440 ultrawides prefer 3840 × 2160 on some inputs, so the monitor stretched 16:9 over 21:9 at every
