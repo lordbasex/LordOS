@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <malloc.h>
 /*
  * lord-server — servidor gráfico de LordOS, escrito desde cero.
  *
@@ -2892,7 +2893,8 @@ int main(int argc, char **argv) {
         int hwbase = n, nhw = hw_pollfds(pfd + n, 8);            /* uevents, the system bus and the session bus clients (src/hw) */
         n += nhw;
         wdog_idle();
-        if (poll(pfd, n, wait) < 0 && errno != EINTR) { perror("poll"); break; }
+        int ready = poll(pfd, n, wait);
+        if (ready < 0 && errno != EINTR) { perror("poll"); break; }
         loop_wake = mono_ns();                  /* LordBench's frame phases: the next frame starts from here */
         wdog_busy(loop_wake);
         loop_wake_flip = 0;
@@ -2992,6 +2994,14 @@ int main(int argc, char **argv) {
         snd_events(js_sound_event);
         wl_events(js_wl_event);
         js_clipboard_poll();
+        /* glibc keeps what was freed inside the heap for later, so a peak (a big window, an app opened and closed, the
+         * theme loading) stays in the RSS for the rest of the session. When a wait ended with nothing to do (the
+         * desktop at rest), at most once a minute, the free pages go back to the system: a few ms, never mid-frame. */
+        static uint64_t trimmed_at;
+        if (ready == 0 && loop_wake - trimmed_at > 60ull * 1000000000ull) {
+            malloc_trim(0);
+            trimmed_at = loop_wake;
+        }
         term_events(js_term_event);
     }
 

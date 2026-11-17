@@ -171,6 +171,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   React renders nothing; CPU usage is reported in steps of 1 % (what every view shows); and a gauge's ring of ticks
   is a memoized component, so a refresh that moves the value by less than a tick rebuilds only the number in the
   middle, not 36–48 tick views.
+- **lord-server gives freed memory back at rest.** Its memory map on a 3-display desktop showed a 277 MB heap with
+  216 MB in use, and glibc keeps freed pages for later, so every peak (an app opened and closed, the theme loading)
+  stayed in the RSS until logout. When a wait ends with nothing to do, at most once a minute, it calls
+  `malloc_trim(0)` (a few milliseconds, never during a frame).
 - **`lord.system.info` reads `/proc/cpuinfo` once.** The processor's name and core count don't change during a
   session, and the file is costly for the kernel to generate (one block per CPU, each asked for its clock); the
   System widget polled it every 5 seconds.
