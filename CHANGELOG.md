@@ -43,6 +43,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     pinned apps, Files on the spine and Search opened on a display send the next new window (or as many as were
     launched) to that display, whatever display the app's saved layout names or where another display has room; with
     a free layout it opens in that display's middle (`aimLaunch` in `tiler.js`, for 30 s).
+  - **Linux apps that draw their own bar (Chrome, GNOME apps) get the theme's rounded corners at the bottom too:** the
+    window is cut to 12 px corners like the theme's own frames (square in full screen).
   - **The status cluster:** the speaker opens its own panel where the notifications do (the level with a slider and
     mute, the outputs when there are several, Sound settings) instead of the Control Center; the status items' panels
     (Cloud, Cleaner…) open there too, under the band at its far edge (`setStatusPanelPlacer` in `sdk/statusitems.js`;

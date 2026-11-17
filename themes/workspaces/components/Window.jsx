@@ -175,7 +175,9 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
   if (win.args?.csd || app.ownFrame) {
     const wmenu = win.windowMenu;
     return (
-      <WindowShell win={win} leaving={leaving} resizable={!locked} onMouseDown={() => wm.focus(win.id)} style={{ ...(app.ownFrame ? { borderRadius: win.fullscreen ? 0 : 12, overflow: 'hidden' } : null), boxShadow: shadow }}>
+      // the same 12 px corners as the theme's own frames, on all four: a Linux app that draws its own bar (Chrome)
+      // rounds only its top ones, or none (the content is cut to the window's geometry, its shadow is outside it)
+      <WindowShell win={win} leaving={leaving} resizable={!locked} onMouseDown={() => wm.focus(win.id)} style={{ borderRadius: win.fullscreen ? 0 : 12, overflow: 'hidden', boxShadow: shadow }}>
         <AppHost id={win.id} focused={focused} />
         {app.ownFrame ? (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 4, height: BTN, flexDirection: 'row', gap: 4, paddingHorizontal: 6, pointerEvents: 'box-none' }}>
