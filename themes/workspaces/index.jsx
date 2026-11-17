@@ -46,6 +46,7 @@ import { GroupFrame, trayNodes } from './components/GroupFrame.jsx';
 import { Search } from './components/Search.jsx';
 import { ControlCenter } from './components/ControlCenter.jsx';
 import { ActivityEditor } from './components/ActivityEditor.jsx';
+import { ShortcutsHelp, shortcutsHelp } from './components/ShortcutsHelp.jsx';
 import { ActivityIcon } from './glyphs.jsx';
 import { Menu } from '../classic/components/Menu.jsx';
 import { NotificationCenter } from '../classic/components/NotificationCenter.jsx';
@@ -89,6 +90,7 @@ const H = {
   edit: (id) => editing.set(id),
   activity: (id) => { panel.set(null); switchDesktop(id); },
   settings: () => { panel.set(null); wm.open('settings'); },
+  help: () => { panel.set(null); shortcutsHelp.set((v) => !v); },
   closePanel: () => panel.set(null),
 };
 
@@ -108,6 +110,7 @@ const table = [
     label: 'shell.ws.shortcuts.activityN', group: 'desktops' },
   { id: 'activityTab', keys: ['Meta+Tab', 'Meta+Shift+Tab'], run: (e) => stepActivity(e.shift ? -1 : 1), when: () => !switcherKeys('meta').includes('Meta+Tab'),
     listed: () => !switcherKeys('meta').includes('Meta+Tab'), label: 'shell.ws.shortcuts.activityTab', group: 'desktops' },
+  { id: 'help', keys: ['Meta+/'], show: ['❖/'], run: () => H.help(), label: 'shell.ws.shortcuts.help', group: 'system' },
   { id: 'bars', keys: ['Ctrl+F2'], run: () => { panel.set(null); enterBars(); }, label: 'shell.ws.shortcuts.bars', group: 'system' },
   { id: 'switchApps', keys: switcherKeys('meta'), run: (e) => openSwitcher(switcherHold(e), e.shift), label: 'shell.shortcuts.switchApps', group: 'windows' },
   { id: 'cycleWindows', keys: ['Meta+`', 'Meta+Shift+`'], run: (e) => cycleAppWindows(e.shift), label: 'shell.shortcuts.cycleWindows', group: 'windows' },
@@ -239,7 +242,7 @@ function App() {
           { id: 'crown', run: () => H.crown(at) }, { id: 'current', run: () => H.edit(desk) },
           ...recent.map((id) => ({ id: `recent:${id}`, run: () => H.activity(id) })),
           { id: 'activities', run: H.activities }, { id: 'apps', run: () => H.apps() }, { id: 'files', run: () => H.files() },
-          { id: 'notif', run: H.notif }, { id: 'settings', run: H.settings }, { id: 'control', run: H.control },
+          { id: 'help', run: H.help }, { id: 'notif', run: H.notif }, { id: 'settings', run: H.settings }, { id: 'control', run: H.control },
         ] : []),
         ...(main?.plan.top ? [...desktopList.get().map((id) => ({ id: `pill:${id}`, run: () => switchDesktop(id) })),
           ...(desktopList.get().length < 9 ? [{ id: 'new', run: () => newActivity() }] : [])] : []),
@@ -253,7 +256,7 @@ function App() {
     const offDown = addListener('pointerdown', () => leaveBars());     // a press of the pointer gives the keyboard back
     return () => { offKey(); offDown(); };
   }, [barsOn]);
-  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { panel.set(null); crownMenu.set(null); deskMenu.set(null); } }), []);
+  useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { panel.set(null); crownMenu.set(null); deskMenu.set(null); shortcutsHelp.set(false); } }), []);
   useEffect(() => { if (inOverview) panel.set(null); }, [inOverview]);
   useEffect(() => registerGestureActions({
     up: (g) => { if (g.fingers >= 4) openOverview(); else openSearch('apps'); },
@@ -262,8 +265,9 @@ function App() {
   }), []);
 
   const leaving = useLeaving(all, main?.plan.spine);
-  const spineActive = useMemo(() => ({ overview: inOverview, apps: open?.name === 'search' && open.mode === 'apps', control: open?.name === 'control', notif: open?.name === 'notif', menu: !!crown }),
-    [inOverview, open, crown]);
+  const helpOpen = useStore(shortcutsHelp);
+  const spineActive = useMemo(() => ({ overview: inOverview, apps: open?.name === 'search' && open.mode === 'apps', control: open?.name === 'control', notif: open?.name === 'notif', help: helpOpen, menu: !!crown }),
+    [inOverview, open, crown, helpOpen]);
   const stripRect = useMemo(() => (main?.plan.top ? { ...main.plan.top, w: main.plan.top.w - STATUS_W } : null), [main]);
   if (open?.name === 'notif' && history.length) seen.current = Math.max(seen.current, history[0].id);
   const unread = history.some((n) => n.id > seen.current);
@@ -287,6 +291,7 @@ function App() {
   const crownItems = [
     { label: tr('shell.menu.about'), onClick: () => wm.open('about') },
     { label: tr('shell.menu.settings'), onClick: () => wm.open('settings') },
+    { label: tr('shell.ws.help.menu'), onClick: () => H.help() },
     '-',
     ...(session.managed() ? [{ label: tr('shell.menu.lock'), onClick: () => session.lock() }, { label: tr('shell.menu.switchUser'), onClick: () => session.switchUser() }] : []),
     { label: tr('shell.menu.logout'), onClick: () => session.quit() },
@@ -332,7 +337,7 @@ function App() {
           {plans.map(({ d, plan }) => (plan.spine ? (
             <Spine key={d.id} t={t} rect={plan.spine} mode={plan.mode} rtl={rtl} active={spineActive} controlRef={d.main ? controlRef : undefined} desk={desktop} unread={unread}
               onCrown={H.crown} onActivities={H.activities} onApps={H.apps} onFiles={H.files} onControl={H.control} onToggle={toggleSpine}
-              onNotif={H.notif} onSettings={H.settings} onEditActivity={H.edit} onActivity={H.activity} />
+              onNotif={H.notif} onSettings={H.settings} onHelp={H.help} onEditActivity={H.edit} onActivity={H.activity} />
           ) : null))}
           {main?.plan.top ? (
             <>
@@ -390,6 +395,7 @@ function App() {
           </Layer>
         ) : null}
         <Layer name="modal"><PowerDialog /></Layer>
+        <ShortcutsHelp t={t} />
         {barsOn ? <Layer name="overlay"><View style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1 }} /></Layer> : null}
         <AppSwitcher />
         <OverviewChrome />

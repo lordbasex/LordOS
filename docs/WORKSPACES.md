@@ -284,7 +284,12 @@ Desktops keys (⌃↑ the Overview, ⌃← ⌃→ and ❖⌃← ❖⌃→ switch
 activity 1 to 9; ❖Tab and ❖⇧Tab, the next and the previous activity, when Settings → Keyboard puts the app switcher on
 ⌥Tab (the proposal's ❖Tab for activities, by choice); ⌃F2 moves the keyboard to the bars (below). Over a Linux app the
 compositor keeps a fixed list for this theme (`workspaces` and `workspaces-desktops` in `server/src/wl/keygrab.c`: Lord
-Flow's two tables plus ⌃F2 and ❖1…❖9, and ❖Tab when the switcher is on ⌥Tab only). Lord Flow's own tables are unchanged.
+Flow's two tables plus ⌃F2, ❖/ and ❖1…❖9, and ❖Tab when the switcher is on ⌥Tab only). Lord Flow's own tables are unchanged.
+
+**The shortcuts' help** (`components/ShortcutsHelp.jsx`): the lifebuoy on the spine, ❖/ or the crown's "Keyboard
+Shortcuts…" open a sheet with every shortcut that works now, from `shortcutList()` (so it never disagrees with the keys):
+the theme's tagged THEME, the shared ones (Search, the clipboard, Screenshots…) untagged, each key on its own keycap;
+then what the pointer and the touchpad do in this theme. Search, a filter by group, Settings → Keyboard.
 
 **The bars' keyboard** (`barfocus.js`). ⌃F2 gives the keyboard to the Context Spine and the activity strip: an empty
 overlay layer holds it (no app gets the keys), the arrows, Tab, Home and End go from the crown down the spine and along

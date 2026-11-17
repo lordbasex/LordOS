@@ -337,7 +337,7 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
   eq('groups: apps remembered', groupApps([{ id: 'g1', apps: [] }], [{ id: 'c', app: 'mail' }], (w) => tagsG[w.id], (w) => w.app)[0].apps, ['mail']);
   eq('groups: every activity counted', everyActivity([1, 2], { 1: ga, 2: cleanActivity({}) }, (d) => `D${d}`).length, 1 + 3 + 1);
   eq('groups: up to 36 activities on 9 desktops', 9 * (1 + MAX_GROUPS), 36);
-  eq('recent: room by height', [500, 640, 768, 1080].map(spineRecentRoom), [0, 1, 2, 3]);
+  eq('recent: room by height', [600, 700, 800, 1080].map(spineRecentRoom), [0, 1, 2, 3]);
 }
 
 console.log(process.exitCode ? 'workspaces-model-test: FAILED' : `workspaces-model-test: ${ok} ok`);

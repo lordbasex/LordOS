@@ -108,6 +108,7 @@ int main(void) {
     CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_HOLD);
     CHECK(keygrab_match(KEY_LEFT, 0, KG_CTRL) == KG_PASS);
     CHECK(keygrab_match(KEY_3, 0, KG_META) == KG_TAKE);
+    CHECK(keygrab_match(KEY_SLASH, 0, KG_META) == KG_TAKE);
     CHECK(keygrab_set("workspaces-desktops+tab-meta"));
     CHECK(keygrab_match(KEY_F2, 0, KG_CTRL) == KG_TAKE);
     CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_HOLD);

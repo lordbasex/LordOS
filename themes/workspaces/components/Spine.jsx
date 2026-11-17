@@ -2,7 +2,7 @@
 // the top: the LordOS crown (the system menu: About, Settings, Lock, Log Out, Restart, Shut Down), the activity in view
 // (its icon in its colour; a click edits it), the activities used just before it (as many as the display's height has
 // room for; a click goes there), Activities (the Overview), Apps (the search panel with every app), Files, and at the
-// bottom the notifications, Settings, the Control Center and the button that collapses the spine to icons (it
+// bottom the shortcuts' help (a lifebuoy, ShortcutsHelp.jsx), the notifications, Settings, the Control Center and the button that collapses the spine to icons (it
 // collapses by itself on narrow displays while its setting is Automatic). It reserves its width in the work area
 // (model/geometry.js).
 // The crown is the brand's full-colour render (assets/icons/lordos-crown.png): never recoloured, no glow or shadow.
@@ -11,7 +11,7 @@ import { View, Text, Image, t as tr, useStore, desktopNames, desktopName } from 
 import { memo, useRef, useState } from 'react';
 import { Surface } from './Surface.jsx';
 import { FocusRing } from './BarButton.jsx';
-import { ActivitiesGlyph, AppsGlyph, FolderGlyph, ControlGlyph, Chevron, BellGlyph, GearGlyph, ActivityIcon } from '../glyphs.jsx';
+import { ActivitiesGlyph, AppsGlyph, FolderGlyph, ControlGlyph, Chevron, BellGlyph, GearGlyph, ActivityIcon, LifebuoyGlyph } from '../glyphs.jsx';
 import { activities, recentActivities, activityOf } from '../state.js';
 import { spineRecentRoom } from '../model/activities.js';
 import { tween, EASE } from '../motion.js';
@@ -67,7 +67,7 @@ const Activities = memo(function Activities({ t, expanded, room, desk, onEditAct
   );
 });
 
-export const Spine = memo(function Spine({ t, rect, mode, rtl, active, desk, unread, onCrown, onActivities, onApps, onFiles, onControl, onToggle, onNotif, onSettings,
+export const Spine = memo(function Spine({ t, rect, mode, rtl, active, desk, unread, onCrown, onActivities, onApps, onFiles, onControl, onToggle, onNotif, onSettings, onHelp,
   onEditActivity, onActivity, controlRef }) {
   const expanded = mode === 'expanded';
   return (
@@ -85,6 +85,8 @@ export const Spine = memo(function Spine({ t, rect, mode, rtl, active, desk, unr
       <Item t={t} expanded={expanded} fid="files" label={tr('shell.ws.spine.files')} active={false} onClick={onFiles}
         glyph={(c) => <FolderGlyph color={c} size={20} />} />
       <View style={{ flex: 1 }} />
+      <Item t={t} expanded={expanded} fid="help" label={tr('shell.ws.spine.help')} active={active.help} onClick={onHelp}
+        glyph={(c, bg) => <LifebuoyGlyph size={18} bg={active.help ? t.accent : t.solidBg} />} />
       <Item t={t} expanded={expanded} fid="notif" label={tr('shell.ws.notif.title')} active={active.notif} onClick={onNotif}
         glyph={(c) => <BellGlyph color={c} size={18} dot={unread ? (active.notif ? t.onAccent : t.accent) : null} />} />
       <Item t={t} expanded={expanded} fid="settings" label={tr('shell.ws.spine.settings')} active={false} onClick={onSettings}

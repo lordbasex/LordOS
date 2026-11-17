@@ -40,6 +40,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     unchanged): the arrows, Tab, Home and End go from one control to the next with a visible ring, Enter or Space
     presses it, Escape gives the keyboard back. ❖1…❖9 show activity 1 to 9; ❖Tab and ❖⇧Tab, the next and the previous
     activity, when Settings → Keyboard puts the app switcher on ⌥Tab.
+  - **The shortcuts' help:** a lifebuoy on the spine (also ❖/ and "Keyboard Shortcuts…" in the crown's menu) opens a
+    sheet with every shortcut that works now, read from the SDK's own list (the one Settings → Keyboard shows): the
+    theme's marked THEME and the ones every theme shares (Search, the clipboard, Screenshots' captures…), each key on
+    its own keycap; then what the pointer and the touchpad do here. A search field, a filter by group, a button to
+    Settings → Keyboard. `shortcutList()` now tells where each shortcut comes from (`from`: theme, lordos or app) and
+    gives its keys one by one (`combos`); `/` has a key name.
   - **Activities keep when they were last changed** (`updatedAt` in `settings.workspaces`, as the proposal's schema).
 - **Search (all themes): recent files** (the home folder's files changed in the last 30 days, read at most once a
   minute) and two more safe actions, Do Not Disturb and Lock Screen.

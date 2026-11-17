@@ -139,6 +139,20 @@ bars.barKey({ key: 'Escape' });
 await flush();
 check('bars: Escape gives the keyboard back', [bars.barFocus.get(), ringed()], [null, 0]);
 
+// the shortcuts' help: the theme's own marked, the shared ones (Search) and the pointer's, searchable
+{
+  const help = await import('../../themes/workspaces/components/ShortcutsHelp.jsx');
+  help.shortcutsHelp.set(true);
+  await flush();
+  const shownT = (v) => [...texts].some(([id, x]) => x === v && attached(id));
+  check('help: open, with the theme\'s, the shared and the pointer\'s', [sdk.t('shell.ws.shortcuts.bars'), sdk.t('shell.shortcuts.search'), sdk.t('shell.ws.help.m.rename')].map(shownT), [true, true, true]);
+  check('help: the theme\'s tagged', shownT(sdk.t('shell.ws.help.theme')), true);
+  check('help: keycaps split', help.keycaps('❖⌥D'), ['❖', '⌥', 'D']);
+  help.shortcutsHelp.set(false);
+  await flush();
+  check('help: closed', shownT(sdk.t('shell.ws.help.title')), false);
+}
+
 // Search on the display it opens for (the one under the pointer)
 state.panel.set({ name: 'search', mode: 'apps', display: L.id });
 await flush();

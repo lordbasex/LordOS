@@ -202,7 +202,7 @@ export function recentOrder(prev, now, list) {
   return [...(have.has(now) ? [now] : []), ...rest, ...fresh];
 }
 // How many recent activities the spine has room for on a display of this height (none on short ones).
-export const spineRecentRoom = (h) => (h >= 860 ? 3 : h >= 720 ? 2 : h >= 620 ? 1 : 0);
+export const spineRecentRoom = (h) => (h >= 920 ? 3 : h >= 780 ? 2 : h >= 680 ? 1 : 0);
 
 // The Focus Surface's summary of an activity: its windows (wins: the open ones, without the theme's own panels), the ones
 // in front first and minimized ones last, at most `max` of them; total and how many more there are.
