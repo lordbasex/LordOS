@@ -354,6 +354,12 @@ after the screen went dark`.
     after unit stopped") and, after a package upgrade, kept the old binary;
   - `lordos.service` has `DelegateSubgroup=supervisor`: without it, systemd couldn't start the new
     main process while live processes remained in the delegated tree ("Device or resource busy");
+  - since systemd 258 that is no longer enough: the new main process is started in the unit's root
+    cgroup and only then moved to `supervisor`, and a cgroup with controllers in its
+    `cgroup.subtree_control` takes no process. `ExecStartPre=-…/lord-sessiond --release-cgroups`
+    therefore notes the sessions' limits in `/run/lordos/cgroup-limits` and turns the controllers off
+    (each session, then the root); the new `lord-sessiond` turns them on again and puts the limits back
+    (`cgroup_release_at`/`cgroup_restore_at`, GitHub #140). Works the same on 257 (Debian 13);
   - autologin is applied only once per machine boot (`/run/lordos/autologin-done`), so a service
     restart doesn't unlock a locked session.
 - **Linux app windows across a lock or a switch:** leaving the monitor tears the session's GPU
@@ -487,6 +493,20 @@ without root, so `lord-sessiond` **delegates** a subtree to it:
   every `cgroup.procs`, are root's. After a restart the new `lord-sessiond` hardens the subtrees
   of the sessions that survived. See `PRIVACY.md`, «Root-owned app scopes».
 - The login screen and the web connections stay in `supervisor`.
+- **Restarts on systemd 258 and later** (GitHub #140): systemd 258 (commit f8f67eab) starts a delegated
+  unit's new main process in the unit's root cgroup and applies `DelegateSubgroup=` afterwards; 257 started
+  it in `supervisor` directly. The root enables `cpu memory pids` for the sessions, and each surviving
+  session enables them for its scopes, so the start failed with "Failed to spawn executor: Device or
+  resource busy" (`clone3(CLONE_INTO_CGROUP)` into a cgroup with controllers on). systemd 261's own
+  clean-up at stop can't help while a session's subtree uses them. The unit's first `ExecStartPre`
+  (a control process, in the unit's `.control` subgroup) runs `lord-sessiond --release-cgroups`: it notes
+  every non-default `memory.high`, `memory.max`, `cpu.max` and `cpu.weight` of the sessions' leaves and
+  scopes, turns the controllers off in each session and then in the root (the kernel refuses the root
+  first; disabling them in a session with live leaves is allowed), and the new `lord-sessiond` turns them
+  on again in `cgroup_service_init` and writes the noted limits back. The sessions run on throughout, their
+  scopes unlimited for about a second. Checked on cgroup v2 in a delegated scope (the order, the lost
+  limit, a process entering the root once the controllers are off) and in `build/cgroup-restart-test`; the
+  unit itself not yet on systemd 258 or later.
 
 ```
 lordos.service

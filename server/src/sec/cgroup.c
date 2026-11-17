@@ -188,6 +188,137 @@ void cgroup_harden_session(int sessfd) {
     closedir(dir);
 }
 
+/* ---- restarts with live sessions on systemd 258 and later (GitHub #140) ----
+ * Up to systemd 257 the new main process of lordos.service was cloned straight into DelegateSubgroup=
+ * (supervisor). Since 258 it is cloned into the unit's root cgroup and moved afterwards, and a cgroup whose
+ * cgroup.subtree_control lists a controller can't take a process (clone3 CLONE_INTO_CGROUP: EBUSY). The root
+ * enables memory, cpu and pids for the sessions, and the sessions that survive a restart enable them for their
+ * app scopes, so systemd could not clear them either (its own clean-up, 261, gives up then). cgroup_release_at()
+ * runs from ExecStartPre (a control process, in the unit's ".control" subgroup): it notes the limits of every
+ * session leaf and scope, then turns the controllers off, sessions first, then the root. lord-sessiond turns
+ * them back on and puts the limits back (cgroup_restore_at, from cgroup_service_init). The sessions keep running
+ * throughout; for that second or so their scopes are unlimited. On 257 it does the same, harmlessly. */
+
+/* the limits that are noted, and their values when nothing was set */
+static const char *const LIMIT_FILES[] = { "memory.high", "memory.max", "cpu.max", "cpu.weight" };
+static int limit_default(const char *file, const char *v) {
+    if (!strcmp(file, "cpu.weight")) return !strcmp(v, "100");
+    if (!strcmp(file, "cpu.max")) return !strncmp(v, "max", 3);
+    return !strcmp(v, "max");
+}
+static int limit_file_ok(const char *file) {
+    for (size_t i = 0; i < sizeof LIMIT_FILES / sizeof *LIMIT_FILES; i++) if (!strcmp(file, LIMIT_FILES[i])) return 1;
+    return 0;
+}
+/* a value as the kernel prints it: digits, "max", spaces (cpu.max "50000 100000") */
+static int limit_value_ok(const char *v) {
+    size_t n = strlen(v);
+    if (!n || n > 40) return 0;
+    for (const char *p = v; *p; p++) if (!((*p >= '0' && *p <= '9') || *p == ' ' || *p == 'm' || *p == 'a' || *p == 'x')) return 0;
+    return 1;
+}
+static int session_dir_ok(const char *name) {
+    unsigned u;
+    char tail;
+    return strlen(name) < 40 && sscanf(name, "lordos-session-%u%c", &u, &tail) == 1;
+}
+static int session_child_ok(const char *name) { return !strcmp(name, "server") || cgroup_scope_name_ok(name); }
+
+/* the whole (small) file at dirfd/leaf, without the final newline; -1 if unreadable */
+static int read_at(int dirfd, const char *leaf, char *buf, size_t n) {
+    int fd = openat(dirfd, leaf, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    ssize_t r = read(fd, buf, n - 1);
+    close(fd);
+    if (r < 0) return -1;
+    buf[r] = 0;
+    buf[strcspn(buf, "\n")] = 0;
+    return 0;
+}
+
+/* Turns off every controller listed in dirfd's cgroup.subtree_control (one write, all of them). 0 when none is
+ * left on. A token starting with '-' is not one the kernel shows (it only reads back what is on). */
+static int controllers_off_at(int dirfd) {
+    char cur[256], req[300] = "";
+    if (read_at(dirfd, "cgroup.subtree_control", cur, sizeof cur)) return -1;
+    size_t used = 0;
+    for (char *save = NULL, *t = strtok_r(cur, " ", &save); t; t = strtok_r(NULL, " ", &save)) {
+        if (t[0] == '-') continue;
+        for (const char *p = t; *p; p++) if (!((*p >= 'a' && *p <= 'z') || *p == '_')) { errno = EINVAL; return -1; }
+        int w = snprintf(req + used, sizeof req - used, "%s-%s", used ? " " : "", t);
+        if (w < 0 || (size_t)w >= sizeof req - used) { errno = E2BIG; return -1; }
+        used += (size_t)w;
+    }
+    if (!used) return 0;
+    if (write_at(dirfd, "cgroup.subtree_control", req)) return -1;
+    if (read_at(dirfd, "cgroup.subtree_control", cur, sizeof cur)) return -1;
+    for (char *save = NULL, *t = strtok_r(cur, " ", &save); t; t = strtok_r(NULL, " ", &save))
+        if (t[0] != '-') { errno = EBUSY; return -1; }
+    return 0;
+}
+
+int cgroup_release_at(int svcfd, int outfd) {
+    int d = dup(svcfd);
+    DIR *dir = d >= 0 ? fdopendir(d) : NULL;
+    if (!dir) { if (d >= 0) close(d); return -1; }
+    struct dirent *e;
+    int bad = 0;
+    while ((e = readdir(dir))) {
+        if (e->d_name[0] == '.' || e->d_type != DT_DIR) continue;
+        int cfd = openat(svcfd, e->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        if (cfd < 0) continue;
+        if (session_dir_ok(e->d_name)) {    /* its leaf's and scopes' limits, before they go */
+            int d2 = dup(cfd);
+            DIR *sd = d2 >= 0 ? fdopendir(d2) : NULL;
+            if (!sd && d2 >= 0) close(d2);
+            struct dirent *s;
+            while (sd && (s = readdir(sd))) {
+                if (s->d_name[0] == '.' || s->d_type != DT_DIR || !session_child_ok(s->d_name)) continue;
+                int lfd = openat(cfd, s->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+                if (lfd < 0) continue;
+                for (size_t i = 0; i < sizeof LIMIT_FILES / sizeof *LIMIT_FILES; i++) {
+                    char v[64];
+                    if (read_at(lfd, LIMIT_FILES[i], v, sizeof v) || !limit_value_ok(v) || limit_default(LIMIT_FILES[i], v)) continue;
+                    if (outfd >= 0) dprintf(outfd, "%s %s %s %s\n", e->d_name, s->d_name, LIMIT_FILES[i], v);
+                }
+                close(lfd);
+            }
+            if (sd) closedir(sd);
+        }
+        if (controllers_off_at(cfd)) { bad = 1; fprintf(stderr, "cgroup: %s keeps its controllers (%s)\n", e->d_name, strerror(errno)); }
+        close(cfd);
+    }
+    closedir(dir);
+    if (controllers_off_at(svcfd)) { fprintf(stderr, "cgroup: the service root keeps its controllers (%s)\n", strerror(errno)); return -1; }
+    return bad ? -1 : 0;
+}
+
+int cgroup_restore_at(int svcfd, const char *saved) {
+    int n = 0;
+    char line[256];
+    for (const char *p = saved; p && *p;) {
+        size_t l = strcspn(p, "\n");
+        if (l < sizeof line) {
+            memcpy(line, p, l);
+            line[l] = 0;
+            char sess[64], child[96], file[24], v[64];
+            int used = 0;
+            if (sscanf(line, "%63s %95s %23s %n", sess, child, file, &used) == 3 && used > 0 &&
+                (size_t)snprintf(v, sizeof v, "%s", line + used) < sizeof v &&
+                session_dir_ok(sess) && session_child_ok(child) && limit_file_ok(file) && limit_value_ok(v)) {
+                int sfd = openat(svcfd, sess, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+                int lfd = sfd >= 0 ? openat(sfd, child, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC) : -1;
+                if (lfd >= 0 && !write_at(lfd, file, v)) n++;
+                if (lfd >= 0) close(lfd);
+                if (sfd >= 0) close(sfd);
+            }
+        }
+        p += l;
+        if (*p == '\n') p++;
+    }
+    return n;
+}
+
 /* Service root: its own cgroup, or its parent if we're in the "supervisor" leaf created by
  * cgroup_service_init(). */
 static int service_root(char *out, size_t n) {
@@ -195,9 +326,31 @@ static int service_root(char *out, size_t n) {
     if (!rel[0]) return -1;
     if ((size_t)snprintf(out, n, CG_ROOT "%s", rel) >= n) return -1;
     size_t l = strlen(out);
-    static const char leaf[] = "/supervisor";
+    static const char leaf[] = "/supervisor", ctl[] = "/.control";      /* .control: systemd's, for ExecStartPre */
     if (l > sizeof leaf - 1 && !strcmp(out + l - (sizeof leaf - 1), leaf)) out[l - (sizeof leaf - 1)] = 0;
+    else if (l > sizeof ctl - 1 && !strcmp(out + l - (sizeof ctl - 1), ctl)) out[l - (sizeof ctl - 1)] = 0;
     return 0;
+}
+
+int cgroup_service_release(void) {
+    char svc[PATH_MAX];
+    if (geteuid() != 0 || service_root(svc, sizeof svc)) return -1;
+    const char *base = strrchr(svc, '/');
+    size_t bl = base ? strlen(base) : 0;
+    if (bl < 10 || strcmp(base + bl - 8, ".service")) return -1;       /* only a service's own tree */
+    int fd = open(svc, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    mkdir("/run/lordos", 0755);
+    unlink(CG_SAVED_LIMITS ".new");
+    int out = open(CG_SAVED_LIMITS ".new", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+    int r = cgroup_release_at(fd, out);
+    close(fd);
+    if (out >= 0) {
+        int ok = !fsync(out);
+        close(out);
+        if (!ok || rename(CG_SAVED_LIMITS ".new", CG_SAVED_LIMITS)) unlink(CG_SAVED_LIMITS ".new");
+    }
+    return r;
 }
 
 int cgroup_service_init(void) {
@@ -220,8 +373,24 @@ int cgroup_service_init(void) {
         char tail;
         if (sscanf(e->d_name, "lordos-session-%u%c", &u, &tail) != 1) continue;
         int sfd = openat(dirfd(dir), e->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-        if (sfd >= 0) { cgroup_harden_session(sfd); close(sfd); }
+        if (sfd < 0) continue;
+        /* its app scopes' controllers again: ExecStartPre turned them off (cgroup_service_release, #140) */
+        write_at(sfd, "cgroup.subtree_control", "+memory +cpu +pids");
+        cgroup_harden_session(sfd);
+        close(sfd);
     }
+    /* and the limits noted then (only root writes the file, in root's /run/lordos) */
+    char saved[16384];
+    int sv = open(CG_SAVED_LIMITS, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    struct stat st;
+    if (sv >= 0 && dir && !fstat(sv, &st) && st.st_uid == 0 && S_ISREG(st.st_mode)) {
+        ssize_t n = read(sv, saved, sizeof saved - 1);
+        saved[n > 0 ? n : 0] = 0;
+        int put = cgroup_restore_at(dirfd(dir), saved);
+        if (put) fprintf(stderr, "cgroup: %d limit(s) of the sessions that stayed put back\n", put);
+    }
+    if (sv >= 0) close(sv);
+    unlink(CG_SAVED_LIMITS);
     if (dir) closedir(dir);
     return 0;
 }

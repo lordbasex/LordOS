@@ -383,6 +383,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   notice arrives, and the screen gets the notice when it mounts (`themes/greeter/inbox.js`, tested in
   `server/tests/greeter_inbox_test.mjs`). A MacBook that wakes up a second after it goes to sleep with the lid open is
   a firmware wake source (`LID0` in `/proc/acpi/wakeup`), not this; LordOS doesn't change wake sources yet.
+- **`systemctl restart lordos` with sessions alive failed on systemd 258 and later (GitHub #140)** with "Failed to
+  spawn executor: Device or resource busy", and after five tries there was no login screen until a reboot (a
+  package upgrade or a crash of lord-sessiond did the same). systemd 258 starts a delegated unit's new main process
+  in the unit's root cgroup and only then moves it to `DelegateSubgroup=supervisor`; the root still had `cpu memory
+  pids` on for the sessions, and a cgroup with controllers on takes no process. `lordos.service` now runs
+  `lord-sessiond --release-cgroups` first (ExecStartPre): it notes the limits of the sessions' leaves and app scopes
+  in `/run/lordos/cgroup-limits`, turns the controllers off in each session and then in the root, and the new
+  lord-sessiond turns them on again and puts the limits back (`server/src/sec/cgroup.c`, tested in
+  `build/cgroup-restart-test`; the kernel's side checked in a delegated scope). Debian 13 ships systemd 257, which
+  wasn't affected and works the same; the unit hasn't been run on 258 or later yet.
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.

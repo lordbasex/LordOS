@@ -52,6 +52,18 @@ int cgroup_delegate_session(unsigned uid, unsigned gid);
  * sessions' subtrees (cgroup v2's "no internal processes" rule). 0 if it did. */
 int cgroup_service_init(void);
 
+/* (GitHub #140) lord-sessiond --release-cgroups, from lordos.service's ExecStartPre: notes the limits of the
+ * sessions' leaves and scopes in CG_SAVED_LIMITS and turns the controllers off in the sessions and the service
+ * root, so that systemd 258 and later can start the new main process in the unit's root cgroup while sessions
+ * live on. cgroup_service_init() turns them on again and puts the limits back. Root only; 0 if the root has no
+ * controller left on. */
+#define CG_SAVED_LIMITS "/run/lordos/cgroup-limits"
+int cgroup_service_release(void);
+/* The same on an open service directory (tests): the noted lines ("<session> <leaf> <file> <value>") go to outfd
+ * (-1: none). And putting them back: the number of values written. */
+int cgroup_release_at(int svcfd, int outfd);
+int cgroup_restore_at(int svcfd, const char *saved);
+
 /* (0.8.5) Called by lord-sessiond in lord-netd's child, before its execve: moves the process into
  * the root-owned lordos.service/<name> leaf (only "netd"), so lord-netperm can count the network
  * service's own traffic (DHCP, the VPN daemons) apart from lord-sessiond's. Best effort: 0 placed. */
