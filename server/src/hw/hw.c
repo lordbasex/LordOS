@@ -1,4 +1,5 @@
 /* hw.c — main-loop glue for Settings' hardware modules (see hw.h). */
+#include "hidppsvc.h"
 #include "hw.h"
 #include "bt.h"
 #include "jbuf.h"
@@ -101,7 +102,7 @@ void hw_dispatch(const struct pollfd *p, int n) {
         if (p[i].fd == uevent_fd()) {
             int m = uevent_dispatch();
             if (m & UEV_DRM) display_hotplug();
-            if (m & UEV_POWER) power_changed();
+            if (m & UEV_POWER) { power_changed(); hidpp_kick(); }   /* a Logitech device woke up: ask lord-hidpp again */
             if (m & UEV_BACKLIGHT) display_hotplug();      /* the list carries the backlight */
         } else if (p[i].fd == sysbus_fd()) sysbus_dispatch();
         else if (p[i].fd == notifyd_fd()) notifyd_dispatch();

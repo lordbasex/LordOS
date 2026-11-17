@@ -890,7 +890,15 @@ const hidppRead = () => { try { return lord.hidpp?.batteries ? lord.hidpp.batter
 function useDevices() {
   const pw = useStore(battery), bt = useStore(bluetooth);
   const hp = useFeed('hidpp', hidppRead, 60000);
-  return devicesFrom(pw, bt, hp);
+  // a power_supply change (a keyboard waking up and reconnecting: an MX Keys answers only while awake) makes
+  // lord-server ask lord-hidpp again; its answer comes a few seconds later
+  const [fresh, setFresh] = useState(null);
+  useEffect(() => {
+    hidppRead();
+    const id = setTimeout(() => setFresh(hidppRead()), 4000);
+    return () => clearTimeout(id);
+  }, [pw]);
+  return devicesFrom(pw, bt, fresh && fresh.length >= (hp || []).length ? fresh : hp);
 }
 // a small drawing of each kind, in plain views (no SVG in the renderer)
 function DeviceGlyph({ kind, size, color }) {

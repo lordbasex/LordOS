@@ -20,12 +20,12 @@
 
 #define HIDPP_KEEP 12
 #define HIDPP_EVERY 60          /* seconds between runs */
-#define HIDPP_KEEP_S 3600       /* a device asleep (a keyboard not typed on) keeps its last answer this long */
+#define HIDPP_KEEP_S 43200      /* a device asleep (a keyboard not typed on) keeps its last answer this long: 12 h */
 
 typedef struct { char supply[32]; int percent, status; time_t at; } Answer;
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static Answer kept[HIDPP_KEEP];
-static int nkept, running;
+static int nkept, running, kicked;
 static time_t ran_at;
 
 int hidpp_parse_line(const char *line, int *hidraw, int *percent, int *status) {
@@ -153,11 +153,18 @@ static void *run(void *arg) {
     return NULL;
 }
 
+void hidpp_kick(void) {
+    pthread_mutex_lock(&lock);
+    kicked = 1;
+    pthread_mutex_unlock(&lock);
+}
+
 size_t hidpp_json(char *out, size_t n) {
     if (!n) return 0;
     pthread_mutex_lock(&lock);
     time_t now = time(NULL);
-    if (!running && (ran_at == 0 || now - ran_at >= HIDPP_EVERY || now < ran_at)) {
+    if (!running && (ran_at == 0 || now - ran_at >= (kicked ? 10 : HIDPP_EVERY) || now < ran_at)) {
+        kicked = 0;
         pthread_t th;
         pthread_attr_t a;
         pthread_attr_init(&a);
