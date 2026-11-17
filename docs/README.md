@@ -46,6 +46,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [GPU.md](GPU.md) | GPU composition, dmabuf and the CPU path |
 | [DOCK.md](DOCK.md) | Dock and taskbar |
 | [DESKTOPS.md](DESKTOPS.md) | Desktops and Overview |
+| [DEVICES.md](DEVICES.md) | The battery of the computer and of mice, keyboards and headphones; lord-hidpp |
 | [WALLPAPERS.md](WALLPAPERS.md) | Moving wallpapers on the desktop and the login screen |
 | [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md) | The on-screen keyboard, for a computer with no physical keyboard |
 | [THEMES-GUIDE.md](THEMES-GUIDE.md) | How to build a LordOS appearance (theme): anatomy, tokens, frames, building, verified code, testing |

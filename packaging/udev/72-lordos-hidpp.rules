@@ -1,0 +1,8 @@
+# LordOS: the battery of Logitech mice and keyboards (docs/DEVICES.md; maintainer's approval 2026-11-17, battery
+# reads only). Only the hidraw nodes of the kernel's logitech-hidpp-device driver (one per device, behind a receiver
+# or over Bluetooth), never a receiver's own node: nothing can be paired or unpaired through them. Their group is
+# lordos-hidpp, which no person is in: only the setgid lord-hidpp opens them, then drops the group and sandboxes
+# itself before asking HID++ for the battery.
+ACTION=="remove", GOTO="lordos_hidpp_end"
+SUBSYSTEM=="hidraw", DRIVERS=="logitech-hidpp-device", GROUP="lordos-hidpp", MODE="0660"
+LABEL="lordos_hidpp_end"

@@ -14,6 +14,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 - **The battery in the bar opens the batteries of every device (all themes).** On a computer with a battery, a click
   on its bar item now shows the computer's, the mice', keyboards' and headphones' charge (the Devices widget's list).
+- **lord-hidpp: the exact battery of Logitech mice and keyboards** (maintainer's approval 2026-11-17, battery reads
+  only). The kernel asks a Logitech device for Unified Battery first, and a device that gives only levels there (an
+  MX Master 3, an MX Keys) shows "Normal" with no percentage. lord-hidpp also asks Battery Status and Battery Voltage.
+  It is setgid `lordos-hidpp`, the only group that may open a Logitech device's own hidraw node
+  (`72-lordos-hidpp.rules`, never a receiver's node); it drops the group before talking, runs in the helpers'
+  sandbox, asks only the three battery features and prints numbers only. lord-server runs it at most once a minute
+  (`lord.hidpp.batteries()`); the Devices widget and the bar's panel use it. See docs/DEVICES.md.
 - **Lord Workspaces: a Devices widget.** The battery of everything connected in one card, as rings with the kind's
   drawing: the computer (when it has a battery), mice and keyboards on a Logitech receiver or over Bluetooth
   (`/sys/class/power_supply`, scope Device) and headphones and the rest that BlueZ reports a battery for. A device

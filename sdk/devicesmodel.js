@@ -64,11 +64,13 @@ export function devicesFrom(power, bt, hidpp) {
     if (macs.has(String(d.address || '').toUpperCase())) continue;          // the kernel already lists it
     out.push({ id: `bt:${d.address}`, name: d.name || d.address, kind: kindOf(d.icon, d.name), percent: d.battery, level: '', charging: false, via: 'bluetooth' });
   }
-  // lord-hidpp's exact numbers for the Logitech devices that gave only a level: matched by name
+  // lord-hidpp's exact numbers for the Logitech devices that gave only a level: by the device's own power supply
+  // (lord.hidpp.batteries() names it), or by name for an older answer without one
   for (const h of hidpp || []) {
+    if (!h || !(h.percent >= 0)) continue;
     const key = fold(h.name);
-    if (!key || !(h.percent >= 0)) continue;
-    const d = out.find((x) => x.via === 'logitech' && x.percent < 0 && (fold(x.name).includes(key) || key.includes(fold(x.name))));
+    const d = h.supply ? out.find((x) => x.id === `ps:${h.supply}`)
+      : key ? out.find((x) => x.via === 'logitech' && x.percent < 0 && (fold(x.name).includes(key) || key.includes(fold(x.name)))) : null;
     if (d) { d.percent = Math.max(0, Math.min(100, Math.round(h.percent))); if (h.charging) d.charging = true; }
   }
   const rank = (k) => KINDS.indexOf(k);

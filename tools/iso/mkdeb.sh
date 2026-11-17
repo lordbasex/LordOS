@@ -72,7 +72,7 @@ for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
          lord-stream:"libavcodec-dev libavformat-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
-         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" \
+         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" \
          lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lordos-guest:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
@@ -167,6 +167,9 @@ fi
 # lord-lan (0.8.7): reads what the local network answers for Files → Network, sandboxed (docs/FILES.md, "Network")
 [ -x server/build/lord-lan ] && install -m 755 server/build/lord-lan "$L/bin/lord-lan"
 [ -x "$L/bin/lord-lan" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-lan" 2>/dev/null || true; }
+# lord-hidpp (0.8.8.10): the battery of Logitech devices; setgid lordos-hidpp, set by postinst (dpkg-statoverride)
+[ -x server/build/lord-hidpp ] && install -m 755 server/build/lord-hidpp "$L/bin/lord-hidpp"
+[ -x "$L/bin/lord-hidpp" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-hidpp" 2>/dev/null || true; }
 # lord-rdesk (0.8.7): one RDP or VNC connection, sandboxed (docs/FILES.md, "Remote desktop")
 install -m 755 server/build/lord-rdesk "$L/bin/lord-rdesk"
 "$STRIP" --strip-unneeded "$L/bin/lord-rdesk" 2>/dev/null || true
@@ -205,6 +208,7 @@ for k in apt/keys/*.asc; do install -m 644 "$k" "$L/apt/keys/"; done
 # FIDO2 security keys reachable by the session user (lord-sessiond sessions have no logind seat)
 install -d "$PKG/usr/lib/udev/rules.d"
 install -m 644 packaging/udev/71-lordos-fido.rules "$PKG/usr/lib/udev/rules.d/71-lordos-fido.rules"
+install -m 644 packaging/udev/72-lordos-hidpp.rules "$PKG/usr/lib/udev/rules.d/72-lordos-hidpp.rules"
 for d in themes/*/; do
     n=$(basename "$d")
     [ -f "$d/theme.bundle.js" ] || continue
@@ -470,6 +474,17 @@ fi
 if [ "$1" = configure ] && [ -x /usr/lib/lordos/bin/lord-say ]; then
     update-alternatives --quiet --install /usr/bin/say say /usr/lib/lordos/bin/lord-say 50
 fi
+# lord-hidpp reads Logitech batteries through its own group (docs/DEVICES.md): the group, the setgid bit kept
+# across upgrades by dpkg-statoverride, and the udev rule applied to the devices already connected
+if [ "$1" = configure ] && [ -e /usr/lib/lordos/bin/lord-hidpp ]; then
+    getent group lordos-hidpp >/dev/null 2>&1 || groupadd --system lordos-hidpp
+    dpkg-statoverride --list /usr/lib/lordos/bin/lord-hidpp >/dev/null 2>&1 ||
+        dpkg-statoverride --update --add root lordos-hidpp 2755 /usr/lib/lordos/bin/lord-hidpp
+    if [ -d /run/udev ] && command -v udevadm >/dev/null 2>&1; then
+        udevadm control --reload >/dev/null 2>&1 || true
+        udevadm trigger --subsystem-match=hidraw --action=change >/dev/null 2>&1 || true
+    fi
+fi
 # version-to-version system changes, each applied once (docs/UPDATES.md, "Migrations")
 if [ "$1" = configure ] && [ -x /usr/lib/lordos/migrate ]; then
     /usr/lib/lordos/migrate "${2:-}"
@@ -513,6 +528,9 @@ if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/apt/sources.list.d/lor
 # the browsers' video settings written by Settings (video-optimize, docs/VIDEO.md)
 if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/chromium/policies/managed/lordos-video.json /etc/firefox-esr/lordos-video.js /etc/chromium/policies/recommended/lordos-session.json /etc/firefox-esr/lordos-session.js; fi
 if [ "$1" = purge ]; then rm -rf /var/lib/lordos/migrations /var/log/lordos; fi
+# lord-hidpp's setgid override goes with the package; its group only on purge
+if [ "$1" = remove ] || [ "$1" = purge ]; then dpkg-statoverride --remove /usr/lib/lordos/bin/lord-hidpp >/dev/null 2>&1 || true; fi
+if [ "$1" = purge ] && getent group lordos-hidpp >/dev/null 2>&1; then groupdel lordos-hidpp 2>/dev/null || true; fi
 # the real pkexec back in its place
 if [ "$1" = remove ] || [ "$1" = purge ]; then
     if [ -L /usr/bin/pkexec ]; then rm -f /usr/bin/pkexec; fi

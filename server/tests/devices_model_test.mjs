@@ -47,6 +47,11 @@ assert.equal(toneOf(lap[3]), 'crit', 'under 15 %');
 assert.equal(toneOf({ percent: 5, charging: true }), 'ok', 'charging is never an alarm');
 assert.equal(toneOf({ percent: -1, level: 'critical' }), 'crit');
 
+// lord.hidpp.batteries() as lord-server gives it: by power supply, exact even when the names differ
+const bySupply = devicesFrom(power, bt, [{ supply: 'hidpp_battery_0', percent: 85, charging: false, full: false }, { supply: 'hidpp_battery_1', percent: 40, charging: true }, { supply: 'hidpp_battery_9', percent: 1 }]);
+assert.deepEqual(bySupply.filter((d) => d.via === 'logitech').map((d) => [d.name, d.percent, d.charging]),
+  [['Wireless Mouse MX Master 3', 85, false], ['MX Keys Wireless Keyboard', 40, true]]);
+
 // nothing at all
 assert.deepEqual(devicesFrom(null, null, null), []);
 assert.deepEqual(devicesFrom({ hasBattery: false, supplies: [] }, { devices: [] }), []);
