@@ -1,9 +1,11 @@
-// Add widget: the desktop widget catalog (sdk/deskwidgets.jsx) as cards over a display, opened from the empty state's
-// "Add widget" or the wallpaper's right-click menu. Each card has a button per size (small 1×1, medium 2×1, large 2×2,
-// wide 4×1, extra large 4×2, drawn as its block of cells); a click puts the widget on the first free block of that display's grid,
-// in the activity in view. Escape or a click outside closes it.
-import { View, Text, Layer, addListener, useStore, createStore, widgetKinds, widgetCatalog, workAreaOf, addDeskWidget, t as tr } from '@lordos/sdk';
-import { useEffect, useRef, useState } from 'react';
+// Add widget: the desktop widget catalog (sdk/deskwidgets.jsx) in a panel centred on a display, opened from the empty
+// state's "Add widget" or the wallpaper's right-click menu. A search field on top (name and description, in the
+// person's language), the categories with their counts on the side, and the cards in a scrolling list, by category.
+// Each card has a button per size (small 1×1, medium 2×1, large 2×2, wide 4×1, extra large 4×2, drawn as its block of
+// cells); a click puts the widget on the first free block of that display's grid, in the activity in view. The arrow
+// keys move between cards and Enter adds the highlighted one at its first size; Escape or a click outside closes it.
+import { View, Text, Layer, ScrollView, SearchField, addListener, useStore, createStore, widgetKinds, widgetCatalog, workAreaOf, addDeskWidget, direction, t as tr } from '@lordos/sdk';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Surface } from './Surface.jsx';
 
 // { display, x?, y? } while the catalog is open
@@ -128,6 +130,26 @@ function KindGlyph({ type, t }) {
   return <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: dim }} />;
 }
 
+// the side list's categories, in order; a kind not listed here (a package's) goes to "other"
+export const CATEGORIES = ['time', 'system', 'devices', 'network', 'productivity', 'media', 'other'];
+const CATEGORY = {
+  clock: 'time', calendar: 'time', weather: 'time', timer: 'time',
+  system: 'system', temps: 'system', disks: 'system', updates: 'system',
+  battery: 'devices', devices: 'devices',
+  network: 'network', vpn: 'network',
+  claude: 'productivity', reminders: 'productivity', note: 'productivity', clipboard: 'productivity', recent: 'productivity', launcher: 'productivity',
+  video: 'media', nowplaying: 'media', readaloud: 'media', soundwave: 'media',
+};
+export const categoryOf = (type) => CATEGORY[type] || 'other';
+// lower case without accents, so "calendario" finds "Calendário" and "reloj" finds "Reloj"
+export const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+export function matches(kind, query, text = tr) {
+  const q = fold(query).trim();
+  if (!q) return true;
+  const hay = fold(`${text(kind.nameKey)} ${text(kind.descKey)}`);
+  return q.split(/\s+/).every((w) => hay.includes(w));
+}
+
 const SPANS = { s: [1, 1], m: [2, 1], l: [2, 2], w: [4, 1], xl: [4, 2] };
 function SizeChip({ t, size, onPick }) {
   const [hover, setHover] = useState(false);
@@ -141,17 +163,30 @@ function SizeChip({ t, size, onPick }) {
     </View>
   );
 }
-function Card({ t, kind, onPick }) {
+function Card({ t, kind, onPick, on }) {
   const [hover, setHover] = useState(false);
+  const lit = hover || on;
   const sizes = kind.sizes || null;
   return (
     <View onClick={sizes ? undefined : () => onPick(null)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ width: 176, minHeight: 132, padding: 12, gap: 6, borderRadius: 16, backgroundColor: hover ? t.hover : t.chipBg,
-        border: `1px solid ${hover ? t.accent : t.separator}` }}>
+      style={{ width: 176, minHeight: 132, padding: 12, gap: 6, borderRadius: 16, backgroundColor: lit ? t.hover : t.chipBg,
+        border: `1px solid ${lit ? t.accent : t.separator}` }}>
       <KindGlyph type={kind.type} t={t} />
       <Text style={{ fontSize: 13, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(kind.nameKey)}</Text>
       <Text style={{ fontSize: 11, color: t.textDim, textAlign: 'start' }}>{tr(kind.descKey)}</Text>
       {sizes ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 'auto' }}>{sizes.map((sz) => <SizeChip key={sz} t={t} size={sz} onPick={() => onPick(sz)} />)}</View> : null}
+    </View>
+  );
+}
+
+function CategoryRow({ t, label, count, on, onPick }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <View onClick={onPick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ flexDirection: 'row', alignItems: 'center', height: 34, paddingHorizontal: 12, borderRadius: 10,
+        backgroundColor: on ? t.hover : hover ? t.chipBg : 'transparent' }}>
+      <Text style={{ flex: 1, fontSize: 13, fontWeight: on ? 600 : 500, color: t.text, textAlign: 'start' }}>{label}</Text>
+      <Text style={{ fontSize: 12, color: t.textDim }}>{String(count)}</Text>
     </View>
   );
 }
@@ -161,20 +196,34 @@ export function WidgetPicker({ t }) {
   useStore(widgetCatalog);
   const ref = useRef(null);
   const [full, setFull] = useState(false);
-  useEffect(() => { setFull(false); }, [p]);
+  const [query, setQuery] = useState('');
+  const [cat, setCat] = useState('all');
+  const [hi, setHi] = useState(-1);
+  useEffect(() => { setFull(false); setQuery(''); setCat('all'); setHi(-1); }, [p]);
   useEffect(() => {
     if (!p) return undefined;
     const offDown = addListener('pointerdown', (e) => { for (let n = e.target; n; n = n.parent) if (n === ref.current) return; widgetPicker.set(null); });
     const offKey = addListener('keydown', (e) => { if (e.key === 'Escape') widgetPicker.set(null); });
     return () => { offDown(); offKey(); };
   }, [p]);
+  const kinds = p ? widgetKinds() : [];
+  const counts = useMemo(() => {
+    const c = { all: kinds.length };
+    for (const k of kinds) c[categoryOf(k.type)] = (c[categoryOf(k.type)] || 0) + 1;
+    return c;
+  }, [kinds.length, p]);
   if (!p) return null;
   const area = workAreaOf(p.display);
-  const kinds = widgetKinds();
-  // four columns (fewer on a narrow display); a card is 176 px plus its 1 px border on each side
-  const CARD = 178, GAPX = 10;
-  const cols = Math.max(1, Math.min(4, kinds.length, Math.floor((area.w - 48 - 36 + GAPX) / (CARD + GAPX))));
-  const W = cols * CARD + (cols - 1) * GAPX + 36 + 2;
+  // the cards that show: the search (over every category) or the chosen category, grouped in the side list's order
+  const shown = kinds.filter((k) => (query ? matches(k, query) : cat === 'all' || categoryOf(k.type) === cat));
+  const groups = CATEGORIES.map((c) => ({ c, list: shown.filter((k) => categoryOf(k.type) === c) })).filter((g) => g.list.length);
+  const flat = groups.flatMap((g) => g.list);
+  // centred on the display, as large as it fits: up to four columns of cards, the list scrolls inside
+  const CARD = 178, GAPX = 10, SIDE = 188, PAD = 18;
+  const room = Math.max(CARD, area.w - 48 - SIDE - PAD * 3);
+  const cols = Math.max(1, Math.min(4, Math.floor((room + GAPX) / (CARD + GAPX))));
+  const W = SIDE + PAD * 3 + cols * CARD + (cols - 1) * GAPX + 10;
+  const H = Math.min(Math.max(320, area.h - 64), 720);
   const pick = (k, size) => {
     if (!k.sizes) {
       widgetPicker.set(null);
@@ -185,16 +234,42 @@ export function WidgetPicker({ t }) {
     if (addDeskWidget(k.type, size, p.display)) widgetPicker.set(null);
     else setFull(true);
   };
+  const onKey = (e) => {
+    const n = flat.length;
+    if (!n) return;
+    const rtl = direction() === 'rtl';
+    const step = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
+    if (step) { setHi((h) => (h < 0 ? 0 : Math.max(0, Math.min(n - 1, h + step)))); e.preventDefault?.(); return; }
+    if (e.key === 'Enter') { const k = flat[hi < 0 ? 0 : Math.min(hi, n - 1)]; if (k) pick(k, k.sizes ? k.sizes[0] : null); }
+  };
+  const cats = ['all', ...CATEGORIES.filter((c) => counts[c])];
   return (
     <Layer name="overlay">
-      <Surface ref={ref} t={t} radius={20} style={{ position: 'absolute', left: Math.round(area.x + (area.w - W) / 2), top: Math.round(area.y + Math.max(24, area.h * 0.16)),
-        width: W, padding: 18, gap: 12 }}>
-        <View style={{ gap: 2 }}>
-          <Text style={{ fontSize: 16, fontWeight: 700, color: t.text, textAlign: 'start' }}>{tr('shell.widgets.title')}</Text>
-          <Text style={{ fontSize: 12, color: full ? '#E5484D' : t.textDim, textAlign: 'start' }}>{tr(full ? 'shell.widgets.noRoom' : 'shell.widgets.subtitle')}</Text>
+      <Surface ref={ref} t={t} radius={22} style={{ position: 'absolute', left: Math.round(area.x + (area.w - W) / 2), top: Math.round(area.y + (area.h - H) / 2),
+        width: W, height: H, overflow: 'hidden' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: PAD + 4, paddingTop: PAD, paddingBottom: 14, borderBottom: `1px solid ${t.separator}` }}>
+          <Text style={{ fontSize: 17, fontWeight: 700, color: t.text, textAlign: 'start' }}>{tr('shell.widgets.title')}</Text>
+          <SearchField value={query} onChange={(v) => { setQuery(v); setHi(-1); }} onKeyDown={onKey} autoFocus placeholder={tr('shell.widgets.search')}
+            onCancel={() => { if (!query) widgetPicker.set(null); }} style={{ flex: 1, height: 36 }} />
         </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          {kinds.map((k) => <Card key={k.type} t={t} kind={k} onPick={(size) => pick(k, size)} />)}
+        <View style={{ flex: 1, flexDirection: 'row', minHeight: 0 }}>
+          <View style={{ width: SIDE, padding: 10, gap: 2, borderEndWidth: 1, borderEndColor: t.separator }}>
+            {cats.map((c) => <CategoryRow key={c} t={t} label={tr(`shell.widgets.cat.${c}`)} count={counts[c] || 0} on={!query && cat === c}
+              onPick={() => { setCat(c); setQuery(''); setHi(-1); }} />)}
+          </View>
+          <ScrollView style={{ flex: 1 }} contentStyle={{ padding: PAD, paddingEnd: PAD - 4, gap: 10 }} resetKey={`${cat}|${query}`}>
+            {groups.length ? groups.map((g) => (
+              <View key={g.c} style={{ gap: 10, marginBottom: 8 }}>
+                <Text style={{ fontSize: 11, fontWeight: 700, color: t.textDim, textAlign: 'start', paddingHorizontal: 4 }}>{tr(`shell.widgets.cat.${g.c}`).toLocaleUpperCase()}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAPX }}>
+                  {g.list.map((k) => <Card key={k.type} t={t} kind={k} on={flat[hi] === k} onPick={(size) => pick(k, size)} />)}
+                </View>
+              </View>
+            )) : <Text style={{ fontSize: 13, color: t.textDim, textAlign: 'center', paddingTop: 40 }}>{tr('shell.widgets.noMatch')}</Text>}
+          </ScrollView>
+        </View>
+        <View style={{ paddingHorizontal: PAD + 4, paddingVertical: 10, borderTop: `1px solid ${t.separator}` }}>
+          <Text style={{ fontSize: 12, color: full ? '#E5484D' : t.textDim, textAlign: 'start' }}>{tr(full ? 'shell.widgets.noRoom' : 'shell.widgets.subtitle')}</Text>
         </View>
       </Surface>
     </Layer>

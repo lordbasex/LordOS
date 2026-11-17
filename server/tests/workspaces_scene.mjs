@@ -386,6 +386,16 @@ await flush();
   await flush();
   check('widgets: the catalog opens', shownT(sdk.t('shell.widgets.title')), 1);
   check('widgets: its kinds', ['video', 'timer', 'recent', 'updates', 'launcher', 'vpn', 'weather', 'clock', 'system', 'calendar', 'nowplaying', 'readaloud', 'network', 'disks', 'temps', 'reminders', 'clipboard', 'claude'].every((k) => shownT(sdk.t(`shell.widgets.${k}.name`)) >= 1), true);
+  // the search (name and description, any accent or case) and the categories
+  const kindOf = (type) => sdk.widgetKinds().find((k) => k.type === type);
+  check('widgets: search by name and description, accents and case ignored',
+    [wp.matches(kindOf('clock'), sdk.t('shell.widgets.clock.name').toUpperCase()), wp.matches(kindOf('clock'), 'zzqx'), wp.matches(kindOf('clock'), ''),
+      wp.fold('Calendário Ñandú'), wp.matches(kindOf('system'), sdk.t('shell.widgets.system.desc').split(' ')[0])], [true, false, true, 'calendario nandu', true]);
+  check('widgets: every kind has a category, none falls to "other"', sdk.widgetKinds().filter((k) => wp.categoryOf(k.type) === 'other').map((k) => k.type), []);
+  check('widgets: the panel sits centred in the work area', (() => {
+    const A = sdk.workAreaOf(R);
+    return [...styles].some(([id, st]) => attached(id) && st.position === 'absolute' && st.height > 300 && Math.abs(st.left + st.width / 2 - (A.x + A.w / 2)) <= 1 && Math.abs(st.top + st.height / 2 - (A.y + A.h / 2)) <= 1);
+  })(), true);
   wp.widgetPicker.set(null);
   const g = grid.gridOf(sdk.workAreaOf(R));
   const at = (w) => { const r = grid.rectOf(g, w.col, w.row, w.size); return [...styles].some(([id, st]) => st.left === r.x && st.top === r.y && st.width === r.w && st.height === r.h && attached(id)); };

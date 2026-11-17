@@ -199,6 +199,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Lord Workspaces: the widget picker is a centred panel with search and categories.** It used to open near the
+  top of the display and was cut off at the bottom when the catalog was taller than the screen. Now it sits in the
+  middle of the display's work area, as tall as fits (up to 720 px), with a search field (name and description in
+  the person's language, accents and case ignored), the categories on the side with their counts (Time, System,
+  Devices, Network, Productivity, Media) and the cards in a scrolling list grouped by category. The arrow keys move
+  between cards and Enter adds the highlighted one; Escape closes it. New strings in all 35 languages.
+
 - **Lord Workspaces: desk widgets read their data only when someone can see it.** One feed
   (`sdk/widgetfeed.js`) replaces a timer per widget: each piece of data (clock, CPU, memory, network, Claude Code,
   VPNs) is read once however many widgets show it, at the shortest interval among the widgets in view, and not at
