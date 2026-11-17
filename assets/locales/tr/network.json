@@ -151,5 +151,10 @@
   "wifi.saved": "kayıtlı",
   "wifi.scan": "Tara",
   "wifi.scanning": "Taranıyor…",
-  "wifi.wrongKey": "Parola yanlış."
+  "wifi.wrongKey": "Parola yanlış.",
+  "wifi.available": "Kullanılabilir Wi-Fi ağları",
+  "wifi.currentLabel": "{ssid} — Bağlı",
+  "wifi.connect": "Bağlan",
+  "wifi.notInRange": "Kapsama alanı dışında",
+  "wifi.knownFooter": "LordOS, kayıtlı bir ağ kapsama alanındayken ona kendiliğinden bağlanır. Unut, ağı ve parolasını bu bilgisayardan kaldırır."
 }

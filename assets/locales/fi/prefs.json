@@ -120,6 +120,7 @@
   "display.rotationHint": "Kierretyn näytön kuva kootaan suorittimella.",
   "display.scale": "Skaalaus",
   "display.scaleHint": "Teksti, kuvakkeet ja kuvat piirretään näytön omalla tarkkuudella, joten jokainen skaalaus pysyy terävänä. Murtolukuskaalausta tukevat Linux-sovellukset piirtävät myös sillä.",
+  "display.scaleSmallHint": "Alle 100 %:n työpöytä on {w} × {h}, suurempi kuin näyttö, joten teksti ja säätimet ovat pienempiä. Linux-sovellukset piirtyvät 100 %:ssa ja LordOS pienentää ne, joten ne näyttävät hieman pehmeämmiltä.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (suositeltu)",
   "display.x11": "X11-sovellukset",

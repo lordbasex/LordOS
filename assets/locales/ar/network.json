@@ -151,5 +151,10 @@
   "wifi.saved": "محفوظة",
   "wifi.scan": "بحث",
   "wifi.scanning": "جارٍ البحث…",
-  "wifi.wrongKey": "كلمة السر غير صحيحة."
+  "wifi.wrongKey": "كلمة السر غير صحيحة.",
+  "wifi.available": "شبكات Wi-Fi المتاحة",
+  "wifi.currentLabel": "{ssid} — متصلة",
+  "wifi.connect": "اتصال",
+  "wifi.notInRange": "خارج النطاق",
+  "wifi.knownFooter": "ينضم LordOS تلقائيًا إلى شبكة محفوظة عندما تكون في النطاق. «نسيان» يزيل الشبكة وكلمة مرورها من هذا الحاسوب."
 }

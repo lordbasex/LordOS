@@ -85,6 +85,8 @@
   "dock.resetTaskbar": "Resetează bara de activități la valorile implicite",
   "dock.right": "Dreapta",
   "dock.sidesHint": "Stânga și dreapta sunt laturi ale ecranului: nu se inversează într-o limbă de la dreapta la stânga.",
+  "dock.snap.label": "Fixează ferestrele la marginile ecranului",
+  "dock.snap.footer": "Trage o fereastră la marginea din stânga sau din dreapta ca să ocupe acea jumătate a ecranului, lângă un colț ca să ocupe un sfert, sau la marginea de sus ca să ocupe tot ecranul. Trasă de acolo își recapătă dimensiunea.",
   "dock.size": "Dimensiune",
   "dock.small": "Mic",
   "dock.taskbar": "Poziția barei de activități",

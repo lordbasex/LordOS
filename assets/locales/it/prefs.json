@@ -120,6 +120,7 @@
   "display.rotationHint": "Uno schermo ruotato viene composto dalla CPU.",
   "display.scale": "Scala",
   "display.scaleHint": "Testo, icone e immagini vengono disegnati alla risoluzione propria dello schermo, quindi ogni scala resta nitida. Anche le app Linux con il ridimensionamento frazionario vengono visualizzate a quella scala.",
+  "display.scaleSmallHint": "Sotto il 100 % la scrivania misura {w} × {h}, più dello schermo, quindi testo e controlli sono più piccoli. Le app Linux si disegnano al 100 % e LordOS le rimpicciolisce, quindi appaiono un po’ meno nitide.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (consigliata)",
   "display.x11": "App X11",

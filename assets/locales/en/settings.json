@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Reset taskbar to defaults",
   "dock.right": "Right",
   "dock.sidesHint": "Left and right are sides of the screen: they don't swap in a right-to-left language.",
+  "dock.snap.label": "Snap windows to the screen edges",
+  "dock.snap.footer": "Drag a window to the left or right edge to fill that half of the screen, near a corner to fill a quarter, or to the top edge to fill the whole screen. Dragging it away gives it its size back.",
   "dock.size": "Size",
   "dock.small": "Small",
   "dock.taskbar": "Taskbar position",

@@ -119,6 +119,7 @@
   "display.rotationHint": "Skrin yang diputar digubah oleh CPU.",
   "display.scale": "Skala",
   "display.scaleHint": "Teks, ikon dan imej dilukis pada resolusi paparan itu sendiri, jadi setiap skala kekal tajam. Apl Linux dengan penskalaan pecahan turut dipaparkan padanya.",
+  "display.scaleSmallHint": "Di bawah 100 % desktop bersaiz {w} × {h}, lebih besar daripada skrin, jadi teks dan kawalan lebih kecil. Apl Linux dilukis pada 100 % dan LordOS mengecilkannya, jadi ia kelihatan kurang tajam sedikit.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (disyorkan)",
   "display.x11": "Apl X11",

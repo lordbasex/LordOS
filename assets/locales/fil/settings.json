@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Ibalik ang taskbar sa default",
   "dock.right": "Kanan",
   "dock.sidesHint": "Ang kaliwa at kanan ay mga gilid ng screen: hindi sila nagpapalit sa wikang right-to-left.",
+  "dock.snap.label": "I-snap ang mga window sa mga gilid ng screen",
+  "dock.snap.footer": "I-drag ang isang window sa kaliwa o kanang gilid para punuin ang kalahating iyon ng screen, malapit sa isang sulok para punuin ang isang-kapat, o sa itaas na gilid para punuin ang buong screen. Kapag inilayo ito, babalik ito sa dati nitong laki.",
   "dock.size": "Laki",
   "dock.small": "Maliit",
   "dock.taskbar": "Posisyon ng taskbar",

@@ -1173,6 +1173,9 @@ static void frac_gone(struct wl_resource *r) {
     if (s) s->frac = NULL;
 }
 static int pointer_scale = 100;         /* the display under the pointer: where a new window opens */
+/* What a client is asked to draw at: a display below 100 % (75, 80: GitHub #158) asks for 100 % and LordOS draws the
+ * buffer smaller, since several toolkits don't handle a scale below 1 (docs/DISPLAYS.md). */
+static int client_pct(int pct) { return pct < 100 ? 100 : pct; }
 static void fsm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void fsm_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface) {
     Surf *s = wl_resource_get_user_data(surface);
@@ -1182,7 +1185,7 @@ static void fsm_get(struct wl_client *c, struct wl_resource *r, uint32_t id, str
     wl_resource_set_implementation(f, &frac_impl, s, frac_gone);
     if (!s) return;
     s->frac = f;
-    int sc = s->pref_scale ? s->pref_scale : pointer_scale;
+    int sc = client_pct(s->pref_scale ? s->pref_scale : pointer_scale);
     wp_fractional_scale_v1_send_preferred_scale(f, (uint32_t)(sc * 120 / 100));
 }
 static const struct wp_fractional_scale_manager_v1_interface frac_mgr_impl = { .destroy = fsm_destroy, .get_fractional_scale = fsm_get };
@@ -1267,6 +1270,7 @@ static void send_enter_leave(Surf *s, unsigned mask) {
 }
 
 static void set_pref_scale(Surf *s, int pct) {
+    pct = client_pct(pct);
     if (s->pref_scale == pct) return;
     s->pref_scale = pct;
     if (s->frac) wp_fractional_scale_v1_send_preferred_scale(s->frac, (uint32_t)(pct * 120 / 100));

@@ -75,6 +75,8 @@
   "dock.resetTaskbar": "將工作列重設為預設值",
   "dock.right": "右側",
   "dock.sidesHint": "左側和右側指的是螢幕的兩側：在由右至左的語言中不會對調。",
+  "dock.snap.label": "將視窗貼齊螢幕邊緣",
+  "dock.snap.footer": "將視窗拖到左邊緣或右邊緣可佔滿該半邊螢幕，拖到角落附近可佔四分之一，拖到上邊緣可佔滿整個螢幕。拖離後視窗會恢復原來的大小。",
   "dock.size": "大小",
   "dock.small": "小",
   "dock.taskbar": "工作列位置",

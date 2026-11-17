@@ -120,6 +120,7 @@
   "display.rotationHint": "Ein gedrehter Bildschirm wird von der CPU zusammengesetzt.",
   "display.scale": "Skalierung",
   "display.scaleHint": "Text, Symbole und Bilder werden in der eigenen Auflösung des Bildschirms gezeichnet, daher bleibt jede Skalierung scharf. Linux-Apps mit gebrochener Skalierung rendern ebenfalls darin.",
+  "display.scaleSmallHint": "Unter 100 % ist der Schreibtisch {w} × {h} groß, größer als der Bildschirm, daher sind Text und Bedienelemente kleiner. Linux-Apps zeichnen mit 100 % und LordOS verkleinert sie, daher wirken sie etwas weicher.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (empfohlen)",
   "display.x11": "X11-Apps",

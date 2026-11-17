@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Taskleiste auf Standard zurücksetzen",
   "dock.right": "Rechts",
   "dock.sidesHint": "Links und rechts sind Seiten des Bildschirms: Sie tauschen in einer Rechts-nach-links-Sprache nicht die Plätze.",
+  "dock.snap.label": "Fenster an den Bildschirmrändern einrasten",
+  "dock.snap.footer": "Ziehen Sie ein Fenster an den linken oder rechten Rand, damit es diese Bildschirmhälfte füllt, in die Nähe einer Ecke für ein Viertel oder an den oberen Rand für den ganzen Bildschirm. Wegziehen gibt ihm seine Größe zurück.",
   "dock.size": "Größe",
   "dock.small": "Klein",
   "dock.taskbar": "Position der Taskleiste",

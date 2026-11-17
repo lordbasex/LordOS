@@ -9,9 +9,10 @@ import {
   findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers,
   toggleShowDesktop, appSettingsItem, flowDesktopKeys, flowGrabs, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome,
   openOverview, closeOverview, toggleOverview, LevelHud, useStore, notifyHistory, menuBarEveryDisplay, hasBar, displayAt, keepWindowsInWorkAreas,
+  snapPreview,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Fragment } from 'react';
 import { makeTheme } from './tokens.js';
 import { minimizeStarts } from './minimize.js';
 import { MenuBars } from './components/MenuBar.jsx';
@@ -44,7 +45,20 @@ function workAreaFor(p, d, every) {
 const areaFn = (d) => { const s = settings.get(); return workAreaFor(dockPrefs(s), d, menuBarEveryDisplay(s)); };
 
 // chrome: borders (1 + 1) and title bar (40 + 1 separator) of Window.jsx's frame
-configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: 43 } });
+// snap (0.8.8.10, GitHub #182): a window dragged to a side of the screen takes that half, near a corner a quarter, to the
+// top it fills the screen (sdk/snap.js); Settings → Desktop & Dock → Windows turns it off (settings.windowSnap)
+configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: 43 }, snap: true });
+
+// Where a dragged window would snap: a translucent rounded rectangle with the accent's edge, under the window.
+function SnapPreview({ t }) {
+  const p = useStore(snapPreview);
+  if (!p) return null;
+  const r = p.rect;
+  return (
+    <View style={{ position: 'absolute', left: r.x + 8, top: r.y + 8, width: r.w - 16, height: r.h - 16, borderRadius: 12, pointerEvents: 'none',
+      backgroundColor: t.mode === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.35)', border: `2px solid ${t.accent}` }} />
+  );
+}
 
 // Pinned by default (the user changes the Dock by dragging and with «Keep in Dock»: settings.dockPinned).
 const DOCK_DEFAULT = [...DOCK_ORDER, ...apps.filter((a) => a.dock && !DOCK_ORDER.includes(a.id)).map((a) => a.id)];
@@ -112,6 +126,8 @@ function App() {
   const [s] = useSettings();
   const t = makeTheme(s);
   const { windows, mounted, focused } = useWindows();
+  const preview = useStore(snapPreview);
+  const top = mounted[mounted.length - 1];
   const minimizing = useMinimizing(windows);
   const minFx = (id) => { const m = minimizing.find((x) => x.win.id === id); return m ? { p: m.p, x: main.x + main.w / 2, y: main.y + main.h - 36 } : undefined; };
   const [launchpad, setLaunchpad] = useState(false);
@@ -174,7 +190,13 @@ function App() {
         {all.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
         <DesktopWidgets layer="below" />
         <OverviewBackdrop />
-        {mounted.map((w) => <Window key={w.id} win={w} app={getApp(w.id)} t={t} focused={w.id === focused} fx={minFx(w.id)} />)}
+        {/* keyed on the window: raising one reorders this list, and it must move, not mount again */}
+        {mounted.map((w) => (
+          <Fragment key={w.id}>
+            {preview && w === top ? <SnapPreview t={t} /> : null}
+            <Window win={w} app={getApp(w.id)} t={t} focused={w.id === focused} fx={minFx(w.id)} />
+          </Fragment>
+        ))}
         {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} />)}
         <DesktopWidgets layer="above" />
         {/* Everything above the windows goes in its layer (sdk/layers.js, docs/LAYERS.md): the

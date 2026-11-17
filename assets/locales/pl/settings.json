@@ -85,6 +85,8 @@
   "dock.resetTaskbar": "Przywróć domyślny pasek zadań",
   "dock.right": "Po prawej",
   "dock.sidesHint": "Lewa i prawa to strony ekranu: nie zamieniają się w języku pisanym od prawej do lewej.",
+  "dock.snap.label": "Przyciągaj okna do krawędzi ekranu",
+  "dock.snap.footer": "Przeciągnij okno do lewej lub prawej krawędzi, aby zajęło tę połowę ekranu, blisko rogu, aby zajęło ćwiartkę, albo do górnej krawędzi, aby zajęło cały ekran. Odciągnięte wraca do swojego rozmiaru.",
   "dock.size": "Rozmiar",
   "dock.small": "Mały",
   "dock.taskbar": "Położenie paska zadań",

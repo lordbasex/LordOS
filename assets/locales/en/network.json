@@ -151,5 +151,10 @@
   "wifi.saved": "saved",
   "wifi.scan": "Scan",
   "wifi.scanning": "Scanning…",
-  "wifi.wrongKey": "The password is wrong."
+  "wifi.wrongKey": "The password is wrong.",
+  "wifi.available": "Available Wi-Fi networks",
+  "wifi.currentLabel": "{ssid} — Connected",
+  "wifi.connect": "Connect",
+  "wifi.notInRange": "Not in range",
+  "wifi.knownFooter": "LordOS joins a saved network by itself when it is in range. Forget removes the network and its password from this computer."
 }

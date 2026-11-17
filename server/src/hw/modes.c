@@ -24,6 +24,31 @@ int mode_preferred(const struct drm_mode_modeinfo *modes, int n) {
     return best;
 }
 
+/* GitHub #173: a 3440 × 1440 ultrawide whose EDID marks 3840 × 2160 as preferred (some do on some inputs) was opened
+ * at 16:9 and the monitor stretched it, on the login screen at every boot. When the panel's physical size (EDID mm)
+ * says another shape, the largest progressive mode of that shape wins. */
+#define ASPECT_OFF 0.08                     /* the preferred mode is fine within 8 % of the panel's shape */
+#define ASPECT_ON 0.03                      /* a mode that matches the shape: within 3 % */
+static double aspect_off(const struct drm_mode_modeinfo *m, double phys) {
+    double a = (double)m->hdisplay / m->vdisplay / phys;
+    return a > 1 ? a - 1 : 1 - a;
+}
+
+int mode_native(const struct drm_mode_modeinfo *modes, int n, int mm_w, int mm_h) {
+    int p = mode_preferred(modes, n);
+    /* no size, or a bogus one (projectors say 0 or 1 cm; a few EDIDs store only 16:9 as 16 × 9 cm) */
+    if (p < 0 || mm_w < 100 || mm_h < 100) return p;
+    double phys = (double)mm_w / mm_h;
+    if (!modes[p].hdisplay || !modes[p].vdisplay || aspect_off(&modes[p], phys) <= ASPECT_OFF) return p;
+    int best = -1;
+    for (int i = 0; i < n; i++) {
+        if (!modes[i].hdisplay || !modes[i].vdisplay || interlaced(&modes[i]) || aspect_off(&modes[i], phys) > ASPECT_ON) continue;
+        long a = (long)modes[i].hdisplay * modes[i].vdisplay, b = best < 0 ? 0 : (long)modes[best].hdisplay * modes[best].vdisplay;
+        if (best < 0 || a > b || (a == b && mode_refresh_mhz(&modes[i]) > mode_refresh_mhz(&modes[best]))) best = i;
+    }
+    return best >= 0 ? best : p;
+}
+
 int mode_pick(const struct drm_mode_modeinfo *modes, int n, int w, int h, int refresh_mhz) {
     if (w <= 0 || h <= 0) {
         int p = mode_preferred(modes, n);

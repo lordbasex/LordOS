@@ -981,6 +981,38 @@ What doesn't, and why:
   can read), which also needs the maintainer's approval.
 - Drag and drop with the host: not tested (XDND inside the guest's session: see "Drag and drop").
 
+Checked by the reporter on a VMware host with 0.8.8.8 (GitHub #76, 2026-11): host → guest works, guest → host doesn't
+(from LordOS's own apps, as expected above). `setsid vmware-user &` "exits at once": that is normal. `setsid` run from
+a shell's background job forks and returns, and the wrapper replaces itself with `vmtoolsd -n vmusr` (host → guest
+working means an agent is already running). `pgrep -a vmtoolsd` shows whether `vmtoolsd -n vmusr` is there; not
+checked on a VMware host.
+
+#### Proposed for guest → host (not built: needs the maintainer's approval, GitHub #76)
+
+Two pieces, each a new exception in `AGENTS.md`; neither can be done with what is approved today.
+
+1. **Starting the agent** (a new launcher exception in lord-server). Once per session, only when the machine is a
+   VMware guest (DMI `sys_vendor` "VMware, Inc." read by lord-server itself, as `sysreport.c` does, never a value from
+   JS) and `/usr/bin/vmware-user-suid-wrapper` exists, is root-owned and not writable by others: run that fixed path,
+   no arguments, with the session's `DISPLAY` and `XAUTHORITY` (so it reaches Xwayland, which then starts as usual),
+   outside the apps' sandbox. It is setuid root (it opens `/dev/uinput` for drag and drop, then drops to the user and
+   execs `vmtoolsd -n vmusr`), so `no_new_privs` can't be set on it; that is why it needs its own review. Never from
+   JS, never another path, no XDG autostart in general.
+2. **An authenticated requestor for LordOS's clipboard** (a widening of the approved #125 rule in `xwm.c`). Today
+   LordOS owns CLIPBOARD in X only while an X window has the keyboard, and answers only the focused X client's process.
+   The agent asks for the guest's clipboard when the pointer leaves the VMware window, with a LordOS window focused.
+   The change: in a VMware guest, LordOS also holds CLIPBOARD (never PRIMARY) in X while the agent is connected, and
+   answers a paste request when X-Resource `XResQueryClientIds` gives a pid whose `/proc/<pid>/exe` is
+   `/usr/bin/vmtoolsd` (root-owned, not writable by others), whose command line is exactly `vmtoolsd -n vmusr`, of the
+   session's uid and not sandboxed (`dndg_pid_sandboxed`), checked again when the answer is sent; secrets
+   (`lord_has`: Passwords and password fields) are never offered, and other requestors are still refused. What remains
+   is X's own weakness: the answer is written into a property of the agent's window, which any X client of the session
+   could read at that moment. Restricted Linux apps and isolated apps have no `DISPLAY`, so only unrestricted X
+   programs the person runs could.
+
+Without these, the workaround stays: copy from an X11 app (for example `xterm`, or a GTK app started with
+`GDK_BACKEND=x11`), which answers the agent itself.
+
 Not tested on VMware yet: the guest side was checked against `open-vm-tools-desktop`
 2:12.5.0-2+deb13u1 (Debian 13) by reading what its binaries call, not on a VMware host.
 

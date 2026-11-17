@@ -151,5 +151,10 @@
   "wifi.saved": "enregistré",
   "wifi.scan": "Rechercher",
   "wifi.scanning": "Recherche…",
-  "wifi.wrongKey": "Le mot de passe est incorrect."
+  "wifi.wrongKey": "Le mot de passe est incorrect.",
+  "wifi.available": "Réseaux Wi-Fi disponibles",
+  "wifi.currentLabel": "{ssid} — Connecté",
+  "wifi.connect": "Se connecter",
+  "wifi.notInRange": "Hors de portée",
+  "wifi.knownFooter": "LordOS rejoint de lui-même un réseau enregistré lorsqu’il est à portée. Oublier supprime le réseau et son mot de passe de cet ordinateur."
 }

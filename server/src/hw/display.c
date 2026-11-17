@@ -171,8 +171,8 @@ static void load(void) {
         s->scale = out_scale_valid(sc) ? sc : 0;            /* 0 = the recommended one */
         if (sc && !s->scale) {                              /* out of range or off the 25 % steps: the nearest one */
             s->scale = out_scale_round(sc / 100.0);
-            fprintf(stderr, "displays: %s: scale %d %% is not one of %d–%d %% in %d %% steps, using %d %%\n", s->id, sc,
-                    OUT_SCALE_MIN, OUT_SCALE_MAX, OUT_SCALE_STEP, s->scale);
+            fprintf(stderr, "displays: %s: scale %d %% is not %d, %d or %d–%d %% in %d %% steps, using %d %%\n", s->id, sc,
+                    OUT_SCALE_SMALL_A, OUT_SCALE_SMALL_B, OUT_SCALE_MIN, OUT_SCALE_MAX, OUT_SCALE_STEP, s->scale);
         }
         const JVal *px = json_get(v, "x"), *py = json_get(v, "y");
         if (px && py && px->type == J_NUM && py->type == J_NUM) {
@@ -290,7 +290,7 @@ int display_plan(const KmsOutput *o, int n, DisplayPlan *p) {
         snprintf(d->name, sizeof d->name, "%s", names[idx[j]]);
         snprintf(d->connector, sizeof d->connector, "%s-%u", kms_connector_type_name(k->type), k->type_id);
         int mi = f && f->w ? mode_pick(k->modes, k->nmodes, f->w, f->h, f->refresh) : -1;
-        if (mi < 0) mi = mode_preferred(k->modes, k->nmodes);
+        if (mi < 0) mi = mode_native(k->modes, k->nmodes, (int)k->mm_w, (int)k->mm_h);   /* the panel's shape (#173) */
         if (mi < 0) mi = 0;
         d->mode = k->modes[mi];
         d->rot = f ? f->rot & 3 : 0;
@@ -541,7 +541,7 @@ static void out_json(HBuf *b, const KmsOutput *all, int n, int i) {
               o->connected ? "true" : "false", pi == D.cur.main ? "true" : "false", pi == D.cur.main ? "true" : "false", d ? "true" : "false",
               !d && o->connected && lid_hides(all, n, i) ? "true" : "false", o->mm_w, o->mm_h, has_edid ? edid_diagonal_tenths(&e) : 0);
     hb_str(b, has_edid ? e.vendor : "");
-    int pref = mode_preferred(o->modes, o->nmodes);
+    int pref = mode_native(o->modes, o->nmodes, (int)o->mm_w, (int)o->mm_h);     /* "native" in Settings (#173) */
     hb_printf(b, ",\"preferred\":{\"w\":%d,\"h\":%d}", pref >= 0 ? o->modes[pref].hdisplay : 0, pref >= 0 ? o->modes[pref].vdisplay : 0);
     if (d) {
         /* rotation: the one chosen in Settings; autoRotation: what the accelerometer adds to it */
@@ -662,7 +662,7 @@ int display_request(uint32_t conn, int w, int h, int refresh_mhz, int rotation, 
     int n = 0, i = -1, ret = -1;
     char id[ID_MAX];
     if (conn_identity(conn, id, sizeof id, outs, &n, &i)) return -1;
-    int m = w > 0 ? mode_pick(outs[i].modes, outs[i].nmodes, w, h, refresh_mhz) : mode_preferred(outs[i].modes, outs[i].nmodes);
+    int m = w > 0 ? mode_pick(outs[i].modes, outs[i].nmodes, w, h, refresh_mhz) : mode_native(outs[i].modes, outs[i].nmodes, (int)outs[i].mm_w, (int)outs[i].mm_h);
     if (m >= 0) {
         D.undo = D.live;
         Cfg *f = cfg_make(&D.live, id);

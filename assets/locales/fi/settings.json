@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Palauta tehtäväpalkin oletukset",
   "dock.right": "Oikealla",
   "dock.sidesHint": "Vasen ja oikea ovat näytön sivuja: ne eivät vaihdu oikealta vasemmalle kirjoitettavassa kielessä.",
+  "dock.snap.label": "Kiinnitä ikkunat näytön reunoihin",
+  "dock.snap.footer": "Vedä ikkuna vasempaan tai oikeaan reunaan täyttämään se puolisko näytöstä, lähelle kulmaa täyttämään neljännes tai yläreunaan täyttämään koko näyttö. Kun vedät sen pois, se palaa omaan kokoonsa.",
   "dock.size": "Koko",
   "dock.small": "Pieni",
   "dock.taskbar": "Tehtäväpalkin sijainti",

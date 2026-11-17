@@ -151,5 +151,10 @@
   "wifi.saved": "tersimpan",
   "wifi.scan": "Pindai",
   "wifi.scanning": "Memindai…",
-  "wifi.wrongKey": "Kata sandinya salah."
+  "wifi.wrongKey": "Kata sandinya salah.",
+  "wifi.available": "Jaringan Wi-Fi yang tersedia",
+  "wifi.currentLabel": "{ssid} — Terhubung",
+  "wifi.connect": "Hubungkan",
+  "wifi.notInRange": "Di luar jangkauan",
+  "wifi.knownFooter": "LordOS bergabung sendiri ke jaringan tersimpan saat berada dalam jangkauan. Lupakan menghapus jaringan dan kata sandinya dari komputer ini."
 }

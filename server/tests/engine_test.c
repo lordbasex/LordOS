@@ -3198,6 +3198,75 @@ static void test_drag_corners(void) {
     dout_free(&o);
 }
 
+/* ---- A display below 100 % (GitHub #158) ----
+ * At 75 % or 80 % a display shows more logical pixels than it has (1024 × 640 logical on 768 × 480 or 819 × 512
+ * physical), so every logical box is painted smaller than itself (k < 1), as a mirrored display smaller than the
+ * main one already was. The whole frame must be covered (no stripe left at the right or bottom edge), and every
+ * partial repaint must match a full repaint: windows with shadows and rounded corners moving, text changing, a
+ * blurred bar, a box shown and hidden. */
+static void test_scale_below_100(void) {
+    static const int pcts[2] = { 75, 80 };
+    for (int pi = 0; pi < 2; pi++) {
+        int pct = pcts[pi];
+        DOut o;
+        int pw = (DW * pct + 50) / 100, ph = (DH * pct + 50) / 100;
+        if (!dout_init(&o, out_view(0, 0, pw, ph, pct))) { CHECK(0, "below 100 %%: out of memory"); dout_free(&o); return; }
+        CHECK(o.v.w == DW && o.v.h == DH && o.v.k < 1, "below 100 %%: %d %% of %dx%d is %dx%d logical (k %.2f)", pct, pw, ph, o.v.w, o.v.h, o.v.k);
+        DOut *const os[1] = { &o };
+        ui_reset();
+        Node *root = view(NULL);
+        ui.root = root;
+        sn(root, "backgroundColor", 0xff2b3a4f);
+        Node *bar = box_in(root, 0, 0, DW, 28, 0xc0f0f0f0);
+        sn(bar, "backdropBlur", 12);
+        Node *clock = dtext(bar, "12:00", 13, 600, 0xff101010);
+        Node *back = box_in(root, 90, 80, 420, 300, 0xffd8e4f0);
+        sn(back, "borderRadius", 10);
+        dshadow(back, 0x60000000, 6, 18);
+        dtext(back, "Files, 12 items", 13, 0, 0xff202020);
+        Node *win = box_in(root, 300, 180, 460, 320, 0xff2c2c2e);
+        ss(win, "overflow", "hidden");
+        sn(win, "borderRadius", 12);
+        sn(win, "borderWidth", 1);
+        sn(win, "borderColor", 0x30ffffff);
+        dshadow(win, 0x73000000, 8, 24);
+        Node *title = dtext(dview(win, 0, 28, 0xff3a3a3c, 0), "lord@lordos: ~", 13, 0, 0xffe0e0e0);
+        Node *badge = box_in(root, 900, 560, 80, 40, 0xffff9500);
+        sn(badge, "borderRadius", 20);
+        canvas_set_clip(&o.c, (Rect){ 0, 0, o.c.w, o.c.h });
+        canvas_clear(&o.c, 0x000000);
+        damage_add((Box){ 0, 0, DW, DH });
+        ui.dirty = 1;
+        drag_paint_n(root, os, 1);
+        /* the first frame covers the whole physical frame: the root's color reaches the last column and row */
+        int edge = 0;
+        for (int x = 0; x < pw; x++) if (o.px[(size_t)(ph - 1) * pw + x] == 0) edge++;
+        for (int y = 0; y < ph; y++) if (o.px[(size_t)y * pw + pw - 1] == 0) edge++;
+        CHECK(!edge, "below 100 %%: at %d %%, %d pixels of the last row and column were never painted", pct, edge);
+        int worst_all = 0, bad = 0;
+        for (int f = 1; f <= 40; f++) {
+            float x = 300 + (float)(f * 13 % 380) - 120, y = 180 + (float)(f * 7 % 160) - 60;
+            win->s.pos[EDGE_L] = (Dim){ x, UNIT_PX };
+            win->s.pos[EDGE_T] = (Dim){ y, UNIT_PX };
+            node_moved(win);
+            if (f % 5 == 0) node_set_text(clock->first, f % 10 ? "12:01" : "12:00");
+            if (f % 7 == 0) node_set_text(title->first, f % 14 ? "lord@lordos: ~/src" : "lord@lordos: ~");
+            if (f % 9 == 0) ss(badge, "display", f % 18 ? "none" : "flex");
+            if (f % 11 == 0) { sn(back, "left", 90 + (float)(f % 3) * 37); sn(back, "width", 420 - (float)(f % 4) * 21); }
+            ui.dirty = 1;
+            drag_paint_n(root, os, 1);
+            int worst = 0;
+            drag_full_diff(root, &o, &worst);
+            if (worst > worst_all) worst_all = worst;
+            if (worst > 2) bad++;
+        }
+        CHECK(!bad, "below 100 %%: at %d %%, %d of 40 frames differ from a full repaint (by up to %d levels)", pct, bad, worst_all);
+        printf("below 100 %%: %d %% (%dx%d physical, %dx%d logical): 40 partial repaints, most %d levels off a full repaint\n",
+               pct, pw, ph, o.v.w, o.v.h, worst_all);
+        dout_free(&o);
+    }
+}
+
 /* ---- A setStyle that only turns or scales a node (node_restyled's transform-only path) ----
  * Two copies of one tree: A takes rotate/scaleX/scaleY/transformOriginX through node_restyled (which
  * keeps the node's own layout and every measure when that gives the same results), B through what
@@ -3698,6 +3767,7 @@ int main(int argc, char **argv) {
     CHECK(!gc_all.bad, "scissor over the GPU drag runs: %d frames differ", gc_all.bad);
     printf("scissor over the GPU drag runs: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_drag_corners();
+    test_scale_below_100();
     test_ellipsis();
     test_carets();
     test_scaled_caret();

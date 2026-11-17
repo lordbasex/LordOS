@@ -355,6 +355,8 @@ export function DisplaysSettings() {
             <PopUp width={210} value={scale} onChange={setScale} options={scales} />
           </SettingRow>
         ) : <ScaleTiles choices={choices} value={scale} rec={rec} onPick={setScale} t={t} tr={tr} />}
+        {/* below 100 % (75, 80: GitHub #158) the desktop is larger than the display: say what that costs */}
+        {scale < 100 ? <Note style={{ paddingBottom: spacing.s }}>{tr('prefs.display.scaleSmallHint', { w: cur.w, h: cur.h })}</Note> : null}
         {x11 ? (
           <SettingRow label={tr('prefs.display.x11')} hint={tr('prefs.display.x11Hint')}>
             <PopUp width={210} value={x11SelfScale(s) ? 'self' : 'lordos'} onChange={setX11Scaling}

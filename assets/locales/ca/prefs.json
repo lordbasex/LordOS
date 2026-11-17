@@ -120,6 +120,7 @@
   "display.rotationHint": "La CPU compon una pantalla girada.",
   "display.scale": "Escala",
   "display.scaleHint": "El text, les icones i les imatges es dibuixen a la resolució pròpia de la pantalla, així que totes les escales es veuen nítides. Les aplicacions de Linux amb escalat fraccionari també s’hi renderitzen.",
+  "display.scaleSmallHint": "Per sota del 100 % l’escriptori fa {w} × {h}, més que la pantalla, així que el text i els controls són més petits. Les apps de Linux es dibuixen al 100 % i LordOS les redueix, així que es veuen una mica menys nítides.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (recomanada)",
   "display.x11": "Aplicacions X11",

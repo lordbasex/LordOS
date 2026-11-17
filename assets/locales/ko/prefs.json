@@ -119,6 +119,7 @@
   "display.rotationHint": "회전된 화면은 CPU로 합성됩니다.",
   "display.scale": "배율",
   "display.scaleHint": "텍스트, 아이콘 및 이미지가 디스플레이 자체 해상도로 그려지므로 어떤 배율에서도 선명합니다. 분수 배율을 지원하는 Linux 앱도 그 배율로 렌더링합니다.",
+  "display.scaleSmallHint": "100 % 미만에서는 데스크탑이 {w} × {h}로 화면보다 커서 텍스트와 컨트롤이 작아집니다. Linux 앱은 100 %로 그려지고 LordOS가 줄이므로 약간 덜 선명하게 보입니다.",
   "display.scaleN": "{n}%",
   "display.scaleRecommended": "{n}%(권장)",
   "display.x11": "X11 앱",

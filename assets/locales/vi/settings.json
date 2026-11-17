@@ -75,6 +75,8 @@
   "dock.resetTaskbar": "Đặt lại thanh tác vụ về mặc định",
   "dock.right": "Phải",
   "dock.sidesHint": "Trái và phải là các cạnh của màn hình: chúng không đổi chỗ trong ngôn ngữ viết từ phải sang trái.",
+  "dock.snap.label": "Gắn cửa sổ vào các cạnh màn hình",
+  "dock.snap.footer": "Kéo một cửa sổ đến cạnh trái hoặc phải để chiếm nửa màn hình đó, gần một góc để chiếm một phần tư, hoặc đến cạnh trên để chiếm toàn màn hình. Kéo nó ra thì nó trở về kích thước cũ.",
   "dock.size": "Kích thước",
   "dock.small": "Nhỏ",
   "dock.taskbar": "Vị trí thanh tác vụ",

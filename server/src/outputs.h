@@ -6,7 +6,8 @@
  *   - logical px: the unit of the UI engine (styles, layout, pointer, windows, Wayland surface
  *     coordinates). The desktop is one logical space; every display shows a rectangle of it.
  *   - physical px: the display's own pixels (its mode, after rotation).
- *   - scale: physical px per logical px, in percent (100 to 300 in 25 % steps).
+ *   - scale: physical px per logical px, in percent (100 to 300 in 25 % steps, and 75 or 80 below 100: GitHub #158,
+ *     more logical pixels than the display has, for small screens).
  */
 #ifndef LORD_OUTPUTS_H
 #define LORD_OUTPUTS_H
@@ -20,6 +21,12 @@
  * display without a saved scale keeps the one it had (a 15" 4K panel would get 250 %). */
 #define OUT_SCALE_REC_MAX 200
 #define OUT_SCALE_STEP 25
+/* Below 100 % (0.8.8.10, GitHub #158): only these two, chosen in Settings → Displays and never recommended or reached by
+ * rounding (out_scale_round stays at 100 and above). 75 % of 1280 × 800 is a 1707 × 1067 desktop. Wayland clients
+ * are asked for 100 % (wl.c set_pref_scale) and X for 100 % (xwscale.c), and drawn smaller by LordOS; the pointer
+ * stays at its own size (cursor.c). */
+#define OUT_SCALE_SMALL_A 75
+#define OUT_SCALE_SMALL_B 80
 
 /* Rectangle of the global logical space. */
 typedef struct { int x, y, w, h; } ORect;
@@ -35,7 +42,7 @@ typedef struct {
 } OutView;
 
 /* ---- scale ---- */
-int  out_scale_valid(int pct);                          /* 100, 125, 150 … 300 */
+int  out_scale_valid(int pct);                          /* 75, 80, 100, 125, 150 … 300 */
 int  out_scale_round(double factor);                    /* 1.37 → 125: nearest valid step, clamped */
 /* Recommended scale from the physical density (EDID size in mm), at most OUT_SCALE_REC_MAX. 100
  * when the size is unknown. */

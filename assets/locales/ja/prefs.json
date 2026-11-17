@@ -119,6 +119,7 @@
   "display.rotationHint": "回転した画面は CPU で合成されます。",
   "display.scale": "拡大率",
   "display.scaleHint": "文字、アイコン、画像はディスプレイ本来の解像度で描画されるので、どの拡大率でも鮮明です。小数スケーリングに対応した Linux アプリもその解像度で描画します。",
+  "display.scaleSmallHint": "100 % 未満ではデスクトップが {w} × {h} になり、ディスプレイより大きいため、文字やコントロールが小さくなります。Linux アプリは 100 % で描画され LordOS が縮小するため、少しやわらかく見えます。",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} %（推奨）",
   "display.x11": "X11 アプリ",

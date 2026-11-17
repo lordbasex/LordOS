@@ -75,6 +75,8 @@
   "dock.resetTaskbar": "Set semula bar tugas kepada lalai",
   "dock.right": "Kanan",
   "dock.sidesHint": "Kiri dan kanan ialah sisi skrin: ia tidak bertukar dalam bahasa kanan ke kiri.",
+  "dock.snap.label": "Lekapkan tetingkap pada tepi skrin",
+  "dock.snap.footer": "Seret tetingkap ke tepi kiri atau kanan untuk memenuhi separuh skrin itu, berhampiran sudut untuk memenuhi suku, atau ke tepi atas untuk memenuhi seluruh skrin. Menyeretnya keluar mengembalikan saiznya.",
   "dock.size": "Saiz",
   "dock.small": "Kecil",
   "dock.taskbar": "Kedudukan bar tugas",

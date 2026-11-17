@@ -120,6 +120,7 @@
   "display.rotationHint": "Een gedraaid scherm wordt door de CPU samengesteld.",
   "display.scale": "Schaal",
   "display.scaleHint": "Tekst, pictogrammen en afbeeldingen worden op de eigen resolutie van het beeldscherm getekend, dus elke schaal blijft scherp. Linux-apps met fractionele schaling renderen er ook op.",
+  "display.scaleSmallHint": "Onder 100 % is het bureaublad {w} × {h}, groter dan het scherm, dus tekst en bedieningselementen zijn kleiner. Linux-apps tekenen op 100 % en LordOS verkleint ze, dus ze zien er iets minder scherp uit.",
   "display.scaleN": "{n} %",
   "display.scaleRecommended": "{n} % (aanbevolen)",
   "display.x11": "X11-apps",

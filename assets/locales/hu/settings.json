@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "A tálca visszaállítása alapértékre",
   "dock.right": "Jobb oldalon",
   "dock.sidesHint": "A bal és a jobb a képernyő oldalait jelenti: jobbról balra író nyelvben sem cserélődnek fel.",
+  "dock.snap.label": "Ablakok illesztése a képernyő széleihez",
+  "dock.snap.footer": "Húzzon egy ablakot a bal vagy jobb szélre, hogy kitöltse a képernyő azon felét, egy sarok közelébe egy negyedért, vagy a felső szélre a teljes képernyőért. Elhúzva visszakapja a méretét.",
   "dock.size": "Méret",
   "dock.small": "Kicsi",
   "dock.taskbar": "Tálca helyzete",

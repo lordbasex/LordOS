@@ -151,5 +151,10 @@
   "wifi.saved": "सहेजा गया",
   "wifi.scan": "स्कैन करें",
   "wifi.scanning": "स्कैन हो रहा है…",
-  "wifi.wrongKey": "पासवर्ड गलत है।"
+  "wifi.wrongKey": "पासवर्ड गलत है।",
+  "wifi.available": "उपलब्ध Wi-Fi नेटवर्क",
+  "wifi.currentLabel": "{ssid} — कनेक्टेड",
+  "wifi.connect": "कनेक्ट करें",
+  "wifi.notInRange": "रेंज से बाहर",
+  "wifi.knownFooter": "कोई सहेजा गया नेटवर्क रेंज में होने पर LordOS उससे अपने-आप जुड़ जाता है। भूल जाएँ उस नेटवर्क और उसके पासवर्ड को इस कंप्यूटर से हटा देता है।"
 }

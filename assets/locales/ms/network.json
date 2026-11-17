@@ -151,5 +151,10 @@
   "wifi.saved": "disimpan",
   "wifi.scan": "Imbas",
   "wifi.scanning": "Mengimbas…",
-  "wifi.wrongKey": "Kata laluan salah."
+  "wifi.wrongKey": "Kata laluan salah.",
+  "wifi.available": "Rangkaian Wi-Fi yang tersedia",
+  "wifi.currentLabel": "{ssid} — Disambungkan",
+  "wifi.connect": "Sambung",
+  "wifi.notInRange": "Di luar liputan",
+  "wifi.knownFooter": "LordOS menyertai rangkaian yang disimpan dengan sendiri apabila ia dalam liputan. Lupakan membuang rangkaian dan kata laluannya daripada komputer ini."
 }

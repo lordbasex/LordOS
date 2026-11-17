@@ -843,13 +843,15 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
     call for the connected SSID (today only an admin scan reports it).
 
 - [ ] **Later, from GitHub suggestions** (maintainer's decisions 2026-11-15, "más adelante"):
-  - Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)): 75 % and 80 % first, never 50 %;
-    the UI engine, pointer, captures, Wayland `int_scale`/fractional scale below 1 and Xwayland's DPI.
+  - [x] Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)), in development for 0.8.8.10:
+    75 % and 80 % only, never 50 % (docs/DISPLAYS.md, "Below 100 %"); Wayland and X11 clients stay at 100 % and are drawn
+    smaller. Still to check with a screenshot on the VM and on a real 1280 × 800 laptop.
   - Lord Flow personalisation ([#151](https://github.com/lordbasex/LordOS/issues/151)): the menu bar at the bottom,
     window-button size, hiding the tiling submenu.
   - Copy and paste with a VMware host ([#76](https://github.com/lordbasex/LordOS/issues/76)): start Debian's
     `vmware-user` only inside VMware (a new AGENTS.md exception), then LordOS → host through an authenticated X
-    requestor; never tested on a real VMware host yet.
+    requestor (`vmtoolsd -n vmusr` by X-Resource pid and `/proc/<pid>/exe`); the design is in WAYLAND.md, "Proposed for
+    guest → host", waiting for approval. Host → guest confirmed by the reporter on 0.8.8.8.
   - Mounting non-LordOS partitions automatically at startup ([#122](https://github.com/lordbasex/LordOS/issues/122),
     second step after mounting by hand).
 

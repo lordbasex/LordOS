@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Rétablir la barre des tâches par défaut",
   "dock.right": "Droite",
   "dock.sidesHint": "Gauche et droite désignent les côtés de l’écran : ils ne s’inversent pas dans une langue écrite de droite à gauche.",
+  "dock.snap.label": "Ancrer les fenêtres aux bords de l’écran",
+  "dock.snap.footer": "Faites glisser une fenêtre vers le bord gauche ou droit pour qu’elle occupe cette moitié de l’écran, près d’un coin pour un quart, ou vers le bord supérieur pour tout l’écran. En l’éloignant, elle retrouve sa taille.",
   "dock.size": "Taille",
   "dock.small": "Petit",
   "dock.taskbar": "Position de la barre des tâches",

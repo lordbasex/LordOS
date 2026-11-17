@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Zet taakbalk terug naar standaard",
   "dock.right": "Rechts",
   "dock.sidesHint": "Links en rechts zijn kanten van het scherm: ze worden niet omgewisseld in een taal die van rechts naar links wordt geschreven.",
+  "dock.snap.label": "Vensters aan de schermranden vastklikken",
+  "dock.snap.footer": "Sleep een venster naar de linker- of rechterrand om die helft van het scherm te vullen, bij een hoek om een kwart te vullen, of naar de bovenrand om het hele scherm te vullen. Wegslepen geeft het zijn grootte terug.",
   "dock.size": "Grootte",
   "dock.small": "Klein",
   "dock.taskbar": "Positie van de taakbalk",

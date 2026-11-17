@@ -335,8 +335,13 @@ function Greeter() {
       inputBg: 'rgba(255,255,255,0.16)', separator: 'rgba(255,255,255,0.22)',
       panelBg: 'rgba(30,22,40,0.94)', control: 'rgba(255,255,255,0.18)', sidebarBg: 'rgba(255,255,255,0.09)' }}>
       <View style={{ width: screen.width, height: screen.height, direction: 'ltr' }}>
-        <Image src={image || wallpaperSrc(findWallpaper(lordosWallpapers, still || GREETER_WALLPAPER), screen.width, screen.height) || 'assets/background.jpg'}
-          style={{ position: 'absolute', left: 0, top: 0, width: screen.width, height: screen.height, objectFit: 'cover' }} />
+        {/* one picture per display, each covering its own display at its own shape and pixels (GitHub #173): one picture over
+            the whole desktop showed a slice of it on each display of a laptop and an ultrawide side by side */}
+        {(screen.displays && screen.displays.length ? screen.displays : [{ id: 0, x: 0, y: 0, w: screen.width, h: screen.height }]).map((d) => (
+          <Image key={`${d.id}:${d.x}:${d.y}`}
+            src={image || wallpaperSrc(findWallpaper(lordosWallpapers, still || GREETER_WALLPAPER), d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100) || 'assets/background.jpg'}
+            style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
+        ))}
         {still || image ? null : <LoginVideo box={M} stop={entered} />}
         <View style={{ position: 'absolute', left: M.left, top: M.top, width: W, height: H }}>
 

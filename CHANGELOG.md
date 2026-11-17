@@ -21,6 +21,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   you need and mark each one up. Before, the panel closed at the capture and only closing the editor and opening
   Screenshots again gave another one. (`apps/screenshots/editor.jsx` `onNewCapture`, the `screenshots.newCapture` text
   in every language.) Checked in `screenshots_newcapture_scene.mjs`.
+- **Display scaling at 75 % and 80 %, for more space on small screens** (GitHub #158; all themes). Settings → Displays
+  offers them before 100 % on displays whose desktop stays within 2560 × 1600 logical (1280 × 800, 1366 × 768, 1080p,
+  1200p, also rotated): a 1280 × 800 laptop at 75 % is a 1707 × 1067 desktop. They show as one more tile ("more
+  space") and in the list, with a note saying the desktop's size and that Linux apps look a little softer. lord-server
+  accepts exactly 75 and 80 (`out_scale_valid`; 50–70 % stay refused, and nothing is recommended or rounded below
+  100); its drawing already handled a scale below 1 (a mirrored smaller display). Wayland clients are asked for 100 %
+  (`client_pct` in `wl.c`) and X11 apps get 100 %, and LordOS draws both smaller; the pointer keeps its size. Not yet
+  checked on the VM or a real 1280 × 800 laptop. (`server/src/outputs.c`, `outputs.h`, `server/src/wl/wl.c`,
+  `server/src/hw/display.c`, `sdk/displaylayout.js`, `apps/settings/Displays.jsx`, `docs/DISPLAYS.md`; tests in
+  `build/outputs-test`, `build/engine-test` `test_scale_below_100`, `server/tests/display_layout_test.mjs`)
+- **Settings → Network → Wi-Fi shows which network you are on, and manages saved ones** (GitHub #167). The list is
+  now "Available Wi-Fi networks": the network LordOS is connected to comes first whatever its signal, as "<name> —
+  Connected" with its own Disconnect button (the header keeps only Scan, and the radio picker with two radios); the
+  others follow strongest first, with the Control Center's signal bars instead of the text ones. Saved networks put the
+  connected one first, then those in range with a Connect button, then the rest marked "Not in range", each with
+  Forget, and a footer says LordOS joins them by itself. `net-wifi-scan` adds `"current"` to the network the
+  interface is joined to (wpa_supplicant's `STATUS`, read only; one the scan missed is listed with `SIGNAL_POLL`'s
+  level); no new action or argument. (`apps/settings/Network.jsx`, `wifimodel.js`, `server/src/net/wifi.c`
+  `wifi_status_ssid`; `server/tests/wifi_model_test.mjs`, `net-test wifi-status`)
+- **Window snapping in Lord Flow, and a switch for it** (GitHub #182; all themes). Dragging a window to the left or
+  right edge of a display fills that half of its work area, near a corner a quarter, and to the top edge the whole area
+  (maximized), with a rounded preview in the accent's color under the window while dragging. Dragging it away gives it
+  back the size it had. Lord Classic and Lord Workspaces already did this; Lord Flow now does too (`configureWindows({
+  snap: true })`), including a maximized window dragged out by its bar. **Settings → Desktop & Dock → Snap windows to
+  the screen edges** (on by default, `settings.windowSnap`, a new key with no migration) turns dragging to the edges off
+  in every theme; the window menus' layouts and Lord Classic's ❖ arrows keep working. Workspaces' thirds are unchanged.
+  (`sdk/snap.js` `snapAllowed`, `sdk/windows.js`, `themes/default/index.jsx`, `themes/default/components/Window.jsx`,
+  `apps/settings/Dock.jsx`; `server/tests/snap_test.mjs`)
 - **Settings → Users: a picture for your account, chosen and fitted** (all themes). "Choose image…" opens the file
   chooser instead of a path to type; the picture (any size or format lord-media reads, turned upright) shows in a
   circle, the slider zooms and dragging places it; Save cuts that square from the full picture, scales it to 512 × 512
@@ -337,6 +365,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `cloud.freeUpHint`; `cloud.cacheLine` is gone). Not done, for the maintainer to decide: showing the user or e-mail an
   account signs in with (it is kept in the keyring with the password and never reaches the interface; OAuth providers
   don't tell it) and choosing an account's color (one per provider by default, as asked).
+- **VMware copy and paste: what works and what is proposed** (GitHub #76, docs only). `docs/WAYLAND.md` "VMware Tools"
+  records the reporter's check on a VMware host (host → guest works on 0.8.8.8; guest → host from LordOS's own apps
+  doesn't), why `setsid vmware-user &` returns at once, and the design that would make guest → host work: starting
+  `vmware-user-suid-wrapper` only in a VMware guest, and answering LordOS's clipboard to `vmtoolsd -n vmusr` identified
+  by X-Resource pid and `/proc/<pid>/exe`. Both are new exceptions waiting for the maintainer's approval; nothing is
+  built.
+- **A display opens at its panel's shape when its EDID prefers another one; the login screen isn't stretched on an
+  ultrawide** (GitHub #173). With nothing saved (always on the login screen) a display used the EDID's preferred mode,
+  and some 3440 × 1440 ultrawides prefer 3840 × 2160 on some inputs, so the monitor stretched 16:9 over 21:9 at every
+  boot. Now the preferred mode is used only when its shape is within 8 % of the panel's physical one (the EDID's size
+  in mm); otherwise the largest progressive mode within 3 % of that shape wins (`mode_native`), and Settings → Displays
+  calls that one native. A saved mode still wins in a session. The login screen's picture is drawn once per display,
+  each covering its own display, instead of one picture over the whole desktop that showed a slice of it on each
+  display. (`server/src/hw/modes.c`, `display.c`, `themes/greeter/index.jsx`; `build/settings-hw-test`)
 - **Cleaner's panel by the clock wears the theme's colours** (all themes): its cards, bars and button take the shell's
   tokens (`shellPalette` in `sdk/cleanertheme.js`), like the bar's other panels; the Cleaner window keeps the look chosen
   in Cleaner → Settings.

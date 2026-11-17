@@ -151,5 +151,10 @@
   "wifi.saved": "محفوظ",
   "wifi.scan": "اسکین کریں",
   "wifi.scanning": "اسکین ہو رہا ہے…",
-  "wifi.wrongKey": "پاس ورڈ غلط ہے۔"
+  "wifi.wrongKey": "پاس ورڈ غلط ہے۔",
+  "wifi.available": "دستیاب Wi-Fi نیٹ ورکس",
+  "wifi.currentLabel": "{ssid} — منسلک",
+  "wifi.connect": "منسلک کریں",
+  "wifi.notInRange": "رینج سے باہر",
+  "wifi.knownFooter": "LordOS محفوظ نیٹ ورک کے رینج میں ہونے پر خود اس سے جڑ جاتا ہے۔ بھول جائیں اس نیٹ ورک اور اس کا پاس ورڈ اس کمپیوٹر سے ہٹا دیتا ہے۔"
 }

@@ -80,6 +80,8 @@
   "dock.resetTaskbar": "Återställ aktivitetsfältet till standard",
   "dock.right": "Höger",
   "dock.sidesHint": "Vänster och höger är skärmens sidor: de byter inte plats i ett språk som skrivs från höger till vänster.",
+  "dock.snap.label": "Fäst fönster mot skärmens kanter",
+  "dock.snap.footer": "Dra ett fönster till vänster eller höger kant för att fylla den halvan av skärmen, nära ett hörn för att fylla en fjärdedel, eller till överkanten för att fylla hela skärmen. Drar du bort det får det tillbaka sin storlek.",
   "dock.size": "Storlek",
   "dock.small": "Liten",
   "dock.taskbar": "Aktivitetsfältets placering",
