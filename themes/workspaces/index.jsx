@@ -20,7 +20,7 @@ import {
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
   switchDesktop, windows as windowsStore, windowTitle, windowIcon, appName, removeDesktopById, renameDesktop, createStore, lordosWallpapers,
-  VideoSetup, setDesktopDecor,
+  VideoSetup, setDesktopDecor, setStatusPanelPlacer,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
@@ -41,7 +41,7 @@ import { GlassTarget, DropTarget, SnapFlyout, dropTarget, useDropTarget } from '
 import { tween, EASE, reduceMotion } from './motion.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Spine } from './components/Spine.jsx';
-import { ActivityStrip, ActivityPeek, StatusCluster, STATUS_W } from './components/TopBar.jsx';
+import { ActivityStrip, ActivityPeek, StatusCluster, VolumePanel, STATUS_W } from './components/TopBar.jsx';
 import { GroupFrame, trayNodes } from './components/GroupFrame.jsx';
 import { Search } from './components/Search.jsx';
 import { ControlCenter } from './components/ControlCenter.jsx';
@@ -83,6 +83,7 @@ const H = {
   files: (e) => { if (e) noteLaunch(e.x, e.y); launchApp('files'); },
   control: () => panel.set((p) => (p?.name === 'control' ? null : { name: 'control', display: pointerDisplay().id })),
   notif: () => panel.set((p) => (p?.name === 'notif' ? null : { name: 'notif', display: mainDisplay().id })),
+  volume: () => panel.set((p) => (p?.name === 'volume' ? null : { name: 'volume', display: mainDisplay().id })),
   addWindow: (d, e) => { if (e) noteLaunch(e.x, e.y); panel.set({ name: 'search', mode: 'apps', display: d.id }); },
   addWidget: (d) => widgetPicker.set({ display: d }),
   // the Store's Web apps page: "Add from an address" and the catalog (docs/WEBAPPS.md)
@@ -224,6 +225,13 @@ function App() {
   // the work areas follow the spine and the displays live; the tiles are laid out again
   useEffect(() => { configureWindows({ apps, workArea: areaFn }); areasChanged(); }, [sig, prefs.spine, prefs.spineEvery, rtl, screen.width, screen.height]);
   useEffect(registerSources, []);
+  // the status items' panels (Cloud, Cleaner…) open where the notifications do: under the band, at its far edge
+  const bandRect = main?.plan.top;
+  useEffect(() => setStatusPanelPlacer((box) => {
+    if (!bandRect) return null;
+    const top = bandRect.y + bandRect.h + 8 - box[1];
+    return rtl ? { position: 'absolute', top, left: bandRect.x - box[0] } : { position: 'absolute', top, right: box[0] + box[2] - (bandRect.x + bandRect.w) };
+  }), [bandRect?.x, bandRect?.y, bandRect?.w, bandRect?.h, rtl]);
   // the Overview's strip shows each desktop as its activity: the icon on a tile of its colour
   useEffect(() => setDesktopDecor((id) => {
     const m = activityOf(id);
@@ -242,7 +250,7 @@ function App() {
           { id: 'crown', run: () => H.crown(at) }, { id: 'current', run: () => H.edit(desk) },
           ...recent.map((id) => ({ id: `recent:${id}`, run: () => H.activity(id) })),
           { id: 'activities', run: H.activities }, { id: 'apps', run: () => H.apps() }, { id: 'files', run: () => H.files() },
-          { id: 'help', run: H.help }, { id: 'notif', run: H.notif }, { id: 'settings', run: H.settings }, { id: 'control', run: H.control },
+          { id: 'help', run: H.help }, { id: 'settings', run: H.settings }, { id: 'control', run: H.control },
         ] : []),
         ...(main?.plan.top ? [...desktopList.get().map((id) => ({ id: `pill:${id}`, run: () => switchDesktop(id) })),
           ...(desktopList.get().length < 9 ? [{ id: 'new', run: () => newActivity() }] : [])] : []),
@@ -343,7 +351,7 @@ function App() {
             <>
               <ActivityStrip t={t} rect={stripRect} onEdit={H.edit} />
               <ActivityPeek t={t} />
-              <StatusCluster t={t} rect={main.plan.top} rtl={rtl} screenW={screen.width} unread={unread} onControl={H.control} onNotif={H.notif} />
+              <StatusCluster t={t} rect={main.plan.top} rtl={rtl} screenW={screen.width} unread={unread} onControl={H.control} onNotif={H.notif} onVolume={H.volume} />
             </>
           ) : null}
         </Layer>
@@ -352,6 +360,12 @@ function App() {
         ) : null}
         {open?.name === 'control' ? (
           <Layer name="popover"><ControlCenter t={t} anchor={controlAnchor()} area={panelDisplay} rtl={rtl} onClose={() => panel.set(null)} isOnChrome={isOnChrome} onEdit={H.edit} /></Layer>
+        ) : null}
+        {open?.name === 'volume' && main?.plan.top ? (
+          <Layer name="popover">
+            <VolumePanel t={t} isOnBar={isOnChrome} onClose={() => panel.set(null)}
+              at={{ left: rtl ? main.plan.top.x : main.plan.top.x + main.plan.top.w - 320, top: main.plan.top.y + main.plan.top.h + 8 }} />
+          </Layer>
         ) : null}
         {open?.name === 'notif' && main?.plan.top ? (
           <Layer name="popover">

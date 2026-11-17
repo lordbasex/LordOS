@@ -139,6 +139,17 @@ bars.barKey({ key: 'Escape' });
 await flush();
 check('bars: Escape gives the keyboard back', [bars.barFocus.get(), ringed()], [null, 0]);
 
+// the status items' panels (Cloud, Cleaner) open where the notifications do: under the band, at its far edge
+{
+  const si = await import('../../sdk/statusitems.js');
+  const band = plan(M).top;
+  const box = [band.x + band.w - 300, band.y + 6, 26, 32];
+  globalThis.__lordTest.layouts.set(9999, box);
+  check('status panels: under the band, its far edge on the band\'s', si.statusPanelAt({ current: { id: 9999 } }),
+    { position: 'absolute', top: band.y + band.h + 8 - box[1], right: box[0] + box[2] - (band.x + band.w) });
+  globalThis.__lordTest.layouts.delete(9999);
+}
+
 // the shortcuts' help: the theme's own marked, the shared ones (Search) and the pointer's, searchable
 {
   const help = await import('../../themes/workspaces/components/ShortcutsHelp.jsx');

@@ -39,6 +39,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     unchanged): the arrows, Tab, Home and End go from one control to the next with a visible ring, Enter or Space
     presses it, Escape gives the keyboard back. ❖1…❖9 show activity 1 to 9; ❖Tab and ❖⇧Tab, the next and the previous
     activity, when Settings → Keyboard puts the app switcher on ⌥Tab.
+  - **The status cluster:** the speaker opens its own panel where the notifications do (the level with a slider and
+    mute, the outputs when there are several, Sound settings) instead of the Control Center; the status items' panels
+    (Cloud, Cleaner…) open there too, under the band at its far edge (`setStatusPanelPlacer` in `sdk/statusitems.js`;
+    the other themes keep theirs). The notifications stay on the bell only, not on the spine.
   - **The shortcuts' help:** a lifebuoy on the spine (in the glyph colour of the other items) (also ❖/ and "Keyboard Shortcuts…" in the crown's menu) opens a
     sheet with every shortcut that works now, read from the SDK's own list (the one Settings → Keyboard shows): the
     theme's marked THEME and the ones every theme shares (Search, the clipboard, Screenshots' captures…), each key on
@@ -286,6 +290,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Cleaner's panel by the clock wears the theme's colours** (all themes): its cards, bars and button take the shell's
+  tokens (`shellPalette` in `sdk/cleanertheme.js`), like the bar's other panels; the Cleaner window keeps the look chosen
+  in Cleaner → Settings.
 - **Lord Workspaces: a cheaper activity switch.** 244 native calls for four switches instead of 352 (one display, three
   windows, `server/tests/theme_cost_scene.mjs`): every activity's icon stays drawn in the frame header with only the
   one in view shown, the spine's activities are one keyed list, the activities' icons in the spine change only their colour.

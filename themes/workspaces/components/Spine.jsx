@@ -2,7 +2,8 @@
 // the top: the LordOS crown (the system menu: About, Settings, Lock, Log Out, Restart, Shut Down), the activity in view
 // (its icon in its colour; a click edits it), the activities used just before it (as many as the display's height has
 // room for; a click goes there), Activities (the Overview), Apps (the search panel with every app), Files, and at the
-// bottom the shortcuts' help (a lifebuoy, ShortcutsHelp.jsx), the notifications, Settings, the Control Center and the button that collapses the spine to icons (it
+// bottom the shortcuts' help (a lifebuoy, ShortcutsHelp.jsx), Settings, the Control Center (the notifications are the
+// status cluster's bell) and the button that collapses the spine to icons (it
 // collapses by itself on narrow displays while its setting is Automatic). It reserves its width in the work area
 // (model/geometry.js).
 // The crown is the brand's full-colour render (assets/icons/lordos-crown.png): never recoloured, no glow or shadow.
@@ -84,8 +85,6 @@ export const Spine = memo(function Spine({ t, rect, mode, rtl, active, desk, unr
       <View style={{ flex: 1 }} />
       <Item t={t} expanded={expanded} fid="help" label={tr('shell.ws.spine.help')} active={active.help} onClick={onHelp}
         glyph={(c, bg) => <LifebuoyGlyph size={18} color={c} bg={bg} />} />
-      <Item t={t} expanded={expanded} fid="notif" label={tr('shell.ws.notif.title')} active={active.notif} onClick={onNotif}
-        glyph={(c) => <BellGlyph color={c} size={18} dot={unread ? (active.notif ? t.onAccent : t.accent) : null} />} />
       <Item t={t} expanded={expanded} fid="settings" label={tr('shell.ws.spine.settings')} active={false} onClick={onSettings}
         glyph={(c, bg) => <GearGlyph color={c} bg={bg} size={18} />} />
       <Item t={t} expanded={expanded} fid="control" label={tr('shell.ws.spine.control')} active={active.control} onClick={onControl} anchor={controlRef}

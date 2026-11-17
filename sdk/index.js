@@ -122,7 +122,7 @@ export { spotlight, spotlightOpen, calc as spotlightCalc, convert as spotlightCo
 export { registerSpotlightSource, searchEverything } from './spotlight.js';
 // session notifications, menu bar status items, Clock (alarms) and Help (docs/SYSTEM.md)
 export { notify, dismissNotification, useNotifications, notifications, notifyHistory, clearNotifyHistory, NotificationBanner, setBannerPlacement } from './notify.js';
-export { registerStatusItem, StatusItems, statusItems } from './statusitems.js';
+export { registerStatusItem, StatusItems, statusItems, setStatusPanelPlacer } from './statusitems.js';
 export { MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, BluetoothGlyph, SignalGlyph } from './quickglyphs.jsx';   // quick settings' glyphs (issue #114)
 export { setBacklight, useBacklight } from './hwkeys.js';   // the Control Center's brightness slider (issue #114)
 export { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, weekStartFor, wifiBars, backlightOf, backlightValue } from './menubarmodel.js';   // what the bar shows (issue #58)

@@ -11,7 +11,7 @@
 // it has none); a click on a window there goes to it. The clock re-renders only its own text, once a minute (sharedTicker).
 import {
   View, Text, TextInput, useStore, desktopList, desktopNames, desktopName, activeDesktop, renameDesktop, switchDesktop, formatTime, formatDate,
-  StatusItems, PrivacyIndicators, clockPrefs, weekdayName, useSound, defaultSink, t as tr, createStore, Layer, windows, windowTitle, windowIcon,
+  StatusItems, PrivacyIndicators, clockPrefs, weekdayName, useSound, defaultSink, sound, Slider, SoundOutputList, addListener, t as tr, createStore, Layer, windows, windowTitle, windowIcon,
   getApp, appName, wm, useLauncherApps,
 } from '@lordos/sdk';
 import { activitySummary } from '../model/activities.js';
@@ -295,14 +295,14 @@ function Volume({ t, onClick }) {
 }
 
 // rect: the top band; screenW: the whole screen's width (the cluster is placed by its end edge, its width is its content)
-export const StatusCluster = memo(function StatusCluster({ t, rect, rtl, screenW, unread, onControl, onNotif, notifRef }) {
+export const StatusCluster = memo(function StatusCluster({ t, rect, rtl, screenW, unread, onControl, onNotif, onVolume, notifRef }) {
   return (
     <Surface t={t} radius={H / 2} style={{ position: 'absolute', top: rect.y, height: H, ...(rtl ? { left: rect.x } : { right: screenW - (rect.x + rect.w) }),
       flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4 }}>
       <PrivacyIndicators />
       <View style={{ paddingHorizontal: 4 }}><StatusItems color={t.iconFg} height={BAR_ITEM} /></View>
       <BarSeparator t={t} />
-      <Volume t={t} onClick={onControl} />
+      <Volume t={t} onClick={onVolume} />
       <BarButton ref={notifRef} t={t} onClick={onNotif} title={tr('shell.ws.notif.title')}
         glyph={(c) => <BellGlyph color={c} size={15} dot={unread ? t.accent : null} />} />
       <BarSeparator t={t} />
@@ -313,3 +313,38 @@ export const StatusCluster = memo(function StatusCluster({ t, rect, rtl, screenW
 
 // room the activity strip leaves for the status cluster
 export const STATUS_W = 330;
+
+// The volume's own panel (the speaker in the status cluster), where the notifications open: the output's level with a
+// slider and mute, the outputs to choose from when there are several, and Settings → Sound.
+export function VolumePanel({ t, at, onClose, isOnBar }) {
+  const st = useSound();
+  const out = defaultSink(st);
+  const box = useRef(null);
+  useEffect(() => addListener('pointerdown', (e) => {
+    for (let n = e.target; n; n = n.parent) if (n === box.current) return;
+    if (!isOnBar(e.x, e.y)) onClose();
+  }), []);
+  if (!out) return null;
+  const pct = Math.round(out.level * 100);
+  return (
+    <View ref={box} style={{ position: 'absolute', left: at.left, top: at.top, width: 320, padding: 14, gap: 10, borderRadius: 16, backgroundColor: t.popupBg,
+      border: `1px solid ${t.mat.border}`, boxShadow: t.shadowSoft }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={{ flex: 1, fontSize: 13, fontWeight: 700, color: t.text, textAlign: 'start' }}>{tr('shell.cc.sound')}</Text>
+        <Text style={{ fontSize: 12, color: t.textDim }}>{out.mute ? '—' : `${pct} %`}</Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, direction: 'ltr' }}>
+        <View onClick={() => sound.setMute('sink', out.index, !out.mute)} title={out.mute ? tr('shell.cc.on') : tr('shell.cc.off')}
+          style={{ width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: t.itemHover }}>
+          <SpeakerGlyph color={t.text} size={15} level={pct === 0 ? 0 : pct < 50 ? 1 : 2} muted={out.mute} />
+        </View>
+        <Slider value={Math.min(1, out.level)} width={250} onChange={(v) => sound.setVolume('sink', out.index, v)} />
+      </View>
+      <SoundOutputList />
+      <View onClick={() => { onClose(); wm.open('settings', { args: { section: 'sound' } }); }}
+        style={{ height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: t.itemHover }}>
+        <Text style={{ fontSize: 12, fontWeight: 600, color: t.text }}>{tr('shell.cc.soundSettings')}</Text>
+      </View>
+    </View>
+  );
+}
