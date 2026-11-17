@@ -280,6 +280,33 @@ anything else dropped):
 On Desktop & Dock, such a theme gets the desktops (here: activities), its options and the title bars' buttons, with no
 Dock or taskbar section. Lord Flow and Lord Classic declare none of the three and see exactly what they did.
 
+## Widget data
+
+The desk widgets get their data from one feed (`sdk/widgetfeed.js`, pure logic in `sdk/widgetfeedmodel.js`, tested
+by `server/tests/widget_feed_test.mjs`) instead of a timer each:
+
+- **One read per source.** Each piece of data is a source with a key (`minute`, `cpu`, `sysinfo`, `net`, `net.ifs`,
+  `claude`, `vpn.list`), read once however many widgets show it; a widget's own data (its disks, its VPN's rates, its
+  recent files, the update status) is a source of its own.
+- **The interval of the widgets that can be seen.** A widget subscribes with how often it wants the data
+  (`useFeed(key, read, ms)`). The source runs at the shortest interval among its visible subscribers, and not at all
+  when none is visible: no timer, no read, no render. Defaults: the clock and the calendar once a minute, CPU and the
+  network rates every 2 s, memory every 4 s, the network interfaces every 8 s, the VPN list every 10 s, disks every
+  30 s, Claude Code's sessions every minute, recent files every minute, updates every 10 minutes.
+- **Aligned ticks.** A source's reads fall on multiples of its interval since the epoch, so the ones due in the same
+  second are read together and their widgets re-render in one frame: the 2 s and 4 s sources tick with each other,
+  and everything ticks on the minute with the clock.
+- **Seen or not.** A widget wholly inside a window frame of the activity in view counts as hidden (a partly covered
+  one is seen; the overview shows every widget). Widgets of other activities aren't mounted at all. A widget is
+  shown again at once and hidden only after a second, so a window dragged across the desk doesn't stop and restart
+  the sources under it. While nobody sees the screen (the displays off after idle, the session locked or switched
+  away with no remote viewer: `lord.system.seen()`, the same rule the compositor uses to stop drawing) the ticks
+  come but read nothing.
+- **Last value, then fresh.** A widget that shows again keeps its last value and gets a fresh read at once if it is
+  older than its interval. A rate (CPU, network) read after a time unseen is the average over that time; the network
+  history carries on with a gap, nothing made up.
+- **Same data, no render.** A read equal to the last (`sameValue`) notifies nobody.
+
 ## Performance
 
 Measured on the development machine (Intel Core i9-10900, AMD Radeon RX 580; CPU path, `LORD_GPU=0`), a headless

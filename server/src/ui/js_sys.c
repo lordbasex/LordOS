@@ -1583,8 +1583,15 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("recent", 2, f_fs_recent),
     JS_CFUNC_DEF("volumes", 0, f_fs_volumes),
 };
+int js_sys_unseen;
+static JSValue f_sys_seen(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    return JS_NewBool(c, !js_sys_unseen);
+}
+
 static const JSCFunctionListEntry system_funcs[] = {
     JS_CFUNC_DEF("info", 0, f_sys_info),
+    JS_CFUNC_DEF("seen", 0, f_sys_seen),
     JS_CFUNC_DEF("cpuTimes", 0, f_sys_cpu),
 };
 static const JSCFunctionListEntry settings_funcs[] = {

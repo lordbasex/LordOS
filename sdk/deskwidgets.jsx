@@ -30,7 +30,8 @@ import { Layer } from './layers.js';
 import { ContextMenu } from './contextmenu.jsx';
 import { workAreaOf, activeDesktop, wm } from './windows.js';
 import { t, formatTime, formatDate, monthName, weekdayName } from './i18n.js';
-import { useCpuUsage, useSystemInfo, formatBytes, sameValue } from './system.js';
+import { formatBytes } from './system.js';
+import { useFeed, WidgetIdContext, setWidgetRects } from './widgetfeed.js';
 import { memUsedKB } from './memfigure.js';
 import { NowPlayingTile } from './media.js';
 import { speak, stopSpeaking, speakAvailable } from './voice.js';
@@ -162,6 +163,7 @@ export function startDeskWidgets() {
       }
     }
     for (const type of PAINT_ORDER) setWidgets(`ws-${type}`, byType[type] || []);
+    setWidgetRects(Object.values(byType).flat());
     const per = {};
     for (const list of Object.values(byType)) for (const w of list) per[w.dk] = (per[w.dk] || 0) + 1;
     // replaced, not merged (a store merges an object into an object): a display left with none drops out
@@ -254,7 +256,7 @@ function WidgetCard({ widget }) {
           border: `0.5px solid ${L.dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`,
           boxShadow: live ? '0 24px 60px rgba(0,0,0,0.32)' : '0 8px 28px rgba(0,0,0,0.16)', transform: live ? 'scale(1.03)' : undefined }}>
         <View style={bare ? { flex: 1 } : { flex: 1, paddingTop: 13, paddingHorizontal: 15, paddingBottom: 14 }}>
-          {Body ? <Body w={widget} L={L} /> : null}
+          {Body ? <WidgetIdContext.Provider value={widget.id}><Body w={widget} L={L} /></WidgetIdContext.Provider> : null}
         </View>
       </View>
       {menu ? (
@@ -324,21 +326,36 @@ function TickRing({ L, size, value, color, ticks = 40, children }) {
     </View>
   );
 }
-// a timer only while mounted
+// This widget's own data, read every ms while it can be seen (sdk/widgetfeed.js: aligned with every other widget's
+// reads, none while it is behind a window or nobody sees the screen)
 function useEvery(fn, ms, deps = []) {
-  const [v, setV] = useState(() => { try { return fn(); } catch (e) { return null; } });
-  useEffect(() => { const id = setInterval(() => { let x = null; try { x = fn(); } catch (e) { /* null */ } setV((p) => (sameValue(p, x) ? p : x)); }, ms); return () => clearInterval(id); }, deps);
-  return v;
+  return useFeed(null, () => { try { return fn(); } catch (e) { return null; } }, ms, deps);
 }
-function useMinute() {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    let iv = 0;
-    const first = setTimeout(() => { setNow(Date.now()); iv = setInterval(() => setNow(Date.now()), 60000); }, 60000 - (Date.now() % 60000) + 50);
-    return () => { clearTimeout(first); clearInterval(iv); };
-  }, []);
-  return now;
+// The shared sources: one read for every widget that shows them.
+const minuteNow = () => Math.floor(Date.now() / 60000) * 60000;
+const useMinute = () => useFeed('minute', minuteNow, 60000);
+// CPU usage (0..1, in whole percents) between two reads of /proc/stat; null on the first
+function cpuRead(st) {
+  const [t, i] = lord.system.cpuTimes();
+  const p = st.p;
+  st.p = [t, i];
+  if (!p || t <= p[0]) return null;
+  return Math.round(Math.max(0, Math.min(1, 1 - (i - p[1]) / (t - p[0]))) * 100) / 100;
 }
+const sysInfoRead = () => lord.system.info();
+// the network's rates (bytes/s) and the last 30 of them; null on the first read. After a time unseen the first rate
+// is the average over that time, and the history carries on from there (it has a gap, nothing made up).
+function netRead(st) {
+  const s = lord.monitor?.netTotals ? lord.monitor.netTotals() : null;
+  const p = st.p;
+  st.p = s;
+  if (!s || !p || s.t <= p.t) return st.v || null;
+  const dt = (s.t - p.t) / 1000, v = { rx: (s.rx - p.rx) / dt, tx: (s.tx - p.tx) / dt };
+  st.hist = [...(st.hist || []).slice(-29), v];
+  st.v = { ...v, hist: st.hist };
+  return st.v;
+}
+const netIfsRead = () => (lord.net?.interfaces ? lord.net.interfaces() : []);
 
 // ---- the clock: analog (TangoOS's face), digital, world cities ----
 const localOffset = (ms) => -new Date(ms).getTimezoneOffset() * 60;
@@ -451,8 +468,8 @@ function ClockBody({ w, L }) {
 
 // ---- system ----
 function SystemBody({ w, L }) {
-  const cpu = useCpuUsage(1500);
-  const info = useSystemInfo(5000) || {};
+  const cpu = useFeed('cpu', cpuRead, 2000) || 0;
+  const info = useFeed('sysinfo', sysInfoRead, 4000) || {};
   const used = memUsedKB(info), total = info.memTotalKB || 0, mem = total ? used / total : 0;
   const ring = (label, v, size) => (
     <View style={{ alignItems: 'center', gap: 4 }}>
@@ -607,18 +624,9 @@ function ReadAloudBody({ w, L }) {
 // ---- network ----
 const rate = (n) => `${formatBytes(Math.max(0, n))}/s`;
 function NetworkBody({ w, L }) {
-  const prev = useRef(null);
-  const hist = useRef([]);
-  const speed = useEvery(() => {
-    const s = lord.monitor?.netTotals ? lord.monitor.netTotals() : null;
-    const p = prev.current;
-    prev.current = s;
-    if (!s || !p || s.t <= p.t) return null;
-    const dt = (s.t - p.t) / 1000, v = { rx: (s.rx - p.rx) / dt, tx: (s.tx - p.tx) / dt };
-    hist.current = [...hist.current.slice(-29), v];
-    return v;
-  }, 2000);
-  const ifs = useEvery(() => (lord.net?.interfaces ? lord.net.interfaces() : []), 8000) || [];
+  const speed = useFeed('net', netRead, 2000);
+  const hist = { current: speed?.hist || [] };
+  const ifs = useFeed('net.ifs', netIfsRead, 8000) || [];
   const up = ifs.filter((i) => i.up && i.carrier !== false && i.type !== 'loopback');
   const main = up.find((i) => i.type === 'wifi' || i.type === 'ethernet') || up[0];
   const ip = main?.addresses?.find((a) => a.scope === 'global' && a.family === 4)?.address || '';
@@ -849,7 +857,7 @@ function Gauge({ L, size, pct, label, sub, inner }) {
   );
 }
 function ClaudeBody({ w, L }) {
-  const data = useEvery(claudeData, 3000) || { sessions: [], accounts: [] };
+  const data = useFeed('claude', claudeData, 60000) || { sessions: [], accounts: [] };
   const list = data.sessions;
   const dot = (s) => (s === 'working' ? L.warn : s === 'waiting' ? L.ok : L.faint);
   const stateText = (s) => t(s === 'working' ? 'shell.widgets.claude.working' : s === 'waiting' ? 'shell.widgets.claude.waiting' : 'shell.widgets.claude.idle');
@@ -1115,7 +1123,7 @@ function vpnToggle(name, on) {
 }
 // the VPNs, their interfaces (every 3 s while shown, no root) and this VPN's rates
 function useVpn(target) {
-  const list = useEvery(vpnList, 10000) || [];
+  const list = useFeed('vpn.list', vpnList, 10000) || [];
   const busy = useStore(vpnBusy);
   const prev = useRef(null);
   const sample = useEvery(() => {
@@ -1174,7 +1182,7 @@ function VpnSettingsLink({ L, busy }) {
   );
 }
 function VpnBody({ w, L }) {
-  const list0 = useEvery(vpnList, 10000) || [];
+  const list0 = useFeed('vpn.list', vpnList, 10000) || [];
   const target = targetOf(w.opts, list0);
   const { list, st, rate: r, busy } = useVpn(target);
   const v = list.find((x) => x.name === target);

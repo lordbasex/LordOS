@@ -2782,6 +2782,7 @@ int main(int argc, char **argv) {
         /* sin monitor y sin nadie mirando no se dibuja (al conectarse alguien llega un cuadro entero) */
         int unseen = s.headless && !mirror_watchers() && !media_needs_cpu();   /* recording the screen: yes */
         if (!s.headless && display_is_off()) unseen = 1;     /* screen off after idle (DPMS): nothing to draw */
+        js_sys_unseen = unseen;                     /* the desk widgets' data feeds rest too (lord.system.seen) */
         /* the minimized windows and those on a hidden desktop: their frame callbacks once a second (wl/framegate.h) */
         if (!unseen) {
             double hd = wl_frame_hidden((unsigned)now_ms());

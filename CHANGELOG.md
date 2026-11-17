@@ -199,6 +199,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Lord Workspaces: desk widgets read their data only when someone can see it.** One feed
+  (`sdk/widgetfeed.js`) replaces a timer per widget: each piece of data (clock, CPU, memory, network, Claude Code,
+  VPNs) is read once however many widgets show it, at the shortest interval among the widgets in view, and not at
+  all when none is (behind a window, the displays off, the session locked). All reads due in the same second happen
+  together, so their widgets re-render in one frame. A widget shown again keeps its last value and is refreshed at
+  once. The Claude Code widget now reads its sessions once a minute (was every 3 s) and CPU every 2 s (was 1.5 s),
+  on the same tick as the network. See docs/WORKSPACES.md, "Widget data".
+
 - **Desk widgets refresh only what changed (all themes).** Measured with `perf` on a 3-display desktop at rest,
   about a third of lord-server's time went to JavaScript, mostly widgets re-rendering on their timers with the same
   data. Now a polled value that reads the same as before (`sameValue`, `sdk/samevalue.js`) keeps the old one, so
