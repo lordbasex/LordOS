@@ -28,7 +28,8 @@ const nameOf = (p) => String(p || '').split('/').pop();
 
 // props: handle (a capture, already decoded) and/or path (the file it is, or the picture to open);
 // newCapturePath() gives a free name in the Screenshots folder for a capture that was never saved.
-export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }) {
+// onNewCapture (optional): New Screenshot (and Ctrl+N) brings the capture panel back, this window staying open (GitHub #166).
+export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved, onNewCapture }) {
   const th = useTheme();
   const win = useAppWindow();
   const narrow = useNarrow(900);
@@ -247,6 +248,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
     const k = String(e.base || '').toLowerCase();
     if ((e.ctrl || e.meta) && k === 'z') undo();
     else if ((e.ctrl || e.meta) && k === 's') (e.shift ? saveCopy : save)();
+    else if ((e.ctrl || e.meta) && k === 'n' && onNewCapture) onNewCapture();
     else if (e.key === 'Enter' && crop && !text) applyCrop();
     else if (e.key === 'Escape' && (crop || size)) { setCrop(null); setSize(null); if (tool === 'crop') setTool('arrow'); }
   });
@@ -281,6 +283,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
         <ToolbarButton icon="⟳" title={tr('screenshots.rotateRight')} onClick={() => turn(1)} />
         <ToolbarButton icon="⤡" title={tr('screenshots.resize')} active={!!size} onClick={() => (size ? setSize(null) : openResize())} />
         <ToolbarSpacer />
+        {onNewCapture && <Button label={tr('screenshots.newCapture')} onClick={onNewCapture} />}
         <ToolbarButton icon="Ⓣ" title={tr('screenshots.tool.transcribe')} active={tool === 'transcribe'} onClick={() => pickTool(tool === 'transcribe' ? 'arrow' : 'transcribe')} />
         <ToolbarButton icon="↶" title={tr('screenshots.undo')} onClick={undo} />
         <ToolbarButton icon="⧉" title={tr('screenshots.copy')} onClick={copy} />

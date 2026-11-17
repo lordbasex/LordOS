@@ -31,6 +31,18 @@ export function useWindowButtons(themeStart) {
   return { atStart, order: buttonOrder(atStart) };
 }
 
+// <SeamCover color below />: the first child of a transparent app's title bar (the Terminal, manifest "transparent"),
+// and of a bar under it. At 125 %, 150 % or 175 % the edges where the frame's border, the title bar, the separator and
+// the app's first row meet fall inside a pixel; each box covers only part of that pixel and the window below them is
+// transparent, so the row let the desktop through (a quarter of it at 150 %: a line across the window, GitHub #162).
+// This box, painted first, goes under those edges: from 1 px above and beside the bar (under the frame's border) to
+// `below` px past the bar's bottom edge (into what follows it), in the bar's color, so every one of those pixels is
+// opaque. An opaque window doesn't need it: its own background is behind the seams. above={0} for a bar under the
+// title bar (whose cover already reaches it), so it never paints over the title bar's buttons.
+export function SeamCover({ color, below = 1, above = 1 }) {
+  return h(View, { style: { position: 'absolute', left: -1, right: -1, top: -above, bottom: -below, backgroundColor: color, pointerEvents: 'none' } });
+}
+
 export const WINDOW_EDGE = 6;     // px of border outside the frame
 const INSIDE = 3;                 // and inside
 const CORNER = 16;

@@ -113,7 +113,7 @@ export { LevelHud, showLevel } from './levelhud.js';
 export { overview, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, toggleAppWindows, overviewOpen, setDesktopDecor } from './overview.jsx';
 export { codeStatus } from './codesig.js';
 import { reportRefusedCode } from './codesig.js';
-export { WindowShell, WINDOW_EDGE, useWindowButtons } from './windowshell.jsx';
+export { WindowShell, WINDOW_EDGE, useWindowButtons, SeamCover } from './windowshell.jsx';
 export { WINDOW_BUTTON_SIDES, windowButtonsPref } from './windowbuttons.js';   // title bar buttons' side (issue #58)
 export { term } from './terminal.js';
 export { clipboard, clipboardHistory, clipboardPanel, clipboardKind, toast } from './clipboard.js';

@@ -132,6 +132,14 @@ EOF
 committed: 한
 preedit: 글
 EOF
+    # (#163) Shift alone (+, sent before every capital) keeps the syllable: ㅆ and ㄲ as finals, ㅒ and ㅖ after an initial
+    ime "ime-test: hangul Shift jamo" hangul 'dl+T_qk+R_rk+Rk_dl+Tdj_r+O_d+P_+dl+T_' "" <<'EOF'
+committed: 있 밖 가까 있어 걔 예 있
+EOF
+    # every double final consonant, and how one splits when a vowel follows
+    ime "ime-test: hangul double finals" hangul 'rkrt_ahrt_dksw_dksg_ekfr_tkfa_sjfq_rhft_gkfx_dmfv_dlfg_djqt_ekfrl_dkswdk_djqtdj_' "" <<'EOF'
+committed: 갃 몫 앉 않 닭 삶 넓 곬 핥 읊 잃 없 달기 앉아 없어
+EOF
     ime "ime-test: kana" kana toukyou_ "skkdic" <<'EOF'
 preedit: 東京
 EOF
@@ -469,6 +477,10 @@ EOF
     # (0.8.8.8, #117) Notes: Edit and Format menus and the editor's right-click menu send the editor's own keys
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "notes-editor-scene (apps/notes/NoteEditor.jsx, editmenu.js)" node tests/textfield_menu_test.mjs notes_editor_scene.mjs
+        # (#169) Notes' reading view keeps a paragraph's line breaks, as the editor shows them (sdk/markdown.jsx breaks)
+        run "notes-breaks-scene (sdk/markdown.jsx breaks, apps/notes)" node tests/textfield_menu_test.mjs notes_breaks_scene.mjs
+        # (#166) Screenshots' markup editor: New Screenshot and Ctrl+N bring the capture panel back, the editor staying open
+        run "screenshots-newcapture-scene (apps/screenshots/editor.jsx)" node tests/textfield_menu_test.mjs screenshots_newcapture_scene.mjs
     else skip "notes-editor-scene" "node and the repository's node_modules (npm install)"; fi
     # a password TextInput: the eye shows it and keeps the focus, copies nothing, hides on blur; ⇪ follows Caps Lock
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then

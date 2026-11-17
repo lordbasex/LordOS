@@ -417,9 +417,11 @@ function RecBadge() {
 
 // ---- markup editor (editor.jsx) ----
 
-// a capture right after it was taken (handle, and its file if it was saved), or a picture file (path)
+// a capture right after it was taken (handle, and its file if it was saved), or a picture file (path).
+// New Screenshot brings the panel back for another capture, with no need to close this window first (GitHub #166);
+// a capture hides the panel but leaves the markup windows open (afterHide).
 function MarkupWindow({ handle, path }) {
-  return <Editor handle={handle} path={path} app={APP} newCapturePath={() => freeName(captureDir(), tr('screenshots.fileName', { date: stamp() }), 'png')}
+  return <Editor handle={handle} path={path} app={APP} onNewCapture={() => wm.open(APP)} newCapturePath={() => freeName(captureDir(), tr('screenshots.fileName', { date: stamp() }), 'png')}
     onSaved={(p) => { if (p.startsWith(`${captureDir()}/`)) recent.set((l) => [{ path: p, time: Date.now() }, ...l.filter((x) => x.path !== p)].slice(0, 20)); }} />;
 }
 

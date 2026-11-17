@@ -3,6 +3,8 @@
 //   <Markdown source={text} base="/home/lord/Notes/x" width={420}
 //     onToggleTask={(line) => …} onLink={(url) => …} onHeadingRef={(id, node) => …} />
 //   fitWidth (optional): width is the exact width of the column (lays list items out at it)
+//   breaks (optional): a single line break inside a paragraph is kept as a line break, as typed (Notes, so the
+//     reading view breaks where the editor does; GitHub #169). Without it, plain markdown: the lines are joined.
 //   markdownHeadings(text) → [{ level, text, id, line }]   (for a table of contents)
 //
 // Blocks: headings, paragraphs, quotes, lists (with levels), numbered lists, checkboxes (- [ ] / - [x]),
@@ -19,7 +21,7 @@ import { useTheme } from './theme.js';
 
 const slug = (s) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') || 'titulo';
 
-export function parseMarkdown(src) {
+export function parseMarkdown(src, opts = {}) {
   const lines = String(src || '').replace(/\r\n/g, '\n').split('\n');
   const blocks = [];
   const ids = new Map();
@@ -49,7 +51,7 @@ export function parseMarkdown(src) {
       const start = i;
       const body = [];
       while (i < lines.length && /^\s*>/.test(lines[i])) body.push(lines[i++].replace(/^\s*>\s?/, ''));
-      blocks.push({ type: 'quote', blocks: parseMarkdown(body.join('\n')), line: start });
+      blocks.push({ type: 'quote', blocks: parseMarkdown(body.join('\n'), opts), line: start });
       continue;
     }
     if (/^\s*\|.*\|\s*$/.test(s) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {   // table
@@ -81,7 +83,7 @@ export function parseMarkdown(src) {
     const start = i;                                              // paragraph
     const body = [];
     while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|>|`{3,}|~{3,})/.test(lines[i]) && !isListLine(lines[i])) body.push(lines[i++].trim());
-    blocks.push({ type: 'paragraph', text: body.join(' '), line: start });
+    blocks.push({ type: 'paragraph', text: body.join(' '), ...(opts.breaks && body.length > 1 ? { lines: body } : null), line: start });
   }
   return blocks;
 }
@@ -200,7 +202,9 @@ function Block({ b, props }) {
           {b.level === 1 && <View style={{ height: 1, marginTop: 4, backgroundColor: t.separator }} />}
         </View>
       );
-    case 'paragraph': return <View style={{ marginVertical: 3 }}>{inl(b.text)}</View>;
+    case 'paragraph':
+      // breaks: one row per typed line (each one still wraps at the width)
+      return <View style={{ marginVertical: 3 }}>{b.lines ? b.lines.map((l, i) => <View key={i}>{inl(l)}</View>) : inl(b.text)}</View>;
     case 'hr': return <View style={{ height: 1, marginVertical: 8, backgroundColor: t.separator }} />;
     case 'code':
       return (
@@ -264,7 +268,7 @@ function Block({ b, props }) {
 }
 
 export function Markdown(props) {
-  const blocks = parseMarkdown(props.source);
+  const blocks = parseMarkdown(props.source, { breaks: !!props.breaks });
   return <View style={[{ gap: 2 }, props.style]}>{blocks.map((b, i) => <Block key={`${b.line}:${i}`} b={b} props={props} />)}</View>;
 }
 

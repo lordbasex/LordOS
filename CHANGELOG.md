@@ -12,6 +12,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Screenshots: another capture without closing the markup editor (GitHub #166).** The markup
+  editor's toolbar has **New Screenshot** (also Ctrl+N): it brings the capture panel back (entire screen, window,
+  selection, color, text, record), and the editor stays open with its picture, so you can take as many captures as
+  you need and mark each one up. Before, the panel closed at the capture and only closing the editor and opening
+  Screenshots again gave another one. (`apps/screenshots/editor.jsx` `onNewCapture`, the `screenshots.newCapture` text
+  in every language.) Checked in `screenshots_newcapture_scene.mjs`.
 - **Settings → Users: a picture for your account, chosen and fitted** (all themes). "Choose image…" opens the file
   chooser instead of a path to type; the picture (any size or format lord-media reads, turned upright) shows in a
   circle, the slider zooms and dragging places it; Save cuts that square from the full picture, scales it to 512 × 512
@@ -446,6 +452,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   A path refused with another error (not a time out), which never stopped the pass but also left the entry "coming
   down" for good, is set aside the same way, without the check.
   `cloud-test` checks the set (added, inside a failed folder, the hour, the limit).
+- **Terminal: no see-through line under the title bar at 125 % or 150 % (GitHub #162; all themes).** The Terminal's
+  window is transparent (its background opacity), so nothing is painted behind its frame. At a fractional scale the
+  edges where the frame's border, the title bar, the separator (Lord Classic and Lord Workspaces: the menu strip) and
+  the Terminal's tab bar meet fall inside a pixel; each box covered only part of that pixel, and the row let a quarter
+  of the desktop through, a thin line with the wallpaper's text showing across the window while it moved. At 100 % and
+  200 % the edges are whole pixels, which is why it was not seen there. The frame of a transparent app now paints, first,
+  one box in the bar's color under those edges (`SeamCover`, `sdk/windowshell.jsx`, used by the three themes' window
+  frames), from under the border to 1 px into the app, so every pixel there is opaque; opaque windows have their own
+  background behind the seams and don't change. `engine-test` draws such a frame at 100, 125, 150, 175 and 200 %:
+  without the cover it finds the see-through pixels, with it none.
+- **Notes: the Read view breaks lines where the Edit view does (GitHub #169).** Reading a note drew it as plain
+  markdown, which joins the lines of a paragraph: two lines typed one under the other ran together as one, so the same
+  note looked different in Read and Edit. The reading view now keeps a single line break as a line break (each typed
+  line still wraps at the width); a blank line still separates paragraphs, and headings, lists, quotes, code and tables
+  are as before. It is the `breaks` option of the SDK's `<Markdown>` (`sdk/markdown.jsx`, `parseMarkdown(src, { breaks })`),
+  which only Notes turns on: Help and Mail keep plain markdown. Checked in `notes_breaks_scene.mjs`. The editor keeps its
+  monospaced font, as it shows the markdown marks themselves.
+- **Korean input (Hangul): Shift no longer ends the syllable (GitHub #163).** Shift pressed alone reached the input
+  method as a key with no text, and every such key confirmed the syllable being composed, so the 2-set keyboard's Shift
+  jamo never joined it: 이 + Shift+T gave 이ㅆ instead of 있, 바 + Shift+R gave 바ㄲ instead of 밖, and ㄱ + Shift+O gave
+  ㄱㅒ instead of 걔. A key that types nothing and has no name (Shift, Caps Lock, Ctrl or AltGr alone, a dead key) now
+  passes through and leaves the composition as it is, in every input method (`server/src/ime.c` `ime_key`). `ime-test`
+  gains `+` for Shift alone, and two suites check ㅆ and ㄲ as finals, ㅒ and ㅖ, and every double final consonant
+  (갃 앉 않 닭 삶 넓 곬 핥 읊 잃 없) with how one splits when a vowel follows (달기, 앉아, 없어).
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.
