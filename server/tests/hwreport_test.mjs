@@ -12,7 +12,7 @@ import { validate } from '../../tools/hwreport/jsonschema.mjs';
 import { pick, buildShareReport, summaryRows, summaryText, issueTitle, issueUrl, shareFileNames, sharePage, reportKind, gpuVendor, cpuVendor, TITLE_MAX } from '../../apps/sysinfo/share.js';
 import { deviceKeys, communityFor, communitySummary } from '../../apps/sysinfo/community.js';
 import { compatibility } from '../../apps/sysinfo/model.js';
-import { findAttachments, allowedUrl, fetchAttachment, parseLimited, privacyScan, plausibility, checkReport, labelsFor, commentBody, code, MARKER, ALL_LABELS } from '../../tools/hwreport/lib.mjs';
+import { embeddedReport, findAttachments, allowedUrl, fetchAttachment, parseLimited, privacyScan, plausibility, checkReport, labelsFor, commentBody, code, MARKER, ALL_LABELS } from '../../tools/hwreport/lib.mjs';
 import { readReports, buildSnapshot, snapshotText, buildModel, renderSections, SNAPSHOT_FILE, REPORTS_DIR } from '../../tools/hwreport/catalog.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -126,13 +126,24 @@ ok('the page escapes everything', !page.includes('<script>alert') && page.includ
 ok('the page is right to left for Arabic', page.includes('<html lang="ar" dir="rtl">'));
 ok('the page runs nothing and loads nothing', !/<script|src=|@import|url\(/i.test(page) && page.includes("default-src 'none'"));
 ok('the page names the file', page.includes('Attach r.json'));
+// issue #171: the page carries the report, so attaching the page works too; a "</script>" inside can't close the block
+{
+  const json = JSON.stringify({ a: '</script><script>alert(1)</script>', b: 1 });
+  const p2 = sharePage({ text: {}, rows: [], url: 'https://x', jsonName: 'r.json', json });
+  const inner = embeddedReport(p2);
+  eq('the page carries the report, read back unchanged', JSON.parse(inner), JSON.parse(json));
+  ok('only the data block, nothing that runs', !/<script(?! type="application\/json" id="lordos-hwreport")/i.test(p2) && (p2.match(/<\/script>/g) || []).length === 1);
+  eq('a page without one, or with two: no report', [embeddedReport('<html></html>'), embeddedReport(p2 + p2)], [null, null]);
+}
 
 // ---- the workflow's checks (lib.mjs) ----
 const body = `Summary\n\n[lordos-hwreport-2026-10-28.json](https://github.com/user-attachments/files/123456/lordos-hwreport-2026-10-28.json)\n
 https://github.com/lordbasex/LordOS/files/77/old.json and https://github.com/someone/else/files/88/evil.json
 https://evil.example/user-attachments/files/1/x.json https://github.com/user-attachments/files/9/x.json.exe javascript:alert(1)`;
-eq('attachment links: GitHub\'s, this repository only, .json only', findAttachments(body, 'lordbasex/LordOS'),
+eq('attachment links: GitHub\'s, this repository only, .json or .html only', findAttachments(body, 'lordbasex/LordOS'),
   ['https://github.com/user-attachments/files/123456/lordos-hwreport-2026-10-28.json', 'https://github.com/lordbasex/LordOS/files/77/old.json']);
+eq('the page is accepted too, the .json first', findAttachments('https://github.com/user-attachments/files/1/r.html https://github.com/user-attachments/files/2/r.json', 'a/b'),
+  ['https://github.com/user-attachments/files/2/r.json', 'https://github.com/user-attachments/files/1/r.html']);
 eq('at most three', findAttachments(Array.from({ length: 6 }, (_, i) => `https://github.com/user-attachments/files/${i}/a.json`).join(' '), 'a/b').length, 3);
 eq('a bad repository name matches only user-attachments', findAttachments('https://github.com/x/y/files/1/a.json', '../x'), []);
 eq('allowed hosts', ['https://github.com/user-attachments/files/1/a.json', 'https://objects.githubusercontent.com/x', 'https://github-production-user-asset-6210df.s3.amazonaws.com/x',

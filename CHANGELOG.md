@@ -368,6 +368,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Hardware reports: attaching System Information's page works too** (issue #171). The page it opens now carries the
+  report in a data block the browser never runs, and the hardware-report check reads it from an attached `.html` when
+  no `.json` is there (`embeddedReport` in `tools/hwreport/lib.mjs`, the same schema and limits).
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.

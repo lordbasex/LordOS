@@ -692,7 +692,7 @@ function Share({ r, onClose }) {
     const names = shareFileNames(rep.createdAt, (n) => { try { return !!fs.stat(`${docs}/${n}`); } catch (e) { return false; } });
     if (!names) { setMsg({ ok: false, text: tr('sysinfo.share.failed') }); return; }
     const text = Object.fromEntries(PAGE_KEYS.map((k) => [k, tr(`sysinfo.share.page.${k}`)]));
-    const html = sharePage({ text, rows, url: issueUrl(rep), jsonName: names.json, lang: lang || 'en', rtl: dir === 'rtl' });
+    const html = sharePage({ text, rows, url: issueUrl(rep), jsonName: names.json, lang: lang || 'en', rtl: dir === 'rtl', json });
     try {
       fs.write(`${docs}/${names.json}`, json);
       fs.write(`${docs}/${names.html}`, html);
