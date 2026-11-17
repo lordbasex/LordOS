@@ -393,6 +393,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   lord-sessiond turns them on again and puts the limits back; notes not yet put back (two failed starts in a row, a limit refused) are kept and merged, never replaced, and the file goes only once every limit is back (`server/src/sec/cgroup.c`, tested in
   `build/cgroup-restart-test`; the kernel's side checked in a delegated scope). Debian 13 ships systemd 257, which
   wasn't affected and works the same; the unit hasn't been run on 258 or later yet.
+- **A GTK 4 app froze when a dropdown or menu was opened a second time (GitHub #159).** GTK 4 keeps one wl_surface
+  for a popover and gives it a new xdg_surface and xdg_popup each time it opens; lord-server kept "configure already
+  sent" on the wl_surface, so the second opening's first commit got no `xdg_popup.configure`/`xdg_surface.configure`
+  and the app waited for it forever (the reporter's `WAYLAND_DEBUG` trace shows exactly that). When a popup or
+  toplevel role object goes, the surface's configure state and window geometry start over (`role_reset` in
+  `server/src/wl/wl.c`), and a commit on a surface whose popup is gone no longer maps it again or sends a configure on
+  a destroyed object. `tests/popup_client.c` opens a popup three times on one wl_surface and remakes a toplevel on its
+  old surface; `tests/popup_headless.sh` runs it against a headless lord-server in `make test` (before the fix: 7 of
+  15 checks failed).
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.

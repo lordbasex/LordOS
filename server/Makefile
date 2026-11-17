@@ -305,7 +305,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/popup-client build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -786,6 +786,11 @@ build/deco-client: tests/deco_client.c $(CLIENT_GEN)
 # (tests/dialog_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/dialog-client)
 build/dialog-client: tests/dialog_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/dialog_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# A popup opened again on the same wl_surface, as GTK 4's popovers (GitHub #159): every opening gets its configure
+# (tests/popup_client.c; inside a session: WAYLAND_DISPLAY=wayland-0 build/popup-client; tests/run_suites.sh runs it
+# against a headless lord-server)
+build/popup-client: tests/popup_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag
 # (tests/dnd_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/dnd-client, then press twice in its window)
 build/dnd-client: tests/dnd_client.c $(CLIENT_GEN)
