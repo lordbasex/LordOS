@@ -325,6 +325,7 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
   const ga = cleanActivity({ icon: 'code', color: '#7C5CFF', groups: [{ id: 'g1', name: 'Docs', icon: 'book', color: '#22A565', apps: ['editor'] }, { id: 'bad' }, { id: 'g2' }, { id: 'g3' }, { id: 'g4' }], group: 'g1' });
   eq('groups: cleaned, at most MAX_GROUPS, the one in view kept', [ga.groups.map((g) => g.id), ga.group], [['g1', 'g2', 'g3'], 'g1']);
   eq('groups: a group in view that is gone is dropped', cleanActivity({ groups: [{ id: 'g1' }], group: 'g7' }).group, undefined);
+  eq('updatedAt: an ISO date kept, anything else dropped', [cleanActivity({ updatedAt: '2026-11-17T10:00:00.000Z' }).updatedAt, cleanActivity({ updatedAt: 'yesterday' }).updatedAt], ['2026-11-17T10:00:00.000Z', undefined]);
   eq('groups: none, no key', 'groups' in cleanActivity({}), false);
   const ng = newGroup({ icon: 'code', color: '#7C5CFF', groups: [{ id: 'g1', icon: 'spark', color: '#3D7BFD' }] }, 'Mail');
   eq('groups: a new one, its own id, icon and colour', [ng.id, ng.icon !== 'code' && ng.icon !== 'spark', ng.color !== '#7C5CFF' && ng.color !== '#3D7BFD', ng.name], ['g2', true, true, 'Mail']);

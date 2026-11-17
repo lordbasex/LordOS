@@ -6,7 +6,7 @@
 // migration): the icon, the colour, the pinned apps and the layouts of each activity, by position like the desktops'
 // names (desktops are numbered again at every start), and the theme's own choices.
 //
-//   settings.workspaces = { v: 1, activities: [ { icon, color, pins, layouts, setup, groups, group } | null ] }
+//   settings.workspaces = { v: 1, activities: [ { icon, color, pins, layouts, setup, groups, group, updatedAt } | null ] }
 //   (groups: up to MAX_GROUPS more activities that share this desktop, the proposal's Activity Islands and its way past
 //   nine: [{ id, name, icon, color, apps }]; group: the one in view, or none for the activity's own; apps: the launcher
 //   ids of each group's windows, so they join their group again when they reopen)
@@ -79,6 +79,8 @@ export function cleanActivity(a, index = 0) {
     pins: Array.isArray(a.pins) ? [...new Set(a.pins.filter(isKey))].slice(0, MAX_PINS) : [],
     layouts: cleanLayouts(a.layouts),
     setup: a.setup === true,
+    // when the person last changed it (the proposal's updatedAt), an ISO date
+    ...(typeof a.updatedAt === 'string' && /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(a.updatedAt) ? { updatedAt: a.updatedAt } : null),
     ...(groups.length ? { groups, ...(groups.some((g) => g.id === a.group) ? { group: a.group } : null) } : null),
   };
 }

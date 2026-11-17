@@ -58,7 +58,10 @@ export const activityOf = (id) => activities.get()[id] || cleanActivity(null, Ma
 export function updateActivity(id, fn) {
   const cur = activities.get();
   const m = cur[id] || activityOf(id);
-  activities.set({ ...cur, [id]: cleanActivity(fn(m), desktopList.get().indexOf(id)) });
+  const next = cleanActivity(fn(m), desktopList.get().indexOf(id));
+  const { updatedAt: a, ...was } = m, { updatedAt: b, ...now } = next;
+  if (JSON.stringify(was) === JSON.stringify(now)) return;            // nothing changed: no new date, no save
+  activities.set({ ...cur, [id]: { ...next, updatedAt: new Date().toISOString() } });
 }
 
 // "+ New activity": a desktop, shown at once, with a fresh icon and colour, marked set up so it doesn't onboard.
