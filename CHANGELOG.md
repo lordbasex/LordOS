@@ -368,6 +368,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Cloud: an account kept on this computer stayed "coming down" for good when one of its folders can't be read
+  (GitHub #185).** Reported with an account set to keep every file here: after copying files into a folder, the files
+  showed the green check but the folder, and every other folder, kept the blue arrow, and files already in the cloud
+  at the top of the account never came down. The provider refuses to list one folder (its locked vault: "ObjectHandle
+  is Invalid") although it answers for everything else, and Keep on This Computer's pass stopped at the first folder
+  that failed (the rule for a provider that doesn't answer, #85, 0.8.8.7): everything after it in the walk was never
+  read, and the kept entry was never marked complete, so every folder under it kept the "coming down" glyph. Now a
+  path that fails while the provider answers is set aside for an hour (`CloudFails` in `cloud_pure.c`, at most 32 per
+  account): the account is checked at once and, when it answers, the keeper comes back and goes around that path, so
+  the rest comes down and the folders turn to kept; the path shows the error glyph meanwhile and is tried again after
+  the hour, at the next mount, or when the person keeps a folder again. The kept entry itself failing is still the
+  provider not answering (never set aside), and a check that finds the provider unreachable forgets what was set aside.
+  `cloud-test` checks the set (added, inside a failed folder, the hour, the limit).
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.

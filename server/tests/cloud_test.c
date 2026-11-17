@@ -123,6 +123,25 @@ static void t_paths(void) {
         unsigned char whole = 1;
         CHECK(cloud_kept_busy(all, &whole, 1, "x/y") && cloud_kept_busy(all, &whole, 1, ""));
     }
+    {
+        /* #185: what the keeper couldn't read while the provider answered is gone around for an hour */
+        CloudFails f;
+        memset(&f, 0, sizeof f);
+        CHECK(!cloud_fails_has(&f, "Vault", 100));
+        CHECK(cloud_fails_add(&f, "Vault", 100) == 1 && cloud_fails_add(&f, "Vault", 200) == 0 && f.n == 1 && f.at[0] == 100);
+        CHECK(cloud_fails_has(&f, "Vault", 100) && cloud_fails_has(&f, "Vault/a/b.txt", 100 + CLOUD_FAILS_RETRY_S - 1));
+        CHECK(!cloud_fails_has(&f, "Vaults", 100) && !cloud_fails_has(&f, "", 100) && !cloud_fails_has(&f, "Docs", 100) && !cloud_fails_has(&f, NULL, 100));
+        CHECK(!cloud_fails_has(&f, "Vault", 100 + CLOUD_FAILS_RETRY_S));          /* due to be tried again */
+        CHECK(cloud_fails_add(&f, "Docs/broken.pdf", 3000) == 1 && f.n == 2);
+        cloud_fails_expire(&f, 100 + CLOUD_FAILS_RETRY_S);
+        CHECK(f.n == 1 && !strcmp(f.rel[0], "Docs/broken.pdf") && f.rel[1] == NULL && cloud_fails_has(&f, "Docs/broken.pdf", 3001));
+        for (int i = 0; i < CLOUD_FAILS_MAX + 4; i++) { char r[16]; snprintf(r, sizeof r, "d%d", i); cloud_fails_add(&f, r, 3000); }
+        CHECK(f.n == CLOUD_FAILS_MAX && cloud_fails_add(&f, "one more", 3000) == -1);
+        cloud_fails_clear(&f);
+        CHECK(f.n == 0 && !cloud_fails_has(&f, "Docs/broken.pdf", 3001));
+        cloud_fails_clear(NULL);
+        CHECK(cloud_fails_add(NULL, "x", 1) == -1 && !cloud_fails_has(NULL, "x", 1));
+    }
 }
 
 static int has_brand(const char *s) {

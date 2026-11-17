@@ -229,6 +229,7 @@ static void acc_free(Acc *a) {
     wipe_free(a->pending_secret);
     for (int i = 0; i < a->nkeep; i++) free(a->keep[i]);
     for (int i = 0; i < a->nerrn; i++) free(a->errn[i]);
+    cloud_fails_clear(&a->kfail);
     memset(a, 0, sizeof *a);
 }
 
@@ -1301,7 +1302,7 @@ static int mount_acc(Acc *a) {
     jb_free(&b);
     const char *off = NULL;
     pthread_mutex_lock(&cl_mu);
-    if (st == 200) { a->mounted = 1; a->mount_gen++; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; a->keeper_wait = 1; }   /* starting: until its first listing answers (check_acc) */
+    if (st == 200) { a->mounted = 1; a->mount_gen++; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; a->keeper_wait = 1; cloud_fails_clear(&a->kfail); }   /* starting: until its first listing answers (check_acc) */
     else {
         a->mounted = 0;
         const char *fc = cloud_failure_code(msg);
@@ -1594,6 +1595,7 @@ static void check_acc(Acc *a) {
         cpy(a->err, sizeof a->err, c ? c : "cloud.listFailed");
         if (!strcmp(a->err, "cloud.authFailed") && !strcmp(a->k->group, "oauth")) cpy(a->err, sizeof a->err, "cloud.signInAgain");
         set_message(a, msg);
+        if (cloud_err_offline(a->err)) cloud_fails_clear(&a->kfail);   /* #185: what the keeper set aside failed because of this */
     } else if (listing_code(a->err)) { a->err[0] = 0; a->message[0] = 0; a->fp_old[0] = a->fp_new[0] = 0; }
     int key = bad && c && !strcmp(c, "cloud.hostKeyChanged") && !a->fp_new[0];
     keeper_waits = keeper_waits && !cloud_err_offline(a->err);
@@ -3393,7 +3395,8 @@ void cloud_keep(const char *const *paths, int n, int keep) {
         int at = -1;
         for (int k = 0; k < a->nkeep; k++) if (!strcmp(a->keep[k], rel)) at = k;
         /* a new kept entry is coming down until the keeper's first pass over it ends (#71) */
-        if (keep && at < 0 && a->nkeep < KEEP_MAX) { char *d = strdup(rel); if (d) { a->keep_busy[a->nkeep] = 1; a->keep[a->nkeep++] = d; changed = 1; } }
+        /* #185: keeping again is the person asking for another try of what failed */
+        if (keep && at < 0 && a->nkeep < KEEP_MAX) { char *d = strdup(rel); if (d) { a->keep_busy[a->nkeep] = 1; a->keep[a->nkeep++] = d; changed = 1; cloud_fails_clear(&a->kfail); } }
         else if (!keep && at >= 0) {
             free(a->keep[at]);
             a->keep[at] = a->keep[--a->nkeep];
