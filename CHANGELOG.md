@@ -375,6 +375,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `server/tests/jsx_undeclared_test.mjs` (in `make test`), reads every `.jsx` of the apps, themes, SDK and runtime and
   fails on a component used as a JSX tag that is never imported or declared in its file; esbuild bundles such a file
   without a warning.
+- **The lock screen could stay lit and never sleep (GitHub #172).** When the session locks (Require password, the
+  lid, the power button or the sleep timer), it hands its display-off and sleep deadlines to the login screen in a
+  `mode` notice. A login screen started for that lock (it is stopped 10 s after each login) added its listener in a
+  React effect, a few turns of the main loop after the theme loaded, so a notice that came first was dropped: the
+  screen stayed on and the computer never went to sleep from the lock screen. The deadlines are now applied as the
+  notice arrives, and the screen gets the notice when it mounts (`themes/greeter/inbox.js`, tested in
+  `server/tests/greeter_inbox_test.mjs`). A MacBook that wakes up a second after it goes to sleep with the lid open is
+  a firmware wake source (`LID0` in `/proc/acpi/wakeup`), not this; LordOS doesn't change wake sources yet.
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.

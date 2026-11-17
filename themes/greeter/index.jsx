@@ -20,6 +20,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { createElement } from 'react';
+import { makeInbox } from './inbox.js';
 
 const send = (msg) => { try { return lord.greeter.send(JSON.stringify(msg)); } catch (e) { return false; } };
 
@@ -36,12 +37,9 @@ function idleOnLock(m) {
   } catch (e) { /* an older lord-server */ }
 }
 
-const listeners = new Set();
-globalThis.__lordGreeter = (json) => {
-  let m = null;
-  try { m = JSON.parse(json); } catch (e) { return; }
-  for (const fn of listeners) fn(m);
-};
+// idle state as the notice comes, even before the screen has mounted (themes/greeter/inbox.js, #172)
+const inbox = makeInbox(idleOnLock);
+globalThis.__lordGreeter = (json) => inbox.dispatch(json);
 
 const PALETTE = [['#5b9cff', '#2f6fe0'], ['#f0915a', '#d0602b'], ['#4cc37a', '#269653'], ['#e0609d', '#b83574'],
   ['#a77bf3', '#7a4fd6'], ['#4cc4d3', '#2391a3'], ['#f2c14e', '#d0961d']];
@@ -276,7 +274,6 @@ function Greeter() {
           return (m.users.find((u) => u.open) || m.users[0] || {}).name || '';
         });
       } else if (m.t === 'mode') {
-        idleOnLock(m);
         setPass(''); setMsg(''); setBusy(false); setMenu(null); setConfirm(null); setFocusRev((v) => v + 1);
         setInfo((old) => ({ ...old, mode: m.mode, user: m.user }));
         reselect.current = true;
@@ -290,12 +287,12 @@ function Greeter() {
       } else if (m.t === 'error') { setBusy(false); setMsg(t('greeter.error')); }
       else if (m.t === 'busy') { setBusy(false); setMsg(t('greeter.busy')); }
     };
-    listeners.add(on);
+    const unlisten = inbox.listen(on);
     send({ t: 'hello' });
     // every 10 s: the network address and the user list (users can be created or deleted meanwhile)
     const id = setInterval(() => { setIp(lanAddress()); send({ t: 'hello' }); }, 10000);
     const tick = setInterval(() => setNow(new Date()), 1000);
-    return () => { listeners.delete(on); clearInterval(id); clearInterval(tick); };
+    return () => { unlisten(); clearInterval(id); clearInterval(tick); };
   }, []);
 
   const user = info.users.find((u) => u.name === sel);

@@ -305,7 +305,10 @@ against BlueZ 5.82's source and the unit tests above; **not yet with a real Magi
   (`dark`) the login screen keeps it off (`lord.display.blank()`) until a key, the mouse or the
   trackpad; it turns the screen off again after the same `off` time, and when the sleep time is up
   (`sleepLeft` after the lock, then `sleep` after the last input) it asks `lord-sessiond` to suspend
-  (`{t:'power', a:'suspend'}`, the login screen having no admin helper). If sleep comes before the lock
+  (`{t:'power', a:'suspend'}`, the login screen having no admin helper). The login screen applies those
+  deadlines as the `mode` notice arrives, before its React tree has mounted (`themes/greeter/inbox.js`): a
+  login screen started for the lock used to drop a notice that came first and stay lit and awake (#172).
+  If sleep comes before the lock
   deadline, the session locks first. Sleep choices: 10, 15, 20, 30 min, 1, 2 and 3 h on the power
   adapter; 5, 10, 15, 30 min, 1, 2 and 3 h on battery. The VM is never put to
   sleep in the tests. Since 0.8.5 a Linux app that holds a Wayland idle inhibitor
