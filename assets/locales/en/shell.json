@@ -662,6 +662,7 @@
   "ws.search.noResults": "Nothing found for “{query}”",
   "ws.search.activitySub": "Activity {pos} · open windows: {n}",
   "ws.shortcuts.spine": "Collapse or expand the Context Spine",
+  "ws.shortcuts.bars": "Move the keyboard to the spine and the activity bar",
   "ws.peek.windows": "Open windows: {n}",
   "ws.peek.more": "More windows: {n}",
   "ws.peek.pinned": "Nothing open · pinned: {apps}",

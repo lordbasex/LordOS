@@ -655,6 +655,7 @@
   "ws.search.noResults": "Tidak ditemukan apa pun untuk “{query}”",
   "ws.search.activitySub": "Aktivitas {pos} · jendela terbuka: {n}",
   "ws.shortcuts.spine": "Ciutkan atau bentangkan bilah konteks",
+  "ws.shortcuts.bars": "Pindahkan keyboard ke bilah samping dan bilah aktivitas",
   "ws.peek.windows": "Jendela: {n}",
   "ws.peek.more": "Jendela lainnya: {n}",
   "ws.peek.pinned": "Tidak ada yang terbuka · disematkan: {apps}",

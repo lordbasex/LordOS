@@ -655,6 +655,7 @@
   "ws.search.noResults": "‘{query}’에 대한 결과가 없습니다",
   "ws.search.activitySub": "활동 {pos} · 열린 창: {n}",
   "ws.shortcuts.spine": "컨텍스트 막대 접기 또는 펼치기",
+  "ws.shortcuts.bars": "키보드를 사이드바와 활동 막대로 옮기기",
   "ws.peek.windows": "창: {n}",
   "ws.peek.more": "다른 창: {n}",
   "ws.peek.pinned": "열린 항목 없음 · 고정됨: {apps}",

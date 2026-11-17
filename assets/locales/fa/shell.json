@@ -662,6 +662,7 @@
   "ws.search.noResults": "چیزی برای «{query}» پیدا نشد",
   "ws.search.activitySub": "فعالیت {pos} · پنجره‌های باز: {n}",
   "ws.shortcuts.spine": "جمع یا باز کردن نوار زمینه",
+  "ws.shortcuts.bars": "بردن صفحه‌کلید به نوار کناری و نوار فعالیت‌ها",
   "ws.peek.windows": "پنجره‌ها: {n}",
   "ws.peek.more": "پنجره‌های بیشتر: {n}",
   "ws.peek.pinned": "چیزی باز نیست · سنجاق‌شده: {apps}",

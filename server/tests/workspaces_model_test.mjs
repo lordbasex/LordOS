@@ -3,7 +3,7 @@
 // styles and the palette's contrast. node server/tests/workspaces_model_test.mjs
 import { displayPlan, shownDisplays, spineMode, onChrome, SPINE_BLUR, SPINE_GAP, FRAME_PAD, SPINE_W, MARGIN, SMALL_W, SPINE_SHADOW_REACH, WINDOW_SHADOW } from '../../themes/workspaces/model/geometry.js';
 import { tileRects, fitTile, splitterAt, ratioFrom, orderFor, homeFor, displayKey, displayKeys, judgeFrame, underBudget, ANSWER_MS, MOVES_PER_SEC, savedDisplay, foldMissing, cleanLayout, cleanRatio, LAYOUTS, TILE_GAP, RATIO_MIN, RATIO_MAX } from '../../themes/workspaces/model/layouts.js';
-import { recentOrder, spineRecentRoom, activitySummary } from '../../themes/workspaces/model/activities.js';
+import { recentOrder, spineRecentRoom, activitySummary, barStep } from '../../themes/workspaces/model/activities.js';
 import { wsPrefs, effectiveSurface, metaFromSaved, savedFromMeta, cleanActivity, defaultActivity, freshActivity, togglePin, needsOnboarding, wsPatch, optPatch,
   ACTIVITY_ICONS, ACTIVITY_COLORS, MAX_PINS, WS_VERSION } from '../../themes/workspaces/model/activities.js';
 import { makeTheme, accents, deep, material } from '../../themes/workspaces/tokens.js';
@@ -318,6 +318,8 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
   const ws = [{ id: 'a', desktop: 2 }, { id: 'b', desktop: 2, minimized: true }, { id: 'c', desktop: 2 }, { id: 'd', desktop: 1 }];
   eq('summary: front first, minimized last', activitySummary(ws, 2).shown.map((w) => w.id), ['c', 'a', 'b']);
   eq('summary: total and more', [activitySummary(ws, 2, 1).total, activitySummary(ws, 2, 1).more], [3, 2]);
+  eq('bars: next, round, first and last', [barStep(['a', 'b', 'c'], 'c', 1), barStep(['a', 'b', 'c'], 'a', -1), barStep(['a', 'b'], 'b', -Infinity), barStep(['a', 'b'], 'a', Infinity)], ['a', 'c', 'a', 'b']);
+  eq('bars: a control gone starts again', barStep(['a', 'b'], 'x', 1), 'a');
   eq('recent: room by height', [500, 640, 768, 1080].map(spineRecentRoom), [0, 1, 2, 3]);
 }
 

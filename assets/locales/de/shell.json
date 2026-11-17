@@ -662,6 +662,7 @@
   "ws.search.noResults": "Nichts gefunden für „{query}“",
   "ws.search.activitySub": "Aktivität {pos} · offene Fenster: {n}",
   "ws.shortcuts.spine": "Kontextleiste ein- oder ausklappen",
+  "ws.shortcuts.bars": "Tastatur zur Seitenleiste und zur Aktivitätenleiste bewegen",
   "ws.peek.windows": "Fenster: {n}",
   "ws.peek.more": "Weitere Fenster: {n}",
   "ws.peek.pinned": "Nichts geöffnet · angeheftet: {apps}",

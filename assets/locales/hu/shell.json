@@ -662,6 +662,7 @@
   "ws.search.noResults": "Nincs találat erre: „{query}”",
   "ws.search.activitySub": "{pos}. tevékenység · nyitott ablakok: {n}",
   "ws.shortcuts.spine": "A kontextussáv összecsukása vagy kinyitása",
+  "ws.shortcuts.bars": "Billentyűzet áthelyezése az oldalsávra és a tevékenységsávra",
   "ws.peek.windows": "Ablakok: {n}",
   "ws.peek.more": "További ablakok: {n}",
   "ws.peek.pinned": "Semmi sincs megnyitva · rögzítve: {apps}",

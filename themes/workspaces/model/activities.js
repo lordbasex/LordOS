@@ -139,5 +139,16 @@ export function activitySummary(wins, desk, max = 6) {
   return { total: on.length, shown: order.slice(0, max), more: Math.max(0, on.length - max) };
 }
 
+// The bars' keyboard (barfocus.js): the control after (dir 1) or before (-1) cur, round the list; ±Infinity: the
+// last or the first. A control that went away (an activity removed) starts again from the first.
+export function barStep(ids, cur, dir) {
+  if (!ids.length) return null;
+  if (dir === Infinity) return ids[ids.length - 1];
+  if (dir === -Infinity) return ids[0];
+  const i = ids.indexOf(cur);
+  if (i < 0) return ids[0];
+  return ids[(i + dir + ids.length) % ids.length];
+}
+
 // The onboarding shows on the only activity while nothing was set up and nothing is open.
 export const needsOnboarding = (meta, count, windows) => count === 1 && !!meta && !meta.setup && windows === 0;

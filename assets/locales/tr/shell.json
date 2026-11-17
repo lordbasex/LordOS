@@ -662,6 +662,7 @@
   "ws.search.noResults": "“{query}” için sonuç yok",
   "ws.search.activitySub": "Etkinlik {pos} · açık pencere: {n}",
   "ws.shortcuts.spine": "Bağlam şeridini daralt veya genişlet",
+  "ws.shortcuts.bars": "Klavyeyi yan çubuğa ve etkinlik çubuğuna taşı",
   "ws.peek.windows": "Pencereler: {n}",
   "ws.peek.more": "Diğer pencereler: {n}",
   "ws.peek.pinned": "Açık bir şey yok · sabitlenenler: {apps}",

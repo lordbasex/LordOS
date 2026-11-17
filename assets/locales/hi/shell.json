@@ -662,6 +662,7 @@
   "ws.search.noResults": "“{query}” के लिए कुछ नहीं मिला",
   "ws.search.activitySub": "गतिविधि {pos} · खुली विंडो: {n}",
   "ws.shortcuts.spine": "संदर्भ पट्टी समेटें या फैलाएँ",
+  "ws.shortcuts.bars": "कीबोर्ड को साइड बार और गतिविधि बार पर ले जाएँ",
   "ws.peek.windows": "विंडो: {n}",
   "ws.peek.more": "और विंडो: {n}",
   "ws.peek.pinned": "कुछ भी खुला नहीं · पिन किए गए: {apps}",

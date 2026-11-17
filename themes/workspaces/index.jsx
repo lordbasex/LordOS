@@ -31,6 +31,9 @@ import { minimizeStarts } from '../default/minimize.js';
 import { activities, panel, deleting, startActivities, updateActivity, setUpActivity, activityOf, noteLaunch, newActivity } from './state.js';
 import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked } from './tiler.js';
 import { startMagnet } from './magnet.js';
+import { barFocus, setBarItems, enterBars, leaveBars, barKey } from './barfocus.js';
+import { recentActivities } from './state.js';
+import { spineRecentRoom } from './model/activities.js';
 import { SnapAssist } from './components/SnapAssist.jsx';
 import { WidgetPicker, widgetPicker } from './components/WidgetPicker.jsx';
 import { GlassTarget, DropTarget, SnapFlyout, dropTarget, useDropTarget } from './components/SnapTargets.jsx';
@@ -92,6 +95,7 @@ const table = [
   { id: 'search', keys: ['Meta+Space'], run: () => openSearch(), label: 'shell.shortcuts.search', group: 'system' },
   { id: 'searchCtrl', keys: ['Ctrl+Space'], run: () => openSearch(), when: notInTerminal, label: 'shell.shortcuts.search', group: 'system' },
   { id: 'spine', keys: ['Meta+Alt+D'], run: toggleSpine, label: 'shell.ws.shortcuts.spine', group: 'system' },
+  { id: 'bars', keys: ['Ctrl+F2'], run: () => { panel.set(null); enterBars(); }, label: 'shell.ws.shortcuts.bars', group: 'system' },
   { id: 'switchApps', keys: switcherKeys('meta'), run: (e) => openSwitcher(switcherHold(e), e.shift), label: 'shell.shortcuts.switchApps', group: 'windows' },
   { id: 'cycleWindows', keys: ['Meta+`', 'Meta+Shift+`'], run: (e) => cycleAppWindows(e.shift), label: 'shell.shortcuts.cycleWindows', group: 'windows' },
   { id: 'minimize', keys: ['Meta+M'], run: onFront(wm.minimize), label: 'shell.shortcuts.minimize', group: 'windows' },
@@ -196,7 +200,33 @@ function App() {
     const m = activityOf(id);
     return { color: m.color, Icon: ({ size }) => <ActivityIcon icon={m.icon} color="#ffffff" bg={m.color} size={size} /> };
   }), []);
-  useShortcuts({ grabs: switcherGrabs(flowGrabs()), table, onSuperTap: () => openSearch('apps'), appsPaste: true });
+  // Lord Flow's key table plus ⌃F2 (server/src/wl/keygrab.c "workspaces")
+  useShortcuts({ grabs: switcherGrabs(flowGrabs().replace('flow', 'workspaces')), table, onSuperTap: () => openSearch('apps'), appsPaste: true });
+  // the bars' keyboard (barfocus.js): the spine from the crown down, then the strip's pills and New
+  useEffect(() => {
+    setBarItems(() => {
+      const desk = activeDesktop.get(), sp = main?.plan.spine;
+      const recent = sp ? recentActivities.get().filter((id) => id !== desk).slice(0, spineRecentRoom(sp.h)) : [];
+      const at = sp ? { x: sp.x + sp.w, y: sp.y + 8 } : { x: 40, y: 40 };
+      return [
+        ...(sp ? [
+          { id: 'crown', run: () => H.crown(at) }, { id: 'current', run: () => H.edit(desk) },
+          ...recent.map((id) => ({ id: `recent:${id}`, run: () => H.activity(id) })),
+          { id: 'activities', run: H.activities }, { id: 'apps', run: () => H.apps() }, { id: 'files', run: () => H.files() },
+          { id: 'notif', run: H.notif }, { id: 'settings', run: H.settings }, { id: 'control', run: H.control },
+        ] : []),
+        ...(main?.plan.top ? [...desktopList.get().map((id) => ({ id: `pill:${id}`, run: () => switchDesktop(id) })),
+          ...(desktopList.get().length < 9 ? [{ id: 'new', run: () => newActivity() }] : [])] : []),
+      ];
+    });
+  }, [main]);
+  const barsOn = useStore(barFocus) != null;
+  useEffect(() => {
+    if (!barsOn) return undefined;
+    const offKey = addListener('keydown', (e) => barKey(e));
+    const offDown = addListener('pointerdown', () => leaveBars());     // a press of the pointer gives the keyboard back
+    return () => { offKey(); offDown(); };
+  }, [barsOn]);
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { panel.set(null); crownMenu.set(null); deskMenu.set(null); } }), []);
   useEffect(() => { if (inOverview) panel.set(null); }, [inOverview]);
   useEffect(() => registerGestureActions({
@@ -334,6 +364,7 @@ function App() {
           </Layer>
         ) : null}
         <Layer name="modal"><PowerDialog /></Layer>
+        {barsOn ? <Layer name="overlay"><View style={{ position: 'absolute', left: 0, top: 0, width: 1, height: 1 }} /></Layer> : null}
         <AppSwitcher />
         <OverviewChrome />
         <LevelHud />

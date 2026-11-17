@@ -669,6 +669,7 @@
   "ws.search.noResults": "Ничего не найдено по запросу «{query}»",
   "ws.search.activitySub": "Занятие {pos} · открытых окон: {n}",
   "ws.shortcuts.spine": "Свернуть или развернуть контекстную панель",
+  "ws.shortcuts.bars": "Перевести клавиатуру на боковую панель и панель занятий",
   "ws.peek.windows": "Окна: {n}",
   "ws.peek.more": "Ещё окна: {n}",
   "ws.peek.pinned": "Ничего не открыто · закреплены: {apps}",

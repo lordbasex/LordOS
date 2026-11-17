@@ -19,6 +19,7 @@ const { displayPlan, SPINE_W } = await import('../../themes/workspaces/model/geo
 const { tileRects } = await import('../../themes/workspaces/model/layouts.js');
 const tiler = await import('../../themes/workspaces/tiler.js');
 const state = await import('../../themes/workspaces/state.js');
+const bars = await import('../../themes/workspaces/barfocus.js');
 
 const { texts, styles, parents, removed, props } = globalThis.__lordTest;
 const h = React.createElement;
@@ -125,6 +126,18 @@ check('control atlas: its sections', [sdk.t('settings.section.appearance'), sdk.
 check('control atlas: the layout in view named', shownText(sdk.t(`shell.ws.layout.${tiler.layoutOf(desk, 'DP-2').layout}`)), true);
 state.panel.set(null);
 await flush();
+
+// the bars' keyboard: ⌃F2 starts at the activity in view, the arrows walk on, a ring shows, Escape gives it back
+bars.enterBars();
+await flush();
+check('bars: the activity in view first', bars.barFocus.get(), 'current');
+bars.barKey({ key: 'ArrowDown' });
+await flush();
+const ringed = () => [...styles].filter(([id, st]) => st.left === -3 && st.top === -3 && st.pointerEvents === 'none' && attached(id)).length;
+check('bars: the next control, with its ring', [bars.barFocus.get() !== 'current', ringed()], [true, 1]);
+bars.barKey({ key: 'Escape' });
+await flush();
+check('bars: Escape gives the keyboard back', [bars.barFocus.get(), ringed()], [null, 0]);
 
 // Search on the display it opens for (the one under the pointer)
 state.panel.set({ name: 'search', mode: 'apps', display: L.id });

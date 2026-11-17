@@ -690,6 +690,7 @@
   "ws.search.noResults": "لم يُعثر على شيء لـ «{query}»",
   "ws.search.activitySub": "النشاط {pos} · النوافذ المفتوحة: {n}",
   "ws.shortcuts.spine": "طي شريط السياق أو توسيعه",
+  "ws.shortcuts.bars": "نقل لوحة المفاتيح إلى الشريط الجانبي وشريط الأنشطة",
   "ws.peek.windows": "النوافذ: {n}",
   "ws.peek.more": "نوافذ أخرى: {n}",
   "ws.peek.pinned": "لا شيء مفتوح · المثبّتة: {apps}",

@@ -669,6 +669,7 @@
   "ws.search.noResults": "Nieko nerasta pagal „{query}“",
   "ws.search.activitySub": "Veikla {pos} · atvirų langų: {n}",
   "ws.shortcuts.spine": "Suskleisti arba išskleisti konteksto juostą",
+  "ws.shortcuts.bars": "Perkelti klaviatūrą į šoninę juostą ir veiklų juostą",
   "ws.peek.windows": "Langai: {n}",
   "ws.peek.more": "Daugiau langų: {n}",
   "ws.peek.pinned": "Nieko neatidaryta · prisegta: {apps}",

@@ -655,6 +655,7 @@
   "ws.search.noResults": "找不到與「{query}」相符的內容",
   "ws.search.activitySub": "活動 {pos} · 開啟的視窗：{n}",
   "ws.shortcuts.spine": "收合或展開情境側欄",
+  "ws.shortcuts.bars": "將鍵盤焦點移到側欄與活動列",
   "ws.peek.windows": "視窗：{n}",
   "ws.peek.more": "更多視窗：{n}",
   "ws.peek.pinned": "沒有開啟的內容 · 已釘選：{apps}",

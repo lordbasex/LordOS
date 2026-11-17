@@ -662,6 +662,7 @@
   "ws.search.noResults": "“{query}” üçün heç nə tapılmadı",
   "ws.search.activitySub": "Fəaliyyət {pos} · açıq pəncərə: {n}",
   "ws.shortcuts.spine": "Kontekst zolağını yığ və ya aç",
+  "ws.shortcuts.bars": "Klaviaturanı yan zolağa və fəaliyyət panelinə keçir",
   "ws.peek.windows": "Pəncərələr: {n}",
   "ws.peek.more": "Daha çox pəncərə: {n}",
   "ws.peek.pinned": "Heç nə açıq deyil · bərkidilmiş: {apps}",

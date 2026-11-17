@@ -662,6 +662,7 @@
   "ws.search.noResults": "Нищо не е намерено за „{query}“",
   "ws.search.activitySub": "Дейност {pos} · отворени прозорци: {n}",
   "ws.shortcuts.spine": "Свий или разгъни контекстната лента",
+  "ws.shortcuts.bars": "Преместване на клавиатурата към страничната лента и лентата с дейности",
   "ws.peek.windows": "Прозорци: {n}",
   "ws.peek.more": "Още прозорци: {n}",
   "ws.peek.pinned": "Нищо не е отворено · закачени: {apps}",

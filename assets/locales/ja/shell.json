@@ -655,6 +655,7 @@
   "ws.search.noResults": "「{query}」に一致するものはありません",
   "ws.search.activitySub": "アクティビティ {pos} · 開いているウインドウ：{n}",
   "ws.shortcuts.spine": "コンテキストバーを折りたたむ／広げる",
+  "ws.shortcuts.bars": "キーボード操作をサイドバーとアクティビティバーへ移す",
   "ws.peek.windows": "ウインドウ: {n}",
   "ws.peek.more": "ほかのウインドウ: {n}",
   "ws.peek.pinned": "開いているものなし · ピン留め: {apps}",

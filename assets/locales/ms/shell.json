@@ -655,6 +655,7 @@
   "ws.search.noResults": "Tiada apa-apa ditemui untuk “{query}”",
   "ws.search.activitySub": "Aktiviti {pos} · tetingkap terbuka: {n}",
   "ws.shortcuts.spine": "Kuncupkan atau kembangkan bar konteks",
+  "ws.shortcuts.bars": "Alihkan papan kekunci ke bar sisi dan bar aktiviti",
   "ws.peek.windows": "Tetingkap: {n}",
   "ws.peek.more": "Lagi tetingkap: {n}",
   "ws.peek.pinned": "Tiada yang dibuka · disemat: {apps}",

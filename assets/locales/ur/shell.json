@@ -662,6 +662,7 @@
   "ws.search.noResults": "«{query}» کے لیے کچھ نہیں ملا",
   "ws.search.activitySub": "سرگرمی {pos} · کھلی ونڈوز: {n}",
   "ws.shortcuts.spine": "سیاق کی پٹی سمیٹیں یا پھیلائیں",
+  "ws.shortcuts.bars": "کی بورڈ کو سائیڈ بار اور سرگرمیوں کی بار پر لے جائیں",
   "ws.peek.windows": "ونڈوز: {n}",
   "ws.peek.more": "مزید ونڈوز: {n}",
   "ws.peek.pinned": "کچھ کھلا نہیں · پن کردہ: {apps}",

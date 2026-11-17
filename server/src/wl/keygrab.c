@@ -43,6 +43,11 @@ static const Grab flow_desktops[] = {
     { KG_CTRL, 0, KEY_UP, KG_TAKE }, { KG_CTRL, 0, KEY_DOWN, KG_TAKE },
 };
 
+/* Lord Workspaces: Lord Flow's table (`workspaces` = flow, `workspaces-desktops` = flow-desktops) and ⌃F2, which moves
+ * the keyboard to the Context Spine and the activity strip (the bars' own focus, themes/workspaces/barfocus.js). */
+static const Grab workspaces_extra[] = {
+    { KG_CTRL, 0, KEY_F2, KG_TAKE },
+};
 static const Grab classic[] = {
     { KG_ALT, 0, KEY_TAB, KG_HOLD },
     { KG_ALT | KG_SHIFT, 0, KEY_TAB, KG_HOLD },
@@ -64,8 +69,8 @@ static const Grab classic[] = {
     { KG_META | KG_CTRL, 0, KEY_LEFT, KG_TAKE }, { KG_META | KG_CTRL, 0, KEY_RIGHT, KG_TAKE },
 };
 
-static const Grab *table;
-static size_t count;
+static const Grab *table, *extra;
+static size_t count, extra_count;
 static int remaps;
 /* Which modifier holds the app switcher, from Settings → Keyboard: a profile's "+tab-meta", "+tab-alt" or
  * "+tab-both". No suffix: what the table says. */
@@ -87,9 +92,17 @@ int keygrab_set(const char *name) {
         else if (!strcmp(plus, "+tab-both")) meta = alt = 1;
         else return 0;
     }
-    if (strcmp(profile, "flow") && strcmp(profile, "flow-desktops") && strcmp(profile, "classic") && profile[0]) return 0;
+    int ws = !strcmp(profile, "workspaces") || !strcmp(profile, "workspaces-desktops");
+    if (strcmp(profile, "flow") && strcmp(profile, "flow-desktops") && strcmp(profile, "classic") && !ws && profile[0]) return 0;
     tab_set = set; tab_meta = meta; tab_alt = alt;
+    extra = NULL; extra_count = 0;
     if (!profile[0]) { table = NULL; count = 0; remaps = 0; tab_set = 0; return 1; }
+    if (ws) {
+        extra = workspaces_extra; extra_count = sizeof workspaces_extra / sizeof workspaces_extra[0];
+        memmove(profile, profile + 10, strlen(profile + 10) + 1);           /* "workspaces" → "", "-desktops" */
+        memmove(profile + 4, profile, strlen(profile) + 1);
+        memcpy(profile, "flow", 4);
+    }
     if (!strcmp(profile, "flow")) { table = flow; count = sizeof flow / sizeof flow[0]; remaps = 1; return 1; }
     if (!strcmp(profile, "flow-desktops")) { table = flow_desktops; count = sizeof flow_desktops / sizeof flow_desktops[0]; remaps = 1; return 1; }
     if (!strcmp(profile, "classic")) { table = classic; count = sizeof classic / sizeof classic[0]; remaps = 0; return 1; }
@@ -119,8 +132,8 @@ int keygrab_match(int code, char letter, unsigned mods) {
         if (m == KG_ALT) return tab_alt ? KG_HOLD : KG_PASS;
     }
     if (tab_set && tab_meta && table == classic && letter == 'w' && mods == KG_META) return KG_TAKE;   /* the Overview moves here */
-    for (size_t i = 0; i < count; i++) {
-        const Grab *g = &table[i];
+    for (size_t i = 0; i < count + extra_count; i++) {
+        const Grab *g = i < count ? &table[i] : &extra[i - count];
         if (g->mods != mods) continue;
         if (g->letter ? g->letter == letter : !letter && g->code == code) return g->how;
     }

@@ -662,6 +662,7 @@
   "ws.search.noResults": "Niets gevonden voor ‘{query}’",
   "ws.search.activitySub": "Activiteit {pos} · open vensters: {n}",
   "ws.shortcuts.spine": "Contextkolom in- of uitklappen",
+  "ws.shortcuts.bars": "Toetsenbord naar de zijbalk en de activiteitenbalk verplaatsen",
   "ws.peek.windows": "Vensters: {n}",
   "ws.peek.more": "Meer vensters: {n}",
   "ws.peek.pinned": "Niets geopend · vastgezet: {apps}",

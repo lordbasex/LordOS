@@ -662,6 +662,7 @@
   "ws.search.noResults": "Ei tuloksia haulle ”{query}”",
   "ws.search.activitySub": "Aktiviteetti {pos} · avoimia ikkunoita: {n}",
   "ws.shortcuts.spine": "Pienennä tai laajenna kontekstipalkki",
+  "ws.shortcuts.bars": "Siirrä näppäimistö sivupalkkiin ja toimintapalkkiin",
   "ws.peek.windows": "Ikkunat: {n}",
   "ws.peek.more": "Lisää ikkunoita: {n}",
   "ws.peek.pinned": "Mitään ei ole auki · kiinnitetyt: {apps}",

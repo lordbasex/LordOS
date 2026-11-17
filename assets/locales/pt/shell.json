@@ -662,6 +662,7 @@
   "ws.search.noResults": "Nada encontrado para “{query}”",
   "ws.search.activitySub": "Atividade {pos} · janelas abertas: {n}",
   "ws.shortcuts.spine": "Recolher ou expandir a coluna de contexto",
+  "ws.shortcuts.bars": "Levar o teclado para o Spine e a barra de atividades",
   "ws.peek.windows": "Janelas: {n}",
   "ws.peek.more": "Mais janelas: {n}",
   "ws.peek.pinned": "Nada aberto · fixados: {apps}",

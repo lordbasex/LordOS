@@ -669,6 +669,7 @@
   "ws.search.noResults": "Нічого не знайдено за запитом «{query}»",
   "ws.search.activitySub": "Заняття {pos} · відкритих вікон: {n}",
   "ws.shortcuts.spine": "Згорнути або розгорнути контекстну панель",
+  "ws.shortcuts.bars": "Перевести клавіатуру на бічну панель і панель занять",
   "ws.peek.windows": "Вікна: {n}",
   "ws.peek.more": "Ще вікна: {n}",
   "ws.peek.pinned": "Нічого не відкрито · закріплені: {apps}",

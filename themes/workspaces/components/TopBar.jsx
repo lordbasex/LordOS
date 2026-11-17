@@ -18,7 +18,7 @@ import { activitySummary } from '../model/activities.js';
 import { memo, useEffect, useRef, useState } from 'react';
 import { tween, EASE } from '../motion.js';
 import { Surface } from './Surface.jsx';
-import { BarButton, BarSeparator, BAR_ITEM } from './BarButton.jsx';
+import { BarButton, BarSeparator, BAR_ITEM, FocusRing } from './BarButton.jsx';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { ActivityIcon, PlusGlyph, SpeakerGlyph, BellGlyph } from '../glyphs.jsx';
 import { activities, renaming, deleting, newActivity, noteLaunch } from '../state.js';
@@ -154,6 +154,7 @@ const Pill = memo(function Pill({ t, id, active, glide, name, meta, count, onMen
           <Text style={{ fontSize: 10, fontWeight: 700, color: t.textDim }}>{count}</Text>
         </View>
       ) : null}
+      <FocusRing t={t} fid={`pill:${id}`} radius={BAR_ITEM / 2} />
     </View>
   );
 });
@@ -212,7 +213,7 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
       {list.map((id) => <Pill key={id} t={t} id={id} active={id === active} glide={!!pos} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }} count={counts[id] || 0}
         pillRef={pillRefFor(pills.current, id)} onMenu={(d, e) => setMenu({ id: d, x: e.x, y: e.y })} />)}
       <BarSeparator t={t} />
-      <BarButton t={t} disabled={full} title={tr('shell.ws.activity.new')} onClick={(e) => { noteLaunch(e.x, e.y); newActivity(); }}
+      <BarButton t={t} fid="new" disabled={full} title={tr('shell.ws.activity.new')} onClick={(e) => { noteLaunch(e.x, e.y); newActivity(); }}
         glyph={(c) => <PlusGlyph color={c} size={11} />}>
         {(c) => <Text style={{ fontSize: 12.5, fontWeight: 500, color: c, whiteSpace: 'nowrap' }}>{tr('shell.ws.activity.newShort')}</Text>}
       </BarButton>

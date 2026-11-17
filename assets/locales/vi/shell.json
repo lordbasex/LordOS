@@ -655,6 +655,7 @@
   "ws.search.noResults": "Không tìm thấy gì cho “{query}”",
   "ws.search.activitySub": "Hoạt động {pos} · cửa sổ đang mở: {n}",
   "ws.shortcuts.spine": "Thu gọn hoặc mở rộng thanh ngữ cảnh",
+  "ws.shortcuts.bars": "Chuyển bàn phím sang thanh bên và thanh hoạt động",
   "ws.peek.windows": "Cửa sổ: {n}",
   "ws.peek.more": "Thêm cửa sổ: {n}",
   "ws.peek.pinned": "Không có gì đang mở · đã ghim: {apps}",

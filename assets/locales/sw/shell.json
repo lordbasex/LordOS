@@ -662,6 +662,7 @@
   "ws.search.noResults": "Hakuna kilichopatikana kwa “{query}”",
   "ws.search.activitySub": "Shughuli {pos} · madirisha yaliyo wazi: {n}",
   "ws.shortcuts.spine": "Kunja au panua upau wa muktadha",
+  "ws.shortcuts.bars": "Hamisha kibodi kwenye upau wa pembeni na upau wa shughuli",
   "ws.peek.windows": "Madirisha: {n}",
   "ws.peek.more": "Madirisha zaidi: {n}",
   "ws.peek.pinned": "Hakuna kilichofunguliwa · zilizobandikwa: {apps}",
