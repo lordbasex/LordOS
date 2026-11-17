@@ -5,18 +5,22 @@
 //   thumb     320×180 for grids (Settings, Control Center); never decode the full image for those
 //   variants  [{ w, h, src }] from small to large: wallpaperSrc() picks the one that fits a screen
 import index from '../assets/wallpapers/index.json';
+import { DEFAULT_WALLPAPER } from './wallpapermodel.js';
 
-// The desktop of a new user (sdk/settings.js DEFAULTS) and the fallback for an unknown id.
-export const DEFAULT_WALLPAPER = 'lumo-celestial';
+// The desktop of a user who never chose one (settings.wallpaper null, sdk/settings.js) and the fallback for an
+// unknown id, unless the theme names its own (theme.json "wallpaper": { "default" }, tokens.defaultWallpaper: Lord
+// Workspaces' is Cyberpunk City HD's panorama).
+export { DEFAULT_WALLPAPER } from './wallpapermodel.js';
 // The login screen's background (themes/greeter; the remote login page serves the same image
 // through themes/greeter/assets/background.jpg, a link to it).
 export const GREETER_WALLPAPER = 'crystal-crown';
 
 // Categories in the order Settings shows them; a theme's own wallpapers come after.
-export const WALLPAPER_CATEGORIES = ['signature', 'lumo', 'cosmos', 'gradients'];
+export const WALLPAPER_CATEGORIES = ['signature', 'lumo', 'cosmos', 'cyberpunk', 'gradients'];
 
-// English fallback for an id: "crystal-crown" → "Crystal Crown", "lumo-celestial" → "Celestial"
-const englishName = (id) => id.replace(/^lumo-/, '').split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+// English fallback for an id: "crystal-crown" → "Crystal Crown", "lumo-celestial" → "Celestial",
+// "cyberpunk-sky-terrace" → "Sky Terrace"
+const englishName = (id) => id.replace(/^(lumo|cyberpunk)-/, '').split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 
 export const lordosWallpapers = index.map((e) => ({
   id: e.id,
@@ -54,9 +58,9 @@ function userWallpaper(id) {
   return { id, category: 'mine', nameKey: 'settings.wallpaperImage.name', name: 'Your picture', src: `${base}.jpg`, thumb: `${base}.thumb.jpg` };
 }
 
-// The wallpaper chosen in the settings, among a theme's list.
-export const findWallpaper = (list, id) => (list || []).find((w) => w.id === id) || userWallpaper(id)
-  || (list || []).find((w) => w.id === DEFAULT_WALLPAPER) || (list || [])[0] || null;
+// The wallpaper chosen in the settings, among a theme's list; def: the theme's default (tokens.defaultWallpaper).
+export const findWallpaper = (list, id, def = DEFAULT_WALLPAPER) => (list || []).find((w) => w.id === (id || def)) || userWallpaper(id)
+  || (list || []).find((w) => w.id === def) || (list || []).find((w) => w.id === DEFAULT_WALLPAPER) || (list || [])[0] || null;
 
 // The small image for a picker (falls back to the full one for theme wallpapers without a thumb).
 export const wallpaperThumb = (w) => (w && (w.thumb || w.src)) || null;

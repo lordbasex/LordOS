@@ -278,6 +278,63 @@ jumps to its end, and the SDK's own desktop slide is off too.
   display; a click brings the window back where it was, its frame unchanged). A maximized window fills its display's
   work area inside the group frame, never the whole canvas of several monitors.
 
+## Wallpaper and slideshow
+
+**The default picture** is Cyberpunk City HD's panorama (`cyberpunk-panorama`, eleven 3840×2160 pictures made for
+LordOS; `assets/wallpapers/README.md`). Since 0.8.9 `settings.wallpaper` is `null` until the person chooses one, and
+`null` means the theme's default: theme.json says `"wallpaper": { "default": "cyberpunk-panorama" }` for Settings
+(`sdk/thememeta.js`) and the theme's tokens say the same to the SDK (`defaultWallpaper`; `wallpaperIdFor(s, d, def)`
+and `findWallpaper(list, id, def)` take it). Lord Flow and Lord Classic pass none and keep Lumo Celestial.
+
+- **Migration 5** (`sdk/settings.js`): until 0.8.8 everyone's settings file held `"wallpaper": "lumo-celestial"` (the
+  default was saved with the other settings), so a user who never chose cannot be told from one who chose Celestial.
+  The migration turns that one value into `null`; any other picture, a picture of the person's own and the
+  per-display pictures stay. In Lord Flow and Lord Classic nothing changes on screen (their default is Celestial). The
+  only case it gets wrong: someone who picked Celestial on purpose sees the panorama the first time they switch to Lord
+  Workspaces, a theme no release had, and picking Celestial again keeps it for good (the migration runs once).
+
+**The slideshow** (Settings → Wallpaper, only while this theme is in use: theme.json `"slideshow": true`; off by
+default). Controls: **Change the wallpaper automatically**, the category (any with two pictures or more; Cyberpunk City
+HD first chosen), the interval (1, 5, 15 or 30 minutes, or an hour; a minute when turned on) and, with several
+displays, **Different picture on each display**. Stored in `settings.slideshow = { on, category, every, perDisplay }`
+(new key). Turning it on turns the moving wallpapers off (a video would hide it); choosing a still picture or a video,
+in Settings or the Control Center, turns it off. Rules in `sdk/slideshowmodel.js` (tested by
+`server/tests/slideshow_model_test.mjs`), drawing in `sdk/slideshow.jsx` (`SlideshowWallpapers`, drawn by `index.jsx`
+in place of the still pictures).
+
+- **Order.** Each display group (all displays together, or each display on its own) deals a shuffled deck of the
+  category: every picture once per round, never the one on screen first in the next round. With *Different picture on
+  each display* every display has its own deck and never takes a picture another display shows or is about to show
+  (with fewer pictures than displays a repeat can't be avoided). Their changes are staggered over the interval (three
+  displays at a minute: 0, 20 and 40 s), so two never cross-fade in the same frames.
+- **The transition** is a film's cross-dissolve with a Ken Burns pan: the next picture fades in over the one shown
+  while it drifts into its place from one of eight directions, over 2.4 s, eased in and out. Every slideshow picture is
+  drawn 2 % larger than its display on each side, so the pan (at most that margin: 38 px on a 1080p display) never
+  shows an edge. Only the arriving picture moves, and only during the transition; at rest nothing is animated. With
+  **Reduce motion** it is a plain 0.4 s crossfade. A pan and not a zoom because of what each costs (below): a
+  translation in whole pixels keeps the picture a 1:1 copy of its decoded pixels, which lord-server blits, while a zoom
+  composites a scaled raster of the whole display every frame.
+- **Decoded ahead, off the interface's thread.** 8 s before a change (at most half the interval) the next picture is
+  mounted at opacity 0 with a `thumb:<px>:asset:wallpapers/…` source: lord-server's image workers decode it straight to
+  the size it is drawn at, the display plus the margin (`IMG_THUMB_MAX` went from 2048 to 4096 for this, and a `thumb:`
+  source may now be an `asset:` path, `server/src/ui/js.c`): on a 1080p display the `@3840x2160` file decoded down to
+  1999×1124, so it is drawn 1:1 and the change never waits on a decode. The frames then set its opacity and transform with `lord.setStyle` from one shared
+  loop (lord-server blits the picture at its new place; React doesn't render per frame). The picture that left is unmounted
+  at the end: its pixels go to the image cache's idle budget (64 MB, oldest dropped first).
+- **When it waits.** No change while nobody sees the screen (`lord.system.seen()`: displays off, session locked), on
+  Power Saver or a discharging battery at 20 % or less, or on a display wholly hidden by a window of the activity in
+  view (the Overview counts as seen); the change is skipped, not queued. Nobody seeing the screen mid-transition jumps
+  it to its end.
+- **Cost.** Off: nothing (no timer, no node; `theme_cost_scene.mjs` gives the same numbers as before in all three
+  themes). On: one `setTimeout` per change for the preload and one for the change itself (no interval), then the
+  transition's frames: 144 at 60 Hz, every one a repaint of the whole display (the wallpaper changes under everything,
+  so the bars' blurs are made again too). `build/engine-test bench-slideshow` (1920×1080, CPU path, a window and two
+  blurred bars like the spine and the top band, Intel Core i9-10900, medians of 144 frames): **the drift 9.6–10.0 ms a
+  frame**, Reduce motion's fade 9.5–10.3 ms, and a 6 % zoom, for comparison, 52–53 ms (what ruled it out). The drift's
+  first frame took 57–62 ms in the bench, which draws the 1920×1080 base scaled once to its larger box; the slideshow
+  decodes each picture at that box's size, so it isn't scaled. Not measured yet on a real session, on the GPU path, at
+  4K (about four times the pixels) or on the Raspberry Pi.
+
 ## Keys
 
 The theme's table (`index.jsx`) on top of the SDK's base: ❖Space and Ctrl+Space open Search (the theme's entries win
@@ -305,7 +362,7 @@ no shadows (`highContrast` in `tokens.js`, checked by `server/tests/workspaces_m
 
 ## Settings
 
-Settings knows the two bundled themes by id; for any other theme it now reads three optional fields of its
+Settings knows the two bundled themes by id; for any other theme it now reads four optional fields of its
 `theme.json`, checked by `sdk/thememeta.js` (labels must be `shell.*` locale keys, values short plain strings,
 anything else dropped):
 
@@ -315,9 +372,11 @@ anything else dropped):
   Workspaces declares Effects style, Context Spine (Automatic, With labels, Icons only), Show the spine on every
   display and High contrast.
 - `desktopArrows`: the Desktops section shows Settings → Keyboard's ⌃-arrows switch, as for Lord Flow.
+- `wallpaper`: `{ "default": <id>, "slideshow": true }`, the picture of a user who never chose one and the slideshow's
+  controls in Settings → Wallpaper ("Wallpaper and slideshow" above).
 
 On Desktop & Dock, such a theme gets the desktops (here: activities), its options and the title bars' buttons, with no
-Dock or taskbar section. Lord Flow and Lord Classic declare none of the three and see exactly what they did.
+Dock or taskbar section. Lord Flow and Lord Classic declare none of the four and see exactly what they did.
 
 ## Widget data
 
@@ -420,6 +479,13 @@ What these say:
   with three monitors — a frame per display, the spine on the main one, the work areas, no timer every second, split
   on one display and single on another, a window moved by hand floating and tiling again, Save layout, a monitor
   unplugged and plugged back, a new activity, Search on the display it opens for, Crystal and Opaque.
+- `server/tests/slideshow_model_test.mjs` (in `make test`): the slideshow's settings and categories, the decks (a
+  whole round before a repeat, never the same picture twice in a row, never one picture on two of three displays over
+  300 staggered changes, each display its own order), the staggered times, the preload, the transition and Reduce
+  motion's, and the reasons to wait. `workspaces_scene.mjs` checks the default picture, the slideshow on three
+  displays (three different pictures decoded at the displays' size, one picture with the option off) and the still
+  pictures back when it is off; `keyboard_default_test.mjs` migration 5; `build/engine-test` a 4K picture decoded by
+  the workers at 3840 and 2560 px, and `build/engine-test bench-slideshow` times the transition.
 - `theme_cost_scene.mjs` (a measurement, not in `make test`): `node tests/workspaces_test.mjs theme_cost_scene.mjs
   <default|classic|workspaces>`.
 - On screen: headless sessions on the development machine, screenshots in light and dark × Opaque, Translucent and

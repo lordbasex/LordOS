@@ -12,6 +12,42 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Cyberpunk City HD, a new wallpaper category** (all themes' Settings → Wallpaper): eleven 3840×2160 pictures made
+  for LordOS (Panorama, Neon Road Entrance, Heart of the City, Skyline Highway, Flower Boulevard, Maglev Station, Sky
+  Terrace, Rings and Bridges, Neon Cherry Avenue, Pier and Train, Metropolis Lookout), named in every language; the
+  category's name is a proper name and stays the same everywhere. Each has a 1920×1080 base (quality 85, 4:4:4) and
+  its 4K size as an `@3840x2160` variant (quality 80, 4:2:0: they are upscaled from 1672×941), so a 1080p screen never
+  decodes the 4K file; 15.5 MB with the thumbnails. `tools/gen-wallpapers.mjs` now takes JPEG originals, makes the
+  1920×1080 base for an original larger than that, has per-category quality, and keeps the categories it isn't given
+  in `index.json`. (`assets/wallpapers/cyberpunk/`, `assets/wallpapers/README.md`, `sdk/wallpapers.js`)
+- **Lord Workspaces' own default wallpaper: Cyberpunk City HD's panorama.** `settings.wallpaper` is now `null` until
+  a picture is chosen, and `null` is the theme's default: Lord Workspaces declares its own (theme.json
+  `"wallpaper": { "default" }`, tokens `defaultWallpaper`), Lord Flow and Lord Classic keep Lumo Celestial
+  (`wallpaperIdFor(s, d, def)`, `findWallpaper(list, id, def)`). Settings migration 5 turns the saved
+  `"lumo-celestial"` (everyone's default since 0.8.2, saved with the other settings) into `null`; any other picture
+  stays, and Lord Flow and Lord Classic look the same. Someone who had picked Celestial on purpose sees the panorama
+  the first time they open Lord Workspaces and can pick Celestial again. (`sdk/settings.js`, `sdk/wallpapermodel.js`,
+  `sdk/thememeta.js`; tests in `wallpaper_model_test.mjs`, `keyboard_default_test.mjs`, `workspaces_model_test.mjs`)
+- **Lord Workspaces: wallpaper slideshow** (Settings → Wallpaper, shown only in Lord Workspaces; off by default).
+  "Change the wallpaper automatically" goes through a category's pictures (Cyberpunk City HD unless another is
+  chosen) every 1, 5, 15 or 30 minutes or every hour (a minute when turned on), and with several displays "Different
+  picture on each display" gives each display its own shuffled order, never a picture another display shows, with the
+  changes staggered over the interval. The change is a cross-dissolve with a Ken Burns pan: the next picture fades in
+  over 2.4 s while it drifts into place from one of eight directions (every slideshow picture is drawn 2 % larger than
+  its display on each side, so no edge shows); with Reduce motion a plain 0.4 s crossfade. A pan, not a zoom: on a
+  1080p display on the CPU each frame of the pan takes 9.6–10 ms against 52–53 ms for a 6 % zoom
+  (`build/engine-test bench-slideshow`, a window and two blurred bars over it). The next picture is decoded 8 s ahead by
+  lord-server's image workers at the size it is drawn at (a
+  `thumb:` source may now be an `asset:` path, and `IMG_THUMB_MAX` is 4096), so a change never waits on a decode on the
+  interface's thread; the picture that left is unmounted. No change while nobody sees the screen (displays off,
+  session locked), on Power Saver or a low battery, or on a display hidden by a window. Off it costs nothing (the same
+  `theme_cost_scene` numbers in all three themes); on, two timers per change and no interval. Turning it on turns the
+  moving wallpapers off; choosing a picture or a video turns it off. Shared logic in the SDK (`sdk/slideshowmodel.js`,
+  `sdk/slideshow.jsx`, `SlideshowWallpapers`), turned on by the theme's theme.json (`"slideshow": true`); all text in
+  every language. Not yet checked on real monitors (only the stub scene with three displays) or on the
+  GPU path. (`themes/workspaces`, `apps/settings/Slideshow.jsx`, `server/src/ui/js.c`, `server/src/ui/ui.h`,
+  docs/WORKSPACES.md "Wallpaper and slideshow"; tests in `server/tests/slideshow_model_test.mjs` (new, in `make test`),
+  `workspaces_scene.mjs`, `build/engine-test` `test_image_wallpaper_thumb`, timing in `build/engine-test bench-slideshow`)
 - **Desktop widgets in Lord Flow and Lord Classic too**, the same as in Lord Workspaces: "Add widget…" in the
   wallpaper's right-click menu opens the catalog (search, categories, sizes), widgets sit on each display's grid, can be
   dragged to another block and keep their data fresh through the shared widget feed. The catalog moved from the theme

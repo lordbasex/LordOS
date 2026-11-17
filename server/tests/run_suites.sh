@@ -289,6 +289,7 @@ EOF
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
     if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs; else skip "motion-model-test" node; fi
     if have node; then run "wallpaper-model-test (sdk/wallpapermodel.js)" node tests/wallpaper_model_test.mjs; else skip "wallpaper-model-test" node; fi
+    if have node; then run "slideshow-model-test (sdk/slideshowmodel.js)" node tests/slideshow_model_test.mjs; else skip "slideshow-model-test" node; fi
     if have node; then run "widget-grid-test (sdk/widgetgrid.js)" node tests/widget_grid_test.mjs; else skip "widget-grid-test" node; fi
     if have node; then run "poll-same-test (sdk/samevalue.js)" node tests/poll_same_test.mjs; else skip "poll-same-test" node; fi
     if have node; then run "widget-feed-test (sdk/widgetfeedmodel.js)" node tests/widget_feed_test.mjs; else skip "widget-feed-test" node; fi

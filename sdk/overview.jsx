@@ -238,7 +238,7 @@ function Strip({ o, th }) {
   const active = useStore(activeDesktop);
   useStore(desktopNames);
   const s = settings.get();
-  const wall = wallpaperThumb(findWallpaper(th.wallpapers, wallpaperIdFor(s, mainDisplay())));
+  const wall = wallpaperThumb(findWallpaper(th.wallpapers, wallpaperIdFor(s, mainDisplay(), th.defaultWallpaper), th.defaultWallpaper));
   const { strip } = o;
   // while a desktop is dragged the others make room where it would go, and it follows the pointer
   let cards = strip.cards;

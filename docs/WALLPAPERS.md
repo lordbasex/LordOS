@@ -31,8 +31,15 @@ name, which three monitors of one model share. The rules are in `sdk/wallpapermo
   per-display pictures and the moving wallpapers, as before.
 - **The Control Center's quick pictures** (Lord Flow, Lord Workspaces) change the display the Control Center opened
   on when there are several.
-- Removing one of your own pictures sends a display that showed it back to the picture of every display.
+- Removing one of your own pictures sends a display that showed it back to the picture of every display, and the
+  picture of every display back to the theme's default.
 - The login screen keeps one picture.
+- **Never chosen** (0.8.9): `settings.wallpaper` is `null` and the theme's default shows: Lumo Celestial in Lord Flow
+  and Lord Classic, Cyberpunk City HD's panorama in Lord Workspaces (settings migration 5 turned the saved Celestial
+  default into `null`; docs/WORKSPACES.md, "Wallpaper and slideshow").
+- **A slideshow** of a category's still pictures, with a different one on each display if wanted, is Lord Workspaces'
+  only (docs/WORKSPACES.md, "Wallpaper and slideshow"); a moving wallpaper chosen turns it off, and turning it on
+  turns the moving wallpapers off.
 
 ## Format
 

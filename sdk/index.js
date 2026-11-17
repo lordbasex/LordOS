@@ -365,6 +365,8 @@ function LocaleRoot({ children }) {
     at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
     at('input', OskPanel, ImeOverlay));
 }
+// the wallpaper slideshow (0.8.9; a theme turns it on in theme.json: sdk/thememeta.js)
+export { SlideshowWallpapers, slideSrc, slideshowPrefs, slideshowPatch, slideshowStop, slideshowCategories, SLIDESHOW_EVERY } from './slideshow.jsx';
 export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor } from './motion.jsx';
 export { userVideoProblem, motionCodecs, MAX_SECONDS } from './motionmodel.js';
 export { lordosWallpapers, userWallpaperName, wallpaperSrc, wallpaperThumb, findWallpaper, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES } from './wallpapers.js';

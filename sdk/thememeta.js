@@ -8,6 +8,9 @@
 //                  settings.themeOptions[<theme id>][key] (one key for every theme: a theme's id can't reach another
 //                  setting)
 //   desktopArrows  true: the theme follows Settings → Keyboard's ⌃ arrows for desktops (as Lord Flow does)
+//   wallpaper      { default: <id>, slideshow: true }: the picture of a user who never chose one (settings.wallpaper
+//                  null; the theme's tokens.defaultWallpaper says the same to the SDK), and Settings → Wallpaper's
+//                  slideshow (sdk/slideshowmodel.js). Read as wallpaperDefault and wallpaperSlideshow.
 //
 // theme.json is data (at most 4 KB, read by lord-server), never code: every field is checked here, labels must be
 // locale keys of the shell catalog, values short plain strings, and anything else is dropped.
@@ -15,6 +18,7 @@ const KEY = /^[A-Za-z][A-Za-z0-9]{0,31}$/;
 const LABEL = /^shell\.[A-Za-z0-9_.-]{1,80}$/;
 const VALUE = /^[a-z][a-z0-9-]{0,23}$/;
 const SKETCH = ['rail', 'pills', 'frame', 'menubar', 'dock', 'taskbar'];
+const WALLPAPER = /^[a-z][a-z0-9-]{0,47}$/;
 
 function cleanOption(o) {
   if (!o || typeof o !== 'object' || !KEY.test(o.key) || !LABEL.test(o.label)) return null;
@@ -32,7 +36,9 @@ export function cleanThemeMeta(meta) {
   const s = m.sketch && typeof m.sketch === 'object' ? m.sketch : null;
   const sketch = s ? Object.fromEntries(SKETCH.filter((k) => s[k] === true).map((k) => [k, true])) : null;
   const options = Array.isArray(m.options) ? m.options.slice(0, 8).map(cleanOption).filter(Boolean) : [];
-  return { sketch: sketch && Object.keys(sketch).length ? sketch : null, options, desktopArrows: m.desktopArrows === true };
+  const wp = m.wallpaper && typeof m.wallpaper === 'object' && !Array.isArray(m.wallpaper) ? m.wallpaper : {};
+  return { sketch: sketch && Object.keys(sketch).length ? sketch : null, options, desktopArrows: m.desktopArrows === true,
+    wallpaperDefault: typeof wp.default === 'string' && WALLPAPER.test(wp.default) ? wp.default : null, wallpaperSlideshow: wp.slideshow === true };
 }
 
 // The value of a theme option in the settings (its default when unset or not one of its choices).

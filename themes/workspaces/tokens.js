@@ -85,6 +85,10 @@ export function highContrast(t, dark) {
   };
 }
 
+// The picture of a user who never chose one (settings.wallpaper null): Cyberpunk City HD's panorama. theme.json's
+// "wallpaper": { "default" } says the same to Settings (workspaces_model_test.mjs checks they agree).
+export const DEFAULT_WALLPAPER = 'cyberpunk-panorama';
+
 export function makeTheme({ mode, accent, effects, surface, contrast = false }, wallpapers = []) {
   if (contrast) return highContrast(makeTheme({ mode, accent, effects: false, surface: 'opaque' }, wallpapers), mode === 'dark');
   const dark = mode === 'dark';
@@ -97,6 +101,7 @@ export function makeTheme({ mode, accent, effects, surface, contrast = false }, 
     accent: acc,
     accents,
     wallpapers,
+    defaultWallpaper: DEFAULT_WALLPAPER,
     effects: s !== 'opaque',
     surface: s,
     text: dark ? '#F1EFFC' : '#191733',

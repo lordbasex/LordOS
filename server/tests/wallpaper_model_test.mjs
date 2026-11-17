@@ -1,6 +1,6 @@
 // wallpaper_model_test.mjs — one wallpaper per display (sdk/wallpapermodel.js): which picture each display shows,
 // what choosing one for all displays or for one writes, and the displays' names. node server/tests/wallpaper_model_test.mjs
-import { displayWallpaperKey, wallpaperIdFor, wallpaperPatch, displayLabel } from '../../sdk/wallpapermodel.js';
+import { displayWallpaperKey, wallpaperIdFor, wallpaperPatch, displayLabel, DEFAULT_WALLPAPER } from '../../sdk/wallpapermodel.js';
 
 let ok = 0, bad = 0;
 const eq = (name, a, b) => {
@@ -23,6 +23,12 @@ eq('all displays: the global picture, no own ones, no moving wallpaper', [[L, M,
 eq('no display (one monitor): the global picture', wallpaperIdFor(s2, null), 'aurora');
 eq('a bad map is ignored', wallpaperIdFor({ wallpaper: 'a', wallpapers: 'x' }, M), 'a');
 eq('an empty entry is ignored', wallpaperIdFor({ wallpaper: 'a', wallpapers: { 'HDMI-A-1': '' } }, M), 'a');
+// 0.8.9: never chosen (null) is the theme's default; Lumo Celestial when the theme has none (Lord Flow, Lord Classic)
+eq('never chosen: Lumo Celestial', wallpaperIdFor({ wallpaper: null }, M), DEFAULT_WALLPAPER);
+eq('never chosen: the theme\'s default', wallpaperIdFor({ wallpaper: null }, M, 'cyberpunk-panorama'), 'cyberpunk-panorama');
+eq('never chosen, no display: the theme\'s default', wallpaperIdFor({ wallpaper: null }, null, 'cyberpunk-panorama'), 'cyberpunk-panorama');
+eq('chosen: the theme\'s default doesn\'t count', wallpaperIdFor({ wallpaper: 'aurora' }, M, 'cyberpunk-panorama'), 'aurora');
+eq('a display\'s own picture over the theme\'s default', wallpaperIdFor({ wallpaper: null, wallpapers: { 'HDMI-A-1': 'lumo' } }, M, 'cyberpunk-panorama'), 'lumo');
 eq('labels: three of one model add the connector', [L, M, R].map((d) => displayLabel(d, [L, M, R])), ['S27F350 · DP-2', 'S27F350 · HDMI-A-1', 'S27F350 · DP-3']);
 eq('labels: different models, the name alone', displayLabel({ id: 1, name: 'U2720Q', connector: 'DP-1' }, [{ id: 1, name: 'U2720Q', connector: 'DP-1' }, L]), 'U2720Q');
 eq('labels: no name, the connector', displayLabel({ id: 2, name: '', connector: 'eDP-1' }, []), 'eDP-1');

@@ -664,6 +664,29 @@ await flush();
   sdk.settings.set(sdk.wallpaperPatch(sdk.settings.get(), sdk.settings.get().wallpaper, null));
   await flush();
   check('wallpaper: all displays again', [L, M, R].map(wallOf), before);
+  // never chosen (null since 0.8.9): Lord Workspaces' own default, Cyberpunk City HD's panorama
+  sdk.settings.set({ wallpaper: null, wallpapers: {} });
+  await flush();
+  check('wallpaper: the theme\'s default when none was chosen', [L, M, R].map(wallOf).every((src) => src.includes('lordos-cyberpunk-panorama')), true);
+}
+
+// the wallpaper slideshow (sdk/slideshow.jsx): off by default; on, each display its own picture of the category,
+// decoded off the interface's thread ("thumb:" sources), and back to the still pictures when turned off
+{
+  const slides = () => [...props].filter(([id, p]) => typeof p.src === 'string' && p.src.startsWith('thumb:') && p.src.includes('/cyberpunk/') && attached(id)).map(([, p]) => p.src);
+  check('slideshow: off by default', slides().length, 0);
+  sdk.settings.set(sdk.slideshowPatch(sdk.settings.get(), { on: true, category: 'cyberpunk', perDisplay: true }));
+  await flush();
+  check('slideshow: a picture per display, three different ones', [slides().length, new Set(slides()).size], [3, 3]);
+  // 1920×1080 plus the drift's 2 % margin on each side (1996×1124): the 4K file, decoded down to that by the workers
+  check('slideshow: at the displays\' size and margin', slides().every((src) => /^thumb:1999:asset:wallpapers\/cyberpunk\/lordos-cyberpunk-[a-z-]+@3840x2160\.jpg$/.test(src)), true);
+  check('slideshow: turning it on keeps the interval\'s default (a minute)', sdk.settings.get().slideshow.every, 60);
+  sdk.settings.set(sdk.slideshowPatch(sdk.settings.get(), { perDisplay: false }));
+  await flush();
+  check('slideshow: one picture for every display', [slides().length, new Set(slides()).size], [3, 1]);
+  sdk.settings.set(sdk.slideshowPatch(sdk.settings.get(), { on: false }));
+  await flush();
+  check('slideshow: off, the still pictures again', slides().length, 0);
 }
 
 // the effects styles: Crystal draws its sheen, Opaque no blur at all

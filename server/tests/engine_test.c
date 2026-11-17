@@ -3375,6 +3375,28 @@ static void test_image_ext(void) {
     node_destroy(c);
 }
 
+/* a 4K wallpaper decoded off the interface's thread (0.8.9: the slideshow's next picture, sdk/slideshow.jsx): a
+ * "thumb:" up to 4096 px keeps the picture's full size, and a smaller one fits a 2560 px display */
+static void test_image_wallpaper_thumb(void) {
+    ui_reset();
+    const char *wall = "../assets/wallpapers/cyberpunk/lordos-cyberpunk-panorama@3840x2160.jpg";
+    char real[PATH_MAX];
+    if (!realpath(wall, real)) { printf("wallpaper thumb: skipped (no %s)\n", wall); return; }
+    Image *full = image_get_thumb(real, 3840, NULL), *qhd = image_get_thumb(real, 2560, NULL), *big = image_get_thumb(real, 9000, NULL);
+    CHECK(full && qhd && big && full != qhd, "one entry per size");
+    CHECK(wait_thumbs(3) == 3, "decoded by the workers");
+    int w = -1, h = -1;
+    if (full) image_size(full, &w, &h);
+    CHECK(w == 3840 && h == 2160, "a 4K picture at 3840 px keeps its size: %dx%d", w, h);
+    if (qhd) image_size(qhd, &w, &h);
+    CHECK(w == 2560 && h == 1440, "at 2560 px it fits a 1440p display: %dx%d", w, h);
+    if (big) image_size(big, &w, &h);
+    CHECK(w == 3840 && h == 2160, "past IMG_THUMB_MAX: never enlarged, %dx%d", w, h);
+    image_release(full);
+    image_release(qhd);
+    image_release(big);
+}
+
 static void test_image_cache(void) {
     ui_reset();
     const char *wall = "../assets/wallpapers/lumo/lordos-lumo-aurora.jpg";     /* 1672 x 941 */
@@ -3754,10 +3776,103 @@ static void bench(void) {
     }
 }
 
+#ifndef ENGINE_BEFORE
+/* the wallpaper slideshow's transition (0.8.9, sdk/slideshow.jsx) on a 1920×1080 display: the arriving picture over
+ * the one shown, its opacity and translation (whole pixels) set every frame as lord.setStyle does, under a window and
+ * Lord Workspaces' blurred bars (a spine and a top band); 144 frames (2.4 s at 60 Hz). Then Reduce motion's plain fade
+ * (opacity only), and a 6 % zoom for comparison (a scaled raster composited every frame). The pictures are the
+ * 1920×1080 bases, so they are scaled once to their 2 % larger box. */
+static void bench_slideshow(void) {
+    char a[PATH_MAX], b[PATH_MAX];
+    if (!realpath("../assets/wallpapers/cyberpunk/lordos-cyberpunk-panorama.jpg", a) ||
+        !realpath("../assets/wallpapers/cyberpunk/lordos-cyberpunk-sky-terrace.jpg", b)) { printf("slideshow: skipped (no pictures)\n"); return; }
+    quiet = 1;
+    for (int mode = 0; mode < 3; mode++) {
+        ui_reset();
+        Node *root = view(NULL);
+        ui.root = root;
+        sn(root, "backgroundColor", 0xff0f0d1c);
+        Node *wall = view(root);
+        ss(wall, "position", "absolute");
+        sn(wall, "left", 0); sn(wall, "top", 0); sn(wall, "width", 1920); sn(wall, "height", 1080);
+        ss(wall, "overflow", "hidden");
+        Node *img[2];
+        for (int i = 0; i < 2; i++) {
+            img[i] = node_new(NODE_IMAGE);
+            node_append(wall, img[i]);
+            img[i]->img = image_get(i ? b : a);
+            ss(img[i], "position", "absolute");    /* 2 % larger on each side, as the slideshow draws them */
+            sn(img[i], "left", -38); sn(img[i], "top", -22); sn(img[i], "width", 1996); sn(img[i], "height", 1124);
+            ss(img[i], "objectFit", "cover");
+        }
+        sn(img[1], "opacity", 0);
+        Node *win = view(root);
+        ss(win, "position", "absolute");
+        sn(win, "left", 300); sn(win, "top", 160); sn(win, "width", 1100); sn(win, "height", 700);
+        sn(win, "backgroundColor", 0xff1c1a2e); sn(win, "borderRadius", 10);
+        sn(win, "shadowColor", 0x66000000); sn(win, "shadowBlur", 24); sn(win, "shadowOffsetY", 8);
+        Node *spine = view(root), *band = view(root);
+        ss(spine, "position", "absolute");
+        sn(spine, "left", 8); sn(spine, "top", 8); sn(spine, "width", 64); sn(spine, "height", 1064);
+        ss(band, "position", "absolute");
+        sn(band, "left", 84); sn(band, "top", 8); sn(band, "width", 1828); sn(band, "height", 44);
+        for (Node *p = spine; p; p = p == spine ? band : NULL) {
+            sn(p, "backgroundColor", 0x661c1a2e); sn(p, "borderRadius", 14); sn(p, "backdropBlur", 24);
+        }
+        uint32_t *px = calloc((size_t)1920 * 1080, 4);
+        Canvas c;
+        canvas_init(&c, px, 1920, 1080, 1920);
+        enum { F = 144 };
+        static double fv[F];
+        double sum = 0, worst = 0;
+        for (int f = -1; f < F; f++) {
+            if (f >= 0) {
+                double p = (double)f / (F - 1), e = p < 0.5 ? 4 * p * p * p : 1 - pow(-2 * p + 2, 3) / 2;
+                js_set(img[1], "opacity", e);
+                if (mode == 0) {           /* the drift: whole pixels, as sdk/slideshow.jsx */
+                    js_set(img[1], "translateX", roundf(38 * (float)(1 - e)));
+                    js_set(img[1], "translateY", roundf(-22 * (float)(1 - e)));
+                } else if (mode == 2) {    /* a zoom, for comparison (what the drift is not) */
+                    js_set(img[1], "scaleX", 1.06 + (1 - 1.06) * e);
+                    js_set(img[1], "scaleY", 1.06 + (1 - 1.06) * e);
+                }
+            }
+            double t0 = now_ms();
+            layout_root(root, 1920, 1080);
+            Box dmg = { 0, 0, 0, 0 };
+            if (paint_damage(root)) dmg = ui.damage;
+            if (f < 0) dmg = (Box){ 0, 0, 1920, 1080 };
+            if (dmg.x1 > dmg.x0) {
+                paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
+                ui.damage = dmg;
+                canvas_set_clip(&c, (Rect){ (int)floorf(fmaxf(dmg.x0, 0)), (int)floorf(fmaxf(dmg.y0, 0)), (int)ceilf(fminf(dmg.x1, 1920)), (int)ceilf(fminf(dmg.y1, 1080)) });
+                paint_root_clear(&c, root, 0);
+                canvas_set_clip(&c, (Rect){ 0, 0, 1920, 1080 });
+            }
+            ui.damage = (Box){ 0, 0, 0, 0 };
+            double ms = now_ms() - t0;
+            if (f < 0) continue;                    /* the first full frame */
+            fv[f] = ms;
+            sum += ms;
+            if (ms > worst) worst = ms;
+        }
+        long r, comp;
+        paint_tf_stats(&r, &comp);
+        printf("slideshow %s (1920x1080, a window and two blurred bars): median %.2f ms per frame, mean %.2f, worst %.2f; raster renders %ld, composites %ld\n",
+               mode == 0 ? "drift" : mode == 1 ? "fade" : "zoom", median(fv, F), sum / F, worst, r, comp);
+        free(px);
+        node_destroy(root);
+    }
+}
+#endif
+
 int main(int argc, char **argv) {
     const char *dir = getenv("LORD_FONTS") ? getenv("LORD_FONTS") : "../assets/fonts";
     fonts_set_builtin_dir(dir);
     if (text_init(dir)) { printf("engine-test: no fonts in %s\n", dir); return 1; }
+#ifndef ENGINE_BEFORE
+    if (argc > 1 && !strcmp(argv[1], "bench-slideshow")) { bench_slideshow(); return 0; }
+#endif
     if (argc > 1 && !strcmp(argv[1], "bench")) { bench(); return 0; }
 #ifdef ENGINE_BEFORE
     return 0;
@@ -3801,6 +3916,7 @@ int main(int argc, char **argv) {
     test_overlay_scrollbar();
     test_transform_restyle();
     test_image_cache();
+    test_image_wallpaper_thumb();
     test_image_ext();
     printf("engine-test: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;

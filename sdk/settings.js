@@ -1,6 +1,5 @@
 // settings.js — user settings, stored in ~/.config/lordos/settings.json.
 import { createStore, useStore } from './store.js';
-import { DEFAULT_WALLPAPER } from './wallpapers.js';
 
 const DEFAULTS = {
   mode: 'dark',          // 'dark' | 'light'
@@ -14,7 +13,9 @@ const DEFAULTS = {
   motionFiles: {},       // id → the variant on disk
   motionUser: [],        // added videos: [{ id: 'user:…', name, path }]
   wallpaperImages: [],   // the user's own pictures, newest first: ids 'image:<name>' (sdk/wallpapers.js)
-  wallpaper: DEFAULT_WALLPAPER,  // 0.8.2: Lumo Celestial (before: 'aurora', still available)
+  wallpaper: null,       // 0.8.9: null = the theme's default (Lumo Celestial; Lord Workspaces: Cyberpunk City HD's panorama),
+                         // migration 5. 0.8.2–0.8.8: 'lumo-celestial' saved for everyone; before: 'aurora', still available
+  slideshow: null,       // 0.8.9, Settings → Wallpaper in Lord Workspaces: { on, category, every, perDisplay } (sdk/slideshowmodel.js); new key, no migration
   weather: { on: false },
   playerStreams: [],        // 0.8.8.10: the Player's saved streams [{ name, url, user }] (no password: the keyring has it)   // 0.8.8.10: the weather widget asks Open-Meteo only once turned on (sdk/weathermodel.js)
   deskWidgets: [],      // 0.8.8.10: Lord Workspaces' desktop widgets, [{ id, type, x, y }] (sdk/deskwidgets.jsx)
@@ -55,7 +56,7 @@ const DEFAULTS = {
 // meaning of a setting, it appends [schema, (settings) => newSettings] here. Each runs once per user,
 // in order, when the session loads the file; "schema" records the last one applied. The system-wide
 // migrations (as root) are the lordos package's (packaging/migrations).
-export const SETTINGS_SCHEMA = 4;
+export const SETTINGS_SCHEMA = 5;
 // A Terminal key mapping that sends what a US keyboard's key types anyway (keys.js names keys by their
 // US position): on a US keyboard it does nothing, on any other it types the wrong character. The iTerm2
 // importer made them from keypad entries before 0.8.8.6 ("-" typed "/" on a Latin American keyboard).
@@ -91,6 +92,12 @@ const MIGRATIONS = [
     // computer's layout is used (/etc/default/keyboard, sdk/keyboard.js; #55).
     if ((Array.isArray(s.keyboards) && s.keyboards.length) || s.keyboard !== 'latam') return s;
     return { ...s, keyboard: null };
+  }],
+  [5, (s) => {            // 0.8.9: the default wallpaper became the theme's (null), so Lord Workspaces can have its own
+    // (Cyberpunk City HD's panorama). Lumo Celestial was every user's default since 0.8.2 and was saved with the rest
+    // of the settings, so it reads as a choice; nobody can tell it from one. Lord Flow and Lord Classic show it all the
+    // same (their default); only Lord Workspaces, new in 0.8.9, shows its own. Any other picture stays.
+    return s.wallpaper === 'lumo-celestial' ? { ...s, wallpaper: null } : s;
   }],
 ];
 export function migrateSettings(s) {
