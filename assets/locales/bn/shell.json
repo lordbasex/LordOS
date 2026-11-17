@@ -263,6 +263,7 @@
   "restore.title": "আপনার উইন্ডোগুলো আবার খুলবেন?",
   "restore.unclean": "গতবার LordOS ঠিকমতো বন্ধ হয়নি।",
   "restore.yes": "আবার খুলুন",
+  "restore.askFirst": "বাকিগুলো আবার খোলা হয়েছে। এগুলোতে একটি সেশন বা ব্যক্তিগত ডেটা থাকে: আপনি বেছে নিলেই কেবল খুলবে।",
   "spotlight.action.dark": "ডার্ক / লাইট মোড বদলান",
   "spotlight.action.hint": "সিস্টেম কাজ",
   "spotlight.keywords.mail": "ইমেইল",

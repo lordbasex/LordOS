@@ -256,6 +256,7 @@
   "restore.title": "윈도우를 다시 열겠습니까?",
   "restore.unclean": "지난번에 LordOS가 제대로 종료되지 않았습니다.",
   "restore.yes": "다시 열기",
+  "restore.askFirst": "나머지는 다시 열렸습니다. 이 항목들은 세션이나 개인 데이터를 담고 있어 선택한 경우에만 다시 열립니다.",
   "spotlight.action.dark": "다크/라이트 모드 전환",
   "spotlight.action.hint": "시스템 동작",
   "spotlight.keywords.mail": "메일 이메일 email",

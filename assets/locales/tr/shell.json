@@ -263,6 +263,7 @@
   "restore.title": "Pencereleriniz yeniden açılsın mı?",
   "restore.unclean": "LordOS geçen sefer düzgün kapanmadı.",
   "restore.yes": "Yeniden Aç",
+  "restore.askFirst": "Diğerleri yeniden açıldı. Bunlar bir oturum veya özel veri içerir: yalnızca seçerseniz açılır.",
   "spotlight.action.dark": "Koyu / açık modu değiştir",
   "spotlight.action.hint": "Sistem eylemi",
   "spotlight.keywords.mail": "e-posta posta",

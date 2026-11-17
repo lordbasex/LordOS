@@ -256,6 +256,7 @@
   "restore.title": "Buka semula tetingkap anda?",
   "restore.unclean": "LordOS tidak dimatikan dengan betul kali terakhir.",
   "restore.yes": "Buka Semula",
+  "restore.askFirst": "Yang lain telah dibuka semula. Yang ini menyimpan sesi atau data peribadi: ia dibuka hanya jika anda memilihnya.",
   "spotlight.action.dark": "Tukar mod gelap / cerah",
   "spotlight.action.hint": "Tindakan sistem",
   "spotlight.keywords.mail": "emel e-mel mel",

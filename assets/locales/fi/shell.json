@@ -263,6 +263,7 @@
   "restore.title": "Avataanko ikkunasi uudelleen?",
   "restore.unclean": "LordOS ei sammunut kunnolla viime kerralla.",
   "restore.yes": "Avaa uudelleen",
+  "restore.askFirst": "Muut on avattu uudelleen. Näissä on istunto tai yksityisiä tietoja: ne avautuvat vain, jos valitset ne.",
   "spotlight.action.dark": "Vaihda tumma / vaalea tila",
   "spotlight.action.hint": "Järjestelmätoiminto",
   "spotlight.keywords.mail": "sähköposti",

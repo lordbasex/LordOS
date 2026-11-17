@@ -263,6 +263,7 @@
   "restore.title": "Deine Fenster wieder öffnen?",
   "restore.unclean": "LordOS wurde letztes Mal nicht richtig ausgeschaltet.",
   "restore.yes": "Wieder öffnen",
+  "restore.askFirst": "Der Rest ist wieder geöffnet. Diese enthalten eine Sitzung oder private Daten: Sie öffnen sich nur, wenn du sie auswählst.",
   "spotlight.action.dark": "Dunkel-/Hellmodus umschalten",
   "spotlight.action.hint": "Systemaktion",
   "spotlight.keywords.mail": "E-Mail",

@@ -256,6 +256,7 @@
   "restore.title": "要重新打开你的窗口吗？",
   "restore.unclean": "LordOS 上次没有正常关机。",
   "restore.yes": "重新打开",
+  "restore.askFirst": "其余的已重新打开。这些包含会话或私人数据：只有你选择后才会重新打开。",
   "spotlight.action.dark": "切换深色／浅色模式",
   "spotlight.action.hint": "系统操作",
   "spotlight.keywords.mail": "邮件 电子邮件 email",

@@ -17,6 +17,12 @@ export const MAX_WINDOWS = 12;      // a session never launches more than this
 // Never reopened: tools about another window, one-shot helpers and apps of the live system.
 export const NEVER = ['forcequit', 'appabout', 'installer', 'sysprobe', 'screenshots'];
 
+// Reopened only when the person says so, even with restore set to Always: apps whose windows hold a live session or
+// private data (a shell, the passwords, another computer's screen, a virtual machine, a database connection, the
+// camera and the recorder). The rest of the list reopens by itself.
+export const ASK_FIRST = ['terminal', 'passwords', 'remote-desk', 'machines', 'databases', 'camera', 'recorder'];
+export const asksFirst = (e) => { const p = e && parseDockId(e.id); return !!p && p.kind === 'app' && ASK_FIRST.includes(p.key); };
+
 const text = (v) => typeof v === 'string' && v.length > 0 && v.length <= 80 && /^[A-Za-z0-9._:-]+$/.test(v);
 const path = (v) => typeof v === 'string' && v.length > 1 && v.length <= 1024 && /^[/~]/.test(v) && !v.includes('\0');
 // Per LordOS app, the args it reads as "what this window shows" and how each must look. An app or a
@@ -75,6 +81,14 @@ export const cleanList = (list, zones) => (Array.isArray(list) ? list.map((e) =>
 export function restoreDecision(mode, clean, count) {
   if (!count || mode === 'off' || !RESTORE_MODES.includes(mode)) return 'none';
   return !clean || mode === 'ask' ? 'ask' : 'run';
+}
+
+// What a decision (restoreDecision) does with the list: { run } reopens at once, { ask } waits for the person's answer
+// (each entry can be left out). Always: everything but the ask-first apps runs, those are asked about.
+export function restoreSplit(decision, list) {
+  if (decision === 'none' || !Array.isArray(list)) return { run: [], ask: [] };
+  if (decision === 'ask') return { run: [], ask: list };
+  return { run: list.filter((e) => !asksFirst(e)), ask: list.filter(asksFirst) };
 }
 
 // The launches of a saved list, in order (bottom window first). open: Map dock id → windows already

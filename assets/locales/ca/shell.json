@@ -263,6 +263,7 @@
   "restore.title": "Vols tornar a obrir les finestres?",
   "restore.unclean": "LordOS no es va apagar correctament l’última vegada.",
   "restore.yes": "Torna a obrir",
+  "restore.askFirst": "La resta ja s’ha tornat a obrir. Aquestes guarden una sessió o dades privades: només s’obren si les tries.",
   "spotlight.action.dark": "Alterna el mode fosc / clar",
   "spotlight.action.hint": "Acció del sistema",
   "spotlight.keywords.mail": "correu electrònic",

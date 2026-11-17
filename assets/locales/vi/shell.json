@@ -256,6 +256,7 @@
   "restore.title": "Mở lại các cửa sổ?",
   "restore.unclean": "Lần trước LordOS không tắt đúng cách.",
   "restore.yes": "Mở lại",
+  "restore.askFirst": "Phần còn lại đã mở lại. Những mục này chứa phiên hoặc dữ liệu riêng tư: chỉ mở lại khi bạn chọn.",
   "spotlight.action.dark": "Chuyển chế độ tối / sáng",
   "spotlight.action.hint": "Tác vụ hệ thống",
   "spotlight.keywords.mail": "email thư điện tử",

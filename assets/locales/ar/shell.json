@@ -291,6 +291,7 @@
   "restore.title": "هل تريد إعادة فتح نوافذك؟",
   "restore.unclean": "لم يتوقف LordOS بشكل سليم في المرة الأخيرة.",
   "restore.yes": "إعادة الفتح",
+  "restore.askFirst": "أُعيد فتح الباقي. هذه تحتفظ بجلسة أو ببيانات خاصة: لا يُعاد فتحها إلا إذا اخترتها.",
   "spotlight.action.dark": "التبديل بين الوضع الداكن والفاتح",
   "spotlight.action.hint": "إجراء نظام",
   "spotlight.keywords.mail": "بريد إلكتروني email",

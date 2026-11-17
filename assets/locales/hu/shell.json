@@ -263,6 +263,7 @@
   "restore.title": "Újranyitja az ablakait?",
   "restore.unclean": "A LordOS legutóbb nem állt le megfelelően.",
   "restore.yes": "Újranyitás",
+  "restore.askFirst": "A többi újra megnyílt. Ezek munkamenetet vagy személyes adatokat tartalmaznak: csak akkor nyílnak meg, ha kiválasztod őket.",
   "spotlight.action.dark": "Sötét / világos mód váltása",
   "spotlight.action.hint": "Rendszerművelet",
   "spotlight.keywords.mail": "e-mail levél",

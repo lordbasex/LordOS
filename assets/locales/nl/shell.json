@@ -263,6 +263,7 @@
   "restore.title": "Je vensters opnieuw openen?",
   "restore.unclean": "LordOS is de vorige keer niet goed uitgezet.",
   "restore.yes": "Open opnieuw",
+  "restore.askFirst": "De rest is weer geopend. Deze bevatten een sessie of privégegevens: ze openen alleen als je ze kiest.",
   "spotlight.action.dark": "Wissel tussen donkere en lichte modus",
   "spotlight.action.hint": "Systeemactie",
   "spotlight.keywords.mail": "e-mail",

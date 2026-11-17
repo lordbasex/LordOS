@@ -263,6 +263,7 @@
   "restore.title": "¿Reabrir tus ventanas?",
   "restore.unclean": "LordOS no se apagó bien la última vez.",
   "restore.yes": "Reabrir",
+  "restore.askFirst": "El resto ya se volvió a abrir. Estas guardan una sesión o datos privados: se abren solo si las elegís.",
   "spotlight.action.dark": "Cambiar modo oscuro / claro",
   "spotlight.action.hint": "Acción del sistema",
   "spotlight.keywords.mail": "correo email",

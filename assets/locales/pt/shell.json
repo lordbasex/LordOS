@@ -263,6 +263,7 @@
   "restore.title": "Reabrir suas janelas?",
   "restore.unclean": "O LordOS não foi desligado corretamente da última vez.",
   "restore.yes": "Reabrir",
+  "restore.askFirst": "O resto já foi reaberto. Estes guardam uma sessão ou dados privados: só reabrem se você os escolher.",
   "spotlight.action.dark": "Alternar modo escuro / claro",
   "spotlight.action.hint": "Ação do sistema",
   "spotlight.keywords.mail": "correio e-mail",

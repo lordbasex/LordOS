@@ -256,6 +256,7 @@
   "restore.title": "ウインドウを再び開きますか？",
   "restore.unclean": "前回 LordOS は正しくシステム終了しませんでした。",
   "restore.yes": "再び開く",
+  "restore.askFirst": "ほかは再び開きました。これらはセッションや個人データを含むため、選んだものだけが開きます。",
   "spotlight.action.dark": "ダーク／ライトモードを切り替え",
   "spotlight.action.hint": "システムアクション",
   "spotlight.keywords.mail": "メール email",

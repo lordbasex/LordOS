@@ -263,6 +263,7 @@
   "restore.title": "Buksan ulit ang iyong mga window?",
   "restore.unclean": "Hindi nag-shut down nang maayos ang LordOS noong nakaraan.",
   "restore.yes": "Buksan ulit",
+  "restore.askFirst": "Nabuksan na ulit ang iba. Ang mga ito ay may session o pribadong data: bubuksan lang kung pipiliin mo.",
   "spotlight.action.dark": "Magpalit sa dark / light mode",
   "spotlight.action.hint": "Aksyon ng system",
   "spotlight.keywords.mail": "email, sulat, liham",

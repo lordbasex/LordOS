@@ -263,6 +263,7 @@
   "restore.title": "Да се отворят ли отново прозорците?",
   "restore.unclean": "Миналия път LordOS не се изключи правилно.",
   "restore.yes": "Отвори отново",
+  "restore.askFirst": "Останалото е отворено отново. Тези пазят сесия или лични данни: отварят се само ако ги изберете.",
   "spotlight.action.dark": "Превключи тъмен / светъл режим",
   "spotlight.action.hint": "Системно действие",
   "spotlight.keywords.mail": "имейл поща email",

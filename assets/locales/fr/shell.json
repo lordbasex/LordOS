@@ -263,6 +263,7 @@
   "restore.title": "Rouvrir vos fenêtres ?",
   "restore.unclean": "LordOS ne s’est pas arrêté correctement la dernière fois.",
   "restore.yes": "Rouvrir",
+  "restore.askFirst": "Le reste est rouvert. Celles-ci contiennent une session ou des données privées : elles ne se rouvrent que si vous les choisissez.",
   "spotlight.action.dark": "Basculer entre mode sombre et clair",
   "spotlight.action.hint": "Action système",
   "spotlight.keywords.mail": "e-mail email courriel",

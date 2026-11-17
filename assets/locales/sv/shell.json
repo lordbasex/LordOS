@@ -263,6 +263,7 @@
   "restore.title": "Öppna dina fönster igen?",
   "restore.unclean": "LordOS stängdes inte av ordentligt förra gången.",
   "restore.yes": "Öppna igen",
+  "restore.askFirst": "Resten är öppet igen. De här har en session eller privata data: de öppnas bara om du väljer dem.",
   "spotlight.action.dark": "Växla mellan mörkt och ljust läge",
   "spotlight.action.hint": "Systemåtgärd",
   "spotlight.keywords.mail": "e-post",

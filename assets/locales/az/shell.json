@@ -263,6 +263,7 @@
   "restore.title": "Pəncərələriniz yenidən açılsın?",
   "restore.unclean": "Ötən dəfə LordOS düzgün sönmədi.",
   "restore.yes": "Yenidən aç",
+  "restore.askFirst": "Qalanları yenidən açıldı. Bunlar sessiya və ya şəxsi məlumat saxlayır: yalnız seçsəniz açılır.",
   "spotlight.action.dark": "Qaranlıq / işıqlı rejimi dəyiş",
   "spotlight.action.hint": "Sistem əməliyyatı",
   "spotlight.keywords.mail": "e-poçt",

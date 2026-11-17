@@ -20,7 +20,7 @@ import { useTheme } from './theme.js';
 import { spacing, typeScale, controlSize } from './controls.jsx';
 import { settings, saveSettingsNow } from './settings.js';
 import { windows, wm, getApp, isLiveSystem, workAreaOf, setLinuxPlacement, SNAP_ZONES, activeDesktop, desktopList, setActiveDesktop } from './windows.js';
-import { desktopAt, indexOfDesktop, activeIndex } from './desktops.js';
+import { desktopAt, indexOfDesktop, activeIndex, desktopName } from './desktops.js';
 import { cleanIndex } from './desktopmodel.js';
 import { dockIdOfWindow, launchDockItem } from './dock.js';
 import { parseDockId } from './dockmodel.js';
@@ -28,7 +28,7 @@ import { isAppOff } from './appsoff.js';
 import { useLauncherApps, shortAppName } from './apps.js';
 import { admin } from './admin.js';
 import { clipboard } from './clipboard.js';
-import { RESTORE_MODES, RESTORE_DEFAULT, MAX_WINDOWS, NEVER, cleanArgs, cleanFrame, cleanList, restoreDecision, planRestore, fitFrame } from './sessionmodel.js';
+import { RESTORE_MODES, RESTORE_DEFAULT, MAX_WINDOWS, NEVER, cleanArgs, cleanFrame, cleanList, restoreDecision, restoreSplit, planRestore, fitFrame } from './sessionmodel.js';
 
 const AUTOSAVE_MS = 2000;     // a dragged window or a new one reaches the disk this long after
 const START_MS = 1500;        // after the theme's first frames
@@ -183,13 +183,14 @@ function restore(list, active = 0) {
   hold = true;
   // the desktops first: a window that comes back never takes the front of a desktop it isn't on
   for (const e of list) desktopAt(e.desk || 0);
-  setActiveDesktop(desktopAt(cleanIndex(active)));
+  if (active != null) setActiveDesktop(desktopAt(cleanIndex(active)));
   const open = new Map();
   for (const w of windows.get()) { const k = dockIdOfWindow(w); open.set(k, (open.get(k) || 0) + 1); }
   const steps = planRestore(list, open, runsOnce);
   topEntry = [...steps].reverse().find((s) => !s.entry.min && (s.entry.desk || 0) === activeIndex())?.entry || null;
   topWin = null;
-  const finish = () => { hold = false; lastJson = ''; schedule(); };
+  // still waiting for the answer about the ask-first apps: the saved list stays as it was until then
+  const finish = () => { if (askStore.get()) return; hold = false; lastJson = ''; schedule(); };
   if (!steps.length) { finish(); return; }
   let i = 0;
   const step = () => {
@@ -223,18 +224,20 @@ function restore(list, active = 0) {
 
 // ---- the question ----
 
-// null, or { list, unclean }
+// null, or { list, active, unclean, partial (the rest already reopened), off: Set of the entries left out }
 const askStore = createStore(null);
 
 function answer(yes) {
   const a = askStore.get();
   askStore.set(null);
   if (!a) return;
-  if (yes) { restore(a.list, a.active); return; }
+  const chosen = yes ? a.list.filter((e, i) => !a.off.has(i)) : [];
+  if (chosen.length) { restore(chosen, a.partial ? null : a.active); return; }
   hold = false;
   lastJson = '';
   write(snapshot(), false);
 }
+const toggleEntry = (i) => askStore.set((a) => { if (!a) return a; const off = new Set(a.off); if (off.has(i)) off.delete(i); else off.add(i); return { ...a, off }; });
 
 function Button({ th, label, onClick, primary }) {
   return h(View, {
@@ -256,13 +259,13 @@ export function RestorePrompt() {
     });
   }, [!!ask]);
   if (!ask) return null;
-  const names = [];
-  for (const e of ask.list) {
+  const nameOf = (e) => {
     const p = parseDockId(e.id);
     const a = apps.find((x) => (p.kind === 'desktop' ? x.desktopId === p.key : x.id === p.key));
-    const n = a ? (a.kind === 'linux' ? shortAppName(a) : a.name) : null;
-    if (n && !names.includes(n)) names.push(n);
-  }
+    return a ? (a.kind === 'linux' ? shortAppName(a) : a.name) : null;
+  };
+  // each window with its desktop (its activity in Lord Workspaces), and a box to leave it closed
+  const rows = ask.list.map((e, i) => ({ i, name: nameOf(e), desk: desktopList.get().length > 1 || e.desk ? desktopName(desktopAt(e.desk || 0)) : '' })).filter((r) => r.name);
   const d = mainDisplay();
   const line = (key, s) => h(Text, { key, style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.4, textAlign: 'start' } }, s);
   return h(View, { style: { position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' } },
@@ -270,7 +273,12 @@ export function RestorePrompt() {
       border: `1px solid ${th.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' } },
     h(Text, { style: { fontSize: typeScale.headline, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('shell.restore.title')),
     ask.unclean ? line('why', t('shell.restore.unclean')) : null,
-    names.length ? line('apps', t('shell.restore.apps', { list: names.join(', ') })) : null,
+    ask.partial ? line('why', t('shell.restore.askFirst')) : null,
+    ...rows.map((r) => h(View, { key: `r${r.i}`, onClick: () => toggleEntry(r.i), style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingVertical: 3 } },
+      h(View, { style: { width: 16, height: 16, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: ask.off.has(r.i) ? th.control : th.accent } },
+        ask.off.has(r.i) ? null : h(Text, { style: { fontSize: 11, fontWeight: 700, color: '#fff' } }, '✓')),
+      h(Text, { style: { flex: 1, fontSize: typeScale.body, color: th.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' } }, r.name),
+      r.desk ? h(Text, { style: { fontSize: typeScale.caption ?? 11, color: th.textDim, whiteSpace: 'nowrap' } }, r.desk) : null)),
     h(View, { style: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m } },
       h(Button, { th, label: t('shell.restore.no'), onClick: () => answer(false) }),
       h(Button, { th, primary: true, label: t('shell.restore.yes'), onClick: () => answer(true) }))));
@@ -310,6 +318,7 @@ export function startSessionRestore() {
   // the restore itself is an unclean end and asks next time
   write(now === 'none' && !switched ? [] : list, false);
   if (now === 'none') { hold = false; schedule(); return; }
-  if (now === 'run') setTimeout(() => restore(list, saved?.active), START_MS);
-  else setTimeout(() => askStore.set({ list, active: saved?.active, unclean: saved?.clean !== true }), START_MS);
+  const { run, ask } = restoreSplit(now, list);
+  if (ask.length) setTimeout(() => askStore.set({ list: ask, active: saved?.active, unclean: saved?.clean !== true, partial: run.length > 0, off: new Set() }), START_MS);
+  if (run.length) setTimeout(() => restore(run, saved?.active), START_MS);
 }

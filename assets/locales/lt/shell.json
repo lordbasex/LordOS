@@ -270,6 +270,7 @@
   "restore.title": "Vėl atidaryti langus?",
   "restore.unclean": "Praėjusį kartą LordOS nebuvo tinkamai išjungta.",
   "restore.yes": "Atidaryti vėl",
+  "restore.askFirst": "Kiti vėl atidaryti. Šiuose yra seansas arba privatūs duomenys: jie atsidaro, tik jei juos pasirenkate.",
   "spotlight.action.dark": "Perjungti tamsų / šviesų režimą",
   "spotlight.action.hint": "Sistemos veiksmas",
   "spotlight.keywords.mail": "el. paštas laiškas",

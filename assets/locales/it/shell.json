@@ -263,6 +263,7 @@
   "restore.title": "Riaprire le tue finestre?",
   "restore.unclean": "L’ultima volta LordOS non si è spento correttamente.",
   "restore.yes": "Riapri",
+  "restore.askFirst": "Il resto è stato riaperto. Queste contengono una sessione o dati privati: si riaprono solo se le scegli.",
   "spotlight.action.dark": "Alterna modalità scura / chiara",
   "spotlight.action.hint": "Azione di sistema",
   "spotlight.keywords.mail": "email e-mail posta",

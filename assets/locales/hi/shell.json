@@ -263,6 +263,7 @@
   "restore.title": "अपनी विंडो फिर से खोलें?",
   "restore.unclean": "पिछली बार LordOS ठीक से बंद नहीं हुआ।",
   "restore.yes": "फिर से खोलें",
+  "restore.askFirst": "बाकी फिर से खुल गए हैं। इनमें एक सत्र या निजी डेटा है: ये तभी खुलेंगे जब आप इन्हें चुनेंगे।",
   "spotlight.action.dark": "डार्क / लाइट मोड बदलें",
   "spotlight.action.hint": "सिस्टम क्रिया",
   "spotlight.keywords.mail": "ईमेल",

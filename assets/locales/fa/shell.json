@@ -263,6 +263,7 @@
   "restore.title": "پنجره‌هایتان دوباره باز شوند؟",
   "restore.unclean": "LordOS دفعهٔ پیش درست خاموش نشد.",
   "restore.yes": "باز کردن دوباره",
+  "restore.askFirst": "بقیه دوباره باز شدند. این‌ها یک نشست یا داده‌های خصوصی دارند: فقط اگر انتخابشان کنید باز می‌شوند.",
   "spotlight.action.dark": "تغییر حالت تیره / روشن",
   "spotlight.action.hint": "کنش سیستم",
   "spotlight.keywords.mail": "ایمیل پست الکترونیک رایانامه email",

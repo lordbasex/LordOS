@@ -270,6 +270,7 @@
   "restore.title": "Otworzyć ponownie okna?",
   "restore.unclean": "LordOS nie został ostatnio poprawnie wyłączony.",
   "restore.yes": "Otwórz ponownie",
+  "restore.askFirst": "Reszta została otwarta ponownie. Te zawierają sesję lub prywatne dane: otworzą się tylko, jeśli je wybierzesz.",
   "spotlight.action.dark": "Przełącz tryb ciemny / jasny",
   "spotlight.action.hint": "Czynność systemowa",
   "spotlight.keywords.mail": "e-mail poczta",

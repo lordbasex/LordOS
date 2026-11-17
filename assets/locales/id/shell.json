@@ -256,6 +256,7 @@
   "restore.title": "Buka kembali jendela Anda?",
   "restore.unclean": "LordOS tidak dimatikan dengan benar terakhir kali.",
   "restore.yes": "Buka Kembali",
+  "restore.askFirst": "Sisanya sudah dibuka lagi. Ini menyimpan sesi atau data pribadi: hanya dibuka jika Anda memilihnya.",
   "spotlight.action.dark": "Beralih mode gelap / terang",
   "spotlight.action.hint": "Tindakan sistem",
   "spotlight.keywords.mail": "email surel",

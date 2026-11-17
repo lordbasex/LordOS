@@ -270,6 +270,7 @@
   "restore.title": "Redeschideți ferestrele?",
   "restore.unclean": "Data trecută, LordOS nu s-a oprit corect.",
   "restore.yes": "Redeschide",
+  "restore.askFirst": "Restul s-a redeschis. Acestea păstrează o sesiune sau date private: se redeschid doar dacă le alegi.",
   "spotlight.action.dark": "Comută modul întunecat / luminos",
   "spotlight.action.hint": "Acțiune de sistem",
   "spotlight.keywords.mail": "email e-mail poștă",
