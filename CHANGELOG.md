@@ -435,6 +435,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Firefox in full screen showed nothing without a GPU** (virtual machines, `LORD_GPU=0`): the CPU path copied only the
+  fullscreen window's own buffer, and Firefox draws its page in a subsurface and leaves that buffer clear, so the
+  desktop showed through while Firefox had the keys. The CPU path now paints the window with its subsurfaces, scaled
+  as one, as the GPU path already did (`blit_tree` in `wl.c`). Found while checking #175 on a VM; it was there since the
+  first multi-monitor work. Checked on the test VM with Firefox ESR (F11 in and out) and Chromium.
 - **Hardware reports: attaching System Information's page works too** (issue #171). The page it opens now carries the
   report in a data block the browser never runs, and the hardware-report check reads it from an attached `.html` when
   no `.json` is there (`embeddedReport` in `tools/hwreport/lib.mjs`, the same schema and limits).

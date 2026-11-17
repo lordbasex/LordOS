@@ -3169,6 +3169,19 @@ void wl_gpu_draw_layer(int layer) {
     if (icon) draw_tree(icon, ix, iy, 1, 1, all);
 }
 
+/* A fullscreen window and its subsurfaces, scaled as one (the GPU path's draw_tree): a browser such as Firefox draws
+ * its page in a subsurface and leaves the window's own buffer clear, so copying only the window showed nothing. */
+static void blit_tree(Canvas *c, Surf *s, float x, float y, float sxk, float syk) {
+    if (s->content) {
+        uint32_t *tmp = s->px ? NULL : capture_readback(s);      /* a GPU app in a screenshot */
+        if (tmp) s->px = tmp;
+        if (s->px) blit_surface(c, s, x, y, sxk, syk, 1);
+        if (tmp) { s->px = NULL; free(tmp); }
+    }
+    for (int i = 0; i < s->nkids; i++)
+        blit_tree(c, s->kids[i], x + s->kids[i]->sx * sxk, y + s->kids[i]->sy * syk, sxk, syk);
+}
+
 /* CPU path: fullscreen and its menus are copied over the already built frame. */
 void wl_paint_fullscreen(Canvas *out) {
     if (paint_capture_mode && fs_surf && fs_surf->content && node_protected(fs_surf->node)) {
@@ -3183,14 +3196,10 @@ void wl_paint_fullscreen(Canvas *out) {
     /* only on the display it covers (a mirror shows the same rect) */
     double vx1 = paint_view.x + (out->w - paint_view.dx) / paint_view.k, vy1 = paint_view.y + (out->h - paint_view.dy) / paint_view.k;
     if (fx >= vx1 || fy >= vy1 || fx + fw <= paint_view.x || fy + fh <= paint_view.y) return;
-    uint32_t *tmp = fs_surf->px ? NULL : capture_readback(fs_surf);     /* a GPU app in a screenshot */
-    if (!fs_surf->px && !tmp) return;
-    if (tmp) fs_surf->px = tmp;
     Rect oc = out->clip;
     canvas_set_clip(out, rect_and(oc, (Rect){ (int)floorf(PVX(fx)), (int)floorf(PVY(fy)), (int)ceilf(PVX(fx + fw)), (int)ceilf(PVY(fy + fh)) }));
-    blit_surface(out, fs_surf, x, y, sx, sy, 1);
+    blit_tree(out, fs_surf, x, y, sx, sy);
     canvas_set_clip(out, oc);
-    if (tmp) { fs_surf->px = NULL; free(tmp); }
     for (int i = 0; i < npopups; i++) {
         float px, py;
         if (origin(popups[i], &px, &py)) paint_tree(out, popups[i], px, py, 1, (Rect){ -65536, -65536, 65536, 65536 });
