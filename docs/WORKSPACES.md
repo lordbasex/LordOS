@@ -11,13 +11,13 @@ performs against the other two themes and what is left for the compositor.
 
 | Piece | What it is | Where |
 |---|---|---|
-| **Context Spine** | The rail at the start of the main display: the LordOS crown (the system menu: About, Settings, Lock, Switch User, Log Out, Restart, Shut Down), **Activities** (the Overview), **Apps** (the search panel with every app), **Files**, and at the bottom the **Control Center** and the button that collapses it to icons. It collapses by itself below 1440 px while its setting is Automatic. It reserves its width in the work area. | `components/Spine.jsx` |
-| **Activity strip** | A pill per activity (its icon in its colour; the one in view under an accent that glides to the next one on a switch), **+ New**, and "Activity 2 of 4 · up to 9". Click switches, double click renames in place, right click: Rename, Icon, colour and apps…, Delete activity… (asked first, in the page). | `components/TopBar.jsx` |
+| **Context Spine** | The rail at the start of the main display: the LordOS crown (the system menu: About, Settings, Lock, Switch User, Log Out, Restart, Shut Down), the **activity in view** (its icon on a tile of its colour; a click edits it) and the **recent** ones (one to three, as the height allows; a click goes there), **Activities** (the Overview), **Apps** (the search panel with every app), **Files**, and at the bottom **Notifications**, **Settings**, the **Control Center** and the button that collapses it to icons. It collapses by itself below 1440 px while its setting is Automatic. It reserves its width in the work area. | `components/Spine.jsx` |
+| **Activity strip** | A pill per activity (its icon in its colour; the one in view under an accent that glides to the next one on a switch; the others with their window count, and a summary of their windows when the pointer rests on them half a second, the **Focus Surface**), the **groups** of the activity in view as chips beside its pill, **+ New**, and "Activity 2 of 4 · up to 9". On a narrow display the other pills show only their icon. Click switches, double click renames in place, right click: Rename, Icon, colour and apps…, Delete activity… (asked first, in the page). | `components/TopBar.jsx` |
 | **Status cluster** | Privacy indicators, the status items (network, Cleaner, Cloud, keyboard…), the volume, notifications with an unread dot, and the date and time (the clock wakes once a minute). | `components/TopBar.jsx` |
 | **Group frame** | Per display, a frame in the accent around the work area; its header holds the activity's name (and the display's, with several), its pinned apps and the actions **Change layout**, **Add window**, **Save layout** and **Move to another activity**. With no window on a display, a short empty state offers Add window and Open pinned apps. | `components/GroupFrame.jsx` |
-| **Windows** | A 36 px title bar (icon and title at the start, minimize, maximize and close as real 28 px targets with a glyph, at the end or first with Settings → Desktop & Dock → Title bars → Left). An app's own menus in a strip under it with Window and Help (there is no global menu bar; F10 or the left ⌥ alone opens the first one). Linux apps that draw their own bar (`args.csd`) get no frame and the theme's window menu where they ask for one. Right click on a title: Tile or Float this window, Move to another activity, Minimize, Maximize, Close. | `components/Window.jsx` |
+| **Windows** | A 36 px title bar (icon and title at the start, minimize, maximize and close as real 28 px targets with a glyph, at the end or first with Settings → Desktop & Dock → Title bars → Left). An app's own menus in a strip under it with Window and Help (there is no global menu bar; F10 or the left ⌥ alone opens the first one). Linux apps that draw their own bar (`args.csd`) get no frame and the theme's window menu where they ask for one. The title starts with the window's activity mark (its icon in its colour, named on hover). Right click on a title: Tile or Float this window, Move to another activity, Move to group, Minimize, Maximize, Close. | `components/Window.jsx` |
 | **Search** | ❖Space, Ctrl+Space (not in the Terminal) or ❖ alone, on the display under the pointer, in the overlay layer (a Linux app doesn't keep the keyboard). LordOS's own search (`searchEverything`: apps, files, Settings, notes, the calculator, Help, the Store) plus two sections this theme registers, **Activities** and **Open windows**. Typing starts at the first character; ↑ ↓ choose, Enter opens, Esc closes. With nothing typed it lists the activities and every app. | `components/Search.jsx`, `index.jsx` |
-| **Control Center** | A live drawn preview of the desktop with the current choices; dark mode, Reduce motion, the **effects style**, the accent, Do Not Disturb, Night Light, Wi-Fi (its state; a click opens Settings → Network → Wi-Fi), Bluetooth, the volume and the screen's brightness, the power mode and the wallpaper. It unfolds from its button. | `components/ControlCenter.jsx` |
+| **Control Center (the Control Atlas)** | A live drawn preview of the desktop with the current choices, then a section each: **Appearance** (dark mode, Reduce motion, High contrast, the effects style, the accent, the wallpaper), **Window tiling** (the layout of the activity in view on this display, its padlock), **Activities** (each with its window count, New activity, Edit), **Displays** (Night Light, brightness, the displays connected, the spine on every display), **Sound** (Do Not Disturb, the volume), **Network** (Wi-Fi, Bluetooth), **Energy** (the power mode) and **Security** (the firewall's mode, Lock Screen). Each section's title opens its page in Settings; nothing duplicates a device's settings. It unfolds from its button. | `components/ControlCenter.jsx` |
 | **Onboarding** | On the only activity, while nothing was set up and nothing is open: 1. its name, icon and colour; 2. its apps and the layout. "Start activity" opens the apps, which the layout places. It can be skipped; the same two steps edit an activity later. | `components/ActivityEditor.jsx` |
 
 The menus and the notification panel are Lord Classic's own components (`themes/classic/components/Menu.jsx`,
@@ -33,12 +33,26 @@ the other themes. Its name is the desktop's own (`settings.desktopNames`, `renam
 is kept in a new settings key, versioned, by position like the names (desktops are numbered again at every start):
 
 ```
-settings.workspaces = { v: 1, activities: [ { icon, color, pins, layouts, setup } | null, … ] }
-settings.themeOptions.workspaces = { surface, spine, spineEvery }
+settings.workspaces = { v: 1, activities: [ { icon, color, pins, layouts, setup, groups, group, updatedAt } | null, … ] }
+settings.themeOptions.workspaces = { surface, spine, spineEvery, contrast }
 ```
 
 `layouts` is per display (by connector name): `{ layout, ratio, apps }`. A new key, so no migration
 (`sdk/settings.js` lists both with "new key, no migration"). The model is `model/activities.js`.
+
+**Groups: more activities on the same desktop** (the proposal's Activity Islands, and its way past nine). An activity
+can hold up to three groups (`groups: [{ id, name, icon, color, apps }]`, `group`: the one in view), so 9 desktops hold
+36 activities without a tenth desktop. Each open window belongs to one (`state.js`, `windowGroups`): a new window to the
+group whose saved apps have its app, else to the one in view. Showing a group minimizes the windows of the others and
+brings back the ones the groups had hidden; those aren't minimized by the person, so they get no minimize effect and no
+place in the frame's tray. Each group's `apps` follow its open windows, so after a restart they join their group again.
+Removing a group moves its windows to the activity's own. The chips sit beside the activity's pill (double click
+renames, right click removes), "New group in this activity" is on the pill's menu, "Move to group" on a window's, and
+Search lists the groups as activities.
+
+**Focus Surface.** The other activities show as summaries: each pill counts its windows (one selector over the windows
+store, so the strip re-renders when a count changes, not on a title), and resting the pointer on one shows its windows
+(by app and title, minimized ones last, at most six) or its pinned apps; a click on a window goes to it.
 
 ## Tiling
 
@@ -266,9 +280,20 @@ jumps to its end, and the SDK's own desktop slide is off too.
 The theme's table (`index.jsx`) on top of the SDK's base: ❖Space and Ctrl+Space open Search (the theme's entries win
 over the base's), ❖ alone opens it with every app; ❖⌥D collapses or expands the spine; the app switcher (❖Tab by
 default), ❖\` the app's next window, ❖M minimize, ❖H hide, ❖⌥H hide others, ❖, the app's settings, and Lord Flow's
-Desktops keys (⌃↑ the Overview, ⌃← ⌃→ and ❖⌃← ❖⌃→ switch activities, ⌃↓ the app's windows). Over a Linux app the
-compositor keeps Lord Flow's fixed lists (`flow-desktops`, or `flow` with Settings → Keyboard's ⌃ arrows off,
-`server/src/wl/keygrab.c`): no new C table, so the keys it keeps are exactly those.
+Desktops keys (⌃↑ the Overview, ⌃← ⌃→ and ❖⌃← ❖⌃→ switch activities, ⌃↓ the app's windows), and its own: ❖1…❖9 show
+activity 1 to 9; ❖Tab and ❖⇧Tab, the next and the previous activity, when Settings → Keyboard puts the app switcher on
+⌥Tab (the proposal's ❖Tab for activities, by choice); ⌃F2 moves the keyboard to the bars (below). Over a Linux app the
+compositor keeps a fixed list for this theme (`workspaces` and `workspaces-desktops` in `server/src/wl/keygrab.c`: Lord
+Flow's two tables plus ⌃F2 and ❖1…❖9, and ❖Tab when the switcher is on ⌥Tab only). Lord Flow's own tables are unchanged.
+
+**The bars' keyboard** (`barfocus.js`). ⌃F2 gives the keyboard to the Context Spine and the activity strip: an empty
+overlay layer holds it (no app gets the keys), the arrows, Tab, Home and End go from the crown down the spine and along
+the strip's pills, the control with the keyboard draws a ring (only the ring re-renders), Enter or Space presses it,
+Escape or a press of the pointer gives the keyboard back.
+
+**High contrast** (the theme's option, also in the Control Atlas): solid black or white surfaces, text at 21:1, dim
+text and the accent at 7:1 or more, the text on the accent at 7:1, a line round every surface and control, no blur and
+no shadows (`highContrast` in `tokens.js`, checked by `server/tests/workspaces_model_test.mjs`).
 
 ## Settings
 
@@ -279,8 +304,8 @@ anything else dropped):
 - `sketch` (`rail`, `pills`, `frame`, `menubar`, `dock`, `taskbar`): the drawn picture in Appearance → Desktop style.
 - `options`: the theme's own choices, under Desktop style and on Desktop & Dock while it is the current theme, stored in
   `settings.themeOptions[<theme id>]` (one key for every theme, so a theme's id can't reach another setting). Lord
-  Workspaces declares Effects style, Context Spine (Automatic, With labels, Icons only) and Show the spine on every
-  display.
+  Workspaces declares Effects style, Context Spine (Automatic, With labels, Icons only), Show the spine on every
+  display and High contrast.
 - `desktopArrows`: the Desktops section shows Settings → Keyboard's ⌃-arrows switch, as for Lord Flow.
 
 On Desktop & Dock, such a theme gets the desktops (here: activities), its options and the title bars' buttons, with no

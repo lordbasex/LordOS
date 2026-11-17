@@ -12,6 +12,43 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Lord Workspaces: the rest of its proposal.** Checked item by item against the theme's design document:
+  - **Context Spine:** under the crown, the activity in view (its icon on a tile of its colour; a click edits it) and
+    the activities used just before it (one to three, as the display's height allows; a click goes there); at the
+    bottom, Notifications and Settings beside the Control Center.
+  - **Focus Surface:** each other activity's pill in the strip counts its windows, and resting the pointer on it for
+    half a second shows what it holds (its windows by app and title, the minimized ones last, or its pinned apps when
+    it has none); a click on a window goes to it. On a narrow display the other pills show only their icon, so every
+    activity stays reachable.
+  - **Groups (the proposal's Activity Islands, and its way past nine):** up to three more activities inside one, on the
+    same desktop: chips beside the activity's pill, "New group in this activity" on its menu, "Move to group" on a
+    window's. Showing a group minimizes the others' windows (without the minimize effect or a place in the tray) and
+    brings its own back; each group remembers its apps, so they join it again after a restart. Search finds groups as
+    activities. 9 desktops × 4 = 36 activities, with no tenth desktop faked.
+  - **Each window's title bar** starts with its activity's mark.
+  - **Control Atlas:** the Control Center gains sections: Appearance, Window tiling (the layout of the activity in view
+    on that display, its padlock), Activities (each with its window count, New activity, Edit), Displays (Night Light,
+    brightness, the displays connected, the spine on every display), Sound, Network, Energy and Security (the firewall's
+    mode, Lock Screen). Each section's title opens its page in Settings.
+  - **High contrast** (Settings → Appearance, the theme's option, and the Control Atlas): solid black or white
+    surfaces, text at 21:1, the dim text and the accent at 7:1 or more, a line round every surface, no blur or
+    shadows (`server/tests/workspaces_model_test.mjs` checks the ratios).
+  - **Amber accent**, the proposal's colour (#A9650A in light mode; #C27A12 in dark mode so white on it keeps 3:1),
+    with the brand's violet focus ring.
+  - **Keyboard:** ⌃F2 moves the keyboard to the spine and the activity strip, even over a Linux app (a new
+    `workspaces` key table in `server/src/wl/keygrab.c`, Lord Flow's plus ⌃F2 and ❖1…9; Lord Flow's own table is
+    unchanged): the arrows, Tab, Home and End go from one control to the next with a visible ring, Enter or Space
+    presses it, Escape gives the keyboard back. ❖1…❖9 show activity 1 to 9; ❖Tab and ❖⇧Tab, the next and the previous
+    activity, when Settings → Keyboard puts the app switcher on ⌥Tab.
+  - **Activities keep when they were last changed** (`updatedAt` in `settings.workspaces`, as the proposal's schema).
+- **Search (all themes): recent files** (the home folder's files changed in the last 30 days, read at most once a
+  minute) and two more safe actions, Do Not Disturb and Lock Screen.
+- **Overview (all themes): Up and Down** move between rows of windows. A theme can mark each desktop in the strip
+  (`setDesktopDecor`); Lord Workspaces shows each one's activity icon and colour.
+- **Session restore asks before apps that hold a session or private data** (all themes): Terminal, Passwords, Remote
+  Desktop, Machines, Databases, Camera and Recorder reopen only when chosen, even with restore set to Always; the rest
+  reopens by itself. The question lists each window with its desktop (its activity in Lord Workspaces), and each can be
+  left out.
 - **Settings → Battery, for any laptop (all themes).** Through the kernel's
   standard attributes (no vendor tool): the state with the plug-in, resume and limit marks; the daily use of the last
   8 days and the level by hour; screen active and idle time on battery; the estimated use per app (each app's CPU on
@@ -244,6 +281,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Lord Workspaces: a cheaper activity switch.** 212 native calls for four switches instead of 352 (one display, three
+  windows, `server/tests/theme_cost_scene.mjs`): every activity's icon stays drawn in the frame header with only the
+  one in view shown, the spine's activities are one keyed list, a pill's window count is hidden rather than removed.
+- **Shortcuts:** F2 has a name in the SDK's key table (`sdk/shortcuts.js`), so a theme can use it.
 - **Lord Workspaces: the Calendar widget, redrawn, with styles to choose from.** The day and the month in red, today
   in a red circle, weekends dimmed and the week from the language's first weekday. Small: "Day" (the default: the day,
   its first event and what comes next), "Month" or "Day and weather". Medium: "Day and month" (the default), "Agenda"

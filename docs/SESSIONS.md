@@ -370,6 +370,12 @@ Settings → Session → **Reopen windows when you log in**: Always (the default
 | Power cut, crash, `SIGKILL` | asks ("did not shut down properly") | asks | nothing |
 | Everything was closed | clean desktop | clean desktop | clean desktop |
 
+**Apps that ask first.** Terminal, Passwords, Remote Desktop, Machines, Databases, Camera and Recorder hold a live
+session or private data (`ASK_FIRST` in `sdk/sessionmodel.js`). With Always, everything else reopens and the question
+lists only those; with Ask first, it lists every window. Each row names the app and its desktop (its activity in Lord
+Workspaces) and has a box to leave it closed (`restoreSplit`, tested in `server/tests/session_model_test.mjs`). Until
+the question is answered the saved list stays as it was, so a logout meanwhile loses nothing.
+
 **What is saved.** `sdk/sessionrestore.jsx` keeps a debounced snapshot of the windows store (2 s, only when it
 changed) in `settings.sessionSaved`, in `settings.json`, which is already on `lord.fs`'s deny list; no new file.
 That write and the logout's are `lord.settings.save(text, true)`: fsynced, file and folder, because they must
