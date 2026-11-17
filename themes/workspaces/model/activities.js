@@ -8,7 +8,7 @@
 //
 //   settings.workspaces = { v: 1, activities: [ { icon, color, pins, layouts, setup } | null ] }
 //   (layouts: { [display connector]: { layout, ratio, apps?, locked? } }; locked: the padlock is closed)
-//   settings.themeOptions.workspaces = { surface, spine, spineEvery }   (theme.json "options": Settings shows them,
+//   settings.themeOptions.workspaces = { surface, spine, spineEvery, contrast }   (theme.json "options": Settings shows them,
 //                                    sdk/thememeta.js)
 //
 //   wsPrefs(settings)                the cleaned key (defaults for anything missing or wrong)
@@ -71,6 +71,7 @@ export function wsPrefs(s) {
     surface: SURFACES.includes(o.surface) ? o.surface : DEFAULT_SURFACE,
     spine: SPINE_PREFS.includes(o.spine) ? o.spine : 'auto',
     spineEvery: o.spineEvery === true,
+    contrast: o.contrast === true,
     activities: list.map((a, i) => (a ? cleanActivity(a, i) : null)),
   };
 }

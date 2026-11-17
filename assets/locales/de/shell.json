@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Nur Symbole",
   "ws.opt.spineEvery": "Leiste auf jedem Bildschirm zeigen",
   "ws.opt.spineEveryHint": "Aus: nur auf dem Hauptbildschirm.",
+  "ws.opt.contrast": "Hoher Kontrast",
+  "ws.opt.contrastHint": "Schwarze oder weiße Flächen, reiner Text und eine Linie um jede Fläche. Keine Transparenz, keine Schatten.",
   "ws.empty.title": "In dieser Aktivität ist nichts geöffnet",
   "ws.empty.body": "Fügen Sie ein Fenster oder ein Widget hinzu oder klicken Sie mit der rechten Maustaste auf den Hintergrund. Neue Fenster nehmen ihren Platz im Layout ein.",
   "ws.empty.openPins": "Angeheftete Apps öffnen",

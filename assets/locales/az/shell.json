@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Yalnız ikonlar",
   "ws.opt.spineEvery": "Zolağı hər ekranda göstər",
   "ws.opt.spineEveryHint": "Söndürülüb: yalnız əsas ekranda.",
+  "ws.opt.contrast": "Yüksək kontrast",
+  "ws.opt.contrastHint": "Qara və ya ağ səthlər, təmiz mətn və hər səthin ətrafında xətt. Şəffaflıq və kölgə yoxdur.",
   "ws.empty.title": "Bu fəaliyyətdə açıq heç nə yoxdur",
   "ws.empty.body": "Pəncərə və ya vidcet əlavə edin, ya da fona sağ klikləyin. Yeni pəncərələr düzülüşdə öz yerini tutur.",
   "ws.empty.openPins": "Bərkidilmiş tətbiqləri aç",

@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Só ícones",
   "ws.opt.spineEvery": "Mostrar a coluna em cada tela",
   "ws.opt.spineEveryHint": "Desligado: só na tela principal.",
+  "ws.opt.contrast": "Alto contraste",
+  "ws.opt.contrastHint": "Superfícies pretas ou brancas, texto puro e uma linha em volta de cada superfície. Sem transparência nem sombras.",
   "ws.empty.title": "Nada aberto nesta atividade",
   "ws.empty.body": "Adicione uma janela ou um widget, ou clique com o botão direito no fundo. Novas janelas tomam seu lugar no layout.",
   "ws.empty.openPins": "Abrir os apps fixados",

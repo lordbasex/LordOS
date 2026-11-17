@@ -461,6 +461,8 @@
   "ws.opt.spineCollapsed": "仅图标",
   "ws.opt.spineEvery": "在每个显示器上显示侧栏",
   "ws.opt.spineEveryHint": "关闭：仅在主显示器上。",
+  "ws.opt.contrast": "高对比度",
+  "ws.opt.contrastHint": "纯黑或纯白的表面、清晰的文字，每个表面都有边线。没有透明效果和阴影。",
   "ws.empty.title": "此活动中没有打开的内容",
   "ws.empty.body": "添加一个窗口或小组件，或在背景上点按右键。新窗口会占据它在布局中的位置。",
   "ws.empty.openPins": "打开固定的应用",

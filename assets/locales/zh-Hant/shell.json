@@ -461,6 +461,8 @@
   "ws.opt.spineCollapsed": "僅圖示",
   "ws.opt.spineEvery": "在每個顯示器上顯示側欄",
   "ws.opt.spineEveryHint": "關閉：僅在主顯示器上。",
+  "ws.opt.contrast": "高對比",
+  "ws.opt.contrastHint": "純黑或純白的表面、清晰的文字，每個表面都有邊線。沒有透明效果和陰影。",
   "ws.empty.title": "此活動中沒有開啟的內容",
   "ws.empty.body": "新增一個視窗或小工具，或在背景上按右鍵。新視窗會佔據它在佈局中的位置。",
   "ws.empty.openPins": "開啟固定的 App",

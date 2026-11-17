@@ -164,7 +164,8 @@ function App() {
   const [s] = useSettings();
   const prefs = wsPrefs(s);
   const surface = effectiveSurface(prefs, s);
-  const t = useMemo(() => makeTheme({ mode: s.mode, accent: s.accent, effects: s.effects, surface }, lordosWallpapers), [s.mode, s.accent, s.effects, surface]);
+  const t = useMemo(() => makeTheme({ mode: s.mode, accent: s.accent, effects: s.effects, surface, contrast: prefs.contrast }, lordosWallpapers),
+    [s.mode, s.accent, s.effects, surface, prefs.contrast]);
   const { windows: all, mounted, focused, desktop } = useWindows();
   const meta = useStore(activities);
   const list = useStore(desktopList);

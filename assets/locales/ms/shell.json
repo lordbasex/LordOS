@@ -461,6 +461,8 @@
   "ws.opt.spineCollapsed": "Ikon sahaja",
   "ws.opt.spineEvery": "Tunjukkan bar pada setiap paparan",
   "ws.opt.spineEveryHint": "Mati: hanya pada paparan utama.",
+  "ws.opt.contrast": "Kontras tinggi",
+  "ws.opt.contrastHint": "Permukaan hitam atau putih, teks jelas dan garis di sekeliling setiap permukaan. Tiada lutsinar atau bayang.",
   "ws.empty.title": "Tiada apa-apa dibuka dalam aktiviti ini",
   "ws.empty.body": "Tambah tetingkap atau widget, atau klik kanan latar belakang. Tetingkap baharu mengambil tempatnya dalam susun atur.",
   "ws.empty.openPins": "Buka aplikasi yang disemat",

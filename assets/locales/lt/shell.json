@@ -475,6 +475,8 @@
   "ws.opt.spineCollapsed": "Tik piktogramos",
   "ws.opt.spineEvery": "Rodyti juostą kiekviename ekrane",
   "ws.opt.spineEveryHint": "Išjungta: tik pagrindiniame ekrane.",
+  "ws.opt.contrast": "Didelis kontrastas",
+  "ws.opt.contrastHint": "Juodi arba balti paviršiai, grynas tekstas ir linija aplink kiekvieną paviršių. Be skaidrumo ir šešėlių.",
   "ws.empty.title": "Šioje veikloje niekas neatidaryta",
   "ws.empty.body": "Pridėkite langą ar valdiklį arba dešiniuoju pelės mygtuku spustelėkite foną. Nauji langai užima savo vietą išdėstyme.",
   "ws.empty.openPins": "Atidaryti prisegtas programėles",

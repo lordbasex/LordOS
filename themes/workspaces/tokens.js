@@ -65,7 +65,24 @@ export function material(surface, dark) {
   };
 }
 
-export function makeTheme({ mode, accent, effects, surface }, wallpapers = []) {
+// High contrast (the theme's option, Settings → Appearance): solid black or white surfaces, pure text, a visible line
+// round every surface and control, an accent that holds 7:1 against them, no blur and no shadows. Checked in
+// server/tests/workspaces_model_test.mjs (text 21:1, dim text and the accent ≥ 7:1, the text on the accent ≥ 7:1).
+export function highContrast(t, dark) {
+  const fg = dark ? '#FFFFFF' : '#000000', bg = dark ? '#000000' : '#FFFFFF', line = dark ? '#FFFFFF' : '#000000';
+  const accent = dark ? '#C9BBFF' : '#3B1FB0', onAccent = dark ? '#000000' : '#FFFFFF';
+  const mat = { bg, bgStill: bg, border: line, blur: 0, sheen: null, edge: null, rim: null, shadow: 'none' };
+  return {
+    ...t, contrast: true, accent, onAccent, focusRing: accent, effects: false, surface: 'opaque', mat, blur: 0, panelBlur: 0,
+    text: fg, textDim: dark ? '#E6E6E6' : '#1F1F1F', windowBg: bg, sidebarBg: bg, separator: line, hover: dark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.16)',
+    iconFg: fg, iconFgHover: fg, itemHover: dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.20)', barSeparator: line, control: dark ? '#1A1A1A' : '#F0F0F0',
+    inputBg: bg, popupBg: bg, solidBg: bg, panelBg: bg, windowBorder: line, titleBg: bg, titleBgBlur: bg, chipBg: bg, frameBg: 'transparent', frameText: fg,
+    shadow: 'none', spineShadow: 'none', shadowSoft: 'none', buttonBorder: true,
+  };
+}
+
+export function makeTheme({ mode, accent, effects, surface, contrast = false }, wallpapers = []) {
+  if (contrast) return highContrast(makeTheme({ mode, accent, effects: false, surface: 'opaque' }, wallpapers), mode === 'dark');
   const dark = mode === 'dark';
   const s = effects === false ? 'opaque' : surface || 'crystal';
   const m = material(s, dark);

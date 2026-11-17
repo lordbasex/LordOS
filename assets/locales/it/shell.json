@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Solo icone",
   "ws.opt.spineEvery": "Mostra la colonna su ogni schermo",
   "ws.opt.spineEveryHint": "Disattivato: solo sullo schermo principale.",
+  "ws.opt.contrast": "Contrasto elevato",
+  "ws.opt.contrastHint": "Superfici nere o bianche, testo puro e una linea attorno a ogni superficie. Niente trasparenza né ombre.",
   "ws.empty.title": "Niente di aperto in questa attività",
   "ws.empty.body": "Aggiungi una finestra o un widget, o fai clic destro sullo sfondo. Le nuove finestre prendono il loro posto nella disposizione.",
   "ws.empty.openPins": "Apri le app fissate",

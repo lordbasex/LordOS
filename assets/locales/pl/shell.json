@@ -475,6 +475,8 @@
   "ws.opt.spineCollapsed": "Tylko ikony",
   "ws.opt.spineEvery": "Pokaż kolumnę na każdym ekranie",
   "ws.opt.spineEveryHint": "Wyłączone: tylko na ekranie głównym.",
+  "ws.opt.contrast": "Wysoki kontrast",
+  "ws.opt.contrastHint": "Czarne lub białe powierzchnie, czysty tekst i linia wokół każdej powierzchni. Bez przezroczystości i cieni.",
   "ws.empty.title": "W tej aktywności nic nie jest otwarte",
   "ws.empty.body": "Dodaj okno lub widżet albo kliknij tło prawym przyciskiem. Nowe okna zajmują swoje miejsce w układzie.",
   "ws.empty.openPins": "Otwórz przypięte aplikacje",

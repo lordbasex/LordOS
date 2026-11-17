@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Mga icon lang",
   "ws.opt.spineEvery": "Ipakita ang bar sa bawat display",
   "ws.opt.spineEveryHint": "Naka-off: sa pangunahing display lang.",
+  "ws.opt.contrast": "Mataas na contrast",
+  "ws.opt.contrastHint": "Itim o puting mga surface, malinaw na teksto at linya sa paligid ng bawat surface. Walang transparency o anino.",
   "ws.empty.title": "Walang bukas sa aktibidad na ito",
   "ws.empty.body": "Magdagdag ng window o widget, o mag-right-click sa background. Kukunin ng mga bagong window ang puwesto nila sa layout.",
   "ws.empty.openPins": "Buksan ang mga naka-pin na app",

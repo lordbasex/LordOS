@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Icons only",
   "ws.opt.spineEvery": "Show the spine on every display",
   "ws.opt.spineEveryHint": "Off: only on the main display.",
+  "ws.opt.contrast": "High contrast",
+  "ws.opt.contrastHint": "Solid black or white surfaces, pure text and a line around every surface. No transparency or shadows.",
   "ws.empty.title": "Nothing open in this activity",
   "ws.empty.body": "Add a window or a widget, or right-click the wallpaper. New windows take their place in the layout.",
   "ws.empty.openPins": "Open pinned apps",

@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Alleen pictogrammen",
   "ws.opt.spineEvery": "Kolom op elk scherm tonen",
   "ws.opt.spineEveryHint": "Uit: alleen op het hoofdscherm.",
+  "ws.opt.contrast": "Hoog contrast",
+  "ws.opt.contrastHint": "Zwarte of witte vlakken, zuivere tekst en een lijn rond elk vlak. Geen transparantie of schaduwen.",
   "ws.empty.title": "Niets geopend in deze activiteit",
   "ws.empty.body": "Voeg een venster of widget toe, of klik met rechts op de achtergrond. Nieuwe vensters nemen hun plaats in de indeling in.",
   "ws.empty.openPins": "Vastgezette apps openen",

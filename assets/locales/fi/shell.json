@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Vain kuvakkeet",
   "ws.opt.spineEvery": "Näytä palkki jokaisella näytöllä",
   "ws.opt.spineEveryHint": "Pois: vain päänäytöllä.",
+  "ws.opt.contrast": "Suuri kontrasti",
+  "ws.opt.contrastHint": "Mustat tai valkoiset pinnat, puhdas teksti ja viiva jokaisen pinnan ympärillä. Ei läpinäkyvyyttä eikä varjoja.",
   "ws.empty.title": "Tässä aktiviteetissa ei ole mitään auki",
   "ws.empty.body": "Lisää ikkuna tai pienoisohjelma tai napsauta taustaa hiiren oikealla. Uudet ikkunat asettuvat paikoilleen asetteluun.",
   "ws.empty.openPins": "Avaa kiinnitetyt sovellukset",

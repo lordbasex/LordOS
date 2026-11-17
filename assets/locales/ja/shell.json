@@ -461,6 +461,8 @@
   "ws.opt.spineCollapsed": "アイコンのみ",
   "ws.opt.spineEvery": "すべてのディスプレイにバーを表示",
   "ws.opt.spineEveryHint": "オフ：メインディスプレイのみ。",
+  "ws.opt.contrast": "ハイコントラスト",
+  "ws.opt.contrastHint": "黒または白の面、くっきりした文字、すべての面を囲む線。透明効果や影はありません。",
   "ws.empty.title": "このアクティビティでは何も開いていません",
   "ws.empty.body": "ウィンドウかウィジェットを追加するか、背景を右クリックします。新しいウィンドウはレイアウト内の位置に入ります。",
   "ws.empty.openPins": "固定したアプリを開く",

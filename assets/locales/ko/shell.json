@@ -461,6 +461,8 @@
   "ws.opt.spineCollapsed": "아이콘만",
   "ws.opt.spineEvery": "모든 디스플레이에 막대 표시",
   "ws.opt.spineEveryHint": "끔: 주 디스플레이에만 표시합니다.",
+  "ws.opt.contrast": "고대비",
+  "ws.opt.contrastHint": "검정 또는 흰색 표면, 선명한 글자, 모든 표면을 두르는 선. 투명도와 그림자가 없습니다.",
   "ws.empty.title": "이 활동에 열린 것이 없습니다",
   "ws.empty.body": "창이나 위젯을 추가하거나 배경을 마우스 오른쪽 버튼으로 클릭하세요. 새 창은 레이아웃에서 제자리를 차지합니다.",
   "ws.empty.openPins": "고정한 앱 열기",

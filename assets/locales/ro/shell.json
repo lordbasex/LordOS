@@ -475,6 +475,8 @@
   "ws.opt.spineCollapsed": "Doar pictograme",
   "ws.opt.spineEvery": "Arată coloana pe fiecare ecran",
   "ws.opt.spineEveryHint": "Oprit: doar pe ecranul principal.",
+  "ws.opt.contrast": "Contrast ridicat",
+  "ws.opt.contrastHint": "Suprafețe negre sau albe, text pur și o linie în jurul fiecărei suprafețe. Fără transparență sau umbre.",
   "ws.empty.title": "Nimic deschis în această activitate",
   "ws.empty.body": "Adăugați o fereastră sau un widget ori faceți clic dreapta pe fundal. Ferestrele noi își iau locul în aranjament.",
   "ws.empty.openPins": "Deschide aplicațiile fixate",

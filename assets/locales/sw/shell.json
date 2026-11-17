@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Aikoni pekee",
   "ws.opt.spineEvery": "Onyesha upau kwenye kila skrini",
   "ws.opt.spineEveryHint": "Imezimwa: kwenye skrini kuu tu.",
+  "ws.opt.contrast": "Utofautishaji mkubwa",
+  "ws.opt.contrastHint": "Nyuso nyeusi au nyeupe, maandishi safi na mstari kuzunguka kila uso. Bila uwazi wala vivuli.",
   "ws.empty.title": "Hakuna kilichofunguliwa katika shughuli hii",
   "ws.empty.body": "Ongeza dirisha au wijeti, au bofya kulia mandharinyuma. Madirisha mapya huchukua nafasi yao kwenye mpangilio.",
   "ws.empty.openPins": "Fungua programu zilizobandikwa",

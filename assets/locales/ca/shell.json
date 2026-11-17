@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Només icones",
   "ws.opt.spineEvery": "Mostra la columna a cada pantalla",
   "ws.opt.spineEveryHint": "Desactivat: només a la pantalla principal.",
+  "ws.opt.contrast": "Contrast alt",
+  "ws.opt.contrastHint": "Superfícies negres o blanques, text pur i una línia al voltant de cada superfície. Sense transparència ni ombres.",
   "ws.empty.title": "No hi ha res obert en aquesta activitat",
   "ws.empty.body": "Afegiu una finestra o un giny, o feu clic dret al fons. Les finestres noves ocupen el seu lloc a la disposició.",
   "ws.empty.openPins": "Obre les apps fixades",

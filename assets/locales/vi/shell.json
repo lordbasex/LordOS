@@ -461,6 +461,8 @@
   "ws.opt.spineCollapsed": "Chỉ biểu tượng",
   "ws.opt.spineEvery": "Hiện thanh trên mọi màn hình",
   "ws.opt.spineEveryHint": "Tắt: chỉ trên màn hình chính.",
+  "ws.opt.contrast": "Độ tương phản cao",
+  "ws.opt.contrastHint": "Bề mặt đen hoặc trắng, chữ rõ nét và một đường viền quanh mỗi bề mặt. Không trong suốt, không đổ bóng.",
   "ws.empty.title": "Không có gì mở trong hoạt động này",
   "ws.empty.body": "Thêm cửa sổ hoặc tiện ích, hoặc nhấp chuột phải vào nền. Cửa sổ mới vào đúng chỗ của nó trong bố cục.",
   "ws.empty.openPins": "Mở các ứng dụng đã ghim",

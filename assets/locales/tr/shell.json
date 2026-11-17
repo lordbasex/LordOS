@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Yalnızca simgeler",
   "ws.opt.spineEvery": "Şeridi her ekranda göster",
   "ws.opt.spineEveryHint": "Kapalı: yalnızca ana ekranda.",
+  "ws.opt.contrast": "Yüksek karşıtlık",
+  "ws.opt.contrastHint": "Siyah veya beyaz yüzeyler, net metin ve her yüzeyin çevresinde bir çizgi. Saydamlık ve gölge yok.",
   "ws.empty.title": "Bu etkinlikte açık bir şey yok",
   "ws.empty.body": "Bir pencere veya widget ekleyin ya da arka plana sağ tıklayın. Yeni pencereler düzende yerini alır.",
   "ws.empty.openPins": "Sabitlenen uygulamaları aç",

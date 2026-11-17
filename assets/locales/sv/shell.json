@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Bara symboler",
   "ws.opt.spineEvery": "Visa listen på varje skärm",
   "ws.opt.spineEveryHint": "Av: bara på huvudskärmen.",
+  "ws.opt.contrast": "Hög kontrast",
+  "ws.opt.contrastHint": "Svarta eller vita ytor, ren text och en linje runt varje yta. Ingen genomskinlighet eller skuggor.",
   "ws.empty.title": "Inget öppet i den här aktiviteten",
   "ws.empty.body": "Lägg till ett fönster eller en widget, eller högerklicka på bakgrunden. Nya fönster tar sin plats i layouten.",
   "ws.empty.openPins": "Öppna fästa appar",

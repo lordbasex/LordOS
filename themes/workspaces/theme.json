@@ -8,6 +8,7 @@
       "choices": [["opaque", "shell.ws.surface.opaque"], ["translucent", "shell.ws.surface.translucent"], ["crystal", "shell.ws.surface.crystal"]] },
     { "key": "spine", "label": "shell.ws.opt.spine", "default": "auto",
       "choices": [["auto", "shell.ws.opt.spineAuto"], ["expanded", "shell.ws.opt.spineExpanded"], ["collapsed", "shell.ws.opt.spineCollapsed"]] },
-    { "key": "spineEvery", "label": "shell.ws.opt.spineEvery", "hint": "shell.ws.opt.spineEveryHint", "toggle": true, "default": false }
+    { "key": "spineEvery", "label": "shell.ws.opt.spineEvery", "hint": "shell.ws.opt.spineEveryHint", "toggle": true, "default": false },
+    { "key": "contrast", "label": "shell.ws.opt.contrast", "hint": "shell.ws.opt.contrastHint", "toggle": true, "default": false }
   ]
 }

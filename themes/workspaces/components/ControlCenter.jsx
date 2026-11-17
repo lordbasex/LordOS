@@ -290,12 +290,16 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome, onEdi
           <Switch t={t} on={!!s.reduceMotion} label={tr('shell.ws.cc.reduceMotion')} glyph={(c) => <Chevron color={c} size={5} dir="right" />}
             onToggle={() => set({ reduceMotion: !s.reduceMotion })} />
         </View>
-        <Tile t={t} style={{ gap: 8 }}>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Switch t={t} on={prefs.contrast} label={tr('shell.ws.opt.contrast')} glyph={(c) => <ContrastGlyph color={c} size={14} />}
+            onToggle={() => set(optPatch(settings.get(), 'contrast', !prefs.contrast))} />
+        </View>
+        {prefs.contrast ? null : <Tile t={t} style={{ gap: 8 }}>
           <Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('shell.ws.surface.title')}</Text>
           <Segmented small value={surface} options={SURFACES.map((x) => [x, tr(`shell.ws.surface.${x}`)])}
             onChange={(v) => set({ ...optPatch(settings.get(), 'surface', v), ...(v !== 'opaque' && s.effects === false ? { effects: true } : null) })} />
           <Text style={{ fontSize: 11, color: t.textDim, textAlign: 'start' }}>{tr(`shell.ws.surface.${surface}Hint`)}</Text>
-        </Tile>
+        </Tile>}
         <Tile t={t} style={{ gap: 8 }}>
           <View onClick={() => openSettings(onClose, 'appearance')}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('shell.cc.accent')}</Text></View>
           <View style={{ flexDirection: 'row', gap: 10, direction: 'ltr' }}>

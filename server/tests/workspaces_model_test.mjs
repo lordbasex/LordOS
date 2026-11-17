@@ -125,10 +125,10 @@ eq('budget: a second later it fits', underBudget(times, 6010)?.length, 1);
 eq('saved display', savedDisplay('three', 0.5, ['files', null, 'terminal']), { layout: 'three', ratio: 0.5, apps: ['files', 'terminal'] });
 
 // ---- activities ----
-eq('empty settings', wsPrefs({}), { v: WS_VERSION, surface: 'crystal', spine: 'auto', spineEvery: false, activities: [] });
+eq('empty settings', wsPrefs({}), { v: WS_VERSION, surface: 'crystal', spine: 'auto', spineEvery: false, contrast: false, activities: [] });
 eq('junk key', wsPrefs({ workspaces: 'x', themeOptions: { workspaces: { surface: 'glass', spine: 4 } } }).surface, 'crystal');
 eq('options from themeOptions', wsPrefs({ themeOptions: { workspaces: { surface: 'opaque', spine: 'collapsed', spineEvery: true } } }),
-  { v: 1, surface: 'opaque', spine: 'collapsed', spineEvery: true, activities: [] });
+  { v: 1, surface: 'opaque', spine: 'collapsed', spineEvery: true, contrast: false, activities: [] });
 eq('transparency off forces opaque', effectiveSurface({ surface: 'crystal' }, { effects: false }), 'opaque');
 eq('transparency on keeps the style', effectiveSurface({ surface: 'translucent' }, { effects: true }), 'translucent');
 const act = cleanActivity({ icon: 'code', color: '#14a89a', pins: ['files', 'files', 3, 'terminal'], layouts: { 'DP-1': { layout: 'split', ratio: 9, apps: ['files', 7] }, bad: 3 }, setup: true });
@@ -151,7 +151,7 @@ eq('option patch', optPatch({ themeOptions: { other: { a: 1 } } }, 'surface', 'o
 const tj = JSON.parse(readFileSync(new URL('../../themes/workspaces/theme.json', import.meta.url)));
 const cm = cleanThemeMeta(tj);
 eq('theme.json sketch', cm.sketch, { rail: true, pills: true, frame: true });
-eq('theme.json options', cm.options.map((o) => o.key), ['surface', 'spine', 'spineEvery']);
+eq('theme.json options', cm.options.map((o) => o.key), ['surface', 'spine', 'spineEvery', 'contrast']);
 eq('theme.json arrows', cm.desktopArrows, true);
 eq('theme.json under 4 KB', readFileSync(new URL('../../themes/workspaces/theme.json', import.meta.url)).length < 4096, true);
 eq('bundled themes declare nothing', ['default', 'classic'].map((id) => cleanThemeMeta(JSON.parse(readFileSync(new URL(`../../themes/${id}/theme.json`, import.meta.url))))),
@@ -297,6 +297,17 @@ eq('material is plain data', JSON.parse(JSON.stringify(material('crystal', true)
   eq('dropSlot: a newcomer over a shown window, a new slot', dropSlot([['a'], ['b']], 'x', 900, 300, rf, isMin).n, 3);
   eq('dropSlot: a newcomer over the free slot, no new slot', dropSlot([['m'], ['b']], 'x', 100, 300, rf, isMin), { at: 0, n: 2 });
 }
+
+// high contrast: pure text, dim text and the accent at 7:1 or more, the text on the accent too, no blur or shadow
+for (const mode of ['dark', 'light']) {
+  const t = makeTheme({ mode, accent: 'violeta', surface: 'crystal', contrast: true });
+  yes(`${mode} contrast: text 21:1`, contrast(t.text, t.windowBg) >= 20.9);
+  yes(`${mode} contrast: dim text ≥ 7`, contrast(t.textDim, t.windowBg) >= 7);
+  yes(`${mode} contrast: accent ≥ 7`, contrast(t.accent, t.windowBg) >= 7);
+  yes(`${mode} contrast: text on the accent ≥ 7`, contrast(t.onAccent, t.accent) >= 7);
+  eq(`${mode} contrast: no blur, no shadow, a line round surfaces`, [t.mat.blur, t.panelBlur, t.shadow, t.mat.border === t.text], [0, 0, 'none', true]);
+}
+eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { workspaces: { contrast: true } } }).contrast, true);
 
 // the spine's recent activities: the one in view first, the others by when they were last shown
 {

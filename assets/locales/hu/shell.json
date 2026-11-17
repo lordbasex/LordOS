@@ -468,6 +468,8 @@
   "ws.opt.spineCollapsed": "Csak ikonok",
   "ws.opt.spineEvery": "Sáv megjelenítése minden kijelzőn",
   "ws.opt.spineEveryHint": "Ki: csak a fő kijelzőn.",
+  "ws.opt.contrast": "Nagy kontraszt",
+  "ws.opt.contrastHint": "Fekete vagy fehér felületek, tiszta szöveg és vonal minden felület körül. Átlátszóság és árnyék nélkül.",
   "ws.empty.title": "Ebben a tevékenységben nincs semmi nyitva",
   "ws.empty.body": "Adjon hozzá egy ablakot vagy minialkalmazást, vagy kattintson jobb gombbal a háttérre. Az új ablakok elfoglalják helyüket az elrendezésben.",
   "ws.empty.openPins": "Kitűzött appok megnyitása",

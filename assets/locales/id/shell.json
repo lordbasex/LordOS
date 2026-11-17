@@ -461,6 +461,8 @@
   "ws.opt.spineCollapsed": "Hanya ikon",
   "ws.opt.spineEvery": "Tampilkan bilah di setiap layar",
   "ws.opt.spineEveryHint": "Mati: hanya di layar utama.",
+  "ws.opt.contrast": "Kontras tinggi",
+  "ws.opt.contrastHint": "Permukaan hitam atau putih, teks murni dan garis di sekeliling setiap permukaan. Tanpa transparansi atau bayangan.",
   "ws.empty.title": "Tidak ada yang terbuka di aktivitas ini",
   "ws.empty.body": "Tambahkan jendela atau widget, atau klik kanan latar belakang. Jendela baru mengambil tempatnya di tata letak.",
   "ws.empty.openPins": "Buka aplikasi yang disematkan",
