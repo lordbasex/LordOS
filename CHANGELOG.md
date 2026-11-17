@@ -68,6 +68,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     mute, the outputs when there are several, Sound settings) instead of the Control Center; the status items' panels
     (Cloud, Cleaner…) open there too, under the band at its far edge (`setStatusPanelPlacer` in `sdk/statusitems.js`;
     the other themes keep theirs). The notifications stay on the bell only, not on the spine.
+  - **Force Quit** from the crown's menu and with ❖⌥Esc, as in Lord Flow (kept from a Linux app in front too: the
+    `workspaces` key table).
   - **The shortcuts' help:** a lifebuoy on the spine (in the glyph colour of the other items) (also ❖/ and "Keyboard Shortcuts…" in the crown's menu) opens a
     sheet with every shortcut that works now, read from the SDK's own list (the one Settings → Keyboard shows): the
     theme's marked THEME and the ones every theme shares (Search, the clipboard, Screenshots' captures…), each key on

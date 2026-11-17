@@ -45,11 +45,12 @@ static const Grab flow_desktops[] = {
 
 /* Lord Workspaces: Lord Flow's table (`workspaces` = flow, `workspaces-desktops` = flow-desktops), ⌃F2, which moves
  * the keyboard to the Context Spine and the activity strip (the bars' own focus, themes/workspaces/barfocus.js), and
- * ❖1…❖9, the activity at that position, and ❖/, the list of shortcuts. With the app switcher on ⌥Tab only (Settings → Keyboard, "+tab-alt"), ❖Tab
+ * ❖1…❖9, the activity at that position, ❖/, the list of shortcuts, and ❖⌥Esc, Force Quit. With the app switcher on ⌥Tab only (Settings → Keyboard, "+tab-alt"), ❖Tab
  * and ❖⇧Tab are the theme's too: the next and the previous activity (keygrab_match). */
 static const Grab workspaces_extra[] = {
     { KG_CTRL, 0, KEY_F2, KG_TAKE },
     { KG_META, 0, KEY_SLASH, KG_TAKE },                              /* the theme's list of shortcuts */
+    { KG_META | KG_ALT, 0, KEY_ESC, KG_TAKE },                       /* Force Quit, over the app that doesn't answer */
     { KG_META, 0, KEY_1, KG_TAKE }, { KG_META, 0, KEY_2, KG_TAKE }, { KG_META, 0, KEY_3, KG_TAKE },
     { KG_META, 0, KEY_4, KG_TAKE }, { KG_META, 0, KEY_5, KG_TAKE }, { KG_META, 0, KEY_6, KG_TAKE },
     { KG_META, 0, KEY_7, KG_TAKE }, { KG_META, 0, KEY_8, KG_TAKE }, { KG_META, 0, KEY_9, KG_TAKE },
