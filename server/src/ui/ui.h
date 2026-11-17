@@ -115,6 +115,7 @@ typedef struct Node {
     unsigned gen;               /* bumped with paint_dirty and never cleared: a transformed subtree's
                                  * cached raster compares it (paint.c tf_check) */
     Box prev_box;               /* what it occupied on screen in the last frame */
+    uint32_t walk_ix;           /* its place among its parent's children at the last damage walk (paint.c, the blur cache) */
     NodeTf *tf;
 } Node;
 
