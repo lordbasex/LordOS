@@ -440,6 +440,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   desktop showed through while Firefox had the keys. The CPU path now paints the window with its subsurfaces, scaled
   as one, as the GPU path already did (`blit_tree` in `wl.c`). Found while checking #175 on a VM; it was there since the
   first multi-monitor work. Checked on the test VM with Firefox ESR (F11 in and out) and Chromium.
+- **Laptops that woke up a second after going to sleep with the lid open** (GitHub #172; on some
+  laptops the firmware's lid device, `LID0` in `/proc/acpi/wakeup`, is a wake source and fires although the lid never
+  moved; reporters fixed it by hand with `echo LID0 > /proc/acpi/wakeup`). LordOS now ships a systemd-sleep hook,
+  `/usr/lib/systemd/system-sleep/lordos-lid-wake` (`server/src/hw/lidwake_tool.c`, libc only, built with the server),
+  that does it for you, and only when it is safe: it is not a service, systemd-sleep runs it as root before and after
+  each sleep (`pre`|`post` with `suspend`, `hibernate`, `hybrid-sleep` or `suspend-then-hibernate`; any other argument
+  is refused). Before sleeping it acts only on a portable computer (SMBIOS chassis type 8, 9, 10, 14, 31 or 32, the
+  on-screen keyboard's list, now shared in `server/src/hw/chassis.h`), only when every lid in
+  `/proc/acpi/button/lid/*/state` reads `open`, and only on `LID*` devices that are enabled and able to wake: it keeps
+  their names in `/run/lordos/lid-wake` (root, `0600`) and then writes each name to `/proc/acpi/wakeup`, which turns
+  it off. After waking it turns back on only the names in that note that are still off and removes the note. A
+  desktop, a server or a tablet is never touched, and with the lid closed (or a lid it can't read) the wake source
+  stays on, so opening the lid still wakes the computer. Kernel files only, at fixed paths, parsed strictly
+  (`server/src/hw/lidwake.h`): anything unexpected changes nothing, and the only name ever written back is one read
+  from `/proc/acpi/wakeup` itself (`[A-Z0-9_]{1,8}`). Each change is a line in the journal. Tested in
+  `build/lidwake-test` (part of `make -C server test`); not yet checked on the reporter's laptop (docs/SETTINGS.md,
+  "Power button and lid").
 - **Hardware reports: attaching System Information's page works too** (issue #171). The page it opens now carries the
   report in a data block the browser never runs, and the hardware-report check reads it from an attached `.html` when
   no `.json` is there (`embeddedReport` in `tools/hwreport/lib.mjs`, the same schema and limits).
@@ -545,7 +562,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   screen stayed on and the computer never went to sleep from the lock screen. The deadlines are now applied as the
   notice arrives, and the screen gets the notice when it mounts (`themes/greeter/inbox.js`, tested in
   `server/tests/greeter_inbox_test.mjs`). A laptop that wakes up a second after it goes to sleep with the lid open has
-  a firmware wake source (`LID0` in `/proc/acpi/wakeup`), not this; LordOS doesn't change wake sources yet.
+  a firmware wake source (`LID0` in `/proc/acpi/wakeup`), not this (handled by the lid wake hook above, #172).
 - **`systemctl restart lordos` with sessions alive failed on systemd 258 and later (GitHub #140)** with "Failed to
   spawn executor: Device or resource busy", and after five tries there was no login screen until a reboot (a
   package upgrade or a crash of lord-sessiond did the same). systemd 258 starts a delegated unit's new main process

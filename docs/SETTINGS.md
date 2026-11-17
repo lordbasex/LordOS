@@ -363,6 +363,29 @@ against BlueZ 5.82's source and the unit tests above; **not yet with a real Magi
   power button: the ACPI "Power Button" isn't opened, and a tablet's `gpio-keys` node is opened for
   its volume keys without a grab and with `KEY_POWER` dropped (`server/src/inputkind.h`), so logind
   sees every press and the desktop none. Lid rows only show with a battery.
+- **A laptop that wakes right after it sleeps with the lid open** (GitHub #172, a MacBookPro12,1): the
+  firmware's lid device (`LID0` in `/proc/acpi/wakeup`) is a wake source and fires a second after the
+  computer goes to sleep, although the lid never moved. Since 0.8.8.10 the systemd-sleep hook
+  `/usr/lib/systemd/system-sleep/lordos-lid-wake` (`server/src/hw/lidwake_tool.c`, a root program that is not a
+  service: systemd-sleep runs it as root only before and after a sleep, with `pre`|`post` and
+  `suspend`|`hibernate`|`hybrid-sleep`|`suspend-then-hibernate`, and it refuses any other argument) handles it.
+  Before sleeping, and only when all of this holds, it writes the lid device's name to `/proc/acpi/wakeup`
+  (writing a name toggles that device) and keeps the name in `/run/lordos/lid-wake` (root, `0600`) first:
+  - the computer is portable: SMBIOS chassis type 8, 9, 10, 14, 31 or 32 in `/sys/class/dmi/id/chassis_type`, the
+    on-screen keyboard's list (`server/src/hw/chassis.h`). A desktop, a server, a tablet or a computer without DMI
+    is never touched;
+  - `/proc/acpi/wakeup` lists a `LID*` device that is enabled and able to wake (`*enabled`);
+  - every lid in `/proc/acpi/button/lid/*/state` says `open`. A closed lid, or one that can't be read, keeps its
+    wake source, so opening the lid still wakes the computer.
+
+  After waking it writes back only the names in its note that are now disabled (one turned back on by someone else
+  is left alone) and removes the note. Inputs are kernel files only, at fixed paths, parsed strictly
+  (`server/src/hw/lidwake.h`): anything unexpected means nothing is changed, and the only name ever written is one
+  read from `/proc/acpi/wakeup` itself, `[A-Z0-9_]{1,8}`. What it did goes to the journal
+  (`journalctl -b -u systemd-suspend`, `lordos-lid-wake: LID0 off as a wake source while the lid is open`). No
+  setting and no text in the desktop. Tested in `build/lidwake-test` (the parsers against a MacBookPro12,1's list
+  and malformed ones, the desktop/closed/unknown cases, the note, the arguments); not yet checked on the reporter's
+  MacBook.
 
 ## Cooling
 
