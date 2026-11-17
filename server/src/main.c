@@ -27,6 +27,7 @@
 #include "ui/js_cloud.h"
 #include "fsasync.h"
 #include "sound/snd.h"
+#include "sec/json.h"
 #include "keyboard.h"
 #include "ui/js_sys.h"
 #include "canvas.h"
@@ -85,6 +86,7 @@
 #include "bench/lbframes.h"
 #include "fpipe.h"
 
+#include <ctype.h>
 #include <libgen.h>
 #include <limits.h>
 
@@ -2269,6 +2271,43 @@ static int render_frame(Server *s) {
     return !prep_only;
 }
 
+/* The theme the person chose (settings.json "theme"), next to the one asked for: a session starts with it instead of
+ * loading the default theme only for its startShell to switch (0.8.8.10: one whole theme less evaluated at every
+ * login, ~1.2 s and its memory). Read as the session user, after dropping privileges; the id is checked as
+ * lord.themes.use checks it, and an unknown or missing one keeps the theme asked for. */
+static void chosen_theme(const char *asked, char *out, size_t n) {
+    snprintf(out, n, "%s", asked);
+    struct passwd *pw = getpwuid(getuid());
+    if (!pw || !pw->pw_dir) return;
+    char path[PATH_MAX];
+    if ((size_t)snprintf(path, sizeof path, "%s/.config/lordos/settings.json", pw->pw_dir) >= sizeof path) return;
+    FILE *f = fopen(path, "rb");
+    if (!f) return;
+    char *text = malloc(4u << 20);
+    size_t len = text ? fread(text, 1, (4u << 20) - 1, f) : 0;
+    fclose(f);
+    if (!text) return;
+    text[len] = 0;
+    JDoc doc;
+    char err[64];
+    if (!json_parse(text, len, &doc, err, sizeof err)) {
+        const char *id = json_str(doc.root, "theme");
+        int ok = id && *id && strlen(id) <= 64;
+        for (const char *c = id; ok && *c; c++) if (!isalnum((unsigned char)*c) && *c != '-' && *c != '_') ok = 0;
+        char a[PATH_MAX], b[PATH_MAX * 2];
+        snprintf(a, sizeof a, "%s", asked);
+        char *dir = dirname(a);                     /* .../themes/<id> */
+        char root[PATH_MAX];
+        snprintf(root, sizeof root, "%s", dir);
+        snprintf(a, sizeof a, "%s", root);
+        snprintf(root, sizeof root, "%s", dirname(a));   /* .../themes */
+        size_t bl = ok ? (size_t)snprintf(b, sizeof b, "%s/%s/theme.bundle.js", root, id) : 0;
+        if (ok && bl < n && !access(b, R_OK)) memcpy(out, b, bl + 1);
+        json_free(&doc);
+    }
+    free(text);
+}
+
 /* Cambio de tema pedido desde JS (lord.themes.use): se descarta el contexto JS y el árbol. */
 /* Loads the first theme that passes the verified-code check (sec/codesig.c): the one asked for,
  * then the default and the classic theme next to it; if none can be loaded because the system code
@@ -2606,7 +2645,10 @@ int main(int argc, char **argv) {
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
     char current[sizeof ui.theme_request];
     svgicon_enable();                       /* SVG icons drawn by lord-media (media/svgicon.c); never in app mode */
-    if (ok) ok = start_theme(theme, s.greeter, current, sizeof current) == 0;
+    char first[sizeof ui.theme_request];
+    if (s.greeter) snprintf(first, sizeof first, "%s", theme);
+    else chosen_theme(theme, first, sizeof first);
+    if (ok) ok = start_theme(first, s.greeter, current, sizeof current) == 0;
     if (ok && !s.greeter) {                  /* the app host as bytecode for isolated apps (app/apphost_bc.c) */
         char host[1200];
         snprintf(host, sizeof host, "%s/app-host.bundle.js", js_sys_assets());
