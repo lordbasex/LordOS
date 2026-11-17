@@ -66,6 +66,7 @@
  *   lord.browserFrame.state()                   { chromiumOn, chromiumOff }: profiles with each frame
  */
 #include "../hw/hidppsvc.h"
+#include "../hw/batthist.h"
 #include "js_hw.h"
 #include "js_fan.h"
 #include "../hw/brframe.h"
@@ -317,6 +318,17 @@ static JSValue f_hidpp_batteries(JSContext *c, JSValueConst this_val, int argc, 
     size_t n = hidpp_json(j, sizeof j);
     return JS_ParseJSON(c, j, n, "<hidpp>");
 }
+/* lord.power.history(): the battery's history kept by lord-server (hw/batthist.c), for Settings → Battery */
+static JSValue f_power_history(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    char *j = malloc(160 * 1024);
+    if (!j) return JS_NULL;
+    size_t n = batthist_json(j, 160 * 1024);
+    JSValue v = JS_ParseJSON(c, j, n, "<history>");
+    free(j);
+    return v;
+}
+
 static const JSCFunctionListEntry hidpp_funcs[] = {
     JS_CFUNC_DEF("batteries", 0, f_hidpp_batteries),
 };
@@ -324,6 +336,7 @@ static const JSCFunctionListEntry hidpp_funcs[] = {
 static const JSCFunctionListEntry power_funcs[] = {
     JS_CFUNC_DEF("state", 0, f_power_state),
     JS_CFUNC_DEF("live", 0, f_power_live),
+    JS_CFUNC_DEF("history", 0, f_power_history),
     JS_CFUNC_DEF("profiles", 0, f_power_profiles),
     JS_CFUNC_DEF("setProfile", 1, f_power_set_profile),
     JS_CFUNC_DEF("buttons", 0, f_power_buttons),

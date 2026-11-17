@@ -1,5 +1,7 @@
 /* hw.c — main-loop glue for Settings' hardware modules (see hw.h). */
 #include "hidppsvc.h"
+#include "batthist.h"
+#include "../ui/js_sys.h"
 #include "hw.h"
 #include "bt.h"
 #include "jbuf.h"
@@ -41,6 +43,7 @@ static double hw_now_ms(void) {
 
 static void power_changed(void) {
     power_read("/sys/class/power_supply", &power);
+    batthist_tick(&power, !js_sys_unseen);          /* Settings → Battery's history (docs/BATTERY.md) */
     char j[8192];
     power_json(&power, j, sizeof j);
     power_next = power.has_battery ? hw_now_ms() + POWER_POLL_MS : 0;
