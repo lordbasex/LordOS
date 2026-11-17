@@ -6,6 +6,11 @@
  * size, twice) goes around them. The result is premultiplied with alpha = its brightest channel, so over
  * a dark wallpaper it reads as added light and over a card as lines with a halo.
  *
+ * Threads: when frames are heavy the engine paints a frame in horizontal bands on several threads at once
+ * (canvas_parallel), so one node's wave_paint can run on two of them together. The raster is built and checked
+ * under one lock and only blitted outside it: before 0.8.8.10's fix, two threads rebuilt the same raster at once
+ * (one freeing what the other read) and lord-server crashed while the desktop was busy.
+ *
  * Cost: the raster is built only when the bands change (30 a second at most, never in silence) and at the
  * node's size; any other repaint of that area blits the kept raster. */
 #include "wave.h"
@@ -13,6 +18,7 @@
 #include "../sound/spectrum.h"
 
 #include <math.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -161,6 +167,11 @@ void wave_render(WaveConf *w, const Spectrum *sp, int pw, int ph, float k) {
     int b0 = (int)floorf(ymin - th) - reach, b1 = (int)ceilf(ymax + th) + reach;
     if (b0 < 0) b0 = 0;
     if (b1 > ph) b1 = ph;
+    /* the half-size glow reads pairs of rows: from an even row, one past an odd end (never memory left from before:
+     * before 0.8.8.10's fix that row was read uncleared, a NaN in it made the tone table's index huge and lord-server
+     * crashed) */
+    b0 &= ~1;
+    if (b1 < ph && (b1 & 1)) b1++;
     memset(w->acc + (size_t)b0 * pw * 3, 0, (size_t)(b1 - b0) * pw * 3 * sizeof(float));
     for (int i = 0; i < lines; i++) {
         float f = (float)i / (lines - 1);
@@ -256,7 +267,7 @@ void wave_render(WaveConf *w, const Spectrum *sp, int pw, int ph, float k) {
             uint32_t c[3];
             for (int ch = 0; ch < 3; ch++) {
                 float v = (acc[x * 3 + ch] + gr[a0 + ch] + (gr[a1 + ch] - gr[a0 + ch]) * u) * k;
-                int i = v >= 1024 ? 1024 : v <= 0 ? 0 : (int)v;
+                int i = v >= 1024 ? 1024 : v > 0 ? (int)v : 0;    /* NaN → 0 */
                 c[ch] = (uint32_t)(tone[i] * 255 + 0.5f);
             }
             uint32_t A = c[0] > c[1] ? c[0] : c[1];
@@ -289,24 +300,33 @@ static void note_shown(const Node *n) {
     shown[free_slot].serial = n->serial;
 }
 
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
 void wave_paint(Canvas *c, Node *n, float x, float y, float w, float h, float k, float op) {
-    if (!n->wave || w < 2 || h < 2 || op <= 0) return;
+    if (!n->wave || !(w >= 2) || !(h >= 2) || op <= 0) return;      /* NaN too */
+    int pw = (int)(w + 0.5f), ph = (int)(h + 0.5f);
+    if (pw > WAVE_MAX_W) pw = WAVE_MAX_W;
+    if (ph > WAVE_MAX_H) ph = WAVE_MAX_H;
+    WaveConf *wc = n->wave;
+    pthread_mutex_lock(&lock);
     note_shown(n);
     const Spectrum *sp = src;
-    int pw = (int)(w + 0.5f), ph = (int)(h + 0.5f);
-    WaveConf *wc = n->wave;
     if (!wc->built || wc->pw != pw || wc->ph != ph || wc->seq != sp->seq) {
         wave_render(wc, sp, pw, ph, k);
-        if (!wc->px) return;
         wc->seq = sp->seq;
-        wc->built = 1;
+        wc->built = wc->px != NULL;
     }
-    canvas_blit(c, wc->px, wc->pw, wc->ph, (int)(x + 0.5f), (int)(y + 0.5f), 0, op, 0);
+    /* the raster changes only under the lock, and only in another frame: the bands of this one blit it as it is */
+    const uint32_t *px = wc->px;
+    int bw = wc->pw, bh = wc->ph;
+    pthread_mutex_unlock(&lock);
+    if (px) canvas_blit(c, px, bw, bh, (int)(x + 0.5f), (int)(y + 0.5f), 0, op, 0);
 }
 
 void wave_tick(void) {
+    pthread_mutex_lock(&lock);                  /* the main thread, between frames; the lock for note_shown's table */
     const Spectrum *sp = src;
-    if (sp->seq == ticked_seq) return;
+    if (sp->seq == ticked_seq) { pthread_mutex_unlock(&lock); return; }
     ticked_seq = sp->seq;
     for (int i = 0; i < WAVE_NODES; i++) {
         if (!shown[i].id) continue;
@@ -318,4 +338,5 @@ void wave_tick(void) {
         damage_add((Box){ floorf(n->ax), floorf(n->ay), ceilf(n->ax + n->w), ceilf(n->ay + n->h) });
         ui.dirty = 1;
     }
+    pthread_mutex_unlock(&lock);
 }

@@ -106,6 +106,22 @@ int main(void) {
     }
     CHECK(spread_mid > 50 && spread_end == 0, "bass: lines open in the middle (%d), the ends stay flat (%d)", spread_mid, spread_end);
 
+    /* memory left from before (a NaN in rows outside the lines' band) never reaches the picture: the 0.8.8.10 crash */
+    {
+        size_t n = (size_t)w->pw * w->ph * 3;
+        for (size_t i = 0; i < n; i++) w->acc[i] = NAN;
+        for (int odd = 0; odd < 2; odd++) {
+            spectrum_init(&s, 48000);
+            tone(&s, 300 + odd * 40, 0.05 + odd * 0.3, 3);
+            wave_render(w, &s, W, H - odd, 1);
+            int nan_px = 0;
+            for (int i = 0; i < w->pw * w->ph; i++) nan_px += (w->px[i] >> 24) == 255 && (w->px[i] & 0xffffff) == 0xffffff;
+            CHECK(nan_px < w->pw, "stale memory: %d saturated pixels at %dx%d", nan_px, w->pw, w->ph);
+            n = (size_t)w->pw * w->ph * 3;
+            for (size_t i = 0; i < n; i++) w->acc[i] = NAN;
+        }
+    }
+
     /* a size change, and sizes past the limit, stay safe */
     wave_render(w, &s, 200, 60, 2);
     CHECK(w->pw == 200 && w->ph == 60, "re-sized");

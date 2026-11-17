@@ -24,6 +24,8 @@
 #include "outputs.h"
 #include "ui/fonts.h"
 #include "ui/ui.h"
+#include "ui/wave.h"
+#include "sound/spectrum.h"
 #include "ui/unicode.h"
 
 /* ---- stubs for what paint.c reaches outside the UI engine ---- */
@@ -1737,6 +1739,59 @@ static void test_blur_cache(void) {
     paint_blur_cache_on = 0;
     paint_nviews = 0;
     paint_blur_cache_reset();
+}
+
+/* The sound wave widget: a <SoundWave> node inside a card that is lifted (scale 1.03, the drag's look: the
+ * transformed subtree's raster path), moved, resized and set back, while the spectrum moves; each frame must equal a
+ * full repaint and nothing may read freed memory (run under ASan: make build/engine-test-asan). */
+static void test_sound_wave(void) {
+    enum { W = 1000, H = 420 };
+    static Spectrum sp;
+    spectrum_init(&sp, 48000);
+    wave_source(&sp);
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff101020);
+    for (int i = 0; i < 10; i++) box_in(root, (float)(i * 100), 0, 40, H, i % 2 ? 0xff803060 : 0xff306080);
+    Node *card = box_in(root, 100, 120, 728, 170, 0x00000000);
+    sn(card, "borderRadius", 22);
+    ss(card, "overflow", "hidden");
+    Node *w = node_new(NODE_WAVE);
+    w->wave = wave_conf_new();
+    node_append(card, w);
+    sn(w, "flexGrow", 1);
+    ss(card, "flexDirection", "column");
+    render(root, W, H);
+    float buf[1600];
+    double ph = 0;
+    int bad = 0;
+    for (int f = 0; f < 60; f++) {
+        for (int i = 0; i < 1600; i++) { buf[i] = (float)(0.4 * sin(ph) + 0.2 * sin(ph * 7.3)); ph += 2 * M_PI * (60 + f * 3) / 48000; }
+        spectrum_feed(&sp, buf, 1600);
+        if (f % 10 == 2) { sn(card, "scaleX", 1.03); sn(card, "scaleY", 1.03); }        /* lifted */
+        if (f % 10 > 2 && f % 10 < 7) sn(card, "left", 100 + (float)(f * 9 % 200));    /* dragged */
+        if (f % 10 == 7) { sn(card, "scaleX", 1); sn(card, "scaleY", 1); }             /* dropped */
+        if (f == 20) sn(card, "width", 356);                                            /* resized */
+        if (f == 30) sn(card, "height", 356);
+        if (f == 40) { sn(card, "width", 728); sn(card, "height", 170); }
+        if (f == 50) { node_destroy(w); w = node_new(NODE_WAVE); w->wave = wave_conf_new(); node_append(card, w); sn(w, "flexGrow", 1); }
+        wave_tick();
+        layout_root(root, W, H);
+        int n = 0;
+        float area = 0;
+        if (paint_partial(root, W, H, &n, &area) < 0) { bad++; continue; }
+        int where = 0, worst = full_differs(root, W, H, &where);
+        if (worst > 2) {
+            if (bad < 3) printf("  sound wave frame %d: differs from a full repaint by %d at %d,%d\n", f, worst, where % W, where / W);
+            bad++;
+        }
+    }
+    CHECK(!bad, "sound wave: %d frames differ from a full repaint", bad);
+    printf("sound wave: 60 frames lifted, dragged, resized and recreated\n");
+    node_destroy(root);
+    ui.root = NULL;
+    wave_source(NULL);
 }
 
 static void test_damage_fuzz(void) {
@@ -3506,6 +3561,7 @@ int main(int argc, char **argv) {
     memset(&gc_all, 0, sizeof gc_all);
     test_damage_pipeline();
     test_blur_cache();
+    test_sound_wave();
     test_damage_fuzz();
     CHECK(!gc_all.bad && gc_all.frames > 1000 && gc_all.partial > gc_all.frames / 2, "scissor: %d frames, %d partial, %d differ", gc_all.frames, gc_all.partial, gc_all.bad);
     printf("scissor over the damage pipeline and fuzz: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);

@@ -118,7 +118,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     each block into 48 log-spaced band levels (`server/src/sound/spectrum.c`, a 2048-point FFT, 30 blocks a second)
     and draws the lines itself in a new node, `<SoundWave>` (`server/src/ui/wave.c`): JS never receives the sound or
     the levels, only sets the look. The node damages only its own box, only when the bands moved; in silence the
-    spectrum goes quiet and nothing repaints. Drawing the lines takes ~1.6 ms per block for the wide size (~5 % of one
+    spectrum goes quiet and nothing repaints. The raster is built under a lock (the engine paints heavy frames in bands on several threads) and every row
+    the glow reads is cleared first (stale memory crashed lord-server while the widget moved or resized during
+    testing). Drawing the lines takes ~1.6 ms per block for the wide size (~5 % of one
     core while sound plays: only the band of rows the lines and glow reach, the glow at half size, tables for the
     rest). Listening to the microphone shows as recording (the microphone
     indicator lights); the desktop and an app don't open a microphone. Transparent by default (no card: it reads as
