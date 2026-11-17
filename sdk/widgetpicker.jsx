@@ -1,12 +1,29 @@
-// Add widget: the desktop widget catalog (sdk/deskwidgets.jsx) in a panel centred on a display, opened from the empty
-// state's "Add widget" or the wallpaper's right-click menu. A search field on top (name and description, in the
+// Add widget, for every theme: the desktop widget catalog (sdk/deskwidgets.jsx) in a panel centred on a display, opened
+// from a theme's "Add widget" (Lord Workspaces' empty state, the wallpaper's right-click menu in each theme). A search field on top (name and description, in the
 // person's language), the categories with their counts on the side, and the cards in a scrolling list, by category.
 // Each card has a button per size (small 1×1, medium 2×1, large 2×2, wide 4×1, extra large 4×2, drawn as its block of
 // cells); a click puts the widget on the first free block of that display's grid, in the activity in view. The arrow
 // keys move between cards and Enter adds the highlighted one at its first size; Escape or a click outside closes it.
-import { View, Text, Layer, ScrollView, SearchField, addListener, useStore, createStore, widgetKinds, widgetCatalog, workAreaOf, addDeskWidget, direction, t as tr } from '@lordos/sdk';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Surface } from './Surface.jsx';
+// A theme can give its own panel (Panel: a component taking ref, style and children; Lord Workspaces passes its glass
+// Surface); otherwise a plain one in the theme's colours. Its tokens are the theme's (useTheme), chipBg falling back to
+// the control colour.
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, addListener } from '@lordos/runtime';
+import { Layer } from './layers.js';
+import { ScrollView } from './components.jsx';
+import { SearchField } from './controls.jsx';
+import { useStore, createStore } from './store.js';
+import { useTheme } from './theme.js';
+import { workAreaOf } from './windows.js';
+import { widgetKinds, widgetCatalog, addDeskWidget } from './deskwidgets.jsx';
+import { direction, t as tr } from './i18n.js';
+
+const PlainPanel = forwardRef(function PlainPanel({ t, radius = 22, style, children }, ref) {
+  return (
+    <View ref={ref} style={{ borderRadius: radius, backgroundColor: t.popupBg || t.windowBg, border: `1px solid ${t.separator}`,
+      boxShadow: '0 18px 40px rgba(0,0,0,0.35)', ...style }}>{children}</View>
+  );
+});
 
 // { display, x?, y? } while the catalog is open
 export const widgetPicker = createStore(null);
@@ -196,7 +213,10 @@ function CategoryRow({ t, label, count, on, onPick }) {
   );
 }
 
-export function WidgetPicker({ t }) {
+export function WidgetPicker({ t: given, Panel = PlainPanel }) {
+  const th = useTheme() || {};
+  const base = given || th;
+  const t = { ...base, chipBg: base.chipBg || base.control || base.hover };
   const p = useStore(widgetPicker);
   useStore(widgetCatalog);
   const ref = useRef(null);
@@ -250,7 +270,7 @@ export function WidgetPicker({ t }) {
   const cats = ['all', ...CATEGORIES.filter((c) => counts[c])];
   return (
     <Layer name="overlay">
-      <Surface ref={ref} t={t} radius={22} style={{ position: 'absolute', left: Math.round(area.x + (area.w - W) / 2), top: Math.round(area.y + (area.h - H) / 2),
+      <Panel ref={ref} t={t} radius={22} style={{ position: 'absolute', left: Math.round(area.x + (area.w - W) / 2), top: Math.round(area.y + (area.h - H) / 2),
         width: W, height: H, overflow: 'hidden' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: PAD + 4, paddingTop: PAD, paddingBottom: 14, borderBottom: `1px solid ${t.separator}` }}>
           <Text style={{ fontSize: 17, fontWeight: 700, color: t.text, textAlign: 'start' }}>{tr('shell.widgets.title')}</Text>
@@ -276,7 +296,7 @@ export function WidgetPicker({ t }) {
         <View style={{ paddingHorizontal: PAD + 4, paddingVertical: 10, borderTop: `1px solid ${t.separator}` }}>
           <Text style={{ fontSize: 12, color: full ? '#E5484D' : t.textDim, textAlign: 'start' }}>{tr(full ? 'shell.widgets.noRoom' : 'shell.widgets.subtitle')}</Text>
         </View>
-      </Surface>
+      </Panel>
     </Layer>
   );
 }

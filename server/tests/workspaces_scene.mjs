@@ -427,7 +427,7 @@ await flush();
 // Add widget: the catalog opens over a display; a widget takes a block of the display's grid, in the activity in view,
 // keeps it (another can't take it), changes size, follows its activity, and is removed
 {
-  const wp = await import('../../themes/workspaces/components/WidgetPicker.jsx');
+  const wp = await import('../../sdk/widgetpicker.jsx');
   const grid = await import('../../sdk/widgetgrid.js');
   const shownT = (v) => [...texts].filter(([id, x]) => x === v && attached(id)).length;
   wp.widgetPicker.set({ display: R });

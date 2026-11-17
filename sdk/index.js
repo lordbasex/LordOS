@@ -377,3 +377,5 @@ export { useWindowWidth, useWindowHeight, useNarrow, useSidebar, SidebarToggle, 
 export { useStream, saveStreamPassword, STREAM_KEYRING_APP } from './streams.jsx';
 export { streamUrlOk, splitCredentials, withCredentials, protocolOf, lowQuality, parseM3U, hostKey } from './streammodel.js';
 export { VideoSetup, videoSetup } from './videowidget.jsx';
+
+export { WidgetPicker, widgetPicker } from './widgetpicker.jsx';   // Add widget, in every theme (0.8.8.10)

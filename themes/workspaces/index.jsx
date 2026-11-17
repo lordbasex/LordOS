@@ -20,7 +20,7 @@ import {
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
   switchDesktop, windows as windowsStore, windowTitle, windowIcon, appName, removeDesktopById, renameDesktop, createStore, lordosWallpapers,
-  VideoSetup, setDesktopDecor, setStatusPanelPlacer,
+  VideoSetup, setDesktopDecor, setStatusPanelPlacer, WidgetPicker, widgetPicker,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
@@ -34,11 +34,11 @@ import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, win
 import { startMagnet } from './magnet.js';
 import { barFocus, setBarItems, enterBars, leaveBars, barKey } from './barfocus.js';
 import { SnapAssist } from './components/SnapAssist.jsx';
-import { WidgetPicker, widgetPicker } from './components/WidgetPicker.jsx';
 import { GlassTarget, DropTarget, SnapFlyout, dropTarget, useDropTarget } from './components/SnapTargets.jsx';
 import { tween, EASE, reduceMotion } from './motion.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Spine } from './components/Spine.jsx';
+import { Surface } from './components/Surface.jsx';
 import { ActivityStrip, ActivityPeek, StatusCluster, VolumePanel, STATUS_W } from './components/TopBar.jsx';
 import { GroupFrame, trayNodes } from './components/GroupFrame.jsx';
 import { Search } from './components/Search.jsx';
@@ -337,7 +337,7 @@ function App() {
         {leavingWins.map((w) => <Window key={w.id} win={w} t={t} focused={false} app={getApp(w.id)} leaving />)}
         <SnapAssist t={t} />
         <SnapFlyout t={t} />
-        <WidgetPicker t={t} />
+        <WidgetPicker t={t} Panel={Surface} />
         <VideoSetup />
         <DesktopWidgets layer="above" />
         <Layer name="dock">

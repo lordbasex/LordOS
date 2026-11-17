@@ -5,7 +5,7 @@ import {
   startShell, View, Text, Image, screen, ThemeProvider, useSettings, useWindows, configureWindows, getApp, wm, addListener, t as tr,
   useLauncherApps, launchApp, useDockEntries, dockActivate, dockMenu, dockPrefs, DOCK_LAUNCHER,
   useTrash, openTrash, emptyTrash, trashMenu, ConfirmDialog,
-  DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, settings, Layer, PowerDialog,
+  DesktopWidgets, WidgetDropTarget, WidgetPicker, widgetPicker, startDeskWidgets, registerGestureActions, screenDisplays, mainDisplay, settings, Layer, PowerDialog,
   findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers,
   toggleShowDesktop, appSettingsItem, flowDesktopKeys, flowGrabs, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome,
   openOverview, closeOverview, toggleOverview, LevelHud, useStore, notifyHistory, menuBarEveryDisplay, hasBar, displayAt, keepWindowsInWorkAreas,
@@ -123,6 +123,7 @@ function DockMenu({ pos, at, items, onClose }) {
 }
 
 function App() {
+  startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Lord Workspaces
   const [s] = useSettings();
   const t = makeTheme(s);
   const { windows, mounted, focused } = useWindows();
@@ -189,6 +190,7 @@ function App() {
         ))}
         {all.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
         <DesktopWidgets layer="below" />
+        <WidgetDropTarget />
         <OverviewBackdrop />
         {/* keyed on the window: raising one reorders this list, and it must move, not mount again */}
         {mounted.map((w) => (
@@ -199,6 +201,7 @@ function App() {
         ))}
         {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} />)}
         <DesktopWidgets layer="above" />
+        <WidgetPicker />
         {/* Everything above the windows goes in its layer (sdk/layers.js, docs/LAYERS.md): the
             order is the layers', not this tree's, and clicks follow it. Menus go to «popover»
             by themselves (Menu.jsx). */}
@@ -236,6 +239,7 @@ function App() {
         {context && (
           <Menu x={context.x} y={context.y} onClose={() => setContext(null)} items={[
             { label: tr('shell.desktop.wallpaper'), onClick: () => { const d = displayAt(context.x, context.y); setControl({ area: hasBar(d, every, screen.mirror) ? d : main, at: null }); } },
+            { label: tr('shell.widgets.add'), onClick: () => widgetPicker.set({ display: displayAt(context.x, context.y) || main, x: context.x, y: context.y }) },
             { label: tr('shell.desktop.openLaunchpad'), onClick: () => setLaunchpad(true) },
             { label: tr('shell.desktops.overview'), onClick: () => toggleOverview() },
             '-',

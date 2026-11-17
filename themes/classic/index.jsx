@@ -13,7 +13,7 @@
 //   placement.js                the work areas and the panels' places, with a taskbar on every display
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows,
-  getApp, wm, t as tr, DesktopWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
+  getApp, wm, t as tr, DesktopWidgets, displayAt, WidgetDropTarget, WidgetPicker, widgetPicker, startDeskWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
   emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text,
   useShortcuts, runShortcut, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, toggleShowDesktop, spotlight, launchApp, dockActivate,
   classicDesktopKeys, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
@@ -122,6 +122,7 @@ const classicTable = (ui) => {
 };
 
 function App() {
+  startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Lord Workspaces
   const [s] = useSettings();
   const t = makeTheme(s);
   const { mounted, focused } = useWindows();
@@ -195,6 +196,7 @@ function App() {
         ))}
         {all.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
         <DesktopWidgets layer="below" />
+        <WidgetDropTarget />
         <OverviewBackdrop />
         {/* keyed on the window: raising one reorders this list, and it must move, not mount again */}
         {mounted.map((w) => (
@@ -204,6 +206,7 @@ function App() {
           </Fragment>
         ))}
         <DesktopWidgets layer="above" />
+        <WidgetPicker />
         {/* a bar on each display and the panels above them: each in its layer (sdk/layers.js,
             docs/LAYERS.md), so the order and the clicks are the layers' */}
         <Layer name="dock">
@@ -227,6 +230,7 @@ function App() {
             '-',
             { label: tr('shell.classic.personalize'), onClick: () => wm.open('settings', { args: { section: 'appearance' } }) },
             { label: tr('shell.desktop.wallpaper'), onClick: () => wm.open('settings', { args: { section: 'wallpaper' } }) },
+            { label: tr('shell.widgets.add'), onClick: () => widgetPicker.set({ display: displayAt(desk.x, desk.y) || mainDisplay(), x: desk.x, y: desk.y }) },
             { label: tr('shell.classic.displaySettings'), onClick: () => wm.open('settings', { args: { section: 'displays' } }) },
           ]} />
         )}

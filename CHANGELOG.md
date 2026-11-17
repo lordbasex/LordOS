@@ -12,6 +12,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Desktop widgets in Lord Flow and Lord Classic too**, the same as in Lord Workspaces: "Add widget…" in the
+  wallpaper's right-click menu opens the catalog (search, categories, sizes), widgets sit on each display's grid, can be
+  dragged to another block and keep their data fresh through the shared widget feed. The catalog moved from the theme
+  into the SDK (`sdk/widgetpicker.jsx`, `WidgetPicker`, `widgetPicker`), in the theme's colours; a theme can give its own
+  panel (Lord Workspaces passes its glass Surface).
 - **Settings → Cloud: a color for each account** (issue #184). Each account's page has a row of colors: Automatic (the
   order the account was added in, so two accounts of one provider still differ) or one of the palette's, shown in Files,
   the Cloud menu and Logs (`settings.cloudColors`, read by `accountColor` in `sdk/cloudmodel.js`).

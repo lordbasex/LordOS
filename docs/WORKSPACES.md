@@ -107,7 +107,7 @@ displays do. Nothing runs per frame, nothing polls.
   on a tiled display that layout is set there and the window takes that slot (`placeInSlot`). Not on locked windows,
   and not on the buttons Linux apps draw themselves (Chrome): for those, **Snap window…** in the window menu (a right
   click on Chrome's tab strip, or on any title bar) opens the same flyout at the pointer.
-- **Widgets** (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`, `components/WidgetPicker.jsx`; Lord Workspaces only). Each
+- **Widgets** (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`, `sdk/widgetpicker.jsx`; since 0.8.8.10 also in Lord Flow and Lord Classic, from the wallpaper's right-click menu). Each
   display's work area holds a grid of 170 px cells with 16 px gaps, anchored to its top right (TangoOS's grid). A widget
   takes a block of cells by its size: small 1×1, medium 2×1, large 2×2, wide 4×1, extra large 4×2; no other widget can be placed
   or dropped over it. Widgets belong to an activity and a display (its connector): another activity shows its own, or
