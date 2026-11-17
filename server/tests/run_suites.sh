@@ -132,6 +132,14 @@ EOF
 committed: 한
 preedit: 글
 EOF
+    # (#163) Shift alone (+, sent before every capital) keeps the syllable: ㅆ and ㄲ as finals, ㅒ and ㅖ after an initial
+    ime "ime-test: hangul Shift jamo" hangul 'dl+T_qk+R_rk+Rk_dl+Tdj_r+O_d+P_+dl+T_' "" <<'EOF'
+committed: 있 밖 가까 있어 걔 예 있
+EOF
+    # every double final consonant, and how one splits when a vowel follows
+    ime "ime-test: hangul double finals" hangul 'rkrt_ahrt_dksw_dksg_ekfr_tkfa_sjfq_rhft_gkfx_dmfv_dlfg_djqt_ekfrl_dkswdk_djqtdj_' "" <<'EOF'
+committed: 갃 몫 앉 않 닭 삶 넓 곬 핥 읊 잃 없 달기 앉아 없어
+EOF
     ime "ime-test: kana" kana toukyou_ "skkdic" <<'EOF'
 preedit: 東京
 EOF

@@ -368,6 +368,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Korean input (Hangul): Shift no longer ends the syllable (GitHub #163).** Shift pressed alone reached the input
+  method as a key with no text, and every such key confirmed the syllable being composed, so the 2-set keyboard's Shift
+  jamo never joined it: 이 + Shift+T gave 이ㅆ instead of 있, 바 + Shift+R gave 바ㄲ instead of 밖, and ㄱ + Shift+O gave
+  ㄱㅒ instead of 걔. A key that types nothing and has no name (Shift, Caps Lock, Ctrl or AltGr alone, a dead key) now
+  passes through and leaves the composition as it is, in every input method (`server/src/ime.c` `ime_key`). `ime-test`
+  gains `+` for Shift alone, and two suites check ㅆ and ㄲ as finals, ㅒ and ㅖ, and every double final consonant
+  (갃 앉 않 닭 삶 넓 곬 핥 읊 잃 없) with how one splits when a vowel follows (달기, 앉아, 없어).
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.
