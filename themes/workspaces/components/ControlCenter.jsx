@@ -9,7 +9,7 @@
 // title opens its page in Settings. The Wi-Fi and firewall states are read once when it opens, nothing polls.
 import {
   View, Text, Image, Slider, Segmented, ScrollView, useSettings, settings, wm, addListener, useSound, defaultSink, sound, useBluetooth, setBluetoothPower,
-  nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiBars, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, screenDisplays, usePowerProfiles, admin, t as tr,
+  nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiBars, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop, screenDisplays, usePowerProfiles, admin, t as tr,
   MoonGlyph, SunGlyph, ContrastGlyph, BluetoothGlyph, SignalGlyph, useStore, desktopList, desktopName, activeDesktop, switchDesktop, windows, getApp, firewall, session,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -276,8 +276,8 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome, onEdi
   const top = Math.max(area.y + 12, Math.min(anchor.y + anchor.h - height, area.y + area.h - 12 - height));
   // several displays: the quick wallpapers are the picture of the display it opened on (sdk/wallpapers.js)
   const wd = screenDisplays().length > 1 ? screenDisplays().find((d) => d.id === area.id) || null : null;
-  const curWall = wallpaperIdFor(s, wd);
-  const quick = [findWallpaper(t.wallpapers, curWall), ...QUICK.map((id) => t.wallpapers.find((w) => w.id === id))].filter((w, i, a) => w && a.indexOf(w) === i).slice(0, 4);
+  const curWall = wallpaperIdFor(s, wd, t.defaultWallpaper);
+  const quick = [findWallpaper(t.wallpapers, curWall, t.defaultWallpaper), ...QUICK.map((id) => t.wallpapers.find((w) => w.id === id))].filter((w, i, a) => w && a.indexOf(w) === i).slice(0, 4);
   return (
     <Surface ref={ref} t={t} radius={20} style={{ position: 'absolute', left, top, width: CC_W, height, transformOrigin: rtl ? 'right bottom' : 'left bottom',
       backgroundColor: t.panelBg, ...(t.panelBlur ? { backdropFilter: `blur(${t.panelBlur}px)` } : null) }}>
@@ -313,7 +313,7 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome, onEdi
           <View onClick={() => openSettings(onClose, 'wallpaper')}><Text style={{ fontSize: 12, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('shell.cc.wallpaper')}</Text></View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {quick.map((w) => (
-              <View key={w.id} onClick={() => set(wd ? wallpaperPatch(s, w.id, wd) : { wallpaper: w.id })} style={{ width: 72, height: 44, borderRadius: 8, overflow: 'hidden',
+              <View key={w.id} onClick={() => set({ ...(wd ? wallpaperPatch(s, w.id, wd) : { wallpaper: w.id }), ...slideshowStop(s) })} style={{ width: 72, height: 44, borderRadius: 8, overflow: 'hidden',
                 border: curWall === w.id ? `2px solid ${t.accent}` : `1px solid ${t.separator}` }}>
                 <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </View>

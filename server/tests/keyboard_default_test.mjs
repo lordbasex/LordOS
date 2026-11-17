@@ -68,9 +68,18 @@ eq('a chosen list is kept', s.keyboard.active(), { layout: 'latam', variant: '' 
 s = await session(JSON.stringify({ schema: 4, keyboard: 'br' }), { layouts: 'us', variants: '' });
 eq('a pre-M5 choice other than the default is kept', s.keyboard.active(), { layout: 'br', variant: '' });
 
-eq('migration 4: latam without a list', migrateSettings({ schema: 3, keyboard: 'latam', keyboards: null }), { schema: 4, keyboard: null, keyboards: null });
+eq('migration 4: latam without a list', migrateSettings({ schema: 3, keyboard: 'latam', keyboards: null }), { schema: 5, keyboard: null, keyboards: null });
 eq('migration 4: latam with a list', migrateSettings({ schema: 3, keyboard: 'latam', keyboards: [{ layout: 'latam' }] }).keyboard, 'latam');
 eq('migration 4: runs once', migrateSettings({ schema: 4, keyboard: 'latam', keyboards: null }).keyboard, 'latam');
+
+// migration 5 (0.8.9): the saved Lumo Celestial default becomes the theme's default (null; Lord Workspaces shows its own)
+eq('migration 5: the saved default', migrateSettings({ schema: 4, wallpaper: 'lumo-celestial' }), { schema: 5, wallpaper: null });
+eq('migration 5: another picture stays', migrateSettings({ schema: 4, wallpaper: 'crystal-crown' }).wallpaper, 'crystal-crown');
+eq('migration 5: a picture of the user\'s own stays', migrateSettings({ schema: 4, wallpaper: 'image:0123456789abcdef' }).wallpaper, 'image:0123456789abcdef');
+eq('migration 5: runs once (Celestial chosen again later)', migrateSettings({ schema: 5, wallpaper: 'lumo-celestial' }).wallpaper, 'lumo-celestial');
+eq('migration 5: a display\'s own picture stays', migrateSettings({ schema: 4, wallpaper: 'lumo-celestial', wallpapers: { 'DP-1': 'lumo-celestial' } }).wallpapers, { 'DP-1': 'lumo-celestial' });
+s = await session('', { layouts: 'us', variants: '' });
+eq('new user: no wallpaper chosen (the theme\'s default)', s.settings.get().wallpaper, null);
 
 console.log(bad ? `keyboard-default: ${bad} of ${n} failed` : `keyboard-default: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

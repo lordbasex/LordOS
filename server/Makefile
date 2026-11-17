@@ -700,7 +700,8 @@ build/nethist-test: tests/nethist_test.c src/monitor/nethist.c src/monitor/nethi
 # canvas.c rows: SIMD (NEON on aarch64) against C, bit for bit, and how long each one takes
 # UI engine (docs/DESIGN.md "Engine notes"): ellipsis in LTR/RTL/Arabic/Thai/emoji, per-side borders,
 # per-corner radii, logical edges, transforms and hit testing, and the dragged window's frames against
-# the golden hashes in tests/drag_golden_{cpu,gpu}.txt; `build/engine-test bench` times a 2000-row
+# the golden hashes in tests/drag_golden_{cpu,gpu}.txt; `build/engine-test bench-slideshow` times the wallpaper
+# slideshow's transition on 1920x1080; `build/engine-test bench` times a 2000-row
 # list and a window drag on one and two displays
 ENGINE_SRC := src/gpu/gscissor.c src/gpu/gcontend.c src/ui/wave.c src/sound/spectrum.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c src/ui/image.c \
               src/ui/paint.c src/ui/otf.c src/ui/fonts.c src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c \

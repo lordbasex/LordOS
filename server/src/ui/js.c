@@ -198,7 +198,7 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
         const char *src = JS_IsString(argv[2]) ? JS_ToCString(c, argv[2]) : NULL;
         if (src) {
             char path[2048];
-            /* "thumb:<px>[:<stamp>]:<absolute path>": a picture shown small (Files, the file dialog), decoded off this thread to
+            /* "thumb:<px>[:<stamp>]:<absolute path | asset:path>": a picture shown small (Files, the file dialog), decoded off this thread to
              * fit px x px (image.c): a folder of photos never holds full-size pictures or waits on a slow disk */
             const char *num = !strncmp(src, "thumb:", 6) ? src + 6 : NULL;
             size_t nl = num ? strspn(num, "0123456789") : 0;
@@ -218,7 +218,13 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
                     stamp[vl] = 0;
                     rest += vl + 1;
                 }
+                /* the path may also be an "asset:" one (0.8.9: Lord Workspaces' wallpaper slideshow decodes the next picture
+                 * off this thread, sdk/slideshow.jsx) */
                 if (rest && rest[0] == '/') n->img = image_get_thumb(rest, atoi(num), stamp);
+                else if (rest && !strncmp(rest, "asset:", 6) && !strstr(rest, "..")) {
+                    snprintf(path, sizeof path, "%s/%s", js_sys_assets(), rest + 6);
+                    n->img = image_get_thumb(path, atoi(num), stamp);
+                }
             } else if (src[0] == '/') snprintf(path, sizeof path, "%s", src);
             else if (!strncmp(src, "asset:", 6) && !strstr(src, "..")) snprintf(path, sizeof path, "%s/%s", js_sys_assets(), src + 6);
             else snprintf(path, sizeof path, "%s/%s", ui.theme_dir, src);

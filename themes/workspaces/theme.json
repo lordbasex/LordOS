@@ -3,6 +3,7 @@
   "description": "Activities with their own apps and layouts, a Context Spine, tiling per display and three effects styles.",
   "sketch": { "rail": true, "pills": true, "frame": true },
   "desktopArrows": true,
+  "wallpaper": { "default": "cyberpunk-panorama", "slideshow": true },
   "options": [
     { "key": "surface", "label": "shell.ws.surface.title", "hint": "shell.ws.opt.surfaceHint", "default": "crystal",
       "choices": [["opaque", "shell.ws.surface.opaque"], ["translucent", "shell.ws.surface.translucent"], ["crystal", "shell.ws.surface.crystal"]] },

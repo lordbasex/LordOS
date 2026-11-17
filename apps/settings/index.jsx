@@ -6,7 +6,7 @@ import { BatterySettings } from './Battery.jsx';
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
+  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop, displayWallpaperKey, displayLabel, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionCountry,
   useSidebar, SidebarToggle, SidebarOverlay, battery, deviceList,
 } from '@lordos/sdk';
@@ -23,6 +23,7 @@ import { PrintersSettings } from './Printers.jsx';
 import { TrackpadSettings } from './Trackpad.jsx';
 import { DockSettings } from './Dock.jsx';
 import { SketchThumb, ThemeOptions, knownTheme } from './ThemeExtras.jsx';
+import { SlideshowSettings } from './Slideshow.jsx';
 import { SwitcherSettings } from './Switcher.jsx';
 import { GlobalShortcutsSettings } from './GlobalShortcuts.jsx';
 import { BrowserFrameSettings } from './BrowserFrame.jsx';
@@ -267,7 +268,8 @@ function MotionWallpapers({ login }) {
   const main = displays[0] || { w: 1920, h: 1080 };
   const motion = s.motion || {};
   const cur = motion[scope] || null;
-  const choose = (id) => { const m = { ...motion }; if (id) m[scope] = id; else delete m[scope]; set({ motion: m }); };
+  // a video chosen ends the slideshow, which it would hide (sdk/slideshowmodel.js)
+  const choose = (id) => { const m = { ...motion }; if (id) m[scope] = id; else delete m[scope]; set({ motion: m, ...(id ? slideshowStop(s) : null) }); };
   const select = (it) => {
     setMsg('');
     const apply = () => (login ? setLoginMotion(it).then(() => { set({ loginWallpaper: it.id }); setMsg(tr('settings.motion.loginDone')); }, (e) => setMsg(errorText(e))) : choose(it.id));
@@ -367,9 +369,9 @@ function UserImages({ login, curId, onChoose, onDefault, setNote }) {
   const cur = ids.includes(curId) ? curId : null;
   const remove = () => {
     removeWallpaperImage(cur).then(() => {
-      // a display that showed it goes back to the picture of every display
+      // a display that showed it goes back to the picture of every display, and that one to the theme's default
       const own = Object.fromEntries(Object.entries(s.wallpapers || {}).filter(([, v]) => v !== cur));
-      set({ wallpaperImages: ids.filter((x) => x !== cur), wallpapers: own, ...(s.wallpaper === cur ? { wallpaper: DEFAULT_WALLPAPER } : {}) });
+      set({ wallpaperImages: ids.filter((x) => x !== cur), wallpapers: own, ...(s.wallpaper === cur ? { wallpaper: null } : {}) });
     }, (e) => setNote(errorText(e)));
   };
   return (
@@ -421,10 +423,12 @@ function Wallpapers() {
   const displays = screenDisplays() || [];
   const [scope, setScope] = useState('*');
   const scopeDisplay = !login && displays.length > 1 ? displays.find((d) => d.id === scope) || null : null;
-  const desk = wallpaperIdFor(s, scopeDisplay);
+  const desk = wallpaperIdFor(s, scopeDisplay, t.defaultWallpaper);
   const shown = login ? s.loginWallpaper : desk;
-  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) || userWallpaperName(shown) ? shown : GREETER_WALLPAPER) : desk);
-  const chooseDesk = (id) => set(wallpaperPatch(s, id, scopeDisplay));
+  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) || userWallpaperName(shown) ? shown : GREETER_WALLPAPER) : desk, t.defaultWallpaper);
+  // a picture chosen ends the slideshow (sdk/slideshowmodel.js)
+  const chooseDesk = (id) => set({ ...wallpaperPatch(s, id, scopeDisplay), ...slideshowStop(s) });
+  const slideshow = !login && !!themes.info()?.wallpaperSlideshow;
   const ownCount = Object.keys(s.wallpapers || {}).filter((k) => displays.some((d) => displayWallpaperKey(d) === k)).length;
   const stillPick = (id) => {
     if (!login) { chooseDesk(id); return; }
@@ -465,6 +469,7 @@ function Wallpapers() {
           </View>
         </SettingRow>
       </Section>
+      {slideshow ? <SlideshowSettings displays={displays} /> : null}
       <UserImages login={login} curId={shown} setNote={setNote}
         onChoose={(id) => (login ? setLoginImage(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }) : chooseDesk(id))}
         onDefault={() => setLoginMotion(null).then(() => { set({ loginWallpaper: null }); setNote(tr('settings.motion.loginReset')); }, (e) => setNote(errorText(e)))} />
