@@ -329,6 +329,18 @@ all: build/lord-browser-prefs
 build/lord-browser-prefs: src/pkg/browserprefs_tool.c src/pkg/browserprefs.c src/pkg/browserprefs.h src/sec/json.c src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/pkg/browserprefs_tool.c src/pkg/browserprefs.c src/sec/json.c -lm
+# lordos-lid-wake (src/hw/lidwake_tool.c, GitHub #172): the systemd-sleep hook that keeps an open lid from waking
+# a laptop right after it sleeps (/usr/lib/systemd/system-sleep/, root, libc only). Its parsing and decisions are
+# the pure src/hw/lidwake.h, tested by tests/lidwake_test.c.
+all: build/lordos-lid-wake
+build/lordos-lid-wake: src/hw/lidwake_tool.c src/hw/lidwake.h src/hw/chassis.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/hw/lidwake_tool.c
+test: build/lidwake-test
+build/lidwake-test: tests/lidwake_test.c src/hw/lidwake.h src/hw/chassis.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lidwake_test.c
+	./$@ || { rm -f $@; exit 1; }
 build/browserprefs-test: tests/browserprefs_test.c src/pkg/browserprefs.c src/pkg/browserprefs.h src/sec/json.c src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/browserprefs_test.c src/pkg/browserprefs.c src/sec/json.c -lm

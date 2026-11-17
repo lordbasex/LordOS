@@ -1,5 +1,6 @@
 /* osk.c — see osk.h. */
 #include "osk.h"
+#include "hw/chassis.h"
 
 #include <linux/input.h>
 #include <string.h>
@@ -79,8 +80,5 @@ int osk_keyboard_counts(int bus, int portable, int typed) {
     return bus != BUS_I8042 || portable || typed;
 }
 
-int osk_chassis_portable(int type) {
-    /* SMBIOS: 8 portable, 9 laptop, 10 notebook, 14 sub notebook, 31 convertible, 32 detachable.
-     * 30 (tablet) and 11 (hand held) have no keyboard of their own. */
-    return type == 8 || type == 9 || type == 10 || type == 14 || type == 31 || type == 32;
-}
+/* The list lives in hw/chassis.h, shared with the lid wake hook (hw/lidwake.h, #172). */
+int osk_chassis_portable(int type) { return chassis_portable(type); }
