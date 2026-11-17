@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} nucli",
     "other": "{cpu} · {count} nuclis"
   },
-  "credits": "IP a país al Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Mapa: Natural Earth (domini públic).",
+  "credits": "IP a país al Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Mapa: Natural Earth (domini públic). Ciutats del temps: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Pantalla",
   "engine": "Motor de la interfície",
   "host": "Ordinador",

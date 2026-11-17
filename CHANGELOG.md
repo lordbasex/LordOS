@@ -12,6 +12,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Weather: choose your city.** The weather widget's "Location…" searches an offline list of 34,000 cities
+  (GeoNames' cities15000, CC BY 4.0, credited in About; `assets/geo/cities.tsv`, refreshed before each release by
+  `tools/geo/fetch-cities.sh`): the search never leaves the computer, and lord-server takes the picked city's
+  coordinates from its own list (`geonames/<id>`), never from the interface. Until now the forecast was always for the
+  time zone's city (Buenos Aires for anyone in Argentina's zone). Also used by the Calendar's "Day and weather".
+  Strings in all 35 languages.
+
 - **Monitor: Battery and Devices tabs, live.** Devices (when something connected has a battery): every device's
   battery, its connection and a bar, from the same list as the Devices widget. Battery (only on a computer with one):
   charge, power, time left or to full, temperature, voltage, current, energy and the charging state, read every 2 s

@@ -20,7 +20,7 @@
     "one": "{cpu} · kiini {count}",
     "other": "{cpu} · viini {count}"
   },
-  "credits": "IP hadi nchi katika Kifuatiliaji: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Ramani: Natural Earth (kikoa cha umma).",
+  "credits": "IP hadi nchi katika Kifuatiliaji: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Ramani: Natural Earth (kikoa cha umma). Majiji ya hali ya hewa: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Skrini",
   "engine": "Injini ya kiolesura",
   "host": "Kompyuta",

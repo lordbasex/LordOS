@@ -24,7 +24,7 @@
     "many": "{cpu} · {count} نواة",
     "other": "{cpu} · {count} نواة"
   },
-  "credits": "تحديد البلد من عنوان IP في المراقبة: DB-IP Lite Country، © db-ip.com، CC BY 4.0. الخريطة: Natural Earth (ملكية عامة).",
+  "credits": "تحديد البلد من عنوان IP في المراقبة: DB-IP Lite Country، © db-ip.com، CC BY 4.0. الخريطة: Natural Earth (ملكية عامة). مدن الطقس: GeoNames، © geonames.org، CC BY 4.0.",
   "display": "الشاشة",
   "engine": "محرك الواجهة",
   "host": "الحاسوب",

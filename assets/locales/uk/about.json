@@ -21,7 +21,7 @@
     "few": "{cpu} · {count} ядра",
     "many": "{cpu} · {count} ядер"
   },
-  "credits": "Визначення країни за IP у Моніторі: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Мапа: Natural Earth (суспільне надбання).",
+  "credits": "Визначення країни за IP у Моніторі: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Мапа: Natural Earth (суспільне надбання). Міста погоди: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Дисплей",
   "engine": "Рушій інтерфейсу",
   "host": "Комп’ютер",

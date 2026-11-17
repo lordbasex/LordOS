@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} mag",
     "other": "{cpu} · {count} mag"
   },
-  "credits": "IP-cím–ország hozzárendelés a Figyelőben: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Térkép: Natural Earth (közkincs).",
+  "credits": "IP-cím–ország hozzárendelés a Figyelőben: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Térkép: Natural Earth (közkincs). Időjárás-városok: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Kijelző",
   "engine": "Felületmotor",
   "host": "Számítógép",

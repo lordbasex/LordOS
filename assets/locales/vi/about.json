@@ -19,7 +19,7 @@
   "cpuValue": {
     "other": "{cpu} · {count} nhân"
   },
-  "credits": "IP sang quốc gia trong Giám sát: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Bản đồ: Natural Earth (phạm vi công cộng).",
+  "credits": "IP sang quốc gia trong Giám sát: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Bản đồ: Natural Earth (phạm vi công cộng). Thành phố thời tiết: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Màn hình",
   "engine": "Bộ máy giao diện",
   "host": "Máy tính",

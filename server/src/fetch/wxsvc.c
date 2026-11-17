@@ -1,4 +1,5 @@
 /* wxsvc.c — the weather widget's forecasts in lord-server (see wxsvc.h). */
+#include "geocities.h"
 #include "wxsvc.h"
 #include "fetchproto.h"
 #include "../doc/wire.h"
@@ -54,8 +55,17 @@ int wxs_zone_ok(const char *z) {
     return 1;
 }
 
-/* tzdata's coordinates of a zone (as display.c's sunrise does) */
+static char cities_path[512];
+void wxs_set_cities(const char *path) { snprintf(cities_path, sizeof cities_path, "%s", path ? path : ""); }
+
+/* tzdata's coordinates of a zone (as display.c's sunrise does), or a picked city's from the offline list */
 static int coords(const char *zone, double *lat, double *lon) {
+    if (!strncmp(zone, "geonames/", 9)) {
+        const char *d = zone + 9;
+        size_t l = strlen(d);
+        if (!l || l > 10 || strspn(d, "0123456789") != l || !cities_path[0]) return -1;
+        return geo_lookup(cities_path, strtol(d, NULL, 10), lat, lon, NULL, 0);
+    }
     static char *tab;
     if (!tab) {
         const char *paths[] = { "/usr/share/zoneinfo/zone1970.tab", "/usr/share/zoneinfo/zone.tab" };

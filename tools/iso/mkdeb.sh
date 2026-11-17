@@ -216,7 +216,7 @@ for d in themes/*/; do
     install -m 644 "$d/theme.json" "$d/theme.bundle.js" "$L/themes/$n/"
     [ -d "$d/assets" ] && cp -r "$d/assets" "$L/themes/$n/"
 done
-cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps "$L/assets/"
+cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps assets/geo "$L/assets/"
 # the makers' keys Machines' download catalog pins (assets/machines/systems.json "keys"; docs/VIRTUALIZATION.md 3.9):
 # the admin helper checks each checksum list's signature with them before it trusts a hash
 install -d "$L/assets/machines/keys"
@@ -384,6 +384,11 @@ License: public-domain
 Files: third_party/quickjs/* third_party/stb/*
 License: MIT and public-domain
  QuickJS (MIT) and stb (public domain / MIT), compiled into lord-server.
+
+Files: usr/lib/lordos/assets/geo/cities.tsv
+Copyright: GeoNames (https://www.geonames.org)
+License: CC-BY-4.0
+ The weather widget's offline list of cities, reduced from GeoNames' cities15000 by tools/geo/fetch-cities.sh.
 C
 chmod 644 "$D/copyright"
 install -m 644 server/src/bench/fonts/OFL.txt "$D/OFL-Noto.txt"

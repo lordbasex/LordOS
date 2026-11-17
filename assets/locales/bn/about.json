@@ -20,7 +20,7 @@
     "one": "{cpu} · {count}টি কোর",
     "other": "{cpu} · {count}টি কোর"
   },
-  "credits": "মনিটরে IP থেকে দেশ: DB-IP Lite Country, © db-ip.com, CC BY 4.0। মানচিত্র: Natural Earth (পাবলিক ডোমেইন)।",
+  "credits": "মনিটরে IP থেকে দেশ: DB-IP Lite Country, © db-ip.com, CC BY 4.0। মানচিত্র: Natural Earth (পাবলিক ডোমেইন)। আবহাওয়ার শহর: GeoNames, © geonames.org, CC BY 4.0।",
   "display": "ডিসপ্লে",
   "engine": "UI ইঞ্জিন",
   "host": "কম্পিউটার",

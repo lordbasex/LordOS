@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} kärna",
     "other": "{cpu} · {count} kärnor"
   },
-  "credits": "IP till land i Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Karta: Natural Earth (allmän egendom).",
+  "credits": "IP till land i Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Karta: Natural Earth (allmän egendom). Väderstäder: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Skärm",
   "engine": "UI-motor",
   "host": "Dator",

@@ -19,7 +19,7 @@
   "cpuValue": {
     "other": "{cpu} · {count}코어"
   },
-  "credits": "모니터의 IP-국가 정보: DB-IP Lite Country, © db-ip.com, CC BY 4.0. 지도: Natural Earth(퍼블릭 도메인).",
+  "credits": "모니터의 IP-국가 정보: DB-IP Lite Country, © db-ip.com, CC BY 4.0. 지도: Natural Earth(퍼블릭 도메인). 날씨 도시: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "디스플레이",
   "engine": "UI 엔진",
   "host": "컴퓨터",

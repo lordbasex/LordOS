@@ -15,6 +15,10 @@
 #define WXS_FRESH 1800          /* seconds a forecast is kept */
 #define WXS_RETRY 600           /* seconds after a failure */
 
+/* A zone may also be "geonames/<id>": a city the person picked from the offline list (geocities.h); its
+ * coordinates come from that list here, never from JS. path: assets/geo/cities.tsv. */
+void wxs_set_cities(const char *path);
+
 /* lord-fetch's folder (lord-server's own). 0 ok. */
 int wxs_init(const char *bindir);
 /* A zone name as tzdata spells it: letters, digits, '_', '-', '+' and '/' (at most 63 bytes). */

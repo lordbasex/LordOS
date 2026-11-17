@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} ydin",
     "other": "{cpu} · {count} ydintä"
   },
-  "credits": "IP-osoitteen maa Monitorissa: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Kartta: Natural Earth (vapaa käyttö).",
+  "credits": "IP-osoitteen maa Monitorissa: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Kartta: Natural Earth (vapaa käyttö). Sään kaupungit: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Näyttö",
   "engine": "Käyttöliittymämoottori",
   "host": "Tietokone",

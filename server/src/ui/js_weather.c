@@ -2,6 +2,9 @@
  *
  *   lord.weather.request(zone) → true | false   asks for a time zone's forecast (tzdata's coordinates for it);
  *                                               false for an unknown zone; a fresh one isn't asked again
+ *   lord.weather.cities(query) → [{ id, name, cc, adm1 }]   the offline list (assets/geo/cities.tsv): names that
+ *                                               start with, then contain, the folded query; nothing asked of the network
+ *   zone may be "geonames/<id>", a city from that list
  *   lord.weather.get(zone) → { t, f, c, d, days: [[code, hi, lo], …], at } | { error } | null
  *                                               t/f/hi/lo in °C, c the WMO code, d 1 by day; at: seconds
  *
@@ -9,6 +12,9 @@
  * while the person has turned the weather on (settings.weather.on); see docs/WORKSPACES.md, "Weather". */
 #include "js_weather.h"
 #include "../fetch/wxsvc.h"
+#include "../fetch/geocities.h"
+#include "js_sys.h"
+#include <stdio.h>
 
 #include <limits.h>
 #include <stdlib.h>
@@ -27,6 +33,20 @@ static void init(void) {
     if (!sl) return;
     *sl = 0;
     if (!wxs_init(self)) ready = 1;
+    char cp[PATH_MAX];
+    snprintf(cp, sizeof cp, "%s/geo/cities.tsv", js_sys_assets());
+    wxs_set_cities(cp);
+}
+
+static JSValue f_cities(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    init();
+    const char *q = argc > 0 ? JS_ToCString(c, argv[0]) : NULL;
+    char cp[PATH_MAX], out[8192];
+    snprintf(cp, sizeof cp, "%s/geo/cities.tsv", js_sys_assets());
+    size_t n = geo_search_json(cp, q ? q : "", 20, out, sizeof out);
+    if (q) JS_FreeCString(c, q);
+    return JS_ParseJSON(c, out, n, "<cities>");
 }
 
 static JSValue f_request(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -74,6 +94,7 @@ static JSValue f_get(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 static const JSCFunctionListEntry weather_funcs[] = {
     JS_CFUNC_DEF("request", 1, f_request),
     JS_CFUNC_DEF("get", 1, f_get),
+    JS_CFUNC_DEF("cities", 1, f_cities),
 };
 
 void js_weather_register(JSContext *c, JSValue lord) {

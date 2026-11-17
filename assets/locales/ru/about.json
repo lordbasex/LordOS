@@ -21,7 +21,7 @@
     "few": "{cpu} · {count} ядра",
     "many": "{cpu} · {count} ядер"
   },
-  "credits": "Определение страны по IP в Мониторе: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Карта: Natural Earth (общественное достояние).",
+  "credits": "Определение страны по IP в Мониторе: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Карта: Natural Earth (общественное достояние). Города погоды: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Дисплей",
   "engine": "Движок интерфейса",
   "host": "Компьютер",

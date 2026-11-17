@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} kern",
     "other": "{cpu} · {count} kernen"
   },
-  "credits": "IP-naar-land in Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Kaart: Natural Earth (publiek domein).",
+  "credits": "IP-naar-land in Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Kaart: Natural Earth (publiek domein). Weersteden: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Beeldscherm",
   "engine": "UI-engine",
   "host": "Computer",

@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} πυρήνας",
     "other": "{cpu} · {count} πυρήνες"
   },
-  "credits": "Αντιστοίχιση IP σε χώρα στην Παρακολούθηση: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Χάρτης: Natural Earth (κοινό κτήμα).",
+  "credits": "Αντιστοίχιση IP σε χώρα στην Παρακολούθηση: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Χάρτης: Natural Earth (κοινό κτήμα). Πόλεις καιρού: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Οθόνη",
   "engine": "Μηχανή διεπαφής",
   "host": "Υπολογιστής",

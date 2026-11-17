@@ -125,6 +125,12 @@ displays do. Nothing runs per frame, nothing polls.
   The card shows a sky gradient by condition and time of day, the city, the temperature, a drawn icon, high
   and low; m adds the next five days, l the week with range bars and three cities. Tests: `tests/weather_test.c`
   (path and parsing), `tests/weather_model_test.mjs`, and the scene checks that nothing is asked while it's off.
+  **Location** (0.8.8.10): the widget's menu has "Location…", a search over an offline list of cities
+  (`assets/geo/cities.tsv`, GeoNames' cities15000, CC BY 4.0, credited in About; refreshed before each release by
+  `tools/geo/fetch-cities.sh`). Searching asks nothing of the network (`lord.weather.cities(query)`, lord-server reads
+  the file: `src/fetch/geocities.c`, `tests/geocities_test.c`). The pick is kept as `settings.weather.city` {id,
+  name, cc}; the widget then asks for `geonames/<id>`, and lord-server takes that city's coordinates from its own
+  list, never from JS. "Automatic" goes back to the time zone's.
 - **VPN** (s, m, l). The VPNs set up in Settings → Network → VPN (`lord.net.vpnList()`), turned on and off with the
   same closed actions Settings uses (`net-vpn-up` / `net-vpn-down`, open to the session's user): no new privilege. A
   widget drives one VPN (`opts.vpn`, chosen from its right-click menu; with a single VPN it is that one), so several

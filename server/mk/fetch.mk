@@ -26,3 +26,10 @@ build/weather-test: tests/weather_test.c src/fetch/weather.c src/fetch/weather.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/weather_test.c src/fetch/weather.c src/sec/json.c -lm
 	./$@ || { rm -f $@; exit 1; }
+
+# the weather widget's offline city list (assets/geo/cities.tsv, tools/geo/fetch-cities.sh)
+test: build/geocities-test
+build/geocities-test: tests/geocities_test.c src/fetch/geocities.c src/fetch/geocities.h src/sec/json.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/geocities_test.c src/fetch/geocities.c src/sec/json.c -lm
+	./$@ || (rm -f $@; exit 1)

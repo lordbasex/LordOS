@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} Kern",
     "other": "{cpu} · {count} Kerne"
   },
-  "credits": "IP-zu-Land in Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Karte: Natural Earth (gemeinfrei).",
+  "credits": "IP-zu-Land in Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Karte: Natural Earth (gemeinfrei). Städte fürs Wetter: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Bildschirm",
   "engine": "UI-Engine",
   "host": "Computer",

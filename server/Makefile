@@ -73,7 +73,7 @@ DOC_SRC := src/doc/doc.c src/doc/wire.c src/ui/js_doc.c src/print/ipp.c src/prin
            src/print/escl.c src/print/print.c src/ui/js_print.c
 SRC += $(DOC_SRC)
 # Per-app firewall (src/fw, docs/FIREWALL.md): rules, decision and names learned from DNS
-FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c src/media/streamurl.c src/fetch/weather.c src/fetch/wxsvc.c src/ui/js_weather.c
+FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c src/media/streamurl.c src/fetch/weather.c src/fetch/wxsvc.c src/fetch/geocities.c src/ui/js_weather.c
 SRC += $(FW_SRC)
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
