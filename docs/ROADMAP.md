@@ -913,7 +913,10 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   2026-11-15: before 1.0 and before Debian 14). With systemd 258 or later, `systemctl restart lordos` fails while
   sessions are alive (EBUSY): move each session out of `lordos.service` into a delegated `lordos-session-<uid>.scope`
   (fixed `systemd-run --scope` from lord-sessiond's root child, or StartTransientUnit), and adapt the cgroup
-  delegation and the app scopes inside it.
+  delegation and the app scopes inside it. Meanwhile (0.8.8.10) the restart works on 258+ without moving anything:
+  `lord-sessiond --release-cgroups` (ExecStartPre) turns the controllers off for the start and the new lord-sessiond
+  turns them on again with the noted limits (docs/SESSIONS.md, "cgroups"); this item stays for the cleaner layout
+  (no controller round trip, the firewall's attach point and `sec/appid.c`'s trusted path reviewed with it).
 
 - [x] **Monitor → Network, second generation (0.8.5)** — done 2026-10-19 on VM 118, see
   `MONITOR.md` ("Network, second generation", "The menu bar network item", "Blocklists") and

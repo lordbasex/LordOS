@@ -2509,9 +2509,18 @@ static const struct xdg_toplevel_interface toplevel_impl = {
     .set_min_size = top_min_size, .set_maximized = top_maximize, .unset_maximized = top_unmaximize,
     .set_fullscreen = top_fullscreen, .unset_fullscreen = top_unfullscreen, .set_minimized = top_minimize,
 };
+/* The role object is gone: the wl_surface is unmapped and a new xdg_surface on it starts over (xdg-shell), so its
+ * first commit must get a configure again. GTK 4 keeps one wl_surface for a popover and gives it a new xdg_surface
+ * and xdg_popup each time it opens: the second opening got no configure and the app froze (GitHub #159). */
+static void role_reset(Surf *s) {
+    s->sent_configure = 0;
+    s->has_geom = s->p_geom = 0;
+    s->conf_serial = s->acked_serial = 0;
+}
 static void top_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (!s || s->top != r) return;
+    role_reset(s);
     if (s->mapped) emit(s, "unmap", "{}");
     s->mapped = 0;
     s->top = NULL;
@@ -2542,6 +2551,7 @@ static void pop_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (!s || s->popup != r) return;
     unmap_popup(s);
+    role_reset(s);
     s->popup = NULL;
     s->mapped = 0;
     if (pointer_focus == s) pointer_focus = NULL;
@@ -2822,6 +2832,7 @@ static void surface_commit_role(Surf *s) {
         }
         damage_node(s);
     } else if (s->role == R_POPUP) {
+        if (!s->popup || !s->xdg) return;   /* its popup is gone (closed): unmapped until a new one is made */
         if (!s->sent_configure) {
             xdg_popup_send_configure(s->popup, s->pop_x, s->pop_y, s->conf_w, s->conf_h);
             xdg_surface_send_configure(s->xdg, wl_display_next_serial(dpy));

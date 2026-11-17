@@ -526,6 +526,40 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   passes through and leaves the composition as it is, in every input method (`server/src/ime.c` `ime_key`). `ime-test`
   gains `+` for Shift alone, and two suites check ㅆ and ㄲ as finals, ㅒ and ㅖ, and every double final consonant
   (갃 앉 않 닭 삶 넓 곬 핥 읊 잃 없) with how one splits when a vowel follows (달기, 앉아, 없어).
+- **Disks: pressing Mount could turn the whole desktop black (GitHub #174).** In 0.8.8.8 and 0.8.8.9, when mounting
+  failed on a FAT, exFAT, NTFS, HFS+ or APFS drive with the disk formats not installed (most USB sticks), Disks drew its "Get the formats" button with a `Button` it never imported:
+  "Button is not defined" while rendering, and React unmounted the shell. The import is in place now, and each app
+  window has its own error boundary (Changed, above), so such a mistake stays in its window. A new check,
+  `server/tests/jsx_undeclared_test.mjs` (in `make test`), reads every `.jsx` of the apps, themes, SDK and runtime and
+  fails on a component used as a JSX tag that is never imported or declared in its file; esbuild bundles such a file
+  without a warning.
+- **The lock screen could stay lit and never sleep (GitHub #172).** When the session locks (Require password, the
+  lid, the power button or the sleep timer), it hands its display-off and sleep deadlines to the login screen in a
+  `mode` notice. A login screen started for that lock (it is stopped 10 s after each login) added its listener in a
+  React effect, a few turns of the main loop after the theme loaded, so a notice that came first was dropped: the
+  screen stayed on and the computer never went to sleep from the lock screen. The deadlines are now applied as the
+  notice arrives, and the screen gets the notice when it mounts (`themes/greeter/inbox.js`, tested in
+  `server/tests/greeter_inbox_test.mjs`). A laptop that wakes up a second after it goes to sleep with the lid open has
+  a firmware wake source (`LID0` in `/proc/acpi/wakeup`), not this; LordOS doesn't change wake sources yet.
+- **`systemctl restart lordos` with sessions alive failed on systemd 258 and later (GitHub #140)** with "Failed to
+  spawn executor: Device or resource busy", and after five tries there was no login screen until a reboot (a
+  package upgrade or a crash of lord-sessiond did the same). systemd 258 starts a delegated unit's new main process
+  in the unit's root cgroup and only then moves it to `DelegateSubgroup=supervisor`; the root still had `cpu memory
+  pids` on for the sessions, and a cgroup with controllers on takes no process. `lordos.service` now runs
+  `lord-sessiond --release-cgroups` first (ExecStartPre): it notes the limits of the sessions' leaves and app scopes
+  in `/run/lordos/cgroup-limits`, turns the controllers off in each session and then in the root, and the new
+  lord-sessiond turns them on again and puts the limits back; notes not yet put back (two failed starts in a row, a limit refused) are kept and merged, never replaced, and the file goes only once every limit is back (`server/src/sec/cgroup.c`, tested in
+  `build/cgroup-restart-test`; the kernel's side checked in a delegated scope). Debian 13 ships systemd 257, which
+  wasn't affected and works the same; the unit hasn't been run on 258 or later yet.
+- **A GTK 4 app froze when a dropdown or menu was opened a second time (GitHub #159).** GTK 4 keeps one wl_surface
+  for a popover and gives it a new xdg_surface and xdg_popup each time it opens; lord-server kept "configure already
+  sent" on the wl_surface, so the second opening's first commit got no `xdg_popup.configure`/`xdg_surface.configure`
+  and the app waited for it forever (the reporter's `WAYLAND_DEBUG` trace shows exactly that). When a popup or
+  toplevel role object goes, the surface's configure state and window geometry start over (`role_reset` in
+  `server/src/wl/wl.c`), and a commit on a surface whose popup is gone no longer maps it again or sends a configure on
+  a destroyed object. `tests/popup_client.c` opens a popup three times on one wl_surface and remakes a toplevel on its
+  old surface; `tests/popup_headless.sh` runs it against a headless lord-server in `make test` (before the fix: 7 of
+  15 checks failed).
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.

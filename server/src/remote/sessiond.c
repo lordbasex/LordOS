@@ -1575,8 +1575,16 @@ int main(int argc, char **argv) {
     int no_monitor = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--no-monitor")) no_monitor = 1;   /* remote desktop only (testing) */
-        else if (!strcmp(argv[i], "--start-login")) { /* handled below, before the root check */ }
-        else { fprintf(stderr, "usage: lord-sessiond [--no-monitor] | --start-login\n"); return 2; }
+        else if (!strcmp(argv[i], "--start-login") || !strcmp(argv[i], "--release-cgroups")) { /* handled below */ }
+        else { fprintf(stderr, "usage: lord-sessiond [--no-monitor] | --start-login | --release-cgroups\n"); return 2; }
+    }
+    /* lordos.service's ExecStartPre (GitHub #140, docs/SESSIONS.md "cgroups"): the controllers off in the service's
+     * tree, so systemd 258 and later can start the new lord-sessiond in it while sessions live on. Always exit 0:
+     * on an older systemd, or without delegation, the start goes on as before. */
+    if (argc == 2 && !strcmp(argv[1], "--release-cgroups")) {
+        if (geteuid() != 0) return 0;
+        if (cgroup_service_release()) fprintf(stderr, "lord-sessiond: the cgroup controllers stayed on (a restart may fail on systemd 258 or later)\n");
+        return 0;
     }
     /* startlordos (a user, on a text console): ask the running lord-sessiond for the login screen. Prints its answer:
      * ok, refused, no-display; exit 0 only for ok. */

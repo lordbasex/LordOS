@@ -232,6 +232,15 @@ EOF
     if have node; then run "windowbuttons-test (sdk/windowbuttons.js)" node tests/windowbuttons_test.mjs; fi
     if have node; then run "login-model-test (sdk/loginmodel.js)" node tests/login_model_test.mjs; fi
     if have node; then run "diskplaces-test (sdk/diskplaces.js, #122)" node tests/diskplaces_test.mjs; fi
+    if have node; then run "jsx-undeclared-test (every JSX component is declared, #174)" node tests/jsx_undeclared_test.mjs; fi
+    if have node; then run "greeter-inbox-test (themes/greeter/inbox.js, #172)" node tests/greeter_inbox_test.mjs; fi
+    # a popup opened again on the same wl_surface, as GTK 4's popovers, against a headless lord-server (#159)
+    sh tests/popup_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
+        77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
+    esac
     if have node; then run "hwkeys-test (sdk/hwkeymodel.js)" node ../tests/hwkeys_test.mjs; fi
     if have node; then run "fwrule-input-test (sdk/fwrule.js)" node tests/fwrule_input_test.mjs
     else skip "fwrule-input-test" "node"; fi

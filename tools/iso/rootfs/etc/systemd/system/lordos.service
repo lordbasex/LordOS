@@ -11,6 +11,9 @@ After=getty@tty1.service
 
 [Service]
 Type=simple
+# sessions alive from before a restart: their cgroup controllers off for a moment, so systemd 258 and later can
+# start lord-sessiond in this unit's root cgroup (it turns them back on; docs/SESSIONS.md, "cgroups", GitHub #140)
+ExecStartPre=-/usr/lib/lordos/bin/lord-sessiond --release-cgroups
 # live only: grub language (lordos.lang) and the lordos user's folders
 ExecStartPre=-/usr/lib/lordos/lordos-live-prep
 # the last step before lord-sessiond: Plymouth drops DRM master and leaves its last frame up
@@ -32,7 +35,9 @@ StandardError=journal
 KillMode=process
 # lord-sessiond splits up the cgroup tree: one branch per session and one scope per app (see docs/PRIVACY.md)
 Delegate=yes
-# the main process goes straight into the «supervisor» leaf: a restart with live processes (login screen, lord-netd, sessions) does not clash with the cgroup v2 rule
+# the main process ends up in the «supervisor» leaf, so the service root can enable controllers for the sessions.
+# Up to systemd 257 it is started there directly; since 258 it is started in the root and moved, which the
+# ExecStartPre above makes possible while sessions live on
 DelegateSubgroup=supervisor
 # on shutdown: if something does not exit, it is killed after 5 s (not the default 90 s)
 TimeoutStopSec=5
