@@ -19,7 +19,7 @@ import { flyout, FLYOUT_DELAY } from './SnapTargets.jsx';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { setFloating, isFloating } from '../tiler.js';
 import { tween, EASE } from '../motion.js';
-import { launchOrigin, activities } from '../state.js';
+import { launchOrigin, activities, windowGroups, moveWindowToGroup } from '../state.js';
 
 export const TITLE_H = 36;
 export const MENU_H = 26;
@@ -94,6 +94,15 @@ function moveItems(win) {
   return list.filter((d) => d !== win.desktop).map((d) => ({ label: desktopName(d), onClick: () => wm.moveToDesktop(win.id, d) }));
 }
 
+// The other groups of the window's activity (state.js), for its title bar's menu.
+function groupItems(win) {
+  const m = activities.get()[win.desktop];
+  if (!m?.groups?.length) return [];
+  const cur = windowGroups.get().get(win.id) ?? null;
+  return [{ id: null, name: desktopName(win.desktop) }, ...m.groups.map((g, i) => ({ id: g.id, name: g.name || tr('shell.ws.group.name', { n: i + 1 }) }))]
+    .filter((g) => g.id !== cur).map((g) => ({ label: g.name, onClick: () => moveWindowToGroup(win.id, g.id) }));
+}
+
 export const Window = memo(function Window({ win, t, focused, app, tight, leaving = false, locked = false }) {
   const drag = useRef(null);
   const geo = wm.frame(win);
@@ -151,6 +160,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
       ? { label: tr('shell.ws.window.tile'), onClick: () => setFloating(win.id, false) }
       : { label: tr('shell.ws.window.float'), onClick: () => setFloating(win.id, true) },
     { label: tr('shell.ws.layout.move'), submenu: moveItems(win) },
+    ...(groupItems(win).length ? [{ label: tr('shell.ws.group.moveTo'), submenu: groupItems(win) }] : []),
     // the layout flyout from the window menu too: for Linux apps that draw their own maximize button (Chrome)
     ...(locked ? [] : [{ label: tr('shell.ws.snapfly.open'), onClick: () => { const m = menu || win.windowMenu; flyout.set({ id: win.id, x: m ? m.x : win.x + 40, y: m ? m.y : win.y + 40, at: 'point' }); } }]),
     '-',

@@ -13,7 +13,7 @@ import { ActivityIcon, PlusGlyph, SaveGlyph, MoveGlyph, LockGlyph, LayoutMini, L
 import { LAYOUTS, splitterAt, ratioFrom, TILE_GAP } from '../model/layouts.js';
 import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled } from '../tiler.js';
 import { Surface } from './Surface.jsx';
-import { noteLaunch } from '../state.js';
+import { noteLaunch, groupHidden } from '../state.js';
 
 const alpha = (hex, a) => `${hex}${Math.round(a * 255).toString(16).padStart(2, '0')}`;
 
@@ -96,7 +96,7 @@ const FrameBox = memo(function FrameBox({ t, f }) {
 // how many windows of this activity show on this display (a narrow selector: other windows' changes don't re-render)
 // The windows of this activity minimized on this display, as a string of ids (a narrow selector, like countOn). A
 // minimized window keeps its frame, so it stays on the display it was on and comes back there.
-const minimizedOn = (desk, d) => (ws) => ws.filter((w) => w.desktop === desk && w.minimized && !w.pip && tileable({ ...w, minimized: false, maximized: false })
+const minimizedOn = (desk, d, hid) => (ws) => ws.filter((w) => w.desktop === desk && w.minimized && !w.pip && !hid.has(w.id) && tileable({ ...w, minimized: false, maximized: false })
   && displayFor(w)?.id === d.id).map((w) => w.id).join('\n');
 // where each display's tray is, for the minimize effect (index.jsx): display id → the tray's node
 export const trayNodes = new Map();
@@ -128,7 +128,8 @@ const countOn = (desk, d) => (ws) => ws.filter((w) => w.desktop === desk && !w.m
 
 export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, desk, meta, multi, canMove, onAddWindow, onAddWidget, onAddWebApp, onEdit, showEmpty }) {
   const count = useStore(windows, countOn(desk, d));
-  const minIds = useStore(windows, minimizedOn(desk, d));
+  const hid = useStore(groupHidden);           // windows another group hid aren't in the tray (state.js, groups)
+  const minIds = useStore(windows, minimizedOn(desk, d, hid));
   const minimized = minIds ? minIds.split('\n') : [];
   const widgetsHere = useStore(deskWidgetsShown, (s) => (s[widgetDisplayKey(d)] || 0) > 0);
   // nothing open here: the free slots keep only their outlines (no "Free space" over the widgets or the card)

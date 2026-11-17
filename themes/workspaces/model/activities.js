@@ -6,7 +6,10 @@
 // migration): the icon, the colour, the pinned apps and the layouts of each activity, by position like the desktops'
 // names (desktops are numbered again at every start), and the theme's own choices.
 //
-//   settings.workspaces = { v: 1, activities: [ { icon, color, pins, layouts, setup } | null ] }
+//   settings.workspaces = { v: 1, activities: [ { icon, color, pins, layouts, setup, groups, group } | null ] }
+//   (groups: up to MAX_GROUPS more activities that share this desktop, the proposal's Activity Islands and its way past
+//   nine: [{ id, name, icon, color, apps }]; group: the one in view, or none for the activity's own; apps: the launcher
+//   ids of each group's windows, so they join their group again when they reopen)
 //   (layouts: { [display connector]: { layout, ratio, apps?, locked? } }; locked: the padlock is closed)
 //   settings.themeOptions.workspaces = { surface, spine, spineEvery, contrast }   (theme.json "options": Settings shows them,
 //                                    sdk/thememeta.js)
@@ -27,6 +30,7 @@ export const ACTIVITY_ICONS = ['spark', 'code', 'design', 'server', 'chat', 'mus
 export const ACTIVITY_COLORS = ['#7C5CFF', '#3D7BFD', '#14A89A', '#22A565', '#E59A12', '#F06A24', '#E5487F', '#7A7891'];
 export const MAX_PINS = 8;
 export const MAX_ACTIVITIES = 9;
+export const MAX_GROUPS = 3;          // per activity: with each one's own, 9 × 4 = 36 activities on 9 desktops
 export const DEFAULT_SURFACE = 'crystal';
 
 const isHex = (c) => typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c);
@@ -50,16 +54,83 @@ function cleanLayouts(l) {
   return out;
 }
 
+const isGroupId = (g) => typeof g === 'string' && /^g[0-9]{1,3}$/.test(g);
+function cleanGroups(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const g of list) {
+    if (!g || typeof g !== 'object' || !isGroupId(g.id) || out.some((x) => x.id === g.id)) continue;
+    out.push({ id: g.id, name: typeof g.name === 'string' ? g.name.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 60) : '',
+      icon: ACTIVITY_ICONS.includes(g.icon) ? g.icon : ACTIVITY_ICONS[out.length % ACTIVITY_ICONS.length],
+      color: isHex(g.color) ? g.color.toUpperCase() : ACTIVITY_COLORS[(out.length + 3) % ACTIVITY_COLORS.length],
+      apps: Array.isArray(g.apps) ? [...new Set(g.apps.filter(isKey))].slice(0, 12) : [] });
+    if (out.length >= MAX_GROUPS) break;
+  }
+  return out;
+}
+
 export function cleanActivity(a, index = 0) {
   const d = defaultActivity(index);
   if (!a || typeof a !== 'object') return d;
+  const groups = cleanGroups(a.groups);
   return {
     icon: ACTIVITY_ICONS.includes(a.icon) ? a.icon : d.icon,
     color: isHex(a.color) ? a.color.toUpperCase() : d.color,
     pins: Array.isArray(a.pins) ? [...new Set(a.pins.filter(isKey))].slice(0, MAX_PINS) : [],
     layouts: cleanLayouts(a.layouts),
     setup: a.setup === true,
+    ...(groups.length ? { groups, ...(groups.some((g) => g.id === a.group) ? { group: a.group } : null) } : null),
   };
+}
+
+// ---- groups (activities that share a desktop) ----
+
+// A new group for activity m: the first unused id, icon and colour (named by the caller).
+export function newGroup(m, name) {
+  const used = new Set((m.groups || []).map((g) => g.id));
+  let n = 1;
+  while (used.has(`g${n}`)) n++;
+  const taken = [m, ...(m.groups || [])];
+  const icon = ACTIVITY_ICONS.find((x) => !taken.some((g) => g.icon === x)) || ACTIVITY_ICONS[n % ACTIVITY_ICONS.length];
+  const color = ACTIVITY_COLORS.find((x) => !taken.some((g) => g.color === x)) || ACTIVITY_COLORS[n % ACTIVITY_COLORS.length];
+  return { id: `g${n}`, name: name || '', icon, color, apps: [] };
+}
+// The group a window belongs to: its tag while it is open; a window not tagged yet, the group whose saved apps have its
+// app, else the one in view (null: the activity's own).
+export function groupOfWindow(m, tag, app) {
+  if (tag !== undefined) return tag;
+  const saved = (m.groups || []).find((g) => g.apps.includes(app));
+  return saved ? saved.id : m.group ?? null;
+}
+// What showing group g of a desktop does: the windows of other groups that show go (hide), the ones of g that the groups
+// hid come back (show). wins: that desktop's windows; tagOf(w): its group; hidden: ids the groups hid.
+export function groupPlan(wins, tagOf, hidden, g) {
+  const hide = [], show = [];
+  for (const w of wins) {
+    if (w.pip) continue;
+    const mine = (tagOf(w) ?? null) === (g ?? null);
+    if (!mine && !w.minimized) hide.push(w.id);
+    else if (mine && w.minimized && hidden.has(w.id)) show.push(w.id);
+  }
+  return { hide, show };
+}
+// Each group's apps from its open windows (appOf(w): the launcher id), for the settings.
+export function groupApps(groups, wins, tagOf, appOf) {
+  return groups.map((g) => {
+    const now = [...new Set(wins.filter((w) => tagOf(w) === g.id).map(appOf).filter(isKey))];
+    return now.length ? { ...g, apps: now.slice(0, 12) } : g;
+  });
+}
+// Every activity, the groups included: [{ desk, group (null: the activity's own), name, icon, color }].
+export function everyActivity(list, meta, nameOf) {
+  const out = [];
+  for (const desk of list) {
+    const m = meta[desk];
+    if (!m) continue;
+    out.push({ desk, group: null, name: nameOf(desk), icon: m.icon, color: m.color });
+    for (const g of m.groups || []) out.push({ desk, group: g.id, name: g.name, icon: g.icon, color: g.color });
+  }
+  return out;
 }
 
 export function wsPrefs(s) {
@@ -90,7 +161,7 @@ export function savedFromMeta(list, meta) {
     const m = meta[id];
     if (!m) return null;
     const d = defaultActivity(i);
-    const plain = m.icon === d.icon && m.color === d.color && !m.pins.length && !Object.keys(m.layouts).length && !m.setup;
+    const plain = m.icon === d.icon && m.color === d.color && !m.pins.length && !Object.keys(m.layouts).length && !m.setup && !m.groups?.length;
     return plain ? null : m;
   });
   while (arr.length && arr[arr.length - 1] == null) arr.pop();

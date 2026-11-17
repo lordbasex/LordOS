@@ -661,4 +661,35 @@ check('high contrast: nothing blurred', blurred(), 0);
 sdk.settings.set(sdk.themeOptionPatch(sdk.settings.get(), 'workspaces', 'contrast', false));
 await flush();
 check('idle again: still no timer every second', intervals(1000), 0);
+// groups: another activity on the same desktop; its windows hide with the others' and come back, never in the tray
+{
+  const g = state.addGroup(desk, 'Mail');
+  await flush();
+  check('group: added and in view', [state.groupInView(desk), state.groupsOf(desk).length], [g, 1]);
+  check('group: the activity\'s own windows hidden by the group, not in the tray', [[a, b, c].every((id) => sdk.wm.get(id).minimized), [a, b, c].every((id) => state.groupHidden.get().has(id))], [true, true]);
+  state.showGroup(desk, null);
+  await flush();
+  check('group: the own again, its windows back', [a, b, c].every((id) => !sdk.wm.get(id).minimized), true);
+  state.moveWindowToGroup(c, g);
+  await flush();
+  check('group: a window moved to the group leaves the view', [state.windowGroups.get().get(c), sdk.wm.get(c).minimized, state.groupHidden.get().has(c)], [g, true, true]);
+  check('group: the chips in the strip', [...texts].some(([id, x]) => x === 'Mail' && attached(id)), true);
+  state.showGroup(desk, g);
+  await flush();
+  check('group: its window shows, the others go', [sdk.wm.get(c).minimized, sdk.wm.get(a).minimized], [false, true]);
+  state.removeGroup(desk, g);
+  await flush();
+  // after a group switch the tiler still tells a hand move from its own
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  const h1 = sdk.wm.open('extra57', { frame: { x: L.x + 100, y: 200, w: 500, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  sdk.wm.setFrame(h1, { x: L.x + 40, y: 60, w: 900, h: 900 });
+  for (let i = 0; i < 3; i++) await flush();
+  check('group: after a switch, a window moved by hand still floats', tiler.isFloating(h1), true);
+  sdk.wm.close(h1, true);
+  tiler.setLayout(desk, 'DP-1', 'free');
+  await flush();
+  check('group: removed, every window back in the activity', [state.groupsOf(desk).length, [a, b, c].every((id) => !sdk.wm.get(id).minimized), state.windowGroups.get().get(c), state.groupHidden.get().size], [0, true, null, 0]);
+}
+
 process.exit(0);

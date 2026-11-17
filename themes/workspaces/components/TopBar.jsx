@@ -15,14 +15,14 @@ import {
   getApp, appName, wm, useLauncherApps,
 } from '@lordos/sdk';
 import { activitySummary } from '../model/activities.js';
-import { memo, useEffect, useRef, useState } from 'react';
+import { Fragment, memo, useEffect, useRef, useState } from 'react';
 import { tween, EASE } from '../motion.js';
 import { Surface } from './Surface.jsx';
 import { BarButton, BarSeparator, BAR_ITEM, FocusRing } from './BarButton.jsx';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { ActivityIcon, PlusGlyph, SpeakerGlyph, BellGlyph } from '../glyphs.jsx';
-import { activities, renaming, deleting, newActivity, noteLaunch } from '../state.js';
-import { MAX_ACTIVITIES } from '../model/activities.js';
+import { activities, renaming, deleting, newActivity, noteLaunch, showGroup, addGroup, renameGroup, removeGroup } from '../state.js';
+import { MAX_ACTIVITIES, MAX_GROUPS } from '../model/activities.js';
 
 const H = 44;
 // One timer for the clock, woken at each minute's turn (each second's only with Settings → Date & Time → Show seconds):
@@ -159,6 +159,59 @@ const Pill = memo(function Pill({ t, id, active, glide, name, meta, count, onMen
   );
 });
 
+// The groups of the activity in view (more activities on the same desktop, state.js): the activity's own first (its
+// icon), then each group (icon and name); the one shown has the accent's outline. Click shows it; double click renames
+// a group; right click: rename, remove (its windows join the activity's own). "+" adds one, up to MAX_GROUPS.
+const groupRenaming = createStore(null);
+const GroupChip = memo(function GroupChip({ t, desk, g, on, label, icon, color, onMenu }) {
+  const [hover, setHover] = useState(false);
+  const editing = useStore(groupRenaming) === `${desk}:${g}`;
+  const [value, setValue] = useState(label);
+  if (editing) {
+    return (
+      <View style={{ width: 130, height: BAR_ITEM, justifyContent: 'center' }}>
+        <TextInput value={value} autoFocus selectAll onChange={setValue} size={12}
+          onSubmit={() => { renameGroup(desk, g, value); groupRenaming.set(null); }} onCancel={() => groupRenaming.set(null)} style={{ height: 28 }} />
+      </View>
+    );
+  }
+  return (
+    <View onClick={() => showGroup(desk, g)} onDoubleClick={() => { if (g) { setValue(label); groupRenaming.set(`${desk}:${g}`); } }}
+      onContextMenu={(e) => { if (g) onMenu(g, e); }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} title={label}
+      style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: g ? 8 : 6, borderRadius: 14, maxWidth: 130,
+        border: `1.5px solid ${on ? t.accent : 'transparent'}`, backgroundColor: hover ? t.itemHover : 'transparent' }}>
+      <View style={{ width: 16, height: 16, borderRadius: 5, backgroundColor: color, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIcon icon={icon} color="#ffffff" bg={color} size={9} />
+      </View>
+      {g ? <Text style={{ fontSize: 11.5, fontWeight: on ? 700 : 500, color: t.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{label}</Text> : null}
+    </View>
+  );
+});
+
+const Groups = memo(function Groups({ t, desk, meta, name }) {
+  const [menu, setMenu] = useState(null);
+  const groups = meta.groups || [];
+  if (!groups.length) return null;
+  const inView = meta.group ?? null;
+  const labelOf = (g, i) => g.name || tr('shell.ws.group.name', { n: i + 1 });
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1, paddingHorizontal: 2 }}>
+      <GroupChip t={t} desk={desk} g={null} on={inView == null} label={name} icon={meta.icon} color={meta.color} />
+      {groups.map((g, i) => <GroupChip key={g.id} t={t} desk={desk} g={g.id} on={inView === g.id} label={labelOf(g, i)} icon={g.icon} color={g.color}
+        onMenu={(id, e) => setMenu({ id, x: e.x, y: e.y })} />)}
+      {groups.length < MAX_GROUPS ? (
+        <BarButton t={t} title={tr('shell.ws.group.add')} onClick={() => addGroup(desk)} style={{ height: 28, minWidth: 28 }}
+          glyph={(c) => <PlusGlyph color={c} size={9} />} />
+      ) : null}
+      {menu && <Menu t={t} x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={[
+        { label: tr('shell.ws.activity.rename'), onClick: () => groupRenaming.set(`${desk}:${menu.id}`) },
+        '-',
+        { label: tr('shell.ws.group.remove'), destructive: true, onClick: () => removeGroup(desk, menu.id) },
+      ]} />}
+    </View>
+  );
+});
+
 // after the next frame's layout (a timer where there are no frames: the tests)
 const nextFrame = (fn) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : setTimeout(fn, 16));
 const cancelFrame = (id) => (typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame(id) : clearTimeout(id));
@@ -210,8 +263,13 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
   return (
     <Surface ref={strip} t={t} radius={H / 2} style={{ position: 'absolute', left: rect.x, top: rect.y, height: H, maxWidth: rect.w, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4 }}>
       {pos ? <View ref={glider} style={{ position: 'absolute', left: pos.x, top: (H - BAR_ITEM) / 2 - 1, width: pos.w, height: BAR_ITEM, borderRadius: BAR_ITEM / 2, backgroundColor: t.accent, pointerEvents: 'none', transformOrigin: 'left center' }} /> : null}
-      {list.map((id) => <Pill key={id} t={t} id={id} active={id === active} glide={!!pos} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }} count={counts[id] || 0}
-        pillRef={pillRefFor(pills.current, id)} onMenu={(d, e) => setMenu({ id: d, x: e.x, y: e.y })} />)}
+      {list.map((id) => (
+        <Fragment key={id}>
+          <Pill t={t} id={id} active={id === active} glide={!!pos} name={desktopName(id)} meta={meta[id] || { icon: 'spark', color: t.accent }} count={counts[id] || 0}
+            pillRef={pillRefFor(pills.current, id)} onMenu={(d, e) => setMenu({ id: d, x: e.x, y: e.y })} />
+          {id === active && meta[id]?.groups?.length ? <Groups t={t} desk={id} meta={meta[id]} name={desktopName(id)} /> : null}
+        </Fragment>
+      ))}
       <BarSeparator t={t} />
       <BarButton t={t} fid="new" disabled={full} title={tr('shell.ws.activity.new')} onClick={(e) => { noteLaunch(e.x, e.y); newActivity(); }}
         glyph={(c) => <PlusGlyph color={c} size={11} />}>
@@ -222,6 +280,7 @@ export const ActivityStrip = memo(function ActivityStrip({ t, rect, onEdit }) {
       {menu && <Menu t={t} x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={[
         { label: tr('shell.ws.activity.rename'), onClick: () => renaming.set(menu.id) },
         { label: tr('shell.ws.activity.edit'), onClick: () => onEdit(menu.id, menu) },
+        { label: tr('shell.ws.group.add'), disabled: (meta[menu.id]?.groups || []).length >= MAX_GROUPS, onClick: () => addGroup(menu.id) },
         '-',
         { label: tr('shell.ws.activity.delete'), disabled: list.length < 2, destructive: true, onClick: () => deleting.set(menu.id) },
       ]} />}

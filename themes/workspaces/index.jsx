@@ -28,6 +28,7 @@ import { makeTheme } from './tokens.js';
 import { displayPlan, shownDisplays, onChrome } from './model/geometry.js';
 import { wsPrefs, optPatch, effectiveSurface, needsOnboarding } from './model/activities.js';
 import { minimizeStarts } from '../default/minimize.js';
+import { startGroups, groupHidden, showGroup } from './state.js';
 import { activities, panel, deleting, startActivities, updateActivity, setUpActivity, activityOf, noteLaunch, newActivity } from './state.js';
 import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked } from './tiler.js';
 import { startMagnet } from './magnet.js';
@@ -119,13 +120,23 @@ const table = [
 
 // Two sections of their own in Search (and in the SDK's panel while this theme runs): Activities and Open windows.
 function registerSources() {
-  const offA = registerSpotlightSource('activities', (q, query, { best }) => desktopList.get().map((id, i) => {
-    const name = desktopName(id);
-    const n = windowsStore.get().filter((w) => w.desktop === id && !w.pip).length;
-    const m = activityOf(id);
-    return { key: `activity:${i}`, score: best(q, name), title: name, subtitle: tr('shell.ws.search.activitySub', { n, pos: i + 1 }),
-      Icon: ({ size }) => <ActivityIcon icon={m.icon} color={m.color} bg="#ffffff" size={Math.round(size * 0.7)} />, run: () => switchDesktop(id) };
-  }).filter((x) => x.score > 0));
+  const offA = registerSpotlightSource('activities', (q, query, { best }) => {
+    const out = [];
+    desktopList.get().forEach((id, i) => {
+      const name = desktopName(id);
+      const n = windowsStore.get().filter((w) => w.desktop === id && !w.pip).length;
+      const m = activityOf(id);
+      out.push({ key: `activity:${i}`, score: best(q, name), title: name, subtitle: tr('shell.ws.search.activitySub', { n, pos: i + 1 }),
+        Icon: ({ size }) => <ActivityIcon icon={m.icon} color={m.color} bg="#ffffff" size={Math.round(size * 0.7)} />, run: () => showGroup(id, null) });
+      // its groups: more activities on the same desktop
+      (m.groups || []).forEach((g, k) => {
+        const gname = g.name || tr('shell.ws.group.name', { n: k + 1 });
+        out.push({ key: `activity:${i}:${g.id}`, score: best(q, gname, name), title: gname, subtitle: tr('shell.ws.group.inActivity', { activity: name }),
+          Icon: ({ size }) => <ActivityIcon icon={g.icon} color={g.color} bg="#ffffff" size={Math.round(size * 0.7)} />, run: () => showGroup(id, g.id) });
+      });
+    });
+    return out.filter((x) => x.score > 0);
+  });
   const offW = registerSpotlightSource('windows', (q, query, { best }) => windowsStore.get().filter((w) => !w.pip && !(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'))).map((w) => {
     const title = windowTitle(w);
     return { key: `window:${w.id}`, score: best(q, title, appName(getApp(w.id))), title, subtitle: desktopName(w.desktop), Icon: windowIcon(w), run: () => wm.focus(w.id) };
@@ -148,7 +159,9 @@ function useLeaving(list, spine) {
   const prev = useRef(new Map());
   const [leaving, setLeaving] = useState([]);
   useEffect(() => {
-    const started = minimizeStarts(list, prev.current, { reduce: reduceMotion() });
+    // a group switch's windows go without the effect: they aren't minimized by the person (state.js, groups)
+    const hid = groupHidden.get();
+    const started = minimizeStarts(list, prev.current, { reduce: reduceMotion() }).filter((x) => !hid.has(x.id));
     if (!started.length) return;
     setLeaving((l) => [...l.filter((x) => !started.some((y) => y.id === x.id)), ...started.map((x) => x.id)]);
     for (const { id } of started) {
@@ -173,6 +186,7 @@ function useLeaving(list, spine) {
 
 function App() {
   startActivities();
+  startGroups();
   startTiler();
   startMagnet();
   startDeskWidgets();

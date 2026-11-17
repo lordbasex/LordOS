@@ -3,7 +3,7 @@
 // styles and the palette's contrast. node server/tests/workspaces_model_test.mjs
 import { displayPlan, shownDisplays, spineMode, onChrome, SPINE_BLUR, SPINE_GAP, FRAME_PAD, SPINE_W, MARGIN, SMALL_W, SPINE_SHADOW_REACH, WINDOW_SHADOW } from '../../themes/workspaces/model/geometry.js';
 import { tileRects, fitTile, splitterAt, ratioFrom, orderFor, homeFor, displayKey, displayKeys, judgeFrame, underBudget, ANSWER_MS, MOVES_PER_SEC, savedDisplay, foldMissing, cleanLayout, cleanRatio, LAYOUTS, TILE_GAP, RATIO_MIN, RATIO_MAX } from '../../themes/workspaces/model/layouts.js';
-import { recentOrder, spineRecentRoom, activitySummary, barStep } from '../../themes/workspaces/model/activities.js';
+import { recentOrder, spineRecentRoom, activitySummary, barStep, newGroup, groupOfWindow, groupPlan, groupApps, everyActivity, MAX_GROUPS } from '../../themes/workspaces/model/activities.js';
 import { wsPrefs, effectiveSurface, metaFromSaved, savedFromMeta, cleanActivity, defaultActivity, freshActivity, togglePin, needsOnboarding, wsPatch, optPatch,
   ACTIVITY_ICONS, ACTIVITY_COLORS, MAX_PINS, WS_VERSION } from '../../themes/workspaces/model/activities.js';
 import { makeTheme, accents, deep, material } from '../../themes/workspaces/tokens.js';
@@ -320,6 +320,21 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
   eq('summary: total and more', [activitySummary(ws, 2, 1).total, activitySummary(ws, 2, 1).more], [3, 2]);
   eq('bars: next, round, first and last', [barStep(['a', 'b', 'c'], 'c', 1), barStep(['a', 'b', 'c'], 'a', -1), barStep(['a', 'b'], 'b', -Infinity), barStep(['a', 'b'], 'a', Infinity)], ['a', 'c', 'a', 'b']);
   eq('bars: a control gone starts again', barStep(['a', 'b'], 'x', 1), 'a');
+  // groups: more activities on one desktop
+  const ga = cleanActivity({ icon: 'code', color: '#7C5CFF', groups: [{ id: 'g1', name: 'Docs', icon: 'book', color: '#22A565', apps: ['editor'] }, { id: 'bad' }, { id: 'g2' }, { id: 'g3' }, { id: 'g4' }], group: 'g1' });
+  eq('groups: cleaned, at most MAX_GROUPS, the one in view kept', [ga.groups.map((g) => g.id), ga.group], [['g1', 'g2', 'g3'], 'g1']);
+  eq('groups: a group in view that is gone is dropped', cleanActivity({ groups: [{ id: 'g1' }], group: 'g7' }).group, undefined);
+  eq('groups: none, no key', 'groups' in cleanActivity({}), false);
+  const ng = newGroup({ icon: 'code', color: '#7C5CFF', groups: [{ id: 'g1', icon: 'spark', color: '#3D7BFD' }] }, 'Mail');
+  eq('groups: a new one, its own id, icon and colour', [ng.id, ng.icon !== 'code' && ng.icon !== 'spark', ng.color !== '#7C5CFF' && ng.color !== '#3D7BFD', ng.name], ['g2', true, true, 'Mail']);
+  eq('groups: a window joins its saved group, else the one in view', [groupOfWindow(ga, undefined, 'editor'), groupOfWindow(ga, undefined, 'files'), groupOfWindow({}, undefined, 'files'), groupOfWindow(ga, null, 'editor')], ['g1', 'g1', null, null]);
+  const gw = [{ id: 'a' }, { id: 'b', minimized: true }, { id: 'c' }, { id: 'd', minimized: true }];
+  const tagsG = { a: null, b: 'g1', c: 'g1', d: 'g1' };
+  eq('groups: showing the own hides g1, brings back only what the groups hid', groupPlan(gw, (w) => tagsG[w.id], new Set(['b']), null), { hide: ['c'], show: [] });
+  eq('groups: showing g1', groupPlan(gw, (w) => tagsG[w.id], new Set(['b']), 'g1'), { hide: ['a'], show: ['b'] });
+  eq('groups: apps remembered', groupApps([{ id: 'g1', apps: [] }], [{ id: 'c', app: 'mail' }], (w) => tagsG[w.id], (w) => w.app)[0].apps, ['mail']);
+  eq('groups: every activity counted', everyActivity([1, 2], { 1: ga, 2: cleanActivity({}) }, (d) => `D${d}`).length, 1 + 3 + 1);
+  eq('groups: up to 36 activities on 9 desktops', 9 * (1 + MAX_GROUPS), 36);
   eq('recent: room by height', [500, 640, 768, 1080].map(spineRecentRoom), [0, 1, 2, 3]);
 }
 
