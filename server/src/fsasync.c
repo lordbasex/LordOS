@@ -100,7 +100,10 @@ static char *error_json(const char *line) {
 static char *errno_json(int e) { char l[128]; lerr_set(l, sizeof l, "sys.errno", "errno", lerr_errno(e), NULL); return error_json(l); }
 
 /* the same answers lord.fs's synchronous calls throw (js_sys.c fs_path_error) */
-static char *path_error(int r, int down) { return error_json(r == -2 ? "fs.protected" : down ? "share.notResponding" : "fs.outsideHome"); }
+static char *path_error(int r, int down, const char *path) {
+    if (r == -1 && !down && fsops_name_too_long(path)) return error_json("fs.nameTooLong max=255");
+    return error_json(r == -2 ? "fs.protected" : down ? "share.notResponding" : "fs.outsideHome");
+}
 
 /* ---- the operations ---- */
 
@@ -153,7 +156,7 @@ static char *op_list(const char *path) {
 static char *op_stat(const char *path) {
     char target[PATH_MAX + 300];
     int down = 0, r = fsops_resolve_stat(path, target, sizeof target, &down);
-    if (r == -1) return path_error(r, down);
+    if (r == -1) return path_error(r, down, path);
     FsStat *s = malloc(sizeof *s);
     if (!s) return error_json("sys.outOfMemory");
     if (fsops_stat(target, r == 0, s)) { int e = errno; free(s); return errno_json(e); }
@@ -182,7 +185,7 @@ static char *op_stat(const char *path) {
 static char *op_trash(const char *path) {
     char target[PATH_MAX + 300], err[256] = "";
     int down = 0, r = fsops_resolve_target(path, target, sizeof target, NULL, 0, &down);
-    if (r) return path_error(r, down);
+    if (r) return path_error(r, down, path);
     if (fstrash_put(target, err, sizeof err)) return error_json(err[0] ? err : "fs.noTrash");
     return strdup("{\"ok\":true}");
 }
@@ -190,7 +193,7 @@ static char *op_trash(const char *path) {
 static char *op_free(const char *path) {
     char real[PATH_MAX];
     int down = 0;
-    if (fsops_resolve_readable(path, real, &down)) return path_error(-1, down);
+    if (fsops_resolve_readable(path, real, &down)) return path_error(-1, down, NULL);
     struct statvfs vs;
     if (statvfs(real, &vs)) return errno_json(errno);
     char b[128];
@@ -202,7 +205,7 @@ static char *op_free(const char *path) {
 static char *op_mkdir(const char *path) {
     char target[PATH_MAX + 300];
     int down = 0, r = fsops_resolve_target(path, target, sizeof target, NULL, 0, &down);
-    if (r) return path_error(r, down);
+    if (r) return path_error(r, down, path);
     if (mkdir(target, 0755) && errno != EEXIST) return errno_json(errno);
     return strdup("{\"ok\":true}");
 }
@@ -212,7 +215,7 @@ static char *op_rename(const char *from, const char *to) {
     char a[PATH_MAX + 300], b[PATH_MAX + 300], err[256] = "";
     int down = 0, r = fsops_resolve_target(from, a, sizeof a, NULL, 0, &down);
     if (!r) r = fsops_resolve_target(to, b, sizeof b, NULL, 0, &down);
-    if (r) return path_error(r, down);
+    if (r) return path_error(r, down, to);
     if (fsops_rename(a, b, err, sizeof err)) return error_json(err[0] ? err : "sys.unknown");
     return strdup("{\"ok\":true}");
 }

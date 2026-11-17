@@ -78,6 +78,9 @@ int fsops_resolve_readable(const char *path, char *out, int *down);    /* 0; -1 
 /* A destination inside the writable roots, even if it doesn't exist yet: the parent resolved, the last name kept.
  * 0; -1 outside the roots; -2 protected (fsops_protected). dir (optional) gets the resolved parent. */
 int fsops_resolve_target(const char *path, char *out, size_t n, char *dir, size_t dn, int *down);
+/* 1 when the last name of path is longer than a file system takes (255 bytes, NAME_MAX): fsops_resolve_target refuses it
+ * with -1, and lord.fs says the name is too long instead of "outside your home folder" (GitHub #102) */
+int fsops_name_too_long(const char *path);
 /* lord.fs.stat's: 0 in the writable roots, 1 read-only elsewhere where reading is allowed, -1 refused, -2 protected */
 int fsops_resolve_stat(const char *path, char *target, size_t n, int *down);
 typedef struct {

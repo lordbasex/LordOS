@@ -235,6 +235,7 @@
   "fs.notRegular": "Ez nem normál fájl (talán hivatkozás?)",
   "fs.openFailed": "Nem sikerült megnyitni a fájlt: {errno}",
   "fs.outsideHome": "Ez a hely a saját mappáján kívül esik, vagy érvénytelen",
+  "fs.nameTooLong": "A név túl hosszú (max. {max} bájt; az ékezetes és nem latin betűk 2–4 bájtot foglalnak)",
   "fs.protected": "Ez a mappa védett",
   "fs.systemFolder": "A Fájlok nem jeleníti meg a rendszer belső mappáit (/proc, /sys, /dev és /run)",
   "fs.tooLarge": "A fájl túl nagy (max. {max})",

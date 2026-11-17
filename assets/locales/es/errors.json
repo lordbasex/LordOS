@@ -235,6 +235,7 @@
   "fs.notRegular": "No es un archivo común (¿es un enlace?)",
   "fs.openFailed": "No se pudo abrir el archivo: {errno}",
   "fs.outsideHome": "Ese lugar está fuera de tu carpeta personal o no es válido",
+  "fs.nameTooLong": "El nombre es demasiado largo (máx. {max} bytes; las letras con tilde y no latinas ocupan de 2 a 4 cada una)",
   "fs.protected": "Esa carpeta está protegida",
   "fs.systemFolder": "Archivos no muestra las carpetas internas del sistema (/proc, /sys, /dev y /run)",
   "fs.tooLarge": "El archivo es demasiado grande (máx. {max})",

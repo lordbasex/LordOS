@@ -6,7 +6,7 @@
  * and every thumbnail was a full-size decode: a folder of phone photos in Files took 48 MB per picture on the
  * interface's thread and lord-server ran out of memory (issues #71 and #82).
  *
- * Thumbnails (src "thumb:<px>:<path>", image_get_thumb) are decoded off the interface's thread by IMG_THREADS workers,
+ * Thumbnails (src "thumb:<px>[:<stamp>]:<path>", image_get_thumb) are decoded off the interface's thread by IMG_THREADS workers,
  * straight down to fit <px> x <px>, so a folder on a slow file system (a Cloud mount) never blocks the desktop and a
  * picture costs at most px * px * 4 bytes. Until one is ready the node draws nothing; image_async_dispatch (main
  * loop, image_async_fd) puts the pixels in and repaints the nodes that show it. */
@@ -40,6 +40,7 @@ struct Image {
     uint32_t *scaled2;              /* the previous one: an icon at two sizes (Dock and bar) is not rescaled every frame */
     int sw2, sh2, sfit2;
     long ver;                       /* the "#<version>" it was loaded for (image_get) */
+    char stamp[IMG_STAMP_MAX + 1];  /* a thumbnail: the file's version it shows ("<mtime>.<size>", "" unknown) */
     struct Image *next;
 };
 
@@ -268,14 +269,30 @@ static void cancel(unsigned id) {
     pthread_mutex_unlock(&mu);
 }
 
-Image *image_get_thumb(const char *path, int max) {
+/* stamp: the file's version as the caller listed it ("<mtime>.<size>", NULL or "" when unknown). A thumbnail is
+ * kept by path, size and stamp, so a picture replaced by another one under the same name (deleted and downloaded
+ * again) is decoded again; until 0.8.8.10 the old one was shown until lord-server restarted (GitHub #180). The
+ * stamp comes from the caller because a stat here could wait on a slow file system. */
+Image *image_get_thumb(const char *path, int max, const char *stamp) {
     if (!path || path[0] != '/') return NULL;
+    if (!stamp || strlen(stamp) > IMG_STAMP_MAX) stamp = "";
     if (max < 16) max = 16;
     if (max > IMG_THUMB_MAX) max = IMG_THUMB_MAX;
     for (Image *i = images; i; i = i->next)
-        if (i->max == max && !strcmp(i->path, path)) { i->refs++; return i; }
+        if (i->max == max && !strcmp(i->path, path) && !strcmp(i->stamp, stamp)) { i->refs++; return i; }
+    /* the same file's thumbnails of another version that nobody shows are stale: dropped now, not left to the LRU */
+    if (*stamp) {
+        for (Image **pp = &images; *pp;) {
+            Image *i = *pp;
+            if (i->max > 0 && i->refs <= 0 && i->state != IMG_PENDING && *i->stamp && strcmp(i->stamp, stamp) && !strcmp(i->path, path)) {
+                *pp = i->next;
+                img_free(i);
+            } else pp = &i->next;
+        }
+    }
     Image *img = calloc(1, sizeof *img);
     if (!img || !(img->path = strdup(path))) { free(img); return NULL; }
+    snprintf(img->stamp, sizeof img->stamp, "%s", stamp);
     img->max = max;
     img->refs = 1;
     img->opaque = 1;

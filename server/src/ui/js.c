@@ -198,7 +198,7 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
         const char *src = JS_IsString(argv[2]) ? JS_ToCString(c, argv[2]) : NULL;
         if (src) {
             char path[2048];
-            /* "thumb:<px>:<absolute path>": a picture shown small (Files, the file dialog), decoded off this thread to
+            /* "thumb:<px>[:<stamp>]:<absolute path>": a picture shown small (Files, the file dialog), decoded off this thread to
              * fit px x px (image.c): a folder of photos never holds full-size pictures or waits on a slow disk */
             const char *num = !strncmp(src, "thumb:", 6) ? src + 6 : NULL;
             size_t nl = num ? strspn(num, "0123456789") : 0;
@@ -208,7 +208,17 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
             size_t sl = strlen(src);
             if (svg) n->img = svgicon_get_spec(src);
             else if (num) {
-                if (nl && nl <= 5 && num[nl] == ':' && num[nl + 1] == '/') n->img = image_get_thumb(num + nl + 1, atoi(num));
+                /* an optional ":<stamp>" after the size, the file's "<mtime>.<size>" (sdk/filekinds.js thumbSrc): a
+                 * picture replaced under the same name gets its own thumbnail (GitHub #180). The path starts with '/'. */
+                const char *rest = nl && nl <= 5 && num[nl] == ':' ? num + nl + 1 : NULL;
+                char stamp[IMG_STAMP_MAX + 1] = "";
+                size_t vl = rest && rest[0] != '/' ? strspn(rest, "0123456789.") : 0;
+                if (vl && vl <= IMG_STAMP_MAX && rest[vl] == ':' && rest[vl + 1] == '/') {
+                    memcpy(stamp, rest, vl);
+                    stamp[vl] = 0;
+                    rest += vl + 1;
+                }
+                if (rest && rest[0] == '/') n->img = image_get_thumb(rest, atoi(num), stamp);
             } else if (src[0] == '/') snprintf(path, sizeof path, "%s", src);
             else if (!strncmp(src, "asset:", 6) && !strstr(src, "..")) snprintf(path, sizeof path, "%s/%s", js_sys_assets(), src + 6);
             else snprintf(path, sizeof path, "%s/%s", ui.theme_dir, src);

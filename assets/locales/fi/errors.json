@@ -235,6 +235,7 @@
   "fs.notRegular": "Se ei ole tavallinen tiedosto (onko se linkki?)",
   "fs.openFailed": "Tiedostoa ei voitu avata: {errno}",
   "fs.outsideHome": "Sijainti on kotikansiosi ulkopuolella tai ei ole kelvollinen",
+  "fs.nameTooLong": "Nimi on liian pitkä (enintään {max} tavua; tarkkeelliset ja muut kuin latinalaiset kirjaimet vievät 2–4 kukin)",
   "fs.protected": "Kansio on suojattu",
   "fs.systemFolder": "Tiedostot ei näytä järjestelmän sisäisiä kansioita (/proc, /sys, /dev ja /run)",
   "fs.tooLarge": "Tiedosto on liian suuri (enint. {max})",

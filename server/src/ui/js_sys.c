@@ -1151,18 +1151,27 @@ static const JSCFunctionListEntry text_funcs[] = {
 
 #define FS_WRITE_MAX (32 * 1024 * 1024)
 
+static int name_long;                   /* the last destination refused had a name longer than 255 bytes (GitHub #102) */
 /* Destination path inside the home folder, even if the file doesn't exist yet: the
  * parent folder is resolved (realpath) and the last component must be a plain name.
  * Rejects the protected folders. out = real folder + "/" + name. */
 static int resolve_target(const char *path, char *out, size_t n, char *dir, size_t dn) {
     int down = 0, r = fsops_resolve_target(path, out, n, dir, dn, &down);   /* fsops.c: shared with fsasync.c */
     share_down = down;
+    name_long = r == -1 && !down && fsops_name_too_long(path);
     return r;
 }
 
-int js_sys_resolve_target(const char *path, char *out, size_t n) { return resolve_target(path, out, n, NULL, 0); }
+int js_sys_resolve_target(const char *path, char *out, size_t n) {
+    int r = resolve_target(path, out, n, NULL, 0);
+    name_long = 0;                      /* only lord.fs's own calls answer with fs_path_error */
+    return r;
+}
 
 static JSValue fs_path_error(JSContext *c, int r) {
+    int long_name = name_long;
+    name_long = 0;                      /* told once: a later refusal by another check isn't taken for this one */
+    if (r == -1 && long_name) return js_throw_code(c, "fs.nameTooLong", "max", "255", NULL);
     return js_throw_code(c, r == -2 ? "fs.protected" : share_down ? "share.notResponding" : "fs.outsideHome", NULL);
 }
 

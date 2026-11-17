@@ -26,7 +26,7 @@ import { parseAddress, sshLine, hostAddress, looksDav, davOf } from './connect.j
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_VIEWS, zoomOf, zoomWith, iconColumns } from './viewprefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
-import { columnEntries, columnRange, byFolder, folderReadOnly, colWidthsWith, chainStep, historyStep, newFolderDir, listEntries, readOnlyWhy } from './colview.js';
+import { columnEntries, columnRange, columnAll, byFolder, folderReadOnly, colWidthsWith, chainStep, historyStep, newFolderDir, listEntries, readOnlyWhy } from './colview.js';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth, ZoomControl } from '../../sdk/fileparts.jsx';
 import { pathCrumbs } from '../../sdk/filepickermodel.js';
 import { pasteAsk } from './clipfiles.js';
@@ -853,6 +853,9 @@ export default function Files() {
 
   // ---- keyboard ----
   const cols = () => iconColumns(root.current ? lord.getLayout(root.current.id)[2] - sideInW : 600, zoom);
+  // Select All: the column the selection is in (not the first one, GitHub #170), every row the list shows (an unfolded
+  // folder's items too), else the folder's items
+  const selectAll = () => setSelected(new Set((colItems ? columnAll(colItems, anchor.current, selected) : listItems || flat).map((x) => x.path)));
   const moveSel = (d, ev) => {
     if (!flat.length) return;
     const i = first ? flat.findIndex((x) => x.path === (anchor.current && selected.has(anchor.current) ? anchor.current : first.path)) : -1;
@@ -896,7 +899,7 @@ export default function Files() {
     if (mod && b === 'c') { if (selPaths.length) copyFiles(selPaths); return; }
     if (mod && b === 'x') { cutSel(); return; }
     if (e.ctrl && b === 'v') { doPaste(); return; }
-    if (mod && b === 'a') { setSelected(new Set(flat.map((x) => x.path))); return; }
+    if (mod && b === 'a') { selectAll(); return; }
     // [ and ] need a modifier on many layouts: the character itself counts, and ⌥← and ⌥→ work on all of them
     if ((mod && (b === '[' || e.key === '[')) || (e.alt && e.key === 'ArrowLeft')) { goBack(); return; }
     if ((mod && (b === ']' || e.key === ']')) || (e.alt && e.key === 'ArrowRight')) { goForward(); return; }
@@ -942,7 +945,7 @@ export default function Files() {
         { label: tr('files.menu.copy'), hint: '❖C', onClick: () => copyFiles(selPaths), disabled: !sel.length },
         { label: tr('files.menu.cut'), hint: '❖X', onClick: () => cutSel(), disabled: !sel.length || (readOnly && !roWhy) },
         { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !canPaste(clip) || (!wDir && !roWhy) },
-        { label: tr('files.menu.selectAll'), hint: '❖A', onClick: () => setSelected(new Set(flat.map((x) => x.path))) },
+        { label: tr('files.menu.selectAll'), hint: '❖A', onClick: () => selectAll() },
       ] },
       { label: tr('files.menu.view'), items: [
         ...VIEWS.map((v, i) => ({ label: tr(`files.view.${v}`), hint: `❖${i + 1}`, checked: tab.view === v, onClick: () => setView(v) })), '-',
@@ -968,7 +971,7 @@ export default function Files() {
       ] },
       { label: tr('files.settings.title'), items: [{ label: tr('files.settings.open'), hint: '❖,', onClick: () => setSheet('settings') }] },
     ]));
-  }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, tab.chain, hidden, selected, sel.length, clip, curDir, readOnly, roWhy, active, tabs.length, prefs.recentFolders.length, zoom, zoomable]);
+  }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, tab.chain, flat, colItems, listItems, hidden, selected, sel.length, clip, curDir, readOnly, roWhy, active, tabs.length, prefs.recentFolders.length, zoom, zoomable]);
 
   // ---- view ----
   const columns = columnsOf(prefs);

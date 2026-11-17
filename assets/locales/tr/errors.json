@@ -235,6 +235,7 @@
   "fs.notRegular": "Normal bir dosya değil (bir bağlantı mı?)",
   "fs.openFailed": "Dosya açılamadı: {errno}",
   "fs.outsideHome": "Bu konum ana klasörünüzün dışında ya da geçerli değil",
+  "fs.nameTooLong": "Ad çok uzun (en fazla {max} bayt; aksanlı ve Latin olmayan harflerin her biri 2 ila 4 bayt kaplar)",
   "fs.protected": "Bu klasör korumalı",
   "fs.systemFolder": "Dosyalar, sistemin iç klasörlerini (/proc, /sys, /dev ve /run) göstermez",
   "fs.tooLarge": "Dosya çok büyük (en fazla {max})",

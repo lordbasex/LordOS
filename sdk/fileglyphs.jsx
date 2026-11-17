@@ -73,7 +73,7 @@ export function EntryIcon({ e, size, dark, thumb = true, tint }) {
   if (thumb && isImage(e) && size >= 32 && e.size < 24 * 1024 * 1024) {
     return (
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-        <Image src={thumbSrc(e.path, size)} style={{ width: size, height: size, objectFit: 'contain' }} />
+        <Image src={thumbSrc(e.path, size, e)} style={{ width: size, height: size, objectFit: 'contain' }} />
       </View>
     );
   }

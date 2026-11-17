@@ -235,6 +235,7 @@
   "fs.notRegular": "Đây không phải là tệp thông thường (có phải là liên kết không?)",
   "fs.openFailed": "Không thể mở tệp: {errno}",
   "fs.outsideHome": "Vị trí đó nằm ngoài thư mục nhà của bạn hoặc không hợp lệ",
+  "fs.nameTooLong": "Tên quá dài (tối đa {max} byte; chữ có dấu và chữ không phải Latin chiếm 2 đến 4 byte mỗi chữ)",
   "fs.protected": "Thư mục đó được bảo vệ",
   "fs.systemFolder": "Tệp không hiển thị các thư mục nội bộ của hệ thống (/proc, /sys, /dev và /run)",
   "fs.tooLarge": "Tệp quá lớn (tối đa {max})",

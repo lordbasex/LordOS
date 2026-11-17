@@ -325,6 +325,27 @@ int main(void) {
         rename(keep, l);
     }
 
+    /* a name longer than 255 bytes (GitHub #102): refused as a destination, and told apart from "outside the home" */
+    {
+        char longp[PATH_MAX], name[300], out[PATH_MAX + 300];
+        memset(name, 'n', 256); name[256] = 0;
+        snprintf(longp, sizeof longp, "%s/%s", H, name);
+        CHECK(fsops_name_too_long(longp));
+        CHECK(fsops_resolve_target(longp, out, sizeof out, NULL, 0, NULL) == -1);
+        name[255] = 0;
+        snprintf(longp, sizeof longp, "%s/%s", H, name);
+        CHECK(!fsops_name_too_long(longp));
+        CHECK(fsops_resolve_target(longp, out, sizeof out, NULL, 0, NULL) == 0);
+        snprintf(longp, sizeof longp, "%s/%s//", H, name);
+        CHECK(!fsops_name_too_long(longp));               /* trailing slashes don't count */
+        name[255] = 'n'; name[256] = 0;
+        snprintf(longp, sizeof longp, "%s/%s/", H, name);
+        CHECK(fsops_name_too_long(longp));
+        CHECK(fsops_name_too_long(name));                  /* a bare name */
+        CHECK(!fsops_name_too_long("/etc/passwd"));        /* outside the home, short: not this answer */
+        CHECK(!fsops_name_too_long(NULL));
+    }
+
     char cmd[300];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", H);
     if (system(cmd)) {}

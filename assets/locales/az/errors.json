@@ -235,6 +235,7 @@
   "fs.notRegular": "Adi fayl deyil (keçiddir?)",
   "fs.openFailed": "Faylı açmaq mümkün olmadı: {errno}",
   "fs.outsideHome": "Bu yer ev qovluğunuzdan kənardadır və ya yararsızdır",
+  "fs.nameTooLong": "Ad çox uzundur (maks. {max} bayt; diakritikli və qeyri-latın hərfləri hər biri 2-4 bayt tutur)",
   "fs.protected": "Bu qovluq qorunur",
   "fs.systemFolder": "Fayllar sistemin daxili qovluqlarını (/proc, /sys, /dev və /run) göstərmir",
   "fs.tooLarge": "Fayl çox böyükdür (maks. {max})",

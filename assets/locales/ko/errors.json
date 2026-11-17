@@ -235,6 +235,7 @@
   "fs.notRegular": "일반 파일이 아닙니다(링크인가요?)",
   "fs.openFailed": "파일을 열 수 없습니다: {errno}",
   "fs.outsideHome": "그 위치는 홈 폴더 밖에 있거나 올바르지 않습니다",
+  "fs.nameTooLong": "이름이 너무 깁니다(최대 {max}바이트, 한글 등 비라틴 문자는 한 글자에 2~4바이트)",
   "fs.protected": "그 폴더는 보호되어 있습니다",
   "fs.systemFolder": "파일 앱은 시스템 내부 폴더(/proc, /sys, /dev, /run)를 표시하지 않습니다",
   "fs.tooLarge": "파일이 너무 큽니다(최대 {max})",

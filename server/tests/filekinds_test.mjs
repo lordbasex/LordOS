@@ -3,7 +3,7 @@
 // (issue #49: .xlsx and the other office documents had no type, so no app was ever offered).
 //
 //   node tests/filekinds_test.mjs        (from server/; run_suites.sh runs it when node exists)
-import { kindOf, mimeOf, mimesOf, appOpens, thumbSrc, isProgram, isTextual } from '../../sdk/filekinds.js';
+import { kindOf, mimeOf, mimesOf, appOpens, thumbSrc, fileVersion, isProgram, isTextual } from '../../sdk/filekinds.js';
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -82,6 +82,16 @@ eq('tiny asks the smallest', thumbSrc('/h/a.jpg', 4), 'thumb:64:/h/a.jpg');
 eq('never past 2048', thumbSrc('/h/a.jpg', 5000), 'thumb:2048:/h/a.jpg');
 eq('a bad size still asks the smallest', thumbSrc('/h/a.jpg', NaN), 'thumb:64:/h/a.jpg');
 eq('the path is kept as it is', thumbSrc('/h/x:y #1.png', 64), 'thumb:128:/h/x:y #1.png');
+// the file's version (GitHub #180): a picture replaced under the same name gets another thumbnail
+eq('with its version', thumbSrc('/h/a.jpg', 64, { mtime: 1700000000123.7, size: 4096 }), 'thumb:128:1700000000123.4096:/h/a.jpg');
+eq('replaced: another src', thumbSrc('/h/a.jpg', 64, { mtime: 1700000099000, size: 4096 }) !== thumbSrc('/h/a.jpg', 64, { mtime: 1700000000123, size: 4096 }), true);
+eq('same mtime, another size: another src', thumbSrc('/h/a.jpg', 64, { mtime: 5, size: 1 }) !== thumbSrc('/h/a.jpg', 64, { mtime: 5, size: 2 }), true);
+eq('no file: as before', thumbSrc('/h/a.jpg', 64, null), 'thumb:128:/h/a.jpg');
+eq('nothing known: as before', thumbSrc('/h/a.jpg', 64, { name: 'a.jpg' }), 'thumb:128:/h/a.jpg');
+eq('version: only digits and a dot', /^[0-9]+\.[0-9]+$/.test(fileVersion({ mtime: -3, size: NaN }) || '0.0'), true);
+eq('version: one of them known', fileVersion({ size: 10 }), '0.10');
+eq('version: a huge number is not printed with an exponent', fileVersion({ mtime: 1e300, size: 7 }), '0.7');
+eq('version: nothing usable', fileVersion({ mtime: 1e300, size: -1 }), '');
 
 console.log(bad ? `filekinds: ${bad} of ${n} failed` : `filekinds: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

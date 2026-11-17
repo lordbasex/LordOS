@@ -371,6 +371,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Hardware reports: attaching System Information's page works too** (issue #171). The page it opens now carries the
   report in a data block the browser never runs, and the hardware-report check reads it from an attached `.html` when
   no `.json` is there (`embeddedReport` in `tools/hwreport/lib.mjs`, the same schema and limits).
+- **Files: the last color tag of an item can be removed** (GitHub #181), and an emptied comment is removed too. The
+  tag and comment maps were handed to their store as an object, which the SDK's `createStore` merges into the old
+  one, so the path whose last tag was taken off came back with it until Files restarted. They are now set whole
+  (`store.set(() => map)`); the logic moved to `apps/files/tags.js`, tested by `files-tags-test`.
+- **Files: Select All (Ctrl+A / ⌘A) selects the column you are in** (GitHub #170). In the column view it always took
+  the first column's items, so picking a file in a subfolder and pressing Ctrl+A selected the parent's items. It now
+  takes the column of the item last clicked (while selected), else the deepest column with a selection
+  (`columnAll` in `apps/files/colview.js`, tested by `files-colview-test`). In the list view with unfolded folders
+  it selects every row shown, their items too, instead of only the top level. The Edit menu's Select All does the same.
+- **Files: a picture replaced by another one under the same name shows the new one** in its icon, the preview pane
+  and Quick Preview (GitHub #180). lord-server kept decoded thumbnails by path only, and an idle one stays cached for
+  coming back, so deleting `photo.jpg` and downloading another `photo.jpg` kept showing the first picture until
+  lord-server restarted (closing Files didn't help; opening it in Photos did). A thumbnail's src now carries the file's
+  version as listed, `thumb:<px>:<mtime>.<size>:<path>` (`thumbSrc(path, size, file)` in `sdk/filekinds.js`), and
+  `image_get_thumb` keeps thumbnails by path, size and that version, dropping the older versions nobody shows. The
+  version comes from the listing so lord-server never stats on its thread (a slow share would block it). Tested in
+  `engine-test` (`test_image_cache`) and `filekinds_test.mjs`. Files still shows a change made by another program
+  when the folder is listed again (opening it again or any change made in Files).
+- **Files: long file names** (GitHub #102). A name past what Linux file systems take for one name (255 bytes, fewer
+  letters when they have accents or are not Latin) was refused by `lord.fs` with "That location is outside your home
+  folder or is not valid"; renaming, New Folder, moving to the Trash and every other `lord.fs` write now say the name
+  is too long and what the limit is (`fs.nameTooLong`, in all 35 languages; `fsops_name_too_long` in
+  `server/src/fsops.c`, used by `js_sys.c` and `fsasync.c`). And a long name copied or duplicated next to itself
+  became "<name> 2.<ext>", past the limit, so the copy failed: the free names Files gives copies, duplicates, new
+  folders, extracted folders and archives now shorten the stem, whole characters only, keeping the number and the
+  extension (`apps/files/names.js`). Tested by `files-names-test` and `fsops-test`.
 - **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
   that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
   can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.

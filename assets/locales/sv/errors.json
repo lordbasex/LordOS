@@ -235,6 +235,7 @@
   "fs.notRegular": "Det är inte en vanlig fil (är det en länk?)",
   "fs.openFailed": "Kunde inte öppna filen: {errno}",
   "fs.outsideHome": "Den platsen ligger utanför din hemmapp eller är inte giltig",
+  "fs.nameTooLong": "Namnet är för långt (max. {max} byte; bokstäver med accent och icke-latinska tar 2 till 4 var)",
   "fs.protected": "Den mappen är skyddad",
   "fs.systemFolder": "Filer visar inte systemets interna mappar (/proc, /sys, /dev och /run)",
   "fs.tooLarge": "Filen är för stor (max. {max})",

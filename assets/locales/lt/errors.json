@@ -235,6 +235,7 @@
   "fs.notRegular": "Tai ne įprastas failas (galbūt nuoroda?)",
   "fs.openFailed": "Nepavyko atidaryti failo: {errno}",
   "fs.outsideHome": "Ši vieta yra už jūsų namų aplanko ribų arba netinkama",
+  "fs.nameTooLong": "Pavadinimas per ilgas (daugiausia {max} baitų; raidės su diakritiniais ženklais ir nelotyniškos užima po 2–4)",
   "fs.protected": "Šis aplankas apsaugotas",
   "fs.systemFolder": "Failai nerodo vidinių sistemos aplankų (/proc, /sys, /dev ir /run)",
   "fs.tooLarge": "Failas per didelis (daugiausia {max})",

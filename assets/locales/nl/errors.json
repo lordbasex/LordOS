@@ -235,6 +235,7 @@
   "fs.notRegular": "Het is geen gewoon bestand (is het een koppeling?)",
   "fs.openFailed": "Het bestand kon niet worden geopend: {errno}",
   "fs.outsideHome": "Die locatie ligt buiten je thuismap of is ongeldig",
+  "fs.nameTooLong": "De naam is te lang (max. {max} bytes; letters met accenten en niet-Latijnse letters nemen er elk 2 tot 4)",
   "fs.protected": "Die map is beschermd",
   "fs.systemFolder": "Bestanden toont de interne mappen van het systeem niet (/proc, /sys, /dev en /run)",
   "fs.tooLarge": "Het bestand is te groot (max. {max})",

@@ -235,6 +235,7 @@
   "fs.notRegular": "Nu este un fișier obișnuit (este o legătură?)",
   "fs.openFailed": "Fișierul nu a putut fi deschis: {errno}",
   "fs.outsideHome": "Locația este în afara dosarului personal sau nu este validă",
+  "fs.nameTooLong": "Numele este prea lung (max. {max} octeți; literele cu diacritice și cele nelatine ocupă câte 2 până la 4)",
   "fs.protected": "Dosarul este protejat",
   "fs.systemFolder": "Fișiere nu afișează dosarele interne ale sistemului (/proc, /sys, /dev și /run)",
   "fs.tooLarge": "Fișierul este prea mare (max. {max})",

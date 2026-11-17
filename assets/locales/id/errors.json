@@ -235,6 +235,7 @@
   "fs.notRegular": "Itu bukan berkas biasa (apakah itu tautan?)",
   "fs.openFailed": "Tidak dapat membuka berkas: {errno}",
   "fs.outsideHome": "Lokasi itu berada di luar folder rumah Anda atau tidak valid",
+  "fs.nameTooLong": "Nama terlalu panjang (maks. {max} byte; huruf beraksen dan non-Latin masing-masing memakai 2 sampai 4)",
   "fs.protected": "Folder itu dilindungi",
   "fs.systemFolder": "Berkas tidak menampilkan folder internal sistem (/proc, /sys, /dev, dan /run)",
   "fs.tooLarge": "Berkas terlalu besar (maks. {max})",
