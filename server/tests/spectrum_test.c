@@ -14,6 +14,7 @@
 Ui ui;
 Node *node_get(int id) { (void)id; return NULL; }
 void damage_add(Box b) { (void)b; }
+int paint_node_covered(const Node *n) { (void)n; return 0; }
 void canvas_blit(Canvas *c, const uint32_t *src, int sw, int sh, int x, int y, float r, float opacity, int opaque) {
     (void)c; (void)src; (void)sw; (void)sh; (void)x; (void)y; (void)r; (void)opacity; (void)opaque;
 }

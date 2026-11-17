@@ -157,6 +157,7 @@ extern Ui ui;
 void  style_defaults(Style *s);
 Node *node_new(int type);
 Node *node_get(int id);
+int   paint_node_covered(const Node *n);   /* its box hidden behind something opaque painted after it (paint.c) */
 /* The node with this id only if it is still the one that had this serial when it was looked up: NULL once that node
  * is destroyed, even if its id now belongs to another node. */
 Node *node_ref(int id, uint64_t serial);
