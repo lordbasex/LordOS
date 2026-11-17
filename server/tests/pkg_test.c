@@ -1251,7 +1251,11 @@ static void test_handover(const char *dir) {
     put(root, bkey, key);
     put(root, "var/lib/dpkg/status", "Package: dpkg\nStatus: install ok installed\nVersion: 1.22\nArchitecture: amd64\nDescription: d\n\n");
     CHECK(pkg_sources_handover_in(root, cat) == 0 && exists_in(root, boot), "handover: steam-launcher not installed: the bootstrap stays");
-    put(root, "var/lib/dpkg/status", "Package: steam-launcher\nStatus: install ok installed\nVersion: 1:1.0.0.87\nArchitecture: amd64\nDescription: s\n\n");
+    /* the machine's own architecture: the status is read for it (pkg_native_arch), so on an arm64 builder too */
+    char steam_status[256];
+    snprintf(steam_status, sizeof steam_status, "Package: steam-launcher\nStatus: install ok installed\nVersion: 1:1.0.0.87\nArchitecture: %s\nDescription: s\n\n",
+             pkg_native_arch());
+    put(root, "var/lib/dpkg/status", steam_status);
     CHECK(pkg_sources_handover_in(root, cat) == 0 && exists_in(root, boot), "handover: installed, no list of its own yet: stays");
     put(root, vlist, "deb [signed-by=/usr/share/keyrings/steam.gpg] https://example.com/steam/ stable steam\n");
     put(root, vkey, key);
