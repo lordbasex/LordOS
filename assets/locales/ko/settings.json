@@ -425,6 +425,7 @@
   "users.loginTitle": "시작할 때",
   "users.textMode": "텍스트 모드로 시작",
   "users.textModeHint": "다음 시작부터 로그인 화면이 나오지 않습니다. 텍스트 콘솔에서 로그인한 뒤 startlordos 를 입력하면 데스크톱이 열립니다. Ctrl+Alt+F1…F6 으로 언제든 콘솔을 바꿀 수 있습니다. 한 번만 그렇게 하려면 부팅 메뉴에서 LordOS (text mode) 를 고르세요.",
+  "users.textModeNoAdmin": "텍스트 모드가 켜져 있고 이 데스크톱은 로그인 화면 없이 시작되어 관리자 작업이 없습니다. 바꾸려면 콘솔에서 startlordos 를 입력하고 로그인하거나 sudo rm /etc/lordos/text-mode 를 실행하세요.",
   "wallpaperCategory.cosmos": "우주",
   "wallpaperCategory.gradients": "그라데이션",
   "wallpaperCategory.lumo": "Lumo",

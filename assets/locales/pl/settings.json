@@ -439,6 +439,7 @@
   "users.loginTitle": "Przy uruchamianiu",
   "users.textMode": "Uruchamiaj w trybie tekstowym",
   "users.textModeHint": "Od następnego uruchomienia nie będzie ekranu logowania: zaloguj się w konsoli tekstowej i wpisz startlordos, aby otworzyć pulpit. Ctrl+Alt+F1…F6 w każdej chwili przełączają konsolę. Na jedno uruchomienie wybierz LordOS (text mode) w menu rozruchu.",
+  "users.textModeNoAdmin": "Tryb tekstowy jest włączony, a ten pulpit uruchomiono bez ekranu logowania, więc nie ma działań administratora. Aby to zmienić: wpisz startlordos w konsoli i zaloguj się albo uruchom sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Kosmos",
   "wallpaperCategory.gradients": "Gradienty",
   "wallpaperCategory.lumo": "Lumo",

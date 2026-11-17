@@ -432,6 +432,7 @@
   "users.loginTitle": "Indításkor",
   "users.textMode": "Indítás szöveges módban",
   "users.textModeHint": "A következő indítástól nincs bejelentkezési képernyő: jelentkezz be a szöveges konzolon, és az asztal megnyitásához írd be: startlordos. A Ctrl+Alt+F1…F6 bármikor konzolt vált. Egyetlen indításhoz válaszd a rendszerbetöltő menüben a LordOS (text mode) elemet.",
+  "users.textModeNoAdmin": "A szöveges mód be van kapcsolva, és ez az asztal bejelentkezési képernyő nélkül indult, ezért nincsenek rendszergazdai műveletek. Módosításhoz: írd be a konzolon a startlordos parancsot és jelentkezz be, vagy futtasd: sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Világűr",
   "wallpaperCategory.gradients": "Színátmenetek",
   "wallpaperCategory.lumo": "Lumo",

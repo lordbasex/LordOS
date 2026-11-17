@@ -432,6 +432,7 @@
   "users.loginTitle": "هنگام راه‌اندازی",
   "users.textMode": "راه‌اندازی در حالت متنی",
   "users.textModeHint": "از راه‌اندازی بعدی صفحهٔ ورود نمایش داده نمی‌شود: در کنسول متنی وارد شوید و برای باز کردن میزکار startlordos را بنویسید. ‏Ctrl+Alt+F1…F6 هر زمان کنسول را عوض می‌کند. برای یک بار راه‌اندازی، در منوی بوت LordOS (text mode) را انتخاب کنید.",
+  "users.textModeNoAdmin": "حالت متنی فعال است و این میزکار بدون صفحهٔ ورود باز شده، پس اقدامات مدیر ندارد. برای تغییر: در کنسول startlordos را بنویسید و وارد شوید، یا sudo rm /etc/lordos/text-mode را اجرا کنید.",
   "wallpaperCategory.cosmos": "کیهان",
   "wallpaperCategory.gradients": "گرادیان‌ها",
   "wallpaperCategory.lumo": "Lumo",

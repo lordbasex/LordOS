@@ -432,6 +432,7 @@
   "users.loginTitle": "शुरू होते समय",
   "users.textMode": "टेक्स्ट मोड में शुरू करें",
   "users.textModeHint": "अगली बार से लॉगिन स्क्रीन नहीं आएगी: टेक्स्ट कंसोल में लॉग इन करें और डेस्कटॉप खोलने के लिए startlordos लिखें। Ctrl+Alt+F1…F6 कभी भी कंसोल बदलते हैं। सिर्फ़ एक बार के लिए बूट मेनू में LordOS (text mode) चुनें।",
+  "users.textModeNoAdmin": "टेक्स्ट मोड चालू है और यह डेस्कटॉप लॉगिन स्क्रीन के बिना खुला है, इसलिए एडमिनिस्ट्रेटर की कार्रवाइयाँ नहीं हैं। बदलने के लिए: कंसोल में startlordos लिखकर साइन इन करें, या sudo rm /etc/lordos/text-mode चलाएँ।",
   "wallpaperCategory.cosmos": "ब्रह्मांड",
   "wallpaperCategory.gradients": "ग्रेडिएंट",
   "wallpaperCategory.lumo": "Lumo",

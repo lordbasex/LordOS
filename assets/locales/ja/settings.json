@@ -425,6 +425,7 @@
   "users.loginTitle": "起動時",
   "users.textMode": "テキストモードで起動",
   "users.textModeHint": "次回の起動からログイン画面は表示されません。テキストコンソールでログインし、startlordos と入力するとデスクトップが開きます。Ctrl+Alt+F1…F6 でいつでもコンソールを切り替えられます。1 回だけなら、ブートメニューで LordOS (text mode) を選びます。",
+  "users.textModeNoAdmin": "テキストモードがオンで、このデスクトップはログイン画面を通さずに起動したため、管理者の操作がありません。変更するには、コンソールで startlordos と入力してサインインするか、sudo rm /etc/lordos/text-mode を実行します。",
   "wallpaperCategory.cosmos": "宇宙",
   "wallpaperCategory.gradients": "グラデーション",
   "wallpaperCategory.lumo": "Lumo",

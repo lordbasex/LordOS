@@ -432,6 +432,7 @@
   "users.loginTitle": "Beim Start",
   "users.textMode": "Im Textmodus starten",
   "users.textModeHint": "Ab dem nächsten Start gibt es keinen Anmeldebildschirm: Melde dich an der Textkonsole an und gib startlordos ein, um den Schreibtisch zu öffnen. Strg+Alt+F1…F6 wechseln jederzeit die Konsole. Für einen einzelnen Start wähle im Bootmenü LordOS (text mode).",
+  "users.textModeNoAdmin": "Der Textmodus ist an und dieser Schreibtisch wurde ohne Anmeldebildschirm gestartet, daher fehlen die Administratoraktionen. Zum Ändern: gib an der Konsole startlordos ein und melde dich an, oder führe sudo rm /etc/lordos/text-mode aus.",
   "wallpaperCategory.cosmos": "Kosmos",
   "wallpaperCategory.gradients": "Verläufe",
   "wallpaperCategory.lumo": "Lumo",

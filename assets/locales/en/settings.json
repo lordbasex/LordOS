@@ -432,6 +432,7 @@
   "users.loginTitle": "Starting up",
   "users.textMode": "Start in text mode",
   "users.textModeHint": "From the next start there is no login screen: log in on the text console and type startlordos to open the desktop. Ctrl+Alt+F1…F6 switch consoles at any time. For a single start, choose LordOS (text mode) in the boot menu.",
+  "users.textModeNoAdmin": "Text mode is on and this desktop was started without the login screen, so it has no administrator's actions. To change it: type startlordos on the console and sign in, or run sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Cosmos",
   "wallpaperCategory.gradients": "Gradients",
   "wallpaperCategory.lumo": "Lumo",

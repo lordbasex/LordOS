@@ -439,6 +439,7 @@
   "users.loginTitle": "La pornire",
   "users.textMode": "Pornește în modul text",
   "users.textModeHint": "De la următoarea pornire nu mai apare ecranul de autentificare: autentifică-te în consola text și scrie startlordos pentru a deschide desktopul. Ctrl+Alt+F1…F6 schimbă consola oricând. Pentru o singură pornire, alege LordOS (text mode) din meniul de pornire.",
+  "users.textModeNoAdmin": "Modul text este activ și acest desktop a pornit fără ecranul de autentificare, deci nu are acțiunile de administrator. Pentru a schimba: scrie startlordos în consolă și autentifică-te, sau rulează sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Cosmos",
   "wallpaperCategory.gradients": "Degradeuri",
   "wallpaperCategory.lumo": "Lumo",

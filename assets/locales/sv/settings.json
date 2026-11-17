@@ -432,6 +432,7 @@
   "users.loginTitle": "Vid start",
   "users.textMode": "Starta i textläge",
   "users.textModeHint": "Från nästa start finns ingen inloggningsskärm: logga in i textkonsolen och skriv startlordos för att öppna skrivbordet. Ctrl+Alt+F1…F6 byter konsol när som helst. För en enda start väljer du LordOS (text mode) i startmenyn.",
+  "users.textModeNoAdmin": "Textläget är på och det här skrivbordet startades utan inloggningsskärmen, så administratörsåtgärderna saknas. För att ändra: skriv startlordos i konsolen och logga in, eller kör sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Kosmos",
   "wallpaperCategory.gradients": "Toningar",
   "wallpaperCategory.lumo": "Lumo",

@@ -432,6 +432,7 @@
   "users.loginTitle": "Au démarrage",
   "users.textMode": "Démarrer en mode texte",
   "users.textModeHint": "À partir du prochain démarrage, il n’y a plus d’écran de connexion : connectez-vous dans la console texte et tapez startlordos pour ouvrir le bureau. Ctrl+Alt+F1…F6 changent de console à tout moment. Pour un seul démarrage, choisissez LordOS (text mode) dans le menu de démarrage.",
+  "users.textModeNoAdmin": "Le mode texte est activé et ce bureau a été ouvert sans l’écran de connexion : il n’a donc pas les actions d’administrateur. Pour le changer : tapez startlordos dans la console et connectez-vous, ou exécutez sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Cosmos",
   "wallpaperCategory.gradients": "Dégradés",
   "wallpaperCategory.lumo": "Lumo",

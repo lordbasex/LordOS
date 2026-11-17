@@ -425,6 +425,7 @@
   "users.loginTitle": "啟動時",
   "users.textMode": "以文字模式啟動",
   "users.textModeHint": "從下次啟動起不再顯示登入畫面：在文字主控台登入後輸入 startlordos 即可開啟桌面。隨時可用 Ctrl+Alt+F1…F6 切換主控台。如只想這一次，請在開機選單中選擇 LordOS (text mode)。",
+  "users.textModeNoAdmin": "文字模式已開啟，且此桌面未經登入畫面啟動，因此沒有管理員操作。要變更：在主控台輸入 startlordos 並登入，或執行 sudo rm /etc/lordos/text-mode。",
   "wallpaperCategory.cosmos": "宇宙",
   "wallpaperCategory.gradients": "漸層",
   "wallpaperCategory.lumo": "Lumo",

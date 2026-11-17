@@ -432,6 +432,7 @@
   "users.loginTitle": "Al iniciar",
   "users.textMode": "Iniciar en modo texto",
   "users.textModeHint": "Desde el próximo inicio no aparece la pantalla de inicio de sesión: entrá en la consola de texto y escribí startlordos para abrir el escritorio. Ctrl+Alt+F1…F6 cambian de consola en cualquier momento. Para un solo inicio, elegí LordOS (text mode) en el menú de arranque.",
+  "users.textModeNoAdmin": "El modo texto está activado y este escritorio se abrió sin la pantalla de inicio de sesión, así que no tiene acciones de administrador. Para cambiarlo: escribí startlordos en la consola e iniciá sesión, o ejecutá sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Cosmos",
   "wallpaperCategory.gradients": "Degradados",
   "wallpaperCategory.lumo": "Lumo",

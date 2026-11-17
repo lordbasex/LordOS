@@ -432,6 +432,7 @@
   "users.loginTitle": "Ao iniciar",
   "users.textMode": "Iniciar no modo texto",
   "users.textModeHint": "A partir do próximo início não há tela de login: entre no console de texto e digite startlordos para abrir a área de trabalho. Ctrl+Alt+F1…F6 trocam de console a qualquer momento. Para um único início, escolha LordOS (text mode) no menu de inicialização.",
+  "users.textModeNoAdmin": "O modo texto está ativado e esta área de trabalho foi aberta sem a tela de login, por isso não tem ações de administrador. Para mudar: digite startlordos no console e faça login, ou execute sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Cosmos",
   "wallpaperCategory.gradients": "Degradês",
   "wallpaperCategory.lumo": "Lumo",

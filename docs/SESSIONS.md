@@ -166,13 +166,23 @@ For those who boot to a text console and start the desktop by hand:
 - **What changes then:** lord-sessiond leaves the monitor alone (it says so in its log: "text mode"); the network,
   remote desktop and Sharing go on as usual. `lordos-text-login.service` puts a login prompt on tty1 (as
   `getty@tty1`, which LordOS masks).
-- **startlordos:** log in on a console and type `startlordos`. It runs lord-server as you on that console (the log
-  in `~/.cache/lordos/startlordos.log`); Log Out or Ctrl+Alt+Backspace brings the console back. Ctrl+Alt+F1…F12 work
-  there too (lord-server keeps its own console in `VT_PROCESS` mode and lets the card and the input go while another
-  console is in front). Without lord-sessiond there is no login screen behind it, so no Lock Screen or Switch User,
-  and no administrator's actions in Settings. It also works from tty2…6 while lord-sessiond has the login screen
-  on tty1. Those who want the name `startx`: `alias startx=startlordos` in `~/.bashrc` (a `startx` from the xinit
-  package would be X11's).
+- **startlordos:** log in on a console and type `startlordos`. With lord-sessiond running (text mode), it asks for
+  the **login screen**: `lord-sessiond --start-login` connects to `/run/lordos/start.sock` (made only in text mode,
+  removed once used), and lord-sessiond reads the caller from the socket itself (`SO_PEERCRED`), its controlling
+  terminal from `/proc/<pid>/stat`, the console in front (`VT_GETSTATE`) and that console's owner, and accepts only
+  someone logged in on the console in front, typing there (`startlogin.h`, tested by `tests/startlogin_test.c`): never
+  a terminal window, ssh, a cron job or another console. Then it stops `lordos-text-login.service` (its agetty,
+  restarting, would reset tty1 to text; a console session on tty1 ends with it), takes the monitor, brings tty1 to the
+  front and shows the login screen with that user chosen. You sign in with your password and get the whole session:
+  administrator's actions, the keyring unlocked, Lock Screen, the apps' cgroups and firewall. The next boot is text
+  mode again while the choice stays.
+- **Without lord-sessiond** (`lordos.service` stopped or disabled), or with `startlordos --standalone`, lord-server runs
+  as you on that console (log: `~/.cache/lordos/startlordos.log`); Log Out or Ctrl+Alt+Backspace brings the console
+  back, and Ctrl+Alt+F1…F12 work (lord-server keeps its own console in `VT_PROCESS` mode). With no lord-sessiond behind
+  it there is no Lock Screen, no Switch User, no administrator's actions and no per-app cgroups; Settings → Users says
+  how to leave text mode then (`sudo rm /etc/lordos/text-mode`).
+- Those who want the name `startx`: `alias startx=startlordos` in `~/.bashrc` (a `startx` from the xinit package
+  would be X11's).
 
 ### No usable display driver
 

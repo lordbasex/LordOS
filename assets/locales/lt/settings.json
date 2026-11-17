@@ -439,6 +439,7 @@
   "users.loginTitle": "Paleidžiant",
   "users.textMode": "Paleisti tekstiniu režimu",
   "users.textModeHint": "Nuo kito paleidimo prisijungimo ekrano nebus: prisijunkite tekstinėje konsolėje ir įveskite startlordos, kad atvertumėte darbalaukį. Ctrl+Alt+F1…F6 bet kada perjungia konsolę. Vienkartiniam paleidimui įkrovos meniu pasirinkite LordOS (text mode).",
+  "users.textModeNoAdmin": "Tekstinis režimas įjungtas, o šis darbalaukis paleistas be prisijungimo ekrano, todėl administratoriaus veiksmų nėra. Norėdami pakeisti: konsolėje įveskite startlordos ir prisijunkite arba vykdykite sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Kosmosas",
   "wallpaperCategory.gradients": "Gradientai",
   "wallpaperCategory.lumo": "Lumo",

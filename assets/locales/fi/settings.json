@@ -432,6 +432,7 @@
   "users.loginTitle": "Käynnistettäessä",
   "users.textMode": "Käynnistä tekstitilassa",
   "users.textModeHint": "Seuraavasta käynnistyksestä alkaen kirjautumisnäyttöä ei ole: kirjaudu tekstikonsolilla ja avaa työpöytä kirjoittamalla startlordos. Ctrl+Alt+F1…F6 vaihtaa konsolia milloin vain. Yksittäistä käynnistystä varten valitse käynnistysvalikosta LordOS (text mode).",
+  "users.textModeNoAdmin": "Tekstitila on päällä ja tämä työpöytä käynnistettiin ilman kirjautumisnäyttöä, joten ylläpitäjän toimintoja ei ole. Muuttaaksesi: kirjoita konsolilla startlordos ja kirjaudu, tai suorita sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Avaruus",
   "wallpaperCategory.gradients": "Liukuvärit",
   "wallpaperCategory.lumo": "Lumo",

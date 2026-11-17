@@ -460,6 +460,7 @@
   "users.loginTitle": "عند البدء",
   "users.textMode": "البدء في الوضع النصي",
   "users.textModeHint": "بدءًا من التشغيل القادم لا تظهر شاشة تسجيل الدخول: سجّل الدخول في الطرفية النصية واكتب startlordos لفتح سطح المكتب. ‏Ctrl+Alt+F1…F6 تبدّل الطرفيات في أي وقت. لتشغيل واحد فقط اختر LordOS (text mode) من قائمة الإقلاع.",
+  "users.textModeNoAdmin": "الوضع النصي مُفعّل وفُتح سطح المكتب هذا دون شاشة تسجيل الدخول، لذا لا توجد إجراءات المسؤول. لتغييره: اكتب startlordos في الطرفية وسجّل الدخول، أو نفّذ sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "الكون",
   "wallpaperCategory.gradients": "تدرجات",
   "wallpaperCategory.lumo": "Lumo",

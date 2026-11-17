@@ -168,6 +168,7 @@ int  sd_mon_vt_switch(int n);                       /* asks the kernel for conso
 void sd_mon_vt_release(void);                       /* after taking the monitor back: the switch goes on */
 void sd_mon_vt_acquire(void);                       /* ours again: graphics mode */
 int  sd_mon_away(void);                             /* another console is in front */
+void sd_mon_vt_front(void);                         /* our console to the front */
 
 /* Messages from the workers to the main process (SOCK_SEQPACKET socketpair; one line, sometimes with
  * an fd): "show g" + fd · "show u <user>" + fd · "greeter-in <json>" */

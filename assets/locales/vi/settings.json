@@ -425,6 +425,7 @@
   "users.loginTitle": "Khi khởi động",
   "users.textMode": "Khởi động ở chế độ văn bản",
   "users.textModeHint": "Từ lần khởi động sau sẽ không có màn hình đăng nhập: đăng nhập ở bảng điều khiển văn bản và gõ startlordos để mở màn hình nền. Ctrl+Alt+F1…F6 chuyển bảng điều khiển bất cứ lúc nào. Chỉ một lần thì chọn LordOS (text mode) trong menu khởi động.",
+  "users.textModeNoAdmin": "Chế độ văn bản đang bật và màn hình nền này được mở mà không qua màn hình đăng nhập, nên không có thao tác quản trị. Để đổi: gõ startlordos ở bảng điều khiển và đăng nhập, hoặc chạy sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Vũ trụ",
   "wallpaperCategory.gradients": "Chuyển màu",
   "wallpaperCategory.lumo": "Lumo",

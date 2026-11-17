@@ -432,6 +432,7 @@
   "users.loginTitle": "Başlanğıcda",
   "users.textMode": "Mətn rejimində başla",
   "users.textModeHint": "Növbəti başlanğıcdan giriş ekranı olmayacaq: mətn konsoluna daxil olun və iş masasını açmaq üçün startlordos yazın. Ctrl+Alt+F1…F6 istənilən vaxt konsolu dəyişir. Yalnız bir dəfəlik başlanğıc üçün yükləmə menyusunda LordOS (text mode) seçin.",
+  "users.textModeNoAdmin": "Mətn rejimi aktivdir və bu iş masası giriş ekranı olmadan açılıb, ona görə idarəçi əməliyyatları yoxdur. Dəyişmək üçün: konsolda startlordos yazıb daxil olun və ya sudo rm /etc/lordos/text-mode icra edin.",
   "wallpaperCategory.cosmos": "Kosmos",
   "wallpaperCategory.gradients": "Qradiyentlər",
   "wallpaperCategory.lumo": "Lumo",

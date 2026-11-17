@@ -432,6 +432,7 @@
   "users.loginTitle": "Başlangıçta",
   "users.textMode": "Metin modunda başlat",
   "users.textModeHint": "Bir sonraki başlangıçtan itibaren giriş ekranı olmaz: metin konsolunda oturum açın ve masaüstünü açmak için startlordos yazın. Ctrl+Alt+F1…F6 her an konsol değiştirir. Yalnızca bir kez için önyükleme menüsünde LordOS (text mode) seçin.",
+  "users.textModeNoAdmin": "Metin modu açık ve bu masaüstü giriş ekranı olmadan başlatıldı, bu yüzden yönetici işlemleri yok. Değiştirmek için: konsolda startlordos yazıp oturum açın veya sudo rm /etc/lordos/text-mode çalıştırın.",
   "wallpaperCategory.cosmos": "Kozmos",
   "wallpaperCategory.gradients": "Renk geçişleri",
   "wallpaperCategory.lumo": "Lumo",

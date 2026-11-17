@@ -64,6 +64,7 @@ export function UsersSettings() {
   return (
     <Stack>
       {!isAdmin && <Note tone="warn">{tr('settings.users.onlyOwn')}</Note>}
+      {!isAdmin && data.textMode && info.admin && <Note>{tr('settings.users.textModeNoAdmin')}</Note>}
       <Section>
         {users.map((u) => {
           const on = cur && cur.name === u.name && !adding;

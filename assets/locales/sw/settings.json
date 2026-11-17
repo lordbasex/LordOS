@@ -432,6 +432,7 @@
   "users.loginTitle": "Wakati wa kuanza",
   "users.textMode": "Anza katika hali ya maandishi",
   "users.textModeHint": "Kuanzia mwanzo ujao hakutakuwa na skrini ya kuingia: ingia kwenye konsoli ya maandishi na uandike startlordos kufungua eneo-kazi. Ctrl+Alt+F1…F6 hubadilisha konsoli wakati wowote. Kwa mara moja tu, chagua LordOS (text mode) kwenye menyu ya kuwasha.",
+  "users.textModeNoAdmin": "Hali ya maandishi imewashwa na eneo-kazi hili lilifunguliwa bila skrini ya kuingia, kwa hivyo halina vitendo vya msimamizi. Kubadilisha: andika startlordos kwenye konsoli na uingie, au endesha sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Anga",
   "wallpaperCategory.gradients": "Upinde rangi",
   "wallpaperCategory.lumo": "Lumo",

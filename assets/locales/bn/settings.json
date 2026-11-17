@@ -432,6 +432,7 @@
   "users.loginTitle": "চালু হওয়ার সময়",
   "users.textMode": "টেক্সট মোডে চালু করুন",
   "users.textModeHint": "পরের বার থেকে লগইন স্ক্রিন থাকবে না: টেক্সট কনসোলে লগইন করে ডেস্কটপ খুলতে startlordos লিখুন। Ctrl+Alt+F1…F6 যেকোনো সময় কনসোল বদলায়। একবারের জন্য বুট মেনুতে LordOS (text mode) বেছে নিন।",
+  "users.textModeNoAdmin": "টেক্সট মোড চালু এবং এই ডেস্কটপ লগইন স্ক্রিন ছাড়া খোলা হয়েছে, তাই অ্যাডমিনিস্ট্রেটরের কাজ নেই। বদলাতে: কনসোলে startlordos লিখে লগইন করুন, অথবা sudo rm /etc/lordos/text-mode চালান।",
   "wallpaperCategory.cosmos": "মহাকাশ",
   "wallpaperCategory.gradients": "গ্রেডিয়েন্ট",
   "wallpaperCategory.lumo": "Lumo",

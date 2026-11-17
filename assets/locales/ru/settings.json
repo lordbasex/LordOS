@@ -439,6 +439,7 @@
   "users.loginTitle": "При запуске",
   "users.textMode": "Запускать в текстовом режиме",
   "users.textModeHint": "Со следующего запуска экрана входа не будет: войдите в текстовой консоли и введите startlordos, чтобы открыть рабочий стол. Ctrl+Alt+F1…F6 в любой момент переключают консоль. Для однократного запуска выберите в меню загрузки LordOS (text mode).",
+  "users.textModeNoAdmin": "Текстовый режим включён, а этот рабочий стол запущен без экрана входа, поэтому действий администратора нет. Чтобы изменить: введите startlordos в консоли и войдите или выполните sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Космос",
   "wallpaperCategory.gradients": "Градиенты",
   "wallpaperCategory.lumo": "Lumo",

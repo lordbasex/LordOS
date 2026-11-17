@@ -432,6 +432,7 @@
   "users.loginTitle": "All’avvio",
   "users.textMode": "Avvia in modalità testo",
   "users.textModeHint": "Dal prossimo avvio non c’è la schermata di accesso: accedi alla console di testo e digita startlordos per aprire la scrivania. Ctrl+Alt+F1…F6 cambiano console in qualsiasi momento. Per un solo avvio, scegli LordOS (text mode) nel menu di avvio.",
+  "users.textModeNoAdmin": "La modalità testo è attiva e questa scrivania è stata aperta senza la schermata di accesso, quindi non ha le azioni da amministratore. Per cambiarla: digita startlordos nella console e accedi, oppure esegui sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Cosmo",
   "wallpaperCategory.gradients": "Sfumature",
   "wallpaperCategory.lumo": "Lumo",

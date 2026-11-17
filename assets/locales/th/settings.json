@@ -425,6 +425,7 @@
   "users.loginTitle": "ตอนเริ่มเครื่อง",
   "users.textMode": "เริ่มในโหมดข้อความ",
   "users.textModeHint": "ตั้งแต่การเริ่มครั้งถัดไปจะไม่มีหน้าจอเข้าสู่ระบบ ให้เข้าสู่ระบบที่คอนโซลข้อความแล้วพิมพ์ startlordos เพื่อเปิดเดสก์ท็อป Ctrl+Alt+F1…F6 สลับคอนโซลได้ทุกเมื่อ หากต้องการเพียงครั้งเดียว ให้เลือก LordOS (text mode) ในเมนูบูต",
+  "users.textModeNoAdmin": "โหมดข้อความเปิดอยู่และเดสก์ท็อปนี้เปิดโดยไม่ผ่านหน้าจอเข้าสู่ระบบ จึงไม่มีการกระทำของผู้ดูแลระบบ หากต้องการเปลี่ยน ให้พิมพ์ startlordos ที่คอนโซลแล้วลงชื่อเข้าใช้ หรือรัน sudo rm /etc/lordos/text-mode",
   "wallpaperCategory.cosmos": "จักรวาล",
   "wallpaperCategory.gradients": "ไล่สี",
   "wallpaperCategory.lumo": "Lumo",

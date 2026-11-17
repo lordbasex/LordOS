@@ -150,6 +150,10 @@ void sd_mon_vt_acquire(void) {
     away = 0;
 }
 int sd_mon_away(void) { return away; }
+/* Our console to the front (text mode's login screen asked from another console): the kernel switches, we acquire. */
+void sd_mon_vt_front(void) {
+    if (tty >= 0 && away && ioctl(tty, VT_ACTIVATE, OUR_VT)) sd_log("text consoles: tty%d to the front: %s", OUR_VT, strerror(errno));
+}
 
 static int send_msg(int type, const void *d, size_t n, const int *fds, int nfds) {
     if (conn < 0) return -1;

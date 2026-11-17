@@ -432,6 +432,7 @@
   "users.loginTitle": "شروع ہوتے وقت",
   "users.textMode": "ٹیکسٹ موڈ میں شروع کریں",
   "users.textModeHint": "اگلی بار سے لاگ اِن اسکرین نہیں آئے گی: ٹیکسٹ کنسول میں لاگ اِن کریں اور ڈیسک ٹاپ کھولنے کے لیے startlordos لکھیں۔ Ctrl+Alt+F1…F6 کسی بھی وقت کنسول بدلتے ہیں۔ صرف ایک بار کے لیے بوٹ مینو میں LordOS (text mode) چنیں۔",
+  "users.textModeNoAdmin": "ٹیکسٹ موڈ آن ہے اور یہ ڈیسک ٹاپ لاگ اِن اسکرین کے بغیر کھولا گیا، اس لیے منتظم کے اعمال نہیں ہیں۔ بدلنے کے لیے: کنسول میں startlordos لکھ کر سائن اِن کریں، یا sudo rm /etc/lordos/text-mode چلائیں۔",
   "wallpaperCategory.cosmos": "کائنات",
   "wallpaperCategory.gradients": "گریڈینٹس",
   "wallpaperCategory.lumo": "Lumo",

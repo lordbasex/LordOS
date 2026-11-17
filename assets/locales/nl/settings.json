@@ -432,6 +432,7 @@
   "users.loginTitle": "Bij het opstarten",
   "users.textMode": "Opstarten in tekstmodus",
   "users.textModeHint": "Vanaf de volgende start is er geen inlogscherm: log in op de tekstconsole en typ startlordos om het bureaublad te openen. Ctrl+Alt+F1…F6 wisselen op elk moment van console. Voor één keer kies je LordOS (text mode) in het opstartmenu.",
+  "users.textModeNoAdmin": "De tekstmodus staat aan en dit bureaublad is zonder inlogscherm gestart, dus er zijn geen beheerdersacties. Om dat te wijzigen: typ startlordos op de console en log in, of voer sudo rm /etc/lordos/text-mode uit.",
   "wallpaperCategory.cosmos": "Kosmos",
   "wallpaperCategory.gradients": "Kleurverlopen",
   "wallpaperCategory.lumo": "Lumo",

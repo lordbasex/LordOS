@@ -425,6 +425,7 @@
   "users.loginTitle": "Semasa bermula",
   "users.textMode": "Mula dalam mod teks",
   "users.textModeHint": "Mulai permulaan seterusnya tiada skrin log masuk: log masuk di konsol teks dan taip startlordos untuk membuka desktop. Ctrl+Alt+F1…F6 menukar konsol pada bila-bila masa. Untuk sekali sahaja, pilih LordOS (text mode) dalam menu but.",
+  "users.textModeNoAdmin": "Mod teks dihidupkan dan desktop ini dibuka tanpa skrin log masuk, jadi tiada tindakan pentadbir. Untuk menukar: taip startlordos di konsol dan log masuk, atau jalankan sudo rm /etc/lordos/text-mode.",
   "wallpaperCategory.cosmos": "Kosmos",
   "wallpaperCategory.gradients": "Gradien",
   "wallpaperCategory.lumo": "Lumo",

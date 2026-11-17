@@ -35,6 +35,7 @@
 #include "../bench/boottest.h"
 #include "../lordlog.h"
 #include "../users/admingroups.h"
+#include "startlogin.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -59,6 +60,8 @@
 #include <linux/kd.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
+#include <sys/un.h>
+#include <linux/vt.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -1071,6 +1074,98 @@ static void from_shown(int type, const char *j) {
     }
 }
 
+/* ---- text mode: startlordos asks for the login screen (docs/SESSIONS.md, "Text mode") ---- */
+#define START_SOCK SD_RUN_DIR "/start.sock"
+static int text_now;                    /* in text mode, the monitor not taken yet */
+static int start_fd = -1;               /* START_SOCK, listening while text_now */
+
+static void start_listen(void) {
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+    if (fd < 0) return;
+    struct sockaddr_un a = { .sun_family = AF_UNIX };
+    snprintf(a.sun_path, sizeof a.sun_path, "%s", START_SOCK);
+    unlink(START_SOCK);
+    mkdir(SD_RUN_DIR, 0755);
+    if (bind(fd, (struct sockaddr *)&a, sizeof a) || chmod(START_SOCK, 0666) || listen(fd, 4)) {
+        sd_log("text mode: %s: %s; startlordos will run the desktop on its own", START_SOCK, strerror(errno));
+        close(fd);
+        unlink(START_SOCK);
+        return;
+    }
+    start_fd = fd;
+}
+static void start_stop(void) {
+    if (start_fd >= 0) { close(start_fd); unlink(START_SOCK); }
+    start_fd = -1;
+}
+
+/* tty1's text login (lordos-text-login.service) stops before the console goes to graphics: its agetty, restarting,
+ * would reset tty1 to text under the login screen. Waited for (a second or two at most), once. */
+static void text_login_stop(void) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        const char *const a[] = { "/usr/bin/systemctl", "stop", "lordos-text-login.service", NULL };
+        char *const env[] = { "PATH=/usr/sbin:/usr/bin:/sbin:/bin", NULL };
+        execve(a[0], (char *const *)a, env);
+        _exit(127);
+    }
+    if (pid > 0) while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
+}
+
+static void boot_monitor(void);
+/* One request: the caller from the socket (SO_PEERCRED), its terminal from /proc, the console in front and that
+ * console's owner from the system; never anything the caller says (startlogin.h). Yes: the login screen comes up on
+ * tty1 (brought to the front), with that user chosen; nothing is unlocked or started for them. */
+static void start_request(void) {
+    int c = accept4(start_fd, NULL, NULL, SOCK_CLOEXEC);
+    if (c < 0) return;
+    struct ucred cr;
+    socklen_t cl = sizeof cr;
+    const char *answer = "refused\n";
+    if (!getsockopt(c, SOL_SOCKET, SO_PEERCRED, &cr, &cl)) {
+        char path[48], st[1024] = "";
+        snprintf(path, sizeof path, "/proc/%d/stat", (int)cr.pid);
+        int f = open(path, O_RDONLY | O_CLOEXEC);
+        ssize_t n = f >= 0 ? read(f, st, sizeof st - 1) : -1;
+        if (f >= 0) close(f);
+        unsigned long tty_nr = 0;
+        const char *rp = n > 0 ? (st[n] = 0, strrchr(st, ')')) : NULL;   /* the name may hold spaces: after its ')' */
+        if (rp) { char state; int ppid, pgrp, sess; if (sscanf(rp + 1, " %c %d %d %d %lu", &state, &ppid, &pgrp, &sess, &tty_nr) != 5) tty_nr = 0; }
+        int active = 0;
+        int t0 = open("/dev/tty0", O_RDONLY | O_CLOEXEC | O_NOCTTY);
+        struct vt_stat vs;
+        if (t0 >= 0 && !ioctl(t0, VT_GETSTATE, &vs)) active = vs.v_active;
+        if (t0 >= 0) close(t0);
+        struct stat ts;
+        snprintf(path, sizeof path, "/dev/tty%d", active);
+        uid_t owner = active > 0 && !stat(path, &ts) ? ts.st_uid : (uid_t)-1;
+        int vt = startlogin_check(cr.uid, tty_nr, active, owner);
+        struct passwd *pw = vt > 0 ? getpwuid(cr.uid) : NULL;
+        if (vt > 0 && pw && sd_user_allowed(pw, 0) && text_now) {
+            sd_log("text mode: %s asked for the login screen from tty%d", pw->pw_name, vt);
+            text_now = 0;
+            /* answered first: tty1's text login goes now, with whatever ran there (startlordos itself, typed on tty1) */
+            if (write(c, "ok\n", 3) < 0) { /* the caller left */ }
+            close(c);
+            c = -1;
+            text_login_stop();
+            has_monitor = sd_mon_open() == 0;
+            if (has_monitor) {
+                char u[40];
+                snprintf(u, sizeof u, "%.32s", pw->pw_name);
+                set_mode("login", u);
+                show_greeter("login", u);
+                sd_mon_vt_front();
+            } else sd_log("text mode: no usable display for the login screen");
+        } else sd_log("text mode: a login screen request refused (uid %u, reason %d)", (unsigned)cr.uid, vt);
+    }
+    if (c >= 0) {
+        if (write(c, answer, strlen(answer)) < 0) { /* the caller left */ }
+        close(c);
+    }
+    if (!text_now) start_stop();
+}
+
 /* The kernel wants to show another console (Ctrl+Alt+Fn, a chvt): a session on the monitor is locked as with Lock
  * Screen (the login screen comes up locked on our console when it is back), the login screen just leaves; the monitor
  * is taken back, then the switch goes on. */
@@ -1476,7 +1571,22 @@ int main(int argc, char **argv) {
     int no_monitor = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--no-monitor")) no_monitor = 1;   /* remote desktop only (testing) */
-        else { fprintf(stderr, "usage: lord-sessiond [--no-monitor]\n"); return 2; }
+        else if (!strcmp(argv[i], "--start-login")) { /* handled below, before the root check */ }
+        else { fprintf(stderr, "usage: lord-sessiond [--no-monitor] | --start-login\n"); return 2; }
+    }
+    /* startlordos (a user, on a text console): ask the running lord-sessiond for the login screen. Prints its answer:
+     * ok, refused, no-display; exit 0 only for ok. */
+    if (argc == 2 && !strcmp(argv[1], "--start-login")) {
+        int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+        struct sockaddr_un a = { .sun_family = AF_UNIX };
+        snprintf(a.sun_path, sizeof a.sun_path, "%s", START_SOCK);
+        if (fd < 0 || connect(fd, (struct sockaddr *)&a, sizeof a)) { puts("unavailable"); return 3; }
+        char buf[32] = "";
+        ssize_t n = read(fd, buf, sizeof buf - 1);
+        close(fd);
+        if (n > 0) buf[n] = 0;
+        fputs(n > 0 ? buf : "refused\n", stdout);
+        return !strncmp(buf, "ok", 2) ? 0 : 2;
     }
     if (geteuid() != 0) { fprintf(stderr, "lord-sessiond: must run as root (lordos.service)\n"); return 1; }
     signal(SIGPIPE, SIG_IGN);
@@ -1577,6 +1687,7 @@ int main(int argc, char **argv) {
     sd_netd_start();
     int text = no_monitor ? 0 : text_mode();
     if (text) sd_log("text mode (%s): no login screen; log in on tty1 and type startlordos", text == 1 ? "lordos.text=1" : "/etc/lordos/text-mode");
+    if (text) { text_now = 1; start_listen(); }
     has_monitor = !no_monitor && !text && sd_mon_open() == 0;
     if (has_monitor) boot_monitor();
     else {
@@ -1600,9 +1711,9 @@ int main(int argc, char **argv) {
             if (rd_conf.enabled && (!listening || !was)) start_remote();
             bump();
         }
-        struct pollfd p[5] = { { wk_r, POLLIN, 0 }, { lfd, POLLIN, 0 }, { sd_mon_fd(), POLLIN, 0 }, { sd_mon_hotplug_fd(), POLLIN, 0 },
-                               { sd_netd_fd(), POLLIN, 0 } };
-        int r = poll(p, 5, 1000);
+        struct pollfd p[6] = { { wk_r, POLLIN, 0 }, { lfd, POLLIN, 0 }, { sd_mon_fd(), POLLIN, 0 }, { sd_mon_hotplug_fd(), POLLIN, 0 },
+                               { sd_netd_fd(), POLLIN, 0 }, { start_fd, POLLIN, 0 } };
+        int r = poll(p, 6, 1000);
         pid_t pid;
         int st;
         while ((pid = waitpid(-1, &st, WNOHANG)) > 0) {
@@ -1623,6 +1734,7 @@ int main(int argc, char **argv) {
                 rd_unlock();
             }
         }
+        if (r > 0 && p[5].fd >= 0 && (p[5].revents & POLLIN)) start_request();
         if (vt_leave) { vt_leave = 0; vt_away(); }
         if (vt_back) { vt_back = 0; vt_return(); }
         if (r > 0 && p[4].fd >= 0 && p[4].revents) sd_netd_event();
@@ -1649,6 +1761,7 @@ int main(int argc, char **argv) {
      * you log in again through the login screen) */
     stop_remote();
     save_lockout();
+    start_stop();
     if (has_monitor) sd_mon_close();
     if (worker_pid > 0) kill(worker_pid, SIGTERM);
     stop_greeters("lord-sessiond is stopping");

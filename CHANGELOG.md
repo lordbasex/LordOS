@@ -21,8 +21,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   boot menu gets **LordOS (text mode)** (`/etc/grub.d/11_lordos_text`, the system's first entry plus `lordos.text=1`);
   Settings → Users → **Start in text mode** keeps it for every start (the closed admin action `boot-text on|off`,
   administrators only, writes `/etc/lordos/text-mode`). Then lord-sessiond leaves the monitor alone,
-  `lordos-text-login.service` puts a login prompt on tty1, and `startlordos` there runs the desktop as that user on that
-  console, with Ctrl+Alt+F1…F12 too (lord-server lets the card and the input go while another console is in front).
+  `lordos-text-login.service` puts a login prompt on tty1, and `startlordos` there brings up the login screen (asked
+  over `/run/lordos/start.sock`, accepted only from someone logged in on the console in front, typing there; you sign
+  in with your password and get the whole session). Without lord-sessiond, `startlordos` runs lord-server as you on
+  that console, with Ctrl+Alt+F1…F12 too (lord-server lets the card and the input go while another console is in front).
   `lord.users.list()` tells Settings whether text mode is on (`textMode`).
 
 - **Lord Workspaces: the rest of its proposal.** Checked item by item against the theme's design document:
