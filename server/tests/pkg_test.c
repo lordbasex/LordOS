@@ -1272,6 +1272,9 @@ static void test_handover(const char *dir) {
 }
 
 int main(int argc, char **argv) {
+    /* the files the tests make are checked like the system's (owner-only writes): a login shell's umask 002 would
+     * make them group-writable and the checks refuse them (seen from a console session, startlordos) */
+    umask(022);
     if (argc >= 4 && !strcmp(argv[1], "pgp")) {
         PgpKeyring kr = { 0 };
         if (pgp_keyring_add_file(&kr, argv[2])) { printf("llavero ilegible\n"); return 1; }
