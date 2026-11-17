@@ -368,6 +368,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Notes: the Read view breaks lines where the Edit view does (GitHub #169).** Reading a note drew it as plain
+  markdown, which joins the lines of a paragraph: two lines typed one under the other ran together as one, so the same
+  note looked different in Read and Edit. The reading view now keeps a single line break as a line break (each typed
+  line still wraps at the width); a blank line still separates paragraphs, and headings, lists, quotes, code and tables
+  are as before. It is the `breaks` option of the SDK's `<Markdown>` (`sdk/markdown.jsx`, `parseMarkdown(src, { breaks })`),
+  which only Notes turns on: Help and Mail keep plain markdown. Checked in `notes_breaks_scene.mjs`. The editor keeps its
+  monospaced font, as it shows the markdown marks themselves.
 - **Korean input (Hangul): Shift no longer ends the syllable (GitHub #163).** Shift pressed alone reached the input
   method as a key with no text, and every such key confirmed the syllable being composed, so the 2-set keyboard's Shift
   jamo never joined it: 이 + Shift+T gave 이ㅆ instead of 있, 바 + Shift+R gave 바ㄲ instead of 밖, and ㄱ + Shift+O gave

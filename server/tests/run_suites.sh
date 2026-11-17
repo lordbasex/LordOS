@@ -471,6 +471,8 @@ EOF
     # (0.8.8.8, #117) Notes: Edit and Format menus and the editor's right-click menu send the editor's own keys
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "notes-editor-scene (apps/notes/NoteEditor.jsx, editmenu.js)" node tests/textfield_menu_test.mjs notes_editor_scene.mjs
+        # (#169) Notes' reading view keeps a paragraph's line breaks, as the editor shows them (sdk/markdown.jsx breaks)
+        run "notes-breaks-scene (sdk/markdown.jsx breaks, apps/notes)" node tests/textfield_menu_test.mjs notes_breaks_scene.mjs
     else skip "notes-editor-scene" "node and the repository's node_modules (npm install)"; fi
     # a password TextInput: the eye shows it and keeps the focus, copies nothing, hides on blur; ⇪ follows Caps Lock
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then

@@ -164,7 +164,8 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
       <ScrollView scrollRef={scroll} style={{ flex: 1 }}>
         <View onDoubleClick={() => onMode('edit')} style={{ paddingVertical: compact ? 10 : 20, paddingHorizontal: compact ? 10 : 28, minHeight: 60 }}>
           {note.body.trim() ? (
-            <Markdown source={note.body} base={absFolder(note.slug)} width={Math.max(80, w - (showToc && toc.length > 1 ? 180 : 0) - (compact ? 20 : 56))} size={size}
+            // breaks: a line break typed in the editor is a line break here too (GitHub #169)
+            <Markdown source={note.body} breaks base={absFolder(note.slug)} width={Math.max(80, w - (showToc && toc.length > 1 ? 180 : 0) - (compact ? 20 : 56))} size={size}
               emoji={emojiFor} onLink={(u) => openLink(note.slug, u)} onHeadingRef={(id, n) => { if (n) heads.current.set(id, n); }}
               onToggleTask={(line) => updateNote(note.slug, { body: toggleTask(note.body, line) })} />
           ) : <Text style={{ fontSize: 13, color: th.textDim }}>{t('notes.empty')}</Text>}

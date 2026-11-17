@@ -8,7 +8,8 @@
 // tests/screencast_scene.mjs (the ScreenCast chooser), tests/webapps_get_scene.mjs (Get of a web app, the engine first),
 // tests/webapps_sheet_scene.mjs (the Store's "Add from an address"
 // sheet), tests/store_trademark_scene.mjs (the trademark notice of the Store's web apps),tests/theme_portal_scene.mjs (only the theme's ThemeProvider sets the portal's colors),
-// tests/notes_editor_scene.mjs (Notes' Edit menu and right-click menu, GitHub #117). A scene with a tests/<scene>_sdk.js next to it gets that file as '@lordos/sdk': the few SDK modules it needs,
+// tests/notes_editor_scene.mjs (Notes' Edit menu and right-click menu, GitHub #117), tests/notes_breaks_scene.mjs (Notes'
+// reading view keeps the typed line breaks, GitHub #169). A scene with a tests/<scene>_sdk.js next to it gets that file as '@lordos/sdk': the few SDK modules it needs,
 // not the whole desktop.
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
