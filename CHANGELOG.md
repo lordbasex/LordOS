@@ -381,7 +381,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   React effect, a few turns of the main loop after the theme loaded, so a notice that came first was dropped: the
   screen stayed on and the computer never went to sleep from the lock screen. The deadlines are now applied as the
   notice arrives, and the screen gets the notice when it mounts (`themes/greeter/inbox.js`, tested in
-  `server/tests/greeter_inbox_test.mjs`). A MacBook that wakes up a second after it goes to sleep with the lid open is
+  `server/tests/greeter_inbox_test.mjs`). A laptop that wakes up a second after it goes to sleep with the lid open has
   a firmware wake source (`LID0` in `/proc/acpi/wakeup`), not this; LordOS doesn't change wake sources yet.
 - **`systemctl restart lordos` with sessions alive failed on systemd 258 and later (GitHub #140)** with "Failed to
   spawn executor: Device or resource busy", and after five tries there was no login screen until a reboot (a
