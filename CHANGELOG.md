@@ -374,8 +374,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **A fullscreen window took the mouse and the keyboard of every monitor (all themes).** With a YouTube video full
   screen on one display, the pointer did nothing on the others and every key went to the video until it left
   fullscreen. Now a fullscreen window owns its own display only (`server/src/wl/wl.c` `on_fs`): the pointer on another
-  display reaches the desktop and its windows there, and the keys go to the fullscreen window while the pointer is on
-  its display (or before the pointer has moved), else to the window focused elsewhere. One display: as before.
+  display reaches the desktop and its windows there. One display: as before.
+- **With a window fullscreen on one display, the keys went back to it whenever the pointer crossed its display
+  (GitHub #175).** A text field clicked on another monitor lost the keys as soon as the pointer passed over the video,
+  and the theme could not focus a window there while the pointer was on the video's display. The keys now follow the
+  window chosen, not the pointer (`server/src/wl/fsfocus.h`): a window chosen on another display keeps them, clicking
+  the fullscreen window gives them back to it (the theme never sees that click, so the compositor does it), a window
+  that goes fullscreen takes them unless they are with a window on another display, and a window under the fullscreen
+  one (on its display, so not seen) never takes them. With no window focused, the fullscreen window gets them while
+  the pointer is on its display. One display: the fullscreen window always has the keys, as before. Checked in
+  `build/fsfocus-test` (in `make -C server test`).
 - **A Linux app's maximize or unmaximize request that LordOS refused got no answer** (xdg-shell asks for a configure
   after each), and Google Chrome stopped responding while it waited. Refused requests are answered with the state as it
   is. Lord Workspaces' padlock also tells the app it can't maximize or minimize (xdg-shell 5 `wm_capabilities`,

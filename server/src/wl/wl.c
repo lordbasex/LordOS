@@ -67,6 +67,7 @@
 #include "xdgact.h"
 #include "dndgate.h"
 #include "seatbtn.h"
+#include "fsfocus.h"
 #include "toolkitenv.h"
 #include "urilist.h"
 #include "tiutf8.h"
@@ -233,16 +234,35 @@ static void fs_rect(float *x, float *y, float *w, float *h) {
 /* Where the pointer was last (wl_pointer), for the keyboard's fullscreen rule. */
 static float ptr_last_x = -1, ptr_last_y = -1;
 /* A fullscreen window owns its own display only: the pointer on another display goes to what is there (the desktop
- * and its windows), and the keys follow the pointer's display (several monitors: a video full screen on one, work on
- * the others). With one display that is the whole screen, as before. */
+ * and its windows), and the keys go to the window chosen there (several monitors: a video full screen on one, work
+ * on the others; fsfocus.h). With one display that is the whole screen, as before. */
 static int on_fs(float x, float y) {
     if (!fs_surf || !fs_surf->content) return 0;
     float fx, fy, fw, fh;
     fs_rect(&fx, &fy, &fw, &fh);
     return x >= fx && x < fx + fw && y >= fy && y < fy + fh;
 }
-/* the keyboard's side: before the pointer ever moved, a fullscreen window has the keys wherever it is */
+/* before the pointer ever moved, it counts as on the fullscreen window's display */
 static int ptr_on_fs(void) { return ptr_last_x < 0 ? fs_surf && fs_surf->content : on_fs(ptr_last_x, ptr_last_y); }
+static Surf *toplevel_of(Surf *s);
+/* A window hidden under the fullscreen one: its centre on that display, or any window when it covers the whole space
+ * (one display). A window with no place on screen counts as hidden. */
+static int fs_hides(Surf *s) {
+    Surf *top = toplevel_of(s);
+    if (!fs_surf || !fs_surf->content || !top || top == fs_surf) return 0;
+    float fx, fy, fw, fh;
+    fs_rect(&fx, &fy, &fw, &fh);
+    int whole = fx <= 0 && fy <= 0 && fw >= (float)ui.width && fh >= (float)ui.height;
+    Node *n = top->node ? node_get(top->node) : NULL;
+    if (!n) return 1;
+    return fsf_hidden((FsfRect){ n->ax, n->ay, n->w, n->h }, (FsfRect){ fx, fy, fw, fh }, whole);
+}
+/* The fullscreen window takes the keys instead of s (a window, or NULL for none): fsfocus.h. The keys follow the
+ * window chosen, not the pointer: one chosen on another display keeps them when the pointer comes back (issue #175). */
+static int fs_takes_keys(Surf *s) {
+    if (!fs_surf || !fs_surf->content) return 0;
+    return fsf_take(s == fs_surf, !s, s && fs_hides(s), ptr_on_fs());
+}
 
 /* cursor of the app with the pointer: 0 LordOS arrow, 1 app image, 2 hidden */
 static Surf *cursor_surf;
@@ -2449,6 +2469,8 @@ static void enter_fullscreen(Surf *s) {
     s->conf_h = (int)fh;
     send_toplevel_configure(s);
     if (s->mapped) emit(s, "fullscreen", "{}");
+    /* the keys: its own, unless they are with a window on another display (fsfocus.h) */
+    if (s->mapped && key_focus != s && (!key_focus || fs_hides(key_focus))) wl_set_focus(s->id);
     damage_add((Box){ 0, 0, ui.width, ui.height });
     ui.dirty = 1;
 }
@@ -3993,6 +4015,8 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
     if (held) wheel = 0;
     for (int i = 0; i < nbuttons; i++)          /* a new press: the one a start_drag may name */
         if (down[i] && !held) { npress = 0; press_surf = target; }
+    for (int i = 0; i < nbuttons; i++)          /* a click on the fullscreen window gives it the keys back (fsfocus.h) */
+        if (down[i] && !held && fs_surf && key_focus != fs_surf && toplevel_of(target) == fs_surf) { wl_set_focus(fs_surf->id); break; }
     unsigned t = now_ms();
     struct wl_resource *p;
     if (xw_scaled(target->client)) { lx = (float)xws_to_xf(lx, xw_pct); ly = (float)xws_to_xf(ly, xw_pct); }
@@ -4399,7 +4423,7 @@ int wl_key(int code, int value, const KeyInfo *k) {
         else if (!value && key_focus) send_key_to_focus(code, 0);   /* pressed before the switcher opened */
         return 0;
     }
-    if (ptr_on_fs() && key_focus != fs_surf) wl_set_focus(fs_surf->id);
+    if (fs_takes_keys(key_focus)) wl_set_focus(fs_surf->id);   /* not a window it hides (fsfocus.h) */
     /* An app holding the shortcuts gets every key but the few kbi_route keeps; ❖Esc turns that off, and with it
      * a locked pointer and fullscreen, so everything is LordOS's again; pressed again it holds again. */
     KbInhib *ki = value == 1 && was_to_app ? focus_inhibitor() : NULL;
@@ -4982,7 +5006,7 @@ void wl_set_focus(int id) {
     if (s && s->role != R_TOPLEVEL) s = NULL;
     if (s && s->parked) s = NULL;                      /* a window on a hidden desktop never has the keyboard */
     if (s && modal_over(s)) s = modal_over(s);         /* under a modal dialog: the keys are the dialog's */
-    if (ptr_on_fs()) s = fs_surf;    /* the pointer on a fullscreen window's display: the keyboard is its own */
+    if (fs_takes_keys(s)) s = fs_surf;     /* a window under a fullscreen one never has the keys (fsfocus.h) */
     if (s == key_focus) return;
     struct wl_resource *kb;
     if (key_focus) {

@@ -511,8 +511,13 @@ change there tells the app's inhibitors at once (`wl_shortcuts_changed`).
   and the ones `on_input` in `main.c` handles before any of this (⌃⌥⌫, ⌃⌥⇧Esc). A key's release and repeats go
   where its press went.
 - **Fullscreen and several displays.** A fullscreen window is presented on its own display and owns only that one:
-  the pointer on another display reaches the desktop and its windows, and the keys go to the fullscreen window while
-  the pointer is on its display (`on_fs`, `ptr_on_fs` in `wl.c`).
+  the pointer on another display reaches the desktop and its windows (`on_fs` in `wl.c`). The keys follow the window
+  chosen, not the pointer (`fsfocus.h`, #175): a window clicked on another display keeps them when the pointer goes
+  back over the fullscreen one, clicking the fullscreen window gives them back to it, a window going fullscreen takes
+  them unless they are with a window on another display, and a window under the fullscreen one (on its display, not
+  seen) never takes them. With no window focused they go to the fullscreen window while the pointer is on its
+  display. One display: every other window is under it, so the fullscreen window always has the keys.
+  `build/fsfocus-test` (in `make -C server test`) checks these rules.
 - **Locked windows** (`wl_set_fixed`, from `lord.wayland.state`'s seventh argument; Lord Workspaces' padlock): the app
   gets `wm_capabilities` with minimize only (no maximize) and a configure, its set_maximized/unset_maximized are
   answered with a configure of the state as it is; set_minimized is done (since 0.8.8.10: minimizing a locked window
