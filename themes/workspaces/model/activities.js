@@ -193,16 +193,6 @@ export function togglePin(pins, key) {
   return [...pins, key].slice(0, MAX_PINS);
 }
 
-// The order the activities were last shown in: the one in view first, then the others from the most recent; a new
-// desktop goes last and a removed one goes away. prev: the previous order; now: the desktop in view; list: every desktop.
-export function recentOrder(prev, now, list) {
-  const have = new Set(list);
-  const rest = (prev || []).filter((id) => id !== now && have.has(id));
-  const fresh = list.filter((id) => id !== now && !rest.includes(id));
-  return [...(have.has(now) ? [now] : []), ...rest, ...fresh];
-}
-// How many recent activities the spine has room for on a display of this height (none on short ones).
-export const spineRecentRoom = (h) => (h >= 920 ? 3 : h >= 780 ? 2 : h >= 680 ? 1 : 0);
 
 // The Focus Surface's summary of an activity: its windows (wins: the open ones, without the theme's own panels), the ones
 // in front first and minimized ones last, at most `max` of them; total and how many more there are.

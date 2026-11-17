@@ -13,9 +13,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 
 - **Lord Workspaces: the rest of its proposal.** Checked item by item against the theme's design document:
-  - **Context Spine:** under the crown, the activity in view (its icon, in the spine's glyph colour; a click edits it) and
-    the activities used just before it (one to three, as the display's height allows; a click goes there); at the
-    bottom, Notifications and Settings beside the Control Center.
+  - **Context Spine:** at the bottom, the shortcuts' help and Settings beside the Control Center. The activities
+    themselves stay on the strip's pills only.
   - **Focus Surface:** resting the pointer for half a second on another activity's pill in the strip shows what it holds (its windows by app and title, the minimized ones last, or its pinned apps when
     it has none); a click on a window goes to it. On a narrow display the other pills show only their icon, so every
     activity stays reachable.
@@ -299,9 +298,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Cleaner's panel by the clock wears the theme's colours** (all themes): its cards, bars and button take the shell's
   tokens (`shellPalette` in `sdk/cleanertheme.js`), like the bar's other panels; the Cleaner window keeps the look chosen
   in Cleaner → Settings.
-- **Lord Workspaces: a cheaper activity switch.** 244 native calls for four switches instead of 352 (one display, three
+- **Lord Workspaces: a cheaper activity switch.** 192 native calls for four switches instead of 352 (one display, three
   windows, `server/tests/theme_cost_scene.mjs`): every activity's icon stays drawn in the frame header with only the
-  one in view shown, the spine's activities are one keyed list, the activities' icons in the spine change only their colour.
+  one in view shown.
 - **Shortcuts:** F2 has a name in the SDK's key table (`sdk/shortcuts.js`), so a theme can use it.
 - **Lord Workspaces: the Calendar widget, redrawn, with styles to choose from.** The day and the month in red, today
   in a red circle, weekends dimmed and the week from the language's first weekday. Small: "Day" (the default: the day,

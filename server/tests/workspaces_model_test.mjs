@@ -3,7 +3,7 @@
 // styles and the palette's contrast. node server/tests/workspaces_model_test.mjs
 import { displayPlan, shownDisplays, spineMode, onChrome, SPINE_BLUR, SPINE_GAP, FRAME_PAD, SPINE_W, MARGIN, SMALL_W, SPINE_SHADOW_REACH, WINDOW_SHADOW } from '../../themes/workspaces/model/geometry.js';
 import { tileRects, fitTile, splitterAt, ratioFrom, orderFor, homeFor, displayKey, displayKeys, judgeFrame, underBudget, ANSWER_MS, MOVES_PER_SEC, savedDisplay, foldMissing, cleanLayout, cleanRatio, LAYOUTS, TILE_GAP, RATIO_MIN, RATIO_MAX } from '../../themes/workspaces/model/layouts.js';
-import { recentOrder, spineRecentRoom, activitySummary, barStep, newGroup, groupOfWindow, groupPlan, groupApps, everyActivity, MAX_GROUPS } from '../../themes/workspaces/model/activities.js';
+import { activitySummary, barStep, newGroup, groupOfWindow, groupPlan, groupApps, everyActivity, MAX_GROUPS } from '../../themes/workspaces/model/activities.js';
 import { wsPrefs, effectiveSurface, metaFromSaved, savedFromMeta, cleanActivity, defaultActivity, freshActivity, togglePin, needsOnboarding, wsPatch, optPatch,
   ACTIVITY_ICONS, ACTIVITY_COLORS, MAX_PINS, WS_VERSION } from '../../themes/workspaces/model/activities.js';
 import { makeTheme, accents, deep, material } from '../../themes/workspaces/tokens.js';
@@ -312,10 +312,6 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
 
 // the spine's recent activities: the one in view first, the others by when they were last shown
 {
-  eq('recent: first time, desktop order', recentOrder([], 2, [1, 2, 3]), [2, 1, 3]);
-  eq('recent: the shown one moves to the front', recentOrder([2, 1, 3], 3, [1, 2, 3]), [3, 2, 1]);
-  eq('recent: a removed desktop goes away', recentOrder([3, 2, 1], 1, [1, 3]), [1, 3]);
-  eq('recent: a new desktop goes last', recentOrder([1, 3], 1, [1, 3, 4]), [1, 3, 4]);
   const ws = [{ id: 'a', desktop: 2 }, { id: 'b', desktop: 2, minimized: true }, { id: 'c', desktop: 2 }, { id: 'd', desktop: 1 }];
   eq('summary: front first, minimized last', activitySummary(ws, 2).shown.map((w) => w.id), ['c', 'a', 'b']);
   eq('summary: total and more', [activitySummary(ws, 2, 1).total, activitySummary(ws, 2, 1).more], [3, 2]);
@@ -337,7 +333,6 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
   eq('groups: apps remembered', groupApps([{ id: 'g1', apps: [] }], [{ id: 'c', app: 'mail' }], (w) => tagsG[w.id], (w) => w.app)[0].apps, ['mail']);
   eq('groups: every activity counted', everyActivity([1, 2], { 1: ga, 2: cleanActivity({}) }, (d) => `D${d}`).length, 1 + 3 + 1);
   eq('groups: up to 36 activities on 9 desktops', 9 * (1 + MAX_GROUPS), 36);
-  eq('recent: room by height', [600, 700, 800, 1080].map(spineRecentRoom), [0, 1, 2, 3]);
 }
 
 console.log(process.exitCode ? 'workspaces-model-test: FAILED' : `workspaces-model-test: ${ok} ok`);

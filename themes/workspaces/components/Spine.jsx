@@ -1,36 +1,33 @@
 // The Context Spine: the rail at the start of the main display (or of every display, Settings → Desktop & Dock). From
-// the top: the LordOS crown (the system menu: About, Settings, Lock, Log Out, Restart, Shut Down), the activity in view
-// (its icon in its colour; a click edits it), the activities used just before it (as many as the display's height has
-// room for; a click goes there), Activities (the Overview), Apps (the search panel with every app), Files, and at the
+// the top: the LordOS crown (the system menu: About, Settings, Lock, Log Out, Restart, Shut Down), Activities (the
+// Overview; the activities themselves are the strip's pills), Apps (the search panel with every app), Files, and at the
 // bottom the shortcuts' help (a lifebuoy, ShortcutsHelp.jsx), Settings, the Control Center (the notifications are the
 // status cluster's bell) and the button that collapses the spine to icons (it
 // collapses by itself on narrow displays while its setting is Automatic). It reserves its width in the work area
 // (model/geometry.js).
 // The crown is the brand's full-colour render (assets/icons/lordos-crown.png): never recoloured, no glow or shadow.
 // Items answer the pointer with a small spring (motion.js: scale on the icon's cached raster, no React render per frame).
-import { View, Text, Image, t as tr, useStore, desktopNames, desktopName } from '@lordos/sdk';
+import { View, Text, Image, t as tr } from '@lordos/sdk';
 import { memo, useRef, useState } from 'react';
 import { Surface } from './Surface.jsx';
 import { FocusRing } from './BarButton.jsx';
-import { ActivitiesGlyph, AppsGlyph, FolderGlyph, ControlGlyph, Chevron, BellGlyph, GearGlyph, ActivityIcon, LifebuoyGlyph } from '../glyphs.jsx';
-import { activities, recentActivities, activityOf } from '../state.js';
-import { spineRecentRoom } from '../model/activities.js';
+import { ActivitiesGlyph, AppsGlyph, FolderGlyph, ControlGlyph, Chevron, GearGlyph, LifebuoyGlyph } from '../glyphs.jsx';
 import { tween, EASE } from '../motion.js';
 
-const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, anchor, small, fid, current }) {
+const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, anchor, small, fid }) {
   const [hover, setHover] = useState(false);
   const icon = useRef(null);
   const spring = (to, ms = 200) => {
     const n = icon.current?.id;
     if (n) tween(n, { scaleX: [to === 1 ? 1.08 : 1, to], scaleY: [to === 1 ? 1.08 : 1, to] }, { ms, ease: EASE.spring, clear: to === 1 });
   };
-  const fg = active ? t.onAccent : hover || current ? t.iconFgHover : t.iconFg;
+  const fg = active ? t.onAccent : hover ? t.iconFgHover : t.iconFg;
   return (
     <View ref={anchor} onClick={(e) => onClick(e)} title={expanded ? undefined : label}
       onMouseEnter={() => { setHover(true); spring(1.08, 180); }} onMouseLeave={() => { setHover(false); spring(1, 220); }}
       onMouseDown={() => spring(0.92, 120)} onMouseUp={() => spring(1.08, 160)}
       style={{ alignSelf: 'stretch', marginHorizontal: 6, paddingVertical: small ? 5 : expanded ? 8 : 10, borderRadius: 12, alignItems: 'center', gap: 4,
-        backgroundColor: active ? t.accent : hover || current ? t.itemHover : 'transparent' }}>
+        backgroundColor: active ? t.accent : hover ? t.itemHover : 'transparent' }}>
       <View ref={icon} style={{ width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>{glyph(fg, active ? t.accent : t.solidBg)}</View>
       {expanded ? <Text style={{ fontSize: 10.5, fontWeight: 600, color: fg, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 70, textAlign: 'center' }}>{label}</Text> : null}
       {fid ? <FocusRing t={t} fid={fid} /> : null}
@@ -38,35 +35,7 @@ const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, an
   );
 });
 
-// The activity in view and the recent ones: each one's icon on a tile of its colour. One keyed list, so a switch moves
-// two tiles and changes a few styles (size, ring) instead of drawing icons again (docs/WORKSPACES.md, "Performance").
-// An activity's icon in the spine: the spine's glyph colour like its other items (the activity's own colour is on its
-// pill and its windows), brighter for the one in view.
-function ActivityGlyph({ id, color, bg }) {
-  const m = activityOf(id);
-  return <ActivityIcon icon={m.icon} color={color} bg={bg} size={18} />;
-}
-
-const Activities = memo(function Activities({ t, expanded, room, desk, onEditActivity, onActivity }) {
-  useStore(activities);
-  useStore(desktopNames);
-  const recent = useStore(recentActivities).filter((id) => id !== desk).slice(0, room);
-  const order = [desk, ...recent];
-  return (
-    <>
-      {order.flatMap((id, i) => [
-        <Item key={id} t={t} expanded={expanded} small current={i === 0} fid={i === 0 ? 'current' : `recent:${id}`} label={desktopName(id)} active={false}
-          onClick={() => (i === 0 ? onEditActivity(id) : onActivity(id))} glyph={(c, bg) => <ActivityGlyph id={id} color={c} bg={bg} />} />,
-        ...(i === 0 && recent.length && expanded ? [<Text key="recent-label" style={{ fontSize: 9, fontWeight: 700, color: t.textDim, marginTop: 4, letterSpacing: 0.4 }}>
-          {tr('shell.ws.spine.recent')}</Text>] : []),
-      ])}
-      <View style={{ alignSelf: 'stretch', height: 1, marginHorizontal: 14, marginVertical: 6, backgroundColor: t.barSeparator }} />
-    </>
-  );
-});
-
-export const Spine = memo(function Spine({ t, rect, mode, rtl, active, desk, unread, onCrown, onActivities, onApps, onFiles, onControl, onToggle, onNotif, onSettings, onHelp,
-  onEditActivity, onActivity, controlRef }) {
+export const Spine = memo(function Spine({ t, rect, mode, rtl, active, onCrown, onActivities, onApps, onFiles, onControl, onToggle, onSettings, onHelp, controlRef }) {
   const expanded = mode === 'expanded';
   return (
     <Surface t={t} radius={18} style={{ boxShadow: t.spineShadow, position: 'absolute', left: rect.x, top: rect.y, width: rect.w, height: rect.h, paddingVertical: 12, alignItems: 'center', gap: 4 }}>
@@ -75,7 +44,6 @@ export const Spine = memo(function Spine({ t, rect, mode, rtl, active, desk, unr
         <Image src="asset:icons/lordos-crown.png" style={{ width: 28, height: 28 }} />
         <FocusRing t={t} fid="crown" />
       </View>
-      <Activities t={t} expanded={expanded} room={spineRecentRoom(rect.h)} desk={desk} onEditActivity={onEditActivity} onActivity={onActivity} />
       <Item t={t} expanded={expanded} fid="activities" label={tr('shell.ws.spine.activities')} active={active.overview} onClick={onActivities}
         glyph={(c) => <ActivitiesGlyph color={c} size={20} />} />
       <Item t={t} expanded={expanded} fid="apps" label={tr('shell.ws.spine.apps')} active={active.apps} onClick={onApps}

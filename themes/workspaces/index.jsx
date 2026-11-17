@@ -33,8 +33,6 @@ import { activities, panel, deleting, startActivities, updateActivity, setUpActi
 import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked, aimLaunch } from './tiler.js';
 import { startMagnet } from './magnet.js';
 import { barFocus, setBarItems, enterBars, leaveBars, barKey } from './barfocus.js';
-import { recentActivities } from './state.js';
-import { spineRecentRoom } from './model/activities.js';
 import { SnapAssist } from './components/SnapAssist.jsx';
 import { WidgetPicker, widgetPicker } from './components/WidgetPicker.jsx';
 import { GlassTarget, DropTarget, SnapFlyout, dropTarget, useDropTarget } from './components/SnapTargets.jsx';
@@ -112,7 +110,7 @@ const table = [
   { id: 'activityTab', keys: ['Meta+Tab', 'Meta+Shift+Tab'], run: (e) => stepActivity(e.shift ? -1 : 1), when: () => !switcherKeys('meta').includes('Meta+Tab'),
     listed: () => !switcherKeys('meta').includes('Meta+Tab'), label: 'shell.ws.shortcuts.activityTab', group: 'desktops' },
   { id: 'help', keys: ['Meta+/'], show: ['❖/'], run: () => H.help(), label: 'shell.ws.shortcuts.help', group: 'system' },
-  { id: 'bars', keys: ['Ctrl+F2'], run: () => { panel.set(null); enterBars(); }, label: 'shell.ws.shortcuts.bars', group: 'system' },
+  { id: 'bars', keys: ['Ctrl+F2'], run: () => { panel.set(null); enterBars(`pill:${activeDesktop.get()}`); }, label: 'shell.ws.shortcuts.bars', group: 'system' },
   { id: 'switchApps', keys: switcherKeys('meta'), run: (e) => openSwitcher(switcherHold(e), e.shift), label: 'shell.shortcuts.switchApps', group: 'windows' },
   { id: 'cycleWindows', keys: ['Meta+`', 'Meta+Shift+`'], run: (e) => cycleAppWindows(e.shift), label: 'shell.shortcuts.cycleWindows', group: 'windows' },
   { id: 'minimize', keys: ['Meta+M'], run: onFront(wm.minimize), label: 'shell.shortcuts.minimize', group: 'windows' },
@@ -243,12 +241,10 @@ function App() {
   useEffect(() => {
     setBarItems(() => {
       const desk = activeDesktop.get(), sp = main?.plan.spine;
-      const recent = sp ? recentActivities.get().filter((id) => id !== desk).slice(0, spineRecentRoom(sp.h)) : [];
       const at = sp ? { x: sp.x + sp.w, y: sp.y + 8 } : { x: 40, y: 40 };
       return [
         ...(sp ? [
-          { id: 'crown', run: () => H.crown(at) }, { id: 'current', run: () => H.edit(desk) },
-          ...recent.map((id) => ({ id: `recent:${id}`, run: () => H.activity(id) })),
+          { id: 'crown', run: () => H.crown(at) },
           { id: 'activities', run: H.activities }, { id: 'apps', run: () => H.apps() }, { id: 'files', run: () => H.files() },
           { id: 'help', run: H.help }, { id: 'settings', run: H.settings }, { id: 'control', run: H.control },
         ] : []),
@@ -343,9 +339,9 @@ function App() {
         <DesktopWidgets layer="above" />
         <Layer name="dock">
           {plans.map(({ d, plan }) => (plan.spine ? (
-            <Spine key={d.id} t={t} rect={plan.spine} mode={plan.mode} rtl={rtl} active={spineActive} controlRef={d.main ? controlRef : undefined} desk={desktop} unread={unread}
+            <Spine key={d.id} t={t} rect={plan.spine} mode={plan.mode} rtl={rtl} active={spineActive} controlRef={d.main ? controlRef : undefined}
               onCrown={H.crown} onActivities={H.activities} onApps={H.apps} onFiles={H.files} onControl={H.control} onToggle={toggleSpine}
-              onNotif={H.notif} onSettings={H.settings} onHelp={H.help} onEditActivity={H.edit} onActivity={H.activity} />
+              onSettings={H.settings} onHelp={H.help} />
           ) : null))}
           {main?.plan.top ? (
             <>

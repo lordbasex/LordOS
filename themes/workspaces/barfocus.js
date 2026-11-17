@@ -15,7 +15,7 @@ export const barFocus = createStore(null);
 let itemsOf = () => [];
 export function setBarItems(fn) { itemsOf = fn; }
 
-export function enterBars(start = 'current') {
+export function enterBars(start) {
   const list = itemsOf();
   if (!list.length) return;
   barFocus.set((list.find((x) => x.id === start) || list[0]).id);

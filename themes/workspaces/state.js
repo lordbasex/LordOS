@@ -4,7 +4,7 @@
 // keep working as in the other themes.
 import { createStore, settings, desktopList, desktopNames, activeDesktop, renameDesktop, addDesktopAndShow, wm, launchApp, windows, getApp, launcherIdOf,
   switchDesktop } from '@lordos/sdk';
-import { wsPrefs, metaFromSaved, savedFromMeta, wsPatch, freshActivity, cleanActivity, togglePin, recentOrder, newGroup, groupOfWindow, groupPlan, groupApps,
+import { wsPrefs, metaFromSaved, savedFromMeta, wsPatch, freshActivity, cleanActivity, togglePin, newGroup, groupOfWindow, groupPlan, groupApps,
   MAX_GROUPS } from './model/activities.js';
 
 // desktop id → activity
@@ -18,22 +18,10 @@ export const deleting = createStore(null);
 export const launchOrigin = { x: 0, y: 0, t: 0 };
 export function noteLaunch(x, y) { launchOrigin.x = x; launchOrigin.y = y; launchOrigin.t = Date.now(); }
 
-// The activities in the order they were last shown, the one in view first (the spine's "recent" ones are the next few).
-// Only for this session: nothing about it is saved.
-export const recentActivities = createStore([]);
-const noteShown = () => {
-  const list = desktopList.get(), now = activeDesktop.get();
-  const next = recentOrder(recentActivities.get(), now, list);
-  if (next.join('|') !== recentActivities.get().join('|')) recentActivities.set(next);
-};
-
 let started = false;
 export function startActivities() {
   if (started) return;
   started = true;
-  activeDesktop.subscribe(noteShown);
-  desktopList.subscribe(noteShown);
-  noteShown();
   activities.set(metaFromSaved(desktopList.get(), wsPrefs(settings.get()).activities));
   // a desktop added anywhere (the Overview, Settings, a shortcut) gets an activity of its own
   desktopList.subscribe(() => {

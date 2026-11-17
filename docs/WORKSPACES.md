@@ -11,7 +11,7 @@ performs against the other two themes and what is left for the compositor.
 
 | Piece | What it is | Where |
 |---|---|---|
-| **Context Spine** | The rail at the start of the main display: the LordOS crown (the system menu: About, Settings, Lock, Switch User, Log Out, Restart, Shut Down), the **activity in view** (its icon, in the spine's glyph colour on a highlight; a click edits it) and the **recent** ones (one to three, as the height allows; a click goes there), **Activities** (the Overview), **Apps** (the search panel with every app), **Files**, and at the bottom the **shortcuts' help** (a lifebuoy), **Settings**, the **Control Center** and the button that collapses it to icons. It collapses by itself below 1440 px while its setting is Automatic. It reserves its width in the work area. | `components/Spine.jsx` |
+| **Context Spine** | The rail at the start of the main display: the LordOS crown (the system menu: About, Settings, Lock, Switch User, Log Out, Restart, Shut Down), **Activities** (the Overview), **Apps** (the search panel with every app), **Files**, and at the bottom the **shortcuts' help** (a lifebuoy), **Settings**, the **Control Center** and the button that collapses it to icons. It collapses by itself below 1440 px while its setting is Automatic. It reserves its width in the work area. | `components/Spine.jsx` |
 | **Activity strip** | A pill per activity (its icon in its colour; the one in view under an accent that glides to the next one on a switch; the others show a summary of their windows when the pointer rests on them half a second, the **Focus Surface**), the **groups** of the activity in view as chips beside its pill, **+ New**, and "Activity 2 of 4 · up to 9". On a narrow display the other pills show only their icon. Click switches, double click renames in place, right click: Rename, Icon, colour and apps…, Delete activity… (asked first, in the page). | `components/TopBar.jsx` |
 | **Status cluster** | Privacy indicators, the status items (network, Cleaner, Cloud, keyboard…; their panels open under the band at its far edge, where the notifications do), the volume (its own panel: level, mute, outputs), notifications with an unread dot, and the date and time (the clock wakes once a minute). | `components/TopBar.jsx` |
 | **Group frame** | Per display, a frame in the accent around the work area; its header holds the activity's name (and the display's, with several), its pinned apps and the actions **Change layout**, **Add window**, **Save layout** and **Move to another activity**. With no window on a display, a short empty state offers Add window and Open pinned apps. | `components/GroupFrame.jsx` |
@@ -296,7 +296,7 @@ then what the pointer and the touchpad do in this theme. Search, a filter by gro
 
 **The bars' keyboard** (`barfocus.js`). ⌃F2 gives the keyboard to the Context Spine and the activity strip: an empty
 overlay layer holds it (no app gets the keys), the arrows, Tab, Home and End go from the crown down the spine and along
-the strip's pills, the control with the keyboard draws a ring (only the ring re-renders), Enter or Space presses it,
+the strip's pills (starting at the activity in view), the control with the keyboard draws a ring (only the ring re-renders), Enter or Space presses it,
 Escape or a press of the pointer gives the keyboard back.
 
 **High contrast** (the theme's option, also in the Control Atlas): solid black or white surfaces, text at 21:1, dim
@@ -379,7 +379,7 @@ windows; numbers, not checks):
 | A window's title, ×10 | 10 | 10 | 10 |
 | The window in front, ×10 | 160 | 290 | 210 |
 | A window opened and closed | 206 | 247 | 287 |
-| Desktop / activity switches, ×4 | 44 | 68 | 244 (352 in 0.8.8.10's first drafts) |
+| Desktop / activity switches, ×4 | 44 | 68 | 192 (352 in 0.8.8.10's first drafts) |
 | Intervals alive at rest | 250 ms, 1 s (the clock), 2 s | 250 ms, 1 s (the clock), 2 s, 5 s (the network glyph) | 250 ms (the SDK's) |
 | Timer wake-ups per minute at rest | 330 | 342 | 240 (+1 for the clock) |
 
@@ -396,9 +396,8 @@ What these say:
   over the work area, changes inside the spine's blur margin); each of those was measured and removed.
 - **In native calls** a switch costs more than in Flow and Classic: the spine, the strip and the frame header show the
   activity in view (its icon, name, pins and layout), so they change with it. What changes is kept to styles: every
-  activity's icon stays drawn in the header and only the one in view shows, the spine's activities are one keyed list
-  (a switch moves two items and changes their colour). That
-  took a switch from 352 calls ×4 to 244, though the spine now also shows the recent activities.
+  activity's icon stays drawn in the header and only the one in view shows. That took a switch from 352 calls ×4 to
+  192.
 
 ## Changed from the proposal
 

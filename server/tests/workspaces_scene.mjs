@@ -113,8 +113,6 @@ check('new activity: set up, a different colour', [state.activityOf(nd).setup, s
 check('new activity: the old activity\'s windows hidden', [a, b, c, s].every((id) => sdk.wm.get(id).desktop === desk), true);
 sdk.switchDesktop(desk);
 await flush();
-check('spine: the activity in view first, the new one next among the recent', state.recentActivities.get().slice(0, 2), [desk, nd]);
-check('spine: the recent activity by name', [...texts].filter(([id, x]) => x === sdk.desktopName(nd) && attached(id)).length >= 1, true);
 check('back: the tiles kept', [a, b, c].map(frameOf), tileRects('split', plan(M).work, 3, 2 / 3));
 
 // the Control Atlas: a section each for the look, tiling, activities, displays, sound, network, energy and security
@@ -128,13 +126,13 @@ state.panel.set(null);
 await flush();
 
 // the bars' keyboard: ⌃F2 starts at the activity in view, the arrows walk on, a ring shows, Escape gives it back
-bars.enterBars();
+bars.enterBars(`pill:${sdk.activeDesktop.get()}`);
 await flush();
-check('bars: the activity in view first', bars.barFocus.get(), 'current');
+check('bars: the activity in view first', bars.barFocus.get(), `pill:${sdk.activeDesktop.get()}`);
 bars.barKey({ key: 'ArrowDown' });
 await flush();
 const ringed = () => [...styles].filter(([id, st]) => st.left === -3 && st.top === -3 && st.pointerEvents === 'none' && attached(id)).length;
-check('bars: the next control, with its ring', [bars.barFocus.get() !== 'current', ringed()], [true, 1]);
+check('bars: the next control, with its ring', [bars.barFocus.get() !== `pill:${sdk.activeDesktop.get()}`, ringed()], [true, 1]);
 bars.barKey({ key: 'Escape' });
 await flush();
 check('bars: Escape gives the keyboard back', [bars.barFocus.get(), ringed()], [null, 0]);
