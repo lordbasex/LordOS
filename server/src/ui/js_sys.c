@@ -235,11 +235,25 @@ static void arm_cpu_name(const char *txt, char *out, size_t size) {
     free(board);
 }
 
+/* The processor's name and its number of logical CPUs, read from /proc/cpuinfo once. They don't change while the
+ * session runs, and the file is costly for the kernel to generate (one block per CPU, each asking that CPU for its
+ * current clock), so the widgets that poll lord.system.info every few seconds don't regenerate it each time. */
+static char cpu_name_kept[160];
+static int cpu_cores_kept = -1;
+static void cpu_info_load(void) {
+    if (cpu_cores_kept >= 0) return;
+    char *txt = read_small("/proc/cpuinfo", 1 << 20, NULL);
+    if (!txt || field(txt, "model name", cpu_name_kept, sizeof cpu_name_kept)) arm_cpu_name(txt, cpu_name_kept, sizeof cpu_name_kept);
+    int cores = 0;
+    for (const char *p = txt; p && (p = strstr(p, "processor")); p += 9) cores++;
+    free(txt);
+    cpu_cores_kept = cores;
+}
+
 /* Processor name ("model name" on x86; on ARM, the core from "CPU part" and the board). */
 void js_sys_cpu_name(char *out, size_t size) {
-    char *txt = read_small("/proc/cpuinfo", 1 << 20, NULL);
-    if (!txt || field(txt, "model name", out, size)) arm_cpu_name(txt, out, size);
-    free(txt);
+    cpu_info_load();
+    snprintf(out, size, "%s", cpu_name_kept);
 }
 
 /* This boot's time to the first frame, from lord-sessiond's /var/lib/lordos/boot-times.jsonl (root's,
@@ -291,11 +305,9 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     if (!txt || field(txt, "PRETTY_NAME", os, sizeof os)) snprintf(os, sizeof os, "Linux");
     free(txt);
 
-    int cores = 0;
-    txt = read_small("/proc/cpuinfo", 1 << 20, NULL);
-    if (!txt || field(txt, "model name", cpu, sizeof cpu)) arm_cpu_name(txt, cpu, sizeof cpu);
-    for (const char *p = txt; p && (p = strstr(p, "processor")); p += 9) cores++;
-    free(txt);
+    cpu_info_load();
+    int cores = cpu_cores_kept;
+    snprintf(cpu, sizeof cpu, "%s", cpu_name_kept);
 
     double mem_total = 0, mem_avail = 0, mem_used = 0, uptime = 0;
     txt = read_small("/proc/meminfo", 8192, NULL);
