@@ -439,5 +439,9 @@
   "details.signIn": "Inloggning",
   "details.server": "Server",
   "details.app": "App",
-  "details.ownApp": "Din egen app"
+  "details.ownApp": "Din egen app",
+  "color": "Färg",
+  "colorAuto": "Automatisk",
+  "colorAutoHint": "Automatisk: i den ordning du lade till kontot, så att två konton hos samma leverantör skiljer sig åt.",
+  "colorChosen": "Visas i Filer, Moln-menyn och Loggar."
 }

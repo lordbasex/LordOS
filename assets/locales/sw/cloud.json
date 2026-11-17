@@ -439,5 +439,9 @@
   "details.signIn": "Kuingia",
   "details.server": "Seva",
   "details.app": "Programu",
-  "details.ownApp": "Programu yako mwenyewe"
+  "details.ownApp": "Programu yako mwenyewe",
+  "color": "Rangi",
+  "colorAuto": "Otomatiki",
+  "colorAutoHint": "Otomatiki: kulingana na mpangilio uliyoongeza akaunti, ili akaunti mbili za mtoa huduma mmoja zitofautiane.",
+  "colorChosen": "Huonyeshwa katika Faili, menyu ya Wingu na Kumbukumbu."
 }

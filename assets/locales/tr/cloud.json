@@ -439,5 +439,9 @@
   "details.signIn": "Oturum açma",
   "details.server": "Sunucu",
   "details.app": "Uygulama",
-  "details.ownApp": "Kendi uygulamanız"
+  "details.ownApp": "Kendi uygulamanız",
+  "color": "Renk",
+  "colorAuto": "Otomatik",
+  "colorAutoHint": "Otomatik: hesabı eklediğiniz sıraya göre, aynı sağlayıcının iki hesabı birbirinden ayrılsın diye.",
+  "colorChosen": "Dosyalar, Bulut menüsü ve Günlüklerde gösterilir."
 }

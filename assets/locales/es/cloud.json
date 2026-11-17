@@ -439,5 +439,9 @@
   "details.signIn": "Inicio de sesión",
   "details.server": "Servidor",
   "details.app": "App",
-  "details.ownApp": "Tu propia app"
+  "details.ownApp": "Tu propia app",
+  "color": "Color",
+  "colorAuto": "Automático",
+  "colorAutoHint": "Automático: según el orden en que agregaste la cuenta, para que dos cuentas del mismo proveedor se distingan.",
+  "colorChosen": "Se usa en Archivos, el menú de la Nube y los Logs."
 }

@@ -439,5 +439,9 @@
   "details.signIn": "Giriş",
   "details.server": "Server",
   "details.app": "Tətbiq",
-  "details.ownApp": "Öz tətbiqiniz"
+  "details.ownApp": "Öz tətbiqiniz",
+  "color": "Rəng",
+  "colorAuto": "Avtomatik",
+  "colorAutoHint": "Avtomatik: hesabı əlavə etdiyiniz sıraya görə, eyni provayderin iki hesabı fərqlənsin deyə.",
+  "colorChosen": "Fayllarda, Bulud menyusunda və Jurnallarda göstərilir."
 }

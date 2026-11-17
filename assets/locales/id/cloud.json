@@ -418,5 +418,9 @@
   "details.signIn": "Masuk",
   "details.server": "Server",
   "details.app": "Aplikasi",
-  "details.ownApp": "Aplikasi Anda sendiri"
+  "details.ownApp": "Aplikasi Anda sendiri",
+  "color": "Warna",
+  "colorAuto": "Otomatis",
+  "colorAutoHint": "Otomatis: sesuai urutan Anda menambahkan akun, agar dua akun dari penyedia yang sama berbeda.",
+  "colorChosen": "Ditampilkan di File, menu Cloud, dan Log."
 }

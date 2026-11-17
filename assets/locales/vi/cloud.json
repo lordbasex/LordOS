@@ -418,5 +418,9 @@
   "details.signIn": "Đăng nhập",
   "details.server": "Máy chủ",
   "details.app": "Ứng dụng",
-  "details.ownApp": "Ứng dụng của bạn"
+  "details.ownApp": "Ứng dụng của bạn",
+  "color": "Màu",
+  "colorAuto": "Tự động",
+  "colorAutoHint": "Tự động: theo thứ tự bạn thêm tài khoản, để hai tài khoản cùng nhà cung cấp khác nhau.",
+  "colorChosen": "Hiển thị trong Tệp, menu Đám mây và Nhật ký."
 }

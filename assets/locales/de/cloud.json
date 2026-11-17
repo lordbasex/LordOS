@@ -439,5 +439,9 @@
   "details.signIn": "Anmeldung",
   "details.server": "Server",
   "details.app": "App",
-  "details.ownApp": "Deine eigene App"
+  "details.ownApp": "Deine eigene App",
+  "color": "Farbe",
+  "colorAuto": "Automatisch",
+  "colorAutoHint": "Automatisch: nach der Reihenfolge, in der du das Konto hinzugefügt hast, damit sich zwei Konten desselben Anbieters unterscheiden.",
+  "colorChosen": "Wird in Dateien, im Cloud-Menü und in den Protokollen gezeigt."
 }

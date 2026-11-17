@@ -439,5 +439,9 @@
   "details.signIn": "Connexion",
   "details.server": "Serveur",
   "details.app": "Application",
-  "details.ownApp": "Votre propre application"
+  "details.ownApp": "Votre propre application",
+  "color": "Couleur",
+  "colorAuto": "Automatique",
+  "colorAutoHint": "Automatique : selon l’ordre d’ajout du compte, pour que deux comptes d’un même fournisseur se distinguent.",
+  "colorChosen": "Affichée dans Fichiers, le menu Cloud et les Journaux."
 }

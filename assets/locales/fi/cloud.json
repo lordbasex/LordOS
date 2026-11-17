@@ -439,5 +439,9 @@
   "details.signIn": "Kirjautuminen",
   "details.server": "Palvelin",
   "details.app": "Sovellus",
-  "details.ownApp": "Oma sovelluksesi"
+  "details.ownApp": "Oma sovelluksesi",
+  "color": "Väri",
+  "colorAuto": "Automaattinen",
+  "colorAutoHint": "Automaattinen: tilin lisäysjärjestyksen mukaan, jotta saman palvelun kaksi tiliä erottuvat.",
+  "colorChosen": "Näkyy Tiedostoissa, Pilven valikossa ja Lokeissa."
 }

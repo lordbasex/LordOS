@@ -481,5 +481,9 @@
   "details.signIn": "Logowanie",
   "details.server": "Serwer",
   "details.app": "Aplikacja",
-  "details.ownApp": "Twoja własna aplikacja"
+  "details.ownApp": "Twoja własna aplikacja",
+  "color": "Kolor",
+  "colorAuto": "Automatyczny",
+  "colorAutoHint": "Automatyczny: według kolejności dodania konta, aby dwa konta tego samego dostawcy się różniły.",
+  "colorChosen": "Widoczny w Plikach, menu Chmury i Dziennikach."
 }

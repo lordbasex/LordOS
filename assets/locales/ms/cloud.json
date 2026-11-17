@@ -418,5 +418,9 @@
   "details.signIn": "Log masuk",
   "details.server": "Pelayan",
   "details.app": "Apl",
-  "details.ownApp": "Apl anda sendiri"
+  "details.ownApp": "Apl anda sendiri",
+  "color": "Warna",
+  "colorAuto": "Automatik",
+  "colorAutoHint": "Automatik: mengikut susunan anda menambah akaun, supaya dua akaun penyedia yang sama berbeza.",
+  "colorChosen": "Ditunjukkan dalam Fail, menu Awan dan Log."
 }

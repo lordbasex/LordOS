@@ -418,5 +418,9 @@
   "details.signIn": "サインイン",
   "details.server": "サーバ",
   "details.app": "アプリ",
-  "details.ownApp": "自分のアプリ"
+  "details.ownApp": "自分のアプリ",
+  "color": "色",
+  "colorAuto": "自動",
+  "colorAutoHint": "自動：アカウントを追加した順に決まり、同じサービスの 2 つのアカウントを区別できます。",
+  "colorChosen": "ファイル、クラウドメニュー、ログに表示されます。"
 }

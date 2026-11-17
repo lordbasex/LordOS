@@ -439,5 +439,9 @@
   "details.signIn": "Inici de sessió",
   "details.server": "Servidor",
   "details.app": "Aplicació",
-  "details.ownApp": "La teva pròpia aplicació"
+  "details.ownApp": "La teva pròpia aplicació",
+  "color": "Color",
+  "colorAuto": "Automàtic",
+  "colorAutoHint": "Automàtic: segons l’ordre en què vas afegir el compte, perquè dos comptes del mateix proveïdor es distingeixin.",
+  "colorChosen": "Es mostra a Fitxers, al menú del Núvol i als Registres."
 }

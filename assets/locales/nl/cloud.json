@@ -439,5 +439,9 @@
   "details.signIn": "Aanmelding",
   "details.server": "Server",
   "details.app": "App",
-  "details.ownApp": "Je eigen app"
+  "details.ownApp": "Je eigen app",
+  "color": "Kleur",
+  "colorAuto": "Automatisch",
+  "colorAutoHint": "Automatisch: in de volgorde waarin je het account toevoegde, zodat twee accounts van dezelfde aanbieder verschillen.",
+  "colorChosen": "Getoond in Bestanden, het Cloud-menu en Logboeken."
 }

@@ -418,5 +418,9 @@
   "details.signIn": "登录",
   "details.server": "服务器",
   "details.app": "应用",
-  "details.ownApp": "你自己的应用"
+  "details.ownApp": "你自己的应用",
+  "color": "颜色",
+  "colorAuto": "自动",
+  "colorAutoHint": "自动：按添加账户的顺序决定，让同一服务的两个账户可以区分。",
+  "colorChosen": "显示在文件、云菜单和日志中。"
 }

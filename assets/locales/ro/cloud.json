@@ -460,5 +460,9 @@
   "details.signIn": "Autentificare",
   "details.server": "Server",
   "details.app": "Aplicație",
-  "details.ownApp": "Propria dvs. aplicație"
+  "details.ownApp": "Propria dvs. aplicație",
+  "color": "Culoare",
+  "colorAuto": "Automată",
+  "colorAutoHint": "Automată: după ordinea în care ai adăugat contul, ca două conturi ale aceluiași furnizor să difere.",
+  "colorChosen": "Afișată în Fișiere, meniul Cloud și Jurnale."
 }

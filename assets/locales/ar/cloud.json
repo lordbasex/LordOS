@@ -523,5 +523,9 @@
   "details.signIn": "تسجيل الدخول",
   "details.server": "الخادم",
   "details.app": "التطبيق",
-  "details.ownApp": "تطبيقك الخاص"
+  "details.ownApp": "تطبيقك الخاص",
+  "color": "اللون",
+  "colorAuto": "تلقائي",
+  "colorAutoHint": "تلقائي: بحسب ترتيب إضافة الحساب، ليتميّز حسابان من المزوّد نفسه.",
+  "colorChosen": "يظهر في الملفات وقائمة السحابة والسجلات."
 }

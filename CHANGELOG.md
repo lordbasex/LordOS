@@ -12,6 +12,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Settings → Cloud: a color for each account** (issue #184). Each account's page has a row of colors: Automatic (the
+  order the account was added in, so two accounts of one provider still differ) or one of the palette's, shown in Files,
+  the Cloud menu and Logs (`settings.cloudColors`, read by `accountColor` in `sdk/cloudmodel.js`).
 - **Screenshots: another capture without closing the markup editor (GitHub #166).** The markup
   editor's toolbar has **New Screenshot** (also Ctrl+N): it brings the capture panel back (entire screen, window,
   selection, color, text, record), and the editor stays open with its picture, so you can take as many captures as

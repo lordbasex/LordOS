@@ -460,5 +460,9 @@
   "details.signIn": "Prisijungimas",
   "details.server": "Serveris",
   "details.app": "Programa",
-  "details.ownApp": "Jūsų programa"
+  "details.ownApp": "Jūsų programa",
+  "color": "Spalva",
+  "colorAuto": "Automatinė",
+  "colorAutoHint": "Automatinė: pagal paskyros pridėjimo tvarką, kad dvi to paties teikėjo paskyros skirtųsi.",
+  "colorChosen": "Rodoma Failuose, Debesies meniu ir Žurnaluose."
 }

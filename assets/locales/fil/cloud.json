@@ -439,5 +439,9 @@
   "details.signIn": "Sign-in",
   "details.server": "Server",
   "details.app": "App",
-  "details.ownApp": "Ang sarili mong app"
+  "details.ownApp": "Ang sarili mong app",
+  "color": "Kulay",
+  "colorAuto": "Awtomatiko",
+  "colorAutoHint": "Awtomatiko: ayon sa pagkakasunod ng pagdagdag mo ng account, para magkaiba ang dalawang account ng iisang provider.",
+  "colorChosen": "Ipinapakita sa Files, sa menu ng Cloud at sa Logs."
 }

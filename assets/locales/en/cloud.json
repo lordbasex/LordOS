@@ -439,5 +439,9 @@
   "details.signIn": "Sign-in",
   "details.server": "Server",
   "details.app": "App",
-  "details.ownApp": "Your own app"
+  "details.ownApp": "Your own app",
+  "color": "Color",
+  "colorAuto": "Automatic",
+  "colorAutoHint": "Automatic: the order you added the account in, so two accounts of one provider differ.",
+  "colorChosen": "Shown in Files, the Cloud menu and Logs."
 }

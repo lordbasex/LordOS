@@ -418,5 +418,9 @@
   "details.signIn": "로그인",
   "details.server": "서버",
   "details.app": "앱",
-  "details.ownApp": "사용자의 앱"
+  "details.ownApp": "사용자의 앱",
+  "color": "색상",
+  "colorAuto": "자동",
+  "colorAutoHint": "자동: 계정을 추가한 순서에 따라 정해져 같은 서비스의 두 계정을 구분할 수 있습니다.",
+  "colorChosen": "파일, 클라우드 메뉴, 로그에 표시됩니다."
 }
