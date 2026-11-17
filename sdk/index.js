@@ -110,7 +110,7 @@ export { desktopName, switchDesktop, nextDesktopBy, addDesktopAndShow, closeActi
 import { startDesktops, desktopsForThemeSwitch, desktopAt, indexOfDesktop } from './desktops.js';
 // the brief level indicator of the volume, brightness and keyboard-light keys (docs/SHORTCUTS.md)
 export { LevelHud, showLevel } from './levelhud.js';
-export { overview, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, toggleAppWindows, overviewOpen } from './overview.jsx';
+export { overview, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, toggleAppWindows, overviewOpen, setDesktopDecor } from './overview.jsx';
 export { codeStatus } from './codesig.js';
 import { reportRefusedCode } from './codesig.js';
 export { WindowShell, WINDOW_EDGE, useWindowButtons } from './windowshell.jsx';

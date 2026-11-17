@@ -20,7 +20,7 @@ import {
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
   switchDesktop, windows as windowsStore, windowTitle, windowIcon, appName, removeDesktopById, renameDesktop, createStore, lordosWallpapers,
-  VideoSetup,
+  VideoSetup, setDesktopDecor,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
@@ -190,6 +190,11 @@ function App() {
   // the work areas follow the spine and the displays live; the tiles are laid out again
   useEffect(() => { configureWindows({ apps, workArea: areaFn }); areasChanged(); }, [sig, prefs.spine, prefs.spineEvery, rtl, screen.width, screen.height]);
   useEffect(registerSources, []);
+  // the Overview's strip shows each desktop as its activity: the icon on a tile of its colour
+  useEffect(() => setDesktopDecor((id) => {
+    const m = activityOf(id);
+    return { color: m.color, Icon: ({ size }) => <ActivityIcon icon={m.icon} color="#ffffff" bg={m.color} size={size} /> };
+  }), []);
   useShortcuts({ grabs: switcherGrabs(flowGrabs()), table, onSuperTap: () => openSearch('apps'), appsPaste: true });
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') { panel.set(null); crownMenu.set(null); deskMenu.set(null); } }), []);
   useEffect(() => { if (inOverview) panel.set(null); }, [inOverview]);

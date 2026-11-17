@@ -19,7 +19,7 @@ import { Layer } from './layers.js';
 import { settings } from './settings.js';
 import { windows, wm, getApp, workAreaOf, windowTitle, activeDesktop, desktopList, desktopNames, desktopName, renameDesktop, moveDesktop, onActiveDesktop, overviewShowing,
   setActiveDesktop, createDesktop, closeDesktop } from './windows.js';
-import { MAX_DESKTOPS, onDesktop, gridLayout, stripLayout, stripSlot, moveDesktopTo, hitRect, overviewPlaceholder, OVERVIEW_LABEL } from './desktopmodel.js';
+import { MAX_DESKTOPS, onDesktop, gridNeighbor, gridLayout, stripLayout, stripSlot, moveDesktopTo, hitRect, overviewPlaceholder, OVERVIEW_LABEL } from './desktopmodel.js';
 import { launcherIdOf } from './dock.js';
 import { windowIcon } from './apps.js';
 import { findWallpaper, wallpaperThumb, wallpaperIdFor } from './wallpapers.js';
@@ -186,7 +186,13 @@ function Labels({ o, th }) {
 }
 
 // One desktop in the strip: the wallpaper and its windows as small frames.
+// A theme can mark each desktop in the strip (Lord Workspaces: its activity's icon and colour): fn(id) → { color, Icon }
+// or null. The mark sits before the name and colours the card's lower edge.
+let decorOf = () => null;
+export function setDesktopDecor(fn) { decorOf = typeof fn === 'function' ? fn : () => null; refresh(); return () => { decorOf = () => null; }; }
+
 function Card({ c, th, active, all, wallpaper, over, canRemove, lifted }) {
+  const decor = decorOf(c.id);
   const hovered = useStore(cardHover) === c.id;
   const edit = useStore(renaming, (r) => (r?.id === c.id ? r : null));
   const d = mainDisplay();
@@ -199,7 +205,8 @@ function Card({ c, th, active, all, wallpaper, over, canRemove, lifted }) {
     onMouseEnter: () => cardHover.set(c.id), onMouseLeave: () => cardHover.set((v) => (v === c.id ? null : v)),
     style: { position: 'absolute', left: c.x, top: c.y, width: c.w, height: c.h + 24, alignItems: 'center', opacity: lifted ? 0.9 : 1 } },
   h(View, { style: { width: c.w, height: c.h, borderRadius: 8, overflow: 'hidden', backgroundColor: th.windowBg,
-    border: `2px solid ${over || lifted ? th.accent : active ? '#ffffff' : 'rgba(255,255,255,0.25)'}`, boxShadow: lifted ? '0 10px 28px rgba(0,0,0,0.45)' : 'none' } },
+    border: `2px solid ${over || lifted ? th.accent : active ? '#ffffff' : 'rgba(255,255,255,0.25)'}`, boxShadow: lifted ? '0 10px 28px rgba(0,0,0,0.45)' : 'none',
+    ...(decor?.color ? { borderBottom: `4px solid ${decor.color}` } : null) } },
   wallpaper ? h(Image, { src: wallpaper, style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, objectFit: 'cover' } }) : null,
   mine.map((w) => {
     const r = wm.frame(w), Icon = windowIcon(w, getApp);
@@ -216,7 +223,8 @@ function Card({ c, th, active, all, wallpaper, over, canRemove, lifted }) {
       onSubmit: () => endRename(true), onCancel: () => endRename(false) }))
     // the name: a click shows that desktop without leaving the Overview, a double-click renames it
     : h(View, { onClick: (e) => { e.stopPropagation?.(); if (Date.now() - cardDropAt >= 300 && !active) setActiveDesktop(c.id); },
-      onDoubleClick: (e) => { e.stopPropagation?.(); startRename(c.id); }, style: { marginTop: 4, maxWidth: c.w, paddingHorizontal: 4 } },
+      onDoubleClick: (e) => { e.stopPropagation?.(); startRename(c.id); }, style: { marginTop: 4, maxWidth: c.w, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'center', gap: 5 } },
+    decor?.Icon ? h(View, { style: { width: 16, height: 16, borderRadius: 5, backgroundColor: decor.color || th.accent, alignItems: 'center', justifyContent: 'center' } }, h(decor.Icon, { size: 10 })) : null,
     h(Text, { style: { fontSize: 12, fontWeight: active ? 600 : 400, color: '#ffffff', whiteSpace: 'nowrap', textOverflow: 'ellipsis' } }, desktopName(c.id))),
   hovered && canRemove && !lifted ? h(View, { onClick: (e) => { e.stopPropagation?.(); closeDesktop(c.id); }, style: { position: 'absolute', top: 4, [direction() === 'rtl' ? 'left' : 'right']: 4, width: 20, height: 20, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.65)' } },
@@ -305,6 +313,10 @@ export function OverviewChrome() {
       if (e.key === 'Tab') e.preventDefault?.();                // the overview's, not the window's behind (sdk/focus.js)
       if (e.key === 'ArrowRight' || e.key === 'Tab') hoverStore.set(list[(i + 1) % list.length].id);
       else if (e.key === 'ArrowLeft') hoverStore.set(list[(i - 1 + list.length) % list.length].id);
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const o = overview.get();
+        hoverStore.set(gridNeighbor(o.places, list.map((w) => w.id), list[i].id, e.key === 'ArrowUp' ? 'up' : 'down'));
+      }
       else if (e.key === 'Enter' && hoverStore.get()) pick(hoverStore.get());
     });
     const offDown = addListener('pointerdown', (e) => {
