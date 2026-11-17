@@ -142,6 +142,16 @@ static void t_paths(void) {
         cloud_fails_clear(NULL);
         CHECK(cloud_fails_add(NULL, "x", 1) == -1 && !cloud_fails_has(NULL, "x", 1));
     }
+    {
+        /* #183: the account a failed rc call was about, for its line in cloud.log */
+        char id[16];
+        CHECK(cloud_body_account("{\"fs\":\"c1a2b3c4d:\"}", id, sizeof id) && !strcmp(id, "c1a2b3c4d"));
+        CHECK(cloud_body_account("{\"fs\":\"c0123abcd:\",\"remote\":\"a/b\"}", id, sizeof id) && !strcmp(id, "c0123abcd"));
+        CHECK(!cloud_body_account("{\"fs\":\"c1A2b3c4d:\"}", id, sizeof id) && !cloud_body_account("{\"fs\":\"c1a2b3c4:\"}", id, sizeof id));
+        CHECK(!cloud_body_account("{\"fs\":\"c1a2b3c4de:\"}", id, sizeof id) && !cloud_body_account("{\"name\":\"c1a2b3c4d\"}", id, sizeof id));
+        CHECK(!cloud_body_account("{\"fs\":\"x1a2b3c4d:\"}", id, sizeof id) && !cloud_body_account("{}", id, sizeof id) && !cloud_body_account(NULL, id, sizeof id));
+        CHECK(!cloud_body_account("{\"fs\":\"c1a2b3c4d:\"}", id, 9));
+    }
 }
 
 static int has_brand(const char *s) {

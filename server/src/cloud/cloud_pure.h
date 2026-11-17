@@ -88,6 +88,9 @@ int  cloud_fails_add(CloudFails *f, const char *rel, long long now);
 int  cloud_fails_has(const CloudFails *f, const char *rel, long long now);
 void cloud_fails_expire(CloudFails *f, long long now);       /* drops what is due to be tried again */
 void cloud_fails_clear(CloudFails *f);
+/* #183: the account a failed rc call was about: its body starts {"fs":"<id>:" (every per-account call lord-server
+ * makes). 1 and the id ("c" and 8 hex digits), else 0 */
+int  cloud_body_account(const char *body, char *id, size_t n);
 
 /* ---- providers (6.1) ---- */
 typedef struct {

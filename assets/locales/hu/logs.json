@@ -2,6 +2,7 @@
   "pick": "Válasszon egy bejegyzést a teljes üzenet és mezői megtekintéséhez.",
   "field.time": "Idő",
   "field.level": "Szint",
+  "field.account": "Fiók",
   "field.process": "Folyamat",
   "field.pid": "PID",
   "field.unit": "Egység",

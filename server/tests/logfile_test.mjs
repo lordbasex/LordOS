@@ -1,6 +1,6 @@
 // LordOS's own log files in the Logs app (sdk/logfile.js): the stamped lines lord-log writes
 // (server/src/lordlog.c), old unstamped ones, and the sidebar's order. node server/tests/logfile_test.mjs
-import { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder } from '../../sdk/logfile.js';
+import { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder, levelMatch, LEVEL_MAX, cloudAccounts } from '../../sdk/logfile.js';
 
 let ok = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exitCode = 1; } else ok++; };
@@ -41,4 +41,57 @@ eq('order with the older part', sortFiles(['compositor.log.prev', 'compositor.lo
 const names = ['web/b.log', 'xwayland.log', 'apps/z.log', 'shell.log.prev', 'cache/session.log', 'compositor.log.prev', 'apps/a.log', 'cloud.log', 'shell.log', 'compositor.log'];
 eq('order', sortFiles(names.map((name) => ({ name }))).map((f) => f.name),
   ['compositor.log', 'compositor.log.prev', 'shell.log', 'shell.log.prev', 'cloud.log', 'xwayland.log', 'apps/a.log', 'apps/z.log', 'web/b.log', 'cache/session.log']);
+// #183: rclone's own lines in cloud.log: their time (local) and level, a multi-line error as one row
+const p2 = (n) => String(n).padStart(2, '0');
+// a LordOS stamp in this machine's zone (as lord-log writes it) for a local time
+const stamp = (h, m, s, ms) => {
+  const o = -new Date(2026, 10, 17, h, m, s).getTimezoneOffset(), a = Math.abs(o);
+  return `2026-11-17T${p2(h)}:${p2(m)}:${p2(s)}.${String(ms).padStart(3, '0')}${o < 0 ? '-' : '+'}${p2(Math.floor(a / 60))}:${p2(a % 60)}`;
+};
+const quota = 'couldn\'t list directory: googleapi: Error 403: Quota exceeded, rateLimitExceeded';
+const cl = [
+  `${stamp(10, 0, 0, 0)} INFO  cloud: rclone v1.75.2 started`,
+  '2026/11/17 10:12:59 NOTICE: Personal Vault: will not be listed',
+  `2026/11/17 10:12:59 ERROR : error listing: ${quota}`,
+  'Details:',
+  '[',
+  '  { "reason": "rateLimitExceeded" }',
+  ']',
+  `2026/11/17 10:12:59 ERROR : rc: "operations/list": error: error in ListJSON: ${quota}`,
+  'Details:',
+  '[',
+  '  { "reason": "rateLimitExceeded" }',
+  ']',
+  `${stamp(10, 12, 59, 400)} ERROR c1a2b3c4d: operations/list: error in ListJSON: ${quota} Details: [   { "reason": "rateLimitExceeded" } ]`,
+  '2026/11/17 10:13:30 ERROR : Mes photos/amis.jpg: vfs cache: detected external removal of cache file',
+  '2026/11/17 10:13:31.250000 DEBUG : a debug line with microseconds',
+  '2026/11/17 10:13:32 CRITICAL: Failed to create file system',
+].join('\n');
+const cr = parseLordLog(cl, 'cloud.log');
+eq('rclone rows', cr.length, 8);
+eq('rclone time, local', cr[1].t, new Date(2026, 10, 17, 10, 12, 59).getTime() * 1000);
+eq('rclone levels', cr.map((x) => x.p), [6, 5, 3, 3, 3, 3, 7, 2]);
+eq('rclone id', [cr[1].id, cr[2].id, cr[0].id], ['rclone', 'rclone', 'cloud']);
+eq('rclone message', cr[1].m, 'Personal Vault: will not be listed');
+eq('a multi-line error is one row', cr[2].m.split('\n').length, 5);
+eq('microseconds', cr[6].t, new Date(2026, 10, 17, 10, 13, 31, 250).getTime() * 1000);
+eq('a LordOS line ends rclone\'s', parseLordLog(`2026/11/17 10:12:59 ERROR : x\n${stamp(10, 0, 0, 0)} INFO  cloud: y\nplain`, 'cloud.log').map((x) => x.m), ['x', 'y', 'plain']);
+eq('a Linux app\'s lines stay rows of their own', parseLordLog('a\nb', 'apps/x.log').length, 2);
+
+// the level filter: that level only
+eq('levels', [0, 2, 3, 4, 5, 6, 7, -1].map((p) => ['all', 'info', 'warning', 'error'].map((l) => +levelMatch(p, l)).join('')),
+  ['1001', '1001', '1001', '1010', '1100', '1100', '1000', '1100']);
+eq('journal bound', LEVEL_MAX, { info: 6, warning: 4, error: 3 });
+
+// the account each line is about; rclone's copy of lord-server's line folded into it
+const ca = cloudAccounts(cr);
+eq('folded', ca.length, 7);
+eq('attributed', ca.map((x) => x.acct || ''), ['', '', 'c1a2b3c4d', 'c1a2b3c4d', '', '', '']);
+eq('the folded row keeps rclone\'s lines', ca[3].m.startsWith('operations/list: error in ListJSON') && ca[3].m.includes('\n]'), true);
+eq('the notice of that second is not taken', ca[1].acct, undefined);
+eq('a line of another moment is not taken', ca[4].acct, undefined);
+eq('nothing to do', cloudAccounts(parseLordLog('2026/11/17 10:12:59 ERROR : x', 'cloud.log')).map((x) => x.acct), [undefined]);
+eq('an id with no rclone line', cloudAccounts(parseLordLog(`${stamp(10, 0, 0, 0)} ERROR c0000000a: mount/mount: failed`, 'cloud.log'))[0].acct, 'c0000000a');
+eq('not an account id', cloudAccounts(parseLordLog(`${stamp(10, 0, 0, 0)} ERROR compositor: x: y`, 'cloud.log'))[0].acct, undefined);
+eq('the rows given are not changed', cr[2].acct, undefined);
 console.log(`logfile-test: ${ok} ok`);

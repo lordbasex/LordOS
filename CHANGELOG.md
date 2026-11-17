@@ -368,6 +368,29 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Logs: the level filter showed the same lines under every choice, and Cloud's log didn't say which account a line
+  was about (GitHub #183).** Reported from Settings → Cloud → Show Log: 681 errors, and Info or Warnings still listed
+  them. Three causes, three fixes:
+  - *The filter:* each choice showed that level and every more urgent one ("Info" was everything but debug), so a log
+    made of errors looked the same under each. "Info", "Warnings" and "Errors" now show that level only, as their
+    names say (notice and info are both "Info"; debug shows under "All"); for the journal lord-server is still asked
+    for that priority and the more urgent ones, and the app keeps the level (`levelMatch`, `LEVEL_MAX` in
+    `sdk/logfile.js`).
+  - *rclone's lines:* `cloud.log` is written by rclone (`2026/11/17 10:12:59 ERROR : …`), which the Logs app didn't
+    parse: no time (the row showed its line number), a level guessed from the words, and each line of a provider's
+    multi-line error (Google Drive's JSON details) was a row of its own, at "Info". They now get their time (local) and
+    rclone's level (CRITICAL, ERROR, NOTICE, INFO, DEBUG), and the unstamped lines after one are the rest of its message.
+  - *The account:* one rclone serves every account and its lines name none. lord-server now adds a line of its own to
+    `cloud.log` after each rc call about an account that failed (`ERROR c1a2b3c4d: operations/list: <rclone's error>`,
+    `note_failure` in `cloud.c`; the account's id only, as the file may be attached to a report; `cloud_body_account`
+    in `cloud_pure.c` takes it from the call). The Logs app shows it as "provider · name" before the message and in
+    the entry's details (new **Account** field, `logs.field.account` in every language), folds rclone's own copy of
+    that error into it, and gives the account to rclone's lines of the same second that end with the same error
+    (`cloudAccounts`). Lines rclone writes on its own for a mount (a file of the cache, a folder listed by Files) still
+    can't be told apart: rclone doesn't say which mount they come from. The export writes the provider and the id,
+    never the account's name.
+  `logfile-test` checks rclone's lines, the multi-line errors, the filter and the accounts; `cloud-test` checks
+  `cloud_body_account`.
 - **Cloud: an account kept on this computer stayed "coming down" for good when one of its folders can't be read
   (GitHub #185).** Reported with an account set to keep every file here: after copying files into a folder, the files
   showed the green check but the folder, and every other folder, kept the blue arrow, and files already in the cloud

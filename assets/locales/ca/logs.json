@@ -2,6 +2,7 @@
   "pick": "Tria una entrada per veure el missatge complet i els seus camps.",
   "field.time": "Hora",
   "field.level": "Nivell",
+  "field.account": "Compte",
   "field.process": "Procés",
   "field.pid": "PID",
   "field.unit": "Unitat",

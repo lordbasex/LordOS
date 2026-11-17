@@ -2,6 +2,7 @@
   "pick": "Pumili ng entry para makita ang buong mensahe at ang mga field nito.",
   "field.time": "Oras",
   "field.level": "Antas",
+  "field.account": "Account",
   "field.process": "Proseso",
   "field.pid": "PID",
   "field.unit": "Unit",

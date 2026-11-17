@@ -2,6 +2,7 @@
   "pick": "Выберите запись, чтобы увидеть полное сообщение и его поля.",
   "field.time": "Время",
   "field.level": "Уровень",
+  "field.account": "Учётная запись",
   "field.process": "Процесс",
   "field.pid": "PID",
   "field.unit": "Юнит",

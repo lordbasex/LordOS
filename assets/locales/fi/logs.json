@@ -2,6 +2,7 @@
   "pick": "Valitse merkintä nähdäksesi koko viestin ja sen kentät.",
   "field.time": "Aika",
   "field.level": "Taso",
+  "field.account": "Tili",
   "field.process": "Prosessi",
   "field.pid": "PID",
   "field.unit": "Yksikkö",

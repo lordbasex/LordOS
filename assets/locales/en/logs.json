@@ -2,6 +2,7 @@
   "pick": "Pick an entry to see the full message and its fields.",
   "field.time": "Time",
   "field.level": "Level",
+  "field.account": "Account",
   "field.process": "Process",
   "field.pid": "PID",
   "field.unit": "Unit",

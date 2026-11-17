@@ -2,6 +2,7 @@
   "pick": "Chọn một mục để xem toàn bộ thông điệp và các trường của nó.",
   "field.time": "Thời gian",
   "field.level": "Mức",
+  "field.account": "Tài khoản",
   "field.process": "Tiến trình",
   "field.pid": "PID",
   "field.unit": "Unit",

@@ -2,6 +2,7 @@
   "pick": "항목을 선택하면 전체 메시지와 필드를 볼 수 있습니다.",
   "field.time": "시간",
   "field.level": "수준",
+  "field.account": "계정",
   "field.process": "프로세스",
   "field.pid": "PID",
   "field.unit": "유닛",

@@ -2,6 +2,7 @@
   "pick": "选择一个条目以查看完整消息及其字段。",
   "field.time": "时间",
   "field.level": "级别",
+  "field.account": "账户",
   "field.process": "进程",
   "field.pid": "PID",
   "field.unit": "单元",

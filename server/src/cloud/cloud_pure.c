@@ -247,6 +247,18 @@ void cloud_fails_clear(CloudFails *f) {
     if (f) f->n = 0;
 }
 
+int cloud_body_account(const char *body, char *id, size_t n) {
+    static const char pre[] = "{\"fs\":\"";
+    if (!body || n < 10 || strncmp(body, pre, sizeof pre - 1)) return 0;
+    const char *p = body + sizeof pre - 1;
+    if (p[0] != 'c') return 0;
+    for (int i = 1; i <= 8; i++) if (!((p[i] >= '0' && p[i] <= '9') || (p[i] >= 'a' && p[i] <= 'f'))) return 0;
+    if (p[9] != ':') return 0;
+    memcpy(id, p, 9);
+    id[9] = 0;
+    return 1;
+}
+
 /* ---- providers ---- */
 
 /* The overlay on rclone's own list (docs/CLOUD.md 17.2): what rclone can't say. Labels are rclone's names (its

@@ -2,6 +2,7 @@
   "pick": "Виберіть запис, щоб побачити повне повідомлення та його поля.",
   "field.time": "Час",
   "field.level": "Рівень",
+  "field.account": "Обліковий запис",
   "field.process": "Процес",
   "field.pid": "PID",
   "field.unit": "Юніт",

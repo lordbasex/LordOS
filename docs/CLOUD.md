@@ -81,7 +81,10 @@ last account goes, and ends with the session.
 XDG_RUNTIME_DIR, USER), umask 077, `nice 10`, idle I/O, `PR_SET_PDEATHSIG` (rclone unmounts and ends if `lord-server` dies),
 scope through lord-sessiond with `memory.high` 512 MB. Its log is `cloud.log` in the user's log folder
 (`/var/log/lordos/users/<user>`, docs/SYSTEM.md "Log files"; NOTICE level; over 4 MB its newest part becomes `cloud.log.old` at
-the next start), which the Logs app shows. A unit's `ProtectSystem=`/`BindPaths=` sandbox (4.5) is not
+the next start), which the Logs app shows. One rclone serves every account and its lines name none, so `lord-server`
+adds a line of its own after each rc call about an account that failed (0.8.8.10, #183: `ERROR c1a2b3c4d:
+operations/list: …`, the id only, `note_failure`), and the Logs app shows that account's provider and name on it and on
+rclone's lines of the same error (`cloudAccounts` in `sdk/logfile.js`). A unit's `ProtectSystem=`/`BindPaths=` sandbox (4.5) is not
 there: the scope and the socket are the boundary.
 
 - **Listens on a Unix socket only**: `$XDG_RUNTIME_DIR/lordos/cloud/rc.sock`, folder 0700, socket 0600. No TCP, not even
