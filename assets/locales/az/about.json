@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} nüvə",
     "other": "{cpu} · {count} nüvə"
   },
-  "credits": "Monitor-da IP-dən ölkə: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Xəritə: Natural Earth (ictimai mülkiyyət).",
+  "credits": "Monitor-da IP-dən ölkə: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Xəritə: Natural Earth (ictimai mülkiyyət). Hava şəhərləri: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Ekran",
   "engine": "İnterfeys mühərriki",
   "host": "Kompüter",

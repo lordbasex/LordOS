@@ -151,5 +151,10 @@
   "wifi.saved": "naka-save",
   "wifi.scan": "Mag-scan",
   "wifi.scanning": "Nag-i-scan…",
-  "wifi.wrongKey": "Mali ang password."
+  "wifi.wrongKey": "Mali ang password.",
+  "wifi.available": "Mga available na Wi-Fi network",
+  "wifi.currentLabel": "{ssid} — Nakakonekta",
+  "wifi.connect": "Kumonekta",
+  "wifi.notInRange": "Wala sa saklaw",
+  "wifi.knownFooter": "Kusang kumokonekta ang LordOS sa naka-save na network kapag nasa saklaw ito. Inaalis ng Kalimutan ang network at ang password nito sa computer na ito."
 }

@@ -235,6 +235,7 @@
   "fs.notRegular": "Itu bukan berkas biasa (apakah itu tautan?)",
   "fs.openFailed": "Tidak dapat membuka berkas: {errno}",
   "fs.outsideHome": "Lokasi itu berada di luar folder rumah Anda atau tidak valid",
+  "fs.nameTooLong": "Nama terlalu panjang (maks. {max} byte; huruf beraksen dan non-Latin masing-masing memakai 2 sampai 4)",
   "fs.protected": "Folder itu dilindungi",
   "fs.systemFolder": "Berkas tidak menampilkan folder internal sistem (/proc, /sys, /dev, dan /run)",
   "fs.tooLarge": "Berkas terlalu besar (maks. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Tidak dapat memperbarui bootloader (kode {code})",
   "hw.logindFailed": "Pengaturan daya tidak dapat diterapkan (kode {code})",
   "hw.noBacklight": "Lampu latar tidak ada",
+  "hw.noChargeControl": "Baterai ini tidak punya kontrol pengisian",
+  "hw.chargeControlFailed": "Pengisian tidak dapat diubah: {errno}",
   "hw.noCpufreq": "Komputer ini tidak memiliki penskalaan frekuensi CPU",
   "hw.noEeprom": "Alat bootloader (rpi-eeprom) tidak terpasang",
   "hw.noKernelLog": "Log kernel tidak dapat dibaca",
@@ -875,5 +878,12 @@
   "pkg.multiarchConflict": "{name} tidak dapat dipasang untuk 64 dan 32 bit sekaligus",
   "pkg.foreignArchUnsupported": "Paket 32-bit hanya dapat diaktifkan di PC 64-bit (amd64); sistem ini {arch}",
   "pkg.foreignArchFailed": "Paket 32-bit ({arch}) tidak dapat diaktifkan (dpkg keluar dengan kode {code})",
-  "webapps.developerOff": "Mode developer nonaktif di Pengaturan → Aplikasi Web"
+  "webapps.developerOff": "Mode developer nonaktif di Pengaturan → Aplikasi Web",
+  "media.streamAddress": "Alamat siaran ini tidak diizinkan",
+  "media.streamCannotOpen": "Siaran tidak bisa dibuka",
+  "media.streamTimeout": "Siaran tidak menjawab tepat waktu",
+  "media.streamAuth": "Siaran meminta pengguna dan kata sandi, atau keduanya salah",
+  "media.streamLost": "Siaran terputus",
+  "media.streamNoChannels": "Daftar tidak berisi saluran",
+  "media.noStreamHelper": "Pembantu siaran (lord-stream) tidak tersedia"
 }

@@ -235,6 +235,7 @@
   "fs.notRegular": "Tai ne įprastas failas (galbūt nuoroda?)",
   "fs.openFailed": "Nepavyko atidaryti failo: {errno}",
   "fs.outsideHome": "Ši vieta yra už jūsų namų aplanko ribų arba netinkama",
+  "fs.nameTooLong": "Pavadinimas per ilgas (daugiausia {max} baitų; raidės su diakritiniais ženklais ir nelotyniškos užima po 2–4)",
   "fs.protected": "Šis aplankas apsaugotas",
   "fs.systemFolder": "Failai nerodo vidinių sistemos aplankų (/proc, /sys, /dev ir /run)",
   "fs.tooLarge": "Failas per didelis (daugiausia {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Nepavyko atnaujinti paleidyklės (kodas {code})",
   "hw.logindFailed": "Nepavyko pritaikyti maitinimo nustatymų (kodas {code})",
   "hw.noBacklight": "Tokio foninio apšvietimo nėra",
+  "hw.noChargeControl": "Ši baterija neturi įkrovimo valdymo",
+  "hw.chargeControlFailed": "Nepavyko pakeisti įkrovimo: {errno}",
   "hw.noCpufreq": "Šiame kompiuteryje procesoriaus dažnio keitimas nepalaikomas",
   "hw.noEeprom": "Paleidyklės įrankiai (rpi-eeprom) neįdiegti",
   "hw.noKernelLog": "Nepavyko perskaityti branduolio žurnalo",
@@ -877,5 +880,12 @@
   "pkg.multiarchConflict": "{name} negalima įdiegti 64 ir 32 bitų vienu metu",
   "pkg.foreignArchUnsupported": "32 bitų paketus galima įjungti tik 64 bitų kompiuteryje (amd64); ši sistema yra {arch}",
   "pkg.foreignArchFailed": "Nepavyko įjungti 32 bitų ({arch}) paketų (dpkg baigė darbą su kodu {code})",
-  "webapps.developerOff": "Kūrėjo režimas išjungtas skiltyje Nustatymai → Žiniatinklio programos"
+  "webapps.developerOff": "Kūrėjo režimas išjungtas skiltyje Nustatymai → Žiniatinklio programos",
+  "media.streamAddress": "Šis transliacijos adresas neleidžiamas",
+  "media.streamCannotOpen": "Transliacijos atidaryti nepavyko",
+  "media.streamTimeout": "Transliacija laiku neatsakė",
+  "media.streamAuth": "Transliacija paprašė naudotojo ir slaptažodžio arba jie neteisingi",
+  "media.streamLost": "Transliacija nutrūko",
+  "media.streamNoChannels": "Sąraše nėra kanalų",
+  "media.noStreamHelper": "Transliacijų pagalbininkas (lord-stream) nepasiekiamas"
 }

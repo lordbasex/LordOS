@@ -235,6 +235,7 @@
   "fs.notRegular": "No és un fitxer normal (és un enllaç?)",
   "fs.openFailed": "No s’ha pogut obrir el fitxer: {errno}",
   "fs.outsideHome": "Aquesta ubicació és fora de la carpeta personal o no és vàlida",
+  "fs.nameTooLong": "El nom és massa llarg (màx. {max} bytes; les lletres accentuades i no llatines ocupen de 2 a 4 cadascuna)",
   "fs.protected": "Aquesta carpeta està protegida",
   "fs.systemFolder": "Fitxers no mostra les carpetes internes del sistema (/proc, /sys, /dev i /run)",
   "fs.tooLarge": "El fitxer és massa gran (màx. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "No s’ha pogut actualitzar el carregador d’arrencada (codi {code})",
   "hw.logindFailed": "No s’ha pogut aplicar la configuració d’energia (codi {code})",
   "hw.noBacklight": "No existeix aquesta retroil·luminació",
+  "hw.noChargeControl": "Aquesta bateria no té control de càrrega",
+  "hw.chargeControlFailed": "No s’ha pogut canviar la càrrega: {errno}",
   "hw.noCpufreq": "Aquest ordinador no permet ajustar la freqüència de la CPU",
   "hw.noEeprom": "Les eines del carregador d’arrencada (rpi-eeprom) no estan instal·lades",
   "hw.noKernelLog": "No s’ha pogut llegir el registre del nucli",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "{name} no es pot instal·lar per a 64 i 32 bits alhora",
   "pkg.foreignArchUnsupported": "Els paquets de 32 bits només es poden habilitar en un PC de 64 bits (amd64); aquest sistema és {arch}",
   "pkg.foreignArchFailed": "No s’han pogut habilitar els paquets de 32 bits ({arch}) (dpkg ha acabat amb el codi {code})",
-  "webapps.developerOff": "El mode de desenvolupador està desactivat a Configuració → Apps web"
+  "webapps.developerOff": "El mode de desenvolupador està desactivat a Configuració → Apps web",
+  "media.streamAddress": "Aquesta adreça d'emissió no està permesa",
+  "media.streamCannotOpen": "No s'ha pogut obrir l'emissió",
+  "media.streamTimeout": "L'emissió no ha respost a temps",
+  "media.streamAuth": "L'emissió ha demanat usuari i contrasenya, o eren incorrectes",
+  "media.streamLost": "S'ha perdut l'emissió",
+  "media.streamNoChannels": "La llista no té canals",
+  "media.noStreamHelper": "L'ajudant d'emissions (lord-stream) no està disponible"
 }

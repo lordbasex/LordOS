@@ -36,5 +36,15 @@
   "col.time": "เวลา",
   "back": "ย้อนกลับ",
   "emptyMusicTitle": "ไม่มีเพลง",
-  "emptyVideosTitle": "ไม่มีวิดีโอ"
+  "emptyVideosTitle": "ไม่มีวิดีโอ",
+  "nav.network": "เครือข่าย",
+  "nav.streams": "สตรีม",
+  "streams.open": "เปิดที่อยู่…",
+  "streams.list": "เปิดรายการ M3U…",
+  "streams.save": "บันทึก",
+  "streams.remove": "เอาออก",
+  "streams.close": "ปิด",
+  "streams.saved": "ที่บันทึกไว้",
+  "streams.channels": "ช่อง ({n})",
+  "streams.empty": "เปิดกล้อง สตรีม หรือช่องทีวีจากที่อยู่ หรือช่องในรายการ M3U"
 }

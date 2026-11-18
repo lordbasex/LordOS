@@ -283,5 +283,16 @@ eq('notice: not a window with an app id, a title, a parent, a dialog or X11', [
   eq('covered: LordOS windows are never listed', ids([N('notes#1', 100, 100, 10, 10), N('files#1', 0, 0, 1280, 800)]), []);
 }
 
+// the Overview's Up and Down keys: the nearest window above or below, the horizontal distance counting most
+{
+  const P = new Map([['a', { x: 0, y: 0, w: 100, h: 100, scale: 1 }], ['b', { x: 200, y: 0, w: 100, h: 100, scale: 1 }],
+    ['c', { x: 0, y: 200, w: 100, h: 100, scale: 1 }], ['d', { x: 220, y: 200, w: 100, h: 100, scale: 1 }]]);
+  const ids = ['a', 'b', 'c', 'd'];
+  eq('grid: down from a is c', M.gridNeighbor(P, ids, 'a', 'down'), 'c');
+  eq('grid: up from d is b', M.gridNeighbor(P, ids, 'd', 'up'), 'b');
+  eq('grid: nothing above the top row', M.gridNeighbor(P, ids, 'b', 'up'), 'b');
+  eq('grid: an unknown window stays', M.gridNeighbor(P, ids, 'x', 'down'), 'x');
+}
+
 if (bad) { console.error(`desktop-model-test: ${bad} of ${n} failed`); process.exit(1); }
 console.log(`desktop-model-test: ${n} checks passed`);

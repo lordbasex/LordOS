@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} core",
     "other": "{cpu} · {count} core"
   },
-  "credits": "IP-to-country sa Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Mapa: Natural Earth (public domain).",
+  "credits": "IP-to-country sa Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Mapa: Natural Earth (public domain). Mga lungsod ng panahon: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Display",
   "engine": "UI engine",
   "host": "Computer",

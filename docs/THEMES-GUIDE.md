@@ -46,12 +46,13 @@ CPU or the GPU. So you write ordinary function components with hooks, but with `
 around the windows (bars, Dock, launcher, panels), where menus open, and the keyboard shortcuts of
 its own layout (for example what the Super key alone does).
 
-**The two built-in themes are the references:**
+**The built-in themes are the references:**
 
 | Theme | Folder | Layout |
 |---|---|---|
 | Lord Flow | `themes/default` | menu bar on top (with the app's menus), magnifying Dock, app launcher, Control Center |
 | Lord Classic | `themes/classic` | taskbar (bottom, top or a side), start menu with search, quick settings, notification panel, menus in each window, snapping and the SDK's Overview |
+| Lord Workspaces (in development) | `themes/workspaces` | activities (desktops with an icon, a colour, pinned apps and a layout per display), a Context Spine, group frames with static tiling, its own Search panel and Control Center, menus in each window, three effects styles ([WORKSPACES.md](WORKSPACES.md)) |
 
 `themes/greeter` is the login and lock screen: it is a separate program, not a desktop theme (see
 [The login and lock screen](#the-login-and-lock-screen-are-not-your-theme)).
@@ -97,6 +98,17 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
   that way; `themes.list` in `sdk/index.js`). A missing or invalid `theme.json` shows the id.
 - `hidden: true` keeps it out of Settings (the login screen uses it).
 - It is read as text of at most 4 KB. It is data, not code, so it is not in the code manifest.
+- (0.8.9) Three optional fields for Settings, which knows only Lord Flow and Lord Classic by id. `sdk/thememeta.js`
+  checks them and drops anything else (labels must be `shell.*` locale keys, values short plain strings):
+  - `"sketch": { "rail": true, "pills": true, "frame": true }` (also `menubar`, `dock`, `taskbar`): the drawn picture
+    in Appearance → Desktop style.
+  - `"options": [{ "key", "label", "hint", "choices": [[value, label], …] | "toggle": true, "default" }]`: the theme's
+    own choices, shown under Desktop style and on Desktop & Dock while it is the current theme, stored in
+    `settings.themeOptions[<theme id>][key]`; read them with `themeOptionValue` (`@lordos/sdk`).
+  - `"desktopArrows": true`: the Desktops section offers Settings → Keyboard's ⌃-arrows switch, as for Lord Flow
+    (the theme then uses `flowDesktopKeys` and `flowGrabs()`).
+
+  Lord Workspaces' `theme.json` uses all three.
 
 ### `tokens.js`: the contract with the apps
 
@@ -229,7 +241,10 @@ Inside it:
 - **`<AppHost id={w.id} focused={…} />`** for the content, in a `flex: 1` box;
 - no background under the content when `getApp(w.id).transparent` (the Terminal). Such a window has
   nothing behind its border either: draw the border with `solidOver(line, titleBg)` so it stays
-  opaque (both themes do);
+  opaque (both themes do). Put **`<SeamCover color={titleBg} below={…} />`** (from `@lordos/sdk`) first in its title
+  bar, and in any bar under it: at 125 %, 150 % or 175 % the edges between the border, the bars and the app's first
+  row fall inside a pixel, and without it that row lets the desktop through (GitHub #162). `below` reaches past the
+  bar into what follows it (the default theme: 2, its 1 px separator and 1 px of the app);
 - the title with `windowTitle(w)` (apps change it, for example the Terminal);
 - buttons that `stopPropagation()` on mouse down, so pressing them doesn't start a move.
 

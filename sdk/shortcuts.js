@@ -42,7 +42,7 @@ import { liveSpeech } from './livespeech.jsx';
 
 const MOD_BITS = { Shift: 1, Alt: 2, Ctrl: 4, Meta: 8 };
 const NAMED = {
-  1: 'Escape', 15: 'Tab', 41: '`', 51: ',', 52: '.', 57: 'Space', 62: 'F4', 68: 'F10', 87: 'F11', 88: 'F12', 99: 'PrintScreen',
+  1: 'Escape', 15: 'Tab', 41: '`', 51: ',', 52: '.', 53: '/', 57: 'Space', 60: 'F2', 62: 'F4', 68: 'F10', 87: 'F11', 88: 'F12', 99: 'PrintScreen',
   103: 'ArrowUp', 105: 'ArrowLeft', 106: 'ArrowRight', 108: 'ArrowDown',
   163: 'MediaNext', 164: 'MediaPlayPause', 165: 'MediaPrev', 166: 'MediaStop', 200: 'MediaPlay', 201: 'MediaPause',
   113: 'VolumeMute', 114: 'VolumeDown', 115: 'VolumeUp', 224: 'BrightnessDown', 225: 'BrightnessUp', 229: 'KeyLightDown', 230: 'KeyLightUp',
@@ -266,16 +266,19 @@ export function comboLabel(combo) {
 
 // [{ group, items: [{ id, label, keys: '❖Space · ⌃Space' }] }], groups in a fixed order. Entries with
 // the same label become one row.
+// from: where it comes from ('app' a module's or an app's own, Screenshots…; 'theme'; 'lordos' the base every theme
+// shares), and combos: the keys one by one (keys is them joined, for a single line).
 export function shortcutList() {
   const groups = new Map([['system', []], ['windows', []], ['desktops', []], ['apps', []]]);
+  const from = new Map([...added.map((e) => [e, 'app']), ...themeTable.map((e) => [e, 'theme']), ...BASE.map((e) => [e, 'lordos'])]);
   for (const entry of [...added, ...themeTable, ...BASE]) {
     if (!entry.label || (entry.listed && !entry.listed())) continue;
     const keys = entry.show || entry.keys.map(comboLabel);
     const list = groups.get(entry.group) || groups.get('system');
     const same = list.find((x) => x.labelKey === entry.label);
-    if (same) same.keys.push(...keys);
-    else list.push({ id: entry.id, labelKey: entry.label, label: t(entry.label), keys: [...keys] });
+    if (same) same.keys.push(...keys.filter((k) => !same.keys.includes(k)));
+    else list.push({ id: entry.id, labelKey: entry.label, label: t(entry.label), keys: [...keys], from: from.get(entry) });
   }
   return [...groups].filter(([, items]) => items.length)
-    .map(([group, items]) => ({ group, items: items.map((x) => ({ ...x, keys: x.keys.join(' · ') })) }));
+    .map(([group, items]) => ({ group, items: items.map((x) => ({ ...x, combos: x.keys, keys: x.keys.join(' · ') })) }));
 }

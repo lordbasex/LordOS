@@ -235,6 +235,7 @@
   "fs.notRegular": "Adi fayl deyil (keçiddir?)",
   "fs.openFailed": "Faylı açmaq mümkün olmadı: {errno}",
   "fs.outsideHome": "Bu yer ev qovluğunuzdan kənardadır və ya yararsızdır",
+  "fs.nameTooLong": "Ad çox uzundur (maks. {max} bayt; diakritikli və qeyri-latın hərfləri hər biri 2-4 bayt tutur)",
   "fs.protected": "Bu qovluq qorunur",
   "fs.systemFolder": "Fayllar sistemin daxili qovluqlarını (/proc, /sys, /dev və /run) göstərmir",
   "fs.tooLarge": "Fayl çox böyükdür (maks. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Yükləyicini yeniləmək mümkün olmadı (kod {code})",
   "hw.logindFailed": "Enerji parametrlərini tətbiq etmək mümkün olmadı (kod {code})",
   "hw.noBacklight": "Belə arxa işıq yoxdur",
+  "hw.noChargeControl": "Bu batareyada şarj idarəsi yoxdur",
+  "hw.chargeControlFailed": "Şarjı dəyişmək olmadı: {errno}",
   "hw.noCpufreq": "Bu kompüterdə prosessor tezliyinin tənzimlənməsi yoxdur",
   "hw.noEeprom": "Yükləyici alətləri (rpi-eeprom) quraşdırılmayıb",
   "hw.noKernelLog": "Nüvə jurnalını oxumaq mümkün olmadı",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "{name} eyni anda 64 və 32 bit üçün quraşdırıla bilməz",
   "pkg.foreignArchUnsupported": "32 bitlik paketlər yalnız 64 bitlik kompüterdə (amd64) aktivləşdirilə bilər; bu sistem {arch}-dir",
   "pkg.foreignArchFailed": "32 bitlik ({arch}) paketlər aktivləşdirilə bilmədi (dpkg {code} kodu ilə başa çatdı)",
-  "webapps.developerOff": "Tərtibatçı rejimi Parametrlər → Veb tətbiqlər bölməsində söndürülüb"
+  "webapps.developerOff": "Tərtibatçı rejimi Parametrlər → Veb tətbiqlər bölməsində söndürülüb",
+  "media.streamAddress": "Bu yayım ünvanına icazə verilmir",
+  "media.streamCannotOpen": "Yayımı açmaq olmadı",
+  "media.streamTimeout": "Yayım vaxtında cavab vermədi",
+  "media.streamAuth": "Yayım istifadəçi və parol istədi və ya səhv idi",
+  "media.streamLost": "Yayım kəsildi",
+  "media.streamNoChannels": "Siyahıda kanal yoxdur",
+  "media.noStreamHelper": "Yayım köməkçisi (lord-stream) əlçatan deyil"
 }

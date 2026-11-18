@@ -5,8 +5,9 @@
   "accounts": "Conturi",
   "allAccounts": "Toate conturile",
   "onThisComputer": "Pe acest computer",
-  "cacheLine": "{size} · {kept} păstrați",
+  "hereLine": "{size} · {kept} păstrați · {free} pot fi eliberați",
   "freeUp": "Eliberează spațiu",
+  "freeUpHint": "„Eliberează spațiu” șterge copiile locale ale fișierelor care nu sunt păstrate pe acest computer; fișierele păstrate și modificările care așteaptă să fie încărcate rămân.",
   "freed": "{size} eliberați pe acest computer",
   "freedSkipped": {
     "one": "{size} eliberați; {count} element rămâne (deschis, păstrat sau în așteptarea încărcării)",
@@ -459,5 +460,9 @@
   "details.signIn": "Autentificare",
   "details.server": "Server",
   "details.app": "Aplicație",
-  "details.ownApp": "Propria dvs. aplicație"
+  "details.ownApp": "Propria dvs. aplicație",
+  "color": "Culoare",
+  "colorAuto": "Automată",
+  "colorAutoHint": "Automată: după ordinea în care ai adăugat contul, ca două conturi ale aceluiași furnizor să difere.",
+  "colorChosen": "Afișată în Fișiere, meniul Cloud și Jurnale."
 }

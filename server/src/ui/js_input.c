@@ -127,6 +127,21 @@ static JSValue f_configure(JSContext *c, JSValueConst this, int argc, JSValueCon
     return JS_TRUE;
 }
 
+/* lord.input.pointerAccent('#RRGGBB' | null): the theme's accent arrow (cursor.h), only the default pointer.
+ * A colour only: nothing else about the cursor can be set from here. */
+static JSValue f_pointer_accent(JSContext *c, JSValueConst this, int argc, JSValueConst *argv) {
+    (void)this;
+    unsigned rgb = 0;
+    int on = 0;
+    const char *str = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    if (str) {
+        on = strlen(str) == 7 && str[0] == '#' && strspn(str + 1, "0123456789abcdefABCDEF") == 6 && sscanf(str + 1, "%6x", &rgb) == 1;
+        JS_FreeCString(c, str);
+    }
+    cursor_set_accent(on, rgb);
+    return JS_NewBool(c, on);
+}
+
 static int keyboard_present;
 void js_input_set_keyboard(int present) { keyboard_present = present; }
 
@@ -186,6 +201,7 @@ static const JSCFunctionListEntry input_funcs[] = {
     JS_CFUNC_DEF("hasKeyboard", 0, f_has_keyboard),
     JS_CFUNC_DEF("keyLabels", 0, f_key_labels),
     JS_CFUNC_DEF("tap", 2, f_tap),
+    JS_CFUNC_DEF("pointerAccent", 1, f_pointer_accent),
 };
 
 void js_input_register(JSContext *c, JSValue lord) {

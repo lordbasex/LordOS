@@ -37,5 +37,15 @@
   "col.time": "Duración",
   "back": "Atrás",
   "emptyMusicTitle": "Sin música",
-  "emptyVideosTitle": "Sin videos"
+  "emptyVideosTitle": "Sin videos",
+  "nav.network": "Red",
+  "nav.streams": "Transmisiones",
+  "streams.open": "Abrir dirección…",
+  "streams.list": "Abrir lista M3U…",
+  "streams.save": "Guardar",
+  "streams.remove": "Quitar",
+  "streams.close": "Cerrar",
+  "streams.saved": "Guardadas",
+  "streams.channels": "Canales ({n})",
+  "streams.empty": "Abrí una cámara, una transmisión o un canal de TV por su dirección, o los canales de una lista M3U."
 }

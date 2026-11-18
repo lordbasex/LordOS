@@ -4,7 +4,7 @@
   "name": "Contacts",
   "description": "Address books, groups and contact cards",
   "size": [880, 560],
-  "minSize": [700, 400],
+  "minSize": [480, 360],
   "dock": true,
   "category": "Office",
   "permissions": [],

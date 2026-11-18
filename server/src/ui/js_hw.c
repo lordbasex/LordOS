@@ -65,6 +65,8 @@
  *   lord.browserFrame.chromiumRunning()         Chromium's profile folder is in use
  *   lord.browserFrame.state()                   { chromiumOn, chromiumOff }: profiles with each frame
  */
+#include "../hw/hidppsvc.h"
+#include "../hw/batthist.h"
 #include "js_hw.h"
 #include "js_fan.h"
 #include "../hw/brframe.h"
@@ -250,8 +252,19 @@ static const JSCFunctionListEntry display_funcs[] = {
 
 static JSValue f_power_state(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
-    char j[4096];
+    char j[8192];
     power_json(hw_power(), j, sizeof j);
+    return JS_ParseJSON(c, j, strlen(j), "<power>");
+}
+
+/* lord.power.live(): the supplies read now (Monitor's Battery tab asks every 2 s while it is shown; lord.power.state()
+ * is the last uevent's or poll's) */
+static JSValue f_power_live(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    PowerState ps;
+    power_read("/sys/class/power_supply", &ps);
+    char j[8192];
+    power_json(&ps, j, sizeof j);
     return JS_ParseJSON(c, j, strlen(j), "<power>");
 }
 
@@ -297,8 +310,33 @@ static JSValue f_power_buttons(JSContext *c, JSValueConst t, int argc, JSValueCo
     return o;
 }
 
+/* lord.hidpp.batteries(): lord-hidpp's latest exact Logitech percentages, [{ supply, percent, charging, full }]; asking
+ * starts a new run at most once a minute (hw/hidppsvc.c) */
+static JSValue f_hidpp_batteries(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    char j[2048];
+    size_t n = hidpp_json(j, sizeof j);
+    return JS_ParseJSON(c, j, n, "<hidpp>");
+}
+/* lord.power.history(): the battery's history kept by lord-server (hw/batthist.c), for Settings → Battery */
+static JSValue f_power_history(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    char *j = malloc(160 * 1024);
+    if (!j) return JS_NULL;
+    size_t n = batthist_json(j, 160 * 1024);
+    JSValue v = JS_ParseJSON(c, j, n, "<history>");
+    free(j);
+    return v;
+}
+
+static const JSCFunctionListEntry hidpp_funcs[] = {
+    JS_CFUNC_DEF("batteries", 0, f_hidpp_batteries),
+};
+
 static const JSCFunctionListEntry power_funcs[] = {
     JS_CFUNC_DEF("state", 0, f_power_state),
+    JS_CFUNC_DEF("live", 0, f_power_live),
+    JS_CFUNC_DEF("history", 0, f_power_history),
     JS_CFUNC_DEF("profiles", 0, f_power_profiles),
     JS_CFUNC_DEF("setProfile", 1, f_power_set_profile),
     JS_CFUNC_DEF("buttons", 0, f_power_buttons),
@@ -1081,6 +1119,7 @@ static void add(JSContext *c, JSValue lord, const char *name, const JSCFunctionL
 void js_hw_register(JSContext *c, JSValue lord) {
     add(c, lord, "display", display_funcs, sizeof display_funcs / sizeof display_funcs[0]);
     add(c, lord, "power", power_funcs, sizeof power_funcs / sizeof power_funcs[0]);
+    add(c, lord, "hidpp", hidpp_funcs, sizeof hidpp_funcs / sizeof hidpp_funcs[0]);
     add(c, lord, "bt", bt_funcs, sizeof bt_funcs / sizeof bt_funcs[0]);
     add(c, lord, "polkit", polkit_funcs, sizeof polkit_funcs / sizeof polkit_funcs[0]);
     /* lord.portal already holds set (js_wm.c): these go on the same object */

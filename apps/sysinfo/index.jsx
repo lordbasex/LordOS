@@ -9,10 +9,11 @@ import {
   View, Text, ScrollView, Button, useTheme, useLocale, LordOSLogo, systemReport, systemInfo, lordosVersion, formatBytes, formatNumber,
   Toolbar, ToolbarSpacer, ToolbarButton, Segmented, SidebarItem, GroupBox, FormRow, EmptyState, Hairline, spacing, typeScale,
   fs, userDirs, clipboard, wm, admin, remote, codeStatus, launchApp, useAppWindow, useBluetooth, formatDate,
+  Dropdown, useNarrow, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { evaluate as evaluateChecks, evaluateProbe, evaluateBench, PENDING as PENDING_CHECKS, PROBE_CHECKS } from './checks.js';
-import Performance from './performance.jsx';
+import Performance, { NARROW_AT } from './performance.jsx';
 import { Scene } from './scene.jsx';
 import { cardLayers, sessionLayers, compatibility, hardwareSections, piStatus, piBoard, machineName, compositionReason, reportFileName, reportJson, parseMemoryLines, parseSerialLines, peripherals, firmwareDate } from './model.js';
 import { buildShareReport, summaryRows, issueUrl, shareFileNames, shareJson, sharePage, bootInfo } from './share.js';
@@ -56,8 +57,9 @@ function Badge({ state }) {
 
 function Row({ label, value }) {
   const t = useTheme();
+  const narrow = useNarrow(NARROW_AT);
   return (
-    <FormRow label={label} labelWidth={170} minHeight={30}>
+    <FormRow label={label} labelWidth={narrow ? 120 : 170} minHeight={30}>
       <Text style={{ fontSize: typeScale.body, color: value ? t.text : t.textDim, textAlign: 'start' }}>{value || '—'}</Text>
     </FormRow>
   );
@@ -66,9 +68,10 @@ function Row({ label, value }) {
 // A layer or compatibility row: name, state and what it means.
 function StateRow({ label, state, detail }) {
   const t = useTheme();
+  const narrow = useNarrow(NARROW_AT);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m, minHeight: 40, paddingVertical: 6 }}>
-      <Text style={{ width: 170, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{label}</Text>
+      <Text style={{ width: narrow ? 120 : 170, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{label}</Text>
       <Badge state={state} />
       <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start', lineHeight: 1.35 }}>{detail || ''}</Text>
     </View>
@@ -420,26 +423,30 @@ function MemoryModules() {
   );
 }
 
-function Hardware({ r }) {
+function Hardware({ r, side }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const sections = useMemo(() => hardwareSections(r), [r]);
   const [sel, setSel] = useState('computer');
   const cur = sections.includes(sel) ? sel : sections[0];
+  const list = (
+    <View style={{ width: 200, ...(side.narrow ? { flex: 1 } : null), backgroundColor: t.sidebarBg }}>
+      <ScrollView style={{ flex: 1 }} contentStyle={{ padding: spacing.s, gap: 1 }}>
+        {sections.map((id) => <SidebarItem key={id} label={tr(`sysinfo.section.${id}`)} selected={id === cur} onClick={() => { setSel(id); if (side.narrow) side.close(); }} />)}
+      </ScrollView>
+      <Hairline edge="end" />
+    </View>
+  );
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 200, backgroundColor: t.sidebarBg }}>
-        <ScrollView style={{ flex: 1 }} contentStyle={{ padding: spacing.s, gap: 1 }}>
-          {sections.map((id) => <SidebarItem key={id} label={tr(`sysinfo.section.${id}`)} selected={id === cur} onClick={() => setSel(id)} />)}
-        </ScrollView>
-        <Hairline edge="end" />
-      </View>
+      {side.narrow ? null : list}
       <ScrollView resetKey={cur} style={{ flex: 1 }}>
         <View style={{ padding: spacing.xl, gap: spacing.l }}>
           <Text style={{ fontSize: typeScale.title, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr(`sysinfo.section.${cur}`)}</Text>
           <Section id={cur} r={r} />
         </View>
       </ScrollView>
+      {side.narrow && side.shown ? <SidebarOverlay width={200} onClose={side.close}>{list}</SidebarOverlay> : null}
     </View>
   );
 }
@@ -474,6 +481,7 @@ function Compatibility({ r }) {
   const version = (r.software && r.software.lordos) || '';
   const byRow = useMemo(() => (comm.state === 'ok' ? communityFor(comm.snapshot, r, version) : {}), [comm, r, version]);
   const sn = comm.state === 'ok' ? comm.snapshot : null;
+  const narrow = useNarrow(NARROW_AT);
   return (
     <ScrollView style={{ flex: 1 }}>
       <View style={{ padding: spacing.xl, gap: spacing.l }}>
@@ -485,7 +493,7 @@ function Compatibility({ r }) {
                 <StateRow label={tr(`sysinfo.component.${c.id}`)} state={c.state} detail={compatNote(tr, c)} />
                 {cs ? (
                   <View style={{ flexDirection: 'row', gap: spacing.m, paddingBottom: 6 }}>
-                    <View style={{ width: 170 }} />
+                    <View style={{ width: narrow ? 120 : 170 }} />
                     <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.35 }}>
                       {`${tr('sysinfo.community.label')} · ${communityNote(tr, cs)}`}</Text>
                   </View>
@@ -512,15 +520,16 @@ function CheckRow({ c }) {
   const note = !c.note ? '' : c.note.startsWith('gpuNot.')
     ? tr('sysinfo.compat.cpuBecause', { reason: tr(`sysinfo.reason.${camel(c.note.slice(7))}`) })
     : tr(`sysinfo.checkNote.${c.note}`, c.vars);
+  const narrow = useNarrow(NARROW_AT);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m, minHeight: 44, paddingVertical: 6 }}>
       <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: CHECK_COLOR[c.state] || '#8e8e93' }} />
-      <View style={{ width: 220, gap: 2 }}>
+      <View style={{ width: narrow ? 140 : 220, gap: 2 }}>
         <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr(`sysinfo.check.${c.id}`)}</Text>
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>
           {[tr(`sysinfo.level.${c.level}`), c.paper ? tr('sysinfo.paperRef', { ref: c.paper }) : ''].filter(Boolean).join(' · ')}</Text>
       </View>
-      <Text style={{ width: 120, fontSize: typeScale.callout, fontWeight: 600, color: CHECK_COLOR[c.state], textAlign: 'start' }}>{tr(`sysinfo.checkState.${c.state}`)}</Text>
+      <Text style={{ width: narrow ? 80 : 120, fontSize: typeScale.callout, fontWeight: 600, color: CHECK_COLOR[c.state], textAlign: 'start' }}>{tr(`sysinfo.checkState.${c.state}`)}</Text>
       <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start', lineHeight: 1.35 }}>{note}</Text>
     </View>
   );
@@ -676,13 +685,14 @@ function Share({ r, onClose }) {
   }), [r]);
   const json = useMemo(() => shareJson(rep), [rep]);
   const rows = useMemo(() => shareRows(tr, rep), [rep, tr]);
+  const narrow = useNarrow(NARROW_AT);
   const save = () => {
     const docs = userDirs().documents;
     try { fs.mkdir(docs); } catch (e) { /* already there */ }
     const names = shareFileNames(rep.createdAt, (n) => { try { return !!fs.stat(`${docs}/${n}`); } catch (e) { return false; } });
     if (!names) { setMsg({ ok: false, text: tr('sysinfo.share.failed') }); return; }
     const text = Object.fromEntries(PAGE_KEYS.map((k) => [k, tr(`sysinfo.share.page.${k}`)]));
-    const html = sharePage({ text, rows, url: issueUrl(rep), jsonName: names.json, lang: lang || 'en', rtl: dir === 'rtl' });
+    const html = sharePage({ text, rows, url: issueUrl(rep), jsonName: names.json, lang: lang || 'en', rtl: dir === 'rtl', json });
     try {
       fs.write(`${docs}/${names.json}`, json);
       fs.write(`${docs}/${names.html}`, html);
@@ -699,8 +709,9 @@ function Share({ r, onClose }) {
       <GroupBox footer={[rep.live ? tr('sysinfo.share.live') : '', rep.bench || rep.desktop ? tr('sysinfo.share.withBench') : tr('sysinfo.share.noBench')].filter(Boolean).join(' ')}>
         {rows.map(([k, v]) => <Row key={k} label={k} value={v} />)}
       </GroupBox>
+      {narrow ? <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('sysinfo.share.exact')}</Text> : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
-        <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('sysinfo.share.exact')}</Text>
+        {narrow ? <View style={{ flex: 1 }} /> : <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('sysinfo.share.exact')}</Text>}
         <Button label={tr('sysinfo.share.back')} onClick={onClose} />
         <Button primary label={tr('sysinfo.share.go')} onClick={save} />
       </View>
@@ -740,10 +751,11 @@ function ReportText({ r, onShare }) {
     } catch (e) { setMsg({ ok: false, text: tr('sysinfo.report.saveFailed') }); }
   };
   const copy = () => { clipboard.set(text); setMsg({ ok: true, text: tr('sysinfo.report.copied') }); };
+  const narrow = useNarrow(NARROW_AT);
   return (
     <View style={{ flex: 1, padding: spacing.xl, gap: spacing.m }}>
       <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('sysinfo.report.intro')}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, ...(narrow ? { flexWrap: 'wrap' } : null) }}>
         <Segmented small value={fmt} onChange={(v) => { setFmt(v); setMsg(null); }} options={[['markdown', tr('sysinfo.report.markdown')], ['json', 'JSON']]} />
         <View style={{ flex: 1 }} />
         <Button label={tr('sysinfo.report.copy')} onClick={copy} />
@@ -773,17 +785,21 @@ function SystemInformationMain({ startTab }) {
   const [n, setN] = useState(0);
   const r = useMemo(() => systemReport(), [n]);
   const info = useMemo(() => systemInfo(), [n]);
+  const narrow = useNarrow(NARROW_AT);
+  const side = useSidebar(640, 'sysinfo-hardware');
   if (!r) return <EmptyState mascot="confused" title={tr('sysinfo.unavailable')} />;
+  const tabs = [['overview', tr('sysinfo.tab.overview')], ['hardware', tr('sysinfo.tab.hardware')], ['compat', tr('sysinfo.tab.compat')], ['checks', tr('sysinfo.tab.checks')], ['perf', tr('sysinfo.tab.perf')], ['report', tr('sysinfo.tab.report')]];
   return (
     <View style={{ flex: 1 }}>
       <Toolbar>
+        {tab === 'hardware' && side.narrow ? <SidebarToggle shown={side.shown} onClick={side.toggle} /> : null}
         <ToolbarSpacer />
-        <Segmented appearance="neutral" value={tab} onChange={setTab}
-          options={[['overview', tr('sysinfo.tab.overview')], ['hardware', tr('sysinfo.tab.hardware')], ['compat', tr('sysinfo.tab.compat')], ['checks', tr('sysinfo.tab.checks')], ['perf', tr('sysinfo.tab.perf')], ['report', tr('sysinfo.tab.report')]]} />
+        {narrow ? <Dropdown value={tab} onChange={setTab} options={tabs} width={200} />
+          : <Segmented appearance="neutral" value={tab} onChange={setTab} options={tabs} />}
         <ToolbarSpacer />
         <ToolbarButton icon="↻" title={tr('sysinfo.refresh')} onClick={() => setN(n + 1)} />
       </Toolbar>
-      {tab === 'overview' ? <Overview r={r} info={info} /> : tab === 'hardware' ? <Hardware r={r} /> : tab === 'compat' ? <Compatibility r={r} /> : tab === 'checks' ? <Checks r={r} /> : tab === 'perf' ? <Performance r={r} /> : <Report r={r} />}
+      {tab === 'overview' ? <Overview r={r} info={info} /> : tab === 'hardware' ? <Hardware r={r} side={side} /> : tab === 'compat' ? <Compatibility r={r} /> : tab === 'checks' ? <Checks r={r} /> : tab === 'perf' ? <Performance r={r} /> : <Report r={r} />}
     </View>
   );
 }

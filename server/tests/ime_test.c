@@ -1,7 +1,8 @@
 /* ime_test.c — headless test of the input methods (ime.c): simulates keys and
  * prints the committed text, the preedit and the candidates.
  *   build/ime-test hangul|kana|pinyin "keys"
- * In the keys: _ = Space, ^ = Enter, < = Backspace, ~ = Escape, everything else letter by letter. */
+ * In the keys: _ = Space, ^ = Enter, < = Backspace, ~ = Escape, + = Shift pressed alone (as a real keyboard
+ * sends it before a capital), everything else letter by letter. */
 #include <stdio.h>
 #include <string.h>
 
@@ -21,6 +22,7 @@ int main(int argc, char **argv) {
         case '^': strcpy(k.key, "Enter"); break;
         case '<': strcpy(k.key, "Backspace"); break;
         case '~': strcpy(k.key, "Escape"); break;
+        case '+': k.shift = 1; break;                       /* no key name and no text, like keyboard.c's Shift */
         default: k.key[0] = k.chr[0] = *p; k.shift = *p >= 'A' && *p <= 'Z'; break;
         }
         char commit[512];

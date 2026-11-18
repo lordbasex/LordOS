@@ -5,8 +5,9 @@
   "accounts": "Mga Account",
   "allAccounts": "Lahat ng account",
   "onThisComputer": "Sa computer na ito",
-  "cacheLine": "{size} · {kept} ang itinatabi",
+  "hereLine": "{size} · {kept} ang itinatabi · {free} ang maaaring bakantehin",
   "freeUp": "Magbakante ng Espasyo",
+  "freeUpHint": "Tinatanggal ng Magbakante ng Espasyo ang mga lokal na kopya ng mga file na hindi itinatabi sa computer na ito; nananatili ang mga itinatabing file at ang mga pagbabagong naghihintay ma-upload.",
   "freed": "{size} ang nabakante sa computer na ito",
   "freedSkipped": {
     "one": "{size} ang nabakante; {count} item ang naiwan (bukas, itinatabi o naghihintay na ma-upload)",
@@ -438,5 +439,9 @@
   "details.signIn": "Sign-in",
   "details.server": "Server",
   "details.app": "App",
-  "details.ownApp": "Ang sarili mong app"
+  "details.ownApp": "Ang sarili mong app",
+  "color": "Kulay",
+  "colorAuto": "Awtomatiko",
+  "colorAutoHint": "Awtomatiko: ayon sa pagkakasunod ng pagdagdag mo ng account, para magkaiba ang dalawang account ng iisang provider.",
+  "colorChosen": "Ipinapakita sa Files, sa menu ng Cloud at sa Logs."
 }

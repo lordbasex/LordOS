@@ -271,6 +271,10 @@ typedef struct {
     int pty_cols, pty_rows;     /* the size last given to the pty (TIOCSWINSZ): term_size_sync */
     double size_checked;        /* when the pty's own size was last compared with the grid */
     int drawn_cx, drawn_cy, blink_on;
+    Cell *shot;                 /* what the screen showed at the last damage (term_damage): cols × rows cells */
+    uint8_t *shot_flags;        /* and each row's line flags (prompt marks) */
+    int shot_cols, shot_rows, shot_ok;
+    uint32_t shot_cursor;       /* how the cursor was drawn (blink phase, focus, shape, shown): term_damage */
     int pending_render;
     Frame *frames;              /* Instant Replay: ring of past screens */
     int nframes, frame_head, replay;

@@ -8,7 +8,7 @@ import {
   diskTempHistory, DISK_TEMP_HISTORY, smart, useSmartSummaries, diskTempLimit, diskAlertPrefs, setDiskAlerts, typeScale,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Big, Pair, Stat, Table, Cell, C, fmt, useCardStyle } from './index.jsx';
+import { Card, Big, Pair, Stat, StatRow, Table, Cell, C, fmt, useCardStyle } from './index.jsx';
 import { Chart } from './Chart.jsx';
 
 export const HEALTH_COLOR = { ok: '#30d158', warning: '#ff9f0a', failing: '#ff453a', unknown: '#8e8e93' };
@@ -145,10 +145,10 @@ function DiskDetail({ d, sum, h }) {
             : sum.error ? tr('monitor.health.errorHint')
             : tr(`monitor.health.hint.${health}`)}
         </Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <StatRow gap={8}>
           <Stat label={tr('monitor.health.hours')} value={sum?.hours != null ? formatNumber(sum.hours, 0) : '—'} unit={sum?.hours != null ? tr('monitor.health.hoursUnit') : null} />
           {!d.rota ? <Stat label={tr('monitor.health.wear')} value={sum?.wear != null ? formatNumber(sum.wear, 0) : '—'} unit={sum?.wear != null ? '%' : null} /> : null}
-        </View>
+        </StatRow>
         {!smart.installed() && smart.smartable(d.name) ? <Text style={{ fontSize: 11, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{tr('monitor.health.basic')}</Text> : null}
         <Button small label={tr('monitor.health.openDisks')} onClick={open} />
       </Card>

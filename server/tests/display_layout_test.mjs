@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { displayNumbers, snapDisplay, resolveDrop, placementOk, touches, scaleChoices, scaleTiles } = await import(path.join(here, '../../sdk/displaylayout.js'));
+const { displayNumbers, snapDisplay, resolveDrop, placementOk, touches, scaleChoices, scaleTiles, scaleValid } = await import(path.join(here, '../../sdk/displaylayout.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -18,18 +18,29 @@ const ok = (name, v) => eq(name, !!v, true);
 const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 // ---- scales (issue #47: up to 300 %) ----
-eq('scales: 1080p offers 100–200', scaleChoices(1920, 1080), [100, 125, 150, 175, 200]);
+eq('scales: 1080p offers 75, 80 and 100–200 (GitHub #158)', scaleChoices(1920, 1080), [75, 80, 100, 125, 150, 175, 200]);
 eq('scales: 4K offers up to 300 (1280 × 720 logical)', scaleChoices(3840, 2160), [100, 125, 150, 175, 200, 225, 250, 275, 300]);
 eq('scales: 2560 × 1600 stops at 250 (1024 × 640)', scaleChoices(2560, 1600), [100, 125, 150, 175, 200, 225, 250]);
 eq('scales: rotated 4K (2160 × 3840) stops at 200', scaleChoices(2160, 3840), [100, 125, 150, 175, 200]);
-eq('scales: a tiny panel still gets 100–200', scaleChoices(800, 480), [100, 125, 150, 175, 200]);
-eq('tiles: 100–200 shows every step', scaleTiles(scaleChoices(1920, 1080), 100, 100), [100, 125, 150, 175, 200]);
+eq('scales: a tiny panel still gets 100–200, and 75 and 80', scaleChoices(800, 480), [75, 80, 100, 125, 150, 175, 200]);
+eq('tiles: 100–200 shows every step, and 75 before them', scaleTiles(scaleChoices(1920, 1080), 100, 100), [75, 100, 125, 150, 175, 200]);
 eq('tiles: 100–300 shows every other step', scaleTiles(scaleChoices(3840, 2160), 200, 200), [100, 150, 200, 250, 300]);
 eq('tiles: the current one replaces the nearest pick', scaleTiles(scaleChoices(3840, 2160), 275, 200), [100, 150, 200, 275, 300]);
 eq('tiles: current and recommended both kept', scaleTiles(scaleChoices(3840, 2160), 175, 225), [100, 175, 225, 250, 300]);
 eq('tiles: 100–250 has seven choices, five tiles', scaleTiles(scaleChoices(2560, 1600), 100, 175), [100, 150, 175, 225, 250]);
-eq('tiles: a saved 300 on a 1080p panel is shown', scaleTiles(scaleChoices(1920, 1080), 300, 100), [100, 125, 175, 200, 300]);
-eq('tiles: an invalid value is ignored', scaleTiles(scaleChoices(1920, 1080), 133, 100), [100, 125, 150, 175, 200]);
+eq('tiles: a saved 300 on a 1080p panel is shown', scaleTiles(scaleChoices(1920, 1080), 300, 100), [75, 100, 125, 175, 200, 300]);
+eq('tiles: an invalid value is ignored', scaleTiles(scaleChoices(1920, 1080), 133, 100), [75, 100, 125, 150, 175, 200]);
+// below 100 % (GitHub #158): only 75 and 80, while the desktop stays within 2560 × 1600 logical
+eq('scales: a MacBook 1280 × 800 offers 75–200', scaleChoices(1280, 800), [75, 80, 100, 125, 150, 175, 200]);
+eq('scales: 1440p gets none below 100 (3413 logical)', scaleChoices(2560, 1440), [100, 125, 150, 175, 200, 225]);
+eq('scales: 4K gets none below 100', scaleChoices(3840, 2160)[0], 100);
+eq('scales: a rotated 1080p (1080 × 1920) is offered them too', scaleChoices(1080, 1920).slice(0, 3), [75, 80, 100]);
+eq('scales: 1920 × 1200 at 80 is 2400 × 1500, at 75 2560 × 1600', scaleChoices(1920, 1200).slice(0, 2), [75, 80]);
+eq('tiles: the current 80 is the small tile', scaleTiles(scaleChoices(1280, 800), 80, 100), [80, 100, 125, 150, 175, 200]);
+eq('tiles: a saved 75 on 1440p is still shown', scaleTiles(scaleChoices(2560, 1440), 75, 100), [75, 100, 125, 175, 200, 225]);
+eq('tiles: 4K keeps its five', scaleTiles(scaleChoices(3840, 2160), 200, 200), [100, 150, 200, 250, 300]);
+eq('valid: 75, 80, 100, 300', [75, 80, 100, 300].map(scaleValid), [true, true, true, true]);
+eq('valid: not 50, 70, 90, 133, 325', [50, 70, 90, 133, 325, '75'].map(scaleValid), [false, false, false, false, false, false]);
 
 // ---- numbers ----
 eq('numbers: main first, then list order', displayNumbers([

@@ -27,6 +27,9 @@
 #   /usr/lib/lordos/code-manifest.sig     its Ed25519 signature (release key; docs/SIGNING.md)
 #   /usr/lib/lordos/lordos-live-prep      live preparation (grub language, folders)
 #   /usr/lib/systemd/system/lordos.service  lord-sessiond on tty1
+#   /usr/lib/systemd/system/lordos-text-login.service  a login prompt on tty1 in text mode (docs/SESSIONS.md)
+#   /etc/grub.d/11_lordos_text            the boot menu's "LordOS (text mode)" entry
+#   /usr/bin/startlordos                  the desktop from a text console, as startx
 #   /usr/lib/lordos/lordos-splash         boot splash hand-off (Plymouth → LordOS, docs/SESSIONS.md)
 #   /usr/share/backgrounds/lordos/        the wallpapers (<category>/lordos-<name>.jpg, thumbs/), linked
 #                                         from /usr/lib/lordos/assets/wallpapers
@@ -49,6 +52,9 @@
 #   /usr/lib/systemd/system/smartmontools.service.d/lordos.conf  Debian's smartd stays off
 #   /usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf  gnome-keyring without the Secret Service
 #   /usr/lib/systemd/logind.conf.d/lordos-machines.conf  a shutdown waits up to 30 s for Machines to save running machines
+#   /usr/lib/systemd/system-sleep/lordos-lid-wake  systemd-sleep's hook (root, pre/post only): on a laptop that goes
+#                                         to sleep with the lid open, the lid's ACPI wake source is off until it
+#                                         wakes (GitHub #172; src/hw/lidwake.h, docs/SETTINGS.md)
 #   /usr/share/chromium/extensions/lordos-video/  LordOS's own browser extension for smooth video without
 #                                         hardware decoding (Debian's chromium loads every folder there;
 #                                         docs/VIDEO.md). Its settings are written at login by the
@@ -62,6 +68,7 @@ VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 [ -x server/build/lord-netd ] || { echo "missing server/build/lord-netd (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-fand ] || { echo "missing server/build/lord-fand (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-browser-prefs ] || { echo "missing server/build/lord-browser-prefs (make -C server)" >&2; exit 1; }
+[ -x server/build/lordos-lid-wake ] || { echo "missing server/build/lordos-lid-wake (make -C server)" >&2; exit 1; }
 [ -x server/build/lordos-sysreport ] || { echo "missing server/build/lordos-sysreport (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-sessiond ] || { echo "missing server/build/lord-sessiond (make -C server, with libssl-dev, libsrtp2-dev and libusrsctp-dev)" >&2; exit 1; }
 # The helpers make builds only when their -dev packages are installed (docs/VM-SETUP.md). A package without one of
@@ -69,9 +76,10 @@ VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 # nothing), so each one is required here. ALLOW_MISSING="lord-tts …" leaves out the ones named, on purpose.
 missing=""
 for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev" \
+         lord-stream:"libavcodec-dev libavformat-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
-         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" \
+         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" \
          lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lordos-guest:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
@@ -97,6 +105,10 @@ install -m 755 server/build/lord-pkexec "$L/bin/lord-pkexec"
 install -m 755 server/build/lord-autoinstall "$L/bin/lord-autoinstall"
 # migration 009's tool (src/pkg/browserprefs_tool.c): browserprefs.c and the JSON reader only, no arguments
 install -m 755 server/build/lord-browser-prefs "$L/bin/lord-browser-prefs"
+# systemd-sleep runs every program in this folder as root with pre|post and the kind of sleep; this one only
+# turns an open lid's ACPI wake source off before sleep and back on after (#172; src/hw/lidwake_tool.c)
+install -d "$PKG/usr/lib/systemd/system-sleep"
+install -m 755 server/build/lordos-lid-wake "$PKG/usr/lib/systemd/system-sleep/lordos-lid-wake"
 # strip for the package's architecture: the host's strip can't read another architecture's binaries
 # (an aarch64 server/build packaged on x86-64 by tools/rpi/build-img.sh), and its errors are ignored below
 STRIP=strip
@@ -140,7 +152,7 @@ if [ -x server/build/lord-tts ]; then
 fi
 # isolated text recognition helper, Screenshots' "copy the text" (optional: make skips it without libtesseract-dev)
 [ -x server/build/lord-ocr ] && install -m 755 server/build/lord-ocr "$L/bin/lord-ocr"
-"$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lord-browser-prefs" "$L/bin/lordos-firstrun" 2>/dev/null || true
+"$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lord-browser-prefs" "$L/bin/lordos-firstrun" "$PKG/usr/lib/systemd/system-sleep/lordos-lid-wake" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
 [ -x "$L/bin/lord-ocr" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-ocr" 2>/dev/null || true; }
 "$STRIP" --strip-unneeded "$L/bin/lord-claude-status" "$L/bin/lord-say" 2>/dev/null || true
@@ -148,6 +160,9 @@ fi
 # lord-server only launches the lord-media in its own folder (media: video, photos, camera, recorder)
 [ -x server/build/lord-media ] && install -m 755 server/build/lord-media "$L/bin/lord-media"
 [ -x "$L/bin/lord-media" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-media" 2>/dev/null || true; }
+# lord-stream (0.8.8.10): lord-media's player with internet sockets only, for cameras and IPTV (docs/MEDIA.md "Network streams")
+[ -x server/build/lord-stream ] && install -m 755 server/build/lord-stream "$L/bin/lord-stream"
+[ -x "$L/bin/lord-stream" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-stream" 2>/dev/null || true; }
 # lord-vault: Passwords and the system keyring (docs/PASSWORDS.md); lord-server only launches the one in its own folder
 [ -x server/build/lord-vault ] && install -m 755 server/build/lord-vault "$L/bin/lord-vault"
 [ -x "$L/bin/lord-vault" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-vault" 2>/dev/null || true; }
@@ -163,6 +178,9 @@ fi
 # lord-lan (0.8.7): reads what the local network answers for Files → Network, sandboxed (docs/FILES.md, "Network")
 [ -x server/build/lord-lan ] && install -m 755 server/build/lord-lan "$L/bin/lord-lan"
 [ -x "$L/bin/lord-lan" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-lan" 2>/dev/null || true; }
+# lord-hidpp (0.8.8.10): the battery of Logitech devices; setgid lordos-hidpp, set by postinst (dpkg-statoverride)
+[ -x server/build/lord-hidpp ] && install -m 755 server/build/lord-hidpp "$L/bin/lord-hidpp"
+[ -x "$L/bin/lord-hidpp" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-hidpp" 2>/dev/null || true; }
 # lord-rdesk (0.8.7): one RDP or VNC connection, sandboxed (docs/FILES.md, "Remote desktop")
 install -m 755 server/build/lord-rdesk "$L/bin/lord-rdesk"
 "$STRIP" --strip-unneeded "$L/bin/lord-rdesk" 2>/dev/null || true
@@ -201,6 +219,7 @@ for k in apt/keys/*.asc; do install -m 644 "$k" "$L/apt/keys/"; done
 # FIDO2 security keys reachable by the session user (lord-sessiond sessions have no logind seat)
 install -d "$PKG/usr/lib/udev/rules.d"
 install -m 644 packaging/udev/71-lordos-fido.rules "$PKG/usr/lib/udev/rules.d/71-lordos-fido.rules"
+install -m 644 packaging/udev/72-lordos-hidpp.rules "$PKG/usr/lib/udev/rules.d/72-lordos-hidpp.rules"
 for d in themes/*/; do
     n=$(basename "$d")
     [ -f "$d/theme.bundle.js" ] || continue
@@ -208,7 +227,7 @@ for d in themes/*/; do
     install -m 644 "$d/theme.json" "$d/theme.bundle.js" "$L/themes/$n/"
     [ -d "$d/assets" ] && cp -r "$d/assets" "$L/themes/$n/"
 done
-cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps "$L/assets/"
+cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps assets/geo assets/desktops "$L/assets/"
 # the makers' keys Machines' download catalog pins (assets/machines/systems.json "keys"; docs/VIRTUALIZATION.md 3.9):
 # the admin helper checks each checksum list's signature with them before it trusts a hash
 install -d "$L/assets/machines/keys"
@@ -281,6 +300,11 @@ install -d "$PKG/usr/lib/sysctl.d"
 printf '%s\n' '# LordOS: ptrace only of descendants (docs/FIREWALL.md, "Linux apps")' 'kernel.yama.ptrace_scope = 1' > "$PKG/usr/lib/sysctl.d/50-lordos-ptrace.conf"
 chmod 644 "$PKG/usr/lib/sysctl.d/50-lordos-ptrace.conf"
 install -m 644 tools/iso/rootfs/etc/systemd/system/lordos.service "$PKG/usr/lib/systemd/system/lordos.service"
+# text mode (docs/SESSIONS.md, "Text mode"): a login prompt on tty1 when lordos.text=1 or /etc/lordos/text-mode,
+# the boot menu's "LordOS (text mode)" entry, and startlordos to start the desktop from a console (as startx)
+install -m 644 tools/iso/rootfs/etc/systemd/system/lordos-text-login.service "$PKG/usr/lib/systemd/system/lordos-text-login.service"
+install -D -m 755 tools/boot/grub/11_lordos_text "$PKG/etc/grub.d/11_lordos_text"
+install -D -m 755 packaging/bin/startlordos "$PKG/usr/bin/startlordos"
 # smooth video in Chromium without hardware decoding (docs/VIDEO.md); the Firefox manifest stays out
 X="$PKG/usr/share/chromium/extensions/lordos-video"
 install -d "$X"
@@ -376,6 +400,11 @@ License: public-domain
 Files: third_party/quickjs/* third_party/stb/*
 License: MIT and public-domain
  QuickJS (MIT) and stb (public domain / MIT), compiled into lord-server.
+
+Files: usr/lib/lordos/assets/geo/cities.tsv
+Copyright: GeoNames (https://www.geonames.org)
+License: CC-BY-4.0
+ The weather widget's offline list of cities, reduced from GeoNames' cities15000 by tools/geo/fetch-cities.sh.
 C
 chmod 644 "$D/copyright"
 install -m 644 server/src/bench/fonts/OFL.txt "$D/OFL-Noto.txt"
@@ -448,6 +477,7 @@ set -e
 if [ "$1" = configure ] && command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload >/dev/null 2>&1 || true
     systemctl enable lord-fand.service >/dev/null 2>&1 || true
+    systemctl enable lordos-text-login.service >/dev/null 2>&1 || true     # does nothing unless in text mode
     if [ -d /run/systemd/system ]; then systemctl restart systemd-sysctl.service >/dev/null 2>&1 || true; fi
     if [ -d /run/systemd/system ]; then systemctl restart lord-fand.service >/dev/null 2>&1 || true; fi
 fi
@@ -465,6 +495,22 @@ fi
 # `say` is LordOS's text to speech (docs/VOICE.md); an alternative, so another package's say can sit beside it
 if [ "$1" = configure ] && [ -x /usr/lib/lordos/bin/lord-say ]; then
     update-alternatives --quiet --install /usr/bin/say say /usr/lib/lordos/bin/lord-say 50
+fi
+# lord-hidpp reads Logitech batteries through its own group (docs/DEVICES.md): the group, the setgid bit kept
+# across upgrades by dpkg-statoverride, and the udev rule applied to the devices already connected
+if [ "$1" = configure ] && [ -e /usr/lib/lordos/bin/lord-hidpp ]; then
+    getent group lordos-hidpp >/dev/null 2>&1 || groupadd --system lordos-hidpp
+    dpkg-statoverride --list /usr/lib/lordos/bin/lord-hidpp >/dev/null 2>&1 ||
+        dpkg-statoverride --update --add root lordos-hidpp 2755 /usr/lib/lordos/bin/lord-hidpp
+    if [ -d /run/udev ] && command -v udevadm >/dev/null 2>&1; then
+        udevadm control --reload >/dev/null 2>&1 || true
+        udevadm trigger --subsystem-match=hidraw --action=change >/dev/null 2>&1 || true
+    fi
+fi
+# the boot menu's "LordOS (text mode)" entry (/etc/grub.d/11_lordos_text): the menu is written again where GRUB is the
+# boot loader (not a Raspberry Pi, not a container or an image being built without /boot/grub)
+if [ "$1" = configure ] && [ -e /boot/grub/grub.cfg ] && command -v update-grub >/dev/null 2>&1; then
+    update-grub >/dev/null 2>&1 || true
 fi
 # version-to-version system changes, each applied once (docs/UPDATES.md, "Migrations")
 if [ "$1" = configure ] && [ -x /usr/lib/lordos/migrate ]; then
@@ -491,6 +537,7 @@ set -e
 if [ "$1" = remove ] && command -v systemctl >/dev/null 2>&1; then
     if [ -d /run/systemd/system ]; then systemctl stop lord-fand.service >/dev/null 2>&1 || true; fi
     systemctl disable lord-fand.service >/dev/null 2>&1 || true
+    systemctl disable lordos-text-login.service >/dev/null 2>&1 || true
 fi
 if [ "$1" = remove ]; then update-alternatives --quiet --remove say /usr/lib/lordos/bin/lord-say 2>/dev/null || true; fi
 # the boot splash theme goes away with the package: Plymouth back to its default theme first
@@ -509,6 +556,16 @@ if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/apt/sources.list.d/lor
 # the browsers' video settings written by Settings (video-optimize, docs/VIDEO.md)
 if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/chromium/policies/managed/lordos-video.json /etc/firefox-esr/lordos-video.js /etc/chromium/policies/recommended/lordos-session.json /etc/firefox-esr/lordos-session.js; fi
 if [ "$1" = purge ]; then rm -rf /var/lib/lordos/migrations /var/log/lordos; fi
+# the text mode choice (Settings, boot-text) and the boot menu's entry go with the package
+if [ "$1" = remove ] || [ "$1" = purge ]; then rm -f /etc/lordos/text-mode; fi
+if [ "$1" = purge ]; then rm -f /etc/grub.d/11_lordos_text; fi
+if { [ "$1" = remove ] || [ "$1" = purge ]; } && [ -e /boot/grub/grub.cfg ] && command -v update-grub >/dev/null 2>&1; then
+    [ -e /etc/grub.d/11_lordos_text ] && chmod -x /etc/grub.d/11_lordos_text 2>/dev/null || true
+    update-grub >/dev/null 2>&1 || true
+fi
+# lord-hidpp's setgid override goes with the package; its group only on purge
+if [ "$1" = remove ] || [ "$1" = purge ]; then dpkg-statoverride --remove /usr/lib/lordos/bin/lord-hidpp >/dev/null 2>&1 || true; fi
+if [ "$1" = purge ] && getent group lordos-hidpp >/dev/null 2>&1; then groupdel lordos-hidpp 2>/dev/null || true; fi
 # the real pkexec back in its place
 if [ "$1" = remove ] || [ "$1" = purge ]; then
     if [ -L /usr/bin/pkexec ]; then rm -f /usr/bin/pkexec; fi

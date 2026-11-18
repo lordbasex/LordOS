@@ -124,7 +124,7 @@ function Dialog({ title, text, ok, okRed, onOk, onCancel, cancelLabel }) {
   return (
     <View onClick={onCancel} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }}>
       <View onClick={(e) => e.stopPropagation?.()} {...platform.a11y({ role: 'alertdialog', label: title })}
-        style={{ width: 400, padding: 20, gap: 8, borderRadius: t.groupRadius + 2, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
+        style={{ width: 400, maxWidth: '94%', padding: 20, gap: 8, borderRadius: t.groupRadius + 2, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text }}>{title}</Text>
         <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.45 }}>{text}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>

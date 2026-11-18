@@ -2,8 +2,9 @@
 // Builds the LordOS wallpaper collection (assets/wallpapers/) from the original PNGs.
 //
 // Usage: node tools/gen-wallpapers.mjs <source dir>
-//   <source dir>/<category>/lordos-<name>.png              (category: signature, lumo, cosmos)
+//   <source dir>/<category>/lordos-<name>.png              (category: signature, lumo, cosmos, cyberpunk; .jpg too)
 //   <source dir>/<category>/lordos-<name>@<W>x<H>.png      optional higher-resolution variant
+// Categories missing from <source dir> keep their entries in index.json (one category can be added on its own).
 //
 // For each original it writes, with ffmpeg (decode, Lanczos scaling) and cjpeg (libjpeg-turbo):
 //   assets/wallpapers/<category>/lordos-<name>.jpg            same size and name as the original
@@ -15,6 +16,16 @@
 //
 // JPEG at quality 90 with 4:4:4 chroma (the art has fine violet and gold detail that 4:2:0 blurs),
 // baseline + optimized Huffman tables. stb_image (lord-server) decodes it; WebP isn't supported.
+//
+// An original larger than BASE (Cyberpunk City HD: 3840×2160 pictures upscaled from 1672×941) gets a base file at
+// 1920×1080 (Lanczos) and is kept itself as the @<W>x<H> variant, so a 1080p screen never decodes the 4K file. Such a
+// category can set its own quality in ENCODE.
+//
+// A category with ENCODE.fill set brings a smaller original (Cyberpunk City HD's 1672×941 scenes) up to 1920×1080 with
+// Lanczos here, once, so the screen never stretches it with the renderer's bilinear filter; no larger variant is made,
+// as it would add bytes and no detail. An optional <source dir>/<category>/order.txt (one id per line) sets the order
+// Settings shows the category in (the Cyberpunk City HD journey, from the road outside into the city); ids missing
+// from it go last, by name.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -26,8 +37,15 @@ if (!src || !fs.statSync(src, { throwIfNoEntry: false })?.isDirectory()) {
   console.error('usage: node tools/gen-wallpapers.mjs <source dir with signature/ lumo/ cosmos/>');
   process.exit(2);
 }
-const CATEGORIES = ['signature', 'lumo', 'cosmos'];
+const CATEGORIES = ['signature', 'lumo', 'cosmos', 'cyberpunk'];
 const THUMB = [320, 180];
+const BASE = [1920, 1080];
+const ENCODE = {
+  default: { base: [90, '1x1'], large: [90, '1x1'] },
+  // neon art: 4:2:0 and quality 80 visibly softened the magenta and red edges against the originals (0.8.9), so both
+  // files keep full colour; the 4K one at 95 is as close to the original as JPEG gets
+  cyberpunk: { base: [92, '1x1'], large: [95, '1x1'], fill: true },
+};
 const out = path.join(root, 'assets', 'wallpapers');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lordos-wp-'));
 
@@ -45,23 +63,44 @@ function jpeg(input, output, vf, quality, sample) {
   run('cjpeg', ['-quality', String(quality), '-sample', sample, '-optimize', '-outfile', output, ppm]);
 }
 
+const IMG = /\.(png|jpe?g)$/;
+const prior = (() => { try { return JSON.parse(fs.readFileSync(path.join(out, 'index.json'), 'utf8')); } catch (e) { return []; } })();
 const index = [];
 for (const cat of CATEGORIES) {
   const dir = path.join(src, cat);
-  if (!fs.existsSync(dir)) continue;
-  const pngs = fs.readdirSync(dir).filter((n) => n.endsWith('.png')).sort();
+  if (!fs.existsSync(dir)) { index.push(...prior.filter((e) => e.category === cat)); continue; }
+  const enc = ENCODE[cat] || ENCODE.default;
+  const orderFile = path.join(dir, 'order.txt');
+  const order = fs.existsSync(orderFile) ? fs.readFileSync(orderFile, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean) : [];
+  const rank = (n) => { const i = order.indexOf(n.replace(IMG, '').replace(/@.*$/, '').replace(/^lordos-/, '')); return i < 0 ? order.length : i; };
+  const pngs = fs.readdirSync(dir).filter((n) => IMG.test(n)).sort((a, b) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0));
   for (const name of pngs.filter((n) => !n.includes('@'))) {
-    const base = name.replace(/\.png$/, '');
+    const base = name.replace(IMG, '');
     if (!/^lordos-[a-z0-9-]+$/.test(base)) throw new Error(`bad wallpaper name: ${name}`);
     const id = base.replace(/^lordos-/, '');
     const entry = { id, category: cat, thumb: `thumbs/${cat}/${base}.jpg`, variants: [] };
-    const variants = [name, ...pngs.filter((n) => n.startsWith(`${base}@`) && /@\d+x\d+\.png$/.test(n))];
-    for (const v of variants) {
-      const file = `${cat}/${v.replace(/\.png$/, '.jpg')}`;
-      jpeg(path.join(dir, v), path.join(out, file), null, 90, '1x1');
-      const { w, h } = size(path.join(dir, v));
+    const variants = [name, ...pngs.filter((n) => n.startsWith(`${base}@`) && /@\d+x\d+\.(png|jpe?g)$/.test(n))];
+    const add = (input, file, vf, w, h, [q, sample]) => {
+      jpeg(input, path.join(out, file), vf, q, sample);
       entry.variants.push({ w, h, file });
       console.log(`${file}  ${w}×${h}  ${(fs.statSync(path.join(out, file)).size / 1024).toFixed(0)} KB`);
+    };
+    for (const v of variants) {
+      const { w, h } = size(path.join(dir, v));
+      if (v === name && (w > BASE[0] || h > BASE[1])) {
+        // too big for a base: a 1920×1080 one, and the original as its own variant
+        const s = Math.min(BASE[0] / w, BASE[1] / h), bw = Math.round(w * s / 2) * 2, bh = Math.round(h * s / 2) * 2;
+        add(path.join(dir, v), `${cat}/${base}.jpg`, `scale=${bw}:${bh}:flags=lanczos`, bw, bh, enc.base);
+        add(path.join(dir, v), `${cat}/${base}@${w}x${h}.jpg`, null, w, h, enc.large);
+        continue;
+      }
+      if (v === name && enc.fill && w < BASE[0] && h < BASE[1]) {
+        // too small: brought up to cover 1920×1080 (Lanczos, centred crop), no larger variant
+        const [bw, bh] = BASE;
+        add(path.join(dir, v), `${cat}/${base}.jpg`, `scale=${bw}:${bh}:force_original_aspect_ratio=increase:flags=lanczos,crop=${bw}:${bh}`, bw, bh, enc.base);
+        continue;
+      }
+      add(path.join(dir, v), `${cat}/${v.replace(IMG, '.jpg')}`, null, w, h, v === name ? enc.base : enc.large);
     }
     entry.variants.sort((a, b) => a.w - b.w);
     entry.file = entry.variants[0].file;

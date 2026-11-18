@@ -11,7 +11,7 @@
 import {
   View, Text, ScrollView, Segmented, SearchField, ToolbarButton, Button, GroupBox, FormRow, typeScale, spacing, useTheme, useLocale,
   useStore, useSettings, useKeyboard, createStore, monitor, monitorProcesses, monitorDetail, firewall, firewallState, formatNumber,
-  formatDate, formatTime, addListener, appName, Table,
+  formatDate, formatTime, addListener, appName, Table, useNarrow,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fmt, AppGlyph, isolatedAppOf } from './index.jsx';
@@ -68,13 +68,14 @@ export function ProcessesTab() {
   const [mine, setMine] = useState('mine');
   const [sort, setSort] = useState({ key: 'cpu', dir: -1 });
   const me = myUid(procs);
+  const narrow = useNarrow(760);           // a small window: fewer columns, the header on two lines
   const cols = [
     { key: 'name', label: tr('monitor.process'), flex: 1, sort: true },
     { key: 'cpu', label: tr('monitor.cpuPct'), width: 80, num: true, sort: true },
     { key: 'rss', label: tr('monitor.memory'), width: 96, num: true, sort: true },
-    { key: 'threads', label: tr('monitor.threads'), width: 64, num: true, sort: true, dim: true },
+    ...(narrow ? [] : [{ key: 'threads', label: tr('monitor.threads'), width: 64, num: true, sort: true, dim: true }]),
     { key: 'pid', label: tr('monitor.pid'), width: 72, num: true, sort: true, dim: true },
-    { key: 'user', label: tr('monitor.user'), width: 96, sort: true, dim: true },
+    ...(narrow ? [] : [{ key: 'user', label: tr('monitor.user'), width: 96, sort: true, dim: true }]),
   ];
   const needle = q.trim().toLowerCase();
   const list = useMemo(() => {
@@ -116,7 +117,7 @@ export function ProcessesTab() {
   };
   return (
     <>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10, flexWrap: narrow ? 'wrap' : 'nowrap' }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text }}>{tr('monitor.processes')}</Text>
         <Text style={{ fontSize: 12, color: t.textDim }}>{tr('monitor.procCount', { count: procs.total })}</Text>
         <View style={{ flex: 1 }} />
@@ -127,7 +128,7 @@ export function ProcessesTab() {
             onClick={() => openInfo(selected)} />
         </View>
         <Segmented value={mine} onChange={setMine} options={[['mine', tr('monitor.mine')], ['all', tr('monitor.all')]]} />
-        <SearchField value={q} onChange={setQ} placeholder={tr('monitor.search')} width={200} />
+        <SearchField value={q} onChange={setQ} placeholder={tr('monitor.search')} width={narrow ? 150 : 200} />
       </View>
       {/* the SDK's table (0.8.8.8): a press or the keys choose a row (↑ ↓, Home, End, Page Up and Page Down, typing a
           name), Enter and a double click open Get Info */}

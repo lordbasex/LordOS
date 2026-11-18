@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} núcleo",
     "other": "{cpu} · {count} núcleos"
   },
-  "credits": "Países por IP en Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Mapa: Natural Earth (dominio público).",
+  "credits": "Países por IP en Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Mapa: Natural Earth (dominio público). Ciudades del clima: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Pantalla",
   "engine": "Motor de interfaz",
   "host": "Equipo",

@@ -37,5 +37,15 @@
   "col.time": "Time",
   "back": "Back",
   "emptyMusicTitle": "No music",
-  "emptyVideosTitle": "No videos"
+  "emptyVideosTitle": "No videos",
+  "nav.network": "Network",
+  "nav.streams": "Streams",
+  "streams.open": "Open address…",
+  "streams.list": "Open M3U list…",
+  "streams.save": "Save",
+  "streams.remove": "Remove",
+  "streams.close": "Close",
+  "streams.saved": "Saved",
+  "streams.channels": "Channels ({n})",
+  "streams.empty": "Open a camera, a stream or a TV channel by its address, or the channels of an M3U list."
 }

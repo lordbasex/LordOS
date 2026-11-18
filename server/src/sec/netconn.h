@@ -2,7 +2,7 @@
  *
  * lord-server opens connections for several of its parts: Mail and the calendar sync (for
  * lord-maild, which has no sockets of its own), printers and scanners, and the blocklist
- * downloads. The kernel ties a socket to the cgroup of the process that created it, so each of
+ * downloads, and (0.8.8.10) the weather widget's forecasts. The kernel ties a socket to the cgroup of the process that created it, so each of
  * those parts gets a small connector process of its own: lord-server re-executed as
  * `lord-server --net-connector <component>` (component from a fixed list, fw_component_ok), which
  * asks lord-sessiond to place it in lordos-net-<component>.scope and then only creates sockets on
@@ -21,9 +21,9 @@
 
 #include <sys/socket.h>
 
-typedef enum { NC_MAIL = 0, NC_PRINT = 1, NC_LISTS = 2, NC_LAN = 3, NC_SQL = 4, NC_COUNT } NcComponent;
+typedef enum { NC_MAIL = 0, NC_PRINT = 1, NC_LISTS = 2, NC_LAN = 3, NC_SQL = 4, NC_WEATHER = 5, NC_COUNT } NcComponent;
 
-/* The connector's name ("mail", "print", "lists", "lan", "sql"), the same as its firewall id after "lordos:". */
+/* The connector's name ("mail", "print", "lists", "lan", "sql", "weather"), the same as its firewall id after "lordos:". */
 const char *netconn_name(NcComponent c);
 
 /* A new non-blocking, close-on-exec socket of family fam (AF_INET / AF_INET6) and type

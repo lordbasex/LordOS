@@ -27,6 +27,18 @@ export function columnRange(pool, anchor, path) {
   return col.slice(Math.min(a, b), Math.max(a, b) + 1).map((e) => e.path);
 }
 
+// Select All in the column view: every item of the column the selection is in, as Finder does. That column is the
+// anchor's (the item last clicked or moved to) while it is selected, else the deepest column with a selected item,
+// else the first one. pool: columnEntries' items, column by column (it was the first column's always, GitHub #170).
+export function columnAll(pool, anchor, selected) {
+  if (!pool.length) return [];
+  let ref = pool[0].path;
+  if (anchor && selected.has(anchor) && pool.some((e) => e.path === anchor)) ref = anchor;
+  else for (const e of pool) if (selected.has(e.path)) ref = e.path;    // the pool goes column by column: the last is deepest
+  const dir = parentOf(ref);
+  return pool.filter((e) => parentOf(e.path) === dir);
+}
+
 // Duplicate: each item is copied next to itself, so the paths go by the folder they are in (a deeper column's
 // item stays in its own folder, not the first column's).
 export function byFolder(paths) {

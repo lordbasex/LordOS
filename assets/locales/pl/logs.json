@@ -2,6 +2,7 @@
   "pick": "Wybierz wpis, aby zobaczyć pełny komunikat i jego pola.",
   "field.time": "Czas",
   "field.level": "Poziom",
+  "field.account": "Konto",
   "field.process": "Proces",
   "field.pid": "PID",
   "field.unit": "Jednostka",

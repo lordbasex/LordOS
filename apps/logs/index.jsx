@@ -8,12 +8,15 @@
 //     own reader (server/src/logs/journal.c);
 //   - System and Kernel: the system journal. If the user is in systemd-journal or adm it is read
 //     directly; otherwise an administrator asks for it via the helper's closed logs-system action.
-// Filters by level, time, process or unit, and text; live with inotify (no polling); exports the
+// Cloud's log (cloud.log) shows which account each line is about where lord-server knows it (#183, cloudAccounts).
+// Filters by level (that level only), time, process or unit, and text; live with inotify (no polling); exports the
 // filtered view to Documents. The list draws only the visible rows.
 import {
   View, Text, TextInput, Segmented, SidebarItem, SectionTitle, useTheme, useLocale,
   logs, fs, formatDate, formatNumber, addListener, parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder,
+  levelMatch, LEVEL_MAX, cloudAccounts, useCloud, cloudModel,
   Toolbar, ToolbarButton, ToolbarSpacer, SearchField, EmptyState, Hairline, spacing, typeScale, useAppWindow,
+  useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -117,14 +120,25 @@ function Dot({ p }) {
   return <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c || 'transparent', border: c ? 'none' : '1px solid rgba(128,128,128,0.5)' }} />;
 }
 
+// A Cloud account a line of cloud.log is about (#183): "Provider · Name" on screen; withName false gives
+// "Provider (c1a2b3c4d)" for the exported file, which may end up attached to a report. An account removed since: its id.
+function accountLabel(id, accounts, withName = true) {
+  const a = (accounts || []).find((x) => x.id === id);
+  if (!a) return id;
+  const p = cloudModel.providerName(a);
+  return withName ? `${p} · ${a.name}` : `${p} (${id})`;
+}
+
 // ---- entry details ----
-function Detail({ e, narrow }) {
+function Detail({ e, narrow, accounts }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   if (!e) return <EmptyState title={null} hint={tr('logs.pick')} style={{ padding: spacing.l }} />;
+  const acct = e.acct ? accountLabel(e.acct, accounts) : '';
   const rows = [
     [tr('logs.field.time'), e.t ? `${formatDate(new Date(e.t / 1000), 'long')} ${clock(e.t / 1000)}` : tr('logs.line', { n: e.line })],
     [tr('logs.field.level'), tr(`logs.level.${levelOf(e.p)}`) + (e.p >= 0 ? ` (${e.p})` : '')],
+    ...(acct ? [[tr('logs.field.account'), acct]] : []),
     [tr('logs.field.process'), e.id || '—'],
     [tr('logs.field.pid'), e.pid >= 0 ? String(e.pid) : '—'],
     [tr('logs.field.unit'), e.u || '—'],
@@ -136,7 +150,7 @@ function Detail({ e, narrow }) {
       <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
           <Dot p={e.p} />
-          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.id || '—'}</Text>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{acct || e.id || '—'}</Text>
         </View>
         <Text style={{ fontSize: typeScale.callout, color: t.text, fontFamily: 'monospace', lineHeight: 1.4, textAlign: 'start' }}>{e.m}</Text>
       </View>
@@ -153,7 +167,6 @@ function Detail({ e, narrow }) {
 }
 
 const RANGES = { '15m': 15 * 60e6, hour: 3600e6, day: 86400e6, all: 0 };
-const LEVELS = { all: null, info: 6, warning: 4, error: 3 };
 
 export default function Registros() {
   const t = useTheme();
@@ -171,12 +184,17 @@ export default function Registros() {
   const [sel, setSel] = useState(-1);
   const [state, setState] = useState({ loading: false, error: '', ms: 0 });
   const [notice, setNotice] = useState('');
+  const accounts = useCloud().accounts || [];
   const sources = useMemo(() => { try { return logs.sources(); } catch (e) { return { user: 0, system: false }; } }, []);
   const files = useMemo(() => { try { return sortFiles(logs.files()); } catch (e) { return []; } }, [src.kind]);
   const logDir = useMemo(() => { try { return (logs.dir() || {}).dir || ''; } catch (e) { return ''; } }, []);
   const query = useRef({ seq: 0 });
   const box = useRef(null);
   const [width, height] = useSize(box, [820, 600]);
+  // a small window (a tile of Lord Workspaces): the sources hide behind a toolbar button and open over the list
+  const bar = useSidebar(640, 'logs');
+  const tight = width < 560;           // narrower fields and process column, the filters may wrap
+  const colProc = tight ? 100 : COL_PROC;
   const newest = useRef(0);
 
   const isJournal = src.kind !== 'lordos';
@@ -184,7 +202,7 @@ export default function Registros() {
 
   const buildQuery = (since) => {
     const q = { limit: 3000 };
-    if (LEVELS[level] != null) q.prio = LEVELS[level];
+    if (LEVEL_MAX[level] != null) q.prio = LEVEL_MAX[level];      // that level and more urgent: levelMatch keeps the level
     if (RANGES[range]) q.since = Date.now() * 1000 - RANGES[range];
     if (since) q.since = since;
     if (proc && procValid) q.match = proc;
@@ -194,9 +212,18 @@ export default function Registros() {
   };
 
   const runJournal = (q) => {
-    if (src.kind === 'user') return logs.query({ ...q, scope: 'user' });
-    if (sources.system) return logs.query({ ...q, scope: 'system' });
-    return logs.system(q);                    // administrators, through the helper
+    const only = (rows) => (Array.isArray(rows) ? rows.filter((r) => levelMatch(r.p, level)) : rows);
+    if (src.kind === 'user') return logs.query({ ...q, scope: 'user' }).then(only);
+    if (sources.system) return logs.query({ ...q, scope: 'system' }).then(only);
+    return logs.system(q).then(only);         // administrators, through the helper
+  };
+
+  // one of LordOS's files, parsed and filtered; cloud.log's rows get their account (#183)
+  const readFile = () => {
+    let rows = parseLordLog(src.file ? logs.tail(src.file, 512 * 1024) || '' : '', src.file || '');
+    if (/^cloud\.log(\.prev|\.old)?$/.test(src.file || '')) rows = cloudAccounts(rows);
+    const s = search.toLowerCase();
+    return rows.filter((r) => levelMatch(r.p, level) && (!s || r.m.toLowerCase().includes(s)) && (!proc || r.id === proc));
   };
 
   // full reload when the source or the filters change (text, after a short pause)
@@ -208,12 +235,7 @@ export default function Registros() {
       try {
         let rows;
         if (isJournal) rows = await runJournal(buildQuery(0));
-        else {
-          const text = src.file ? logs.tail(src.file, 512 * 1024) || '' : '';
-          rows = parseLordLog(text, src.file || '');
-          const s = search.toLowerCase(), max = LEVELS[level];
-          rows = rows.filter((r) => (max == null || r.p <= max) && (!s || r.m.toLowerCase().includes(s)) && (!proc || r.id === proc));
-        }
+        else rows = readFile();
         if (seq !== query.current.seq) return;
         newest.current = rows.length ? rows[rows.length - 1].t : Date.now() * 1000;
         setItems(rows);
@@ -244,9 +266,7 @@ export default function Registros() {
         let more;
         if (isJournal) more = await runJournal(buildQuery(newest.current));
         else {
-          const all = parseLordLog(logs.tail(src.file, 512 * 1024) || '', src.file || '');
-          const s = search.toLowerCase(), max = LEVELS[level];
-          setItems(all.filter((r) => (max == null || r.p <= max) && (!s || r.m.toLowerCase().includes(s))));
+          setItems(readFile());
           more = null;
         }
         if (more && more.length && seq === query.current.seq) {
@@ -266,7 +286,8 @@ export default function Registros() {
   const exportView = () => {
     const lines = items.map((e) => {
       const when = e.t ? `${formatDate(new Date(e.t / 1000), 'short')} ${clock(e.t / 1000)}` : `#${e.line}`;
-      return `${when} ${tr(`logs.level.${levelOf(e.p)}`)} ${e.id || '-'}${e.pid >= 0 ? `[${e.pid}]` : ''}: ${e.m}`;
+      const acct = e.acct ? ` [${accountLabel(e.acct, accounts, false)}]` : '';
+      return `${when} ${tr(`logs.level.${levelOf(e.p)}`)} ${e.id || '-'}${e.pid >= 0 ? `[${e.pid}]` : ''}${acct}: ${e.m}`;
     });
     const d = new Date();
     const name = `${tr('logs.exportName')}-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.txt`;
@@ -290,53 +311,59 @@ export default function Registros() {
         backgroundColor: on ? t.accent : i % 2 ? (t.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)') : 'transparent' }}>
         <View style={{ width: 10, alignItems: 'center' }}><Dot p={e.p} /></View>
         <Text style={{ width: COL_TIME, fontSize: typeScale.caption, color: on ? '#fff' : t.textDim, fontFamily: 'monospace', whiteSpace: 'nowrap', direction: 'ltr', textAlign: 'start' }}>{e.t ? clock(e.t / 1000) : `#${e.line}`}</Text>
-        <Text style={{ width: COL_PROC, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.id || '—'}</Text>
-        <Text style={{ flex: 1, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.m.replace(/\n/g, ' ⏎ ')}</Text>
+        <Text style={{ width: colProc, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.id || '—'}</Text>
+        <Text style={{ flex: 1, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
+          {e.acct ? `${accountLabel(e.acct, accounts)}: ` : ''}{e.m.replace(/\n/g, ' ⏎ ')}</Text>
       </View>
     );
   };
 
   const side = (kind, label, icon, extra) => (
     <SidebarItem key={kind + (extra?.file || '')} label={label} icon={icon} selected={src.kind === kind && (!extra || src.file === extra.file)}
-      onClick={() => setSrc({ kind, ...(extra || {}) })} />
+      onClick={() => { setSrc({ kind, ...(extra || {}) }); if (bar.narrow) bar.close(); }} />
   );
   const narrow = width < 640;
   const caption = { fontSize: typeScale.caption, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', textAlign: 'start' };
 
+  const sourceList = (
+    <View style={{ width: 210, ...(bar.narrow ? { flex: 1 } : null), backgroundColor: t.sidebarBg, paddingHorizontal: 10, paddingTop: spacing.xs, gap: 2 }}>
+      <SectionTitle>{tr('logs.section.journal')}</SectionTitle>
+      {side('user', tr('logs.src.user'), '☺')}
+      {side('system', tr('logs.src.system'), '▣')}
+      {side('kernel', tr('logs.src.kernel'), '◐')}
+      <SectionTitle>{tr('logs.section.lordos')}</SectionTitle>
+      {!files.length && <Text style={{ fontSize: typeScale.caption, color: t.textDim, paddingHorizontal: 10, textAlign: 'start' }}>{tr('logs.noFiles')}</Text>}
+      {['session', 'apps', 'web', 'old'].map((g) => {
+        const list = files.filter((f) => fileGroup(f.name) === g);
+        if (!list.length) return null;
+        return [
+          g !== 'session' && <SectionTitle key={`t-${g}`}>{tr(`logs.section.${g}`)}</SectionTitle>,
+          ...list.map((f) => side('lordos', isPrevious(f.name) ? tr('logs.previous', { name: fileLabel(f.name) })
+            : isOlder(f.name) ? tr('logs.older', { name: fileLabel(f.name) }) : fileLabel(f.name), '≡', { file: f.name })),
+        ];
+      })}
+      <View style={{ flex: 1 }} />
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, paddingHorizontal: spacing.s, paddingBottom: spacing.m, textAlign: 'start' }}>
+        {src.kind === 'user' ? tr('logs.hint.user') : src.kind === 'lordos' ? tr('logs.hint.lordos', { dir: logDir.replace(fs.home(), '~') }) : sources.system ? tr('logs.hint.systemDirect') : tr('logs.hint.systemAdmin')}
+      </Text>
+      <Hairline edge="end" />
+    </View>
+  );
+
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 210, backgroundColor: t.sidebarBg, paddingHorizontal: 10, paddingTop: spacing.xs, gap: 2 }}>
-        <SectionTitle>{tr('logs.section.journal')}</SectionTitle>
-        {side('user', tr('logs.src.user'), '☺')}
-        {side('system', tr('logs.src.system'), '▣')}
-        {side('kernel', tr('logs.src.kernel'), '◐')}
-        <SectionTitle>{tr('logs.section.lordos')}</SectionTitle>
-        {!files.length && <Text style={{ fontSize: typeScale.caption, color: t.textDim, paddingHorizontal: 10, textAlign: 'start' }}>{tr('logs.noFiles')}</Text>}
-        {['session', 'apps', 'web', 'old'].map((g) => {
-          const list = files.filter((f) => fileGroup(f.name) === g);
-          if (!list.length) return null;
-          return [
-            g !== 'session' && <SectionTitle key={`t-${g}`}>{tr(`logs.section.${g}`)}</SectionTitle>,
-            ...list.map((f) => side('lordos', isPrevious(f.name) ? tr('logs.previous', { name: fileLabel(f.name) })
-              : isOlder(f.name) ? tr('logs.older', { name: fileLabel(f.name) }) : fileLabel(f.name), '≡', { file: f.name })),
-          ];
-        })}
-        <View style={{ flex: 1 }} />
-        <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, paddingHorizontal: spacing.s, paddingBottom: spacing.m, textAlign: 'start' }}>
-          {src.kind === 'user' ? tr('logs.hint.user') : src.kind === 'lordos' ? tr('logs.hint.lordos', { dir: logDir.replace(fs.home(), '~') }) : sources.system ? tr('logs.hint.systemDirect') : tr('logs.hint.systemAdmin')}
-        </Text>
-        <Hairline edge="end" />
-      </View>
+      {bar.narrow ? null : sourceList}
       <View ref={box} style={{ flex: 1, minWidth: 0 }}>
         <Toolbar>
+          {bar.narrow ? <SidebarToggle shown={bar.shown} onClick={bar.toggle} /> : null}
           <ToolbarButton icon="●" iconSize={9} label={tr('logs.live')} active={live} color={t.textDim} onClick={() => setLive(!live)} />
           <ToolbarButton label={tr('logs.export')} onClick={exportView} />
           <ToolbarSpacer />
           <TextInput value={proc} onChange={setProc} placeholder={tr('logs.process')}
-            style={{ width: narrow ? 130 : 150, ...(procValid ? {} : { border: '1px solid #ff453a' }) }} />
-          <SearchField value={search} onChange={setSearch} placeholder={tr('logs.search')} width={narrow ? 190 : 220} />
+            style={{ width: tight ? 96 : narrow ? 130 : 150, ...(procValid ? {} : { border: '1px solid #ff453a' }) }} />
+          <SearchField value={search} onChange={setSearch} placeholder={tr('logs.search')} width={tight ? 130 : narrow ? 190 : 220} />
         </Toolbar>
-        <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
+        <View style={{ ...(tight ? { minHeight: 40, flexWrap: 'wrap', paddingVertical: 6 } : { height: 40 }), flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
           <Segmented small appearance="neutral" value={level} onChange={setLevel}
             options={[['all', tr('logs.lv.all')], ['info', tr('logs.lv.info')], ['warning', tr('logs.lv.warning')], ['error', tr('logs.lv.error')]]} />
           <Segmented small appearance="neutral" value={range} onChange={setRange}
@@ -346,7 +373,7 @@ export default function Registros() {
         <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.m }}>
           <View style={{ width: 10 }} />
           <Text style={[caption, { width: COL_TIME }]}>{tr('logs.field.time')}</Text>
-          <Text style={[caption, { width: COL_PROC }]}>{tr('logs.field.process')}</Text>
+          <Text style={[caption, { width: colProc }]}>{tr('logs.field.process')}</Text>
           <Text style={[caption, { flex: 1 }]}>{tr('logs.field.message')}</Text>
           <Hairline edge="bottom" />
         </View>
@@ -357,7 +384,7 @@ export default function Registros() {
         </View>
         <View style={{ height: height < 560 ? 112 : 156 }}>
           <Hairline edge="top" />
-          <Detail e={sel >= 0 ? items[sel] : null} narrow={narrow} />
+          <Detail e={sel >= 0 ? items[sel] : null} narrow={narrow} accounts={accounts} />
         </View>
         <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
           <Hairline edge="top" />
@@ -375,6 +402,7 @@ export default function Registros() {
           ) : null}
         </View>
       </View>
+      {bar.narrow && bar.shown ? <SidebarOverlay width={210} onClose={bar.close}>{sourceList}</SidebarOverlay> : null}
     </View>
   );
 }

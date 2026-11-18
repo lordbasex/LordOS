@@ -19,7 +19,7 @@
   "cpuValue": {
     "other": "{cpu} · {count} 核"
   },
-  "credits": "“监视器”中的 IP 到国家/地区数据：DB-IP Lite Country，© db-ip.com，CC BY 4.0。地图：Natural Earth（公有领域）。",
+  "credits": "“监视器”中的 IP 到国家/地区数据：DB-IP Lite Country，© db-ip.com，CC BY 4.0。地图：Natural Earth（公有领域）。 天气城市：GeoNames，© geonames.org，CC BY 4.0。",
   "display": "显示器",
   "engine": "界面引擎",
   "host": "电脑",

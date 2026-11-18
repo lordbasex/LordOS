@@ -2,6 +2,7 @@
   "pick": "Pilih entri untuk melihat pesan lengkap dan kolom-kolomnya.",
   "field.time": "Waktu",
   "field.level": "Tingkat",
+  "field.account": "Akun",
   "field.process": "Proses",
   "field.pid": "PID",
   "field.unit": "Unit",

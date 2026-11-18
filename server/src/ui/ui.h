@@ -10,7 +10,7 @@
 enum { UNIT_AUTO = 0, UNIT_PX, UNIT_PCT };
 typedef struct { float v; uint8_t unit; } Dim;
 
-enum { NODE_VIEW, NODE_TEXT, NODE_IMAGE, NODE_RAW, NODE_TERM, NODE_SURFACE, NODE_MEDIA };
+enum { NODE_VIEW, NODE_TEXT, NODE_IMAGE, NODE_RAW, NODE_TERM, NODE_SURFACE, NODE_MEDIA, NODE_WAVE };
 enum { JUSTIFY_START, JUSTIFY_CENTER, JUSTIFY_END, JUSTIFY_BETWEEN, JUSTIFY_AROUND, JUSTIFY_EVENLY };
 enum { ALIGN_AUTO, ALIGN_STRETCH, ALIGN_START, ALIGN_CENTER, ALIGN_END };
 enum { TEXT_LEFT, TEXT_CENTER, TEXT_RIGHT, TEXT_START, TEXT_END };   /* start/end according to direction */
@@ -101,6 +101,7 @@ typedef struct Node {
     Style s;
     char *text;                 /* NODE_RAW */
     Image *img;                 /* NODE_IMAGE */
+    struct WaveConf *wave;      /* NODE_WAVE: its look and its last raster (wave.h) */
     int term;                   /* NODE_TERM: session id; NODE_SURFACE: Wayland surface id; NODE_MEDIA: source (media/) */
     uint8_t protect;            /* protected window: black in screenshots, recordings and remote desktop (media/capture.c) */
     uint8_t rtl;                /* effective direction (computed in layout) */
@@ -115,6 +116,7 @@ typedef struct Node {
     unsigned gen;               /* bumped with paint_dirty and never cleared: a transformed subtree's
                                  * cached raster compares it (paint.c tf_check) */
     Box prev_box;               /* what it occupied on screen in the last frame */
+    uint32_t walk_ix;           /* its place among its parent's children at the last damage walk (paint.c, the blur cache) */
     NodeTf *tf;
 } Node;
 
@@ -156,6 +158,7 @@ extern Ui ui;
 void  style_defaults(Style *s);
 Node *node_new(int type);
 Node *node_get(int id);
+int   paint_node_covered(const Node *n);   /* its box hidden behind something opaque painted after it (paint.c) */
 /* The node with this id only if it is still the one that had this serial when it was looked up: NULL once that node
  * is destroyed, even if its id now belongs to another node. */
 Node *node_ref(int id, uint64_t serial);
@@ -295,9 +298,10 @@ int   text_direction(const char *s);                       /* 1 if the first str
 #define IMG_IDLE_MAX 512                    /* and this many */
 #define IMG_THREADS 2                       /* thumbnail decoders */
 #define IMG_QUEUE_MAX 8192                  /* thumbnails waiting; more are not made */
-#define IMG_THUMB_MAX 2048                  /* the largest thumbnail side */
+#define IMG_THUMB_MAX 4096                  /* the largest thumbnail side (a 4K wallpaper decoded off the interface's thread) */
 Image *image_get(const char *path);          /* adds a holder: image_release when done */
-Image *image_get_thumb(const char *path, int max);   /* decoded off this thread, to fit max x max; empty until then */
+#define IMG_STAMP_MAX 40                    /* a thumbnail's file version ("<mtime>.<size>") */
+Image *image_get_thumb(const char *path, int max, const char *stamp);   /* decoded off this thread, to fit max x max; empty until then */
 int    image_async_fd(void);                 /* readable when thumbnails are ready (-1 before the first) */
 int    image_async_dispatch(void);           /* puts them in; repaints their nodes; how many */
 void   image_thumb_size(int w, int h, int max, int *tw, int *th);
@@ -317,6 +321,15 @@ void   image_draw(Canvas *c, Image *img, float x, float y, float w, float h, flo
  * index tells displays apart (the window-drag layer belongs to one of them). Default: 1:1. */
 typedef struct { float x, y, k, dx, dy; int index; } PaintView;
 extern PaintView paint_view;
+/* The blurred backdrop cache (paint.c): main.c says which displays are painted (logical box, scale, view) and
+ * turns it on around a display's paint; a display change resets it */
+#define PAINT_VIEWS_MAX 9
+typedef struct { Box b; float x, y, k, dx, dy; int index; } PaintViewBox;
+extern PaintViewBox paint_views[PAINT_VIEWS_MAX];
+extern int paint_nviews;
+extern int paint_blur_cache_on;
+extern void (*damage_hook)(Box b);      /* node.c damage_add: set by paint.c during its damage walk */
+void paint_blur_cache_reset(void);
 void  paint_layer_view(int index);  /* the display with most of the window being moved */
 int   paint_layer_node(void);       /* that window's node (0: no drag layer) */
 int   paint_damage(Node *root);     /* computes ui.damage; 0 if there is nothing to repaint */
@@ -326,7 +339,7 @@ int   paint_damage_rects(Box *out, int max);
 /* damage gathered over several frames (a display whose flip was pending): the blur rule again,
  * on the tree as it is now (paint.c, main.c paint_out) */
 void  paint_damage_settle(DamageList *l);
-extern int paint_multi_damage;      /* 1: several rectangles (LORD_DAMAGE=multi, tests); 0 by default */
+extern int paint_multi_damage;      /* 1: several rectangles (the default since 0.8.8.10); 0: one box (LORD_DAMAGE=one) */
 extern int paint_tf_nocache;        /* tests: a reference paint that neither reads nor fills the
                                      * transformed subtrees' raster cache (engine-test) */
 void  paint_root(Canvas *c, Node *root);

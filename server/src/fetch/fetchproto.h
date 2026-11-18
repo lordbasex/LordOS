@@ -5,11 +5,15 @@
  *   FQ_GET   {"host":"example.org","path":"/list.txt","format":"hosts|domains|ips","sub":0|1}
  *            + 1 fd: a TCP socket lord-server already connected (the blocklists' connector, in
  *            lordos-net-lists.scope) to host:443
+ *   FQ_WEATHER {"lat":-34.6,"lon":-58.45} + 1 fd: a TCP socket lord-server already connected (the
+ *            weather connector, lordos-net-weather.scope) to api.open-meteo.com:443 (0.8.8.10, the
+ *            weather widget; fetch/weather.h). The helper builds the path from the two numbers itself.
  *   FQ_END   {}: the helper exits
  *
  *   FR_DONE      {"domains":N,"nets":N,"skipped":N,"bad":N,"dups":N,"truncated":0|1,"bytes":N,
  *                 "lastModified":"…"} + 1 sealed memfd with the normalized lines (fw/fwlists.h)
  *   FR_REDIRECT  {"location":"https://…"} (lord-server checks it and connects again; at most 3)
+ *   FR_WEATHER   the forecast in weather.h's compact JSON (numbers only); no redirects followed
  *   FR_ERR       {"error":"tls|cert|http|status|big|nul|line|format|empty|oom|bad-request","detail":"…"}
  *
  * lord-fetch never opens a socket or a file: it loads the CA bundle, locks itself in with
@@ -20,7 +24,7 @@
 #ifndef LORD_FETCH_PROTO_H
 #define LORD_FETCH_PROTO_H
 
-enum { FQ_GET = 1, FQ_END = 2 };
-enum { FR_DONE = 101, FR_REDIRECT = 102, FR_ERR = 103 };
+enum { FQ_GET = 1, FQ_END = 2, FQ_WEATHER = 3 };
+enum { FR_DONE = 101, FR_REDIRECT = 102, FR_ERR = 103, FR_WEATHER = 104 };
 
 #endif

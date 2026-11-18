@@ -4,7 +4,7 @@
   "name": "Text Editor",
   "description": "TextMate-style code editor: project, tabs, multiple cursors, find and replace, syntax highlighting",
   "size": [900, 600],
-  "minSize": [520, 340],
+  "minSize": [480, 340],
   "dock": true,
   "category": "Development",
   "permissions": ["fs:read", "fs:write"]

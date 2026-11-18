@@ -1,7 +1,7 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. Sections of later phases say so.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal } from './ui.jsx';
@@ -46,6 +46,8 @@ export function Configure({ dir, section: section0 }) {
   const [picking, setPicking] = useState(false);
   const [pickShare, setPickShare] = useState(false);
   const [disk, setDisk] = useState(null);
+  // a small window: the sections hide behind a button beside the title and open over the pane
+  const side = useSidebar(640, 'machines-configure');
   const load = () => {
     const x = has() ? lord.vm.list().find((y) => y.dir === dir) : null;
     setM(x || null);
@@ -259,19 +261,27 @@ export function Configure({ dir, section: section0 }) {
   </Group>;
 
   const savable = ['general', 'cpu', 'network', 'disks', 'sharing', 'agent'].includes(sec);
+  const list = (
+    <View style={{ width: 260, ...(side.narrow ? { flex: 1 } : null), paddingHorizontal: 10, paddingVertical: 14, gap: 1, backgroundColor: p.raised }}>
+      <Text style={{ marginHorizontal: 8, marginBottom: 8, fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{m.name}</Text>
+      {SECTIONS.map((k) => (
+        <View key={k} onClick={() => { setSec(k); if (side.narrow) side.close(); }} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: sec === k ? p.accent : 'transparent' }}>
+          <Text style={{ fontSize: 13, fontWeight: 600, color: sec === k ? '#fff' : p.text, textAlign: 'start' }}>{tr(`machines.cfg.sec.title.${k}`)}</Text>
+          <Text style={{ fontSize: 12, color: sec === k ? '#e6f1ff' : p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{summary[k]}</Text>
+        </View>
+      ))}
+    </View>
+  );
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: p.bg }}>
-      <View style={{ width: 260, paddingHorizontal: 10, paddingVertical: 14, gap: 1, backgroundColor: p.raised }}>
-        <Text style={{ marginHorizontal: 8, marginBottom: 8, fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{m.name}</Text>
-        {SECTIONS.map((k) => (
-          <View key={k} onClick={() => setSec(k)} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: sec === k ? p.accent : 'transparent' }}>
-            <Text style={{ fontSize: 13, fontWeight: 600, color: sec === k ? '#fff' : p.text, textAlign: 'start' }}>{tr(`machines.cfg.sec.title.${k}`)}</Text>
-            <Text style={{ fontSize: 12, color: sec === k ? '#e6f1ff' : p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{summary[k]}</Text>
+      {side.narrow ? null : list}
+      <View style={{ flex: 1, minWidth: 0, padding: side.narrow ? 16 : 22, gap: 14 }}>
+        {side.narrow ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <SidebarToggle shown={side.shown} onClick={side.toggle} />
+            <Text style={{ flex: 1, minWidth: 0, fontSize: 18, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.cfg.sec.title.${sec}`)}</Text>
           </View>
-        ))}
-      </View>
-      <View style={{ flex: 1, minWidth: 0, padding: 22, gap: 14 }}>
-        <Text style={{ fontSize: 18, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.cfg.sec.title.${sec}`)}</Text>
+        ) : <Text style={{ fontSize: 18, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.cfg.sec.title.${sec}`)}</Text>}
         {running ? <View style={{ padding: 10, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.cfg.runningBanner')}</Text></View> : null}
         <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 14 }}>{pane}</ScrollView>
         {msg ? <Text style={{ fontSize: 13, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}
@@ -291,6 +301,7 @@ export function Configure({ dir, section: section0 }) {
         }} /> : null}
       {picking ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPicking(false)}
         onPick={(x) => { setPicking(false); save({ iso: Array.isArray(x) ? x[0] : x }); }} /> : null}
+      {side.narrow && side.shown ? <SidebarOverlay width={260} onClose={side.close}>{list}</SidebarOverlay> : null}
     </View>
   );
 }

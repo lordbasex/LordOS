@@ -84,5 +84,14 @@ eq('display gone', fitFrame({ x: 3000, y: 100, w: 400, h: 300 }, D, area), { x: 
 eq('under the bar', fitFrame({ x: 10, y: 0, w: 400, h: 300 }, D, area), { x: 10, y: 24, w: 400, h: 300 });
 eq('second display', fitFrame({ x: 1400, y: 100, w: 400, h: 300 }, [...D, { x: 1280, y: 0, w: 800, h: 600 }], area), { x: 1400, y: 100, w: 400, h: 300 });
 
+// the ask-first apps: with Always they wait for the answer, the rest reopens; with Ask everything waits
+{
+  const L = [{ id: 'app:files' }, { id: 'app:terminal' }, { id: 'desktop:org.gimp.GIMP' }, { id: 'app:passwords' }];
+  eq('split: always', M.restoreSplit('run', L), { run: [L[0], L[2]], ask: [L[1], L[3]] });
+  eq('split: ask', M.restoreSplit('ask', L), { run: [], ask: L });
+  eq('split: none', M.restoreSplit('none', L), { run: [], ask: [] });
+  eq('ask first: the terminal yes, a Linux app no', [M.asksFirst(L[1]), M.asksFirst(L[2])], [true, false]);
+}
+
 console.log(bad ? `session-model: ${bad}/${n} failed` : `session-model: ${n} ok`);
 process.exit(bad ? 1 : 0);

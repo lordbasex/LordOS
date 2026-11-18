@@ -151,5 +151,10 @@
   "wifi.saved": "tallennettu",
   "wifi.scan": "Etsi",
   "wifi.scanning": "Etsitään…",
-  "wifi.wrongKey": "Salasana on väärä."
+  "wifi.wrongKey": "Salasana on väärä.",
+  "wifi.available": "Käytettävissä olevat Wi-Fi-verkot",
+  "wifi.currentLabel": "{ssid} – Yhdistetty",
+  "wifi.connect": "Yhdistä",
+  "wifi.notInRange": "Ei kantoalueella",
+  "wifi.knownFooter": "LordOS liittyy tallennettuun verkkoon itse, kun se on kantoalueella. Unohda poistaa verkon ja sen salasanan tältä tietokoneelta."
 }

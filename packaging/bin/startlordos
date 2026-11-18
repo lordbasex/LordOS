@@ -1,0 +1,44 @@
+#!/bin/sh
+# startlordos — the LordOS desktop from a text console, as startx does (docs/SESSIONS.md, "Text mode"). Log in on a
+# console (tty1 in text mode, or Ctrl+Alt+F2…F6) and type startlordos:
+#   - with lord-sessiond running (lordos.service, in text mode): it brings up the login screen on tty1 with you chosen;
+#     you sign in with your password and get the whole session (administrator's actions, the keyring unlocked, Lock
+#     Screen, the apps' cgroups and firewall). Asked over /run/lordos/start.sock, which lord-sessiond answers only for
+#     someone logged in on the console in front, typing there.
+#   - without lord-sessiond (lordos.service stopped or disabled): lord-server runs as you on this console, with what a
+#     session can do on its own (no Lock Screen, no administrator's actions, no per-app cgroups).
+set -eu
+tty_now=$(tty 2>/dev/null || true)
+case "$tty_now" in
+    /dev/tty[1-9]|/dev/tty[1-9][0-9]) ;;
+    *) echo "startlordos: run it on a text console (Ctrl+Alt+F1…F6), not in a terminal window or over ssh" >&2; exit 1 ;;
+esac
+L=/usr/lib/lordos
+[ -x "$L/bin/lord-server" ] || { echo "startlordos: $L/bin/lord-server is missing (is the lordos package installed?)" >&2; exit 1; }
+
+if [ "${1:-}" != "--standalone" ]; then
+    answer=$("$L/bin/lord-sessiond" --start-login 2>/dev/null || true)
+    case "$answer" in
+        ok*)
+            # lord-sessiond stops tty1's text login now (lordos-text-login.service): a console session there ends with it
+            echo "startlordos: the login screen is coming up on tty1; sign in with your password."
+            exit 0 ;;
+        refused*) echo "startlordos: refused: type it on the console you logged in on, the one on the screen." >&2; exit 2 ;;
+        no-display*) echo "startlordos: no usable display (see /var/log/lordos/lord-sessiond.log)." >&2; exit 2 ;;
+    esac
+    # unavailable: no lord-sessiond in text mode; run the desktop here on our own
+    echo "startlordos: lord-sessiond is not running in text mode; starting the desktop on its own on $tty_now"
+    echo "            (no Lock Screen, no administrator's actions; startlordos --standalone skips this check)"
+fi
+
+if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$XDG_RUNTIME_DIR" ]; then
+    echo "startlordos: no XDG_RUNTIME_DIR: log in on the console first (login sets it up)" >&2
+    exit 1
+fi
+log_dir="${XDG_CACHE_HOME:-$HOME/.cache}/lordos"
+mkdir -p "$log_dir"
+[ -f "$log_dir/startlordos.log" ] && mv -f "$log_dir/startlordos.log" "$log_dir/startlordos.log.prev"
+echo "startlordos: starting the desktop on $tty_now (log: $log_dir/startlordos.log)"
+cd "$L/bin"
+exec "$L/bin/lord-server" --theme "$L/themes/default/theme.bundle.js" --fonts "$L/assets/fonts" --shell "$L/assets/shell" \
+    > "$log_dir/startlordos.log" 2>&1

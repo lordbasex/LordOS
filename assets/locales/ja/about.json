@@ -19,7 +19,7 @@
   "cpuValue": {
     "other": "{cpu} · {count} コア"
   },
-  "credits": "モニタの IP アドレスから国への変換：DB-IP Lite Country、© db-ip.com、CC BY 4.0。地図：Natural Earth（パブリックドメイン）。",
+  "credits": "モニタの IP アドレスから国への変換：DB-IP Lite Country、© db-ip.com、CC BY 4.0。地図：Natural Earth（パブリックドメイン）。 天気の都市: GeoNames、© geonames.org、CC BY 4.0。",
   "display": "ディスプレイ",
   "engine": "UI エンジン",
   "host": "コンピュータ",

@@ -235,6 +235,7 @@
   "fs.notRegular": "Đây không phải là tệp thông thường (có phải là liên kết không?)",
   "fs.openFailed": "Không thể mở tệp: {errno}",
   "fs.outsideHome": "Vị trí đó nằm ngoài thư mục nhà của bạn hoặc không hợp lệ",
+  "fs.nameTooLong": "Tên quá dài (tối đa {max} byte; chữ có dấu và chữ không phải Latin chiếm 2 đến 4 byte mỗi chữ)",
   "fs.protected": "Thư mục đó được bảo vệ",
   "fs.systemFolder": "Tệp không hiển thị các thư mục nội bộ của hệ thống (/proc, /sys, /dev và /run)",
   "fs.tooLarge": "Tệp quá lớn (tối đa {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Không thể cập nhật bootloader (mã {code})",
   "hw.logindFailed": "Không thể áp dụng cài đặt năng lượng (mã {code})",
   "hw.noBacklight": "Không có đèn nền như vậy",
+  "hw.noChargeControl": "Pin này không có điều khiển sạc",
+  "hw.chargeControlFailed": "Không thể đổi chế độ sạc: {errno}",
   "hw.noCpufreq": "Máy tính này không hỗ trợ điều chỉnh tần số CPU",
   "hw.noEeprom": "Chưa cài công cụ bootloader (rpi-eeprom)",
   "hw.noKernelLog": "Không thể đọc nhật ký kernel",
@@ -875,5 +878,12 @@
   "pkg.multiarchConflict": "Không thể cài {name} cho cả 64 và 32 bit cùng lúc",
   "pkg.foreignArchUnsupported": "Chỉ có thể bật các gói 32 bit trên PC 64 bit (amd64); hệ thống này là {arch}",
   "pkg.foreignArchFailed": "Không thể bật các gói 32 bit ({arch}) (dpkg kết thúc với mã {code})",
-  "webapps.developerOff": "Chế độ nhà phát triển đang tắt trong Cài đặt → Ứng dụng web"
+  "webapps.developerOff": "Chế độ nhà phát triển đang tắt trong Cài đặt → Ứng dụng web",
+  "media.streamAddress": "Địa chỉ luồng này không được phép",
+  "media.streamCannotOpen": "Không mở được luồng",
+  "media.streamTimeout": "Luồng không phản hồi kịp",
+  "media.streamAuth": "Luồng yêu cầu người dùng và mật khẩu, hoặc chúng sai",
+  "media.streamLost": "Luồng đã mất",
+  "media.streamNoChannels": "Danh sách không có kênh",
+  "media.noStreamHelper": "Trình trợ giúp luồng (lord-stream) không có sẵn"
 }

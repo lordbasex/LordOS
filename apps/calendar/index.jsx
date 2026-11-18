@@ -4,6 +4,7 @@
 import {
   View, Text, useTheme, useLocale, useAppWindow, useKeyboard, useWindowState, usePim, calendars, calendarEvents,
   Button, Segmented, ScrollView, Hairline, Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, EmptyState, formatDate, formatTime, weekdayName, direction, textDirection, t, openDavSetup, openMailAccounts,
+  SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -161,14 +162,16 @@ export default function CalendarApp() {
   else if (view === 'week') title = monthYear(addDays(startOfWeek(cursor), 3));
   else title = monthYear(cursor);
   const rtl = direction() === 'rtl';
+  // a narrow window (a Workspaces tile) lays the sidebar over the views; picking a day there closes it
+  const sidebarView = (
+    <Sidebar cals={eventCals} cursor={cursor} days={days} onPick={(d) => { setCursor(sod(d).getTime()); if (narrow) setNarrowSidebar(false); }}
+      onNew={() => setSheet({ newCal: true })} onEdit={(c) => setSheet({ cal: c })} />
+  );
 
   return (
     <View ref={rootRef} style={{ flex: 1, flexDirection: 'row', backgroundColor: th.windowBg }}>
-      {showSidebar && (
-        <Sidebar cals={eventCals} cursor={cursor} days={days} onPick={(d) => setCursor(sod(d).getTime())}
-          onNew={() => setSheet({ newCal: true })} onEdit={(c) => setSheet({ cal: c })} />
-      )}
-      <View style={{ flex: 1 }}>
+      {showSidebar && !narrow && sidebarView}
+      <View style={{ flex: 1, minWidth: 0 }}>
         {/* toolbar: sidebar and new event at the start, the view switch centered */}
         <Toolbar separator={false}>
           <ToolbarButton icon="▤" title={t('calendar.toggleSidebar')} onClick={toggleSidebar} active={showSidebar} />
@@ -199,6 +202,7 @@ export default function CalendarApp() {
             onDay={(d) => { setCursor(sod(d).getTime()); setView('day'); }} />
         )}
       </View>
+      {showSidebar && narrow ? <SidebarOverlay width={216} onClose={() => setNarrowSidebar(false)}>{sidebarView}</SidebarOverlay> : null}
       {sheet && sheet.ev ? <EventSheet ev={sheet.ev} isNew={sheet.isNew} cals={eventCals} onClose={() => setSheet(null)} /> : null}
       {sheet && (sheet.newCal || sheet.cal) ? <CalendarSheet cal={sheet.cal} onClose={() => setSheet(null)} /> : null}
       <Layers />

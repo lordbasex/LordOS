@@ -235,6 +235,7 @@
   "fs.notRegular": "Het is geen gewoon bestand (is het een koppeling?)",
   "fs.openFailed": "Het bestand kon niet worden geopend: {errno}",
   "fs.outsideHome": "Die locatie ligt buiten je thuismap of is ongeldig",
+  "fs.nameTooLong": "De naam is te lang (max. {max} bytes; letters met accenten en niet-Latijnse letters nemen er elk 2 tot 4)",
   "fs.protected": "Die map is beschermd",
   "fs.systemFolder": "Bestanden toont de interne mappen van het systeem niet (/proc, /sys, /dev en /run)",
   "fs.tooLarge": "Het bestand is te groot (max. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "De bootloader kon niet worden bijgewerkt (code {code})",
   "hw.logindFailed": "De energie-instellingen konden niet worden toegepast (code {code})",
   "hw.noBacklight": "Die achtergrondverlichting bestaat niet",
+  "hw.noChargeControl": "Deze batterij heeft geen laadregeling",
+  "hw.chargeControlFailed": "Laden kon niet worden gewijzigd: {errno}",
   "hw.noCpufreq": "Deze computer heeft geen schaling van de CPU-frequentie",
   "hw.noEeprom": "De bootloadertools (rpi-eeprom) zijn niet geïnstalleerd",
   "hw.noKernelLog": "Het kernellogboek kon niet worden gelezen",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "{name} kan niet tegelijk voor 64 en 32 bits worden geïnstalleerd",
   "pkg.foreignArchUnsupported": "32-bits pakketten kunnen alleen worden ingeschakeld op een 64-bits pc (amd64); dit systeem is {arch}",
   "pkg.foreignArchFailed": "32-bits pakketten ({arch}) konden niet worden ingeschakeld (dpkg stopte met code {code})",
-  "webapps.developerOff": "De ontwikkelaarsmodus staat uit in Instellingen → Webapps"
+  "webapps.developerOff": "De ontwikkelaarsmodus staat uit in Instellingen → Webapps",
+  "media.streamAddress": "Dit streamadres is niet toegestaan",
+  "media.streamCannotOpen": "De stream kon niet worden geopend",
+  "media.streamTimeout": "De stream antwoordde niet op tijd",
+  "media.streamAuth": "De stream vroeg om gebruiker en wachtwoord, of ze waren fout",
+  "media.streamLost": "De stream is weggevallen",
+  "media.streamNoChannels": "De lijst heeft geen zenders",
+  "media.noStreamHelper": "De streamhelper (lord-stream) is niet beschikbaar"
 }

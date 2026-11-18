@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} core",
     "other": "{cpu} · {count} core"
   },
-  "credits": "Corrispondenza IP-paese in Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Mappa: Natural Earth (pubblico dominio).",
+  "credits": "Corrispondenza IP-paese in Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Mappa: Natural Earth (pubblico dominio). Città del meteo: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Schermo",
   "engine": "Motore UI",
   "host": "Computer",

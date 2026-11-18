@@ -132,6 +132,14 @@ EOF
 committed: 한
 preedit: 글
 EOF
+    # (#163) Shift alone (+, sent before every capital) keeps the syllable: ㅆ and ㄲ as finals, ㅒ and ㅖ after an initial
+    ime "ime-test: hangul Shift jamo" hangul 'dl+T_qk+R_rk+Rk_dl+Tdj_r+O_d+P_+dl+T_' "" <<'EOF'
+committed: 있 밖 가까 있어 걔 예 있
+EOF
+    # every double final consonant, and how one splits when a vowel follows
+    ime "ime-test: hangul double finals" hangul 'rkrt_ahrt_dksw_dksg_ekfr_tkfa_sjfq_rhft_gkfx_dmfv_dlfg_djqt_ekfrl_dkswdk_djqtdj_' "" <<'EOF'
+committed: 갃 몫 앉 않 닭 삶 넓 곬 핥 읊 잃 없 달기 앉아 없어
+EOF
     ime "ime-test: kana" kana toukyou_ "skkdic" <<'EOF'
 preedit: 東京
 EOF
@@ -176,6 +184,7 @@ EOF
     run "net-test wake" build/net-test wake
     run "net-test wifi-saved" build/net-test wifi-saved
     run "net-test wireless" build/net-test wireless
+    run "net-test wifi-status" build/net-test wifi-status
     run "pkg-test" build/pkg-test
     # (0.8.8.9) lordos + lordos-web updated together: the engine's dpkg order against a real dpkg in a throwaway root
     if have dpkg && have dpkg-deb; then run "pkg-breaks-dpkg-test (lordos + lordos-web, dpkg --root)" sh tests/pkg_breaks_dpkg_test.sh
@@ -198,12 +207,15 @@ EOF
     run "ipp-test" build/ipp-test
     run "tp-test" build/tp-test
     run "fan-test" build/fan-test
+    run "term-damage-test" build/term-damage-test
     run "freespace-test" build/freespace-test
     run "install-plan-test" build/install-plan-test
     # the firewall rule sheet's parser (sdk/fwrule.js) against the same cases as build/fwdest-test
     if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
     if have node; then run "remotedesk-test (sdk/remotedeskmodel.js)" node tests/remotedesk_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
+    run "spectrum-test" build/spectrum-test
+    if have node; then run "soundwave-model-test (sdk/soundwavemodel.js, widgetgrid.js pins)" node tests/soundwave_model_test.mjs; fi
     if have node; then run "statusplace-test (sdk/statusplace.js)" node tests/statusplace_test.mjs; fi
     if have node; then run "logfile-test (sdk/logfile.js)" node tests/logfile_test.mjs; fi
     if have node; then run "menubar-model-test (sdk/menubarmodel.js, sdk/ticker.js)" node tests/menubar_model_test.mjs; fi
@@ -220,6 +232,22 @@ EOF
     if have node; then run "windowbuttons-test (sdk/windowbuttons.js)" node tests/windowbuttons_test.mjs; fi
     if have node; then run "login-model-test (sdk/loginmodel.js)" node tests/login_model_test.mjs; fi
     if have node; then run "diskplaces-test (sdk/diskplaces.js, #122)" node tests/diskplaces_test.mjs; fi
+    if have node; then run "jsx-undeclared-test (every JSX component is declared, #174)" node tests/jsx_undeclared_test.mjs; fi
+    if have node; then run "greeter-inbox-test (themes/greeter/inbox.js, #172)" node tests/greeter_inbox_test.mjs; fi
+    # a popup opened again on the same wl_surface, as GTK 4's popovers, against a headless lord-server (#159)
+    sh tests/popup_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
+        77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
+    esac
+    # a getter that destroys the node lord.setProp / lord.setStyle are writing (Claude Security, 0.8.9)
+    sh tests/js_getter_destroy.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "js-getter-destroy (tests/js_getter_destroy.js, headless lord-server)" ;;
+        77) skip "js-getter-destroy" "build/lord-server (make)" ;;
+        *) bad "js-getter-destroy (tests/js_getter_destroy.js, headless lord-server)" ;;
+    esac
     if have node; then run "hwkeys-test (sdk/hwkeymodel.js)" node ../tests/hwkeys_test.mjs; fi
     if have node; then run "fwrule-input-test (sdk/fwrule.js)" node tests/fwrule_input_test.mjs
     else skip "fwrule-input-test" "node"; fi
@@ -267,6 +295,18 @@ EOF
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
     if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs; else skip "motion-model-test" node; fi
+    if have node; then run "wallpaper-model-test (sdk/wallpapermodel.js)" node tests/wallpaper_model_test.mjs; else skip "wallpaper-model-test" node; fi
+    if have node; then run "slideshow-model-test (sdk/slideshowmodel.js)" node tests/slideshow_model_test.mjs; else skip "slideshow-model-test" node; fi
+    if have node; then run "widget-grid-test (sdk/widgetgrid.js)" node tests/widget_grid_test.mjs; else skip "widget-grid-test" node; fi
+    if have node; then run "poll-same-test (sdk/samevalue.js)" node tests/poll_same_test.mjs; else skip "poll-same-test" node; fi
+    if have node; then run "widget-feed-test (sdk/widgetfeedmodel.js)" node tests/widget_feed_test.mjs; else skip "widget-feed-test" node; fi
+    if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi
+    if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
+    if have node; then run "avatar-model-test (apps/settings/avatarmodel.js)" node tests/avatar_model_test.mjs; else skip "avatar-model-test" node; fi
+    if have node; then run "weather-model-test (sdk/weathermodel.js)" node tests/weather_model_test.mjs; else skip "weather-model-test" node; fi
+    if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi
+    if have node; then run "claude-widget-model-test (sdk/claudewidgetmodel.js)" node tests/claude_widget_model_test.mjs; else skip "claude-widget-model-test" node; fi
+    if have node; then run "stream-model-test (sdk/streammodel.js)" node tests/stream_model_test.mjs; else skip "stream-model-test" node; fi
     # (0.8.8.8, #112) Lord Flow's minimize effect: which windows start it, none with Reduce motion
     if have node; then run "minimize-model-test (themes/default/minimize.js)" node tests/minimize_model_test.mjs; else skip "minimize-model-test" node; fi
     if have node; then run "share-model-test (sdk/sharemodel.js)" node tests/share_model_test.mjs
@@ -308,6 +348,9 @@ EOF
     # window snapping geometry (sdk/snap.js): zones without gaps or overlaps, drop zones, Super+arrows
     if have node; then run "snap-test (sdk/snap.js)" node tests/snap_test.mjs
     else skip "snap-test" "node"; fi
+    # Settings → Network → Wi-Fi's lists: the connected network first, saved ones in range (GitHub #167)
+    if have node; then run "wifi-model-test (apps/settings/wifimodel.js)" node tests/wifi_model_test.mjs
+    else skip "wifi-model-test" "node"; fi
     # smartctl's JSON → the Disks/Monitor SMART model (sdk/smartparse.js), with real smartctl output
     if have node; then run "smart-parse-test (sdk/smartparse.js)" node tests/smart_parse_test.mjs
     else skip "smart-parse-test" "node"; fi
@@ -361,9 +404,15 @@ EOF
     # a paste of many items: the copies past lord-server's job slots wait their turn (apps/files/jobqueue.js, GitHub #104)
     if have node; then run "files-jobqueue-test (apps/files/jobqueue.js)" node tests/files_jobqueue_test.mjs
     else skip "files-jobqueue-test" "node"; fi
-    # the column view: what is picked in a deeper column is selected (apps/files/colview.js, GitHub #100)
+    # the column view: what is picked in a deeper column is selected, Select All takes its column (apps/files/colview.js, GitHub #100, #170)
     if have node; then run "files-colview-test (apps/files/colview.js)" node tests/files_colview_test.mjs
     else skip "files-colview-test" "node"; fi
+    # color tags and comments: the last tag and an emptied comment are removed (apps/files/tags.js, GitHub #181)
+    if have node; then run "files-tags-test (apps/files/tags.js)" node tests/files_tags_test.mjs
+    else skip "files-tags-test" "node"; fi
+    # the free names of copies, duplicates and new folders fit 255 bytes (apps/files/names.js, GitHub #102)
+    if have node; then run "files-names-test (apps/files/names.js)" node tests/files_names_test.mjs
+    else skip "files-names-test" "node"; fi
     # menus from the keyboard: arrows, type-ahead, the submenu's side and the safe triangle (sdk/menunav.js)
     if have node; then run "menu-nav-test (sdk/menunav.js)" node tests/menu_nav_test.mjs
     else skip "menu-nav-test" "node"; fi
@@ -449,6 +498,10 @@ EOF
     # (0.8.8.8, #117) Notes: Edit and Format menus and the editor's right-click menu send the editor's own keys
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "notes-editor-scene (apps/notes/NoteEditor.jsx, editmenu.js)" node tests/textfield_menu_test.mjs notes_editor_scene.mjs
+        # (#169) Notes' reading view keeps a paragraph's line breaks, as the editor shows them (sdk/markdown.jsx breaks)
+        run "notes-breaks-scene (sdk/markdown.jsx breaks, apps/notes)" node tests/textfield_menu_test.mjs notes_breaks_scene.mjs
+        # (#166) Screenshots' markup editor: New Screenshot and Ctrl+N bring the capture panel back, the editor staying open
+        run "screenshots-newcapture-scene (apps/screenshots/editor.jsx)" node tests/textfield_menu_test.mjs screenshots_newcapture_scene.mjs
     else skip "notes-editor-scene" "node and the repository's node_modules (npm install)"; fi
     # a password TextInput: the eye shows it and keeps the focus, copies nothing, hides on blur; ⇪ follows Caps Lock
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
@@ -469,6 +522,7 @@ EOF
     # (0.8.8.9) the trademark notice of the Store's Web apps section and of each web app's page
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-trademark-scene (apps/store/trademark.js)" node tests/textfield_menu_test.mjs store_trademark_scene.mjs
+        run "battery-settings-scene (apps/settings/Battery.jsx)" node tests/textfield_menu_test.mjs battery_settings_scene.mjs
     else skip "store-trademark-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
@@ -503,6 +557,19 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-taskbar-test (themes/classic on every display, sdk/dock.js drop targets)" node tests/classic_taskbar_test.mjs
     else skip "classic-taskbar-test" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9) Lord Workspaces: three monitors, tiling per display, Save layout, a monitor unplugged and back, the styles
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "workspaces-test (themes/workspaces on three displays)" node tests/workspaces_test.mjs
+    else skip "workspaces-test" "node and the repository's node_modules (npm install)"; fi
+    if have node; then run "workspaces-model-test (themes/workspaces/model, tokens.js, sdk/thememeta.js)" node tests/workspaces_model_test.mjs; fi
+    # (0.8.9) the first-start desktop chooser: who sees it, the random order, the steps across the live theme switch,
+    # and the whole wizard drawn over each theme (sdk/firststart.jsx)
+    if have node; then run "firststart-model-test (sdk/firststartmodel.js)" node tests/firststart_model_test.mjs; fi
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default classic workspaces; do
+            run "firststart-scene-$th (sdk/firststart.jsx over themes/$th)" node tests/workspaces_test.mjs firststart_scene.mjs "$th"
+        done
+    else skip "firststart-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8, #111) how many app buttons fit on a Classic taskbar, and how big
     if have node; then run "classic-taskbarfit-test (themes/classic/taskbarfit.js)" node tests/classic_taskbarfit_test.mjs; fi
     # (0.8.8.6) the Terminal's key mappings: iTerm2's keypad, "\n", settings migration 2

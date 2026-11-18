@@ -30,7 +30,7 @@ double wl_frame_hidden(unsigned time_ms);
 int  wl_pointer(float x, float y, struct Node *hit, int moved, int nbuttons, const int *down, const int *button, int wheel);
 /* While lord-server moves or resizes a window (ui/grab.c): no app receives the pointer
  * (they are sent leave) and only the button count is tracked. */
-void wl_pointer_grab(int nbuttons, const int *down);
+void wl_pointer_grab(int nbuttons, const int *down, const int *button);
 /* 0: the key is the shell's; 1: it went to the focused app; 2: it went to the app as another key
  * (Lord Flow's ❖ → Ctrl): the shell is only told, so ❖ does not count as pressed alone. */
 int  wl_key(int code, int value, const KeyInfo *k);
@@ -62,6 +62,7 @@ void wl_close(int id);                  /* asks the app to close the window */
 void wl_close_all(int ms);              /* every app asked to close, then waits for them: at most ms */
 const char *wl_kill(int id);            /* Force Quit: SIGKILL to its client (same user only); NULL or an error code */
 void wl_set_state(int id, int maximized, int fullscreen);
+void wl_set_fixed(int id, int fixed);     /* locked by the theme: no maximize or minimize offered or done */
 void wl_set_minimized(int id, int minimized);   /* X11 windows: iconic and at the bottom of X's stack */
 void wl_set_parked(int id, int parked);         /* on a hidden desktop: no keyboard and no fullscreen until back */
 void wl_set_covered(int id, int covered);       /* wholly under an opaque window: paced once a second, suspended */

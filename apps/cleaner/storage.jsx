@@ -2,7 +2,7 @@
 // allocated sizes, and a summary by type. Selecting a rectangle only selects it.
 import { View, Image, cleaner, useAppWindow, useStore, windows, wm, userDirs, t as tr, formatBytes, formatDate, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
-import { Label, Glass, GlassButton, Pill, Hero, Bar, Enter, PagedList, usePal } from './ui.jsx';
+import { Label, Glass, GlassButton, Pill, Hero, Bar, Enter, PagedList, usePal, useRail, ASIDE } from './ui.jsx';
 
 const SAFE = '#35c98f', REVIEW = '#f0b13c';
 const COLOURS = ['#7b2fe0', '#2a6fe0', '#c0349f', '#0f8f86', '#b8541a', '#a02c56', '#55577f', '#3f7fb5'];
@@ -66,7 +66,8 @@ function Treemap({ data, onOpen }) {
   const { id } = useAppWindow() || {};
   const win = useStore(windows, (ws) => ws.find((w) => w.id === id));
   const geo = win ? wm.frame(win) : null;
-  const W = geo ? Math.max(240, Math.round(geo.w - 236 - 76)) : 0, H = geo ? Math.max(160, Math.round(geo.h - 230)) : 0;
+  const rail = useRail();
+  const W = geo ? Math.max(240, Math.round(geo.w - ASIDE(rail))) : 0, H = geo ? Math.max(160, Math.round(geo.h - 230)) : 0;
   const rects = useMemo(() => {
     const kids = data.children.filter((c) => c.allocated > 0);
     const items = kids.slice(0, 26).map((c) => ({ ...c, v: c.allocated }));
@@ -260,7 +261,9 @@ export function StorageView({ scan, volume, onReview }) {
   const { id } = useAppWindow() || {};
   const win = useStore(windows, (ws) => ws.find((w) => w.id === id));
   const geo = win ? wm.frame(win) : null;
-  const W = geo ? Math.max(260, Math.round(geo.w - 236 - 76 - 228)) : 400, H = geo ? Math.max(200, Math.round(geo.h - 232)) : 300;
+  // a small window leaves out the list beside the bubbles and puts the views on a row of their own
+  const rail = useRail();
+  const W = geo ? Math.max(rail ? 200 : 260, Math.round(geo.w - ASIDE(rail) - (rail ? 0 : 228))) : 400, H = geo ? Math.max(rail ? 140 : 200, Math.round(geo.h - 232 - (rail ? 36 : 0))) : 300;
   const data = useMemo(() => cleaner.tree(scan.id, node, 500), [scan.id, node]);
   const kinds = useMemo(() => (data && !data.trail.length && volume && volume.id === 'home' ? folderKinds() : null), [data, volume]);
   const go = (n) => { setBack([...back, node]); setAhead([]); setNode(n); setSel(null); };
@@ -273,6 +276,7 @@ export function StorageView({ scan, volume, onReview }) {
   const summary = volume && volume.total > 0 ? tr('cleaner.map.summary', { free: formatBytes(volume.free), safe: formatBytes(whole.safe || 0), review: formatBytes(whole.review || 0), other: formatBytes(Math.max(0, volume.total - volume.free - whole.allocated)) }) : '';
   const rel = (name) => [...data.trail.map((t) => t.name), name].join('/');
   const real = !!sel && sel.id >= 0;           // "Others" is no folder: it can be looked at, not opened or reviewed
+  const pills = [['bubbles', 'cleaner.map.viewBubbles'], ['map', 'cleaner.map.viewMap'], ['tree', 'cleaner.map.viewTree'], ...(scan.savedAt ? [] : [['types', 'cleaner.map.viewTypes']])].map(([k, key]) => <Pill key={k} label={tr(key)} on={view === k} onClick={() => setView(k)} />);
   return (
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: spacing.m }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
@@ -281,12 +285,13 @@ export function StorageView({ scan, volume, onReview }) {
         <View style={{ flex: 1, minWidth: 0, paddingHorizontal: spacing.s }}>
           <Label size={20} weight={300} lines={1}>{data.trail.length ? data.trail[data.trail.length - 1].name : tr('cleaner.section.storage')}</Label>
         </View>
-        {[['bubbles', 'cleaner.map.viewBubbles'], ['map', 'cleaner.map.viewMap'], ['tree', 'cleaner.map.viewTree'], ...(scan.savedAt ? [] : [['types', 'cleaner.map.viewTypes']])].map(([k, key]) => <Pill key={k} label={tr(key)} on={view === k} onClick={() => setView(k)} />)}
+        {rail ? null : pills}
       </View>
+      {rail ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>{pills}</View> : null}
       <Label dim size={typeScale.callout} lines={1}>{scan.savedAt ? tr('cleaner.map.savedAt', { when: formatDate(new Date(scan.savedAt * 1000), 'short') }) : summary}</Label>
       {!scan.complete ? <Label size={typeScale.callout}>{tr(scan.limit ? `cleaner.incomplete.${scan.limit}` : 'cleaner.incomplete')}</Label> : null}
       <View style={{ flex: 1, minHeight: 0, flexDirection: 'row', gap: spacing.m }}>
-        {view === 'bubbles' ? (
+        {view === 'bubbles' && !rail ? (
           <Glass style={{ width: 216, padding: spacing.m, gap: spacing.s }}>
             <Label weight={600} lines={1}>{volume ? (volume.id === 'home' ? tr('cleaner.map.home') : volume.id === 'root' ? tr('cleaner.map.root') : volume.path) : data.base}</Label>
             {volume && volume.total > 0 ? <Bar value={1 - volume.free / volume.total} /> : null}

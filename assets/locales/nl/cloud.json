@@ -5,8 +5,9 @@
   "accounts": "Accounts",
   "allAccounts": "Alle accounts",
   "onThisComputer": "Op deze computer",
-  "cacheLine": "{size} · {kept} behouden",
+  "hereLine": "{size} · {kept} behouden · {free} vrij te maken",
   "freeUp": "Maak ruimte vrij",
+  "freeUpHint": "‘Maak ruimte vrij’ verwijdert de lokale kopieën van bestanden die niet op deze computer worden behouden; behouden bestanden en wijzigingen die nog moeten worden geüpload blijven.",
   "freed": "{size} vrijgemaakt op deze computer",
   "freedSkipped": {
     "one": "{size} vrijgemaakt; {count} item blijft (open, behouden of wacht op uploaden)",
@@ -438,5 +439,9 @@
   "details.signIn": "Aanmelding",
   "details.server": "Server",
   "details.app": "App",
-  "details.ownApp": "Je eigen app"
+  "details.ownApp": "Je eigen app",
+  "color": "Kleur",
+  "colorAuto": "Automatisch",
+  "colorAutoHint": "Automatisch: in de volgorde waarin je het account toevoegde, zodat twee accounts van dezelfde aanbieder verschillen.",
+  "colorChosen": "Getoond in Bestanden, het Cloud-menu en Logboeken."
 }

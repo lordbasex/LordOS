@@ -2,6 +2,7 @@
   "pick": "পুরো বার্তা ও এর ফিল্ড দেখতে একটি এন্ট্রি বেছে নিন।",
   "field.time": "সময়",
   "field.level": "স্তর",
+  "field.account": "অ্যাকাউন্ট",
   "field.process": "প্রসেস",
   "field.pid": "PID",
   "field.unit": "ইউনিট",

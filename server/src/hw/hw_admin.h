@@ -51,6 +51,10 @@
  *                                      /etc/chromium/policies/recommended/lordos-session.json and
  *                                      /etc/firefox-esr/lordos-session.js; off: removes both
  *                                      (docs/SESSIONS.md, "Session restore")                 anyone
+ *   boot-text on|off                   on: the next boots start in text mode, a login prompt on tty1 and
+ *                                      startlordos to start the desktop; writes the fixed file
+ *                                      /etc/lordos/text-mode, off removes it (docs/SESSIONS.md,
+ *                                      "Text mode")                                           admin
  *   boot-test <n>                      LordBench's boot time test (bench/boottest.h): n restarts
  *                                      in a row, 2..10; writes only the fixed-format state file
  *                                      /var/lib/lordos/boot-test, which lord-sessiond follows at
@@ -62,6 +66,7 @@
 
 #include "../admin.h"
 #include "rpifw.h"
+#include "battery_admin.h"   /* battery-thresholds, battery-behaviour (admin only) */
 
 void hw_act_brightness(const AdminReq *r, const char *arg, size_t len);
 void hw_act_keyboard_light(const AdminReq *r, const char *arg, size_t len);
@@ -105,6 +110,7 @@ int hw_uv_log(const char *log, size_t n, long long *last_s);
 const char *hw_rpi_case_text(const char *id);   /* fixed file text of a known case, NULL otherwise */
 void hw_act_video(const AdminReq *r, const char *arg, size_t len);
 void hw_act_browser_restore(const AdminReq *r, const char *arg, size_t len);
+void hw_act_boot_text(const AdminReq *r, const char *arg, size_t len);
 void hw_act_boot_test(const AdminReq *r, const char *arg, size_t len);          /* LordBench, bench/boottest.h */
 void hw_act_boot_test_cancel(const AdminReq *r, const char *arg, size_t len);
 /* The two files video-optimize writes, from its argument; 0 if the argument is valid. */
@@ -152,7 +158,10 @@ void hw_act_wallpaper_login_image(const AdminReq *r, const char *arg, size_t len
     { "rpi-eeprom-update", hw_act_eeprom_update, A_FORK }, \
     { "video-optimize", hw_act_video, A_ANYONE }, \
     { "browser-restore", hw_act_browser_restore, A_ANYONE }, \
+    { "boot-text", hw_act_boot_text, 0 }, \
     { "boot-test", hw_act_boot_test, 0 }, \
-    { "boot-test-cancel", hw_act_boot_test_cancel, A_ANYONE },
+    { "boot-test-cancel", hw_act_boot_test_cancel, A_ANYONE }, \
+    { "battery-thresholds", hw_act_battery_thresholds, 0 }, \
+    { "battery-behaviour", hw_act_battery_behaviour, 0 },
 
 #endif

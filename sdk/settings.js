@@ -1,10 +1,10 @@
 // settings.js — user settings, stored in ~/.config/lordos/settings.json.
 import { createStore, useStore } from './store.js';
-import { DEFAULT_WALLPAPER } from './wallpapers.js';
+import { markExistingUser } from './firststartmodel.js';
 
 const DEFAULTS = {
   mode: 'dark',          // 'dark' | 'light'
-  accent: 'azul',
+  accent: null,          // 0.8.9: null = the theme's default (azul; Lord Workspaces: rosa, to go with its wallpaper), migration 7
   effects: true,         // transparency with blur
   reduceMotion: false,   // decorative animations off (Settings → Appearance)
   browserTabsInTitlebar: true,   // 0.8.4, Settings → Appearance: Chromium and Firefox draw their own bar (browserframe.js)
@@ -14,7 +14,13 @@ const DEFAULTS = {
   motionFiles: {},       // id → the variant on disk
   motionUser: [],        // added videos: [{ id: 'user:…', name, path }]
   wallpaperImages: [],   // the user's own pictures, newest first: ids 'image:<name>' (sdk/wallpapers.js)
-  wallpaper: DEFAULT_WALLPAPER,  // 0.8.2: Lumo Celestial (before: 'aurora', still available)
+  wallpaper: null,       // 0.8.9: null = the theme's default (Lumo Celestial; Lord Workspaces: Cyberpunk City HD's panorama),
+                         // migration 5. 0.8.2–0.8.8: 'lumo-celestial' saved for everyone; before: 'aurora', still available
+  slideshow: null,       // 0.8.9, Settings → Wallpaper in Lord Workspaces: { on, category, every, perDisplay } (sdk/slideshowmodel.js); new key, no migration
+  weather: { on: false },
+  playerStreams: [],        // 0.8.8.10: the Player's saved streams [{ name, url, user }] (no password: the keyring has it)   // 0.8.8.10: the weather widget asks Open-Meteo only once turned on (sdk/weathermodel.js)
+  deskWidgets: [],      // 0.8.8.10: Lord Workspaces' desktop widgets, [{ id, type, x, y }] (sdk/deskwidgets.jsx)
+  wallpapers: {},       // 0.8.8.10: a display's own picture, { [connector]: id } (sdk/wallpapers.js wallpaperIdFor)
   keyboard: null,        // before M5; now keyboards (see keyboard.js). It was 'latam' until 0.8.8.6 (#55)
   keyboards: null,       // [{ layout, variant }] from xkb-data
   keyboardIndex: 0,
@@ -37,17 +43,23 @@ const DEFAULTS = {
   sessionSaved: null,         // { clean, windows } what was open; written by sessionrestore.jsx only
   bluetoothOff: false,        // 0.8.8.6 (#75), the user's last Bluetooth switch: applied again at login (btpowermodel.js)
   windowButtons: 'auto',      // 0.8.8.7 (#58), Settings → Desktop & Dock → Title bars: 'auto' | 'left' | 'right' (windowbuttons.js)
+  windowSnap: true,           // 0.8.8.10 (#182), Settings → Desktop & Dock → Windows: dragging a window to an edge snaps it (snap.js snapAllowed); new key, no migration
   x11Scaling: 'self',         // 0.8.8.8, Settings → Displays → X11 apps: 'self' (they scale themselves, sharp) | 'lordos' (wayland.js)
   appsOff: [],                // 0.8.8.8, Store → Installed → Deactivate: built-in apps turned off (appsoff.js, appsoffmodel.js)
   webAppPrefs: {},            // 0.8.8.8, Settings → Web apps: per app { badge, dockPerProfile } (webappsmodel.js webPrefs); new key, no migration
   appsOffKept: null,         // what deactivating changed, to put back on Activate: { backupInterval } (appsoffactions.js)
+  cloudColors: {},            // 0.8.8.10 (#184), Settings → Cloud: a color chosen per account id (cloudmodel.js accountColor); new key, no migration
+  themeOptions: {},           // 0.8.9, a theme's own choices from its theme.json "options", by theme id (thememeta.js); new key, no migration
+  workspaces: null,           // 0.8.9, Lord Workspaces' activities: { v, activities } (themes/workspaces/model/activities.js); new key, no migration
+  desktopChosen: false,       // 0.8.9, the first-start desktop chooser was finished (sdk/firststart.jsx); migration 5 sets it for existing users
+  firstStart: null,           // 0.8.9, that chooser's step while it is open, across its live theme switches (sdk/firststartmodel.js cleanState)
 };
 
 // Per-user settings migrations (docs/UPDATES.md, "Migrations"): when an update changes the shape or
 // meaning of a setting, it appends [schema, (settings) => newSettings] here. Each runs once per user,
 // in order, when the session loads the file; "schema" records the last one applied. The system-wide
 // migrations (as root) are the lordos package's (packaging/migrations).
-export const SETTINGS_SCHEMA = 4;
+export const SETTINGS_SCHEMA = 7;
 // A Terminal key mapping that sends what a US keyboard's key types anyway (keys.js names keys by their
 // US position): on a US keyboard it does nothing, on any other it types the wrong character. The iTerm2
 // importer made them from keypad entries before 0.8.8.6 ("-" typed "/" on a Latin American keyboard).
@@ -83,6 +95,18 @@ const MIGRATIONS = [
     // computer's layout is used (/etc/default/keyboard, sdk/keyboard.js; #55).
     if ((Array.isArray(s.keyboards) && s.keyboards.length) || s.keyboard !== 'latam') return s;
     return { ...s, keyboard: null };
+  }],
+  [5, (s) => {            // 0.8.9: the default wallpaper became the theme's (null), so Lord Workspaces can have its own
+    // (Cyberpunk City HD's panorama). Lumo Celestial was every user's default since 0.8.2 and was saved with the rest
+    // of the settings, so it reads as a choice; nobody can tell it from one. Lord Flow and Lord Classic show it all the
+    // same (their default); only Lord Workspaces, new in 0.8.9, shows its own. Any other picture stays.
+    return s.wallpaper === 'lumo-celestial' ? { ...s, wallpaper: null } : s;
+  }],
+  [6, markExistingUser],  // 0.8.9: someone who already used LordOS never sees the first-start desktop chooser (firststartmodel.js)
+  [7, (s) => {            // 0.8.9: the default accent became the theme's (null), so Lord Workspaces can have its own (rosa,
+    // which goes with Cyberpunk City HD). Azul was every user's default and was saved with the rest of the settings,
+    // like the wallpaper in migration 5: Lord Flow and Lord Classic show it all the same; any other accent stays.
+    return s.accent === 'azul' ? { ...s, accent: null } : s;
   }],
 ];
 export function migrateSettings(s) {

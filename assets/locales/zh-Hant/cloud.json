@@ -5,8 +5,9 @@
   "accounts": "帳號",
   "allAccounts": "所有帳號",
   "onThisComputer": "在這台電腦上",
-  "cacheLine": "{size} · 保留 {kept}",
+  "hereLine": "{size} · 保留 {kept} · 可釋放 {free}",
   "freeUp": "釋放空間",
+  "freeUpHint": "「釋放空間」會刪除未保留在這台電腦上的檔案的本機副本；保留的檔案和等待上傳的變更不受影響。",
   "freed": "已在這台電腦上釋放 {size}",
   "freedSkipped": {
     "other": "已釋放 {size}；{count} 個項目保留（開啟中、已保留或等待上傳）"
@@ -417,5 +418,9 @@
   "details.signIn": "登入方式",
   "details.server": "伺服器",
   "details.app": "App",
-  "details.ownApp": "你自己的 App"
+  "details.ownApp": "你自己的 App",
+  "color": "顏色",
+  "colorAuto": "自動",
+  "colorAutoHint": "自動：依新增帳號的順序決定，讓同一服務的兩個帳號可以區分。",
+  "colorChosen": "顯示在檔案、雲端選單和記錄中。"
 }

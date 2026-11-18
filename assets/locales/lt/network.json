@@ -151,5 +151,10 @@
   "wifi.saved": "įrašytas",
   "wifi.scan": "Ieškoti",
   "wifi.scanning": "Ieškoma…",
-  "wifi.wrongKey": "Neteisingas slaptažodis."
+  "wifi.wrongKey": "Neteisingas slaptažodis.",
+  "wifi.available": "Pasiekiami „Wi-Fi“ tinklai",
+  "wifi.currentLabel": "{ssid} – prisijungta",
+  "wifi.connect": "Prisijungti",
+  "wifi.notInRange": "Nepasiekiamas",
+  "wifi.knownFooter": "LordOS pats prisijungia prie išsaugoto tinklo, kai jis pasiekiamas. „Pamiršti“ pašalina tinklą ir jo slaptažodį iš šio kompiuterio."
 }

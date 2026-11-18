@@ -37,5 +37,15 @@
   "col.time": "Muda",
   "back": "Nyuma",
   "emptyMusicTitle": "Hakuna muziki",
-  "emptyVideosTitle": "Hakuna video"
+  "emptyVideosTitle": "Hakuna video",
+  "nav.network": "Mtandao",
+  "nav.streams": "Mitiririko",
+  "streams.open": "Fungua anwani…",
+  "streams.list": "Fungua orodha ya M3U…",
+  "streams.save": "Hifadhi",
+  "streams.remove": "Ondoa",
+  "streams.close": "Funga",
+  "streams.saved": "Zilizohifadhiwa",
+  "streams.channels": "Chaneli ({n})",
+  "streams.empty": "Fungua kamera, mtiririko au chaneli ya TV kwa anwani yake, au chaneli za orodha ya M3U."
 }

@@ -16,6 +16,7 @@ import { useLauncherApps, launchApp } from './apps.js';
 import { isAppOff } from './appsoff.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
 import { logOut } from './sessionrestore.jsx';
+import { dndActive, notifyPrefs } from './notify.js';
 import { TextInput, focusToken, restoreFocus } from './components.jsx';
 import * as fs from './fs.js';
 
@@ -172,26 +173,33 @@ export function convert(input) {
 // ---- file index (if the server doesn't provide lord.fs.search) ----
 
 let fileIndex = { at: 0, list: [], building: false };
+// Folders nobody searches by name and that can hold tens of thousands of entries (a stall of 12 s on 2026-11-16 was the
+// old builder listing and sorting one of these on the main loop).
+const SKIP_DIRS = new Set(['node_modules', '__pycache__', 'venv', 'site-packages', 'target', 'vendor', 'third_party', 'out']);
+const PER_DIR = 2000, MAX_FILES = 5000;
+// Built a folder at a time with fs.listAsync (read on lord-server's file thread, not on the main loop, and not sorted:
+// the index needs no order), hidden entries left out; each name is kept folded once so typing only compares.
 function buildFileIndex() {
   if (fileIndex.building || Date.now() - fileIndex.at < 120000) return;
   fileIndex.building = true;
   const out = [];
   const queue = [['', 0]];
+  const done = () => { fileIndex = { at: Date.now(), list: out, building: false }; resultsVersion.set((x) => x + 1); };
+  let home = '';
+  try { home = fs.home(); } catch (e) { home = ''; }
+  if (!home) { done(); return; }
   const step = () => {
-    let budget = 40;
-    while (queue.length && budget-- > 0 && out.length < 5000) {
-      const [dir, depth] = queue.shift();
-      let entries = [];
-      try { entries = fs.list(dir || '.'); } catch (e) { continue; }
-      for (const e of entries) {
+    if (!queue.length || out.length >= MAX_FILES) { done(); return; }
+    const [dir, depth] = queue.shift();
+    Promise.resolve().then(() => fs.listAsync(dir ? `${home}/${dir}` : home)).then((entries) => {
+      let n = 0;
+      for (const e of Array.isArray(entries) ? entries : []) {
+        if (!e || !e.name || e.name[0] === '.' || n++ >= PER_DIR || out.length >= MAX_FILES) continue;
         const rel = dir ? `${dir}/${e.name}` : e.name;
-        out.push({ path: `${fs.home()}/${rel}`, name: e.name, dir: e.dir, size: e.size, mtime: e.mtime });
-        if (e.dir && depth < 4) queue.push([rel, depth + 1]);
+        out.push({ path: `${home}/${rel}`, name: e.name, key: fold(e.name), dir: e.dir, size: e.size, mtime: e.mtime });
+        if (e.dir && depth < 4 && !SKIP_DIRS.has(e.name)) queue.push([rel, depth + 1]);
       }
-    }
-    if (queue.length && out.length < 5000) { setTimeout(step, 0); return; }
-    fileIndex = { at: Date.now(), list: out, building: false };
-    resultsVersion.set((x) => x + 1);
+    }, () => {}).then(() => setTimeout(step, 0));
   };
   step();
 }
@@ -203,7 +211,7 @@ function searchFiles(q) {
     try { return lord.fs.search(fs.home(), q, { limit: 60, depth: 6 }); } catch (e) { /* fall back to the index */ }
   }
   buildFileIndex();
-  return fileIndex.list.filter((f) => fold(f.name).includes(q)).slice(0, 60);
+  return fileIndex.list.filter((f) => (f.key ?? fold(f.name)).includes(q)).slice(0, 60);
 }
 
 const IMG = /\.(png|jpe?g|gif|webp|bmp)$/i;
@@ -218,6 +226,19 @@ function openFile(f) {
 function revealFile(f) {
   const parent = f.path.split('/').slice(0, -1).join('/') || fs.home();
   wm.open('files', { new: true, args: { path: parent, select: f.name } });
+}
+
+// ---- recent files: the home folder's files changed in the last 30 days (lord.fs.recent walks the folder: read
+// once a minute at most, when a search is typed) ----
+
+let recentCache = { at: 0, list: [] };
+function recentFiles() {
+  if (Date.now() - recentCache.at > 60000) {
+    let list = [];
+    try { list = typeof lord !== 'undefined' && lord.fs?.recent ? fs.recent(200, 30) || [] : []; } catch (e) { list = []; }
+    recentCache = { at: Date.now(), list: list.filter((f) => f && f.name && !f.dir) };
+  }
+  return recentCache.list;
 }
 
 // ---- notes (Notes app: ~/Notes/<note>/nota.md; ~/Notas before 0.7.0) ----
@@ -290,9 +311,12 @@ function buildResults(raw, apps) {
     .map((x) => ({ key: `settings:${x.id}`, score: x.s + usageBoost(`settings:${x.id}`), title: x.name, subtitle: t('shell.spotlight.inSettings'), glyph: '⚙',
       run: () => wm.open('settings', { args: { section: x.id } }) })));
 
-  // system actions
+  // system actions: only safe ones (they change a preference or ask first), never a command
+  const hasSession = typeof lord !== 'undefined' && typeof lord.session !== 'undefined' && lord.session.managed();
   const actions = [
     { id: 'dark', name: t('shell.spotlight.action.dark'), run: () => settings.set({ mode: settings.get().mode === 'dark' ? 'light' : 'dark' }) },
+    { id: 'dnd', name: t('shell.classic.dnd'), run: () => settings.set((x) => ({ ...x, notifications: { ...notifyPrefs(x), dnd: !dndActive() } })) },
+    ...(hasSession ? [{ id: 'lock', name: t('shell.menu.lock'), run: () => lord.session.lock() }] : []),
     { id: 'logout', name: t('shell.menu.logout'), run: () => logOut() },
   ];
   add('actions', actions.map((x) => ({ ...x, s: best(q, x.name) })).filter((x) => x.s >= 40)
@@ -304,6 +328,13 @@ function buildResults(raw, apps) {
     .filter((x) => x.s > 15).map((x) => ({ ...x, s: x.s + usageBoost(`file:${x.f.path}`) - (x.f.dir ? 0 : 1) }))
     .sort((a, b) => b.s - a.s).slice(0, 6)
     .map(({ f, s: sc }) => ({ key: `file:${f.path}`, score: sc * 0.8, title: f.name, subtitle: f.path.replace(fs.home(), '~'), glyph: f.dir ? '📁' : IMG.test(f.name) ? '🖼' : '📄',
+      preview: { kind: 'file', file: f }, run: () => openFile(f), reveal: () => revealFile(f) })));
+
+  // recent files (changed in the last 30 days), the ones the index search above didn't already list
+  const listed = new Set((sections.find((x) => x.id === 'files')?.items || []).map((x) => x.key));
+  add('recent', recentFiles().map((f) => ({ f, s: Math.max(score(stem(f.name), q), score(f.name, q, false) * 0.3) }))
+    .filter((x) => x.s > 15 && !listed.has(`file:${x.f.path}`)).sort((a, b) => b.s - a.s || (b.f.mtime || 0) - (a.f.mtime || 0)).slice(0, 4)
+    .map(({ f, s: sc }) => ({ key: `file:${f.path}`, score: sc * 0.75, title: f.name, subtitle: f.path.replace(fs.home(), '~'), glyph: IMG.test(f.name) ? '🖼' : '📄',
       preview: { kind: 'file', file: f }, run: () => openFile(f), reveal: () => revealFile(f) })));
 
   // notes

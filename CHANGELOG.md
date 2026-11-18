@@ -10,6 +10,536 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Lord Workspaces has its own pointer**: the default arrow becomes a rounded tip with no tail, filled with the
+  person's accent colour, with LordOS's white outline and soft shadow; it follows the accent when it changes. Only the
+  default pointer: the hand, the text cursor and the resize arrows stay LordOS's. Lord Flow and Lord Classic keep the
+  black arrow (`startShell` puts it back for every theme). `cursor_set_accent` in `cursor.c` draws it (rounded
+  polygons in the signed-distance shapes, a colour fill), `lord.input.pointerAccent('#RRGGBB' | null)` takes only a
+  colour, and `setPointerAccent` in the SDK; `build/cursor-test` checks the fill, the size, the text cursor and going
+  back. Linux apps that ask for the default shape get it too.
+- **A window that draws its own title bar no longer sticks to the pointer after Minimize (GitHub #189).** Floorp,
+  clicked on Minimize while the pointer moved a little, asked to be moved once the button was already up; the move
+  then had no release to end it and the minimized window followed the pointer until the next click. lord-server now
+  ignores a move or resize request with no button down (xdg-shell allows it), and minimizing a window ends a move of
+  it still under way (`wm.cancelGrab`). (`server/src/wl/wl.c`, `sdk/wayland.js`, `sdk/windows.js`)
+- **Security (Claude Security review of the 0.8.9 branch).** Four findings, all in code new in this version, fixed:
+  - Streams checked no TLS certificate: FFmpeg only verifies when asked, so an https, HLS-over-https or rtmps camera
+    or channel accepted any server, and a camera password from the keyring could go to someone in the middle. lord-stream
+    now asks for the certificate against the system's CAs and the host name on every open, nested HLS and DASH opens
+    included (`lm_tls_verify`, `server/src/media/helper/lm_io.c`); a self-signed server fails with "can't open". rtsps
+    can't be checked with FFmpeg 7.1 (its RTSP demuxer passes no TLS options), which docs/MEDIA.md says.
+  - The https M3U list download checked no certificate either (`server/src/media/stream/ls_m3u.c`).
+  - lord-server leaked a parsed list when lord-stream sent JSON that wasn't an array (`m3u_result`,
+    `server/src/media/media.c`).
+  - A use-after-free in `lord.setProp(id, 'wave', …)`: a getter on the object could destroy the node while it was
+    being written. The values are now read first and the node looked up again by id and serial; `lord.setStyle(id,
+    'gradient', …)` and the property key of `setProp` had the same pattern and are fixed the same way
+    (`server/src/ui/js.c`). `tests/js_getter_destroy.sh` runs it headless (found with AddressSanitizer on the old code).
+- **The clock widget can show a second hand.** Its menu has a third style, "Analog with seconds", next to Analog and
+  Digital: a thin hand in the accent colour (and an accent centre) that moves every second; the other two still change
+  once a minute. The hand is its own node on a shared one-second feed, so each tick repaints only the square it sweeps,
+  and like every widget feed it stops while the widget is behind a window, the displays are off or the session is
+  locked. Named in all 35 languages. (`sdk/deskwidgets.jsx`)
+- **Cyberpunk City HD, a new wallpaper category** (all themes' Settings → Wallpaper): seventeen pictures made for
+  LordOS, in the order of a journey from the road outside into the city: Panorama, Neon Road Entrance, Heart of the
+  City, Skyline Highway, Rings and Bridges, Flower Boulevard, Neon Cherry Avenue, Maglev Station, Pier and Train, Sky
+  Terrace, Metropolis Lookout, and a closing series with a woman in the same city (Neon Rider, Night Watch, Hooded,
+  Unmasked, Night Pose, Portrait). Named in every language; the category's name is a proper name and stays the same
+  everywhere. Panorama and Neon Road Entrance are 3840×2160 originals: a 1920×1080 base (quality 92, 4:4:4) and the 4K
+  size as an `@3840x2160` variant (quality 95, 4:4:4: neon edges blur with 4:2:0), so a 1080p screen never decodes
+  the 4K file. The other fifteen were made again at 1672×941 (the first versions were crops of one picture and looked
+  soft) and are brought up to 1920×1080 once with Lanczos, with no 4K file that would add bytes and no detail;
+  22.4 MB with the thumbnails. `tools/gen-wallpapers.mjs` now takes JPEG originals, makes the 1920×1080 base for an
+  original larger than that (and, for a category that asks for it, for a smaller one), has per-category quality,
+  takes the category's order from an `order.txt`, and keeps the categories it isn't given in `index.json`.
+  (`assets/wallpapers/cyberpunk/`, `assets/wallpapers/README.md`, `sdk/wallpapers.js`)
+- **Lord Workspaces' own default accent: rosa**, to go with Cyberpunk City HD's neon. `settings.accent` is now `null`
+  until the person chooses one, and `null` means the theme's default: azul in Lord Flow and Lord Classic, rosa in Lord
+  Workspaces (`DEFAULT_ACCENT`, `themes/workspaces/tokens.js`). Each theme's tokens carry `accentName`, so the pickers
+  (Settings → Appearance, the Control Centers) mark the accent in use and Linux apps get its name through the portal.
+  Settings migration 7 turns the saved `azul` (everyone's default until now, saved with the rest of the settings)
+  into `null`, like migration 5 did for the wallpaper; any other accent stays. A new install that picks Lord
+  Workspaces starts with the panorama and the pink accent. (`sdk/settings.js`, `themes/*/tokens.js`,
+  `apps/settings/index.jsx`, `sdk/theme.js`)
+- **Lord Workspaces' own default wallpaper: Cyberpunk City HD's panorama.** `settings.wallpaper` is now `null` until
+  a picture is chosen, and `null` is the theme's default: Lord Workspaces declares its own (theme.json
+  `"wallpaper": { "default" }`, tokens `defaultWallpaper`), Lord Flow and Lord Classic keep Lumo Celestial
+  (`wallpaperIdFor(s, d, def)`, `findWallpaper(list, id, def)`). Settings migration 5 turns the saved
+  `"lumo-celestial"` (everyone's default since 0.8.2, saved with the other settings) into `null`; any other picture
+  stays, and Lord Flow and Lord Classic look the same. Someone who had picked Celestial on purpose sees the panorama
+  the first time they open Lord Workspaces and can pick Celestial again. (`sdk/settings.js`, `sdk/wallpapermodel.js`,
+  `sdk/thememeta.js`; tests in `wallpaper_model_test.mjs`, `keyboard_default_test.mjs`, `workspaces_model_test.mjs`)
+- **Lord Workspaces: wallpaper slideshow** (Settings → Wallpaper, shown only in Lord Workspaces; off by default).
+  "Change the wallpaper automatically" goes through a category's pictures (Cyberpunk City HD unless another is
+  chosen) every 1, 5, 15 or 30 minutes or every hour (a minute when turned on), and with several displays "Different
+  picture on each display" gives each display its own shuffled order, never a picture another display shows, with the
+  changes staggered over the interval. The change is a cross-dissolve with a Ken Burns pan: the next picture fades in
+  over 2.4 s while it drifts into place from one of eight directions (every slideshow picture is drawn 2 % larger than
+  its display on each side, so no edge shows); with Reduce motion a plain 0.4 s crossfade. A pan, not a zoom: on a
+  1080p display on the CPU each frame of the pan takes 9.6–10 ms against 52–53 ms for a 6 % zoom
+  (`build/engine-test bench-slideshow`, a window and two blurred bars over it). The next picture is decoded 8 s ahead by
+  lord-server's image workers at the size it is drawn at (a
+  `thumb:` source may now be an `asset:` path, and `IMG_THUMB_MAX` is 4096), so a change never waits on a decode on the
+  interface's thread; the picture that left is unmounted. No change while nobody sees the screen (displays off,
+  session locked), on Power Saver or a low battery, or on a display hidden by a window. Off it costs nothing (the same
+  `theme_cost_scene` numbers in all three themes); on, two timers per change and no interval. Turning it on turns the
+  moving wallpapers off; choosing a picture or a video turns it off. Shared logic in the SDK (`sdk/slideshowmodel.js`,
+  `sdk/slideshow.jsx`, `SlideshowWallpapers`), turned on by the theme's theme.json (`"slideshow": true`); all text in
+  every language. Not yet checked on real monitors (only the stub scene with three displays) or on the
+  GPU path. (`themes/workspaces`, `apps/settings/Slideshow.jsx`, `server/src/ui/js.c`, `server/src/ui/ui.h`,
+  docs/WORKSPACES.md "Wallpaper and slideshow"; tests in `server/tests/slideshow_model_test.mjs` (new, in `make test`),
+  `workspaces_scene.mjs`, `build/engine-test` `test_image_wallpaper_thumb`, timing in `build/engine-test bench-slideshow`)
+- **First start: choose your desktop.** The first session of a new account on an installed system opens a three-step
+  chooser in the language picked in the installer (`sdk/firststart.jsx`, `sdk/firststartmodel.js`; docs/SETTINGS.md,
+  "First start"). Step 1, over the dimmed desktop: the crown, "Choose your desktop" and three equal cards for Lord Flow,
+  Lord Classic and Lord Workspaces, each with a real picture (`assets/desktops/*.jpg`, 640 × 400, about 40 KB each), its
+  name and the theme's own description; the cards come in a random order every time, none is chosen and none is
+  marked as recommended, and "See it live" waits for a choice. Step 2: the chosen desktop is applied for real with the
+  live theme switch, and the panel becomes a small floating box (330 px) on the end side of the work area at about
+  mid-height, never over the Dock, the Classic taskbar or the Workspaces spine; its grip drags it anywhere inside the
+  display's work area, the three names switch live (a ✓ on the current one), with Back and Use this. Step 3, "Change it
+  whenever you like": a drawn replica of Settings → Appearance in the person's language with Desktop style ringed and
+  the chosen desktop selected, the path Settings → Appearance → Desktop style, Back and Start. Back works on every
+  step; the step, the pick, the order and the box's place are kept in `settings.firstStart` across the theme switch
+  (the JS context is discarded) and checked when read back, and a failed switch leaves the theme as it was. Tab, Space,
+  Enter and Escape (Back) work throughout, and it follows right-to-left languages. It never shows on the live system,
+  on the OVA's first boot, on the login screen or to anyone who already used LordOS: settings migration 6 marks
+  `desktopChosen` on a settings file that shows an earlier session (`welcomeShown`, `sessionSaved` or a chosen
+  `theme`), while the files the installer, the OVA's first boot and Settings → Users write for a new account don't
+  count. It is mounted by the SDK for all three themes, "Welcome to LordOS" and Lord Workspaces' activity onboarding
+  wait for it, and once done it leaves no listener or timer (the three themes' idle wakeups are unchanged). Settings →
+  Appearance's drawn desktop-style pictures moved into the SDK (`sdk/stylethumb.jsx`, `DesktopStyleThumb`) so the
+  replica draws the same ones. 11 new texts in all 35 languages. Tests: `server/tests/firststart_model_test.mjs` (51
+  checks: who sees it, the random order, the saved state, Back and forward, the box's place) and
+  `firststart_scene.mjs` over each theme (33 checks each: the whole wizard, the switch and resume, the drag, the keys,
+  nothing left after Start), both in `make test`.
+- **Desktop widgets in Lord Flow and Lord Classic too**, the same as in Lord Workspaces: "Add widget…" in the
+  wallpaper's right-click menu opens the catalog (search, categories, sizes), widgets sit on each display's grid, can be
+  dragged to another block and keep their data fresh through the shared widget feed. The catalog moved from the theme
+  into the SDK (`sdk/widgetpicker.jsx`, `WidgetPicker`, `widgetPicker`), in the theme's colours; a theme can give its own
+  panel (Lord Workspaces passes its glass Surface).
+- **Settings → Cloud: a color for each account** (issue #184). Each account's page has a row of colors: Automatic (the
+  order the account was added in, so two accounts of one provider still differ) or one of the palette's, shown in Files,
+  the Cloud menu and Logs (`settings.cloudColors`, read by `accountColor` in `sdk/cloudmodel.js`).
+- **Screenshots: another capture without closing the markup editor (GitHub #166).** The markup
+  editor's toolbar has **New Screenshot** (also Ctrl+N): it brings the capture panel back (entire screen, window,
+  selection, color, text, record), and the editor stays open with its picture, so you can take as many captures as
+  you need and mark each one up. Before, the panel closed at the capture and only closing the editor and opening
+  Screenshots again gave another one. (`apps/screenshots/editor.jsx` `onNewCapture`, the `screenshots.newCapture` text
+  in every language.) Checked in `screenshots_newcapture_scene.mjs`.
+- **Display scaling at 75 % and 80 %, for more space on small screens** (GitHub #158; all themes). Settings → Displays
+  offers them before 100 % on displays whose desktop stays within 2560 × 1600 logical (1280 × 800, 1366 × 768, 1080p,
+  1200p, also rotated): a 1280 × 800 laptop at 75 % is a 1707 × 1067 desktop. They show as one more tile ("more
+  space") and in the list, with a note saying the desktop's size and that Linux apps look a little softer. lord-server
+  accepts exactly 75 and 80 (`out_scale_valid`; 50–70 % stay refused, and nothing is recommended or rounded below
+  100); its drawing already handled a scale below 1 (a mirrored smaller display). Wayland clients are asked for 100 %
+  (`client_pct` in `wl.c`) and X11 apps get 100 %, and LordOS draws both smaller; the pointer keeps its size. Not yet
+  checked on the VM or a real 1280 × 800 laptop. (`server/src/outputs.c`, `outputs.h`, `server/src/wl/wl.c`,
+  `server/src/hw/display.c`, `sdk/displaylayout.js`, `apps/settings/Displays.jsx`, `docs/DISPLAYS.md`; tests in
+  `build/outputs-test`, `build/engine-test` `test_scale_below_100`, `server/tests/display_layout_test.mjs`)
+- **Settings → Network → Wi-Fi shows which network you are on, and manages saved ones** (GitHub #167). The list is
+  now "Available Wi-Fi networks": the network LordOS is connected to comes first whatever its signal, as "<name> —
+  Connected" with its own Disconnect button (the header keeps only Scan, and the radio picker with two radios); the
+  others follow strongest first, with the Control Center's signal bars instead of the text ones. Saved networks put the
+  connected one first, then those in range with a Connect button, then the rest marked "Not in range", each with
+  Forget, and a footer says LordOS joins them by itself. `net-wifi-scan` adds `"current"` to the network the
+  interface is joined to (wpa_supplicant's `STATUS`, read only; one the scan missed is listed with `SIGNAL_POLL`'s
+  level); no new action or argument. (`apps/settings/Network.jsx`, `wifimodel.js`, `server/src/net/wifi.c`
+  `wifi_status_ssid`; `server/tests/wifi_model_test.mjs`, `net-test wifi-status`)
+- **Window snapping in Lord Flow, and a switch for it** (GitHub #182; all themes). Dragging a window to the left or
+  right edge of a display fills that half of its work area, near a corner a quarter, and to the top edge the whole area
+  (maximized), with a rounded preview in the accent's color under the window while dragging. Dragging it away gives it
+  back the size it had. Lord Classic and Lord Workspaces already did this; Lord Flow now does too (`configureWindows({
+  snap: true })`), including a maximized window dragged out by its bar. **Settings → Desktop & Dock → Snap windows to
+  the screen edges** (on by default, `settings.windowSnap`, a new key with no migration) turns dragging to the edges off
+  in every theme; the window menus' layouts and Lord Classic's ❖ arrows keep working. Workspaces' thirds are unchanged.
+  (`sdk/snap.js` `snapAllowed`, `sdk/windows.js`, `themes/default/index.jsx`, `themes/default/components/Window.jsx`,
+  `apps/settings/Dock.jsx`; `server/tests/snap_test.mjs`)
+- **Settings → Users: a picture for your account, chosen and fitted** (all themes). "Choose image…" opens the file
+  chooser instead of a path to type; the picture (any size or format lord-media reads, turned upright) shows in a
+  circle, the slider zooms and dragging places it; Save cuts that square from the full picture, scales it to 512 × 512
+  and writes a JPEG (`~/.cache/lordos/avatar.jpg`, a few dozen KB even from a 100 MB photo), which `user-avatar` copies
+  as before. The preview works on a copy at most 1200 px wide. (`apps/settings/AvatarEditor.jsx`, `avatarmodel.js`)
+- **Text consoles while the desktop runs: Ctrl+Alt+F1…F12** (all themes). The keyboard is the session's, so the kernel
+  never saw the keys and nothing happened. Now lord-server takes them and asks lord-sessiond, which keeps tty1 in
+  `VT_PROCESS` mode: leaving locks the session (as Lock Screen), takes the monitor back and lets the kernel switch;
+  Ctrl+Alt+F1 brings tty1 back with the login screen locked for that user. Modifiers held at the switch are released.
+  (docs/SESSIONS.md, "Text consoles")
+- **Text mode and `startlordos`, for starting the desktop by hand as startx** (docs/SESSIONS.md, "Text mode"): the
+  boot menu gets **LordOS (text mode)** (`/etc/grub.d/11_lordos_text`, the system's first entry plus `lordos.text=1`);
+  Settings → Users → **Start in text mode** keeps it for every start (the closed admin action `boot-text on|off`,
+  administrators only, writes `/etc/lordos/text-mode`). Then lord-sessiond leaves the monitor alone,
+  `lordos-text-login.service` puts a login prompt on tty1, and `startlordos` there brings up the login screen (asked
+  over `/run/lordos/start.sock`, accepted only from someone logged in on the console in front, typing there; you sign
+  in with your password and get the whole session). Without lord-sessiond, `startlordos` runs lord-server as you on
+  that console, with Ctrl+Alt+F1…F12 too (lord-server lets the card and the input go while another console is in front).
+  `lord.users.list()` tells Settings whether text mode is on (`textMode`).
+
+- **Lord Workspaces: the rest of its proposal.** Checked item by item against the theme's design document:
+  - **Context Spine:** at the bottom, the shortcuts' help and Settings beside the Control Center. The activities
+    themselves stay on the strip's pills only.
+  - **Focus Surface:** resting the pointer for half a second on another activity's pill in the strip shows what it holds (its windows by app and title, the minimized ones last, or its pinned apps when
+    it has none); a click on a window goes to it. On a narrow display the other pills show only their icon, so every
+    activity stays reachable.
+  - **Groups (the proposal's Activity Islands, and its way past nine):** up to three more activities inside one, on the
+    same desktop: chips beside the activity's pill, "New group in this activity" on its menu, "Move to group" on a
+    window's. Showing a group minimizes the others' windows (without the minimize effect or a place in the tray) and
+    brings its own back; each group remembers its apps, so they join it again after a restart. Search finds groups as
+    activities. 9 desktops × 4 = 36 activities, with no tenth desktop faked.
+  - **Each window's title bar** starts with its activity's mark.
+  - **Control Atlas:** the Control Center gains sections: Appearance, Window tiling (the layout of the activity in view
+    on that display, its padlock), Activities (each with its window count, New activity, Edit), Displays (Night Light,
+    brightness, the displays connected, the spine on every display), Sound, Network, Energy and Security (the firewall's
+    mode, Lock Screen). Each section's title opens its page in Settings.
+  - **High contrast** (Settings → Appearance, the theme's option, and the Control Atlas): solid black or white
+    surfaces, text at 21:1, the dim text and the accent at 7:1 or more, a line round every surface, no blur or
+    shadows (`server/tests/workspaces_model_test.mjs` checks the ratios).
+  - **Amber accent**, the proposal's colour (#A9650A in light mode; #C27A12 in dark mode so white on it keeps 3:1),
+    with the brand's violet focus ring.
+  - **Keyboard:** ⌃F2 moves the keyboard to the spine and the activity strip, even over a Linux app (a new
+    `workspaces` key table in `server/src/wl/keygrab.c`, Lord Flow's plus ⌃F2 and ❖1…9; Lord Flow's own table is
+    unchanged): the arrows, Tab, Home and End go from one control to the next with a visible ring, Enter or Space
+    presses it, Escape gives the keyboard back. ❖1…❖9 show activity 1 to 9; ❖Tab and ❖⇧Tab, the next and the previous
+    activity, when Settings → Keyboard puts the app switcher on ⌥Tab.
+  - **An app opens on the display it was asked from:** a display's frame + and Add window (through Search), its
+    pinned apps, Files on the spine and Search opened on a display send the next new window (or as many as were
+    launched) to that display, whatever display the app's saved layout names or where another display has room; with
+    a free layout it opens in that display's middle (`aimLaunch` in `tiler.js`, for 30 s).
+  - **Linux apps that draw their own bar (Chrome, GNOME apps) get the theme's rounded corners at the bottom too:** the
+    window is cut to 12 px corners like the theme's own frames (square in full screen).
+  - **The status cluster:** the speaker opens its own panel where the notifications do (the level with a slider and
+    mute, the outputs when there are several, Sound settings) instead of the Control Center; the status items' panels
+    (Cloud, Cleaner…) open there too, under the band at its far edge (`setStatusPanelPlacer` in `sdk/statusitems.js`;
+    the other themes keep theirs). The notifications stay on the bell only, not on the spine.
+  - **Force Quit** from the crown's menu and with ❖⌥Esc, as in Lord Flow (kept from a Linux app in front too: the
+    `workspaces` key table).
+  - **The shortcuts' help:** a lifebuoy on the spine (in the glyph colour of the other items) (also ❖/ and "Keyboard Shortcuts…" in the crown's menu) opens a
+    sheet with every shortcut that works now, read from the SDK's own list (the one Settings → Keyboard shows): the
+    theme's marked THEME and the ones every theme shares (Search, the clipboard, Screenshots' captures…), each key on
+    its own keycap; then what the pointer and the touchpad do here. A search field, a filter by group, a button to
+    Settings → Keyboard. `shortcutList()` now tells where each shortcut comes from (`from`: theme, lordos or app) and
+    gives its keys one by one (`combos`); `/` has a key name.
+  - **Activities keep when they were last changed** (`updatedAt` in `settings.workspaces`, as the proposal's schema).
+- **Search (all themes): recent files** (the home folder's files changed in the last 30 days, read at most once a
+  minute) and two more safe actions, Do Not Disturb and Lock Screen.
+- **Overview (all themes): Up and Down** move between rows of windows. A theme can mark each desktop in the strip
+  (`setDesktopDecor`); Lord Workspaces shows each one's activity icon and colour.
+- **Session restore asks before apps that hold a session or private data** (all themes): Terminal, Passwords, Remote
+  Desktop, Machines, Databases, Camera and Recorder reopen only when chosen, even with restore set to Always; the rest
+  reopens by itself. The question lists each window with its desktop (its activity in Lord Workspaces), and each can be
+  left out.
+- **Settings → Battery, for any laptop (all themes).** Through the kernel's
+  standard attributes (no vendor tool): the state with the plug-in, resume and limit marks; the daily use of the last
+  8 days and the level by hour; screen active and idle time on battery; the estimated use per app (each app's CPU on
+  battery); the battery's condition, maximum capacity, real cycles (counted by LordOS when the battery reports none),
+  manufacture date and first use; and optimized charging: charge limit, sailing mode, a "plug in" notice (default
+  20 %), full charge this time, pause charging, heat protection (40 °C) and discharge on power. Only an
+  administrator changes the charging (new closed admin actions `battery-thresholds` and `battery-behaviour`,
+  maintainer's approval 2026-11-17); what the laptop can't do shows disabled with why. The devices' batteries and
+  their notices (unplug at the limit, charge at the mark) are on the same page; without a laptop battery only they
+  show. The history is kept by lord-server in `~/.local/state/lordos/battery-history` (`lord.power.history()`), never
+  sent anywhere. Not yet tested on laptop hardware. See docs/BATTERY.md. Strings in all 35 languages.
+
+- **Weather: choose your city.** The weather widget's "Location…" searches an offline list of 34,000 cities
+  (GeoNames' cities15000, CC BY 4.0, credited in About; `assets/geo/cities.tsv`, refreshed before each release by
+  `tools/geo/fetch-cities.sh`): the search never leaves the computer, and lord-server takes the picked city's
+  coordinates from its own list (`geonames/<id>`), never from the interface. Until now the forecast was always for the
+  time zone's city (Buenos Aires for anyone in Argentina's zone). Also used by the Calendar's "Day and weather".
+  Strings in all 35 languages.
+
+- **Monitor: Battery and Devices tabs, live.** Devices (when something connected has a battery): every device's
+  battery, its connection and a bar, from the same list as the Devices widget. Battery (only on a computer with one):
+  charge, power, time left or to full, temperature, voltage, current, energy and the charging state, read every 2 s
+  while the tab is shown (`lord.power.live()`, new), with the power of the last 60 s. Only what happens now; the
+  history goes to Settings → Battery. `lord.power.state()` now also carries each battery's voltage, current,
+  temperature, energy in Wh, manufacture date and its charge control (thresholds and `charge_behaviour`). Strings in
+  all 35 languages.
+
+- **The battery in the bar opens the batteries of every device (all themes).** On a computer with a battery, a click
+  on its bar item now shows the computer's, the mice', keyboards' and headphones' charge (the Devices widget's list).
+- **lord-hidpp: the exact battery of Logitech mice and keyboards** (maintainer's approval 2026-11-17, battery reads
+  only). The kernel asks a Logitech device for Unified Battery first, and a device that gives only levels there (an
+  MX Master 3, an MX Keys) shows "Normal" with no percentage. lord-hidpp also asks Battery Status and Battery Voltage.
+  It is setgid `lordos-hidpp`, the only group that may open a Logitech device's own hidraw node
+  (`72-lordos-hidpp.rules`, never a receiver's node); it drops the group before talking, runs in the helpers'
+  sandbox, asks only the three battery features and prints numbers only. lord-server runs it at most once a minute
+  (`lord.hidpp.batteries()`); the Devices widget and the bar's panel use it. See docs/DEVICES.md.
+- **Lord Workspaces: a Devices widget.** The battery of everything connected in one card, as rings with the kind's
+  drawing: the computer (when it has a battery), mice and keyboards on a Logitech receiver or over Bluetooth
+  (`/sys/class/power_supply`, scope Device) and headphones and the rest that BlueZ reports a battery for. A device
+  seen both ways is listed once. A device that gives only a level (a Logitech MX over HID++ in the kernel) shows the
+  level ("Normal", "Low"…) and a ring filled roughly. Green, yellow under 30 %, red under 15 %; a bolt while charging.
+  Small: four rings; medium: a row of rings, or the warning when one is under 15 % and not charging; large: a list
+  with names, connection and bars. No timer: the kernel's and BlueZ's change notices keep it current. No external
+  app needed. `lord.power.state()` now carries each supply's `level` (capacity_level). Strings in all 35 languages.
+
+- **One wallpaper per display, in every theme.** Settings → Wallpaper gains a display selector (all displays or one,
+  named by model plus connector when monitors share a model); a display's own picture is kept in a new settings key,
+  `wallpapers` (`{ [connector]: id }`, no migration: an absent key is the old behaviour). Lord Flow, Lord Classic and
+  Lord Workspaces draw each display's picture, and the Control Center's quick pictures change the display it opened
+  on. A picture for one display turns that display's moving wallpaper off (a `null` entry in `motion` now wins over
+  the one for all displays). The motion selector names displays the same way. `sdk/wallpapermodel.js`, tests in
+  `server/tests/wallpaper_model_test.mjs` and the Workspaces scene (`docs/WALLPAPERS.md`).
+- **Lord Workspaces, a third desktop theme (in development;** approved by the maintainer on 2026-11-15;
+  `docs/WORKSPACES.md`). It organizes the desktop by activities and leaves Lord Flow and Lord Classic as they were.
+  - *Activities:* each activity is one of the SDK's desktops (up to 9) with a name (the desktop's own), an icon, a
+    colour, pinned apps and a layout per display, kept by position in a new settings key, `workspaces` (version 1; no
+    migration). A strip of pills switches them (the accent glides to the new one), **+ New** adds one, a double click
+    renames in place, the right-click menu edits the icon, colour and apps or deletes the activity after asking in the
+    page; its windows go to the activity beside it. A first run shows a two-step onboarding (name, icon and colour;
+    apps and layout) on the only activity while nothing is open.
+  - *Context Spine:* a rail with the LordOS crown (the system menu), Activities (the Overview), Apps, Files and the
+    Control Center; it collapses to icons on its own below 1440 px, from its button or with ❖⌥D, and can show on every
+    display. A status cluster holds the privacy indicators, the status items, the volume, notifications and the clock,
+    which wakes once a minute.
+  - *Tiling:* a group frame per display with Change layout, chosen per display (Free, One at a time, Two halves, Main
+    and side, Three columns, Grid),
+    Add window, Save layout and Move to another activity. The divider of a split layout shows a line while dragged and
+    applies on release; a window moved by hand floats until "Tile this window"; one whose minimum size is bigger than
+    its tile keeps its minimum inside the work area and says so. In Free, the magnet: a window dragged to the left or
+    right edge takes that half and the only other window of the display fills the other one (with several, a chooser
+    over the empty half); resizing one of the pair by the shared edge moves the other's on release. With several
+    monitors of one model, each frame header adds the connector ("S27F350 · DP-2"). ❖V pastes in LordOS apps, as in Lord Flow
+    (❖⇧V opens the clipboard). A maximized window fills the frame's work area and keeps its rounded
+    corners. Minimized windows stay on their display: its frame header shows them as icons ("Minimized"),
+    the minimize effect shrinks the window there, and a click brings it back where it was. In a tiled layout a minimized window keeps its place: the others don't
+    grow into it, the free space shows with Add window, a new app takes it, and bringing the first back swaps the two.
+    Dragging a tiled window onto another tile swaps them, and dragging it to another monitor adds it to that monitor's
+    tiles; choosing a layout again takes back every floating window of that display, including one dragged there from
+    another monitor (before, it stayed loose and the others filled the screen). While a window is dragged over a tiled monitor,
+    a glass rectangle shows the slot it will take, and the drop takes it; resting on a side edge half a second turns a
+    half into a third; resting on the maximize button opens a flyout of halves, thirds, main and side, and quarters (on
+    a tiled monitor it sets that layout and slot; for Chrome, which draws its own buttons, "Snap window…" in the
+    window menu opens it). A window dropped on a free space (a minimized window's place) takes it and gives its own up,
+    so it gets the whole half instead of a third. Lord Flow and Lord Classic are unchanged: the SDK's `snapThirds` is
+    off for them and its new `moveGrab` store is read only by Workspaces. "Add widget" in a display's empty state, or a right click on
+    the wallpaper, opens the widget catalog: each widget takes a block of the display's grid (small 1×1, medium 2×1,
+    large 2×2, wide 4×1, extra large 4×2, TangoOS's 170 px cells) that no other can take, belongs to the activity in view, is
+    dragged to the nearest free block and resized or set up from its right-click menu (the clock: analog or digital,
+    world cities; its four cities fit the wide 4×1 block, and one kept at 4×2 shows as the wide one). The right-click
+    menu opens inside the widget's own display, inwards at an edge, instead of running onto the next monitor. Main and
+    side keeps three slots (the side split in two) and Grid four, each free one shown as a dashed space even with fewer
+    windows open; with nothing open the outlines stay and only the empty state's card speaks. The empty state's card
+    shows only on a display with nothing at all (no window, none minimized, no widget); widgets alone hide it. The "+"
+    in each frame header is now a menu: Add window, Add widget, Add web app (the Store's Web apps page), and the
+    wallpaper's right-click menu starts with the same three. The widget catalog shows four columns (it wrapped to
+    three: the cards' borders were left out of its width), fewer on a narrow display.
+    **Weather widget** (maintainer's approval 2026-11-16): small, medium and large, in a card with a sky by
+    condition and time of day, a drawn icon, high and low, the next days, three of Clock's cities). It is the only
+    widget that uses the internet and asks nothing until the person presses Turn on (`settings.weather.on`). The
+    coordinates are the time zone's own, from tzdata (no location); lord-server connects through a connector of its
+    own, `lordos:weather` (its own scope, firewall row and Monitor row), to `api.open-meteo.com:443` only, and the
+    sandboxed `lord-fetch` does one fixed GET and parses the answer strictly into numbers (`fetch/weather.c`, checked
+    again in lord-server, kept 30 minutes). `lord.weather` exists only in the desktop's own context. Tests:
+    `weather-test` (25), `weather_model_test.mjs`, and the scene checks that nothing is asked while it is off.
+    **Every app fits a small window**: a Workspaces side tile is about 600×470, and apps with a larger minimum
+    (Cleaner 880×600, Disks 760×480, …) ran over the next window. Every native app's minimum is now at most 480×360,
+    and below 640 px their sidebars hide behind a toolbar button and open over the content (`sdk/narrow.jsx`:
+    `useWindowWidth`, `useNarrow`, `useSidebar`, `SidebarToggle`, `SidebarOverlay`; the window store's width, no
+    polling). Wide windows look as before. In a short window Calendar's and Reminders' sheets scroll their fields
+    between the title and the buttons (`useWindowHeight`), Machines' snapshot timeline gives way to the selected
+    snapshot's panel, Monitor's Overview stacks its paired cards below 640 px, and Databases' ⋯ menu has its tooltip.
+    **VPN widget**: a switch with relief (sunken track, raised knob, ON/OFF) that turns a VPN from Settings → Network →
+    VPN on or off with the same actions Settings uses; medium shows its address and traffic, large lists every VPN
+    with a switch each. One widget per VPN (chosen from its menu; the only one by default), so several can be on the
+    desktop at once. A password, sign-on or certificate question sends the person to Settings.
+    **Timer, Recent files, Updates and Apps widgets**: the Clock app's timer (presets, pause, cancel) and stopwatch;
+    the files opened lately; whether LordOS and the apps are up to date (the last check of the signed lists, nothing
+    fetched); and 4 or 8 apps to launch (the Dock's pins until chosen). Cleaner in a small window: its icon rail was
+    kept wide by the sidebar's opening animation when the window was tiled at once; the animation no longer runs on
+    opening, and the rail's icons have their section's name as a tooltip.
+    **Search no longer freezes the desktop while typing**: its file index (used where lord.fs.search isn't there)
+    listed up to 40 home folders per turn of the main loop, each read on the main thread and sorted by name, so one
+    huge folder (a node_modules) stopped the desktop for seconds (12.8 s on the maintainer's machine, caught by the
+    watchdog inside the sort). It now reads one folder at a time with fs.listAsync (lord-server's file thread),
+    unsorted, skips hidden entries and folders such as node_modules, keeps at most 2000 entries a folder, and folds
+    each name once instead of on every keystroke.
+    **Web apps come back with the session**: they were saved (`web:<id>`) but the restore only launched LordOS apps and
+    Linux apps with a .desktop, so a web app (WhatsApp, Discord… on an activity of their own) never reopened. They are
+    now launched like a Dock click and take their saved place, activity and state. **The padlock keeps minimize**:
+    a locked display's windows show minimize beside the padlock (a Linux app is offered it too), so another app can
+    take the slot while the layout holds, and the free slot keeps its Add window button.
+    **Cameras, streams and TV (`lord-stream`)**: a Video widget (m, s, l, xl) and the Player's new Streams section
+    play RTSP, RTMP, SRT, RTP, UDP (multicast included), HLS, MPEG-DASH, HTTP MPEG-TS and MJPEG addresses and the
+    channels of M3U lists (by address or file), with pause, mute and Reconnecting. They run in `lord-stream`
+    (maintainer's approval 2026-11-16): lord-media's player built as a second binary with internet sockets only
+    (`sandbox_apply_helper` gains `network`: AF_INET/AF_INET6, connect, bind; never unix, netlink or exec), in its own
+    firewall scope `lordos:streams`, every wait bounded so a dead camera never holds the desktop. lord-media itself
+    still has no network. A password in an address goes to the keyring, never settings.json. The sandbox's Landlock
+    rules now work for single files too (a file got directory rights and the kernel refused the rule: files such as
+    /etc/ld.so.cache in the helpers' lists were never readable). Tests: `streamurl-test` (39), `stream_model_test`,
+    `sandbox-test helper-net`, and `lordstream-e2e` against local FFmpeg servers for each protocol.
+    **Claude Code widget**: rings for the context, the 5-hour window and the week, with the time until each renews, the
+    model, the state and the account (each `~/.claude*` folder is an account: name and plan from its .claude.json); a
+    slow amber or red glow near a limit (70 % / 85 %), without sound. The large one lists the sessions and each
+    account's limits. **Sound wave widget** (w, m, l, xl): glowing lines that move with the sound of the desktop (the
+    default output), one app (chosen by name from those playing; its stream is found again each time it starts) or the
+    default microphone, one source at a time. lord-server listens with one more recording stream from our own PipeWire
+    client (`lord.sound.spectrum`; one app is that output's monitor limited to its stream, `direct_on_input`), turns
+    each block into 48 log-spaced band levels (`server/src/sound/spectrum.c`, a 2048-point FFT, 30 blocks a second)
+    and draws the lines itself in a new node, `<SoundWave>` (`server/src/ui/wave.c`): JS never receives the sound or
+    the levels, only sets the look. The node damages only its own box, only when the bands moved; in silence the
+    spectrum goes quiet and nothing repaints. The raster is built under a lock (the engine paints heavy frames in bands on several threads) and every row
+    the glow reads is cleared first (stale memory crashed lord-server while the widget moved or resized during
+    testing). Drawing the lines takes ~1.6 ms per block for the wide size (~5 % of one
+    core while sound plays: only the band of rows the lines and glow reach, the glow at half size, tables for the
+    rest). Listening to the microphone shows as recording (the microphone
+    indicator lights); the desktop and an app don't open a microphone. Transparent by default (no card: it reads as
+    part of the wallpaper) or on a card; colours (Neon, the theme's accent, Aurora, Fire, Ice), number of lines,
+    sensitivity and what it shows in silence (nothing by default, it fades out; or one still line) from its
+    right-click menu. **Pin to the bottom centre** for every widget (`opts.pin`,
+    `widgetgrid.js pinnedRect`): centred along the bottom of its display, off the grid; dragging puts it back on the
+    grid. A new sound wave starts pinned there. The wave isn't drawn while an opaque window covers it, and the widget kinds that change on their own are painted
+    after the still ones, so a changing number never makes a neighbour's frosted glass blur again. Tests: `spectrum-test` (bands, silence, the lines' shape and bounds),
+    `soundwave-model-test` and the Workspaces scene. Clock, Calendar, System, Network, Disks, Temperatures, Battery, Reminders, Clipboard, Claude Code, Now
+    playing and Read aloud, in TangoOS's look (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`). Cleaner no longer shows a second set of window buttons there. A padlock in each frame header locks that display's windows: the header keeps only the padlock, and the
+    windows can't be moved, resized, minimized, maximized, snapped or closed by the person (their buttons give way to a
+    small padlock; the SDK refuses the other ways through `configureWindows({ locked })`); a Linux app's own close button
+    still closes it. The tiler writes the window store once per change and
+    never runs per frame.
+  - *Bars like a video player's controls:* the activity strip and the status cluster now blur like the Context Spine
+    (the theme's material: Crystal, Translucent or Opaque, the same as the spine and menus), and each of their
+    controls sits on its own pill that shows under the pointer, with thin lines between groups and glyphs in the
+    spine's colour (`components/BarButton.jsx`, tokens `iconFg`, `itemHover`, `barSeparator`). Activity icons keep the
+    colour chosen for them.
+  - *A failing app no longer takes the desktop down:* each app window has its own error boundary (sdk/components.jsx
+    AppHost): an app that throws while rendering or in an effect shows "<app> ran into a problem" with Close window in
+    its own window, and the error goes to the log. Before, React unmounted the whole shell: a black screen with only
+    the pointer (Photos restored with a picture that no longer existed). lord.media calls that C refuses (a path
+    outside the home or gone) now return null in the SDK, as with no helper. A free slot's "Free space" and Add window
+    stay out on a display with widgets (the frame header's + adds a window).
+  - *The activity frame is one thin line:* the brighter accent line along its top is gone, so the frame no longer
+    looks doubled there.
+  - *Claude Code widget, small:* the context ring is larger (it names itself inside: Context) and the state and limit
+    bars sit along the bottom, as the weather's text does.
+  - *Several displays:* one activity spans every display, each with its own frame, layout and divider, and switching
+    activity switches them all. Save layout keeps, per display connector, the layout and the app of each tile, and
+    windows of those apps go back there; with fewer monitors a missing display's apps join the main display's tiles; a
+    monitor unplugged moves its windows into the main display's tiles and plugged back returns them. Search, the
+    Control Center and Add window open on the display under the pointer. A different activity per monitor and the
+    Overview per display need SDK and compositor work (not built).
+  - *Search:* ❖Space, Ctrl+Space or ❖ alone open a panel on LordOS's own search plus two new sections, Activities and
+    Open windows (`registerSpotlightSource`); typing starts at the first character, Enter opens, Esc closes.
+  - *Control Center:* a live drawn preview, dark mode, Reduce motion, the effects style, the accent, Do Not Disturb,
+    Night Light, Wi-Fi, Bluetooth, volume, brightness, the power mode and the wallpaper.
+  - *Effects styles* (a theme setting): **Opaque** (solid panels), **Translucent** (tinted panels that blur) and
+    **Crystal** (the translucent glass with a two-stop sheen, a darker lower rim and a depth shadow,
+    per light and dark; the default). Transparency off in Appearance is always Opaque. One live blur at rest (the
+    spine); the group frame is a border, never a full-screen blur or scrim.
+  - *Motion:* activity switches with the windows' slide and the pills' glide, spring feedback on the spine, Search that
+    drops in and settles, a Control Center that unfolds from its button, windows that zoom from where they were launched
+    and minimize into the spine; all from one frame loop on cached transforms (no React render per frame), 120–260 ms,
+    and none with Reduce motion.
+  - *Window frames:* a 36 px title bar with real button targets, the app's menus in a strip under it (F10 or ⌥ alone), Linux
+    apps with their own bar unframed with the theme's window menu.
+  - *Keys:* Lord Flow's fixed lists over Linux apps (`flow-desktops`, no new compositor table) and its Desktops keys.
+  - *Performance,* measured headless at 1920×1080 on the CPU path against Lord Flow and Lord Classic in the same
+    scenario: focus changes repaint about a third of the screen they do, activity switches cost about the same as their
+    desktop switches, no timer runs every second at rest, and an idle desktop paints nothing (`docs/WORKSPACES.md`,
+    "Performance"). Several first drafts were measured slower and changed: no scale of the display-sized frame, no
+    scrim, nothing that moves inside the spine's blur margin, short window shadows.
+  - *Settings:* a theme's `theme.json` may now declare `sketch` (its picture in Appearance → Desktop style), `options`
+    (its own choices, shown under Desktop style and on Desktop & Dock, kept in the new `themeOptions` settings key) and
+    `desktopArrows` (`sdk/thememeta.js`, checked strictly); Desktop & Dock shows such a theme its desktops, its options
+    and the title bars' buttons, without a Dock section. Lord Flow and Lord Classic declare none of them and are
+    unchanged. The SDK also exports `switchDesktop` and `removeDesktopById`.
+  - *Languages:* 72 new strings (`shell.ws.*`, the two search sections and the theme's name) in all 35 languages.
+  - *Tests:* `server/tests/workspaces_model_test.mjs` (geometry, layouts, saved layouts across monitors, the settings
+    key, theme.json, the three styles and the palette's contrast) and `workspaces_test.mjs` with
+    `workspaces_scene.mjs` (the whole theme on three displays), both in `make test`; `theme_cost_scene.mjs` measures
+    any theme. Not yet checked on a real session, with real monitors, Linux apps, right to left or the GPU path.
+- **The compositor's watchdog** (approved by the maintainer on 2026-11-16; `server/src/wdog.c`, `docs/BENCHMARK.md`,
+  "Real-time priority"). No bug in a theme or in lord-server may leave the desktop frozen for good. The main loop marks
+  when it leaves its `poll()` (two atomic stores per iteration, no system call); a thread of its own at the normal
+  policy looks every 200 ms. Away for more than 2 s: the compositor's threads go back to the normal policy for the rest
+  of the session, and the session log gets the main thread's state, its C stack and, when JavaScript runs, the JS
+  stack. Past 10 s the JavaScript task that runs is stopped (an uncatchable error, logged with its stack) and the
+  desktop goes on. A theme load never counts. A display whose page flip doesn't complete in 2 s is logged too. Test:
+  `build/wdog-test` in `make test` (a stall seen once, quick iterations and a theme load not, the priority drop where
+  real time can be had, an endless JS loop with a `try/catch` stopped, the next task running normally).
+
+### Changed
+
+- **A new Trash in Lord Flow's Dock**, drawn for LordOS: a smooth white bin with the crown in relief, and crumpled
+  paper balls in LordOS's colours (violet, blue, amber, green) plus a lined sheet when it has something. The front of
+  the rim passes in front of the papers. It replaces the drawn wire basket; the same picture in light and dark mode,
+  at 256 px and 512 px for the magnified Dock (`assets/icons/trash-empty*.png`, `trash-full*.png`).
+- **Settings → Cloud says what "On this computer" counts, account by account (GitHub #184).** The line read "144 MB ·
+  144 MB kept", and it wasn't clear that the first figure is everything the accounts have here and the second the kept
+  part of it, nor what Free Up Space would do. It now reads "144 MB · 144 MB kept · 0 bytes can be freed"; with more
+  than one account a row per account (by name, with its color) adds up to it; a line says that Free Up Space removes the
+  local copies of files that aren't kept and that kept files and changes waiting to go up stay; and the button is off
+  when nothing can be freed. Each account's page gets the same box, with Free Up Space for that account alone. The
+  figures are lord-server's own measure of the cache (`cacheBytes`, `keptBytes`), nothing estimated (`hereOf` and
+  `here` in `sdk/cloudmodel.js`, checked in `cloud_model_test.mjs`). New texts in every language (`cloud.hereLine`,
+  `cloud.freeUpHint`; `cloud.cacheLine` is gone). Not done, for the maintainer to decide: showing the user or e-mail an
+  account signs in with (it is kept in the keyring with the password and never reaches the interface; OAuth providers
+  don't tell it) and choosing an account's color (one per provider by default, as asked).
+- **VMware copy and paste: what works and what is proposed** (GitHub #76, docs only). `docs/WAYLAND.md` "VMware Tools"
+  records the reporter's check on a VMware host (host → guest works on 0.8.8.8; guest → host from LordOS's own apps
+  doesn't), why `setsid vmware-user &` returns at once, and the design that would make guest → host work: starting
+  `vmware-user-suid-wrapper` only in a VMware guest, and answering LordOS's clipboard to `vmtoolsd -n vmusr` identified
+  by X-Resource pid and `/proc/<pid>/exe`. Both are new exceptions waiting for the maintainer's approval; nothing is
+  built.
+- **A display opens at its panel's shape when its EDID prefers another one; the login screen isn't stretched on an
+  ultrawide** (GitHub #173). With nothing saved (always on the login screen) a display used the EDID's preferred mode,
+  and some 3440 × 1440 ultrawides prefer 3840 × 2160 on some inputs, so the monitor stretched 16:9 over 21:9 at every
+  boot. Now the preferred mode is used only when its shape is within 8 % of the panel's physical one (the EDID's size
+  in mm); otherwise the largest progressive mode within 3 % of that shape wins (`mode_native`), and Settings → Displays
+  calls that one native. A saved mode still wins in a session. The login screen's picture is drawn once per display,
+  each covering its own display, instead of one picture over the whole desktop that showed a slice of it on each
+  display. (`server/src/hw/modes.c`, `display.c`, `themes/greeter/index.jsx`; `build/settings-hw-test`)
+- **Cleaner's panel by the clock wears the theme's colours** (all themes): its cards, bars and button take the shell's
+  tokens (`shellPalette` in `sdk/cleanertheme.js`), like the bar's other panels; the Cleaner window keeps the look chosen
+  in Cleaner → Settings.
+- **Lord Workspaces: a cheaper activity switch.** 192 native calls for four switches instead of 352 (one display, three
+  windows, `server/tests/theme_cost_scene.mjs`): every activity's icon stays drawn in the frame header with only the
+  one in view shown.
+- **Shortcuts:** F2 has a name in the SDK's key table (`sdk/shortcuts.js`), so a theme can use it.
+- **Lord Workspaces: the Calendar widget, redrawn, with styles to choose from.** The day and the month in red, today
+  in a red circle, weekends dimmed and the week from the language's first weekday. Small: "Day" (the default: the day,
+  its first event and what comes next), "Month" or "Day and weather". Medium: "Day and month" (the default), "Agenda"
+  (today and tomorrow) or "Busy days" (the month shaded by how many events each day has). Large: "Agenda and month"
+  (the default) or "Month" (today's events under it). The space is always used: with nothing today it says "No
+  events today" and what comes next ("Tomorrow: Dentist, 09:00", or nothing in the next 7 days); with more events
+  than fit, "+N more today". The style is in the widget's menu. Events are asked again every 5 minutes and at once
+  when a calendar changes. New strings in all 35 languages.
+
+- **Lord Workspaces: the widget picker is a centred panel with search and categories.** It used to open near the
+  top of the display and was cut off at the bottom when the catalog was taller than the screen. Now it sits in the
+  middle of the display's work area, as tall as fits (up to 720 px), with a search field (name and description in
+  the person's language, accents and case ignored), the categories on the side with their counts (Time, System,
+  Devices, Network, Productivity, Media) and the cards in a scrolling list grouped by category. The arrow keys move
+  between cards and Enter adds the highlighted one; Escape closes it. New strings in all 35 languages.
+
+- **Lord Workspaces: desk widgets read their data only when someone can see it.** One feed
+  (`sdk/widgetfeed.js`) replaces a timer per widget: each piece of data (clock, CPU, memory, network, Claude Code,
+  VPNs) is read once however many widgets show it, at the shortest interval among the widgets in view, and not at
+  all when none is (behind a window, the displays off, the session locked). All reads due in the same second happen
+  together, so their widgets re-render in one frame. A widget shown again keeps its last value and is refreshed at
+  once. The Claude Code widget now reads its sessions once a minute (was every 3 s) and CPU every 2 s (was 1.5 s),
+  on the same tick as the network. See docs/WORKSPACES.md, "Widget data".
+
+- **Desk widgets refresh only what changed (all themes).** Measured with `perf` on a 3-display desktop at rest,
+  about a third of lord-server's time went to JavaScript, mostly widgets re-rendering on their timers with the same
+  data. Now a polled value that reads the same as before (`sameValue`, `sdk/samevalue.js`) keeps the old one, so
+  React renders nothing; CPU usage is reported in steps of 1 % (what every view shows); and a gauge's ring of ticks
+  is a memoized component, so a refresh that moves the value by less than a tick rebuilds only the number in the
+  middle, not 36–48 tick views.
+- **lord-server gives freed memory back at rest.** Its memory map on a 3-display desktop showed a 277 MB heap with
+  216 MB in use, and glibc keeps freed pages for later, so every peak (an app opened and closed, the theme loading)
+  stayed in the RSS until logout. When a wait ends with nothing to do, at most once a minute, it calls
+  `malloc_trim(0)` (a few milliseconds, never during a frame).
+- **`lord.system.info` reads `/proc/cpuinfo` once.** The processor's name and core count don't change during a
+  session, and the file is costly for the kernel to generate (one block per CPU, each asked for its clock); the
+  System widget polled it every 5 seconds.
+
+- **Settings → Appearance → Desktop style:** its hint said "Both styles have the same apps", untrue with a third style.
+  It now reads "Every desktop style has the same apps." (no number, so new themes don't need it changed), in all 35
+  languages; the rest of the hint is the same. Lord Flow and Lord Classic show it too.
+
 ### Fixed
 
 - **Spanish and Portuguese voices read numbers and symbols.** Measured on the maintainer's computer with all 135 voice
@@ -55,6 +585,222 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     reunión es a las 14:30 y quedé en 2.º lugar. El 15/11/2026 hacía 21 °C." and its Portuguese (with R$), 8 items:
     Spanish HD 0 → 100 %, standard 41 → 96 %; Portuguese HD 5 → 93 %, standard 27 → 100 %. Most of what is left is
     whisper writing the spoken words its own way ("80 e 8" for oitenta e oito).
+- **Settings → Wallpaper could not scroll to its end in a wide window**: the layout measured a box's children with the
+  whole width even when the box had a `maxWidth` (Settings' 680 px column), so a wrapping grid in it (Cyberpunk City
+  HD's 11 pictures, three lines) measured one line and the page came out short. Measuring now bounds the children by
+  the box's `maxWidth`/`maxHeight`, as layout does (`layout.c`; `test_wrap_in_max_width` in engine-test). Any page
+  with a wrapping grid in a narrower column benefits.
+- **Lord Workspaces: Force Quit, About and Settings from the crown's menu open on the display of that menu**, and
+  ❖⌥Esc opens Force Quit on the pointer's display, instead of wherever the last window was.
+- **A session could end on a lone Backspace.** Ctrl+Alt+Backspace (end the session at once) read Ctrl and Alt from
+  a state kept across every keyboard; a lost release (another console, a keyboard that sleeps or reconnects) left them
+  "held", and the next Backspace ended the session with no trace in any log (seen while watching a video). The kernel
+  is now asked whether Ctrl and Alt are really held on the keyboard that sent the Backspace (`EVIOCGKEY`); if not, the
+  session goes on and the state is corrected. lord-server also logs why a session ends: the key and its keyboard, a
+  SIGTERM/SIGINT with the sender's pid and uid, or the theme's Log Out.
+- **Firefox in full screen showed nothing without a GPU** (virtual machines, `LORD_GPU=0`): the CPU path copied only the
+  fullscreen window's own buffer, and Firefox draws its page in a subsurface and leaves that buffer clear, so the
+  desktop showed through while Firefox had the keys. The CPU path now paints the window with its subsurfaces, scaled
+  as one, as the GPU path already did (`blit_tree` in `wl.c`). Found while checking #175 on a VM; it was there since the
+  first multi-monitor work. Checked on the test VM with Firefox ESR (F11 in and out) and Chromium.
+- **Laptops that woke up a second after going to sleep with the lid open** (GitHub #172; on some
+  laptops the firmware's lid device, `LID0` in `/proc/acpi/wakeup`, is a wake source and fires although the lid never
+  moved; reporters fixed it by hand with `echo LID0 > /proc/acpi/wakeup`). LordOS now ships a systemd-sleep hook,
+  `/usr/lib/systemd/system-sleep/lordos-lid-wake` (`server/src/hw/lidwake_tool.c`, libc only, built with the server),
+  that does it for you, and only when it is safe: it is not a service, systemd-sleep runs it as root before and after
+  each sleep (`pre`|`post` with `suspend`, `hibernate`, `hybrid-sleep` or `suspend-then-hibernate`; any other argument
+  is refused). Before sleeping it acts only on a portable computer (SMBIOS chassis type 8, 9, 10, 14, 31 or 32, the
+  on-screen keyboard's list, now shared in `server/src/hw/chassis.h`), only when every lid in
+  `/proc/acpi/button/lid/*/state` reads `open`, and only on `LID*` devices that are enabled and able to wake: it keeps
+  their names in `/run/lordos/lid-wake` (root, `0600`) and then writes each name to `/proc/acpi/wakeup`, which turns
+  it off. After waking it turns back on only the names in that note that are still off and removes the note. A
+  desktop, a server or a tablet is never touched, and with the lid closed (or a lid it can't read) the wake source
+  stays on, so opening the lid still wakes the computer. Kernel files only, at fixed paths, parsed strictly
+  (`server/src/hw/lidwake.h`): anything unexpected changes nothing, and the only name ever written back is one read
+  from `/proc/acpi/wakeup` itself (`[A-Z0-9_]{1,8}`). Each change is a line in the journal. Tested in
+  `build/lidwake-test` (part of `make -C server test`); not yet checked on the reporter's laptop (docs/SETTINGS.md,
+  "Power button and lid").
+- **Hardware reports: attaching System Information's page works too** (issue #171). The page it opens now carries the
+  report in a data block the browser never runs, and the hardware-report check reads it from an attached `.html` when
+  no `.json` is there (`embeddedReport` in `tools/hwreport/lib.mjs`, the same schema and limits).
+- **Files: the last color tag of an item can be removed** (GitHub #181), and an emptied comment is removed too. The
+  tag and comment maps were handed to their store as an object, which the SDK's `createStore` merges into the old
+  one, so the path whose last tag was taken off came back with it until Files restarted. They are now set whole
+  (`store.set(() => map)`); the logic moved to `apps/files/tags.js`, tested by `files-tags-test`.
+- **Files: Select All (Ctrl+A / ⌘A) selects the column you are in** (GitHub #170). In the column view it always took
+  the first column's items, so picking a file in a subfolder and pressing Ctrl+A selected the parent's items. It now
+  takes the column of the item last clicked (while selected), else the deepest column with a selection
+  (`columnAll` in `apps/files/colview.js`, tested by `files-colview-test`). In the list view with unfolded folders
+  it selects every row shown, their items too, instead of only the top level. The Edit menu's Select All does the same.
+- **Files: a picture replaced by another one under the same name shows the new one** in its icon, the preview pane
+  and Quick Preview (GitHub #180). lord-server kept decoded thumbnails by path only, and an idle one stays cached for
+  coming back, so deleting `photo.jpg` and downloading another `photo.jpg` kept showing the first picture until
+  lord-server restarted (closing Files didn't help; opening it in Photos did). A thumbnail's src now carries the file's
+  version as listed, `thumb:<px>:<mtime>.<size>:<path>` (`thumbSrc(path, size, file)` in `sdk/filekinds.js`), and
+  `image_get_thumb` keeps thumbnails by path, size and that version, dropping the older versions nobody shows. The
+  version comes from the listing so lord-server never stats on its thread (a slow share would block it). Tested in
+  `engine-test` (`test_image_cache`) and `filekinds_test.mjs`. Files still shows a change made by another program
+  when the folder is listed again (opening it again or any change made in Files).
+- **Files: long file names** (GitHub #102). A name past what Linux file systems take for one name (255 bytes, fewer
+  letters when they have accents or are not Latin) was refused by `lord.fs` with "That location is outside your home
+  folder or is not valid"; renaming, New Folder, moving to the Trash and every other `lord.fs` write now say the name
+  is too long and what the limit is (`fs.nameTooLong`, in all 35 languages; `fsops_name_too_long` in
+  `server/src/fsops.c`, used by `js_sys.c` and `fsasync.c`). And a long name copied or duplicated next to itself
+  became "<name> 2.<ext>", past the limit, so the copy failed: the free names Files gives copies, duplicates, new
+  folders, extracted folders and archives now shorten the stem, whole characters only, keeping the number and the
+  extension (`apps/files/names.js`). Tested by `files-names-test` and `fsops-test`.
+- **Logs: the level filter showed the same lines under every choice, and Cloud's log didn't say which account a line
+  was about (GitHub #183).** Reported from Settings → Cloud → Show Log: 681 errors, and Info or Warnings still listed
+  them. Three causes, three fixes:
+  - *The filter:* each choice showed that level and every more urgent one ("Info" was everything but debug), so a log
+    made of errors looked the same under each. "Info", "Warnings" and "Errors" now show that level only, as their
+    names say (notice and info are both "Info"; debug shows under "All"); for the journal lord-server is still asked
+    for that priority and the more urgent ones, and the app keeps the level (`levelMatch`, `LEVEL_MAX` in
+    `sdk/logfile.js`).
+  - *rclone's lines:* `cloud.log` is written by rclone (`2026/11/17 10:12:59 ERROR : …`), which the Logs app didn't
+    parse: no time (the row showed its line number), a level guessed from the words, and each line of a provider's
+    multi-line error (Google Drive's JSON details) was a row of its own, at "Info". They now get their time (local) and
+    rclone's level (CRITICAL, ERROR, NOTICE, INFO, DEBUG), and the unstamped lines after one are the rest of its message.
+  - *The account:* one rclone serves every account and its lines name none. lord-server now adds a line of its own to
+    `cloud.log` after each rc call about an account that failed (`ERROR c1a2b3c4d: operations/list: <rclone's error>`,
+    `note_failure` in `cloud.c`; the account's id only, as the file may be attached to a report; `cloud_body_account`
+    in `cloud_pure.c` takes it from the call). The Logs app shows it as "provider · name" before the message and in
+    the entry's details (new **Account** field, `logs.field.account` in every language), folds rclone's own copy of
+    that error into it, and gives the account to rclone's lines of the same second that end with the same error
+    (`cloudAccounts`). Lines rclone writes on its own for a mount (a file of the cache, a folder listed by Files) still
+    can't be told apart: rclone doesn't say which mount they come from. The export writes the provider and the id,
+    never the account's name.
+  `logfile-test` checks rclone's lines, the multi-line errors, the filter and the accounts; `cloud-test` checks
+  `cloud_body_account`.
+- **Cloud: an account kept on this computer stayed "coming down" for good when one of its folders can't be read
+  (GitHub #185).** Reported with an account set to keep every file here: after copying files into a folder, the files
+  showed the green check but the folder, and every other folder, kept the blue arrow, and files already in the cloud
+  at the top of the account never came down. The provider refuses to list one folder (its locked vault: "ObjectHandle
+  is Invalid") although it answers for everything else, and Keep on This Computer's pass stopped at the first folder
+  that failed (the rule for a provider that doesn't answer, #85, 0.8.8.7): everything after it in the walk was never
+  read, and the kept entry was never marked complete, so every folder under it kept the "coming down" glyph. Now a
+  path that fails while the provider answers is set aside for an hour (`CloudFails` in `cloud_pure.c`, at most 32 per
+  account): the account is checked at once and, when it answers, the keeper comes back and goes around that path, so
+  the rest comes down and the folders turn to kept; the path shows the error glyph meanwhile and is tried again after
+  the hour, at the next mount, or when the person keeps a folder again. The kept entry itself failing is still the
+  provider not answering (never set aside), and a check that finds the provider unreachable forgets what was set aside.
+  A path refused with another error (not a time out), which never stopped the pass but also left the entry "coming
+  down" for good, is set aside the same way, without the check.
+  `cloud-test` checks the set (added, inside a failed folder, the hour, the limit).
+- **Terminal: no see-through line under the title bar at 125 % or 150 % (GitHub #162; all themes).** The Terminal's
+  window is transparent (its background opacity), so nothing is painted behind its frame. At a fractional scale the
+  edges where the frame's border, the title bar, the separator (Lord Classic and Lord Workspaces: the menu strip) and
+  the Terminal's tab bar meet fall inside a pixel; each box covered only part of that pixel, and the row let a quarter
+  of the desktop through, a thin line with the wallpaper's text showing across the window while it moved. At 100 % and
+  200 % the edges are whole pixels, which is why it was not seen there. The frame of a transparent app now paints, first,
+  one box in the bar's color under those edges (`SeamCover`, `sdk/windowshell.jsx`, used by the three themes' window
+  frames), from under the border to 1 px into the app, so every pixel there is opaque; opaque windows have their own
+  background behind the seams and don't change. `engine-test` draws such a frame at 100, 125, 150, 175 and 200 %:
+  without the cover it finds the see-through pixels, with it none.
+- **Notes: the Read view breaks lines where the Edit view does (GitHub #169).** Reading a note drew it as plain
+  markdown, which joins the lines of a paragraph: two lines typed one under the other ran together as one, so the same
+  note looked different in Read and Edit. The reading view now keeps a single line break as a line break (each typed
+  line still wraps at the width); a blank line still separates paragraphs, and headings, lists, quotes, code and tables
+  are as before. It is the `breaks` option of the SDK's `<Markdown>` (`sdk/markdown.jsx`, `parseMarkdown(src, { breaks })`),
+  which only Notes turns on: Help and Mail keep plain markdown. Checked in `notes_breaks_scene.mjs`. The editor keeps its
+  monospaced font, as it shows the markdown marks themselves.
+- **Korean input (Hangul): Shift no longer ends the syllable (GitHub #163).** Shift pressed alone reached the input
+  method as a key with no text, and every such key confirmed the syllable being composed, so the 2-set keyboard's Shift
+  jamo never joined it: 이 + Shift+T gave 이ㅆ instead of 있, 바 + Shift+R gave 바ㄲ instead of 밖, and ㄱ + Shift+O gave
+  ㄱㅒ instead of 걔. A key that types nothing and has no name (Shift, Caps Lock, Ctrl or AltGr alone, a dead key) now
+  passes through and leaves the composition as it is, in every input method (`server/src/ime.c` `ime_key`). `ime-test`
+  gains `+` for Shift alone, and two suites check ㅆ and ㄲ as finals, ㅒ and ㅖ, and every double final consonant
+  (갃 앉 않 닭 삶 넓 곬 핥 읊 잃 없) with how one splits when a vowel follows (달기, 앉아, 없어).
+- **Disks: pressing Mount could turn the whole desktop black (GitHub #174).** In 0.8.8.8 and 0.8.8.9, when mounting
+  failed on a FAT, exFAT, NTFS, HFS+ or APFS drive with the disk formats not installed (most USB sticks), Disks drew its "Get the formats" button with a `Button` it never imported:
+  "Button is not defined" while rendering, and React unmounted the shell. The import is in place now, and each app
+  window has its own error boundary (Changed, above), so such a mistake stays in its window. A new check,
+  `server/tests/jsx_undeclared_test.mjs` (in `make test`), reads every `.jsx` of the apps, themes, SDK and runtime and
+  fails on a component used as a JSX tag that is never imported or declared in its file; esbuild bundles such a file
+  without a warning.
+- **The lock screen could stay lit and never sleep (GitHub #172).** When the session locks (Require password, the
+  lid, the power button or the sleep timer), it hands its display-off and sleep deadlines to the login screen in a
+  `mode` notice. A login screen started for that lock (it is stopped 10 s after each login) added its listener in a
+  React effect, a few turns of the main loop after the theme loaded, so a notice that came first was dropped: the
+  screen stayed on and the computer never went to sleep from the lock screen. The deadlines are now applied as the
+  notice arrives, and the screen gets the notice when it mounts (`themes/greeter/inbox.js`, tested in
+  `server/tests/greeter_inbox_test.mjs`). A laptop that wakes up a second after it goes to sleep with the lid open has
+  a firmware wake source (`LID0` in `/proc/acpi/wakeup`), not this (handled by the lid wake hook above, #172).
+- **`systemctl restart lordos` with sessions alive failed on systemd 258 and later (GitHub #140)** with "Failed to
+  spawn executor: Device or resource busy", and after five tries there was no login screen until a reboot (a
+  package upgrade or a crash of lord-sessiond did the same). systemd 258 starts a delegated unit's new main process
+  in the unit's root cgroup and only then moves it to `DelegateSubgroup=supervisor`; the root still had `cpu memory
+  pids` on for the sessions, and a cgroup with controllers on takes no process. `lordos.service` now runs
+  `lord-sessiond --release-cgroups` first (ExecStartPre): it notes the limits of the sessions' leaves and app scopes
+  in `/run/lordos/cgroup-limits`, turns the controllers off in each session and then in the root, and the new
+  lord-sessiond turns them on again and puts the limits back; notes not yet put back (two failed starts in a row, a limit refused) are kept and merged, never replaced, and the file goes only once every limit is back (`server/src/sec/cgroup.c`, tested in
+  `build/cgroup-restart-test`; the kernel's side checked in a delegated scope). Debian 13 ships systemd 257, which
+  wasn't affected and works the same; the unit hasn't been run on 258 or later yet.
+- **A GTK 4 app froze when a dropdown or menu was opened a second time (GitHub #159).** GTK 4 keeps one wl_surface
+  for a popover and gives it a new xdg_surface and xdg_popup each time it opens; lord-server kept "configure already
+  sent" on the wl_surface, so the second opening's first commit got no `xdg_popup.configure`/`xdg_surface.configure`
+  and the app waited for it forever (the reporter's `WAYLAND_DEBUG` trace shows exactly that). When a popup or
+  toplevel role object goes, the surface's configure state and window geometry start over (`role_reset` in
+  `server/src/wl/wl.c`), and a commit on a surface whose popup is gone no longer maps it again or sends a configure on
+  a destroyed object. `tests/popup_client.c` opens a popup three times on one wl_surface and remakes a toplevel on its
+  old surface; `tests/popup_headless.sh` runs it against a headless lord-server in `make test` (before the fix: 7 of
+  15 checks failed).
+- **A boot with no monitor connected no longer waits 35 s for the splash** (a Raspberry Pi used over SSH): the session
+  that gets a card with nothing on it says at once that it is shown, instead of Plymouth waiting for a first frame that
+  can't come. Measured on a Raspberry Pi 5 with no monitor: 39.2 s → 8.6 s to `graphical.target`.
+- **A fullscreen window took the mouse and the keyboard of every monitor (all themes).** With a YouTube video full
+  screen on one display, the pointer did nothing on the others and every key went to the video until it left
+  fullscreen. Now a fullscreen window owns its own display only (`server/src/wl/wl.c` `on_fs`): the pointer on another
+  display reaches the desktop and its windows there. One display: as before.
+- **With a window fullscreen on one display, the keys went back to it whenever the pointer crossed its display
+  (GitHub #175).** A text field clicked on another monitor lost the keys as soon as the pointer passed over the video,
+  and the theme could not focus a window there while the pointer was on the video's display. The keys now follow the
+  window chosen, not the pointer (`server/src/wl/fsfocus.h`): a window chosen on another display keeps them, clicking
+  the fullscreen window gives them back to it (the theme never sees that click, so the compositor does it), a window
+  that goes fullscreen takes them unless they are with a window on another display, and a window under the fullscreen
+  one (on its display, so not seen) never takes them. With no window focused, the fullscreen window gets them while
+  the pointer is on its display. One display: the fullscreen window always has the keys, as before. Checked in
+  `build/fsfocus-test` (in `make -C server test`).
+- **A Linux app's maximize or unmaximize request that LordOS refused got no answer** (xdg-shell asks for a configure
+  after each), and Google Chrome stopped responding while it waited. Refused requests are answered with the state as it
+  is. Lord Workspaces' padlock also tells the app it can't maximize or minimize (xdg-shell 5 `wm_capabilities`,
+  `wl_set_fixed`, the seventh argument of `lord.wayland.state`), so Chromium hides those buttons; its own close
+  button stays, as closing is the app's.
+- **Lord Workspaces froze a desktop with three monitors (in development; found on the maintainer's computer with the
+  0.8.8.10~ws1 test build).** What froze it is not reproduced yet (headless, CPU path: no stall in a stress of layouts,
+  the Apps panel, Google Chrome and a terminal); the watchdog above now names it if it happens again. Fixed meanwhile:
+  - *Display keys:* the tiler and Save layout keyed a display by its model name, so three monitors of one model were
+    one display: each window was placed on all three in turn, ended on the wrong one and floated. They are keyed by
+    their connector now (`DP-2`, `HDMI-A-1`…), never two alike (`displayKeys`). A layout saved by the test build under
+    the model's name is not read back.
+  - *Bounded tiling:* a pass with nothing new moves nothing; a window is asked for a tile's size once per tile, and an
+    app that answers with another size at the tile's corner within 1.5 s (Chrome's minimum size, a terminal's character
+    grid) keeps it and stays in its tile instead of floating (`judgeFrame`); at most 10 moves per window and 60 passes
+    per second, past that the pass waits a second (`underBudget`). Checked in `workspaces_model_test.mjs` (an app that
+    answers every size with another one is asked once) and `workspaces_scene.mjs` (idempotent passes, a stubborn app
+    stays tiled with a bounded number of changes).
+  - *Search:* the Apps view no longer builds the home folder's file index; it starts with the first typed character.
+- **A drag and drop inside a Linux app could stay going after the mouse button was released (GitHub #176, #177).** In
+  Google Chrome a page's box dragged onto a canvas kept following the pointer and never dropped; in Firefox and Floorp
+  a tab dragged along the tab bar went back to its place. The compositor counted the seat's held buttons and ended a
+  drag only when that count went back to zero, so one press counted twice or one release that never arrived (two
+  devices reporting the same button, a kernel buffer overrun, a console or session switch with a button down) kept the
+  count above zero for good: from then on no Wayland drag ended at its release, only with Escape. The held buttons are
+  a set now (`server/src/wl/seatbtn.h`): a button's next release clears it, and a drag also ends at the release of the
+  button that started it, whatever another button looks like (as Weston does). Checked in `build/seatbtn-test` (in
+  `make -C server test`: a lost release, a doubled press, another button stuck down, a second button mid-drag).
+- **Firefox's (and any GTK 3 app's) first drag in a window it had just been clicked into was refused (GitHub #177).**
+  A drag must name the press it comes from, and the compositor took only that press's own serial. GTK 3 names the
+  newest serial it has seen instead, and after a click that focused the window that is the keyboard's `enter` or
+  `modifiers`, which LordOS sends after the button (the theme focuses the window when it sees the press): the drag was
+  cancelled before it started and the tab went back. A serial newer than the press and not newer than the newest the
+  display gave out is taken too, still only while that client's press is held on the window it names (`sb_serial_ok`
+  in `server/src/wl/seatbtn.h`). Checked in `build/seatbtn-test` (the press's serials, newer ones, ones not given out,
+  older ones, a made-up one, across the serials' wrap) and in `build/dnd-client`, whose second drag now starts as GTK 3
+  starts one.
+- **The real-time priority's demotion left the main thread at real time.** On `SIGXCPU` lord-server asked the kernel
+  for `SCHED_OTHER` alone, which it refuses for a thread with `SCHED_RESET_ON_FORK` (the main one) without
+  `CAP_SYS_NICE`: only the paint threads went back. It keeps the flag now (`par.c`).
 
 ## [0.8.8.9-beta] - 2026-11-15
 

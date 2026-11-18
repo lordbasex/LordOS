@@ -235,6 +235,7 @@
   "fs.notRegular": "ليس ملفًا عاديًا (هل هو رابط؟)",
   "fs.openFailed": "تعذّر فتح الملف: {errno}",
   "fs.outsideHome": "هذا الموقع خارج مجلد المنزل أو غير صالح",
+  "fs.nameTooLong": "الاسم طويل جدًا (الحد الأقصى {max} بايت؛ الحروف غير اللاتينية تشغل من 2 إلى 4 بايت لكل منها)",
   "fs.protected": "هذا المجلد محمي",
   "fs.systemFolder": "لا تعرض «الملفات» مجلدات النظام الداخلية (/proc و/sys و/dev و/run)",
   "fs.tooLarge": "الملف كبير جدًا (الحد الأقصى {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "تعذّر تحديث محمّل الإقلاع (الرمز {code})",
   "hw.logindFailed": "تعذّر تطبيق إعدادات الطاقة (الرمز {code})",
   "hw.noBacklight": "لا توجد إضاءة خلفية كهذه",
+  "hw.noChargeControl": "هذه البطارية لا تدعم التحكم في الشحن",
+  "hw.chargeControlFailed": "تعذر تغيير الشحن: {errno}",
   "hw.noCpufreq": "لا يدعم هذا الحاسوب تغيير تردد المعالج",
   "hw.noEeprom": "أدوات محمّل الإقلاع (rpi-eeprom) غير مثبّتة",
   "hw.noKernelLog": "تعذّرت قراءة سجل النواة",
@@ -880,5 +883,12 @@
   "pkg.multiarchConflict": "لا يمكن تثبيت {name} لـ 64 و32 بت في الوقت نفسه",
   "pkg.foreignArchUnsupported": "لا يمكن تفعيل حزم 32 بت إلا على حاسوب 64 بت (amd64)؛ هذا النظام {arch}",
   "pkg.foreignArchFailed": "تعذّر تفعيل حزم 32 بت ({arch}) (انتهى dpkg بالرمز {code})",
-  "webapps.developerOff": "وضع المطور متوقف في الإعدادات ← تطبيقات الويب"
+  "webapps.developerOff": "وضع المطور متوقف في الإعدادات ← تطبيقات الويب",
+  "media.streamAddress": "عنوان البث هذا غير مسموح",
+  "media.streamCannotOpen": "تعذّر فتح البث",
+  "media.streamTimeout": "لم يستجب البث في الوقت المناسب",
+  "media.streamAuth": "طلب البث اسم مستخدم وكلمة مرور، أو كانا خاطئين",
+  "media.streamLost": "انقطع البث",
+  "media.streamNoChannels": "لا توجد قنوات في القائمة",
+  "media.noStreamHelper": "مساعد البث (lord-stream) غير متاح"
 }

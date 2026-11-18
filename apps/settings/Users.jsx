@@ -7,6 +7,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, FieldRow, Note, Message, Actions } from './ui.jsx';
+import { AvatarEditor } from './AvatarEditor.jsx';
 
 const COLORS = ['#5b9cff', '#f0915a', '#4cc37a', '#e0609d', '#a77bf3', '#4cc4d3', '#f2c14e', '#8e8e93'];
 const NAME_RE = /^[a-z_][a-z0-9_-]{0,31}$/;
@@ -64,6 +65,7 @@ export function UsersSettings() {
   return (
     <Stack>
       {!isAdmin && <Note tone="warn">{tr('settings.users.onlyOwn')}</Note>}
+      {!isAdmin && data.textMode && info.admin && <Note>{tr('settings.users.textModeNoAdmin')}</Note>}
       <Section>
         {users.map((u) => {
           const on = cur && cur.name === u.name && !adding;
@@ -80,6 +82,14 @@ export function UsersSettings() {
       {isAdmin && !adding && <Actions><Button label={tr('settings.users.add')} onClick={() => { setAdding(true); setMsg(null); }} /></Actions>}
       {busy && <Note>{tr('settings.users.working')}</Note>}
       <Message msg={msg} />
+      {isAdmin && !adding && (
+        // the whole computer's: no login screen at the next boots, a login prompt on tty1 and startlordos there (as startx)
+        <Section title={tr('settings.users.loginTitle')} footer={tr('settings.users.textModeHint')}>
+          <SettingRow label={tr('settings.users.textMode')}>
+            <Toggle small on={!!data.textMode} onChange={(on) => run('boot-text', on ? 'on' : 'off', tr('settings.users.saved'))} />
+          </SettingRow>
+        </Section>
+      )}
       {adding ? <AddUser onDone={(name) => { setAdding(false); if (name) setSel(name); }} run={run} />
         : cur ? <UserDetail key={cur.name} user={cur} isAdmin={isAdmin} run={run} autologin={data.autologin} admins={data.users.filter((x) => x.admin).length} /> : null}
     </Stack>
@@ -128,7 +138,7 @@ function UserDetail({ user, isAdmin, run, autologin, admins }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [pw, setPw] = useState({ old: '', pass: '', pass2: '' });
-  const [img, setImg] = useState('');
+  const [editing, setEditing] = useState(false);       // the picture chooser and its fitting (AvatarEditor.jsx)
   const [del, setDel] = useState(false);
   const [keep, setKeep] = useState(true);
   useEffect(() => { setPw({ old: '', pass: '', pass2: '' }); }, [user.name]);
@@ -157,10 +167,17 @@ function UserDetail({ user, isAdmin, run, autologin, admins }) {
             ))}
           </View>
           <View style={{ flexDirection: 'row', gap: spacing.s, paddingVertical: spacing.s, alignItems: 'center' }}>
-            <TextInput value={img} placeholder={tr('settings.users.imagePath')} onChange={setImg} style={{ flex: 1 }} />
-            <Button small label={tr('settings.users.useImage')} onClick={() => img && run('user-avatar', [user.name, user.color || '', img.replace(/^~/, fs.home())].join('\n'), tr('settings.users.avatarSaved'))} />
+            <Button small label={tr('settings.users.chooseImage')} onClick={() => setEditing(true)} />
             {user.image ? <Button small label={tr('settings.users.removeImage')} onClick={() => run('user-avatar', [user.name, user.color || '', '-'].join('\n'), tr('settings.users.avatarSaved'))} /> : null}
           </View>
+          {editing ? (
+            <AvatarEditor onClose={() => setEditing(false)}
+              onSave={(path) => {
+                setEditing(false);
+                // the fitted copy (~/.cache/lordos/avatar.jpg) goes to /var/lib/lordos/users
+                run('user-avatar', [user.name, user.color || '', path].join('\n'), tr('settings.users.avatarSaved'));
+              }} />
+          ) : null}
         </Section>
       )}
       {canEdit && (

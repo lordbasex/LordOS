@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkReport, commentBody, findAttachments, fetchAttachment, parseLimited, labelsFor, STATUS_LABELS, MARKER, MAX_BYTES } from './lib.mjs';
+import { checkReport, commentBody, findAttachments, fetchAttachment, parseLimited, labelsFor, embeddedReport, STATUS_LABELS, MARKER, MAX_BYTES } from './lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const schema = JSON.parse(fs.readFileSync(path.join(REPO, 'apps/sysinfo/hwreport.schema.json'), 'utf8'));
@@ -56,7 +56,13 @@ async function github() {
   if (!urls.length) result = { status: 'missing', labels: ['hardware-report', 'report:missing'] };
   else {
     fileName = decodeURIComponent(urls[0].split('/').pop());
-    try { result = checkText(await fetchAttachment(urls[0], { maxBytes: MAX_BYTES })); }
+    try {
+      const text = await fetchAttachment(urls[0], { maxBytes: MAX_BYTES });
+      // System Information's page: the report inside it (issue #171)
+      const inner = fileName.endsWith('.html') ? embeddedReport(text) : text;
+      if (inner == null) throw new Error('this page has no report inside: attach the .json file System Information saved next to it');
+      result = checkText(inner);
+    }
     catch (e) { result = { status: 'invalid', error: e.message, labels: labelsFor('invalid', null) }; }
   }
   const body = commentBody(result, { fileName });

@@ -235,6 +235,7 @@
   "fs.notRegular": "它不是普通文件（是链接吗？）",
   "fs.openFailed": "无法打开文件：{errno}",
   "fs.outsideHome": "该位置在你的个人文件夹之外或无效",
+  "fs.nameTooLong": "名称太长（最多 {max} 字节；中文等非拉丁字符每个占 2 到 4 字节）",
   "fs.protected": "该文件夹受保护",
   "fs.systemFolder": "“文件”不显示系统的内部文件夹（/proc、/sys、/dev 和 /run）",
   "fs.tooLarge": "文件太大（最大 {max}）",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "无法更新引导加载程序（代码 {code}）",
   "hw.logindFailed": "无法应用电源设置（代码 {code}）",
   "hw.noBacklight": "没有此背光",
+  "hw.noChargeControl": "此电池不支持充电控制",
+  "hw.chargeControlFailed": "无法更改充电：{errno}",
   "hw.noCpufreq": "这台电脑不支持 CPU 频率调节",
   "hw.noEeprom": "未安装引导加载程序工具（rpi-eeprom）",
   "hw.noKernelLog": "无法读取内核日志",
@@ -875,5 +878,12 @@
   "pkg.multiarchConflict": "{name} 不能同时以 64 位和 32 位安装",
   "pkg.foreignArchUnsupported": "只能在 64 位电脑（amd64）上启用 32 位软件包；本系统为 {arch}",
   "pkg.foreignArchFailed": "无法启用 32 位（{arch}）软件包（dpkg 以代码 {code} 退出）",
-  "webapps.developerOff": "“设置 → 网页应用”中的开发者模式已关闭"
+  "webapps.developerOff": "“设置 → 网页应用”中的开发者模式已关闭",
+  "media.streamAddress": "不允许此直播流地址",
+  "media.streamCannotOpen": "无法打开直播流",
+  "media.streamTimeout": "直播流未及时响应",
+  "media.streamAuth": "直播流要求用户名和密码，或输入有误",
+  "media.streamLost": "直播流已中断",
+  "media.streamNoChannels": "列表中没有频道",
+  "media.noStreamHelper": "直播流助手（lord-stream）不可用"
 }

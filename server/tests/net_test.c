@@ -9,6 +9,7 @@
  *   net-test wake                    Wi-Fi after waking from sleep: checked, re-associated, turned off and on
  *   net-test wifi-saved              a saved network's key file: what a join without a password keeps
  *   net-test wireless                the Wi-Fi level in /proc/net/wireless (the Control Center's bars, #114)
+ *   net-test wifi-status             the network an interface is joined to, from wpa_supplicant's STATUS (#167)
  *   sudo net-test health <if>        the after-sleep check of one Wi-Fi interface (needs its wpa_supplicant)
  *   sudo net-test arp <if> <src> <ip> does ip answer an ARP request from src (the after-sleep gateway check)
  *   sudo net-test dhcp <if>          the DHCP client in the foreground (SIGUSR2: confirm the lease, as after sleep)
@@ -429,6 +430,29 @@ static int test_wifi_saved(void) {
     return bad;
 }
 
+/* GitHub #167: net-wifi-scan marks the network the interface is joined to, from wpa_supplicant's STATUS. Only a
+ * finished association counts, and the SSID comes back unescaped and at most 32 bytes. */
+static int test_wifi_status(void) {
+    int bad = 0;
+    char ss[40];
+#define WT(x) do { if (!(x)) { printf("FAIL wifi-status:%d: %s\n", __LINE__, #x); bad++; } } while (0)
+    const char *joined = "bssid=aa:bb:cc:dd:ee:ff\nfreq=5180\nssid=Casa 5G\nid=0\nmode=station\npairwise_cipher=CCMP\n"
+                         "key_mgmt=WPA2-PSK\nwpa_state=COMPLETED\nip_address=192.168.1.20\naddress=11:22:33:44:55:66\n";
+    WT(wifi_status_ssid(joined, ss, sizeof ss) == 1 && !strcmp(ss, "Casa 5G"));
+    /* "bssid=" and "p2p_device_address=" lines aren't the ssid */
+    WT(wifi_status_ssid("wpa_state=COMPLETED\nbssid=aa:bb:cc:dd:ee:ff\n", ss, sizeof ss) == 0 && !ss[0]);
+    WT(wifi_status_ssid("ssid=Casa\nwpa_state=ASSOCIATING\n", ss, sizeof ss) == 0 && !ss[0]);
+    WT(wifi_status_ssid("wpa_state=DISCONNECTED\naddress=11:22:33:44:55:66\n", ss, sizeof ss) == 0);
+    WT(wifi_status_ssid("wpa_state=COMPLETED\nssid=caf\\xc3\\xa9 \\\"x\\\"\n", ss, sizeof ss) == 1 && !strcmp(ss, "caf\xc3\xa9 \"x\""));
+    WT(wifi_status_ssid("wpa_state=COMPLETED\nssid=0123456789012345678901234567890123\n", ss, sizeof ss) == 0);  /* 34 bytes */
+    WT(wifi_status_ssid("wpa_state=COMPLETED", ss, sizeof ss) == 0);
+    WT(wifi_status_ssid(NULL, ss, sizeof ss) == 0);
+    WT(wifi_status_ssid("ssid=Casa\nwpa_state=COMPLETED", ss, 4) == 0);   /* doesn't fit: nothing, never cut */
+#undef WT
+    printf("wifi-status: %s\n", bad ? "FAILED" : "ok");
+    return bad;
+}
+
 /* GitHub #114: the bars on the Control Center's Wi-Fi icon come from the level in /proc/net/wireless, which
  * lord.net.interfaces() passes on as "signal" (dBm). Only a real reading counts: a radio that is not associated
  * says 0 or -256, and a line that is cut short or names another interface gives nothing. */
@@ -473,6 +497,7 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[1], "wake")) return test_wake() ? 1 : 0;
     if (!strcmp(argv[1], "wifi-saved")) return test_wifi_saved() ? 1 : 0;
     if (!strcmp(argv[1], "wireless")) return test_wireless() ? 1 : 0;
+    if (!strcmp(argv[1], "wifi-status")) return test_wifi_status() ? 1 : 0;
     if (!strcmp(argv[1], "dhcp") && argc > 2) { dhcp_run(argv[2], 0); return 0; }
     if (!strcmp(argv[1], "arp") && argc > 4) {
         int fam;

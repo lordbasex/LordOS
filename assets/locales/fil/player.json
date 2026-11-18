@@ -37,5 +37,15 @@
   "col.time": "Oras",
   "back": "Bumalik",
   "emptyMusicTitle": "Walang musika",
-  "emptyVideosTitle": "Walang video"
+  "emptyVideosTitle": "Walang video",
+  "nav.network": "Network",
+  "nav.streams": "Mga stream",
+  "streams.open": "Buksan ang address…",
+  "streams.list": "Buksan ang M3U list…",
+  "streams.save": "I-save",
+  "streams.remove": "Alisin",
+  "streams.close": "Isara",
+  "streams.saved": "Naka-save",
+  "streams.channels": "Mga channel ({n})",
+  "streams.empty": "Buksan ang camera, stream o TV channel sa address nito, o ang mga channel ng M3U list."
 }

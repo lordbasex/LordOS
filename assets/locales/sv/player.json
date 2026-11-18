@@ -37,5 +37,15 @@
   "col.time": "Tid",
   "back": "Tillbaka",
   "emptyMusicTitle": "Ingen musik",
-  "emptyVideosTitle": "Inga videor"
+  "emptyVideosTitle": "Inga videor",
+  "nav.network": "Nätverk",
+  "nav.streams": "Strömmar",
+  "streams.open": "Öppna adress…",
+  "streams.list": "Öppna M3U-lista…",
+  "streams.save": "Spara",
+  "streams.remove": "Ta bort",
+  "streams.close": "Stäng",
+  "streams.saved": "Sparade",
+  "streams.channels": "Kanaler ({n})",
+  "streams.empty": "Öppna en kamera, ström eller tv-kanal via adressen, eller kanalerna i en M3U-lista."
 }

@@ -151,5 +151,10 @@
   "wifi.saved": "сохранена",
   "wifi.scan": "Искать",
   "wifi.scanning": "Поиск…",
-  "wifi.wrongKey": "Неверный пароль."
+  "wifi.wrongKey": "Неверный пароль.",
+  "wifi.available": "Доступные сети Wi-Fi",
+  "wifi.currentLabel": "{ssid} — Подключено",
+  "wifi.connect": "Подключиться",
+  "wifi.notInRange": "Вне зоны действия",
+  "wifi.knownFooter": "LordOS сам подключается к сохранённой сети, когда она в зоне действия. «Забыть» удаляет сеть и её пароль с этого компьютера."
 }

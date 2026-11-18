@@ -2,6 +2,7 @@
   "pick": "Wähle einen Eintrag, um die vollständige Meldung und ihre Felder zu sehen.",
   "field.time": "Zeit",
   "field.level": "Stufe",
+  "field.account": "Konto",
   "field.process": "Prozess",
   "field.pid": "PID",
   "field.unit": "Unit",

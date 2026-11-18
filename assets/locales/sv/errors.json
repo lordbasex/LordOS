@@ -235,6 +235,7 @@
   "fs.notRegular": "Det är inte en vanlig fil (är det en länk?)",
   "fs.openFailed": "Kunde inte öppna filen: {errno}",
   "fs.outsideHome": "Den platsen ligger utanför din hemmapp eller är inte giltig",
+  "fs.nameTooLong": "Namnet är för långt (max. {max} byte; bokstäver med accent och icke-latinska tar 2 till 4 var)",
   "fs.protected": "Den mappen är skyddad",
   "fs.systemFolder": "Filer visar inte systemets interna mappar (/proc, /sys, /dev och /run)",
   "fs.tooLarge": "Filen är för stor (max. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Kunde inte uppdatera startladdaren (kod {code})",
   "hw.logindFailed": "Ströminställningarna kunde inte tillämpas (kod {code})",
   "hw.noBacklight": "Ingen sådan bakgrundsbelysning",
+  "hw.noChargeControl": "Det här batteriet har ingen laddningsstyrning",
+  "hw.chargeControlFailed": "Laddningen kunde inte ändras: {errno}",
   "hw.noCpufreq": "Den här datorn har ingen frekvensskalning för CPU:n",
   "hw.noEeprom": "Startladdarverktygen (rpi-eeprom) är inte installerade",
   "hw.noKernelLog": "Kärnloggen kunde inte läsas",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "{name} kan inte installeras för 64 och 32 bitar samtidigt",
   "pkg.foreignArchUnsupported": "32-bitarspaket kan bara aktiveras på en 64-bitars dator (amd64); det här systemet är {arch}",
   "pkg.foreignArchFailed": "32-bitarspaket ({arch}) kunde inte aktiveras (dpkg avslutades med kod {code})",
-  "webapps.developerOff": "Utvecklarläget är avstängt i Inställningar → Webbappar"
+  "webapps.developerOff": "Utvecklarläget är avstängt i Inställningar → Webbappar",
+  "media.streamAddress": "Den här strömadressen är inte tillåten",
+  "media.streamCannotOpen": "Strömmen kunde inte öppnas",
+  "media.streamTimeout": "Strömmen svarade inte i tid",
+  "media.streamAuth": "Strömmen bad om användare och lösenord, eller så var de fel",
+  "media.streamLost": "Strömmen bröts",
+  "media.streamNoChannels": "Listan har inga kanaler",
+  "media.noStreamHelper": "Strömhjälpen (lord-stream) är inte tillgänglig"
 }

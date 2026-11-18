@@ -235,6 +235,7 @@
   "fs.notRegular": "通常のファイルではありません（リンクですか？）",
   "fs.openFailed": "ファイルを開けませんでした：{errno}",
   "fs.outsideHome": "その場所はホームフォルダの外にあるか、無効です",
+  "fs.nameTooLong": "名前が長すぎます（最大 {max} バイト。日本語などの文字は 1 文字で 2〜4 バイト使います）",
   "fs.protected": "そのフォルダは保護されています",
   "fs.systemFolder": "ファイルはシステムの内部フォルダ（/proc、/sys、/dev、/run）を表示しません",
   "fs.tooLarge": "ファイルが大きすぎます（最大 {max}）",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "ブートローダーを更新できませんでした（コード {code}）",
   "hw.logindFailed": "電源設定を適用できませんでした（コード {code}）",
   "hw.noBacklight": "そのようなバックライトはありません",
+  "hw.noChargeControl": "このバッテリーは充電制御に対応していません",
+  "hw.chargeControlFailed": "充電を変更できませんでした: {errno}",
   "hw.noCpufreq": "このコンピュータは CPU の周波数調整に対応していません",
   "hw.noEeprom": "ブートローダーのツール（rpi-eeprom）がインストールされていません",
   "hw.noKernelLog": "カーネルログを読み取れませんでした",
@@ -875,5 +878,12 @@
   "pkg.multiarchConflict": "{name} を 64 ビットと 32 ビットの両方で同時にインストールすることはできません",
   "pkg.foreignArchUnsupported": "32 ビットパッケージを有効にできるのは 64 ビット PC (amd64) だけです。このシステムは {arch} です",
   "pkg.foreignArchFailed": "32 ビット ({arch}) パッケージを有効にできませんでした (dpkg の終了コード {code})",
-  "webapps.developerOff": "「設定」→「Web アプリ」でデベロッパモードがオフになっています"
+  "webapps.developerOff": "「設定」→「Web アプリ」でデベロッパモードがオフになっています",
+  "media.streamAddress": "この配信アドレスは許可されていません",
+  "media.streamCannotOpen": "配信を開けませんでした",
+  "media.streamTimeout": "配信が時間内に応答しませんでした",
+  "media.streamAuth": "配信がユーザー名とパスワードを求めたか、それが違っていました",
+  "media.streamLost": "配信が途切れました",
+  "media.streamNoChannels": "リストにチャンネルがありません",
+  "media.noStreamHelper": "配信ヘルパー（lord-stream）を利用できません"
 }

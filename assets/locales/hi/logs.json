@@ -2,6 +2,7 @@
   "pick": "पूरा संदेश और उसके फ़ील्ड देखने के लिए कोई प्रविष्टि चुनें।",
   "field.time": "समय",
   "field.level": "स्तर",
+  "field.account": "खाता",
   "field.process": "प्रोसेस",
   "field.pid": "PID",
   "field.unit": "यूनिट",

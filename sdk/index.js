@@ -4,10 +4,12 @@ import { render, onScreenChange } from '@lordos/runtime';
 import { settings } from './settings.js';
 import { createStore, useStore } from './store.js';
 import { locale, tOptional } from './i18n.js';
+import { cleanThemeMeta } from './thememeta.js';
 
 export { View, Text, Image, Terminal, Surface, MediaView, screen, addListener, useClock, system, layouts, getLayout, modifiers } from '@lordos/runtime';
 export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox } from '@lordos/runtime';
 export { createStore, useStore } from './store.js';
+export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch } from './thememeta.js';   // theme.json's sketch and options (0.8.9)
 export { settings, useSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
@@ -76,10 +78,14 @@ import { startCleanerStatus } from './cleanerstatus.jsx';
 import { startCloud } from './cloudstatus.jsx';
 export { errorText, statusText, codeError, parseCode } from './errors.js';
 export { logs } from './logs.js';
-export { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder } from './logfile.js';
+export { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder, levelMatch, LEVEL_MAX, cloudAccounts } from './logfile.js';
 export { LordOSLogo, LordOSGlyph, LordOSWordmark } from './logo.js';
 export { Lumo, lumoSource } from './mascot.js';
 export { DesktopWidgets, registerWidgetType, setWidgets, desktopWidgets } from './widgets.js';
+export { BATTERY_DEFAULTS, batteryPrefs, batteryStep } from './batterypolicy.js';
+export { useDevices, deviceList, deviceName, deviceShort, deviceValue, deviceVia } from './devices.js';
+export { devicesFrom, fractionOf as deviceFraction, toneOf as deviceTone, kindOf as deviceKind } from './devicesmodel.js';
+export { registerWidgetKind, widgetKinds, widgetCatalog, addDeskWidget, removeDeskWidget, setDeskWidget, resizeDeskWidget, startDeskWidgets, deskWidgetSize, kindSizes, WidgetDropTarget, widgetDrag, deskWidgetsShown, widgetDisplayKey } from './deskwidgets.jsx';
 export { Markdown, markdownHeadings, parseMarkdown, parseInline, toggleTask } from './markdown.jsx';
 export {
   dock, useDockEntries, dockActivate, dockMenu, registerDockMenu, registerDockActions, dockQuickActions, launcherIdOf, dockIdOf, dockIdOfWindow,
@@ -96,18 +102,18 @@ export { packages, packageList, refreshPackages, packageFile, loadWasm } from '.
 import { refreshPackages, forgetGonePackaged, packageList as packageListOf } from './packages.js';
 export {
   windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, windowMenuTitle, windowAccent, appRegistry, appMenuClick,
-  registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
+  registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, isWindowLocked, moveGrab, SNAP_DWELL_MS, locksChanged, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
   keepWindowsInWorkAreas, pointerDisplay,
 } from './windows.js';
 // Desktops and the Overview (docs/DESKTOPS.md)
-export { desktopName, nextDesktopBy, addDesktopAndShow, closeActiveDesktop, moveToDesktopItems, flowDesktopKeys, classicDesktopKeys, flowGrabs, ctrlArrowsOn, desktopSwipe, DesktopHud } from './desktops.js';
+export { desktopName, switchDesktop, nextDesktopBy, addDesktopAndShow, closeActiveDesktop, removeDesktopById, moveToDesktopItems, flowDesktopKeys, classicDesktopKeys, flowGrabs, ctrlArrowsOn, desktopSwipe, DesktopHud } from './desktops.js';
 import { startDesktops, desktopsForThemeSwitch, desktopAt, indexOfDesktop } from './desktops.js';
 // the brief level indicator of the volume, brightness and keyboard-light keys (docs/SHORTCUTS.md)
 export { LevelHud, showLevel } from './levelhud.js';
-export { overview, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, toggleAppWindows, overviewOpen } from './overview.jsx';
+export { overview, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, toggleAppWindows, overviewOpen, setDesktopDecor } from './overview.jsx';
 export { codeStatus } from './codesig.js';
 import { reportRefusedCode } from './codesig.js';
-export { WindowShell, WINDOW_EDGE, useWindowButtons } from './windowshell.jsx';
+export { WindowShell, WINDOW_EDGE, useWindowButtons, SeamCover } from './windowshell.jsx';
 export { WINDOW_BUTTON_SIDES, windowButtonsPref } from './windowbuttons.js';   // title bar buttons' side (issue #58)
 export { term } from './terminal.js';
 export { clipboard, clipboardHistory, clipboardPanel, clipboardKind, toast } from './clipboard.js';
@@ -116,7 +122,7 @@ export { spotlight, spotlightOpen, calc as spotlightCalc, convert as spotlightCo
 export { registerSpotlightSource, searchEverything } from './spotlight.js';
 // session notifications, menu bar status items, Clock (alarms) and Help (docs/SYSTEM.md)
 export { notify, dismissNotification, useNotifications, notifications, notifyHistory, clearNotifyHistory, NotificationBanner, setBannerPlacement } from './notify.js';
-export { registerStatusItem, StatusItems, statusItems } from './statusitems.js';
+export { registerStatusItem, StatusItems, statusItems, setStatusPanelPlacer } from './statusitems.js';
 export { MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, BluetoothGlyph, SignalGlyph } from './quickglyphs.jsx';   // quick settings' glyphs (issue #114)
 export { setBacklight, useBacklight } from './hwkeys.js';   // the Control Center's brightness slider (issue #114)
 export { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, weekStartFor, wifiBars, backlightOf, backlightValue } from './menubarmodel.js';   // what the bar shows (issue #58)
@@ -130,6 +136,7 @@ import { NotificationBanner } from './notify.js';
 import { startAlarms } from './alarms.js';
 import { startDiskWatch } from './diskwatch.js';
 import { maybeStartTour } from './help.js';
+import { FirstStart, startFirstStart } from './firststart.jsx';
 import { liveStartWindow } from './livestart.js';
 import { getApp as getAppOf, isLiveSystem as isLiveSystemOf, wm as wmOf, windows as windowsStore } from './windows.js';
 export const windowIcon = (w) => windowIconOf(w, getAppOf);
@@ -221,10 +228,13 @@ export const themes = {
     let meta = {};
     try { meta = t.meta ? JSON.parse(t.meta) : {}; } catch (e) { /* invalid theme.json */ }
     // translated name and description (shell.theme.<id>.*) or those from theme.json
+    // (0.8.9) sketch, options and desktopArrows: what Settings shows for a theme it doesn't know by id (sdk/thememeta.js)
     return { id: t.id, current: t.current, hidden: !!meta.hidden, name: tOptional(`shell.theme.${t.id}.name`) || meta.name || t.id,
-      description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '' };
+      description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '', ...cleanThemeMeta(meta) };
   }).filter((t) => !t.hidden),         // the login screen (themes/greeter) can't be chosen
   current: () => lord.themes.list().find((t) => t.current)?.id || null,
+  // the current theme's entry (null on the login screen or without lord.themes)
+  info: () => { try { return themes.list().find((t) => t.current) || null; } catch (e) { return null; } },
   // Switches theme live: the server discards this JS context and loads the new one. The LordOS
   // app windows that are open come back in the new theme (themeReopen, read once by startShell);
   // Linux app windows stay connected and simply get the new theme's frame.
@@ -268,6 +278,7 @@ export function startShell(element) {
   const wanted = settings.get().theme;
   const current = themes.current();
   if (wanted && current && wanted !== current && lord.themes.use(wanted)) return;
+  try { lord.input?.pointerAccent?.(null); } catch (e) { /* older server */ }   // LordOS's black arrow; a theme may tint it (setPointerAccent)
   refreshPackages();                    // after the theme's configureWindows
   startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
   enableShellLayers();                  // menus, popovers and prompts go to their layer (sdk/layers.js)
@@ -283,7 +294,8 @@ export function startShell(element) {
   startAlarms();                        // Clock alarms and timer, with the app closed
   startMail();                          // new-mail notifications and passwords on demand (docs/MAIL.md)
   startReminders();                     // calendar and reminder alarms, with the apps closed
-  maybeStartTour();                     // "Welcome to LordOS", the first time
+  // (0.8.9) a new account's first session: choose the desktop (firststart.jsx); "Welcome to LordOS" waits for it
+  if (!startFirstStart({ list: themes.list, current: themes.current, use: (id) => themes.use(id), onDone: maybeStartTour })) maybeStartTour();
   startHardware();                      // Night Light, idle timers, battery in the menu bar (hardware.jsx)
   startTray();                          // the tray icons of Linux apps next to the status items (trayitems.jsx)
   startDiskWatch();                     // notices when a disk gets too hot or its health gets worse
@@ -351,14 +363,31 @@ function LocaleRoot({ children }) {
     at('floating', FloatingWindows),
     at('overlay', SpotlightPanel, LiveSpeechPanel),
     at('popover', ClipboardPanel, EmojiPanel),
-    at('modal', PrintDialog, RestorePrompt),
+    at('modal', PrintDialog, RestorePrompt, FirstStart),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),
     at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
     at('input', OskPanel, ImeOverlay));
 }
+// the wallpaper slideshow (0.8.9; a theme turns it on in theme.json: sdk/thememeta.js)
+export { SlideshowWallpapers, slideSrc, slideshowPrefs, slideshowPatch, slideshowStop, slideshowCategories, SLIDESHOW_EVERY } from './slideshow.jsx';
 export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor } from './motion.jsx';
 export { userVideoProblem, motionCodecs, MAX_SECONDS } from './motionmodel.js';
-export { lordosWallpapers, userWallpaperName, wallpaperSrc, wallpaperThumb, findWallpaper, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES } from './wallpapers.js';
+export { lordosWallpapers, userWallpaperName, wallpaperSrc, wallpaperThumb, findWallpaper, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES } from './wallpapers.js';
 export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, hideApp, hideOthers, toggleShowDesktop, appSettingsItem, webHelpItems, webAppearanceItem, webUserAgentItem } from './appcontrol.js';
 export { windowMenuItems, moveResizeItems } from './windowmenu.js';
 export { setDesktopCount } from './desktops.js';
+// Apps in a small window (a Workspaces tile): the window's width, a breakpoint and a sidebar that hides (sdk/narrow.jsx)
+export { useWindowWidth, useWindowHeight, useNarrow, useSidebar, SidebarToggle, SidebarOverlay, NARROW, MIN_W, MIN_H } from './narrow.jsx';
+// Network streams: cameras, IPTV and the Player's addresses through lord-stream (sdk/streams.jsx, sdk/streammodel.js)
+export { useStream, saveStreamPassword, STREAM_KEYRING_APP } from './streams.jsx';
+export { streamUrlOk, splitCredentials, withCredentials, protocolOf, lowQuality, parseM3U, hostKey } from './streammodel.js';
+export { VideoSetup, videoSetup } from './videowidget.jsx';
+
+export { WidgetPicker, widgetPicker } from './widgetpicker.jsx';
+// (0.8.9) the first-start desktop chooser and Desktop style's drawn pictures (Settings → Appearance)
+export { FirstStart, startFirstStart, firstStartState, useFirstStartOpen } from './firststart.jsx';
+export { DesktopStyleThumb, SketchThumb, knownStyleTheme } from './stylethumb.jsx';   // Add widget, in every theme (0.8.8.10)
+
+// A theme's own pointer (0.8.9, Lord Workspaces): the default arrow as a rounded tip in its accent colour ('#RRGGBB'),
+// or null for LordOS's black arrow. Only the default pointer changes. startShell puts the black one back for every theme.
+export const setPointerAccent = (color) => { try { return !!lord.input?.pointerAccent?.(color || null); } catch (e) { return false; } };

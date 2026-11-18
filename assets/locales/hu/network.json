@@ -151,5 +151,10 @@
   "wifi.saved": "mentve",
   "wifi.scan": "Keresés",
   "wifi.scanning": "Keresés…",
-  "wifi.wrongKey": "A jelszó hibás."
+  "wifi.wrongKey": "A jelszó hibás.",
+  "wifi.available": "Elérhető Wi-Fi-hálózatok",
+  "wifi.currentLabel": "{ssid} – Csatlakozva",
+  "wifi.connect": "Csatlakozás",
+  "wifi.notInRange": "Hatótávon kívül",
+  "wifi.knownFooter": "A LordOS magától csatlakozik egy mentett hálózathoz, ha az hatótávon belül van. Az Elfelejtés törli a hálózatot és a jelszavát erről a számítógépről."
 }

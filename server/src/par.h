@@ -22,6 +22,9 @@ typedef void (*ParFn)(void *ctx, int a, int b);
  * gets SIGXCPU (RLIMIT_RTTIME) and every thread goes back to the normal policy. */
 void par_init(int threads);
 int  par_realtime(void);            /* 1 while the compositor's threads run at real-time priority */
+/* The watchdog's (wdog.h): every thread back to the normal policy for the rest of the session, as SIGXCPU
+ * does; 1 if they were at real time until now. Async-signal-safe, from any thread. */
+int  par_demote(void);
 int  par_threads(void);             /* threads that take pieces, the caller included (1: serial) */
 void par_rows(int j0, int j1, ParFn fn, void *ctx);
 

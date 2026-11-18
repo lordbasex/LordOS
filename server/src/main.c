@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <malloc.h>
 /*
  * lord-server — servidor gráfico de LordOS, escrito desde cero.
  *
@@ -27,10 +28,13 @@
 #include "ui/js_cloud.h"
 #include "fsasync.h"
 #include "sound/snd.h"
+#include "ui/wave.h"
+#include "sec/json.h"
 #include "keyboard.h"
 #include "ui/js_sys.h"
 #include "canvas.h"
 #include "par.h"
+#include "wdog.h"
 #include "input.h"
 #include "inputkind.h"
 #include "kms.h"
@@ -84,6 +88,7 @@
 #include "bench/lbframes.h"
 #include "fpipe.h"
 
+#include <ctype.h>
 #include <libgen.h>
 #include <limits.h>
 
@@ -92,6 +97,7 @@
 #include <grp.h>
 #include <linux/capability.h>
 #include <linux/kd.h>
+#include <linux/vt.h>
 #include <math.h>
 #include <poll.h>
 #include <pwd.h>
@@ -337,6 +343,17 @@ static void view_of(const Out *o, int index) {
     paint_view = (PaintView){ (float)o->v.x, (float)o->v.y, (float)o->v.k, (float)o->v.dx, (float)o->v.dy, index };
 }
 static void view_reset(void) { paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 }; }
+/* The displays the UI is painted on, for the blurred backdrop cache (paint.c): a blurred node is left out of the
+ * blur rule only when every display showing it keeps its blurred pixels */
+static void paint_views_set(const Server *s) {
+    paint_nviews = 0;
+    for (int i = 0; i <= OUT_MAX && paint_nviews < PAINT_VIEWS_MAX; i++) {
+        const Out *o = i < OUT_MAX ? &s->out[i] : &s->cap;
+        if (!o->on) continue;
+        paint_views[paint_nviews++] = (PaintViewBox){ { (float)o->v.x, (float)o->v.y, (float)(o->v.x + o->v.w), (float)(o->v.y + o->v.h) },
+                                                      (float)o->v.x, (float)o->v.y, (float)o->v.k, (float)o->v.dx, (float)o->v.dy, i };
+    }
+}
 
 /* "text" for JSON (display names come from EDID: printable ASCII, but escaped anyway). */
 static void jquote(char *out, size_t n, const char *s) {
@@ -494,7 +511,7 @@ static void dispatch_pointer(Server *s) {
     for (int i = 0; i < s->nbuttons; i++) { down[i] = s->buttons[i].down; button[i] = s->buttons[i].button; }
     double t0 = now_ms();
     int over = 0;
-    if (grabbing && !ended) wl_pointer_grab(s->nbuttons, down);
+    if (grabbing && !ended) wl_pointer_grab(s->nbuttons, down, button);
     else over = wl_pointer(x, y, target, s->moved, s->nbuttons, down, button, s->wheel);
     if (over == 2) id = 0;                  /* sobre un menú de una app Linux: el árbol no lo ve */
     if (ended) js_wm_end(gnode, gedges, gdx, gdy, gdw, gdh);
@@ -916,6 +933,7 @@ static void plan_drop(DisplayPlan *p, int j) {
 /* Between frames (no flip pending): open, move, modeset and close heads so the displays match
  * the plan. out[0] keeps the card's fd: if its display went away it takes another one. */
 static void outputs_apply(Server *s) {
+    paint_blur_cache_reset();            /* kept blurred pixels belong to the old displays */
     Kms *k0 = K0(s);
     if (s->headless || k0->fd < 0) return;
     KmsOutput ko[KMS_MAX_OUTPUTS];
@@ -1088,6 +1106,9 @@ static void display_attach(const int *fds, int n, int flags) {
         o0->kms.fd = -1;
         if (card >= 0 && n <= PARK_MAX) {
             fprintf(stderr, "monitor: nothing connected to the card; waiting for a monitor (hotplug)\n");
+            /* the boot splash waits for our first frame (RP_DISPLAY_KEEP), which can't come with nothing connected: told
+             * now, so a headless boot (a Raspberry Pi with no monitor) doesn't wait for Plymouth's timeout (35 s) */
+            if (flags & RP_DISPLAY_KEEP) mirror_shown();
             parked_fd[0] = card;
             for (int i = 1; i < n; i++) parked_fd[i] = fds[i];
             parked_n = n;
@@ -1149,6 +1170,7 @@ static void display_detach(void) {
     for (int i = 0; i < OUT_MAX; i++) s->out[i].gpu = -1;
     input_close(&s->input);
     kb_reset_state();                           /* a key held now (the ❖ of ❖L) is released where we can't see it */
+    s->ctrl = s->alt = s->shift = 0;            /* Ctrl and Alt of Ctrl+Alt+F2 are released on the text console */
     for (int i = OUT_MAX - 1; i >= 0; i--) {        /* the second displays first: out[0] owns the fd */
         Out *o = &s->out[i];
         if (!o->on && i) continue;
@@ -1165,6 +1187,61 @@ static void display_detach(void) {
     js_input_drop();
     set_size(s, s->W & ~1, s->H & ~1);  /* a frame in memory of the same size */
     fprintf(stderr, "monitor: the session leaves the screen\n");
+}
+
+/* Text consoles (Ctrl+Alt+F1…F12, docs/SESSIONS.md "Text consoles"). Under lord-sessiond the session only asks
+ * ({"a":"vt"}): lord-sessiond locks it, takes the monitor back and switches. A standalone lord-server (startlordos
+ * from a text console, as startx; or a developer's) owns its console in VT_PROCESS mode: the kernel asks before
+ * switching away (SIGUSR1, read from vt_sfd), and it lets the card and the input go; back on its console (SIGUSR2) it
+ * opens them again and draws everything. */
+static int vt_tty = -1, vt_sfd = -1, vt_away;
+static char vt_card[64];
+static void vt_request(int n) {
+    if (vt_tty < 0) {
+        char j[48];
+        snprintf(j, sizeof j, "{\"a\":\"vt\",\"n\":%d}", n);
+        mirror_session(j);
+        return;
+    }
+    struct vt_stat st;
+    if (vt_away || (!ioctl(vt_tty, VT_GETSTATE, &st) && st.v_active == n)) return;
+    if (ioctl(vt_tty, VT_ACTIVATE, n)) fprintf(stderr, "lord-server: text console %d: %s\n", n, strerror(errno));
+}
+static void display_attach(const int *fds, int n, int flags);
+static void display_detach(void);
+static void vt_signal(Server *s) {
+    struct signalfd_siginfo si;
+    while (read(vt_sfd, &si, sizeof si) == (ssize_t)sizeof si) {
+        if (si.ssi_signo == SIGUSR1 && !vt_away) {
+            fprintf(stderr, "lord-server: leaving for another text console\n");
+            display_detach();               /* the card's master and the input go with their fds */
+            ioctl(vt_tty, KDSETMODE, KD_TEXT);
+            ioctl(vt_tty, VT_RELDISP, 1);
+            vt_away = 1;
+        } else if (si.ssi_signo == SIGUSR2 && vt_away) {
+            ioctl(vt_tty, VT_RELDISP, VT_ACKACQ);
+            ioctl(vt_tty, KDSETMODE, KD_GRAPHICS);
+            vt_away = 0;
+            int fd = open(vt_card, O_RDWR | O_CLOEXEC);   /* nobody is master now: this open is */
+            if (fd < 0) { fprintf(stderr, "lord-server: back on the console, but %s: %s\n", vt_card, strerror(errno)); continue; }
+            display_attach(&fd, 1, 0);
+            if (input_open(&s->input)) fprintf(stderr, "input: no devices (permissions?)\n");
+            wl_input_devices_changed();
+            fprintf(stderr, "lord-server: back on its text console\n");
+        }
+    }
+}
+
+/* Ctrl and Alt as the kernel has them on one keyboard right now (EVIOCGKEY); 0 when it can't be asked */
+static int zap_held(int fd, int *ctrl, int *alt) {
+    unsigned char keys[KEY_MAX / 8 + 1];
+    memset(keys, 0, sizeof keys);
+    if (fd < 0 || ioctl(fd, EVIOCGKEY(sizeof keys), keys) < 0) return 0;
+#define HELD(k) ((keys[(k) / 8] >> ((k) % 8)) & 1)
+    *ctrl = HELD(KEY_LEFTCTRL) || HELD(KEY_RIGHTCTRL);
+    *alt = HELD(KEY_LEFTALT) || HELD(KEY_RIGHTALT);
+#undef HELD
+    return 1;
 }
 
 static void on_input(void *ud, const InputDevice *d, const struct input_event *ev) {
@@ -1222,10 +1299,24 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->code == KEY_LEFTCTRL || ev->code == KEY_RIGHTCTRL) s->ctrl = ev->value != 0;
         if (ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) s->alt = ev->value != 0;
         if (ev->code == KEY_LEFTSHIFT || ev->code == KEY_RIGHTSHIFT) s->shift = ev->value != 0;
-        if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt) s->quit = 1;
+        /* Ctrl+Alt+Backspace ends the session at once. The modifiers are tracked from every keyboard and a release can
+         * be lost (another console, a keyboard that sleeps or reconnects), so the kernel is asked whether Ctrl and Alt
+         * are really held on this keyboard: a stale state must never end a session on a lone Backspace. */
+        if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt) {
+            int ctrl = 0, alt = 0;
+            if (zap_held(d->fd, &ctrl, &alt) && ctrl && alt) {
+                fprintf(stderr, "lord-server: Ctrl+Alt+Backspace on %s: ending the session\n", d->name);
+                s->quit = 1;
+            } else {
+                fprintf(stderr, "lord-server: Backspace on %s with Ctrl and Alt noted but not held: the session goes on\n", d->name);
+                s->ctrl = ctrl; s->alt = alt;
+            }
+        }
         /* ends a share with no JavaScript in the way; only here, on the physical keyboard: what the API or
          * the remote desktop injects doesn't pass through on_input (docs/SHORTCUTS.md) */
         if (ev->code == KEY_ESC && ev->value == 1 && s->ctrl && s->alt && s->shift && share_user_stop()) break;
+        /* Ctrl+Alt+F1…F12: a text console (taken here, so no app or theme gets the key) */
+        if (ev->value == 1 && s->ctrl && s->alt && !s->shift && input_vt_key(ev->code)) { vt_request(input_vt_key(ev->code)); break; }
         /* Buttons in the DOM's numbering: 0 left, 1 middle, 2 right, 3 back, 4 forward (inputkind.h, issue #159) */
         int button = input_dom_button(ev->code);
         /* Settings → Mouse & Trackpad, primary button on the right: a mouse's (not a touchpad's) */
@@ -1434,7 +1525,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
      * own; r, what is presented, is the box around them (the scene keeps the pixels in between) */
     Box lb = o->pl.n ? o->pl.r[0] : (Box){ 0, 0, 0, 0 };
     for (int k = 1; k < o->pl.n; k++) lb = box_join(lb, o->pl.r[k]);
-    int multi = !whole && o->pl.n > 1 && !gpu_active() && lb.x0 == b.x0 && lb.y0 == b.y0 && lb.x1 == b.x1 && lb.y1 == b.y1;
+    int multi = !whole && o->pl.n > 1 && lb.x0 == b.x0 && lb.y0 == b.y0 && lb.x1 == b.x1 && lb.y1 == b.y1;
     DamageList l = { .n = 0 };
     if (multi) l = o->pl;
     else if (!whole) dlist_add(&l, b);
@@ -1445,7 +1536,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
         b = l.r[0];
         for (int k = 1; k < l.n; k++) b = box_join(b, l.r[k]);
     }
-    multi = !whole && !gpu_active() && l.n > 1;
+    multi = !whole && l.n > 1;
     int nparts = multi ? l.n : 1;
     /* GPU drag (paint_root_gdrag): one box on a GPU display while a window is dragged */
     int gdrag = !whole && nparts == 1 && index < OUT_MAX && o->gpu >= 0 && gpu_active() && !(o->d.rot & 3) &&
@@ -1463,6 +1554,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     o->pframes = 0;
     double t0 = now_ms(), px = 0;
     view_of(o, index);
+    paint_blur_cache_on = 1;                /* a display's scene: its blurred backdrops may be kept and reused */
     for (int k = 0; k < nparts; k++) {
         Box q = parts[k];
         Rect pr = whole ? (Rect){ 0, 0, o->scene.w, o->scene.h } : out_phys_rect(&o->v, q.x0, q.y0, q.x1, q.y1);
@@ -1486,6 +1578,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
         o->painted[o->npainted++] = (Box){ (float)pr.x0, (float)pr.y0, (float)pr.x1, (float)pr.y1 };
         px += (double)(pr.x1 - pr.x0) * (pr.y1 - pr.y0);
     }
+    paint_blur_cache_on = 0;
     canvas_set_clip(&o->scene, (Rect){ 0, 0, o->scene.w, o->scene.h });
     ui.damage = (Box){ 0, 0, 0, 0 };
     view_reset();
@@ -1951,14 +2044,20 @@ static void out_present(Server *s, Out *o, int i, Rect r, const Out *feed, LbPha
          * composed while the remote desktop reads it back) */
         /* GPU drag: the strips around the window, and the window from its textures (gpu_frame_ex); a frame
          * with nothing painted while the last one had it draws it again (its rectangle is stale) */
-        Rect up[4] = { r };
+        /* what paint_out painted: each damaged rectangle on its own (paint.c, "Several damaged rectangles") */
+        Rect up[DAMAGE_MAX] = { r };
         int nup = 1, gdragdrawn = 0;
+        if (!o->gdragtaken && o->npainted > 1 && r.x1 > r.x0) {
+            nup = 0;
+            for (int k = 0; k < o->npainted && nup < DAMAGE_MAX; k++)
+                up[nup++] = (Rect){ (int)o->painted[k].x0, (int)o->painted[k].y0, (int)o->painted[k].x1, (int)o->painted[k].y1 };
+        }
         GpuDrag again;
         const GpuDrag *gdrag = NULL;
         if (o->gdragtaken) {
             gdrag = &o->gdrag;
             nup = o->gdrag.nstrip;
-            memcpy(up, o->gdrag.strip, sizeof up);
+            memcpy(up, o->gdrag.strip, sizeof o->gdrag.strip);
         } else if (o->gdrag_on && r.x1 <= r.x0) {
             again = o->gdrag;
             again.lpx = again.bpx = NULL;
@@ -2140,6 +2239,7 @@ static int render_frame(Server *s) {
             if (fpipe_hold_callbacks(o->prep, o->prep_js)) ui_js_hold = 1;
             o->prep_js = 0;
         }
+    paint_views_set(s);
     paint_ui(s);
     s->last_render = now_ms();
     cursor_mark(s);
@@ -2245,6 +2345,43 @@ static int render_frame(Server *s) {
     }
     if (!prep_only) frame_stats(s, now_ms() - t0, ui.layout_ms + ui.paint_ms);
     return !prep_only;
+}
+
+/* The theme the person chose (settings.json "theme"), next to the one asked for: a session starts with it instead of
+ * loading the default theme only for its startShell to switch (0.8.8.10: one whole theme less evaluated at every
+ * login, ~1.2 s and its memory). Read as the session user, after dropping privileges; the id is checked as
+ * lord.themes.use checks it, and an unknown or missing one keeps the theme asked for. */
+static void chosen_theme(const char *asked, char *out, size_t n) {
+    snprintf(out, n, "%s", asked);
+    struct passwd *pw = getpwuid(getuid());
+    if (!pw || !pw->pw_dir) return;
+    char path[PATH_MAX];
+    if ((size_t)snprintf(path, sizeof path, "%s/.config/lordos/settings.json", pw->pw_dir) >= sizeof path) return;
+    FILE *f = fopen(path, "rb");
+    if (!f) return;
+    char *text = malloc(4u << 20);
+    size_t len = text ? fread(text, 1, (4u << 20) - 1, f) : 0;
+    fclose(f);
+    if (!text) return;
+    text[len] = 0;
+    JDoc doc;
+    char err[64];
+    if (!json_parse(text, len, &doc, err, sizeof err)) {
+        const char *id = json_str(doc.root, "theme");
+        int ok = id && *id && strlen(id) <= 64;
+        for (const char *c = id; ok && *c; c++) if (!isalnum((unsigned char)*c) && *c != '-' && *c != '_') ok = 0;
+        char a[PATH_MAX], b[PATH_MAX * 2];
+        snprintf(a, sizeof a, "%s", asked);
+        char *dir = dirname(a);                     /* .../themes/<id> */
+        char root[PATH_MAX];
+        snprintf(root, sizeof root, "%s", dir);
+        snprintf(a, sizeof a, "%s", root);
+        snprintf(root, sizeof root, "%s", dirname(a));   /* .../themes */
+        size_t bl = ok ? (size_t)snprintf(b, sizeof b, "%s/%s/theme.bundle.js", root, id) : 0;
+        if (ok && bl < n && !access(b, R_OK)) memcpy(out, b, bl + 1);
+        json_free(&doc);
+    }
+    free(text);
 }
 
 /* Cambio de tema pedido desde JS (lord.themes.use): se descarta el contexto JS y el árbol. */
@@ -2357,6 +2494,7 @@ static int check_code(int argc, char **argv) {
 /* 0 if the requested theme is running; -1 if it failed and `current` (the last one that loaded) was put
  * back: the caller keeps `current` then, so a second failed switch never falls back to a refused theme */
 static int switch_theme(const char *current) {
+    paint_blur_cache_reset();            /* the new theme's nodes may reuse the old ids */
     char path[sizeof ui.theme_request];
     snprintf(path, sizeof path, "%s", ui.theme_request);
     ui.theme_request[0] = 0;
@@ -2512,9 +2650,13 @@ int main(int argc, char **argv) {
     int vt = -1;
     if (!s.headless) {
         if (input_open(&s.input)) fprintf(stderr, "input: no devices (permissions?)\n");
-        /* The text console stops drawing over us. */
-        vt = open("/dev/tty0", O_RDWR | O_CLOEXEC);
+        /* The text console stops drawing over us: our own (startlordos runs on the console it was typed on, which the
+         * person owns), else the one in front (root) */
+        const char *own = isatty(STDIN_FILENO) ? ttyname(STDIN_FILENO) : NULL;
+        vt = own && !strncmp(own, "/dev/tty", 8) && own[8] >= '1' && own[8] <= '9' ? open(own, O_RDWR | O_CLOEXEC | O_NOCTTY) : -1;
+        if (vt < 0) vt = open("/dev/tty0", O_RDWR | O_CLOEXEC);
         if (vt >= 0 && ioctl(vt, KDSETMODE, KD_GRAPHICS)) { close(vt); vt = -1; }
+        snprintf(vt_card, sizeof vt_card, "%s", card);
     }
 
     /* Privileged helper (a closed set of actions: region, time zone, language packs). The
@@ -2565,11 +2707,12 @@ int main(int argc, char **argv) {
     /* Cloud: rclone rcd on a Unix socket, started when there is an account (cloud/cloud.c, docs/CLOUD.md) */
     if (ok && !s.greeter && getenv("HOME") && session_user && js_cloud_start(getenv("HOME"))) fprintf(stderr, "lord-server: no Cloud\n");
     if (ok && snd_start()) fprintf(stderr, "lord-server: no PipeWire for now (sound); it retries on its own\n");
+    wave_source(snd_spectrum_now());            /* <SoundWave> nodes draw the sound client's spectrum */
     if (ok && !s.greeter) portal_start();   /* dark mode, accent and buttons for GTK/GNOME/Qt (ui/portal.c) */
     if (ok && !s.greeter) sni_start();      /* the tray icons of Linux apps (ui/sni.c) */
     if (ok && !s.greeter) term_restore();   /* shells still alive from the previous start */
     netrec_init(ok && !s.greeter && session_user != NULL);   /* the Monitor's traffic history (monitor/netrec.c) */
-    if (getenv("LORD_DAMAGE") && !strcmp(getenv("LORD_DAMAGE"), "multi")) paint_multi_damage = 1;   /* several damaged rectangles (paint.c; off by default) */
+    if (getenv("LORD_DAMAGE") && !strcmp(getenv("LORD_DAMAGE"), "one")) paint_multi_damage = 0;    /* one box per frame, as before 0.8.8.10 (paint.c) */
     remote_server = &s;
     tp_route_init(&tp_host);
     static const MirrorInput mirror_in = { remote_pointer, remote_button, remote_wheel, remote_key, remote_clip, remote_clients,
@@ -2583,7 +2726,10 @@ int main(int argc, char **argv) {
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
     char current[sizeof ui.theme_request];
     svgicon_enable();                       /* SVG icons drawn by lord-media (media/svgicon.c); never in app mode */
-    if (ok) ok = start_theme(theme, s.greeter, current, sizeof current) == 0;
+    char first[sizeof ui.theme_request];
+    if (s.greeter) snprintf(first, sizeof first, "%s", theme);
+    else chosen_theme(theme, first, sizeof first);
+    if (ok) ok = start_theme(first, s.greeter, current, sizeof current) == 0;
     if (ok && !s.greeter) {                  /* the app host as bytecode for isolated apps (app/apphost_bc.c) */
         char host[1200];
         snprintf(host, sizeof host, "%s/app-host.bundle.js", js_sys_assets());
@@ -2613,13 +2759,34 @@ int main(int argc, char **argv) {
     fprintf(stderr, "lord-server: frame pipeline %s (LORD_PIPELINE: unset or 0 off, 1 while frames are heavy, 2 always)\n",
             fpipe.mode == FPIPE_OFF ? "off" : fpipe.mode == FPIPE_ALWAYS ? "always" : "while frames are heavy");
     int sfd = signalfd(-1, &mask, SFD_CLOEXEC);
+    /* text consoles, standalone: VT_PROCESS on our console once the loop can answer (vt_signal) */
+    if (vt >= 0) {
+        sigset_t vm;
+        sigemptyset(&vm);
+        sigaddset(&vm, SIGUSR1);
+        sigaddset(&vm, SIGUSR2);
+        sigprocmask(SIG_BLOCK, &vm, NULL);
+        struct sigaction fw = { .sa_handler = forward_stop, .sa_flags = SA_RESTART };   /* a worker thread passes it on */
+        sigemptyset(&fw.sa_mask);
+        sigaction(SIGUSR1, &fw, NULL);
+        sigaction(SIGUSR2, &fw, NULL);
+        vt_sfd = signalfd(-1, &vm, SFD_CLOEXEC | SFD_NONBLOCK);
+        struct vt_mode m = { .mode = VT_PROCESS, .relsig = SIGUSR1, .acqsig = SIGUSR2 };
+        if (vt_sfd >= 0 && !ioctl(vt, VT_SETMODE, &m)) vt_tty = vt;
+        else fprintf(stderr, "lord-server: no text consoles (VT_PROCESS): %s\n", strerror(errno));
+    }
 
     double start = now_ms();
+    /* the watchdog (wdog.h): a stall of this loop never leaves the desktop frozen at real time */
+    wdog_start();
+    wdog_busy(mono_ns());
     while (!s.quit && !ui.quit_requested) {
         if (ui.theme_request[0]) {
             char next[sizeof current];
             snprintf(next, sizeof next, "%s", ui.theme_request);
+            wdog_expect(1);                 /* a theme loads for a second or more by design */
             if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
+            wdog_expect(0);
         }
         /* El movimiento del puntero juntado: una vez por cuadro, cuando terminó el page flip. Así un
          * mouse de 1000 Hz no llama a JS (ni a las apps Linux) mil veces por segundo. */
@@ -2709,6 +2876,7 @@ int main(int argc, char **argv) {
         /* sin monitor y sin nadie mirando no se dibuja (al conectarse alguien llega un cuadro entero) */
         int unseen = s.headless && !mirror_watchers() && !media_needs_cpu();   /* recording the screen: yes */
         if (!s.headless && display_is_off()) unseen = 1;     /* screen off after idle (DPMS): nothing to draw */
+        js_sys_unseen = unseen;                     /* the desk widgets' data feeds rest too (lord.system.seen) */
         /* the minimized windows and those on a hidden desktop: their frame callbacks once a second (wl/framegate.h) */
         if (!unseen) {
             double hd = wl_frame_hidden((unsigned)now_ms());
@@ -2773,11 +2941,13 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[141 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
+        struct pollfd pfd[142 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
         pfd[n++] = (struct pollfd){ sfd, POLLIN, 0 };
+        int vt_i = n;
+        pfd[n++] = (struct pollfd){ vt_sfd, POLLIN, 0 };
         for (int i = 0; i < s.input.count; i++) pfd[n++] = (struct pollfd){ s.input.dev[i].fd, POLLIN, 0 };
         int tbase = n, nterm = term_pollfds(pfd + n, TERM_MAX, term_ids);
         n += nterm;
@@ -2821,8 +2991,11 @@ int main(int argc, char **argv) {
         n += nmed;
         int hwbase = n, nhw = hw_pollfds(pfd + n, 8);            /* uevents, the system bus and the session bus clients (src/hw) */
         n += nhw;
-        if (poll(pfd, n, wait) < 0 && errno != EINTR) { perror("poll"); break; }
+        wdog_idle();
+        int ready = poll(pfd, n, wait);
+        if (ready < 0 && errno != EINTR) { perror("poll"); break; }
         loop_wake = mono_ns();                  /* LordBench's frame phases: the next frame starts from here */
+        wdog_busy(loop_wake);
         loop_wake_flip = 0;
         if (pfd[0].revents & POLLIN) {
             Kms *heads[OUT_MAX], *mk = &main_out(&s)->kms;
@@ -2850,11 +3023,33 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        if (pfd[1].revents & POLLIN) break;
+        if (pfd[1].revents & POLLIN) {                 /* SIGINT or SIGTERM: who sent it, for the log */
+            struct signalfd_siginfo si;
+            if (read(pfd[1].fd, &si, sizeof si) == (ssize_t)sizeof si)
+                fprintf(stderr, "lord-server: %s from pid %u (uid %u): ending the session\n",
+                        si.ssi_signo == SIGTERM ? "SIGTERM" : "SIGINT", si.ssi_pid, si.ssi_uid);
+            break;
+        }
+        int vt_moved = vt_sfd >= 0 && (pfd[vt_i].revents & POLLIN);
+        if (vt_moved) vt_signal(&s);           /* the input list changed: this pass's poll entries are stale */
+        /* the watchdog's other half (wdog.h): a display whose page flip never completes leaves the desktop
+         * frozen on it while this loop runs on; said once per flip, from fields this loop already keeps */
+        if (!s.headless) {
+            static uint64_t flip_told[OUT_MAX];
+            for (int i = 0; i < OUT_MAX; i++) {
+                const Kms *k = &s.out[i].kms;
+                if (!s.out[i].on || !k->flip_pending) { flip_told[i] = 0; continue; }
+                if (flip_told[i] != k->flip_submit_ns && k->flip_submit_ns && loop_wake > k->flip_submit_ns + 2000000000ull) {
+                    flip_told[i] = k->flip_submit_ns;
+                    fprintf(stderr, "lord-server: watchdog: %s: its page flip has not completed for %.1f s\n",
+                            s.out[i].d.connector, (loop_wake - k->flip_submit_ns) / 1e9);
+                }
+            }
+        }
         int lost[INPUT_MAX_DEVICES], nlost = 0;
-        for (int i = 0; i < s.input.count; i++) {
-            if (pfd[2 + i].revents & POLLIN) input_dispatch(&s.input, i, on_input, &s);
-            if (pfd[2 + i].revents & (POLLERR | POLLHUP | POLLNVAL)) lost[nlost++] = i;
+        for (int i = 0; !vt_moved && i < s.input.count; i++) {
+            if (pfd[3 + i].revents & POLLIN) input_dispatch(&s.input, i, on_input, &s);
+            if (pfd[3 + i].revents & (POLLERR | POLLHUP | POLLNVAL)) lost[nlost++] = i;
         }
         /* un dispositivo que dejó de servir (desenchufado, o revocado al cambiar de sesión): se cierra
          * solo ese. Dejar el monitor lo decide únicamente lord-sessiond (RP_UNDISPLAY), nunca un error */
@@ -2904,14 +3099,25 @@ int main(int argc, char **argv) {
         brokersrv_events(js_broker_event);        /* avisos de permiso e indicadores → tema */
         brokersrv_tick();                         /* teclado y reintentos hacia las apps aisladas */
         snd_events(js_sound_event);
+        wave_tick();                              /* <SoundWave>: only its box, only when the bands moved */
         wl_events(js_wl_event);
         js_clipboard_poll();
+        /* glibc keeps what was freed inside the heap for later, so a peak (a big window, an app opened and closed, the
+         * theme loading) stays in the RSS for the rest of the session. When a wait ended with nothing to do (the
+         * desktop at rest), at most once a minute, the free pages go back to the system: a few ms, never mid-frame. */
+        static uint64_t trimmed_at;
+        if (ready == 0 && loop_wake - trimmed_at > 60ull * 1000000000ull) {
+            malloc_trim(0);
+            trimmed_at = loop_wake;
+        }
         term_events(js_term_event);
     }
 
     /* a logout on the monitor: lord-sessiond takes it back now (a black frame on every display, the login screen up),
      * so closing the apps and unmounting the cloud folders below happens off the screen instead of behind a frozen
      * desktop for seconds */
+    wdog_stop();                          /* closing the apps below may take seconds by design */
+    if (ui.quit_requested) fprintf(stderr, "lord-server: the theme asked to log out\n");
     if (ui.quit_requested && !s.headless) mirror_session("{\"a\":\"logout\"}");
     js_before_exit();                     /* what is open goes to settings.json, marked clean */
     wl_close_all(LOGOUT_CLOSE_MS);        /* the apps close as if the user did it, before wl_stop() */
@@ -2933,6 +3139,7 @@ int main(int argc, char **argv) {
     wl_stop();
     snd_stop();
     js_shutdown();
+    if (vt_tty >= 0) { struct vt_mode m = { .mode = VT_AUTO }; ioctl(vt_tty, VT_SETMODE, &m); }
     if (vt >= 0) { ioctl(vt, KDSETMODE, KD_TEXT); close(vt); }
     for (int i = 0; i < OUT_MAX; i++) out_free(&s.out[i]);
     out_free(&s.cap);

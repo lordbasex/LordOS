@@ -21,6 +21,8 @@
 #include <fcntl.h>
 #include <linux/input.h>
 #include <linux/kd.h>
+#include <linux/vt.h>
+#include <signal.h>
 #include <drm/drm.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +39,11 @@ static char card[64] = "/dev/dri/card0";
 #define MAX_IN 32
 
 static int vt = -1, conn = -1, drm = -1;
+/* Text consoles (Ctrl+Alt+F1…F12, docs/SESSIONS.md "Text consoles"): our VT (tty1, lordos.service's TTYPath) in
+ * VT_PROCESS mode, so the kernel asks before switching away (SIGUSR1) and tells us when it comes back (SIGUSR2);
+ * away: another console is in front, the monitor is lent to nobody. */
+#define OUR_VT 1
+static int tty = -1, away;
 static int ins[MAX_IN], nin;
 static char inname[MAX_IN][16];        /* "eventN" of each one (to know which one was unplugged) */
 static int hp = -1;                    /* inotify on /dev/input (hotplug) */
@@ -95,10 +102,57 @@ int sd_mon_open(void) {
     hp = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
     if (hp >= 0 && inotify_add_watch(hp, "/dev/input", IN_CREATE | IN_ATTRIB | IN_DELETE) < 0) { close(hp); hp = -1; }
     if (hp < 0) sd_log("no inotify on /dev/input: new devices will show up on the next session switch");
-    /* the text console stops drawing on top */
-    vt = open("/dev/tty0", O_RDWR | O_CLOEXEC);
-    if (vt >= 0 && ioctl(vt, KDSETMODE, KD_GRAPHICS)) { close(vt); vt = -1; }
+    /* our own console in process mode: Ctrl+Alt+F2… (asked by the session, sd_mon_vt_switch) or a chvt go through us */
+    char p[16];
+    snprintf(p, sizeof p, "/dev/tty%d", OUR_VT);
+    tty = open(p, O_RDWR | O_CLOEXEC | O_NOCTTY);
+    if (tty < 0) sd_log("text consoles: %s: %s", p, strerror(errno));
+    struct vt_mode m = { .mode = VT_PROCESS, .relsig = SIGUSR1, .acqsig = SIGUSR2 };
+    if (tty >= 0 && ioctl(tty, VT_SETMODE, &m)) { sd_log("text consoles: no process mode on tty%d: %s", OUR_VT, strerror(errno)); close(tty); tty = -1; }
+    /* the text console stops drawing on top: ours (never whichever console is in front, a restart of the service while
+     * someone is on tty2 would turn that one to graphics); without it, the one in front as before */
+    if (tty >= 0) {
+        ioctl(tty, KDSETMODE, KD_GRAPHICS);
+        struct vt_stat st;
+        if (!ioctl(tty, VT_GETSTATE, &st) && st.v_active != OUR_VT) {
+            away = 1;                       /* started while another console is in front: shown when ours is back */
+            sd_log("text consoles: tty%d is in front; the login screen waits for tty%d", st.v_active, OUR_VT);
+        }
+    } else {
+        vt = open("/dev/tty0", O_RDWR | O_CLOEXEC);
+        if (vt >= 0 && ioctl(vt, KDSETMODE, KD_GRAPHICS)) { close(vt); vt = -1; }
+    }
     return 0;
+}
+
+/* Ctrl+Alt+Fn from the session or the login screen: the kernel switches once we release (sd_mon_vt_release). */
+int sd_mon_vt_switch(int n) {
+    if (tty < 0 || away || n < 1 || n > 12 || n == OUR_VT) {
+        sd_log("text console %d not shown (%s)", n, tty < 0 ? "tty1 is not ours" : away ? "another console is in front" : "not a console to switch to");
+        return -1;
+    }
+    if (ioctl(tty, VT_ACTIVATE, n)) { sd_log("text console %d: %s", n, strerror(errno)); return -1; }
+    sd_log("text console %d asked for", n);
+    return 0;
+}
+/* Called once the monitor was taken back from whoever had it: the console goes back to text and the switch goes on. */
+void sd_mon_vt_release(void) {
+    if (tty < 0) return;
+    ioctl(tty, KDSETMODE, KD_TEXT);
+    if (ioctl(tty, VT_RELDISP, 1)) sd_log("text consoles: release: %s", strerror(errno));
+    away = 1;
+}
+/* Our console is in front again: graphics mode; the caller lends the monitor again. */
+void sd_mon_vt_acquire(void) {
+    if (tty < 0) return;
+    ioctl(tty, VT_RELDISP, VT_ACKACQ);
+    ioctl(tty, KDSETMODE, KD_GRAPHICS);
+    away = 0;
+}
+int sd_mon_away(void) { return away; }
+/* Our console to the front (text mode's login screen asked from another console): the kernel switches, we acquire. */
+void sd_mon_vt_front(void) {
+    if (tty >= 0 && away && ioctl(tty, VT_ACTIVATE, OUR_VT)) sd_log("text consoles: tty%d to the front: %s", OUR_VT, strerror(errno));
 }
 
 static int send_msg(int type, const void *d, size_t n, const int *fds, int nfds) {
@@ -265,6 +319,13 @@ static void take_back(void) {
 
 void sd_mon_close(void) {
     take_back();
+    if (tty >= 0) {
+        struct vt_mode m = { .mode = VT_AUTO };
+        ioctl(tty, VT_SETMODE, &m);
+        ioctl(tty, KDSETMODE, KD_TEXT);
+        close(tty);
+    }
+    tty = -1;
     if (vt >= 0) { ioctl(vt, KDSETMODE, KD_TEXT); close(vt); }
     vt = -1;
 }
@@ -424,6 +485,7 @@ void sd_mon_child(void) {
     if (drm >= 0) close(drm);
     if (conn >= 0) close(conn);
     if (vt >= 0) close(vt);
+    if (tty >= 0) close(tty);           /* closing it in a child leaves the VT's mode as it is (the mode is the VT's) */
     if (hp >= 0) close(hp);
-    drm = conn = vt = hp = -1;
+    drm = conn = vt = tty = hp = -1;
 }

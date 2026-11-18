@@ -37,5 +37,15 @@
   "col.time": "Süre",
   "back": "Geri",
   "emptyMusicTitle": "Müzik yok",
-  "emptyVideosTitle": "Video yok"
+  "emptyVideosTitle": "Video yok",
+  "nav.network": "Ağ",
+  "nav.streams": "Yayınlar",
+  "streams.open": "Adres aç…",
+  "streams.list": "M3U listesi aç…",
+  "streams.save": "Kaydet",
+  "streams.remove": "Kaldır",
+  "streams.close": "Kapat",
+  "streams.saved": "Kaydedilenler",
+  "streams.channels": "Kanallar ({n})",
+  "streams.empty": "Bir kamerayı, yayını veya TV kanalını adresiyle ya da bir M3U listesinin kanallarını aç."
 }

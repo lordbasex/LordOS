@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} कोर",
     "other": "{cpu} · {count} कोर"
   },
-  "credits": "मॉनिटर में IP से देश: DB-IP Lite Country, © db-ip.com, CC BY 4.0। मानचित्र: Natural Earth (सार्वजनिक डोमेन)।",
+  "credits": "मॉनिटर में IP से देश: DB-IP Lite Country, © db-ip.com, CC BY 4.0। मानचित्र: Natural Earth (सार्वजनिक डोमेन)। मौसम के शहर: GeoNames, © geonames.org, CC BY 4.0।",
   "display": "डिस्प्ले",
   "engine": "UI इंजन",
   "host": "कंप्यूटर",

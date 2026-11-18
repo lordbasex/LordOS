@@ -59,8 +59,8 @@ MEDIA_SRC := src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/m
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/osk.c \
-       src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/osk.c \
+       src/ui/wave.c src/sound/spectrum.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c \
        src/term/vt.c src/term/pty.c src/term/term.c src/term/termapp.c src/term/pastefilter.c src/term/termfill.c src/term/tsecret.c src/term/tcapture.c src/term/term_paint.c src/term/hold.c \
@@ -73,10 +73,10 @@ DOC_SRC := src/doc/doc.c src/doc/wire.c src/ui/js_doc.c src/print/ipp.c src/prin
            src/print/escl.c src/print/print.c src/ui/js_print.c
 SRC += $(DOC_SRC)
 # Per-app firewall (src/fw, docs/FIREWALL.md): rules, decision and names learned from DNS
-FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c
+FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c src/media/streamurl.c src/fetch/weather.c src/fetch/wxsvc.c src/fetch/geocities.c src/ui/js_weather.c
 SRC += $(FW_SRC)
 OBJ := $(SRC:src/%.c=build/obj/%.o)
-HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
+HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)
 # Touchpad and touchscreens: our own driver (src/tp, no libinput), gestures and touches for the
 # Wayland apps (src/wl/wl_input.c) and lord.input (src/ui/js_input.c). See docs/TRACKPAD.md.
@@ -164,7 +164,7 @@ endif
 # lord-server never does. If FFmpeg's -dev packages are missing, everything else is built without it.
 MEDIA ?= $(shell pkg-config --exists libavcodec libavformat libavutil libswscale libswresample 2>/dev/null && echo 1 || echo 0)
 ifeq ($(MEDIA),1)
-ALL += build/lord-media
+ALL += build/lord-media build/lord-stream
 endif
 # lord-doc: the document helper (docs/DOCUMENTS.md). It's the only one that links Poppler and
 # libarchive (and cairo, FreeType and fontconfig, which come with Poppler); lord-server never does.
@@ -228,6 +228,12 @@ ALL += build/lord-fand
 build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h src/lordlog.c src/lordlog.h src/users/admingroups.c src/users/admingroups.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c src/users/admingroups.c
+# lordos.service restarts with live sessions on systemd 258+: controllers off and limits back (src/sec/cgroup.c, #140)
+test: build/cgroup-restart-test
+build/cgroup-restart-test: tests/cgroup_restart_test.c src/sec/cgroup.c src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/cgroup_restart_test.c src/sec/cgroup.c
+	./$@ || { rm -f $@; exit 1; }
 # the toolkit variables Linux apps get: Wayland first, X11 as the fallback (src/wl/toolkitenv.h, #76, #96)
 test: build/toolkitenv-test
 build/toolkitenv-test: tests/toolkitenv_test.c src/wl/toolkitenv.h
@@ -280,7 +286,11 @@ build/install-run-cli: tests/install_run_cli.c src/install/install.c $(INSTALL_D
 build/manualpart-cli: tests/manualpart_cli.c $(INSTALL_DISK_SRC) $(INSTALL_DISK_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFP_TEST -o $@ tests/manualpart_cli.c $(INSTALL_DISK_SRC)
-test: build/fan-test
+test: build/fan-test build/spectrum-test
+# the sound wave widget: spectrum bands and the lines drawn from them
+build/spectrum-test: tests/spectrum_test.c src/sound/spectrum.c src/ui/wave.c src/sound/spectrum.h src/ui/wave.h src/ui/ui.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/spectrum_test.c src/sound/spectrum.c src/ui/wave.c -lm
 build/fan-test: tests/fan_test.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fan_test.c $(FAN_SRC)
@@ -295,7 +305,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/popup-client build/vt-dump build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -319,6 +329,18 @@ all: build/lord-browser-prefs
 build/lord-browser-prefs: src/pkg/browserprefs_tool.c src/pkg/browserprefs.c src/pkg/browserprefs.h src/sec/json.c src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/pkg/browserprefs_tool.c src/pkg/browserprefs.c src/sec/json.c -lm
+# lordos-lid-wake (src/hw/lidwake_tool.c, GitHub #172): the systemd-sleep hook that keeps an open lid from waking
+# a laptop right after it sleeps (/usr/lib/systemd/system-sleep/, root, libc only). Its parsing and decisions are
+# the pure src/hw/lidwake.h, tested by tests/lidwake_test.c.
+all: build/lordos-lid-wake
+build/lordos-lid-wake: src/hw/lidwake_tool.c src/hw/lidwake.h src/hw/chassis.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/hw/lidwake_tool.c
+test: build/lidwake-test
+build/lidwake-test: tests/lidwake_test.c src/hw/lidwake.h src/hw/chassis.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lidwake_test.c
+	./$@ || { rm -f $@; exit 1; }
 build/browserprefs-test: tests/browserprefs_test.c src/pkg/browserprefs.c src/pkg/browserprefs.h src/sec/json.c src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/browserprefs_test.c src/pkg/browserprefs.c src/sec/json.c -lm
@@ -342,6 +364,12 @@ build/codesig-test: tests/codesig_test.c src/sec/codesig.c src/sec/json.c src/pk
 	./$@ ../tools/release/lordos-release.pub.pem || { rm -f $@; exit 1; }
 # Clock time zones: TZif and POSIX rules against glibc (docs/SYSTEM.md)
 # tests/xwm_test.c: the X11 wire helpers of the window manager (src/wl/x11wire.c, docs/WAYLAND.md)
+test: build/startlogin-test
+build/startlogin-test: tests/startlogin_test.c src/remote/startlogin.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -o $@ tests/startlogin_test.c
+	./$@
+
 test: build/inputkind-test
 build/inputkind-test: tests/inputkind_test.c src/inputkind.h
 	@mkdir -p build
@@ -437,11 +465,29 @@ build/wlregion-test: tests/wlregion_test.c src/wl/wlregion.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -Isrc -o $@ tests/wlregion_test.c
 	./$@
+# the seat's buttons for drag and drop: a drag ends at its button's release (src/wl/seatbtn.h, issues #176 and #177)
+test: build/seatbtn-test
+build/seatbtn-test: tests/seatbtn_test.c src/wl/seatbtn.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/seatbtn_test.c
+	./$@
+# who has the keyboard while a Linux window is fullscreen on one of several displays (src/wl/fsfocus.h, issue #175)
+test: build/fsfocus-test
+build/fsfocus-test: tests/fsfocus_test.c src/wl/fsfocus.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/fsfocus_test.c
+	./$@
 
 test: build/xwm-test
 build/xwm-test: tests/xwm_test.c src/wl/x11wire.c src/wl/x11wire.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/xwm_test.c src/wl/x11wire.c
+	./$@ || { rm -f $@; exit 1; }
+# tests/wdog_test.c: the compositor's watchdog (src/wdog.c): stalls seen, priority dropped, endless JS stopped
+test: build/wdog-test
+build/wdog-test: tests/wdog_test.c src/wdog.c src/wdog.h src/par.c src/par.h $(QJS_OBJ)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/wdog_test.c src/wdog.c src/par.c $(QJS_OBJ) -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
 # tests/timer_order_test.c: the JS timers (src/ui/js_prelude.h) against the prelude they replaced
 test: build/timer-order-test
@@ -654,12 +700,18 @@ build/nethist-test: tests/nethist_test.c src/monitor/nethist.c src/monitor/nethi
 # canvas.c rows: SIMD (NEON on aarch64) against C, bit for bit, and how long each one takes
 # UI engine (docs/DESIGN.md "Engine notes"): ellipsis in LTR/RTL/Arabic/Thai/emoji, per-side borders,
 # per-corner radii, logical edges, transforms and hit testing, and the dragged window's frames against
-# the golden hashes in tests/drag_golden_{cpu,gpu}.txt; `build/engine-test bench` times a 2000-row
+# the golden hashes in tests/drag_golden_{cpu,gpu}.txt; `build/engine-test bench-slideshow` times the wallpaper
+# slideshow's transition on 1920x1080; `build/engine-test bench` times a 2000-row
 # list and a window drag on one and two displays
-ENGINE_SRC := src/gpu/gscissor.c src/gpu/gcontend.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c src/ui/image.c \
+ENGINE_SRC := src/gpu/gscissor.c src/gpu/gcontend.c src/ui/wave.c src/sound/spectrum.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c src/ui/image.c \
               src/ui/paint.c src/ui/otf.c src/ui/fonts.c src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c \
               src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/canvas.c
 test: build/engine-test
+# the terminal's damage (term.c term_damage): a real session fed like a TUI and at random, every frame painted in part
+# equal to a full repaint, and only the cells that changed repainted
+test: build/term-damage-test
+build/term-damage-test: tests/term_damage_test.c $(ENGINE_SRC) src/term/term.c src/term/term_paint.c src/term/hold.c src/term/pty.c src/term/pastefilter.c src/term/tcapture.c src/term/tsecret.c src/sec/cgroup.c build/obj/term/vt.o build/obj/ui/stb.o $(HDR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_damage_test.c $(ENGINE_SRC) src/term/term.c src/term/term_paint.c src/term/hold.c src/term/pty.c src/term/pastefilter.c src/term/tcapture.c src/term/tsecret.c src/sec/cgroup.c build/obj/term/vt.o build/obj/ui/stb.o -lm -lpthread
 build/engine-test: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR) tests/drag_golden_cpu.txt tests/drag_golden_gpu.txt
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
@@ -759,6 +811,11 @@ build/deco-client: tests/deco_client.c $(CLIENT_GEN)
 # (tests/dialog_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/dialog-client)
 build/dialog-client: tests/dialog_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/dialog_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# A popup opened again on the same wl_surface, as GTK 4's popovers (GitHub #159): every opening gets its configure
+# (tests/popup_client.c; inside a session: WAYLAND_DISPLAY=wayland-0 build/popup-client; tests/run_suites.sh runs it
+# against a headless lord-server)
+build/popup-client: tests/popup_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag
 # (tests/dnd_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/dnd-client, then press twice in its window)
 build/dnd-client: tests/dnd_client.c $(CLIENT_GEN)
@@ -817,6 +874,24 @@ build/lord-media: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h s
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+# lord-stream (0.8.8.10; cameras and IPTV, docs/MEDIA.md "Network streams"): lord-media's player built with LM_NET, the
+# only helper with internet sockets (sandbox network=1, firewall scope lordos-net-streams). Network players and M3U
+# lists only; lord-media itself keeps no network at all.
+LS_SRC := $(LM_SRC) src/media/stream/ls_m3u.c src/media/streamurl.c
+build/lord-stream: $(LS_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/media/streamurl.h src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_NET $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LS_SRC) \
+	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+# lord-stream end to end against a test server (a tool, never installed): build/lordstream-e2e build/lord-stream play URL
+build/lordstream-e2e: tests/lordstream_e2e.c src/media/proto.c src/media/proto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lordstream_e2e.c src/media/proto.c
+# the addresses lord-stream may open and the M3U lists it reads (src/media/streamurl.c)
+test: build/streamurl-test
+build/streamurl-test: tests/streamurl_test.c src/media/streamurl.c src/media/streamurl.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/streamurl_test.c src/media/streamurl.c
+	./$@ || { rm -f $@; exit 1; }
 # lord-media with a decoder that fails after 30 frames (HWFALL=2: frames that can't be read back), to run the way
 # out of it where there is no hardware (LM_HWFALL_TEST, docs/MEDIA.md); a test tool, never installed
 HWFALL ?= 1

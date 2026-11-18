@@ -4,7 +4,7 @@
 // form with a right-aligned label column that stacks the labels above the controls when the window is narrow.
 import {
   View, Text, TextInput, TextArea, Toggle, Segmented, Stepper, Slider, Button, ScrollView, SidebarItem, Hairline, GroupBox, ToolbarButton, ToolbarGroup, SearchField, Overlay,
-  useStore, useTheme, fs, spacing, typeScale, FilePicker, revealPath, errorText, formatNumber, DisclosureGlyph, t as T,
+  useStore, useTheme, fs, spacing, typeScale, FilePicker, revealPath, errorText, formatNumber, DisclosureGlyph, useSidebar, SidebarToggle, SidebarOverlay, t as T,
 } from '@lordos/sdk';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { PRESETS, DEFAULT_PROFILE, terminalSettings, saveTerminalSettings, schemeOf, allSchemes, newProfileId, profileName, profileGroups } from './profiles.js';
@@ -286,19 +286,19 @@ function TriggerSheet({ t, sheet, onCancel, onSave }) {
       <View style={{ width: 520, maxWidth: '92%', padding: spacing.xl, gap: spacing.m, borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{T(sheet.index < 0 ? 'terminal.prefs.tr.newTitle' : 'terminal.prefs.tr.editTitle')}</Text>
         <Field t={t} label={T('terminal.prefs.tr.regex')} note={T('terminal.prefs.tr.regexNote')}>
-          <TextInput value={d.regex} placeholder="error|failed" onChange={(v) => upd({ regex: v })} style={{ width: 280, fontFamily: 'monospace', direction: 'ltr' }} />
+          <TextInput value={d.regex} placeholder="error|failed" onChange={(v) => upd({ regex: v })} style={{ width: 280, maxWidth: '100%', fontFamily: 'monospace', direction: 'ltr' }} />
         </Field>
         <Field t={t} label={T('terminal.prefs.tr.action')}>
           <Picker t={t} width={200} value={d.action} onChange={(v) => upd({ action: v })} options={TRIGGER_ACTIONS.map((a) => [a.id, actionName(a.id)])} />
         </Field>
         {act.param && (
           <Field t={t} label={T('terminal.prefs.tr.param')} note={T(`terminal.prefs.tr.paramNote.${act.param}`)}>
-            <TextInput value={d.param || ''} onChange={(v) => upd({ param: v })} style={{ width: 280, fontFamily: act.param === 'text' ? undefined : 'monospace', direction: 'ltr' }} />
+            <TextInput value={d.param || ''} onChange={(v) => upd({ param: v })} style={{ width: 280, maxWidth: '100%', fontFamily: act.param === 'text' ? undefined : 'monospace', direction: 'ltr' }} />
           </Field>
         )}
         <Field t={t} label={T('terminal.prefs.tr.enabled')}><Toggle small on={d.enabled !== false} onChange={(v) => upd({ enabled: v })} /></Field>
         <Field t={t} label={T('terminal.prefs.tr.try')}>
-          <TextInput value={sample} placeholder={T('terminal.prefs.tr.tryPh')} onChange={setSample} style={{ width: 280, fontFamily: 'monospace', direction: 'ltr' }} />
+          <TextInput value={sample} placeholder={T('terminal.prefs.tr.tryPh')} onChange={setSample} style={{ width: 280, maxWidth: '100%', fontFamily: 'monospace', direction: 'ltr' }} />
         </Field>
         <Text style={{ fontSize: 12, lineHeight: 1.4, textAlign: 'start', color: p.error && d.regex ? '#ff453a' : p.match == null || p.error ? t.textDim : '#32d74b' }}>
           {!d.regex ? T('terminal.prefs.tr.regexFirst') : p.error ? T('terminal.prefs.tr.invalid') : !sample ? T('terminal.prefs.tr.tryHint') : p.match == null ? T('terminal.prefs.tr.noMatch')
@@ -374,13 +374,13 @@ function ImportPanel({ t, onClose, onDone }) {
         <Button label={T('terminal.prefs.import.open')} primary onClick={() => load(path)} />
       </View>
       <View style={{ flex: 1, flexDirection: 'row', gap: spacing.l }}>
-        <View style={{ width: 220 }}>
+        <View style={{ width: 220, maxWidth: '40%' }}>
           <Heading t={t} top={0}>{T('terminal.prefs.import.found')}</Heading>
           {files.length ? files.map((f) => (
             <SidebarItem key={f} label={f} selected={path === `~/${f}`} onClick={() => load(`~/${f}`)} />
           )) : <Text style={{ fontSize: typeScale.callout, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{T('terminal.prefs.import.none')}</Text>}
         </View>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <ScrollView>
             {error && <Text style={{ fontSize: 13, color: '#ff453a' }}>{T('terminal.prefs.import.failed', { error })}</Text>}
             {result && (
@@ -512,6 +512,7 @@ export function Preferences({ wid, onClose }) {
   const paneW = useWidth(pane);
   const narrow = paneW > 0 && paneW < 480;          // the form stacks its labels
   const narrowWin = paneW > 0 && paneW < 420;       // and the sidebar gets a bit narrower
+  const sb = useSidebar(640, 'prefsSidebar');        // a small window: the profiles go behind a button, over the form
   const p = cfg.profiles.find((x) => x.id === sel) || cfg.profiles[0];
 
   const save = (profiles, extra = {}) => { saveTerminalSettings({ profiles, ...extra }); reconfigureAll(); };
@@ -785,52 +786,60 @@ export function Preferences({ wid, onClose }) {
 
   const groups = profileGroups(cfg.profiles, query);
   const tagsOf = (x) => (Array.isArray(x.tags) ? x.tags.filter((g) => typeof g === 'string' && g.trim()) : []);
+  const sidebar = (
+    <>
+      <View style={{ padding: 10 }}>
+        <SearchField value={query} onChange={setQuery} placeholder={T('terminal.prefs.search')} />
+      </View>
+      <ScrollView style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: 10, paddingBottom: spacing.m }}>
+          {groups.map((g) => {
+            const shut = g.tag !== null && !query && !!closed[g.tag];
+            return (
+              <View key={g.tag ?? ''}>
+                {g.tag !== null && (
+                  <View onClick={() => setClosed((c) => ({ ...c, [g.tag]: !shut }))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 6, marginTop: 4 }}>
+                    <DisclosureGlyph open={!shut} color={t.textDim} />
+                    <Text style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{g.tag.toUpperCase()}</Text>
+                    <Text style={{ fontSize: 11, color: t.textDim }}>{g.items.length}</Text>
+                  </View>
+                )}
+                {!shut && g.items.map((x) => (
+                  <View key={x.id} style={{ paddingLeft: g.tag !== null ? 10 : 0 }}>
+                    <SidebarItem label={profileName(x)} detail={x.id === cfg.defaultProfile ? '★' : null} selected={x.id === p.id} onClick={() => { setSel(x.id); if (sb.narrow) sb.close(); }} />
+                  </View>
+                ))}
+              </View>
+            );
+          })}
+          {!groups.length && <Text style={{ padding: 8, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{T('terminal.prefs.noMatch')}</Text>}
+        </View>
+      </ScrollView>
+      <View style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+        <Hairline edge="top" />
+        <ToolbarGroup>
+          <ToolbarButton small icon="+" title={T('terminal.prefs.newProfile')} onClick={() => addProfile(null)} />
+          <ToolbarButton small icon="−" title={T('terminal.prefs.remove')} disabled={cfg.profiles.length < 2} onClick={removeProfile} />
+        </ToolbarGroup>
+        <ToolbarButton small icon="⧉" title={T('terminal.prefs.duplicate')} onClick={() => addProfile(p)} />
+        <View style={{ flex: 1 }} />
+        <Button small plain label={T('terminal.prefs.importBtn')} onClick={() => setImporting(true)} />
+      </View>
+    </>
+  );
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: t.windowBg, flexDirection: 'row' }}>
+      {!sb.narrow && (
       <View style={{ width: narrowWin ? 200 : 250, backgroundColor: t.sidebarBg }}>
         <Hairline edge="end" />
-        <View style={{ padding: 10 }}>
-          <SearchField value={query} onChange={setQuery} placeholder={T('terminal.prefs.search')} />
-        </View>
-        <ScrollView style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 10, paddingBottom: spacing.m }}>
-            {groups.map((g) => {
-              const shut = g.tag !== null && !query && !!closed[g.tag];
-              return (
-                <View key={g.tag ?? ''}>
-                  {g.tag !== null && (
-                    <View onClick={() => setClosed((c) => ({ ...c, [g.tag]: !shut }))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 26, paddingHorizontal: 6, marginTop: 4 }}>
-                      <DisclosureGlyph open={!shut} color={t.textDim} />
-                      <Text style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{g.tag.toUpperCase()}</Text>
-                      <Text style={{ fontSize: 11, color: t.textDim }}>{g.items.length}</Text>
-                    </View>
-                  )}
-                  {!shut && g.items.map((x) => (
-                    <View key={x.id} style={{ paddingLeft: g.tag !== null ? 10 : 0 }}>
-                      <SidebarItem label={profileName(x)} detail={x.id === cfg.defaultProfile ? '★' : null} selected={x.id === p.id} onClick={() => setSel(x.id)} />
-                    </View>
-                  ))}
-                </View>
-              );
-            })}
-            {!groups.length && <Text style={{ padding: 8, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{T('terminal.prefs.noMatch')}</Text>}
-          </View>
-        </ScrollView>
-        <View style={{ padding: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          <Hairline edge="top" />
-          <ToolbarGroup>
-            <ToolbarButton small icon="+" title={T('terminal.prefs.newProfile')} onClick={() => addProfile(null)} />
-            <ToolbarButton small icon="−" title={T('terminal.prefs.remove')} disabled={cfg.profiles.length < 2} onClick={removeProfile} />
-          </ToolbarGroup>
-          <ToolbarButton small icon="⧉" title={T('terminal.prefs.duplicate')} onClick={() => addProfile(p)} />
-          <View style={{ flex: 1 }} />
-          <Button small plain label={T('terminal.prefs.importBtn')} onClick={() => setImporting(true)} />
-        </View>
+        {sidebar}
       </View>
+      )}
       <View ref={pane} style={{ flex: 1, minWidth: 0 }}>
         <View style={{ alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.xl, paddingTop: spacing.m, paddingBottom: spacing.m }}>
           <Hairline edge="bottom" />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, maxWidth: '100%' }}>
+            {sb.narrow && <SidebarToggle small shown={sb.shown} onClick={sb.toggle} />}
             <Text style={{ flexShrink: 1, fontSize: typeScale.headline, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{profileName(p)}</Text>
             {p.id === cfg.defaultProfile && <Text style={{ fontSize: typeScale.caption, color: '#ffd60a' }}>★</Text>}
             {tagsOf(p).length ? <Text style={{ flexShrink: 1, fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tagsOf(p).join(' · ')}</Text> : null}
@@ -855,9 +864,14 @@ export function Preferences({ wid, onClose }) {
           <Button primary label={T('terminal.prefs.done')} onClick={onClose} />
         </View>
       </View>
+      {sb.narrow && sb.shown && (
+        <SidebarOverlay width={250} onClose={sb.close}>{sidebar}</SidebarOverlay>
+      )}
       {trSheet && (
+        <Narrow.Provider value={narrow}>
         <TriggerSheet t={t} sheet={trSheet} onCancel={() => setTrSheet(null)}
           onSave={(d) => { const list = p.triggers || []; set({ triggers: trSheet.index < 0 ? [...list, d] : list.map((x, j) => (j === trSheet.index ? d : x)) }); setTrSheet(null); }} />
+        </Narrow.Provider>
       )}
       {filePick && (
         <FilePicker mode="save" modal askReplace={filePick.kind === 'export'} name={filePick.kind === 'export' ? 'terminal-profiles.json' : 'terminal.json'}

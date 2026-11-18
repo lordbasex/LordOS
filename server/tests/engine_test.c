@@ -24,6 +24,8 @@
 #include "outputs.h"
 #include "ui/fonts.h"
 #include "ui/ui.h"
+#include "ui/wave.h"
+#include "sound/spectrum.h"
 #include "ui/unicode.h"
 
 /* ---- stubs for what paint.c reaches outside the UI engine ---- */
@@ -432,6 +434,63 @@ static void test_borders(void) {
     sn(in, "flexGrow", 1);
     render(root, 140, 100);
     CHECK(in->x == 1 && in->y == 0 && in->w == 49 && in->h == 28, "content box %g %g %g %g", in->x, in->y, in->w, in->h);
+}
+
+/* GitHub #162: a transparent app's frame (the Terminal, as themes/default draws it): a border, the title bar, a 1 px
+ * separator and the app's opaque tab bar, over nothing. At 125, 150 and 175 % those edges fall inside a pixel that
+ * each box covers only in part, so the row let what is below through (a quarter at 150 %). sdk/windowshell.jsx's
+ * SeamCover, the title bar's first child from 1 px outside it to 2 px under it, makes every pixel down to the tab bar
+ * opaque. Without it the same frame must show the hole (or this test proves nothing). */
+static int frame_holes(float k, int cover) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    Node *win = view(root);
+    ss(win, "position", "absolute");
+    sn(win, "left", 10); sn(win, "top", 10); sn(win, "width", 100); sn(win, "height", 120);
+    sn(win, "borderWidth", 1); sn(win, "borderColor", 0xff3a3a40); sn(win, "borderRadius", 12); ss(win, "overflow", "hidden");
+    Node *title = view(win);
+    sn(title, "height", 40); sn(title, "backgroundColor", 0xff2b2b30);
+    if (cover) {
+        Node *c = view(title);
+        ss(c, "position", "absolute");
+        sn(c, "left", -1); sn(c, "right", -1); sn(c, "top", -1); sn(c, "bottom", -2); sn(c, "backgroundColor", 0xff2b2b30);
+    }
+    Node *sep = view(win);
+    sn(sep, "height", 1); sn(sep, "backgroundColor", 0xff3a3a40);
+    Node *tabs = view(win);
+    sn(tabs, "height", 36); sn(tabs, "backgroundColor", 0xff26262b);
+    Node *pane = view(win);
+    sn(pane, "flexGrow", 1); sn(pane, "backgroundColor", 0x80101010);     /* the terminal, see-through by design */
+    int w = (int)ceilf(140 * k), h = (int)ceilf(160 * k);
+    uint32_t *px = calloc((size_t)w * h, 4);
+    Canvas c;
+    canvas_init(&c, px, w, h, w);
+    PaintView keep = paint_view;
+    paint_view = (PaintView){ 0, 0, k, 0, 0, 0 };
+    layout_root(root, 140, 160);
+    paint_damage(root);
+    ui.damage = (Box){ 0, 0, 140, 160 };
+    paint_root_clear(&c, root, 0);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    paint_view = keep;
+    /* a column through the middle, from the window's top edge to the tab bar's last row: each pixel opaque */
+    int holes = 0, x = (int)(60 * k);
+    for (int y = (int)ceilf(10 * k); y < (int)floorf((10 + 1 + 40 + 1 + 36) * k); y++)
+        if (px[(size_t)y * w + x] >> 24 != 255) holes++;
+    free(px);
+    return holes;
+}
+static void test_frame_seams(void) {
+    static const float ks[] = { 1, 1.25f, 1.5f, 1.75f, 2 };
+    int before = 0;
+    for (int i = 0; i < 5; i++) {
+        int open = frame_holes(ks[i], 0), covered = frame_holes(ks[i], 1);
+        before += open;
+        CHECK(!covered, "frame seams at %g: %d see-through pixels with the cover", ks[i], covered);
+    }
+    CHECK(before > 0, "frame seams: the frame without a cover showed no hole, so the test checks nothing");
+    printf("frame seams: a transparent window's title bar, separator and tab bar let nothing through at 125-175 %% (%d pixels without the cover)\n", before);
 }
 
 static void test_logical(void) {
@@ -1115,6 +1174,9 @@ static void sim_free(SimOut *o) { free(o->scene); free(o->buf[0]); free(o->buf[1
 
 /* main.c paint_ui: layout, damage, and the damage goes to the display's pending list */
 static void sim_paint_ui(SimOut *o, Node *root) {
+    (void)o;
+    paint_nviews = 1;                       /* main.c paint_views_set: one display */
+    paint_views[0] = (PaintViewBox){ { 0, 0, SW, SH }, 0, 0, 1, 0, 0, 0 };
     layout_root(root, SW, SH);
     Box d = { 0, 0, 0, 0 };
     if (paint_damage(root)) d = ui.damage;
@@ -1157,6 +1219,7 @@ static Rect sim_paint_out(SimOut *o, Node *root, int *nparts_out) {
     else parts[0] = b;
     o->pl.n = 0;
     o->pframes = 0;
+    paint_blur_cache_on = !getenv("SIM_NO_BLUR_CACHE");    /* main.c paint_out: the blurred backdrop cache */
     for (int k = 0; k < nparts; k++) {
         Box q = parts[k];
         Rect pr = { (int)floorf(fmaxf(q.x0, 0)), (int)floorf(fmaxf(q.y0, 0)), (int)ceilf(fminf(q.x1, SW)), (int)ceilf(fminf(q.y1, SH)) };
@@ -1170,6 +1233,7 @@ static Rect sim_paint_out(SimOut *o, Node *root, int *nparts_out) {
         o->painted[o->npainted++] = (Box){ (float)pr.x0, (float)pr.y0, (float)pr.x1, (float)pr.y1 };
     }
     *nparts_out = nparts;
+    paint_blur_cache_on = 0;
     canvas_set_clip(&o->sc, (Rect){ 0, 0, SW, SH });
     ui.damage = (Box){ 0, 0, 0, 0 };
     return r;
@@ -1675,6 +1739,190 @@ static void test_gcontend(void) {
 #undef GR
 }
 
+/* The blurred backdrop cache (paint.c, 0.8.8.10): four frosted cards 16 px apart over a striped wallpaper, like
+ * Lord Workspaces' widgets. A hand moving inside one card repaints the hand, not the four cards and their margins;
+ * a stripe changing under a card, a card moving and a card's own blur changing blur again; every frame is the
+ * same as a full repaint. */
+static void test_blur_cache(void) {
+    enum { W = 900, H = 360 };
+    paint_multi_damage = 1;
+    ui_reset();
+    paint_blur_cache_reset();
+    paint_nviews = 1;
+    paint_views[0] = (PaintViewBox){ { 0, 0, W, H }, 0, 0, 1, 0, 0, 0 };
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff102030);
+    Node *stripes[18];
+    for (int i = 0; i < 18; i++) stripes[i] = box_in(root, (float)(i * 50), 0, 22, H, i % 2 ? 0xffc04060 : 0xff40a0c0);
+    Node *card[4], *hand[4];
+    for (int i = 0; i < 4; i++) {
+        card[i] = box_in(root, 30 + i * (186 + 16), 60, 186, 186, 0x60ffffff);
+        sn(card[i], "backdropBlur", 24);
+        sn(card[i], "borderRadius", 18);
+        ss(card[i], "overflow", "hidden");
+        hand[i] = box_in(card[i], 90, 40, 4, 50, 0xffffffff);
+    }
+    paint_blur_cache_on = 1;
+    render(root, W, H);
+    int bad = 0, small = 0, big = 0, ticks = 0;
+    float card_area = 186.0f * 186.0f;
+    for (int f = 0; f < 40; f++) {
+        int tick = f % 5 != 4 && f != 21 && f != 27 && f != 33;
+        if (tick) { sn(hand[f % 4], "left", 60 + (float)((f * 7) % 60)); ticks++; }
+        if (f == 9) sn(stripes[5], "backgroundColor", 0xff30ff30);     /* under the second card: blurred again */
+        if (f == 21) sn(card[2], "left", 30 + 2 * (186 + 16) + 6);     /* a card moves */
+        if (f == 27) sn(card[1], "backdropBlur", 12);                  /* a card's own blur */
+        if (f == 33) node_destroy(stripes[12]);                        /* a stripe goes away under the third card */
+        layout_root(root, W, H);
+        int n = 0;
+        float area = 0;
+        paint_blur_cache_on = 1;
+        int r = paint_partial(root, W, H, &n, &area);
+        paint_blur_cache_on = 0;
+        if (r < 0) { bad++; continue; }
+        int where = 0, worst = full_differs(root, W, H, &where);
+        if (worst > 2) {
+            if (bad < 3) printf("  blur cache frame %d: differs from a full repaint by %d at %d,%d\n", f, worst, where % W, where / W);
+            bad++;
+        }
+        if (tick && f != 9 && f != 10 && area > 0 && area < card_area * 0.25f) small++;
+        if (!tick || f == 9) big += area >= card_area;
+    }
+    CHECK(!bad, "blur cache: %d frames differ from a full repaint", bad);
+    CHECK(small >= ticks - 2, "blur cache: a hand inside a frosted card repaints the hand alone (%d of %d frames)", small, ticks);
+    CHECK(big >= 4, "blur cache: a change below or of a card blurs it again (%d frames)", big);
+    printf("blur cache: %d of %d hand frames repainted under a quarter of a card\n", small, ticks);
+    paint_blur_cache_on = 0;
+    paint_nviews = 0;
+    paint_blur_cache_reset();
+}
+
+/* The sound wave widget: a <SoundWave> node inside a card that is lifted (scale 1.03, the drag's look: the
+ * transformed subtree's raster path), moved, resized and set back, while the spectrum moves; each frame must equal a
+ * full repaint and nothing may read freed memory (run under ASan: make build/engine-test-asan). */
+static void test_sound_wave(void) {
+    enum { W = 1000, H = 420 };
+    static Spectrum sp;
+    spectrum_init(&sp, 48000);
+    wave_source(&sp);
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff101020);
+    for (int i = 0; i < 10; i++) box_in(root, (float)(i * 100), 0, 40, H, i % 2 ? 0xff803060 : 0xff306080);
+    Node *card = box_in(root, 100, 120, 728, 170, 0x00000000);
+    sn(card, "borderRadius", 22);
+    ss(card, "overflow", "hidden");
+    Node *w = node_new(NODE_WAVE);
+    w->wave = wave_conf_new();
+    node_append(card, w);
+    sn(w, "flexGrow", 1);
+    ss(card, "flexDirection", "column");
+    render(root, W, H);
+    float buf[1600];
+    double ph = 0;
+    int bad = 0;
+    for (int f = 0; f < 60; f++) {
+        for (int i = 0; i < 1600; i++) { buf[i] = (float)(0.4 * sin(ph) + 0.2 * sin(ph * 7.3)); ph += 2 * M_PI * (60 + f * 3) / 48000; }
+        spectrum_feed(&sp, buf, 1600);
+        if (f % 10 == 2) { sn(card, "scaleX", 1.03); sn(card, "scaleY", 1.03); }        /* lifted */
+        if (f % 10 > 2 && f % 10 < 7) sn(card, "left", 100 + (float)(f * 9 % 200));    /* dragged */
+        if (f % 10 == 7) { sn(card, "scaleX", 1); sn(card, "scaleY", 1); }             /* dropped */
+        if (f == 20) sn(card, "width", 356);                                            /* resized */
+        if (f == 30) sn(card, "height", 356);
+        if (f == 40) { sn(card, "width", 728); sn(card, "height", 170); }
+        if (f == 50) { node_destroy(w); w = node_new(NODE_WAVE); w->wave = wave_conf_new(); node_append(card, w); sn(w, "flexGrow", 1); }
+        wave_tick();
+        layout_root(root, W, H);
+        int n = 0;
+        float area = 0;
+        if (paint_partial(root, W, H, &n, &area) < 0) { bad++; continue; }
+        int where = 0, worst = full_differs(root, W, H, &where);
+        if (worst > 2) {
+            if (bad < 3) printf("  sound wave frame %d: differs from a full repaint by %d at %d,%d\n", f, worst, where % W, where / W);
+            bad++;
+        }
+    }
+    CHECK(!bad, "sound wave: %d frames differ from a full repaint", bad);
+    /* behind an opaque window it isn't drawn at all; uncovered, it is again */
+    Node *win = box_in(root, 50, 80, 900, 300, 0xff202024);
+    layout_root(root, W, H);
+    render(root, W, H);
+    int before = ui.dlist.n;
+    for (int i = 0; i < 1600; i++) { buf[i] = (float)(0.4 * sin(ph)); ph += 2 * M_PI * 220 / 48000; }
+    spectrum_feed(&sp, buf, 1600);
+    ui.damage = (Box){ 0, 0, 0, 0 }; ui.dlist.n = 0;
+    wave_tick();
+    CHECK(ui.damage.x1 <= ui.damage.x0, "sound wave: behind an opaque window a new spectrum damages nothing (%g,%g %gx%g)",
+          ui.damage.x0, ui.damage.y0, ui.damage.x1 - ui.damage.x0, ui.damage.y1 - ui.damage.y0);
+    sn(win, "backgroundColor", 0xc0202024);             /* a translucent window: the wave shows through, so it is drawn */
+    layout_root(root, W, H);
+    paint_damage(root);
+    ui.damage = (Box){ 0, 0, 0, 0 }; ui.dlist.n = 0;
+    spectrum_feed(&sp, buf, 1600);
+    wave_tick();
+    CHECK(ui.damage.x1 > ui.damage.x0, "sound wave: behind a translucent window it is still drawn");
+    (void)before;
+    node_destroy(win);
+    printf("sound wave: 60 frames lifted, dragged, resized and recreated\n");
+    node_destroy(root);
+    ui.root = NULL;
+    wave_source(NULL);
+}
+
+/* Paint order and the blur cache (0.8.8.10): three frosted cards 16 px apart in a row, as Lord Workspaces' widgets.
+ * A ring changing near the edge of a card painted above its neighbour leaves the neighbour's blur alone (the change
+ * is not under it); the same change in a card painted below blurs the neighbour again; a card raised with zIndex is
+ * handled as unsure. Every frame equals a full repaint. */
+static void test_blur_order(void) {
+    enum { W = 700, H = 260 };
+    paint_multi_damage = 1;
+    ui_reset();
+    paint_blur_cache_reset();
+    paint_nviews = 1;
+    paint_views[0] = (PaintViewBox){ { 0, 0, W, H }, 0, 0, 1, 0, 0, 0 };
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff102030);
+    for (int i = 0; i < 14; i++) box_in(root, (float)(i * 50), 0, 22, H, i % 2 ? 0xffc04060 : 0xff40a0c0);
+    Node *card[3], *ring[3];
+    for (int i = 0; i < 3; i++) {
+        card[i] = box_in(root, 20 + i * (200 + 16), 40, 200, 170, 0x60ffffff);
+        sn(card[i], "backdropBlur", 30);
+        sn(card[i], "borderRadius", 22);
+        ss(card[i], "overflow", "hidden");
+        ring[i] = box_in(card[i], 4, 60, 10, 40, 0xffffffff);      /* by its left edge: inside the left card's margin */
+    }
+    sn(ring[1], "left", 186);                           /* the middle one by its right edge: under the right card's margin */
+    paint_blur_cache_on = 1;
+    render(root, W, H);
+    float card_area = 200.0f * 170.0f;
+    int bad = 0, kept = 0, reblur = 0;
+    for (int f = 0; f < 30; f++) {
+        int which = f % 3 == 2 ? 1 : 2;                 /* mostly the right card (above the middle one); sometimes the middle (below the right one) */
+        if (f == 20) sn(card[0], "zIndex", 1);          /* the left card raised above the others */
+        sn(ring[which], "backgroundColor", f % 2 ? 0xffffffff : 0xff80ff80);
+        layout_root(root, W, H);
+        int n = 0;
+        float area = 0;
+        paint_blur_cache_on = 1;
+        int r = paint_partial(root, W, H, &n, &area);
+        paint_blur_cache_on = 0;
+        if (r < 0) { bad++; continue; }
+        int where = 0, worst = full_differs(root, W, H, &where);
+        if (worst > 2) { if (bad < 3) printf("  blur order frame %d: differs by %d at %d,%d\n", f, worst, where % W, where / W); bad++; }
+        if (f < 20 && f > 1) { if (which == 2) kept += area < card_area * 0.2f; else reblur += area >= card_area; }
+    }
+    CHECK(!bad, "blur order: %d frames differ from a full repaint", bad);
+    CHECK(kept >= 11, "blur order: a change above a neighbour leaves its blur (%d frames)", kept);
+    CHECK(reblur >= 5, "blur order: a change below a neighbour blurs it again (%d frames)", reblur);
+    printf("blur order: %d of 12 changes above a neighbour stayed small, %d below re-blurred it\n", kept, reblur);
+    paint_blur_cache_on = 0;
+    paint_nviews = 0;
+    paint_blur_cache_reset();
+}
+
 static void test_damage_fuzz(void) {
     int seeds = getenv("FUZZ_SEEDS") ? atoi(getenv("FUZZ_SEEDS")) : 12, multi = 0, failed = 0;
     for (int seed = 0; seed < seeds; seed++) {
@@ -1745,6 +1993,34 @@ static void test_wrap_basis_height(void) {
     float want = 148 * 2 + 12 * 3;
     CHECK(fabsf(grid->h - want) < 0.5f, "card grid: %g high, want %g", grid->h, want);
     CHECK(fabsf(next->ay - (grid->ay + grid->h)) < 0.5f, "the next item follows the grid (y %g, grid ends at %g)", next->ay, grid->ay + grid->h);
+}
+
+/* A wrapping grid inside a column of width 100% and a maxWidth, in a wider space (Settings' pages: a 680 px column in a
+ * maximized window). Measuring the column used the whole width for its children, so the grid measured fewer lines than
+ * it lays out and everything that holds it (a ScrollView's content) came out short: the page could not scroll to its
+ * end (Settings → Wallpaper with Cyberpunk City HD's 11 pictures, 0.8.9). */
+static void test_wrap_in_max_width(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "width", 1000);
+    Node *content = view(root);                        /* a ScrollView's content: its height is measured */
+    ss(content, "alignItems", "center");
+    Node *col = view(content);
+    ss(col, "width", "100%"); sn(col, "maxWidth", 300);
+    Node *grid = view(col);
+    ss(grid, "flexDirection", "row"); ss(grid, "flexWrap", "wrap");
+    sn(grid, "gap", 10);
+    for (int i = 0; i < 6; i++) { Node *it = view(grid); sn(it, "width", 90); sn(it, "height", 50); }
+    Node *next = view(root);
+    sn(next, "height", 10);
+    layout_root(root, 1000, 2000);
+    /* 3 per line in 300 px (3 x 90 + 2 x 10 = 290): 2 lines */
+    float want = 50 * 2 + 10;
+    CHECK(fabsf(col->w - 300) < 0.5f, "column: %g wide, want 300", col->w);
+    CHECK(fabsf(grid->h - want) < 0.5f, "grid in a maxWidth column: %g high, want %g", grid->h, want);
+    CHECK(content->h >= want - 0.5f, "the content (%g) is shorter than the grid it holds (%g)", content->h, want);
+    CHECK(next->ay >= grid->ay + grid->h - 0.5f, "the next item (y %g) overlaps the grid (ends at %g)", next->ay, grid->ay + grid->h);
 }
 
 /* GPU path: a Linux window in a scaled node goes through the raster like the rest of the subtree, with
@@ -2224,8 +2500,10 @@ static void drag_paint_out(Node *root, DOut *o, int index, Box d) {
     ui.damage = (Box){ lx0, ly0, lx1, ly1 };
     canvas_set_clip(&o->c, pr);
     int taken = 0;
+    paint_blur_cache_on = 1;
     if (test_gdrag) taken = paint_root_gdrag(&o->c, root, &o->g);
     else paint_root_clear(&o->c, root, 0x000000);
+    paint_blur_cache_on = 0;
     canvas_set_clip(&o->c, (Rect){ 0, 0, o->c.w, o->c.h });
     ui.damage = (Box){ 0, 0, 0, 0 };
     paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
@@ -2249,6 +2527,10 @@ static void drag_present(DOut *const *os, int n) {
 static void drag_paint_n(Node *root, DOut *const *os, int n) {
     if (!ui.dirty) return;
     ui.dirty = 0;
+    paint_nviews = 0;                       /* main.c paint_views_set */
+    for (int i = 0; i < n && i < PAINT_VIEWS_MAX; i++)
+        paint_views[paint_nviews++] = (PaintViewBox){ { (float)os[i]->v.x, (float)os[i]->v.y, (float)(os[i]->v.x + os[i]->v.w), (float)(os[i]->v.y + os[i]->v.h) },
+                                                      (float)os[i]->v.x, (float)os[i]->v.y, (float)os[i]->v.k, (float)os[i]->v.dx, (float)os[i]->v.dy, i };
     layout_root(root, DW, DH);
     Box d = { 0, 0, 0, 0 };
     if (paint_damage(root)) d = ui.damage;
@@ -2944,6 +3226,75 @@ static void test_drag_corners(void) {
     dout_free(&o);
 }
 
+/* ---- A display below 100 % (GitHub #158) ----
+ * At 75 % or 80 % a display shows more logical pixels than it has (1024 × 640 logical on 768 × 480 or 819 × 512
+ * physical), so every logical box is painted smaller than itself (k < 1), as a mirrored display smaller than the
+ * main one already was. The whole frame must be covered (no stripe left at the right or bottom edge), and every
+ * partial repaint must match a full repaint: windows with shadows and rounded corners moving, text changing, a
+ * blurred bar, a box shown and hidden. */
+static void test_scale_below_100(void) {
+    static const int pcts[2] = { 75, 80 };
+    for (int pi = 0; pi < 2; pi++) {
+        int pct = pcts[pi];
+        DOut o;
+        int pw = (DW * pct + 50) / 100, ph = (DH * pct + 50) / 100;
+        if (!dout_init(&o, out_view(0, 0, pw, ph, pct))) { CHECK(0, "below 100 %%: out of memory"); dout_free(&o); return; }
+        CHECK(o.v.w == DW && o.v.h == DH && o.v.k < 1, "below 100 %%: %d %% of %dx%d is %dx%d logical (k %.2f)", pct, pw, ph, o.v.w, o.v.h, o.v.k);
+        DOut *const os[1] = { &o };
+        ui_reset();
+        Node *root = view(NULL);
+        ui.root = root;
+        sn(root, "backgroundColor", 0xff2b3a4f);
+        Node *bar = box_in(root, 0, 0, DW, 28, 0xc0f0f0f0);
+        sn(bar, "backdropBlur", 12);
+        Node *clock = dtext(bar, "12:00", 13, 600, 0xff101010);
+        Node *back = box_in(root, 90, 80, 420, 300, 0xffd8e4f0);
+        sn(back, "borderRadius", 10);
+        dshadow(back, 0x60000000, 6, 18);
+        dtext(back, "Files, 12 items", 13, 0, 0xff202020);
+        Node *win = box_in(root, 300, 180, 460, 320, 0xff2c2c2e);
+        ss(win, "overflow", "hidden");
+        sn(win, "borderRadius", 12);
+        sn(win, "borderWidth", 1);
+        sn(win, "borderColor", 0x30ffffff);
+        dshadow(win, 0x73000000, 8, 24);
+        Node *title = dtext(dview(win, 0, 28, 0xff3a3a3c, 0), "lord@lordos: ~", 13, 0, 0xffe0e0e0);
+        Node *badge = box_in(root, 900, 560, 80, 40, 0xffff9500);
+        sn(badge, "borderRadius", 20);
+        canvas_set_clip(&o.c, (Rect){ 0, 0, o.c.w, o.c.h });
+        canvas_clear(&o.c, 0x000000);
+        damage_add((Box){ 0, 0, DW, DH });
+        ui.dirty = 1;
+        drag_paint_n(root, os, 1);
+        /* the first frame covers the whole physical frame: the root's color reaches the last column and row */
+        int edge = 0;
+        for (int x = 0; x < pw; x++) if (o.px[(size_t)(ph - 1) * pw + x] == 0) edge++;
+        for (int y = 0; y < ph; y++) if (o.px[(size_t)y * pw + pw - 1] == 0) edge++;
+        CHECK(!edge, "below 100 %%: at %d %%, %d pixels of the last row and column were never painted", pct, edge);
+        int worst_all = 0, bad = 0;
+        for (int f = 1; f <= 40; f++) {
+            float x = 300 + (float)(f * 13 % 380) - 120, y = 180 + (float)(f * 7 % 160) - 60;
+            win->s.pos[EDGE_L] = (Dim){ x, UNIT_PX };
+            win->s.pos[EDGE_T] = (Dim){ y, UNIT_PX };
+            node_moved(win);
+            if (f % 5 == 0) node_set_text(clock->first, f % 10 ? "12:01" : "12:00");
+            if (f % 7 == 0) node_set_text(title->first, f % 14 ? "lord@lordos: ~/src" : "lord@lordos: ~");
+            if (f % 9 == 0) ss(badge, "display", f % 18 ? "none" : "flex");
+            if (f % 11 == 0) { sn(back, "left", 90 + (float)(f % 3) * 37); sn(back, "width", 420 - (float)(f % 4) * 21); }
+            ui.dirty = 1;
+            drag_paint_n(root, os, 1);
+            int worst = 0;
+            drag_full_diff(root, &o, &worst);
+            if (worst > worst_all) worst_all = worst;
+            if (worst > 2) bad++;
+        }
+        CHECK(!bad, "below 100 %%: at %d %%, %d of 40 frames differ from a full repaint (by up to %d levels)", pct, bad, worst_all);
+        printf("below 100 %%: %d %% (%dx%d physical, %dx%d logical): 40 partial repaints, most %d levels off a full repaint\n",
+               pct, pw, ph, o.v.w, o.v.h, worst_all);
+        dout_free(&o);
+    }
+}
+
 /* ---- A setStyle that only turns or scales a node (node_restyled's transform-only path) ----
  * Two copies of one tree: A takes rotate/scaleX/scaleY/transformOriginX through node_restyled (which
  * keeps the node's own layout and every measure when that gives the same results), B through what
@@ -3052,6 +3403,28 @@ static void test_image_ext(void) {
     node_destroy(c);
 }
 
+/* a 4K wallpaper decoded off the interface's thread (0.8.9: the slideshow's next picture, sdk/slideshow.jsx): a
+ * "thumb:" up to 4096 px keeps the picture's full size, and a smaller one fits a 2560 px display */
+static void test_image_wallpaper_thumb(void) {
+    ui_reset();
+    const char *wall = "../assets/wallpapers/cyberpunk/lordos-cyberpunk-panorama@3840x2160.jpg";
+    char real[PATH_MAX];
+    if (!realpath(wall, real)) { printf("wallpaper thumb: skipped (no %s)\n", wall); return; }
+    Image *full = image_get_thumb(real, 3840, NULL), *qhd = image_get_thumb(real, 2560, NULL), *big = image_get_thumb(real, 9000, NULL);
+    CHECK(full && qhd && big && full != qhd, "one entry per size");
+    CHECK(wait_thumbs(3) == 3, "decoded by the workers");
+    int w = -1, h = -1;
+    if (full) image_size(full, &w, &h);
+    CHECK(w == 3840 && h == 2160, "a 4K picture at 3840 px keeps its size: %dx%d", w, h);
+    if (qhd) image_size(qhd, &w, &h);
+    CHECK(w == 2560 && h == 1440, "at 2560 px it fits a 1440p display: %dx%d", w, h);
+    if (big) image_size(big, &w, &h);
+    CHECK(w == 3840 && h == 2160, "past IMG_THUMB_MAX: never enlarged, %dx%d", w, h);
+    image_release(full);
+    image_release(qhd);
+    image_release(big);
+}
+
 static void test_image_cache(void) {
     ui_reset();
     const char *wall = "../assets/wallpapers/lumo/lordos-lumo-aurora.jpg";     /* 1672 x 941 */
@@ -3073,8 +3446,8 @@ static void test_image_cache(void) {
 
     /* a thumbnail: empty at first, shared, decoded off this thread to fit, its node repainted */
     Node *nd = node_new(NODE_IMAGE), *nd2 = node_new(NODE_IMAGE);
-    nd->img = image_get_thumb(real, 128);
-    nd2->img = image_get_thumb(real, 128);
+    nd->img = image_get_thumb(real, 128, NULL);
+    nd2->img = image_get_thumb(real, 128, NULL);
     CHECK(nd->img && nd->img == nd2->img, "two nodes share one thumbnail");
     int w = -1, h = -1;
     if (nd->img) image_size(nd->img, &w, &h);
@@ -3089,7 +3462,7 @@ static void test_image_cache(void) {
 
     /* a file that isn't a picture: the thumbnail fails, nothing retried, nothing kept but the entry */
     Node *bad = node_new(NODE_IMAGE);
-    bad->img = image_get_thumb("/proc/self/status", 128);
+    bad->img = image_get_thumb("/proc/self/status", 128, NULL);
     wait_thumbs(1);
     if (bad->img) image_size(bad->img, &w, &h);
     CHECK(bad->img && w == 0 && h == 0, "a file that doesn't decode stays empty");
@@ -3098,11 +3471,41 @@ static void test_image_cache(void) {
     /* still decoding when its node goes: dropped at once (a folder left before its pictures were made) */
     char many[64][PATH_MAX + 16];
     Image *pend[64];
-    for (int i = 0; i < 64; i++) { snprintf(many[i], sizeof many[i], "%s#%d", real, i); pend[i] = image_get_thumb(many[i], 64); }
+    for (int i = 0; i < 64; i++) { snprintf(many[i], sizeof many[i], "%s#%d", real, i); pend[i] = image_get_thumb(many[i], 64, NULL); }
     for (int i = 0; i < 64; i++) image_release(pend[i]);
     wait_thumbs(64);
     image_cache_stats(&n, &idle, &b);
     CHECK(n <= n0 + 1 + 1 + 64 && b - b0 == 128 * 72 * 4, "thumbnails dropped while decoding hold no pixels (%d cached)", n - n0);
+
+    /* a picture replaced under the same name (GitHub #180): another version is another thumbnail, decoded again, and
+     * the old version's, shown by nobody, goes */
+    {
+        int c0, i0, c1, i1, c2, i2;
+        size_t b1;
+        image_cache_stats(&c0, &i0, &b1);
+        Image *v1 = image_get_thumb(real, 96, "1700000000000.1000");
+        Image *v1b = image_get_thumb(real, 96, "1700000000000.1000");
+        CHECK(v1 && v1 == v1b, "the same version shares one thumbnail");
+        if (v1b) image_release(v1b);
+        wait_thumbs(1);
+        Image *v2 = image_get_thumb(real, 96, "1700000000999.2000");
+        CHECK(v2 && v2 != v1, "another version of the file: its own thumbnail");
+        int w2 = -1, h2 = -1;
+        if (v2) image_size(v2, &w2, &h2);
+        CHECK(w2 == 0 && h2 == 0, "the new version is decoded again, not the old pixels: %dx%d", w2, h2);
+        image_cache_stats(&c1, &i1, &b1);
+        CHECK(c1 == c0 + 2, "both versions cached while the old one is shown: %d", c1 - c0);
+        CHECK(wait_thumbs(1) == 1, "the new version is decoded");
+        image_release(v1);
+        image_release(v2);
+        Image *v3 = image_get_thumb(real, 96, "1700000005000.3000");
+        image_cache_stats(&c2, &i2, &b1);
+        CHECK(c2 == c0 + 1, "older versions nobody shows are dropped: %d cached", c2 - c0);
+        Image *none = image_get_thumb(real, 96, NULL);
+        CHECK(none && none != v3, "no version is its own entry");
+        image_release(v3);                     /* still decoding: dropped at once, nothing left of this block */
+        if (none) image_release(none);
+    }
 
     int idle1;
     image_cache_stats(&n, &idle1, &b);
@@ -3401,10 +3804,103 @@ static void bench(void) {
     }
 }
 
+#ifndef ENGINE_BEFORE
+/* the wallpaper slideshow's transition (0.8.9, sdk/slideshow.jsx) on a 1920×1080 display: the arriving picture over
+ * the one shown, its opacity and translation (whole pixels) set every frame as lord.setStyle does, under a window and
+ * Lord Workspaces' blurred bars (a spine and a top band); 144 frames (2.4 s at 60 Hz). Then Reduce motion's plain fade
+ * (opacity only), and a 6 % zoom for comparison (a scaled raster composited every frame). The pictures are the
+ * 1920×1080 bases, so they are scaled once to their 2 % larger box. */
+static void bench_slideshow(void) {
+    char a[PATH_MAX], b[PATH_MAX];
+    if (!realpath("../assets/wallpapers/cyberpunk/lordos-cyberpunk-panorama.jpg", a) ||
+        !realpath("../assets/wallpapers/cyberpunk/lordos-cyberpunk-sky-terrace.jpg", b)) { printf("slideshow: skipped (no pictures)\n"); return; }
+    quiet = 1;
+    for (int mode = 0; mode < 3; mode++) {
+        ui_reset();
+        Node *root = view(NULL);
+        ui.root = root;
+        sn(root, "backgroundColor", 0xff0f0d1c);
+        Node *wall = view(root);
+        ss(wall, "position", "absolute");
+        sn(wall, "left", 0); sn(wall, "top", 0); sn(wall, "width", 1920); sn(wall, "height", 1080);
+        ss(wall, "overflow", "hidden");
+        Node *img[2];
+        for (int i = 0; i < 2; i++) {
+            img[i] = node_new(NODE_IMAGE);
+            node_append(wall, img[i]);
+            img[i]->img = image_get(i ? b : a);
+            ss(img[i], "position", "absolute");    /* 2 % larger on each side, as the slideshow draws them */
+            sn(img[i], "left", -38); sn(img[i], "top", -22); sn(img[i], "width", 1996); sn(img[i], "height", 1124);
+            ss(img[i], "objectFit", "cover");
+        }
+        sn(img[1], "opacity", 0);
+        Node *win = view(root);
+        ss(win, "position", "absolute");
+        sn(win, "left", 300); sn(win, "top", 160); sn(win, "width", 1100); sn(win, "height", 700);
+        sn(win, "backgroundColor", 0xff1c1a2e); sn(win, "borderRadius", 10);
+        sn(win, "shadowColor", 0x66000000); sn(win, "shadowBlur", 24); sn(win, "shadowOffsetY", 8);
+        Node *spine = view(root), *band = view(root);
+        ss(spine, "position", "absolute");
+        sn(spine, "left", 8); sn(spine, "top", 8); sn(spine, "width", 64); sn(spine, "height", 1064);
+        ss(band, "position", "absolute");
+        sn(band, "left", 84); sn(band, "top", 8); sn(band, "width", 1828); sn(band, "height", 44);
+        for (Node *p = spine; p; p = p == spine ? band : NULL) {
+            sn(p, "backgroundColor", 0x661c1a2e); sn(p, "borderRadius", 14); sn(p, "backdropBlur", 24);
+        }
+        uint32_t *px = calloc((size_t)1920 * 1080, 4);
+        Canvas c;
+        canvas_init(&c, px, 1920, 1080, 1920);
+        enum { F = 144 };
+        static double fv[F];
+        double sum = 0, worst = 0;
+        for (int f = -1; f < F; f++) {
+            if (f >= 0) {
+                double p = (double)f / (F - 1), e = p < 0.5 ? 4 * p * p * p : 1 - pow(-2 * p + 2, 3) / 2;
+                js_set(img[1], "opacity", e);
+                if (mode == 0) {           /* the drift: whole pixels, as sdk/slideshow.jsx */
+                    js_set(img[1], "translateX", roundf(38 * (float)(1 - e)));
+                    js_set(img[1], "translateY", roundf(-22 * (float)(1 - e)));
+                } else if (mode == 2) {    /* a zoom, for comparison (what the drift is not) */
+                    js_set(img[1], "scaleX", 1.06 + (1 - 1.06) * e);
+                    js_set(img[1], "scaleY", 1.06 + (1 - 1.06) * e);
+                }
+            }
+            double t0 = now_ms();
+            layout_root(root, 1920, 1080);
+            Box dmg = { 0, 0, 0, 0 };
+            if (paint_damage(root)) dmg = ui.damage;
+            if (f < 0) dmg = (Box){ 0, 0, 1920, 1080 };
+            if (dmg.x1 > dmg.x0) {
+                paint_view = (PaintView){ 0, 0, 1, 0, 0, 0 };
+                ui.damage = dmg;
+                canvas_set_clip(&c, (Rect){ (int)floorf(fmaxf(dmg.x0, 0)), (int)floorf(fmaxf(dmg.y0, 0)), (int)ceilf(fminf(dmg.x1, 1920)), (int)ceilf(fminf(dmg.y1, 1080)) });
+                paint_root_clear(&c, root, 0);
+                canvas_set_clip(&c, (Rect){ 0, 0, 1920, 1080 });
+            }
+            ui.damage = (Box){ 0, 0, 0, 0 };
+            double ms = now_ms() - t0;
+            if (f < 0) continue;                    /* the first full frame */
+            fv[f] = ms;
+            sum += ms;
+            if (ms > worst) worst = ms;
+        }
+        long r, comp;
+        paint_tf_stats(&r, &comp);
+        printf("slideshow %s (1920x1080, a window and two blurred bars): median %.2f ms per frame, mean %.2f, worst %.2f; raster renders %ld, composites %ld\n",
+               mode == 0 ? "drift" : mode == 1 ? "fade" : "zoom", median(fv, F), sum / F, worst, r, comp);
+        free(px);
+        node_destroy(root);
+    }
+}
+#endif
+
 int main(int argc, char **argv) {
     const char *dir = getenv("LORD_FONTS") ? getenv("LORD_FONTS") : "../assets/fonts";
     fonts_set_builtin_dir(dir);
     if (text_init(dir)) { printf("engine-test: no fonts in %s\n", dir); return 1; }
+#ifndef ENGINE_BEFORE
+    if (argc > 1 && !strcmp(argv[1], "bench-slideshow")) { bench_slideshow(); return 0; }
+#endif
     if (argc > 1 && !strcmp(argv[1], "bench")) { bench(); return 0; }
 #ifdef ENGINE_BEFORE
     return 0;
@@ -3414,11 +3910,13 @@ int main(int argc, char **argv) {
     CHECK(!gc_all.bad, "scissor over the GPU drag runs: %d frames differ", gc_all.bad);
     printf("scissor over the GPU drag runs: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_drag_corners();
+    test_scale_below_100();
     test_ellipsis();
     test_carets();
     test_scaled_caret();
     test_covered();
     test_borders();
+    test_frame_seams();
     test_logical();
     test_transform_math();
     test_transform_paint_hit();
@@ -3435,14 +3933,19 @@ int main(int argc, char **argv) {
     test_gcontend();
     memset(&gc_all, 0, sizeof gc_all);
     test_damage_pipeline();
+    test_blur_cache();
+    test_sound_wave();
+    test_blur_order();
     test_damage_fuzz();
     CHECK(!gc_all.bad && gc_all.frames > 1000 && gc_all.partial > gc_all.frames / 2, "scissor: %d frames, %d partial, %d differ", gc_all.frames, gc_all.partial, gc_all.bad);
     printf("scissor over the damage pipeline and fuzz: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_grow_wrap_height();
     test_wrap_basis_height();
+    test_wrap_in_max_width();
     test_overlay_scrollbar();
     test_transform_restyle();
     test_image_cache();
+    test_image_wallpaper_thumb();
     test_image_ext();
     printf("engine-test: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;

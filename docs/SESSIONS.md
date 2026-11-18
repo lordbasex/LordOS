@@ -136,6 +136,55 @@ put in graphics mode once (`KD_GRAPHICS`) and goes back to text when the service
 The card, the input and the monitor socket are never left open in the children (web
 connections, workers): `sd_mon_child()` closes them before dropping root.
 
+### Text consoles (Ctrl+Alt+F1…F12)
+
+The keyboard is the session's (`EVIOCGRAB`), so the kernel never sees Ctrl+Alt+F2 itself. Instead:
+
+- **lord-server** takes Ctrl+Alt+F1…F12 before anything else (`input_vt_key` in `inputkind.h`; no app or theme gets
+  the key) and asks lord-sessiond: `{"a":"vt","n":2}`. Asking also closes the Passwords vault and ends a share, as
+  Lock Screen does (`mirror.c`).
+- **lord-sessiond** keeps tty1 in `VT_PROCESS` mode (`monitor.c`), so the kernel asks before leaving it (SIGUSR1) and
+  says when it is back (SIGUSR2); a `chvt` from a root shell goes the same way. Leaving: the session on the monitor
+  is **locked** (as Lock Screen: its browsers signed out of the remote desktop, the login screen asked for in lock
+  mode), the monitor is taken back (input revoked, DRM master dropped), tty1 goes back to text mode and the switch
+  goes on. The login screen just leaves. While another console is in front nothing is lent: a "show" from a worker
+  waits (`held_fd`).
+- **Coming back** (Ctrl+Alt+F1 on a text console, the kernel's own key): tty1 is in graphics mode again and the
+  login screen comes up locked for that user; the session behind it never stopped.
+- **Text consoles exist as before:** `getty@tty2…6` start when they are first shown (logind's autovt).
+
+### Text mode, and startlordos (as startx)
+
+For those who boot to a text console and start the desktop by hand:
+
+- **Once:** the boot menu's **LordOS (text mode)** entry, which the package adds (`/etc/grub.d/11_lordos_text`: the
+  system's first entry with `lordos.text=1` and the console's cursor back; `update-grub` runs on install and remove).
+  On a Raspberry Pi, add `lordos.text=1` to the line in `/boot/firmware/cmdline.txt`.
+- **Every start:** Settings → Users & Login → **Start in text mode** (administrators only): the closed action
+  `boot-text on|off` writes or removes `/etc/lordos/text-mode`. By hand: `sudo touch /etc/lordos/text-mode`, and
+  `sudo rm /etc/lordos/text-mode` to go back.
+- **What changes then:** lord-sessiond leaves the monitor alone (it says so in its log: "text mode"); the network,
+  remote desktop and Sharing go on as usual. `lordos-text-login.service` puts a login prompt on tty1 (as
+  `getty@tty1`, which LordOS masks).
+- **startlordos:** log in on a console and type `startlordos`. With lord-sessiond running (text mode), it asks for
+  the **login screen**: `lord-sessiond --start-login` connects to `/run/lordos/start.sock` (made only in text mode,
+  removed once used), and lord-sessiond reads the caller from the socket itself (`SO_PEERCRED`), its controlling
+  terminal from `/proc/<pid>/stat`, the console in front (`VT_GETSTATE`) and that console's owner, and accepts only
+  someone logged in on the console in front, typing there (`startlogin.h`, tested by `tests/startlogin_test.c`): never
+  a terminal window, ssh, a cron job or another console; and tty1 must be the caller's or nobody's, never someone
+  else's console session. Then it stops `lordos-text-login.service` (its agetty,
+  restarting, would reset tty1 to text; a console session on tty1 ends with it), takes the monitor, brings tty1 to the
+  front and shows the login screen with that user chosen. You sign in with your password and get the whole session:
+  administrator's actions, the keyring unlocked, Lock Screen, the apps' cgroups and firewall. The next boot is text
+  mode again while the choice stays.
+- **Without lord-sessiond** (`lordos.service` stopped or disabled), or with `startlordos --standalone`, lord-server runs
+  as you on that console (log: `~/.cache/lordos/startlordos.log`); Log Out or Ctrl+Alt+Backspace brings the console
+  back, and Ctrl+Alt+F1…F12 work (lord-server keeps its own console in `VT_PROCESS` mode). With no lord-sessiond behind
+  it there is no Lock Screen, no Switch User, no administrator's actions and no per-app cgroups; Settings → Users says
+  how to leave text mode then (`sudo rm /etc/lordos/text-mode`).
+- Those who want the name `startx`: `alias startx=startlordos` in `~/.bashrc` (a `startx` from the xinit package
+  would be X11's).
+
 ### No usable display driver
 
 `sd_mon_open` (`remote/monitor.c`) waits up to 30 s for a card with KMS, a connector and a CRTC
@@ -305,6 +354,12 @@ after the screen went dark`.
     after unit stopped") and, after a package upgrade, kept the old binary;
   - `lordos.service` has `DelegateSubgroup=supervisor`: without it, systemd couldn't start the new
     main process while live processes remained in the delegated tree ("Device or resource busy");
+  - since systemd 258 that is no longer enough: the new main process is started in the unit's root
+    cgroup and only then moved to `supervisor`, and a cgroup with controllers in its
+    `cgroup.subtree_control` takes no process. `ExecStartPre=-…/lord-sessiond --release-cgroups`
+    therefore notes the sessions' limits in `/run/lordos/cgroup-limits` and turns the controllers off
+    (each session, then the root); the new `lord-sessiond` turns them on again and puts the limits back
+    (`cgroup_release_at`/`cgroup_restore_at`, GitHub #140). Works the same on 257 (Debian 13);
   - autologin is applied only once per machine boot (`/run/lordos/autologin-done`), so a service
     restart doesn't unlock a locked session.
 - **Linux app windows across a lock or a switch:** leaving the monitor tears the session's GPU
@@ -321,7 +376,10 @@ In the SDK: `session.lock()`, `session.switchUser()` and `session.managed()`. Th
 Since 0.8.1 the crown menu ends with **Restart…** and **Shut Down…**, after Lock Screen, Switch
 User… and Log Out; the Lord Classic theme has them behind a **Power** button at the bottom of its start
 menu. Before, they were only on the login screen. Sleep is not in the menu; the computer sleeps from the lid, the power
-button (a tap on tablets, since 0.8.8.9) and the idle timers in Settings → Energy. Suspend and resume
+button (a tap on tablets, since 0.8.8.9) and the idle timers in Settings → Energy. A laptop that went to sleep with
+the lid open has its lid's ACPI wake source off until it wakes, so the firmware can't wake it a second later
+(0.8.8.10, GitHub #172; the systemd-sleep hook `lordos-lid-wake`, [SETTINGS.md](SETTINGS.md), "Power button and
+lid"). Suspend and resume
 is unchecked in every hardware report; the only report after waking is #14's Wi-Fi on a laptop, handled since 0.8.8.3
 ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)).
 
@@ -369,6 +427,12 @@ Settings → Session → **Reopen windows when you log in**: Always (the default
 | Log out, Restart, Shut Down, `systemctl`, a signal to `lord-server` | reopens | asks | nothing |
 | Power cut, crash, `SIGKILL` | asks ("did not shut down properly") | asks | nothing |
 | Everything was closed | clean desktop | clean desktop | clean desktop |
+
+**Apps that ask first.** Terminal, Passwords, Remote Desktop, Machines, Databases, Camera and Recorder hold a live
+session or private data (`ASK_FIRST` in `sdk/sessionmodel.js`). With Always, everything else reopens and the question
+lists only those; with Ask first, it lists every window. Each row names the app and its desktop (its activity in Lord
+Workspaces) and has a box to leave it closed (`restoreSplit`, tested in `server/tests/session_model_test.mjs`). Until
+the question is answered the saved list stays as it was, so a logout meanwhile loses nothing.
 
 **What is saved.** `sdk/sessionrestore.jsx` keeps a debounced snapshot of the windows store (2 s, only when it
 changed) in `settings.sessionSaved`, in `settings.json`, which is already on `lord.fs`'s deny list; no new file.
@@ -432,6 +496,20 @@ without root, so `lord-sessiond` **delegates** a subtree to it:
   every `cgroup.procs`, are root's. After a restart the new `lord-sessiond` hardens the subtrees
   of the sessions that survived. See `PRIVACY.md`, «Root-owned app scopes».
 - The login screen and the web connections stay in `supervisor`.
+- **Restarts on systemd 258 and later** (GitHub #140): systemd 258 (commit f8f67eab) starts a delegated
+  unit's new main process in the unit's root cgroup and applies `DelegateSubgroup=` afterwards; 257 started
+  it in `supervisor` directly. The root enables `cpu memory pids` for the sessions, and each surviving
+  session enables them for its scopes, so the start failed with "Failed to spawn executor: Device or
+  resource busy" (`clone3(CLONE_INTO_CGROUP)` into a cgroup with controllers on). systemd 261's own
+  clean-up at stop can't help while a session's subtree uses them. The unit's first `ExecStartPre`
+  (a control process, in the unit's `.control` subgroup) runs `lord-sessiond --release-cgroups`: it notes
+  every non-default `memory.high`, `memory.max`, `cpu.max` and `cpu.weight` of the sessions' leaves and
+  scopes, turns the controllers off in each session and then in the root (the kernel refuses the root
+  first; disabling them in a session with live leaves is allowed), and the new `lord-sessiond` turns them
+  on again in `cgroup_service_init` and writes the noted limits back. A release merges into notes not yet put back (`cgroup_merge_notes`: the fresh value wins, notes for gone leaves drop), since after a failed start the limits are no longer readable; the file is removed only when every limit took. The sessions run on throughout, their
+  scopes unlimited for about a second. Checked on cgroup v2 in a delegated scope (the order, the lost
+  limit, a process entering the root once the controllers are off) and in `build/cgroup-restart-test`; the
+  unit itself not yet on systemd 258 or later.
 
 ```
 lordos.service

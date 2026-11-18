@@ -4,7 +4,7 @@
 // (docs/WINDOWS.md); the JS drag below is only kept for a maximized window.
 // The lights go at the start of the bar (close, minimize, maximize), or at the end (minimize, maximize, close) when
 // Settings → Desktop & Dock → Title bars puts the buttons on that side (useWindowButtons, issue #58).
-import { View, Text, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, moveToDesktopItems, t as tr, solidOver, useWindowButtons } from '@lordos/sdk';
+import { View, Text, addListener, wm, snapZoneAt, AppHost, windowTitle, windowAccent, WindowShell, moveToDesktopItems, t as tr, solidOver, useWindowButtons, SeamCover } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 
@@ -78,7 +78,12 @@ export function Window({ win, app, t, focused, fx }) {
       }
       wm.move(win.id, e.x - d.dx, e.y - d.dy);
     });
-    const offUp = addListener('pointerup', () => { drag.current = null; });
+    // dropped at an edge of the screen: it snaps there (snapZoneAt is null with snapping off)
+    const offUp = addListener('pointerup', (e) => {
+      const d = drag.current;
+      drag.current = null;
+      if (d && d.moving) { const z = snapZoneAt(e.x, e.y); if (z) wm.snap(win.id, z); }
+    });
     return () => { offMove(); offUp(); };
   }, [win.id, win.w, geo.y]);
 
@@ -122,6 +127,9 @@ export function Window({ win, app, t, focused, fx }) {
       <View onMouseDown={(e) => { if (!wm.beginMove(win.id)) drag.current = { x0: e.x, y0: e.y, rel: geo.w ? (e.x - geo.x) / geo.w : 0.5, moving: false }; }}
         onDoubleClick={() => wm.toggleMaximize(win.id)}
         style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, backgroundColor: t.titleBg }}>
+        {/* a transparent app: under the bar, the separator and the app's first row, so their edges let nothing through
+            at 125 % or 150 % (GitHub #162) */}
+        {app.transparent ? <SeamCover color={t.titleBg} below={2} /> : null}
         <Text style={{ position: 'absolute', left: 0, right: 0, top: 0, lineHeight: TITLE_H, textAlign: 'center',
           fontSize: 13, fontWeight: 600, color: focused ? t.text : t.textDim, pointerEvents: 'none', whiteSpace: 'nowrap',
           paddingHorizontal: 80 }}>{windowTitle(win)}</Text>

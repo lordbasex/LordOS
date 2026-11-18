@@ -14,7 +14,7 @@ function Card({ title, children }) {
   const t = useTheme();
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 480, maxHeight: '90%', borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`,
+      <View style={{ width: 480, maxWidth: '94%', maxHeight: '90%', borderRadius: 12, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`,
         boxShadow: '0 12px 40px rgba(0,0,0,0.45)', padding: 20, gap: 12 }}>
         <Text style={{ fontSize: 15, fontWeight: 600, color: t.text, textAlign: 'start' }}>{title}</Text>
         {children}

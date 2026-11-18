@@ -32,12 +32,19 @@ export function StatusItems({ color, height = 22 }) {
     ...list.map(({ id, Component }) => h(Component, { key: id, color, height })));
 }
 
+// A theme can put the items' panels where its own open (Lord Workspaces: where its notifications do, under its band):
+// fn(box) → the style inside <Overlay anchor={button}> (box: the button's [x, y, w, h]), or null for the default.
+let placer = null;
+export function setStatusPanelPlacer(fn) { placer = typeof fn === 'function' ? fn : null; return () => { if (placer === fn) placer = null; }; }
+
 // The style of an item's panel inside <Overlay anchor={button}>: toward the middle of the button's display.
 export function statusPanelAt(button, gap = 4) {
   const n = button && typeof button === 'object' && 'current' in button ? button.current : button;
   let box = null;
   try { box = n ? lord.getLayout(n.id) : null; } catch (e) { box = null; }
   if (!box) return { position: 'absolute', top: 26, right: 0 };
+  const own = placer ? placer(box) : null;
+  if (own) return own;
   return panelPlacement(box, displayAt(box[0] + box[2] / 2, box[1] + box[3] / 2), gap);
 }
 

@@ -41,5 +41,15 @@
   "col.time": "المدة",
   "back": "رجوع",
   "emptyMusicTitle": "لا موسيقى",
-  "emptyVideosTitle": "لا فيديوهات"
+  "emptyVideosTitle": "لا فيديوهات",
+  "nav.network": "الشبكة",
+  "nav.streams": "البث",
+  "streams.open": "فتح عنوان…",
+  "streams.list": "فتح قائمة M3U…",
+  "streams.save": "حفظ",
+  "streams.remove": "إزالة",
+  "streams.close": "إغلاق",
+  "streams.saved": "المحفوظة",
+  "streams.channels": "القنوات ({n})",
+  "streams.empty": "افتح كاميرا أو بثًا أو قناة تلفزيون بعنوانها، أو قنوات قائمة M3U."
 }

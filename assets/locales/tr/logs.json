@@ -2,6 +2,7 @@
   "pick": "Tam iletiyi ve alanlarını görmek için bir kayıt seçin.",
   "field.time": "Zaman",
   "field.level": "Düzey",
+  "field.account": "Hesap",
   "field.process": "İşlem",
   "field.pid": "PID",
   "field.unit": "Birim",

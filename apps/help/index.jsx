@@ -5,6 +5,7 @@
 import {
   View, Text, useTheme, useAppWindow, useLocale, t as tr, help, Markdown, ScrollView, SidebarItem, SectionTitle, Button,
   getApp, wm, appName, settings, textDirection, SearchField, EmptyState, Hairline, Lumo, spacing, typeScale,
+  useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -37,20 +38,21 @@ const SECTIONS = ['start', 'desktop', 'apps', 'system', 'settings'];
 
 // ---- welcome tour ----
 
-function TourArt({ step }) {
+function TourArt({ step, compact }) {
   const t = useTheme();
   const icons = [[], ['files', 'terminal', 'store'], [], ['settings', 'monitor'], ['clock', 'help'], ['help']][step] || [];
   const glyph = ['', '', '⌕', '', '', '?'][step];
   return (
-    <View style={{ height: 120, flexDirection: 'row', gap: spacing.l, alignItems: 'center', justifyContent: 'center' }}>
-      {step === 0 ? <Lumo pose="wave" size={120} /> : null}
-      {icons.map((id) => { const a = getApp(id); return a?.Icon ? <a.Icon key={id} size={84} /> : null; })}
+    <View style={{ height: compact ? 72 : 120, flexDirection: 'row', gap: spacing.l, alignItems: 'center', justifyContent: 'center' }}>
+      {step === 0 ? <Lumo pose="wave" size={compact ? 72 : 120} /> : null}
+      {icons.map((id) => { const a = getApp(id); return a?.Icon ? <a.Icon key={id} size={compact ? 56 : 84} /> : null; })}
       {!icons.length && glyph ? <Text style={{ fontSize: 64, color: t.textDim }}>{glyph}</Text> : null}
     </View>
   );
 }
 
-function Tour({ onDone }) {
+// compact: a narrow window (a Workspaces tile), smaller art and margins
+function Tour({ onDone, compact }) {
   const t = useTheme();
   const [step, setStep] = useState(0);
   const steps = 6;
@@ -64,12 +66,12 @@ function Tour({ onDone }) {
     null,
   ][step];
   return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxxl, gap: spacing.l }}>
-      <TourArt step={step} />
-      <Text style={{ fontSize: 26, fontWeight: 600, color: t.text, textAlign: 'center' }}>{tr(`help.tour.${step}.title`)}</Text>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: compact ? spacing.l : spacing.xxxl, gap: compact ? spacing.m : spacing.l }}>
+      <TourArt step={step} compact={compact} />
+      <Text style={{ fontSize: compact ? 20 : 26, fontWeight: 600, color: t.text, textAlign: 'center' }}>{tr(`help.tour.${step}.title`)}</Text>
       <Text style={{ fontSize: 14, color: t.textDim, textAlign: 'center', lineHeight: 1.5, maxWidth: 520 }}>{tr(`help.tour.${step}.body`)}</Text>
       {actions && (
-        <View style={{ flexDirection: 'row', gap: spacing.s }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.s }}>
           {actions.map(([app, section]) => (
             <Button key={section} label={tr(`settings.section.${section}`)} onClick={() => wm.open(app, { args: { section } })} />
           ))}
@@ -142,53 +144,69 @@ export default function Help() {
   }, [args?.nonce]);
   const list = useMemo(() => help.list(), [lang]);
   const results = useMemo(() => (query.trim().length >= 2 ? help.search(query) : null), [query, lang]);
+  const sb = useSidebar(640);
+  // picking an article in a narrow window closes the sidebar over it
+  const pick = (id) => { setArticle(id); if (sb.narrow) sb.close(); };
   const finishTour = () => { setTour(false); settings.set({ welcomeShown: true }); setArticle('welcome'); };
+  const sidebar = (
+    <>
+      <View style={{ paddingHorizontal: 10, paddingTop: spacing.m, paddingBottom: spacing.s }}>
+        <SearchField value={query} onChange={setQuery} placeholder={tr('help.search')} onSubmit={() => results?.[0] && pick(results[0].id)} />
+      </View>
+      <ScrollView style={{ flex: 1 }}>
+        <View style={{ paddingHorizontal: 10, paddingBottom: spacing.m, gap: 2 }}>
+          {results ? (
+            results.length ? results.map((r) => {
+              const on = r.id === article && !tour;
+              return (
+                <View key={r.id} onClick={() => pick(r.id)} style={{ paddingVertical: spacing.s, paddingHorizontal: 10, borderRadius: 6, gap: 2, backgroundColor: on ? t.accent : 'transparent' }}>
+                  <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: on ? '#fff' : t.text, textAlign: 'start' }}>{r.title}</Text>
+                  <Text style={{ fontSize: typeScale.caption, color: on ? 'rgba(255,255,255,0.85)' : t.textDim, lineHeight: 1.35, maxHeight: 44, overflow: 'hidden', textAlign: 'start' }}>{r.snippet}</Text>
+                </View>
+              );
+            }) : <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'center', paddingTop: spacing.xl }}>{tr('help.noResults')}</Text>
+          ) : (
+            <>
+              <View style={{ height: spacing.xs }} />
+              <SidebarItem label={tr('help.tour.open')} selected={tour} onClick={() => { setTour(true); if (sb.narrow) sb.close(); }} icon="☺" />
+              {SECTIONS.map((sec) => {
+                const items = list.filter((x) => (x.section || 'apps') === sec);
+                if (!items.length) return null;
+                return (
+                  <View key={sec} style={{ gap: 2 }}>
+                    <SectionTitle>{tr(`help.section.${sec}`)}</SectionTitle>
+                    {items.map((x) => {
+                      const app = x.app ? getApp(x.app) : null;
+                      return <SidebarItem key={x.id} label={x.title} selected={!tour && x.id === article} onClick={() => pick(x.id)}
+                        icon={app?.Icon ? <View style={{ width: 18, alignItems: 'center' }}><app.Icon size={18} /></View> : '≡'} />;
+                    })}
+                  </View>
+                );
+              })}
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </>
+  );
   if (!help.available() || !list.length) return <EmptyState mascot="confused" title={tr('help.unavailable')} />;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 240, backgroundColor: t.sidebarBg }}>
-        <View style={{ paddingHorizontal: 10, paddingTop: spacing.m, paddingBottom: spacing.s }}>
-          <SearchField value={query} onChange={setQuery} placeholder={tr('help.search')} onSubmit={() => results?.[0] && setArticle(results[0].id)} />
-        </View>
-        <ScrollView style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 10, paddingBottom: spacing.m, gap: 2 }}>
-            {results ? (
-              results.length ? results.map((r) => {
-                const on = r.id === article && !tour;
-                return (
-                  <View key={r.id} onClick={() => setArticle(r.id)} style={{ paddingVertical: spacing.s, paddingHorizontal: 10, borderRadius: 6, gap: 2, backgroundColor: on ? t.accent : 'transparent' }}>
-                    <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: on ? '#fff' : t.text, textAlign: 'start' }}>{r.title}</Text>
-                    <Text style={{ fontSize: typeScale.caption, color: on ? 'rgba(255,255,255,0.85)' : t.textDim, lineHeight: 1.35, maxHeight: 44, overflow: 'hidden', textAlign: 'start' }}>{r.snippet}</Text>
-                  </View>
-                );
-              }) : <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'center', paddingTop: spacing.xl }}>{tr('help.noResults')}</Text>
-            ) : (
-              <>
-                <View style={{ height: spacing.xs }} />
-                <SidebarItem label={tr('help.tour.open')} selected={tour} onClick={() => setTour(true)} icon="☺" />
-                {SECTIONS.map((sec) => {
-                  const items = list.filter((x) => (x.section || 'apps') === sec);
-                  if (!items.length) return null;
-                  return (
-                    <View key={sec} style={{ gap: 2 }}>
-                      <SectionTitle>{tr(`help.section.${sec}`)}</SectionTitle>
-                      {items.map((x) => {
-                        const app = x.app ? getApp(x.app) : null;
-                        return <SidebarItem key={x.id} label={x.title} selected={!tour && x.id === article} onClick={() => setArticle(x.id)}
-                          icon={app?.Icon ? <View style={{ width: 18, alignItems: 'center' }}><app.Icon size={18} /></View> : '≡'} />;
-                      })}
-                    </View>
-                  );
-                })}
-              </>
-            )}
-          </View>
-        </ScrollView>
+      {sb.narrow ? null : <View style={{ width: 240, backgroundColor: t.sidebarBg }}>
+        {sidebar}
         <Hairline edge="end" />
-      </View>
+      </View>}
       <View style={{ flex: 1, minWidth: 0 }}>
-        {tour ? <Tour onDone={finishTour} /> : <Article id={article} onOpen={setArticle} />}
+        {sb.narrow ? (
+          <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.s }}>
+            <SidebarToggle shown={sb.shown} onClick={sb.toggle} />
+            <Hairline edge="bottom" />
+          </View>
+        ) : null}
+        {tour ? <Tour onDone={finishTour} compact={sb.narrow} /> : <Article id={article} onOpen={setArticle} />}
       </View>
+      {sb.narrow && sb.shown ? <SidebarOverlay width={240} top={40} onClose={sb.close}>{sidebar}</SidebarOverlay> : null}
     </View>
   );
 }
+

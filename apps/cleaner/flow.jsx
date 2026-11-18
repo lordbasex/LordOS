@@ -14,7 +14,7 @@ function Dialog({ title, rows, note, okLabel, onOk, onCancel, danger }) {
   return (
     <View onClick={onCancel} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: p.scrim, alignItems: 'center', justifyContent: 'center' }}>
       <Enter x={0} y={14}>
-        <View onClick={(e) => e.stopPropagation()} style={{ width: 460, padding: spacing.xxl, borderRadius: 20, backgroundColor: p.panel, border: `1px solid ${p.line}`, boxShadow: '0 24px 60px rgba(8,4,30,0.5)' }}>
+        <View onClick={(e) => e.stopPropagation()} style={{ width: 460, maxWidth: '94%', padding: spacing.xxl, borderRadius: 20, backgroundColor: p.panel, border: `1px solid ${p.line}`, boxShadow: '0 24px 60px rgba(8,4,30,0.5)' }}>
           <Label size={20} weight={600} style={{ marginBottom: spacing.m }}>{title}</Label>
           {rows.map(([a, b], i) => (
             <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.m, paddingVertical: 10, borderTop: `1px solid ${p.line}` }}>

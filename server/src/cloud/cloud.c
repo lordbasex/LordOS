@@ -229,6 +229,7 @@ static void acc_free(Acc *a) {
     wipe_free(a->pending_secret);
     for (int i = 0; i < a->nkeep; i++) free(a->keep[i]);
     for (int i = 0; i < a->nerrn; i++) free(a->errn[i]);
+    cloud_fails_clear(&a->kfail);
     memset(a, 0, sizeof *a);
 }
 
@@ -464,6 +465,33 @@ static void load_all(void) {
 
 /* ---- rc ---- */
 
+/* #183: rclone's log names no account (one rclone serves them all), so a call about an account that fails gets a line
+ * of LordOS's own in cloud.log after rclone's: "<time> ERROR c1a2b3c4d: operations/list: <rclone's error>". The Logs
+ * app shows the account's provider and name for that id, and folds rclone's own copy of the line into it
+ * (sdk/logfile.js, cloudAccounts). Only the id is written: the file may end up attached to a report. */
+static void note_failure(int m, const char *body, const char *err) {
+    char id[16], path[PATH_MAX], text[900];
+    const char *meth = rc_method_path(m);
+    if (!meth || !cloud_body_account(body, id, sizeof id)) return;
+    pthread_mutex_lock(&cl_mu);
+    cpy(path, sizeof path, log_path);
+    pthread_mutex_unlock(&cl_mu);
+    if (!path[0]) return;
+    /* one line: control characters (rclone's multi-line errors) become spaces, cut at a UTF-8 character boundary */
+    size_t k = 0;
+    const unsigned char *p = (const unsigned char *)(err && err[0] ? err : "rc error");
+    for (; *p && k < sizeof text - 1; p++) text[k++] = *p < 0x20 || *p == 0x7f ? ' ' : (char)*p;
+    if (*p && (*p & 0xc0) == 0x80) {                /* cut inside a character: drop its first bytes too */
+        while (k > 0 && ((unsigned char)text[k - 1] & 0xc0) == 0x80) k--;
+        if (k > 0 && ((unsigned char)text[k - 1] & 0x80)) k--;
+    }
+    text[k] = 0;
+    int fd = lordlog_open(path);
+    if (fd < 0) return;
+    lordlog_write(fd, "ERROR", id, "%s: %s", meth, text);
+    close(fd);
+}
+
 /* one call, parsed: status (200 ok), the document in *d when it parsed (json_free it). msg: rclone's error text. */
 static int rcj(int m, const char *body, JDoc *d, char *msg, size_t mn, int timeout) {
     RcConn c;
@@ -481,9 +509,10 @@ static int rcj(int m, const char *body, JDoc *d, char *msg, size_t mn, int timeo
     explicit_bzero(&c, sizeof c);
     if (st < 0) { if (msg) cpy(msg, mn, "no answer"); return -1; }
     if (json_parse(out, ol, d, NULL, 0)) { d->root = NULL; d->mem = NULL; }
-    if (st != 200 && msg) {
+    if (st != 200) {
         const char *e = d->root ? json_str(d->root, "error") : NULL;
-        cpy(msg, mn, e ? e : "rc error");
+        if (msg) cpy(msg, mn, e ? e : "rc error");
+        note_failure(m, body, e);
     }
     explicit_bzero(out, ol);
     free(out);
@@ -1301,7 +1330,7 @@ static int mount_acc(Acc *a) {
     jb_free(&b);
     const char *off = NULL;
     pthread_mutex_lock(&cl_mu);
-    if (st == 200) { a->mounted = 1; a->mount_gen++; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; a->keeper_wait = 1; }   /* starting: until its first listing answers (check_acc) */
+    if (st == 200) { a->mounted = 1; a->mount_gen++; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; a->keeper_wait = 1; cloud_fails_clear(&a->kfail); }   /* starting: until its first listing answers (check_acc) */
     else {
         a->mounted = 0;
         const char *fc = cloud_failure_code(msg);
@@ -1594,6 +1623,7 @@ static void check_acc(Acc *a) {
         cpy(a->err, sizeof a->err, c ? c : "cloud.listFailed");
         if (!strcmp(a->err, "cloud.authFailed") && !strcmp(a->k->group, "oauth")) cpy(a->err, sizeof a->err, "cloud.signInAgain");
         set_message(a, msg);
+        if (cloud_err_offline(a->err)) cloud_fails_clear(&a->kfail);   /* #185: what the keeper set aside failed because of this */
     } else if (listing_code(a->err)) { a->err[0] = 0; a->message[0] = 0; a->fp_old[0] = a->fp_new[0] = 0; }
     int key = bad && c && !strcmp(c, "cloud.hostKeyChanged") && !a->fp_new[0];
     keeper_waits = keeper_waits && !cloud_err_offline(a->err);
@@ -3393,7 +3423,8 @@ void cloud_keep(const char *const *paths, int n, int keep) {
         int at = -1;
         for (int k = 0; k < a->nkeep; k++) if (!strcmp(a->keep[k], rel)) at = k;
         /* a new kept entry is coming down until the keeper's first pass over it ends (#71) */
-        if (keep && at < 0 && a->nkeep < KEEP_MAX) { char *d = strdup(rel); if (d) { a->keep_busy[a->nkeep] = 1; a->keep[a->nkeep++] = d; changed = 1; } }
+        /* #185: keeping again is the person asking for another try of what failed */
+        if (keep && at < 0 && a->nkeep < KEEP_MAX) { char *d = strdup(rel); if (d) { a->keep_busy[a->nkeep] = 1; a->keep[a->nkeep++] = d; changed = 1; cloud_fails_clear(&a->kfail); } }
         else if (!keep && at >= 0) {
             free(a->keep[at]);
             a->keep[at] = a->keep[--a->nkeep];

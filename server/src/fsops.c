@@ -1014,6 +1014,15 @@ int fsops_resolve_target(const char *path, char *out, size_t n, char *dir, size_
     return 0;
 }
 
+int fsops_name_too_long(const char *path) {
+    if (!path) return 0;
+    size_t len = strlen(path);
+    while (len > 1 && path[len - 1] == '/') len--;
+    size_t start = len;
+    while (start > 0 && path[start - 1] != '/') start--;
+    return len - start > 255;
+}
+
 int fsops_resolve_stat(const char *path, char *target, size_t n, int *down) {
     int r = fsops_resolve_target(path, target, n, NULL, 0, down);
     if (r != -1) return r;

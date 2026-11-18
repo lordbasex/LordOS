@@ -212,6 +212,53 @@ int cloud_kept_busy(const char *const *kept, const unsigned char *busy, int n, c
     return 0;
 }
 
+int cloud_fails_add(CloudFails *f, const char *rel, long long now) {
+    if (!f || !rel) return -1;
+    for (int i = 0; i < f->n; i++) if (!strcmp(f->rel[i], rel)) return 0;
+    if (f->n >= CLOUD_FAILS_MAX) return -1;
+    char *d = strdup(rel);
+    if (!d) return -1;
+    f->rel[f->n] = d;
+    f->at[f->n++] = now;
+    return 1;
+}
+
+int cloud_fails_has(const CloudFails *f, const char *rel, long long now) {
+    for (int i = 0; f && rel && i < f->n; i++) {
+        if (now - f->at[i] >= CLOUD_FAILS_RETRY_S) continue;
+        const char *r = f->rel[i];
+        if (cloud_kept(&r, 1, rel)) return 1;
+    }
+    return 0;
+}
+
+void cloud_fails_expire(CloudFails *f, long long now) {
+    int k = 0;
+    for (int i = 0; f && i < f->n; i++) {
+        if (now - f->at[i] >= CLOUD_FAILS_RETRY_S) { free(f->rel[i]); continue; }
+        f->rel[k] = f->rel[i];
+        f->at[k++] = f->at[i];
+    }
+    if (f) { for (int i = k; i < f->n; i++) f->rel[i] = NULL; f->n = k; }
+}
+
+void cloud_fails_clear(CloudFails *f) {
+    for (int i = 0; f && i < f->n; i++) { free(f->rel[i]); f->rel[i] = NULL; }
+    if (f) f->n = 0;
+}
+
+int cloud_body_account(const char *body, char *id, size_t n) {
+    static const char pre[] = "{\"fs\":\"";
+    if (!body || n < 10 || strncmp(body, pre, sizeof pre - 1)) return 0;
+    const char *p = body + sizeof pre - 1;
+    if (p[0] != 'c') return 0;
+    for (int i = 1; i <= 8; i++) if (!((p[i] >= '0' && p[i] <= '9') || (p[i] >= 'a' && p[i] <= 'f'))) return 0;
+    if (p[9] != ':') return 0;
+    memcpy(id, p, 9);
+    id[9] = 0;
+    return 1;
+}
+
 /* ---- providers ---- */
 
 /* The overlay on rclone's own list (docs/CLOUD.md 17.2): what rclone can't say. Labels are rclone's names (its

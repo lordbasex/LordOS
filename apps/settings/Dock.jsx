@@ -12,6 +12,7 @@ import {
 import { useState } from 'react';
 import { Stack, Section, SettingRow, Actions } from './ui.jsx';
 import { DesktopsSection } from './Desktops.jsx';
+import { ThemeOptions } from './ThemeExtras.jsx';
 
 // A small picture of the screen with the Dock (or the taskbar) on the chosen side.
 function Preview({ side, t }) {
@@ -137,14 +138,29 @@ function ControlCenterSection() {
 
 // Where the close, minimize and maximize buttons go: the theme's own side, the left or the right, in Lord Flow and
 // Lord Classic alike (and for Linux apps that draw their own title bar).
-function WindowsSection({ classic }) {
+// plain: a theme other than Lord Flow and Lord Classic (the footers name theirs)
+function WindowsSection({ classic, plain }) {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
   return (
-    <Section title={tr('settings.dock.windows.title')} footer={tr(classic ? 'settings.dock.windows.footerClassic' : 'settings.dock.windows.footer')}>
+    <Section title={tr('settings.dock.windows.title')} footer={plain ? undefined : tr(classic ? 'settings.dock.windows.footerClassic' : 'settings.dock.windows.footer')}>
       <SettingRow label={tr('settings.dock.windows.buttons')}>
         <Segmented small appearance="neutral" value={windowButtonsPref(s)} onChange={(windowButtons) => set({ windowButtons })}
           options={WINDOW_BUTTON_SIDES.map((v) => [v, tr(`settings.dock.windows.${v}`)])} />
+      </SettingRow>
+    </Section>
+  );
+}
+
+// Dragging a window to an edge of the screen snaps it (0.8.8.10, GitHub #182; sdk/snap.js snapAllowed): every theme
+// that snaps follows this switch, on by default.
+function SnapSection() {
+  const { t: tr } = useLocale();
+  const [s, set] = useSettings();
+  return (
+    <Section footer={tr('settings.dock.snap.footer')}>
+      <SettingRow label={tr('settings.dock.snap.label')}>
+        <Toggle small on={s.windowSnap !== false} onChange={(windowSnap) => set({ windowSnap })} />
       </SettingRow>
     </Section>
   );
@@ -154,7 +170,21 @@ export function DockSettings() {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
   const p = dockPrefs(s);
-  const classic = themes.current() === 'classic';
+  const current = themes.current();
+  const classic = current === 'classic';
+  // (0.8.9) a theme Settings doesn't know by id that brings its own choices (theme.json "options", Lord Workspaces): it
+  // has no Dock or taskbar here; its desktops and the title bars' buttons are the same as everywhere
+  const info = classic || current === 'default' ? null : themes.info();
+  if (info && info.options.length) {
+    return (
+      <Stack>
+        <DesktopsSection tr={tr} />
+        <ThemeOptions theme={info} />
+        <SnapSection />
+        <WindowsSection plain />
+      </Stack>
+    );
+  }
   if (classic) {
     return (
       <Stack>
@@ -170,6 +200,7 @@ export function DockSettings() {
           </Section>
         ) : null}
         <MenuBarSection classic />
+        <SnapSection />
         <WindowsSection classic />
         <ResetDock classic />
       </Stack>
@@ -205,6 +236,7 @@ export function DockSettings() {
       </Section>
       <MenuBarSection />
       <ControlCenterSection />
+      <SnapSection />
       <WindowsSection />
       <ResetDock />
     </Stack>

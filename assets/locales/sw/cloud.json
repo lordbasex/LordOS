@@ -5,8 +5,9 @@
   "accounts": "Akaunti",
   "allAccounts": "Akaunti zote",
   "onThisComputer": "Kwenye kompyuta hii",
-  "cacheLine": "{size} · {kept} zimewekwa",
+  "hereLine": "{size} · {kept} zimewekwa · {free} zinaweza kuachiliwa",
   "freeUp": "Pata Nafasi",
+  "freeUpHint": "\"Pata Nafasi\" huondoa nakala za ndani za faili ambazo hazijawekwa kwenye kompyuta hii; faili zilizowekwa na mabadiliko yanayosubiri kupakiwa hubaki.",
   "freed": "{size} zimeachiliwa kwenye kompyuta hii",
   "freedSkipped": {
     "one": "{size} zimeachiliwa; kipengee {count} kinabaki (kiko wazi, kimewekwa au kinasubiri kupanda)",
@@ -438,5 +439,9 @@
   "details.signIn": "Kuingia",
   "details.server": "Seva",
   "details.app": "Programu",
-  "details.ownApp": "Programu yako mwenyewe"
+  "details.ownApp": "Programu yako mwenyewe",
+  "color": "Rangi",
+  "colorAuto": "Otomatiki",
+  "colorAutoHint": "Otomatiki: kulingana na mpangilio uliyoongeza akaunti, ili akaunti mbili za mtoa huduma mmoja zitofautiane.",
+  "colorChosen": "Huonyeshwa katika Faili, menyu ya Wingu na Kumbukumbu."
 }

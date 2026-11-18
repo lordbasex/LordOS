@@ -235,6 +235,7 @@
   "fs.notRegular": "Não é um arquivo comum (é um link?)",
   "fs.openFailed": "Não foi possível abrir o arquivo: {errno}",
   "fs.outsideHome": "Esse local está fora da sua pasta pessoal ou não é válido",
+  "fs.nameTooLong": "O nome é longo demais (máx. {max} bytes; letras acentuadas e não latinas ocupam de 2 a 4 cada)",
   "fs.protected": "Essa pasta é protegida",
   "fs.systemFolder": "O Arquivos não mostra as pastas internas do sistema (/proc, /sys, /dev e /run)",
   "fs.tooLarge": "O arquivo é grande demais (máx. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Não foi possível atualizar o carregador de inicialização (código {code})",
   "hw.logindFailed": "Não foi possível aplicar a configuração de energia (código {code})",
   "hw.noBacklight": "Essa luz de fundo não existe",
+  "hw.noChargeControl": "Esta bateria não tem controle de carga",
+  "hw.chargeControlFailed": "Não foi possível mudar a carga: {errno}",
   "hw.noCpufreq": "Este computador não permite alterar a frequência do processador",
   "hw.noEeprom": "As ferramentas do carregador de inicialização (rpi-eeprom) não estão instaladas",
   "hw.noKernelLog": "Não foi possível ler o registro do kernel",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "{name} não pode ser instalado para 64 e 32 bits ao mesmo tempo",
   "pkg.foreignArchUnsupported": "Os pacotes de 32 bits só podem ser habilitados num PC de 64 bits (amd64); este sistema é {arch}",
   "pkg.foreignArchFailed": "Não foi possível habilitar os pacotes de 32 bits ({arch}) (o dpkg terminou com o código {code})",
-  "webapps.developerOff": "O modo desenvolvedor está desativado em Ajustes → Apps web"
+  "webapps.developerOff": "O modo desenvolvedor está desativado em Ajustes → Apps web",
+  "media.streamAddress": "Este endereço de transmissão não é permitido",
+  "media.streamCannotOpen": "Não foi possível abrir a transmissão",
+  "media.streamTimeout": "A transmissão não respondeu a tempo",
+  "media.streamAuth": "A transmissão pediu usuário e senha, ou estavam errados",
+  "media.streamLost": "A transmissão caiu",
+  "media.streamNoChannels": "A lista não tem canais",
+  "media.noStreamHelper": "O auxiliar de transmissões (lord-stream) não está disponível"
 }

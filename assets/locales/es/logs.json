@@ -2,6 +2,7 @@
   "pick": "Elegí una entrada para ver el mensaje completo y sus campos.",
   "field.time": "Hora",
   "field.level": "Nivel",
+  "field.account": "Cuenta",
   "field.process": "Proceso",
   "field.pid": "PID",
   "field.unit": "Unidad",

@@ -241,7 +241,12 @@ const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</
 // The page the browser opens: plain words about what is shared and what never is, the summary, the steps and
 // one link to the form. Self-contained (no scripts, no outside files), light and dark, right to left when the
 // language is. `text`: the page's strings, already translated (sysinfo.share.page.*); `rows`: [label, value].
-export function sharePage({ text, rows, url, jsonName, lang = 'en', rtl = false }) {
+// The report inside the page too (issue #171: people attach the page, which is what opens), in a data block the browser
+// never runs; "<" is written as \u003c so the text can't close the block. tools/hwreport reads it back (embeddedReport).
+export const EMBED_ID = 'lordos-hwreport';
+export const embedReport = (json) => (json ? `<script type="application/json" id="${EMBED_ID}">${String(json).replace(/</g, '\\u003c')}</script>\n` : '');
+
+export function sharePage({ text, rows, url, jsonName, lang = 'en', rtl = false, json = '' }) {
   const T = (k) => esc(text[k] || '');
   const li = (k) => `<li>${T(k)}</li>`;
   const tr = rows.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('\n');
@@ -297,7 +302,7 @@ ${steps}
 <p class="small">${T('fileLabel')} <code>${esc(jsonName)}</code></p>
 <p class="small">${T('footer')}</p>
 </main>
-</body>
+${embedReport(json)}</body>
 </html>
 `;
 }

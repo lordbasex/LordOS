@@ -4,7 +4,7 @@
   "name": "Emoji & Symbols",
   "description": "Emoji by category with search and skin tones, and Unicode symbols by block (quick picker with ❖.)",
   "size": [860, 560],
-  "minSize": [600, 380],
+  "minSize": [480, 360],
   "dock": false,
   "category": "Utility",
   "permissions": []

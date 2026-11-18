@@ -1,4 +1,7 @@
 /* hw.c — main-loop glue for Settings' hardware modules (see hw.h). */
+#include "hidppsvc.h"
+#include "batthist.h"
+#include "../ui/js_sys.h"
 #include "hw.h"
 #include "bt.h"
 #include "jbuf.h"
@@ -30,7 +33,7 @@ const PowerState *hw_power(void) { return &power; }
  * notices never came). */
 #define POWER_POLL_MS 30000.0
 static double power_next;               /* CLOCK_MONOTONIC ms of the next read, 0 = none */
-static char power_last[4096];
+static char power_last[8192];
 
 static double hw_now_ms(void) {
     struct timespec t;
@@ -40,7 +43,8 @@ static double hw_now_ms(void) {
 
 static void power_changed(void) {
     power_read("/sys/class/power_supply", &power);
-    char j[4096];
+    batthist_tick(&power, !js_sys_unseen);          /* Settings → Battery's history (docs/BATTERY.md) */
+    char j[8192];
     power_json(&power, j, sizeof j);
     power_next = power.has_battery ? hw_now_ms() + POWER_POLL_MS : 0;
     if (!strcmp(j, power_last)) return;
@@ -101,7 +105,7 @@ void hw_dispatch(const struct pollfd *p, int n) {
         if (p[i].fd == uevent_fd()) {
             int m = uevent_dispatch();
             if (m & UEV_DRM) display_hotplug();
-            if (m & UEV_POWER) power_changed();
+            if (m & UEV_POWER) { power_changed(); hidpp_kick(); }   /* a Logitech device woke up: ask lord-hidpp again */
             if (m & UEV_BACKLIGHT) display_hotplug();      /* the list carries the backlight */
         } else if (p[i].fd == sysbus_fd()) sysbus_dispatch();
         else if (p[i].fd == notifyd_fd()) notifyd_dispatch();

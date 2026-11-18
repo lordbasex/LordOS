@@ -11,6 +11,7 @@
 import {
   partMountable, partUnmountable, statusText, needsDiskFormats, openDiskFormats, View, Text, ScrollView, useTheme, useLocale, useSystemInfo, useAppWindow, admin, useDisks, disks, formatBytes,
   Toolbar as Bar, ToolbarButton, ToolbarSpacer, MenuButton, Hairline, GroupBox, FormRow, EmptyState, spacing, typeScale,
+  useSidebar, SidebarToggle, SidebarOverlay, Button,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DisksIcon, DriveGlyph, PartGlyph, fsColor } from './icons.jsx';
@@ -165,7 +166,7 @@ function Sidebar({ list, sel, onSel }) {
 
 // The toolbar over the details: the actions that apply to the selection as
 // labelled toolbar items; the ones that don't fit go into the "⋯" menu, so the bar never wraps.
-function DiskToolbar({ disk, part, onDialog, run, busy }) {
+function DiskToolbar({ disk, part, onDialog, run, busy, side }) {
   const { t: tr } = useLocale();
   const t = useTheme();
   const { can, use, isAdmin } = useCanTouch();
@@ -184,7 +185,7 @@ function DiskToolbar({ disk, part, onDialog, run, busy }) {
   if (ok) actions.push(['erase', tr('disks.erase'), () => onDialog({ kind: 'erase' })]);
   if (ok && !part) actions.push(['image', tr('disks.makeBootable'), () => onDialog({ kind: 'image' })]);
   // what fits: label width (≈ 7 px per character at 13 px) + 16 px padding + 8 px gap
-  const room = width - 2 * spacing.m - 36;
+  const room = width - 2 * spacing.m - 36 - (side ? 36 : 0);
   const shown = [];
   let used = 0;
   for (const a of actions) {
@@ -197,6 +198,7 @@ function DiskToolbar({ disk, part, onDialog, run, busy }) {
   return (
     <View ref={box}>
       <Bar>
+        {side ? <SidebarToggle shown={side.shown} onClick={side.toggle} /> : null}
         {!ok ? (
           <Text style={{ flex: 1, fontSize: typeScale.callout, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
             {disk.system ? tr('disks.systemNote') : disk.ro ? tr('disks.readOnlyNote') : tr('disks.adminNote')}</Text>
@@ -209,7 +211,7 @@ function DiskToolbar({ disk, part, onDialog, run, busy }) {
   );
 }
 
-function Details({ disk, part, onDialog, autoCheck }) {
+function Details({ disk, part, onDialog, autoCheck, side }) {
   const t = useTheme();
   const { isAdmin } = useCanTouch();
   const { t: tr } = useLocale();
@@ -232,7 +234,7 @@ function Details({ disk, part, onDialog, autoCheck }) {
     : [disk.name, formatBytes(disk.size), transportName(tr, disk), disk.table ? tr(`disks.table.${disk.table === 'gpt' ? 'gpt' : 'dos'}`) : ''].filter(Boolean).join(' · ');
   return (
     <View style={{ flex: 1, minWidth: 0 }}>
-      <DiskToolbar disk={disk} part={part} onDialog={onDialog} run={run} busy={busy} />
+      <DiskToolbar disk={disk} part={part} onDialog={onDialog} run={run} busy={busy} side={side} />
       <ScrollView style={{ flex: 1 }}>
         <View style={{ padding: spacing.xl, gap: spacing.xl }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l }}>
@@ -287,6 +289,8 @@ export default function Disks() {
   const { args } = useAppWindow() || {};
   useEffect(() => { if (args?.disk) setSel({ disk: args.disk, part: null }); }, [args?.disk, args?.nonce]);
   const [dialog, setDialog] = useState(null);
+  // a small window: the list of disks hides behind a toolbar button and opens over the details
+  const side = useSidebar(640, 'disks');
   const tools = useMemo(() => disks.tools(), []);
   // pick something on open (the first removable, if any) and keep a valid selection if it disappears
   const disk = list.find((d) => d.name === sel.disk) || list.find((d) => d.removable) || list[0];
@@ -294,9 +298,14 @@ export default function Disks() {
   if (!disks.available()) return <EmptyState mascot="confused" title={tr('disks.unavailable')} />;
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      <Sidebar list={list} sel={{ disk: disk && disk.name, part: part && part.name }} onSel={setSel} />
-      {disk ? <Details key={disk.name} disk={disk} part={part} onDialog={(d) => setDialog({ ...d, disk, part })} autoCheck={args?.disk === disk.name ? args.nonce || 1 : null} />
+      {side.narrow ? null : <Sidebar list={list} sel={{ disk: disk && disk.name, part: part && part.name }} onSel={setSel} />}
+      {disk ? <Details key={disk.name} disk={disk} part={part} onDialog={(d) => setDialog({ ...d, disk, part })} autoCheck={args?.disk === disk.name ? args.nonce || 1 : null} side={side.narrow ? side : null} />
         : <EmptyState icon={<DisksIcon size={56} />} title={tr('disks.none')} />}
+      {side.narrow && side.shown ? (
+        <SidebarOverlay width={240} onClose={side.close}>
+          <Sidebar list={list} sel={{ disk: disk && disk.name, part: part && part.name }} onSel={(s) => { setSel(s); side.close(); }} />
+        </SidebarOverlay>
+      ) : null}
       {dialog ? <DiskDialog {...dialog} tools={tools} onClose={() => { setDialog(null); reload(); }} /> : null}
     </View>
   );

@@ -37,5 +37,15 @@
   "col.time": "Durada",
   "back": "Enrere",
   "emptyMusicTitle": "No hi ha música",
-  "emptyVideosTitle": "No hi ha vídeos"
+  "emptyVideosTitle": "No hi ha vídeos",
+  "nav.network": "Xarxa",
+  "nav.streams": "Emissions",
+  "streams.open": "Obre una adreça…",
+  "streams.list": "Obre una llista M3U…",
+  "streams.save": "Desa",
+  "streams.remove": "Treu",
+  "streams.close": "Tanca",
+  "streams.saved": "Desades",
+  "streams.channels": "Canals ({n})",
+  "streams.empty": "Obre una càmera, una emissió o un canal de TV per l'adreça, o els canals d'una llista M3U."
 }

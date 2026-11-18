@@ -151,5 +151,10 @@
   "wifi.saved": "সংরক্ষিত",
   "wifi.scan": "স্ক্যান করুন",
   "wifi.scanning": "স্ক্যান করা হচ্ছে…",
-  "wifi.wrongKey": "পাসওয়ার্ড ভুল।"
+  "wifi.wrongKey": "পাসওয়ার্ড ভুল।",
+  "wifi.available": "উপলব্ধ Wi-Fi নেটওয়ার্ক",
+  "wifi.currentLabel": "{ssid} — সংযুক্ত",
+  "wifi.connect": "সংযুক্ত করুন",
+  "wifi.notInRange": "সীমার বাইরে",
+  "wifi.knownFooter": "সংরক্ষিত নেটওয়ার্ক সীমার মধ্যে থাকলে LordOS নিজে থেকেই তাতে যুক্ত হয়। ভুলে যান নেটওয়ার্কটি ও তার পাসওয়ার্ড এই কম্পিউটার থেকে মুছে দেয়।"
 }

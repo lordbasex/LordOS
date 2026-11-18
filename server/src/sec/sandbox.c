@@ -83,6 +83,19 @@ static int ll_path(int rs, const char *path, uint64_t allow) {
     struct landlock_path_beneath_attr pb = { .allowed_access = allow };
     pb.parent_fd = open(path, O_PATH | O_CLOEXEC);
     if (pb.parent_fd < 0) return -1;
+    /* a single file (resolv.conf, ld.so.cache): only the rights a file can have, or the kernel refuses the rule
+     * (EINVAL) and the file stays unreadable */
+    struct stat st;
+    if (!fstat(pb.parent_fd, &st) && !S_ISDIR(st.st_mode)) {
+        uint64_t file = LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_READ_FILE;
+#ifdef LANDLOCK_ACCESS_FS_TRUNCATE
+        file |= LANDLOCK_ACCESS_FS_TRUNCATE;
+#endif
+#ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
+        file |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
+#endif
+        pb.allowed_access &= file;
+    }
     int r = ll_add(rs, LANDLOCK_RULE_PATH_BENEATH, &pb);
     close(pb.parent_fd);
     return r;
@@ -563,7 +576,25 @@ static int build_filter(struct sock_filter *f, int cap, int net, const int *extr
         }
 #endif
         /* socket, socketpair, connect, bind, listen, accept, execve and execveat: none is in
-         * the lists, so they fall into EPERM */
+         * the lists, so they fall into EPERM. A network helper (lord-stream): socket only for AF_INET/AF_INET6
+         * ([0]jeq nr [1]ld domain [2]jeq inet [3]jeq inet6 [4]EACCES [5]ALLOW); connect and bind below. */
+        if (net) {
+            EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_socket), 0, 5));
+            EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[0])));
+            EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AF_INET, 2, 0));
+            EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AF_INET6, 1, 0));
+            EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ERRNO | (EACCES & SECCOMP_RET_DATA)));
+            EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
+            RELOAD_NR();
+            EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_connect), 0, 1));
+            EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
+            EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_bind), 0, 1));      /* UDP: RTP ports, multicast */
+            EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
+            EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_sendmmsg), 0, 1));  /* glibc's resolver: A and AAAA at once */
+            EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
+            EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, NR(SYS_recvmmsg), 0, 1));
+            EMIT(BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
+        }
     } else {
         /* apps' socket(2): network only (with the permission). Not AF_UNIX either: Wayland and the broker
          * are already connected before the sandbox, and a new unix socket could reach the
@@ -864,16 +895,17 @@ int sandbox_apply_helper(const SandboxHelperCfg *cfg) {
     /* no network; read-only access to the declared folders, plus the folders that arrive as fds */
     SandboxConfig ro = { .id = cfg->name ? cfg->name : "helper", .pkg_dir = NULL, .data_dir = NULL,
                          .runtime_dir = NULL, .ro_extra = cfg->ro_paths, .dev_files = cfg->dev_files,
-                         .list_dirs = cfg->list_dirs, .network = 0 };
+                         .list_dirs = cfg->list_dirs, .network = cfg->network ? 1 : 0 };
     int fs_ok = 0, net_ok = 0;
     if (!apply_landlock(&ro, cfg->ro_dir_fds, cfg->rw_dir_fds, &fs_ok, &net_ok)) { if (fs_ok) mask |= SB_LANDLOCK_FS; if (net_ok) mask |= SB_LANDLOCK_NET; }
-    if (apply_seccomp_extra(0, cfg->extra_syscalls, cfg->allow_ioctl_classes, 1)) {
+    if (apply_seccomp_extra(cfg->network ? 1 : 0, cfg->extra_syscalls, cfg->allow_ioctl_classes, 1)) {
         /* fails closed: a helper decoding foreign data doesn't run without seccomp */
         fprintf(stderr, "sandbox-helper[%s]: no seccomp; the helper exits\n", ro.id);
         _exit(70);
     }
     mask |= SB_SECCOMP;
-    fprintf(stderr, "sandbox-helper[%s]: cgroup=%d landlock-fs=%d seccomp=1(tsync) nopriv=%d nocaps=%d (no network or new sockets, no exec, threads only)\n",
-            ro.id, !!(mask & SB_CGROUP), !!(mask & SB_LANDLOCK_FS), !!(mask & SB_NOPRIV), !!(mask & SB_NOCAPS));
+    fprintf(stderr, "sandbox-helper[%s]: cgroup=%d landlock-fs=%d seccomp=1(tsync) nopriv=%d nocaps=%d (%s, no exec, threads only)\n",
+            ro.id, !!(mask & SB_CGROUP), !!(mask & SB_LANDLOCK_FS), !!(mask & SB_NOPRIV), !!(mask & SB_NOCAPS),
+            cfg->network ? "internet sockets only, no unix or netlink" : "no network or new sockets");
     return mask;
 }

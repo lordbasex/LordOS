@@ -1,0 +1,30 @@
+[Unit]
+Description=LordOS text mode: a login prompt on tty1 (startlordos starts the desktop)
+Documentation=file:///usr/share/doc/lordos/README.md
+# Only in text mode (docs/SESSIONS.md, "Text mode"): the boot menu's "LordOS (text mode)" entry (lordos.text=1)
+# or Settings → Users & Login → Start in text mode (/etc/lordos/text-mode). lord-sessiond then leaves tty1 alone.
+ConditionKernelCommandLine=|lordos.text=1
+ConditionPathExists=|/etc/lordos/text-mode
+# lordos.service hangs tty1 up when it starts (TTYVHangup): the prompt comes after it
+After=lordos.service systemd-user-sessions.service plymouth-quit-wait.service
+Conflicts=getty@tty1.service
+
+[Service]
+# as getty@tty1.service, which LordOS masks (lordos.service has tty1 in graphics mode the rest of the time)
+ExecStart=-/sbin/agetty -o '-- \\u' --noreset --noclear - ${TERM}
+Type=idle
+Restart=always
+RestartSec=0
+UtmpIdentifier=tty1
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+IgnoreSIGPIPE=no
+SendSIGHUP=yes
+UnsetEnvironment=LANG LANGUAGE LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT LC_IDENTIFICATION
+
+[Install]
+WantedBy=multi-user.target

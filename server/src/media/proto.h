@@ -39,6 +39,9 @@ enum {
                            Clips generated in memory; answers MM_BENCH records, then MM_STATE MS_DONE */
     MK_LIVE,            /* a packaged app's live stream (lm_live.c, live.h): fds = link to its companion, audio ring (or
                            none). Encoded pictures and Opus in; frame slots, sound and, with MM_RECORD, the microphone out */
+    /* lord-stream only (0.8.8.10, src/media/stream, streamurl.h): MK_PLAY with no file (params url=…; fds = audio ring,
+       render node), and the channels of an M3U list: */
+    MK_M3U,             /* params url=http(s)://… → MM_RESULT JSON chunks [{name,group,logo,url}], v[1] = 1 while more follow */
 };
 
 /* Jobs of the MK_WORKER helper (MM_JOB with v[0] = MW_*). */

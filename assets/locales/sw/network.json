@@ -151,5 +151,10 @@
   "wifi.saved": "imehifadhiwa",
   "wifi.scan": "Tafuta",
   "wifi.scanning": "Inatafuta…",
-  "wifi.wrongKey": "Nenosiri si sahihi."
+  "wifi.wrongKey": "Nenosiri si sahihi.",
+  "wifi.available": "Mitandao ya Wi-Fi inayopatikana",
+  "wifi.currentLabel": "{ssid} — Imeunganishwa",
+  "wifi.connect": "Unganisha",
+  "wifi.notInRange": "Nje ya masafa",
+  "wifi.knownFooter": "LordOS hujiunga yenyewe na mtandao uliohifadhiwa ukiwa ndani ya masafa. Sahau huondoa mtandao na nenosiri lake kwenye kompyuta hii."
 }

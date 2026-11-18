@@ -335,6 +335,8 @@ void term_close(Session *s) {
     free(s->app_line);
     for (int i = 0; i < s->nframes; i++) free(s->frames[(s->frame_head + i) % REPLAY_FRAMES].cells);
     free(s->frames);
+    free(s->shot);
+    free(s->shot_flags);
     if (s->log) fclose(s->log);
     memset(s, 0, sizeof *s);
 }
@@ -385,6 +387,8 @@ void term_shutdown(int keep) {
             free(s->out);
             for (int k = 0; k < s->nframes; k++) free(s->frames[(s->frame_head + k) % REPLAY_FRAMES].cells);
             free(s->frames);
+            free(s->shot);
+            free(s->shot_flags);
             if (s->log) fclose(s->log);
             memset(s, 0, sizeof *s);
         } else term_close(s);
@@ -880,6 +884,62 @@ int term_export(Session *s, char *path, size_t size) {
     return f ? 0 : -1;
 }
 
+/* Damage by what changed on screen (0.8.8.10). A program often writes a row again with the same text (a TUI
+ * redrawing its whole area for a spinner), and a change is often a few cells: the rows written are compared with a
+ * snapshot of what was drawn, and only the columns that differ are damaged, a few cells wider for ligatures and
+ * italic overhang. Rows next to each other go in one box. The cursor's old and new cells are damaged on their own
+ * (blinking, moving, its shape or focus). Whole rows instead whenever the picture depends on more than the cells:
+ * bidi or a complex script (shaping moves glyphs), the prompt marks, the cursor line guide, timestamps, search
+ * matches, a selection, inline images; the whole terminal as before after a scroll or a full redraw (all_dirty),
+ * while looking at the history or during Instant Replay. A translucent background no longer forces the whole
+ * terminal: the scene under the damaged part is painted again first. */
+#define SHOT_MARGIN 3
+static int complex_cp(uint32_t cp) {
+    return (cp >= 0x0590 && cp < 0x1100) || (cp >= 0x1700 && cp < 0x1d00) || (cp >= 0xa800 && cp < 0xac00) || (cp >= 0x10a00 && cp < 0x11fff);
+}
+static void shot_take_row(Session *s, int r) {
+    Term *t = &s->t;
+    Line *l = vt_view_line(t, r, NULL);
+    Cell *d = s->shot + (size_t)r * s->shot_cols;
+    int n = l ? (l->len < s->shot_cols ? l->len : s->shot_cols) : 0;
+    if (n) memcpy(d, l->c, (size_t)n * sizeof *d);
+    if (n < s->shot_cols) memset(d + n, 0, (size_t)(s->shot_cols - n) * sizeof *d);
+    s->shot_flags[r] = l ? l->flags : 0;
+}
+static void shot_take(Session *s) {
+    Term *t = &s->t;
+    if (s->shot_cols != t->cols || s->shot_rows != t->rows || !s->shot) {
+        free(s->shot); free(s->shot_flags);
+        s->shot = calloc((size_t)t->cols * t->rows, sizeof *s->shot);
+        s->shot_flags = calloc((size_t)t->rows, 1);
+        s->shot_cols = t->cols; s->shot_rows = t->rows;
+        if (!s->shot || !s->shot_flags) { free(s->shot); free(s->shot_flags); s->shot = NULL; s->shot_flags = NULL; s->shot_ok = 0; return; }
+    }
+    for (int r = 0; r < t->rows; r++) shot_take_row(s, r);
+    s->shot_ok = 1;
+}
+/* columns [*c0, *c1) of row r that differ from the snapshot (and the snapshot updated); 0 if none */
+static int shot_diff_row(Session *s, int r, int *c0, int *c1, int *whole) {
+    Term *t = &s->t;
+    Line *l = vt_view_line(t, r, NULL);
+    const Cell *o = s->shot + (size_t)r * s->shot_cols;
+    static const Cell zero;
+    int lo = -1, hi = -1, cx = 0;
+    for (int c = 0; c < t->cols; c++) {
+        const Cell *a = l && c < l->len ? &l->c[c] : &zero;
+        if (complex_cp(a->cp) || complex_cp(o[c].cp)) cx = 1;
+        if (memcmp(a, &o[c], sizeof *a)) { if (lo < 0) lo = c; hi = c + 1; }
+    }
+    int flags = l ? l->flags : 0;
+    *whole = cx || flags != s->shot_flags[r];
+    if (lo < 0 && !*whole) return 0;
+    shot_take_row(s, r);
+    if (*whole || lo < 0) { *c0 = 0; *c1 = t->cols; return 1; }
+    *c0 = lo - SHOT_MARGIN < 0 ? 0 : lo - SHOT_MARGIN;
+    *c1 = hi + SHOT_MARGIN > t->cols ? t->cols : hi + SHOT_MARGIN;
+    return 1;
+}
+
 int term_damage(void) {
     int any = 0;
     double now = now_ms();
@@ -891,19 +951,63 @@ int term_damage(void) {
         capture_frame(s, now);
         Node *n = node_get(s->node);
         int visible = n && n->type == NODE_TERM && n->term == s->id && n->prev_box.x1 > n->prev_box.x0 && s->gw > 0;
-        if (t->cx != s->drawn_cx || t->cy != s->drawn_cy) { vt_mark_dirty(t, s->drawn_cy); vt_mark_dirty(t, t->cy); }
+        int moved = t->cx != s->drawn_cx || t->cy != s->drawn_cy;
+        if (moved) { vt_mark_dirty(t, s->drawn_cy); vt_mark_dirty(t, t->cy); }
         int lo = t->rows, hi = -1;
         for (int r = 0; r < t->rows; r++) if (t->dirty[r]) { if (r < lo) lo = r; hi = r; }
         if (visible && (t->all_dirty || hi >= 0)) {
             float cw, ch, base;
             term_metrics(&s->prof, &cw, &ch, &base);
-            if (t->all_dirty || t->view > 0 || s->prof.bg_opacity < 1) damage_add((Box){ s->gx, s->gy, s->gx + s->gw, s->gy + s->gh });
-            else {
-                float y0 = s->gy + s->prof.padding + lo * ch, y1 = s->gy + s->prof.padding + (hi + 1) * ch;
-                damage_add((Box){ floorf(s->gx), floorf(y0 - 2), ceilf(s->gx + s->gw), ceilf(y1 + 2) });
+            const TermProfile *p = &s->prof;
+            /* how the cursor is drawn now; noted on every damage, a full one too */
+            uint32_t ckey = (uint32_t)s->blink_on | (uint32_t)t->focused << 1 | (uint32_t)(t->cursor_shape & 15) << 2 |
+                            (uint32_t)!!(t->modes & M_HIDECURSOR) << 6 | (uint32_t)!!t->copy_active << 7 | (t->cursor_set ? (t->cursor_color & 0xffffff) << 8 : 0);
+            int full = t->all_dirty || t->view > 0 || s->replay >= 0 || !s->shot_ok || s->shot_cols != t->cols || s->shot_rows != t->rows;
+            if (full) {
+                damage_add((Box){ s->gx, s->gy, s->gx + s->gw, s->gy + s->gh });
+                if (t->view == 0 && s->replay < 0) shot_take(s); else s->shot_ok = 0;
+                s->shot_cursor = ckey;
+            } else {
+                int rows_only = p->bidi || p->cursor_guide || p->timestamps || t->nmatches || t->sel_active || t->nimages;
+                float px0 = s->gx + p->padding, py0 = s->gy + p->padding;
+                /* rows next to each other in one box: the union of their columns */
+                int g0 = -1, gc0 = 0, gc1 = 0;
+                for (int r = lo; r <= hi + 1; r++) {
+                    int c0 = 0, c1 = 0, whole = 0, hit = 0;
+                    if (r <= hi && t->dirty[r]) {
+                        hit = shot_diff_row(s, r, &c0, &c1, &whole);
+                        if (hit && rows_only) { c0 = 0; c1 = t->cols; }
+                    }
+                    if (hit && g0 < 0) { g0 = r; gc0 = c0; gc1 = c1; continue; }
+                    if (hit) { if (c0 < gc0) gc0 = c0; if (c1 > gc1) gc1 = c1; continue; }
+                    if (g0 >= 0) {
+                        /* the first and last columns reach the padding (a background run is filled to the edge) */
+                        float x0 = gc0 == 0 ? s->gx : px0 + gc0 * cw, x1 = gc1 == t->cols ? s->gx + s->gw : px0 + gc1 * cw;
+                        damage_add((Box){ floorf(x0 - 2), floorf(py0 + g0 * ch - 2), ceilf(x1 + 2), ceilf(py0 + r * ch + 2) });
+                        g0 = -1;
+                    }
+                }
+                /* the cursor: its old and its new cell, when it moved or is drawn differently (a write in its row with the
+                 * cursor where it was is in the cells' diff) */
+                int ccur = moved || ckey != s->shot_cursor;
+                s->shot_cursor = ckey;
+                int cys[2] = { s->drawn_cy, t->cy }, cxs[2] = { s->drawn_cx, t->cx };
+                for (int i = 0; i < 2 && ccur; i++) {
+                    if (cys[i] < 0 || cys[i] >= t->rows || !t->dirty[cys[i]]) continue;
+                    if (rows_only) {
+                        damage_add((Box){ floorf(s->gx), floorf(py0 + cys[i] * ch - 2), ceilf(s->gx + s->gw), ceilf(py0 + (cys[i] + 1) * ch + 2) });
+                        continue;
+                    }
+                    /* a ligature is broken at the cursor (shape_row): its neighbours too */
+                    int c0 = cxs[i] - SHOT_MARGIN < 0 ? 0 : cxs[i] - SHOT_MARGIN, c1 = cxs[i] + 1 + SHOT_MARGIN > t->cols ? t->cols : cxs[i] + 1 + SHOT_MARGIN;
+                    float x0 = c0 == 0 ? s->gx : px0 + c0 * cw, x1 = c1 == t->cols ? s->gx + s->gw : px0 + c1 * cw;
+                    damage_add((Box){ floorf(x0 - 2), floorf(py0 + cys[i] * ch - 2), ceilf(x1 + 2), ceilf(py0 + (cys[i] + 1) * ch + 2) });
+                }
             }
             any = 1;
         }
+        /* not drawn now (another activity, a minimized window): what the screen shows is no longer known */
+        if (!visible) s->shot_ok = 0;
         t->all_dirty = 0;
         memset(t->dirty, 0, (size_t)t->rows);
     }

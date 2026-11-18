@@ -99,8 +99,12 @@ timer that sleeps until the next change (30 s steps only during the 30-minute fa
   follow the recommended one; files with 1 or 2 are read as 100 and 200 %); `x`, `y` place the display
   relative to the main one. `kms.c` asks `display_pick()` (registered with `kms_set_picker`) every
   time `lord-sessiond` lends the monitor to the session, so the main display's saved mode is used
-  from the first frame; the other displays open right after. The greeter always uses the preferred
-  mode.
+  from the first frame; the other displays open right after. The greeter (and a display with nothing saved) uses the
+  display's native mode (`mode_native`, `server/src/hw/modes.c`): the EDID's preferred mode, unless its shape is more
+  than 8 % off the panel's physical one (the EDID size in mm, both sides at least 10 cm) and a progressive mode within
+  3 % of that shape exists; then the largest such mode. A 34" 3440 × 1440 ultrawide whose EDID prefers 3840 × 2160
+  opens at 3440 × 1440 instead of being stretched to 16:9 (GitHub #173). Settings → Displays names that mode "native".
+  The login screen draws its picture once per display, each covering its own display (`themes/greeter`).
 - **Main display.** "Use as Main Display" moves the Dock (and the menu bar, when it is not on every display) to another display (no
   modeset; the arrangement stays). A plugged display is added and an unplugged one removed (DRM
   uevent → `display_hotplug()` → resync); its windows go to the main display.
@@ -305,7 +309,10 @@ against BlueZ 5.82's source and the unit tests above; **not yet with a real Magi
   (`dark`) the login screen keeps it off (`lord.display.blank()`) until a key, the mouse or the
   trackpad; it turns the screen off again after the same `off` time, and when the sleep time is up
   (`sleepLeft` after the lock, then `sleep` after the last input) it asks `lord-sessiond` to suspend
-  (`{t:'power', a:'suspend'}`, the login screen having no admin helper). If sleep comes before the lock
+  (`{t:'power', a:'suspend'}`, the login screen having no admin helper). The login screen applies those
+  deadlines as the `mode` notice arrives, before its React tree has mounted (`themes/greeter/inbox.js`): a
+  login screen started for the lock used to drop a notice that came first and stay lit and awake (#172).
+  If sleep comes before the lock
   deadline, the session locks first. Sleep choices: 10, 15, 20, 30 min, 1, 2 and 3 h on the power
   adapter; 5, 10, 15, 30 min, 1, 2 and 3 h on battery. The VM is never put to
   sleep in the tests. Since 0.8.5 a Linux app that holds a Wayland idle inhibitor
@@ -356,6 +363,29 @@ against BlueZ 5.82's source and the unit tests above; **not yet with a real Magi
   power button: the ACPI "Power Button" isn't opened, and a tablet's `gpio-keys` node is opened for
   its volume keys without a grab and with `KEY_POWER` dropped (`server/src/inputkind.h`), so logind
   sees every press and the desktop none. Lid rows only show with a battery.
+- **A laptop that wakes right after it sleeps with the lid open** (GitHub #172, a MacBookPro12,1): the
+  firmware's lid device (`LID0` in `/proc/acpi/wakeup`) is a wake source and fires a second after the
+  computer goes to sleep, although the lid never moved. Since 0.8.8.10 the systemd-sleep hook
+  `/usr/lib/systemd/system-sleep/lordos-lid-wake` (`server/src/hw/lidwake_tool.c`, a root program that is not a
+  service: systemd-sleep runs it as root only before and after a sleep, with `pre`|`post` and
+  `suspend`|`hibernate`|`hybrid-sleep`|`suspend-then-hibernate`, and it refuses any other argument) handles it.
+  Before sleeping, and only when all of this holds, it writes the lid device's name to `/proc/acpi/wakeup`
+  (writing a name toggles that device) and keeps the name in `/run/lordos/lid-wake` (root, `0600`) first:
+  - the computer is portable: SMBIOS chassis type 8, 9, 10, 14, 31 or 32 in `/sys/class/dmi/id/chassis_type`, the
+    on-screen keyboard's list (`server/src/hw/chassis.h`). A desktop, a server, a tablet or a computer without DMI
+    is never touched;
+  - `/proc/acpi/wakeup` lists a `LID*` device that is enabled and able to wake (`*enabled`);
+  - every lid in `/proc/acpi/button/lid/*/state` says `open`. A closed lid, or one that can't be read, keeps its
+    wake source, so opening the lid still wakes the computer.
+
+  After waking it writes back only the names in its note that are now disabled (one turned back on by someone else
+  is left alone) and removes the note. Inputs are kernel files only, at fixed paths, parsed strictly
+  (`server/src/hw/lidwake.h`): anything unexpected means nothing is changed, and the only name ever written is one
+  read from `/proc/acpi/wakeup` itself, `[A-Z0-9_]{1,8}`. What it did goes to the journal
+  (`journalctl -b -u systemd-suspend`, `lordos-lid-wake: LID0 off as a wake source while the lid is open`). No
+  setting and no text in the desktop. Tested in `build/lidwake-test` (the parsers against a MacBookPro12,1's list
+  and malformed ones, the desktop/closed/unknown cases, the note, the arguments); not yet checked on the reporter's
+  MacBook.
 
 ## Cooling
 
@@ -543,6 +573,54 @@ that day, or the chosen app (Thunderbird…) as it starts.
 
 **Show Keyboard**, and how to open it: the button next to the clock or ❖⌃K. It never opens by itself. See
 [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md).
+
+## First start: choose your desktop (0.8.9)
+
+The first session of a new account on an installed system opens a three-step chooser over the desktop, in the
+language chosen in the installer. It never appears on the live system, on the OVA image's first boot (the installer
+runs there), on the login screen, or for anyone who has already used LordOS.
+
+1. **Choose your desktop**: a panel over the dimmed desktop with the crown, and three cards, Lord Flow, Lord Classic and
+   Lord Workspaces (a real picture of each, its name and the theme's own description). Their order is random every
+   time it starts; none is chosen and none is marked as recommended, so **See it live** waits for a choice.
+2. **Live**: the chosen desktop is applied for real with the same live switch as Settings → Appearance → Desktop style
+   (`themes.use`, which discards the JS context). The panel becomes a small box (330 px) on the end side of the work
+   area, about mid-height, never over the Dock, the Classic taskbar or the Workspaces spine and band. Its grip drags it
+   anywhere inside the work area of the display under it. It lists the three names with a ✓ on the current one (a click
+   switches live) and has **Back** and **Use this**.
+3. **Change it whenever you like**: names the chosen desktop and shows a drawn replica of Settings → Appearance in the
+   person's language, with Desktop style ringed in amber and the chosen one selected, and the path Settings →
+   Appearance → Desktop style. **Back** and **Start**.
+
+**Back** works on every step; going from 2 to 1 keeps the pick and the theme already applied (nothing is switched
+back), and a new pick switches again when the person goes on. Keys: Tab goes round the controls (the chooser is in the
+modal layer, so it has the keyboard), Space and Enter press the focused one, Enter alone presses the main button and
+Escape is Back. "Welcome to LordOS" (`SYSTEM.md`) and Lord Workspaces' activity onboarding wait until it is done.
+
+How it works:
+
+- `sdk/firststartmodel.js` (pure, `server/tests/firststart_model_test.mjs`) decides who sees it and the steps;
+  `sdk/firststart.jsx` draws it. `startShell` calls `startFirstStart()`, and `<FirstStart>` is mounted in the modal
+  layer by the SDK for every theme. Once it is done it draws nothing and leaves no listener or timer.
+- **Who sees it**: `settings.desktopChosen` is `false` and `lord.system.info()` is neither `live` nor `firstAccount`. A
+  new account has no settings file, or the small one the installer, the OVA's first boot or Settings → Users write
+  (language, keyboard). Settings migration 5 (`sdk/settings.js` `MIGRATIONS`, `markExistingUser`) sets
+  `desktopChosen: true` on a file that shows an earlier session: the welcome tour was shown (`welcomeShown`), a
+  session saved its windows (`sessionSaved`), or a desktop style was chosen (`theme`). So nobody who upgrades sees it,
+  and neither does an unattended first boot that already named a theme.
+- **Across the live switch**: the step, the pick, the cards' order and where the box was left are kept in
+  `settings.firstStart` and saved before `themes.use` (which writes the settings synchronously); the new theme's
+  `startShell` resumes from there. The saved state is checked (`cleanState`): a desktop uninstalled since, an order
+  that isn't the three desktops or an odd step starts the chooser over. If the switch fails the theme stays and the
+  chooser goes back to step 1. **Start** sets `desktopChosen: true` and clears `firstStart`; the theme is already the
+  chosen one, so it is never left half switched.
+- The card pictures are `assets/desktops/<theme id>.jpg` (640 × 400, about 40 KB each, captures of the three desktops
+  on the test VM), installed by `tools/iso/mkdeb.sh` with the other assets. The crown is
+  `assets/icons/lordos-crown-512.png`. Desktop style's drawn pictures moved from Settings to
+  `sdk/stylethumb.jsx` (`DesktopStyleThumb`) so the replica and Settings draw the same ones.
+- Tests: `server/tests/firststart_model_test.mjs`, and `firststart_scene.mjs` over each theme
+  (`node tests/workspaces_test.mjs firststart_scene.mjs <default|classic|workspaces>`): the whole wizard, the switch
+  and the resume, the drag kept inside the work area, Escape and Enter, and nothing left once it is done.
 
 ## Appearance: «Browsers: tabs in the title bar»
 

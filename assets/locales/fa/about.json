@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} هسته",
     "other": "{cpu} · {count} هسته"
   },
-  "credits": "تعیین کشور از روی IP در پایشگر: DB-IP Lite Country، © db-ip.com، CC BY 4.0. نقشه: Natural Earth (مالکیت عمومی).",
+  "credits": "تعیین کشور از روی IP در پایشگر: DB-IP Lite Country، © db-ip.com، CC BY 4.0. نقشه: Natural Earth (مالکیت عمومی). شهرهای آب‌وهوا: GeoNames، © geonames.org، CC BY 4.0.",
   "display": "نمایشگر",
   "engine": "موتور رابط کاربری",
   "host": "رایانه",

@@ -235,6 +235,7 @@
   "fs.notRegular": "یہ عام فائل نہیں ہے (کیا یہ لنک ہے؟)",
   "fs.openFailed": "فائل کھولی نہیں جا سکی: {errno}",
   "fs.outsideHome": "یہ مقام آپ کے ہوم فولڈر سے باہر ہے یا درست نہیں",
+  "fs.nameTooLong": "نام بہت لمبا ہے (زیادہ سے زیادہ {max} بائٹ؛ غیر لاطینی حروف ہر ایک 2 سے 4 بائٹ لیتے ہیں)",
   "fs.protected": "یہ فولڈر محفوظ ہے",
   "fs.systemFolder": "فائلیں سسٹم کے اندرونی فولڈرز (/proc، /sys، /dev اور /run) نہیں دکھاتی",
   "fs.tooLarge": "فائل بہت بڑی ہے (زیادہ سے زیادہ {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "بوٹ لوڈر اپ ڈیٹ نہیں ہو سکا (کوڈ {code})",
   "hw.logindFailed": "پاور ترتیبات لاگو نہیں ہو سکیں (کوڈ {code})",
   "hw.noBacklight": "ایسی کوئی بیک لائٹ نہیں",
+  "hw.noChargeControl": "اس بیٹری میں چارج کنٹرول نہیں",
+  "hw.chargeControlFailed": "چارجنگ تبدیل نہ ہو سکی: {errno}",
   "hw.noCpufreq": "اس کمپیوٹر میں CPU فریکوئنسی اسکیلنگ نہیں",
   "hw.noEeprom": "بوٹ لوڈر ٹولز (rpi-eeprom) انسٹال نہیں",
   "hw.noKernelLog": "کرنل لاگ پڑھا نہیں جا سکا",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "{name} کو بیک وقت 64 اور 32 بٹ کے لیے انسٹال نہیں کیا جا سکتا",
   "pkg.foreignArchUnsupported": "32 بٹ پیکیجز صرف 64 بٹ پی سی (amd64) پر فعال کیے جا سکتے ہیں؛ یہ سسٹم {arch} ہے",
   "pkg.foreignArchFailed": "32 بٹ ({arch}) پیکیجز فعال نہیں کیے جا سکے (dpkg کوڈ {code} کے ساتھ بند ہوا)",
-  "webapps.developerOff": "ترتیبات → ویب ایپس میں ڈویلپر موڈ بند ہے"
+  "webapps.developerOff": "ترتیبات → ویب ایپس میں ڈویلپر موڈ بند ہے",
+  "media.streamAddress": "اس اسٹریم پتے کی اجازت نہیں",
+  "media.streamCannotOpen": "اسٹریم نہیں کھل سکا",
+  "media.streamTimeout": "اسٹریم نے وقت پر جواب نہیں دیا",
+  "media.streamAuth": "اسٹریم نے صارف اور پاس ورڈ مانگا، یا وہ غلط تھے",
+  "media.streamLost": "اسٹریم ٹوٹ گیا",
+  "media.streamNoChannels": "فہرست میں کوئی چینل نہیں",
+  "media.noStreamHelper": "اسٹریم مددگار (lord-stream) دستیاب نہیں"
 }

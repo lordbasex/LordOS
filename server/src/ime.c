@@ -990,6 +990,11 @@ void ime_context(int on) {
 int ime_key(const KeyInfo *k, char *out, size_t size) {
     out[0] = 0;
     if (!engine || !context) return 0;
+    /* A key that types nothing and has no name (Shift, Caps Lock, AltGr or Ctrl pressed alone, a dead key
+     * waiting for the next one) is not part of the text: it passes through and the composition stays. Shift
+     * used to end the syllable, so the 2-set keyboard's Shift jamo never joined it (이 + Shift+T gave 이ㅆ,
+     * not 있; 바 + Shift+R gave 바ㄲ, not 밖; GitHub #163). */
+    if (!k->key[0] && !k->chr[0]) return 0;
     if (k->ctrl || k->alt || k->meta) {         /* shortcuts: confirms whatever there is and passes through */
         if (engine == E_HANGUL) { if (syl.l || syl.v || syl.t) hangul_commit(out, size); }
         else if (engine == E_KANA) { if (kana[0] || pend[0]) kana_commit(out, size); }

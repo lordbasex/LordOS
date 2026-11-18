@@ -21,6 +21,8 @@
 // lord-server's cloud thread is rclone's only client; JS never reaches it. The state is pushed (__lordCloud),
 // at most twice a second, never polled. The two calls that talk to the provider (link, unlink) answer later.
 import { createStore, useStore } from './store.js';
+import { settings } from './settings.js';
+import { setChosenColors } from './cloudmodel.js';
 import { wm } from './windows.js';
 import { defaultOpenerId } from './defaults.js';
 
@@ -114,3 +116,7 @@ export const cloud = {
 };
 
 export const useCloud = () => useStore(cloudState);
+
+// the colors chosen in Settings → Cloud (cloudmodel.js accountColor), kept in step with the settings
+setChosenColors(settings.get().cloudColors);
+settings.subscribe(() => setChosenColors(settings.get().cloudColors));

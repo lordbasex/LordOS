@@ -5,8 +5,9 @@
   "accounts": "Fiókok",
   "allAccounts": "Minden fiók",
   "onThisComputer": "Ezen a számítógépen",
-  "cacheLine": "{size} · {kept} megőrizve",
+  "hereLine": "{size} · {kept} megőrizve · {free} felszabadítható",
   "freeUp": "Hely felszabadítása",
+  "freeUpHint": "A „Hely felszabadítása” törli azoknak a fájloknak a helyi másolatát, amelyek nincsenek megőrizve ezen a számítógépen; a megőrzött fájlok és a feltöltésre váró módosítások maradnak.",
   "freed": "{size} felszabadítva ezen a számítógépen",
   "freedSkipped": {
     "one": "{size} felszabadítva; {count} elem marad (nyitva van, meg van őrizve, vagy feltöltésre vár)",
@@ -438,5 +439,9 @@
   "details.signIn": "Bejelentkezés",
   "details.server": "Szerver",
   "details.app": "Alkalmazás",
-  "details.ownApp": "Saját alkalmazás"
+  "details.ownApp": "Saját alkalmazás",
+  "color": "Szín",
+  "colorAuto": "Automatikus",
+  "colorAutoHint": "Automatikus: a fiók hozzáadásának sorrendje szerint, hogy ugyanannak a szolgáltatónak két fiókja megkülönböztethető legyen.",
+  "colorChosen": "A Fájlokban, a Felhő menüben és a Naplókban látszik."
 }

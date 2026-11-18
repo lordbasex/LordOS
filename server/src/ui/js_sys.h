@@ -12,7 +12,10 @@ void js_sys_set_greeter(int on);             /* login screen theme: lord.greeter
 void js_sys_set_assets(const char *dir);   /* assets/ folder (language catalogs) */
 int js_sys_reserved_id(const char *id);     /* one of LordOS's string namespaces: no package may have it */
 const char *js_sys_assets(void);          /* for src: 'asset:icons/x.png' */
-void js_sys_cpu_name(char *out, size_t size);   /* processor (x86 or ARM; the Monitor uses it too) */
+void js_sys_cpu_name(char *out, size_t size);
+/* Nobody sees the screen: the displays off after idle, or the session not on the monitor (locked, switched away)
+ * with no remote viewer. Set by the main loop each iteration; lord.system.seen() reads it (sdk/widgetfeed.js). */
+extern int js_sys_unseen;   /* processor (x86 or ARM; the Monitor uses it too) */
 /* Valid destination path for writing (home folder or user mounts, never the
  * protected folders): 0 if it is OK; out receives the real path. */
 int js_sys_resolve_target(const char *path, char *out, size_t n);

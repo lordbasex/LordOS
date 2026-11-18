@@ -73,6 +73,24 @@ int  cloud_kept(const char *const *kept, int n, const char *rel);   /* rel is a 
 /* #71: a folder still coming down as a whole: rel is inside a kept entry whose files aren't all here yet (busy[i]), or
  * holds one. Its glyph stays "coming down" between one file and the next instead of flipping to kept. */
 int  cloud_kept_busy(const char *const *kept, const unsigned char *busy, int n, const char *rel);
+/* #185: what Keep on This Computer couldn't read through the mount although the provider answers (OneDrive's Personal
+ * Vault refuses every listing: "ObjectHandle is Invalid"). Until 0.8.8.10 the keeper's pass stopped at such a folder
+ * every time (#85's rule for a provider that doesn't answer), so what came after it in the walk never came down and
+ * the kept entry stayed "coming down" for good: every folder of the account kept the blue arrow. Now the failed path
+ * is set aside for CLOUD_FAILS_RETRY_S: the next pass goes around it, it shows as an error, and it is tried again
+ * after that. At most CLOUD_FAILS_MAX per account; the strings are the set's own (cloud_fails_clear frees them). */
+#define CLOUD_FAILS_MAX 32
+#define CLOUD_FAILS_RETRY_S 3600
+typedef struct { char *rel[CLOUD_FAILS_MAX]; long long at[CLOUD_FAILS_MAX]; int n; } CloudFails;
+/* 1 added, 0 already there (its time is kept: the hour counts from the first failure), -1 full or no memory */
+int  cloud_fails_add(CloudFails *f, const char *rel, long long now);
+/* rel is a failed path or inside one, failed less than CLOUD_FAILS_RETRY_S ago */
+int  cloud_fails_has(const CloudFails *f, const char *rel, long long now);
+void cloud_fails_expire(CloudFails *f, long long now);       /* drops what is due to be tried again */
+void cloud_fails_clear(CloudFails *f);
+/* #183: the account a failed rc call was about: its body starts {"fs":"<id>:" (every per-account call lord-server
+ * makes). 1 and the id ("c" and 8 hex digits), else 0 */
+int  cloud_body_account(const char *body, char *id, size_t n);
 
 /* ---- providers (6.1) ---- */
 typedef struct {

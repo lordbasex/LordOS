@@ -20,6 +20,8 @@
 #include "../ui/ui.h"
 #include "../ui/js_sys.h"
 #include "../errcode.h"
+#include "../sec/json.h"
+#include "streamurl.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -111,7 +113,7 @@ void media_events(MediaEventFn fn) {
 
 /* ---- launching the helper ---- */
 
-static int helper_path(char *out, size_t n) {
+static int helper_path_of(const char *bin, char *out, size_t n) {
     char self[PATH_MAX];
     ssize_t l = readlink("/proc/self/exe", self, sizeof self - 1);
     if (l <= 0) return -1;
@@ -119,7 +121,7 @@ static int helper_path(char *out, size_t n) {
     char *slash = strrchr(self, '/');
     if (!slash) return -1;
     *slash = 0;
-    if ((size_t)snprintf(out, n, "%.*s/lord-media", (int)(n > 16 ? n - 16 : 0), self) >= n) return -1;
+    if ((size_t)snprintf(out, n, "%.*s/%s", (int)(n > 24 ? n - 24 : 0), self, bin) >= n) return -1;
     struct stat st;
     if (stat(out, &st) || !S_ISREG(st.st_mode) || !(st.st_mode & S_IXUSR)) return -1;
     /* owned by the user or by root, and nobody else can change it */
@@ -130,11 +132,24 @@ static int helper_path(char *out, size_t n) {
     return 0;
 }
 
+static int spawn_bin(const char *bin, const char *path, int kind, const char *params, const int *fds, int nfds, pid_t *pid);
 int media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid) {
     static char path[PATH_MAX];
     static int checked;
-    if (!checked) { checked = helper_path(path, sizeof path) ? -1 : 1; if (checked < 0) fprintf(stderr, "media: lord-media is missing (no video, music or camera)\n"); }
+    if (!checked) { checked = helper_path_of("lord-media", path, sizeof path) ? -1 : 1; if (checked < 0) fprintf(stderr, "media: lord-media is missing (no video, music or camera)\n"); }
     if (checked < 0) return -1;
+    return spawn_bin("lord-media", path, kind, params, fds, nfds, pid);
+}
+/* lord-stream: only for MK_PLAY with an address and MK_M3U (it refuses the rest itself) */
+int media_spawn_stream(int kind, const char *params, const int *fds, int nfds, pid_t *pid) {
+    static char path[PATH_MAX];
+    static int checked;
+    if (kind != MK_PLAY && kind != MK_M3U) return -1;
+    if (!checked) { checked = helper_path_of("lord-stream", path, sizeof path) ? -1 : 1; if (checked < 0) fprintf(stderr, "media: lord-stream is missing (no cameras or IPTV)\n"); }
+    if (checked < 0) return -1;
+    return spawn_bin("lord-stream", path, kind, params, fds, nfds, pid);
+}
+static int spawn_bin(const char *bin, const char *path, int kind, const char *params, const int *fds, int nfds, pid_t *pid) {
     int sv[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return -1;
     /* roomy buffers: messages are small, but frame notifications must not get stuck */
@@ -152,7 +167,7 @@ int media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *p
 #ifdef SYS_close_range
         syscall(SYS_close_range, 4U, ~0U, 0);
 #endif
-        char *const argv[] = { "lord-media", NULL };
+        char *const argv[] = { (char *)bin, NULL };
         static char lang[64], dbg[32], va[96];
         char *env[5];
         int ne = 0;
@@ -446,6 +461,55 @@ static uint8_t *map_sealed(int fd, size_t need) {
     return m == MAP_FAILED ? NULL : m;
 }
 
+/* lord-stream's channel list, read again here: every entry rebuilt from checked strings (an address stream_url_ok()
+ * accepts, an http(s) logo or none, names cut); nothing of the helper's text goes to JS as it came. */
+static void m3u_result(MediaSrc *s, const MediaMsg *m, const char *payload) {
+    if (m->v[0] != 0) {
+        char code[64];
+        snprintf(code, sizeof code, "%.60s", m->len ? payload : "media.streamCannotOpen");
+        for (char *p = code; *p; p++) if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || *p == '.')) { *p = 0; break; }
+        char esc[160];
+        media_json_str(esc, sizeof esc, code);
+        media_event(s->id, "m3u", "{\"ok\":false,\"code\":%s}", esc);
+        return;
+    }
+    JDoc d;
+    if (!m->len || json_parse(payload, m->len, &d, NULL, 0)) {
+        media_event(s->id, "m3u", "{\"ok\":false,\"code\":\"media.streamNoChannels\"}");
+        return;
+    }
+    if (!d.root || d.root->type != J_ARR) {      /* parsed but not a list: the document is freed all the same */
+        json_free(&d);
+        media_event(s->id, "m3u", "{\"ok\":false,\"code\":\"media.streamNoChannels\"}");
+        return;
+    }
+    size_t cap = (size_t)m->len * 2 + 64, o = 0;
+    char *out = malloc(cap);
+    if (!out) { json_free(&d); return; }
+    o += (size_t)snprintf(out + o, cap - o, "{\"ok\":true,\"more\":%s,\"items\":[", m->v[1] ? "true" : "false");
+    int first = 1;
+    for (const JVal *e = d.root->kid; e; e = e->next) {
+        const char *url = json_str(e, "url"), *name = json_str(e, "name"), *group = json_str(e, "group"), *logo = json_str(e, "logo");
+        if (!url || !stream_url_ok(url) || !name) continue;
+        char n1[STREAM_NAME_MAX + 1], g1[STREAM_NAME_MAX + 1];
+        snprintf(n1, sizeof n1, "%s", name);
+        snprintf(g1, sizeof g1, "%s", group ? group : "");
+        char eu[STREAM_URL_MAX * 2 + 8], en[STREAM_NAME_MAX * 6 + 8], eg[STREAM_NAME_MAX * 6 + 8], el[1100];
+        media_json_str(eu, sizeof eu, url);
+        media_json_str(en, sizeof en, n1);
+        media_json_str(eg, sizeof eg, g1);
+        media_json_str(el, sizeof el, logo && stream_m3u_url_ok(logo) && strlen(logo) < 512 ? logo : "");
+        size_t need = strlen(eu) + strlen(en) + strlen(eg) + strlen(el) + 48;
+        if (o + need + 4 > cap) break;
+        o += (size_t)snprintf(out + o, cap - o, "%s{\"name\":%s,\"group\":%s,\"logo\":%s,\"url\":%s}", first ? "" : ",", en, eg, el, eu);
+        first = 0;
+    }
+    snprintf(out + o, cap - o, "]}");
+    media_event(s->id, "m3u", "%s", out);
+    free(out);
+    json_free(&d);
+}
+
 static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
     char esc[MP_PAYLOAD_MAX * 2 + 16];
     if (s->bk_msg && s->bk_msg(s, m, payload, fds)) return;    /* camera of an isolated app (brokercam.c) */
@@ -523,6 +587,7 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
         if (m->id < 4) s->in_busy[m->id] = 0;
         break;
     case MM_RESULT: {
+        if (s->kind == SK_M3U) { m3u_result(s, m, payload); break; }
         /* camera: photo or video finished (id = 1 photo, 2 video) */
         if (s->kind == SK_CAMERA) {
             char *tmp = m->id == 1 ? s->tmp : s->tmp + 2048, *dst = m->id == 1 ? s->dst : s->dst + 2048;

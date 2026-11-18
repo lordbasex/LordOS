@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} core",
     "other": "{cpu} · {count} cores"
   },
-  "credits": "IP-to-country in Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Map: Natural Earth (public domain).",
+  "credits": "IP-to-country in Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Map: Natural Earth (public domain). Weather cities: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Display",
   "engine": "UI engine",
   "host": "Computer",

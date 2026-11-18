@@ -19,7 +19,7 @@
   "cpuValue": {
     "other": "{cpu} · {count} คอร์"
   },
-  "credits": "การระบุประเทศจาก IP ในตัวตรวจสอบ: DB-IP Lite Country, © db-ip.com, CC BY 4.0 แผนที่: Natural Earth (สาธารณสมบัติ)",
+  "credits": "การระบุประเทศจาก IP ในตัวตรวจสอบ: DB-IP Lite Country, © db-ip.com, CC BY 4.0 แผนที่: Natural Earth (สาธารณสมบัติ) เมืองสภาพอากาศ: GeoNames, © geonames.org, CC BY 4.0",
   "display": "จอภาพ",
   "engine": "เอนจิน UI",
   "host": "คอมพิวเตอร์",

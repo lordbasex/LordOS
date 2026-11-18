@@ -151,5 +151,10 @@
   "wifi.saved": "bewaard",
   "wifi.scan": "Scan",
   "wifi.scanning": "Scannen…",
-  "wifi.wrongKey": "Het wachtwoord is onjuist."
+  "wifi.wrongKey": "Het wachtwoord is onjuist.",
+  "wifi.available": "Beschikbare wifi-netwerken",
+  "wifi.currentLabel": "{ssid} — Verbonden",
+  "wifi.connect": "Verbinden",
+  "wifi.notInRange": "Niet binnen bereik",
+  "wifi.knownFooter": "LordOS maakt vanzelf verbinding met een opgeslagen netwerk als het binnen bereik is. Vergeet verwijdert het netwerk en het wachtwoord van deze computer."
 }

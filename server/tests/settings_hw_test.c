@@ -142,6 +142,31 @@ static void test_modes(void) {
     CHECK(mode_preferred(modes, 0) == -1);
     modes[0].type = 0;
     CHECK(mode_preferred(modes, n) == 4);                /* largest without a preferred one */
+    /* GitHub #173: the panel's physical shape decides when the preferred mode doesn't fit it */
+    struct drm_mode_modeinfo uw[] = {
+        mk(3840, 2160, 533250, 4000, 2222, 1, 0),   /* preferred, 16:9: 60 Hz */
+        mk(3440, 1440, 319750, 3600, 1481, 0, 0),   /* 21:9, ~60 Hz */
+        mk(3440, 1440, 543500, 3600, 1481, 0, 0),   /* 21:9, ~100 Hz */
+        mk(2560, 1080, 185580, 2720, 1111, 0, 0),   /* 21:9, smaller */
+        mk(1920, 1080, 148500, 2200, 1125, 0, 0),
+    };
+    int nu = (int)(sizeof uw / sizeof uw[0]);
+    CHECK(mode_native(uw, nu, 800, 335) == 2);           /* a 34" ultrawide: 3440 × 1440, the faster one */
+    CHECK(mode_native(uw, nu, 597, 336) == 0);           /* a real 16:9 panel keeps its preferred mode */
+    CHECK(mode_native(uw, nu, 0, 0) == 0);               /* no size in the EDID */
+    CHECK(mode_native(uw, nu, 16, 9) == 0);              /* an aspect stored as a size, or a projector: ignored */
+    CHECK(mode_native(uw, nu, 1600, 335) == 0);          /* no mode of that shape: the preferred one */
+    CHECK(mode_native(uw, 0, 800, 335) == -1);
+    struct drm_mode_modeinfo lap[] = {
+        mk(2880, 1800, 593000, 3040, 1830, 1, 0),   /* a 16:10 laptop panel */
+        mk(1920, 1200, 154000, 2080, 1235, 0, 0),
+        mk(1920, 1080, 148500, 2200, 1125, 0, 0),
+    };
+    CHECK(mode_native(lap, 3, 302, 189) == 0);           /* 1.598 against 1.6: within 8 %, kept */
+    lap[0].flags = DRM_MODE_FLAG_INTERLACE;              /* never an interlaced mode for the shape */
+    lap[0].type = 0;
+    lap[2].type = DRM_MODE_TYPE_PREFERRED;
+    CHECK(mode_native(lap, 3, 302, 189) == 1);           /* 16:9 preferred on a 16:10 panel: 10 % off → 1920 × 1200 */
 }
 
 static void test_night(void) {
@@ -319,6 +344,19 @@ static void test_power(void) {
     CHECK(!strcmp(b->name, "BAT0") && b->health == 87 && b->cycles == 312 && fabs(b->watts - 7) < 1e-9);
     CHECK(!strcmp(b->technology, "Li-poly") && !strcmp(b->model, "5B10W13930"));
     CHECK(ps.s[2].device_scope && ps.s[2].percent == 90);
+    /* a Logitech keyboard over HID++ that gives only a level: no percentage, its level kept; "Unknown" is none */
+    wfile(dir, "hidpp_battery_1", "type", "Battery");
+    wfile(dir, "hidpp_battery_1", "scope", "Device");
+    wfile(dir, "hidpp_battery_1", "capacity_level", "Low");
+    wfile(dir, "hidpp_battery_1", "model_name", "MX Keys Wireless Keyboard");
+    wfile(dir, "hidpp_battery_0", "capacity_level", "Unknown");
+    CHECK(power_read(dir, &ps) == 4);
+    CHECK(ps.s[3].device_scope && ps.s[3].percent == -1 && !strcmp(ps.s[3].level, "Low") && !ps.s[2].level[0]);
+    CHECK(ps.has_battery && ps.percent == 42);          /* the devices still don't count as the system battery */
+    { char jj[4096]; power_json(&ps, jj, sizeof jj); CHECK(strstr(jj, "\"level\":\"Low\"") != NULL); }
+    { char pp[512]; snprintf(pp, sizeof pp, "%s/hidpp_battery_1", dir); char q[600];
+      const char *fl[] = { "type", "scope", "capacity_level", "model_name" };
+      for (int i = 0; i < 4; i++) { snprintf(q, sizeof q, "%s/%s", pp, fl[i]); unlink(q); } rmdir(pp); }
 
     /* charging with charge_* / current_now, time to full */
     wfile(dir, "AC", "online", "1");
@@ -334,6 +372,24 @@ static void test_power(void) {
     CHECK(power_read(dir, &ps) == 3);
     CHECK(ps.on_ac && ps.charging && ps.percent == 50 && ps.minutes_left == 120);
     CHECK(ps.s[1].health == 100 && fabs(ps.s[1].watts - 12) < 1e-9);
+    /* the live readings and the battery's facts: volts, amps, temperature (signed tenths), Wh from charge × voltage,
+     * manufacture date, and charge control */
+    CHECK(fabs(ps.s[1].volts - 12) < 1e-9 && fabs(ps.s[1].amps - 1) < 1e-9 && fabs(ps.s[1].wh_now - 24) < 1e-6 && fabs(ps.s[1].wh_full - 48) < 1e-6);
+    CHECK(ps.s[1].temp_c == -1000 && ps.s[1].mfg_year == 0 && ps.s[1].start_threshold == -1 && ps.s[1].end_threshold == -1 && ps.s[1].behaviours == 0);
+    wfile(dir, "BAT0", "temp", "-52");
+    wfile(dir, "BAT0", "manufacture_year", "2024");
+    wfile(dir, "BAT0", "manufacture_month", "3");
+    wfile(dir, "BAT0", "charge_control_start_threshold", "70");
+    wfile(dir, "BAT0", "charge_control_end_threshold", "80");
+    wfile(dir, "BAT0", "charge_behaviour", "auto [inhibit-charge] force-discharge");
+    CHECK(power_read(dir, &ps) == 3);
+    CHECK(fabs(ps.s[1].temp_c + 5.2) < 1e-9 && ps.s[1].mfg_year == 2024 && ps.s[1].mfg_month == 3);
+    CHECK(ps.s[1].start_threshold == 70 && ps.s[1].end_threshold == 80);
+    CHECK(ps.s[1].behaviours == (POWER_BEH_AUTO | POWER_BEH_INHIBIT | POWER_BEH_DISCHARGE) && ps.s[1].behaviour == POWER_BEH_INHIBIT);
+    { int l = 0;
+      CHECK(power_parse_behaviour("[auto] inhibit-charge\n", &l) == POWER_BEH_AUTO && l == (POWER_BEH_AUTO | POWER_BEH_INHIBIT));
+      CHECK(power_parse_behaviour("auto bogus [rm -rf]", &l) == 0 && l == POWER_BEH_AUTO);
+      CHECK(power_parse_behaviour("", &l) == 0 && l == 0); }
     char json[4096];
     size_t n = power_json(&ps, json, sizeof json);
     CHECK(n > 0 && n < sizeof json && json[n - 1] == '}');
@@ -640,7 +696,77 @@ static void test_tablet_power(void) {
     if (system(cmd)) { /* a leftover in /tmp */ }
 }
 
+static int rdint(const char *dir, const char *dev, const char *name) {
+    char p[512];
+    snprintf(p, sizeof p, "%s/%s/%s", dir, dev, name);
+    FILE *f = fopen(p, "r");
+    int v = -1;
+    if (f) { if (fscanf(f, "%d", &v) != 1) v = -1; fclose(f); }
+    return v;
+}
+static void rdtext(const char *dir, const char *dev, const char *name, char *out, size_t n) {
+    char p[512];
+    snprintf(p, sizeof p, "%s/%s/%s", dir, dev, name);
+    FILE *f = fopen(p, "r");
+    out[0] = 0;
+    if (f) { if (!fgets(out, (int)n, f)) out[0] = 0; fclose(f); }
+}
+
+/* Settings → Battery's root actions (hw/battery_admin.c): the system battery chosen root-side, numbers 50..100 with
+ * start below end, written in an order the kernel accepts, and only a charge_behaviour the battery lists */
+static void test_battery_admin(void) {
+    char dir[] = "/tmp/batadm-XXXXXX";
+    CHECK(mkdtemp(dir) != NULL);
+    char devices[600];
+    snprintf(devices, sizeof devices, "%s/", dir);
+    char name[32];
+    CHECK(hw_battery_pick(dir, devices, name, sizeof name) == -1);          /* nothing yet */
+    wfile(dir, "hidpp_battery_0", "type", "Battery");
+    wfile(dir, "hidpp_battery_0", "scope", "Device");
+    wfile(dir, "hidpp_battery_0", "charge_control_end_threshold", "100");
+    wfile(dir, "AC", "type", "Mains");
+    CHECK(hw_battery_pick(dir, devices, name, sizeof name) == -1);          /* a mouse is never the battery */
+    wfile(dir, "BAT1", "type", "Battery");
+    wfile(dir, "BAT0", "type", "Battery");
+    CHECK(hw_battery_pick(dir, devices, name, sizeof name) == 0 && !strcmp(name, "BAT0"));
+    CHECK(hw_battery_pick(dir, "/sys/devices/", name, sizeof name) == -1);  /* not a real device: refused */
+
+    int st, en;
+    CHECK(hw_battery_thresholds_parse("70 80", &st, &en) == 0 && st == 70 && en == 80);
+    CHECK(hw_battery_thresholds_parse("50 100\n", &st, &en) == 0);
+    const char *bad[] = { "", "80", "80 70", "80 80", "49 80", "70 101", "-5 80", "70 80 90", "70 8a", "70 80; rm", " 70 0x50", NULL };
+    for (int i = 0; bad[i]; i++) CHECK(hw_battery_thresholds_parse(bad[i], &st, &en) == -1);
+
+    /* no charge control at all: refused, nothing written */
+    CHECK(hw_battery_set_thresholds(dir, devices, 70, 80) == -1);
+    /* only an end threshold (most laptops): the start is validated and left alone */
+    wfile(dir, "BAT0", "charge_control_end_threshold", "100");
+    CHECK(hw_battery_set_thresholds(dir, devices, 70, 80) == 0 && rdint(dir, "BAT0", "charge_control_end_threshold") == 80);
+    /* both, lowering below the current start: start first */
+    wfile(dir, "BAT0", "charge_control_start_threshold", "90");
+    wfile(dir, "BAT0", "charge_control_end_threshold", "95");
+    CHECK(hw_battery_set_thresholds(dir, devices, 60, 75) == 0);
+    CHECK(rdint(dir, "BAT0", "charge_control_start_threshold") == 60 && rdint(dir, "BAT0", "charge_control_end_threshold") == 75);
+    CHECK(rdint(dir, "hidpp_battery_0", "charge_control_end_threshold") == 100);    /* the mouse untouched */
+    CHECK(hw_battery_set_thresholds(dir, devices, 80, 70) == -1);
+
+    CHECK(hw_battery_behaviour_parse("auto") == POWER_BEH_AUTO && hw_battery_behaviour_parse("inhibit-charge\n") == POWER_BEH_INHIBIT);
+    CHECK(hw_battery_behaviour_parse("force-discharge") == POWER_BEH_DISCHARGE);
+    CHECK(!hw_battery_behaviour_parse("") && !hw_battery_behaviour_parse("Auto") && !hw_battery_behaviour_parse("auto inhibit-charge") && !hw_battery_behaviour_parse("../x"));
+    CHECK(hw_battery_set_behaviour(dir, devices, POWER_BEH_INHIBIT) == -1);        /* no charge_behaviour */
+    wfile(dir, "BAT0", "charge_behaviour", "[auto] inhibit-charge");
+    CHECK(hw_battery_set_behaviour(dir, devices, POWER_BEH_DISCHARGE) == -1);      /* not listed by this battery */
+    CHECK(hw_battery_set_behaviour(dir, devices, POWER_BEH_INHIBIT) == 0);
+    char txt[64];
+    rdtext(dir, "BAT0", "charge_behaviour", txt, sizeof txt);
+    CHECK(!strcmp(txt, "inhibit-charge\n"));
+    char cmd[700];
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
+    if (system(cmd)) { /* a leftover in /tmp */ }
+}
+
 int main(void) {
+    test_battery_admin();
     test_admin();
     test_eeprom();
     test_edid();

@@ -105,12 +105,107 @@ AVFormatContext *lm_open_input(int fd, char *err, size_t errlen) {
 
 void lm_close_input(AVFormatContext **fmt) {
     if (!*fmt) return;
+    if (!((*fmt)->flags & AVFMT_FLAG_CUSTOM_IO)) { avformat_close_input(fmt); return; }   /* lord-stream: FFmpeg's own I/O */
     AVIOContext *io = (*fmt)->pb;
     void *op = io ? io->opaque : NULL;
     avformat_close_input(fmt);
     if (io) { av_freep(&io->buffer); avio_context_free(&io); }
     av_free(op);
 }
+
+#ifdef LM_NET
+/* ---- lord-stream: an address instead of a file (0.8.8.10; streamurl.h) ----
+ * Only lord-stream is built with LM_NET, and only it may open sockets (its sandbox: internet sockets in the firewall
+ * scope lordos-net-streams). The address was checked by lord-server and is checked again here; FFmpeg may use only
+ * the network protocols of STREAM_FF_PROTOCOLS, never file: or pipe:. Every wait is bounded: a dead camera or a
+ * stalled server fails within seconds (the desktop then shows Reconnecting and starts a new lord-stream). */
+#include "../streamurl.h"
+volatile int lm_net_abort;
+static double net_deadline;                 /* ms: an open or a read past this gives up */
+static int net_interrupt(void *op) { (void)op; return lm_net_abort || (net_deadline && lm_now_ms() > net_deadline); }
+void lm_net_deadline(double ms_from_now) { net_deadline = ms_from_now > 0 ? lm_now_ms() + ms_from_now : 0; }
+
+/* TLS: FFmpeg checks no certificate unless asked (tls_verify defaults to 0), so https, HLS over https and rtmps
+ * accepted any server, and a camera's keyring password went to whoever answered (Claude Security, 0.8.9). Every open
+ * asks for the peer's certificate against the system's CAs and the host name; a self-signed camera fails with
+ * media.streamCannotOpen instead of being trusted. The options go on the first open and, through io_open, on every
+ * nested one (HLS playlists, segments and keys), which FFmpeg's demuxers don't pass on themselves.
+ * rtsps is the exception FFmpeg 7.1 leaves no way around: the RTSP demuxer opens its tls:// connection with no
+ * options, so it can't be verified (docs/MEDIA.md says so; it is no weaker than plain rtsp). */
+#define LM_CA_FILE "/etc/ssl/certs/ca-certificates.crt"
+void lm_tls_verify(AVDictionary **o) {
+    av_dict_set(o, "tls_verify", "1", 0);
+    av_dict_set(o, "ca_file", LM_CA_FILE, 0);
+}
+static int (*default_io_open)(AVFormatContext *, AVIOContext **, const char *, int, AVDictionary **);
+static int verified_io_open(AVFormatContext *s, AVIOContext **pb, const char *url, int flags, AVDictionary **options) {
+    AVDictionary *own = NULL, **o = options ? options : &own;
+    lm_tls_verify(o);
+    int r = default_io_open(s, pb, url, flags, o);
+    av_dict_free(&own);
+    return r;
+}
+static void net_context(AVFormatContext *fmt) {
+    fmt->interrupt_callback.callback = net_interrupt;
+    fmt->protocol_whitelist = av_strdup(STREAM_FF_PROTOCOLS);
+    fmt->flags |= AVFMT_FLAG_NOBUFFER;
+    if (fmt->io_open && fmt->io_open != verified_io_open) { default_io_open = fmt->io_open; fmt->io_open = verified_io_open; }
+}
+
+AVFormatContext *lm_open_url(const char *url, const char *params, char *err, size_t errlen) {
+    if (!stream_url_ok(url)) { lerr_set(err, errlen, "media.streamAddress", NULL); return NULL; }
+    AVFormatContext *fmt = avformat_alloc_context();
+    if (!fmt) { lerr_set(err, errlen, "sys.outOfMemory", NULL); return NULL; }
+    net_context(fmt);
+    AVDictionary *o = NULL;
+    lm_tls_verify(&o);
+    /* RTSP over TCP by default (cameras behind NAT, no lost packets); transport=udp asks for UDP */
+    char tr[8] = "tcp";
+    if (mp_param_int(params, "udp", 0)) snprintf(tr, sizeof tr, "udp");
+    if (!strncmp(url, "rtsp", 4)) { av_dict_set(&o, "rtsp_transport", tr, 0); av_dict_set(&o, "timeout", "8000000", 0); }
+    int cam = !strncmp(url, "rtsp", 4);                          /* a camera: one known stream, start sooner */
+    av_dict_set(&o, "rw_timeout", "8000000", 0);                 /* tcp, http, rtmp: 8 s without data */
+    av_dict_set(&o, "reconnect", "0", 0);                        /* the desktop reconnects (a new helper) */
+    av_dict_set(&o, "probesize", cam ? "500000" : "2000000", 0);
+    av_dict_set(&o, "analyzeduration", cam ? "1000000" : "3000000", 0);
+    av_dict_set(&o, "user_agent", "LordOS-stream/1", 0);
+    lm_net_deadline(20000);                                      /* the whole open, DNS and handshake included */
+    int r = avformat_open_input(&fmt, url, NULL, &o);
+    av_dict_free(&o);
+    /* a server that refuses RTSP over TCP (461 Unsupported transport: VLC, some cameras): the same over UDP, once */
+    if (r < 0 && !strncmp(url, "rtsp", 4) && !strcmp(tr, "tcp") && r != AVERROR_EXIT && r != AVERROR(ETIMEDOUT) &&
+        r != AVERROR_HTTP_UNAUTHORIZED && r != AVERROR_HTTP_FORBIDDEN && !lm_net_abort) {
+        LM_LOG("RTSP over TCP refused; trying UDP");
+        fmt = avformat_alloc_context();
+        if (!fmt) { lerr_set(err, errlen, "sys.outOfMemory", NULL); return NULL; }
+        net_context(fmt);
+        lm_tls_verify(&o);
+        av_dict_set(&o, "rtsp_transport", "udp", 0);
+        av_dict_set(&o, "timeout", "8000000", 0);
+        av_dict_set(&o, "probesize", "500000", 0);
+        av_dict_set(&o, "analyzeduration", "1000000", 0);
+        av_dict_set(&o, "user_agent", "LordOS-stream/1", 0);
+        lm_net_deadline(20000);
+        r = avformat_open_input(&fmt, url, NULL, &o);
+        av_dict_free(&o);
+    }
+    if (r < 0) {
+        char why[128];
+        av_strerror(r, why, sizeof why);
+        LM_LOG("could not open the stream: %s", why);
+        lerr_set(err, errlen, r == AVERROR_EXIT || r == AVERROR(ETIMEDOUT) ? "media.streamTimeout" : r == AVERROR_HTTP_UNAUTHORIZED ||
+                 r == AVERROR_HTTP_FORBIDDEN ? "media.streamAuth" : "media.streamCannotOpen", NULL);
+        lm_net_deadline(0);
+        return NULL;
+    }
+    fmt->max_analyze_duration = (cam ? 1 : 3) * AV_TIME_BASE;
+    lm_net_deadline(15000);
+    r = avformat_find_stream_info(fmt, NULL);
+    lm_net_deadline(0);
+    if (r < 0) LM_DBG("find_stream_info: %d", r);
+    return fmt;
+}
+#endif
 
 /* ---- output ---- */
 

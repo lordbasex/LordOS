@@ -14,7 +14,11 @@ static int fails, checks;
 static void scale_tests(void) {
     CHECK(out_scale_valid(100) && out_scale_valid(125) && out_scale_valid(150) && out_scale_valid(175) && out_scale_valid(200));
     CHECK(out_scale_valid(225) && out_scale_valid(250) && out_scale_valid(275) && out_scale_valid(300));     /* issue #47 */
-    CHECK(!out_scale_valid(110) && !out_scale_valid(75) && !out_scale_valid(260) && !out_scale_valid(325) && !out_scale_valid(0));
+    CHECK(!out_scale_valid(110) && !out_scale_valid(260) && !out_scale_valid(325) && !out_scale_valid(0));
+    /* below 100 % only 75 and 80 (GitHub #158); never 50, 70, 85 or 90, and nothing rounds or is recommended there */
+    CHECK(out_scale_valid(75) && out_scale_valid(80));
+    CHECK(!out_scale_valid(50) && !out_scale_valid(70) && !out_scale_valid(85) && !out_scale_valid(90) && !out_scale_valid(99));
+    CHECK(out_scale_round(0.75) == 100 && out_scale_round(0.8) == 100);
     CHECK(out_scale_round(1.0) == 100);
     CHECK(out_scale_round(1.12) == 100);
     CHECK(out_scale_round(1.13) == 125);
@@ -51,9 +55,34 @@ static void scale_tests(void) {
     CHECK(lw == 1280 && lh == 720);
     out_logical_size(1920, 1080, 133, &lw, &lh);                   /* invalid → 100 */
     CHECK(lw == 1920 && lh == 1080);
+    out_logical_size(1280, 800, 75, &lw, &lh);                     /* GitHub #158: a 1280 × 800 laptop at 75 % */
+    CHECK(lw == 1707 && lh == 1067);
+    out_logical_size(1280, 800, 80, &lw, &lh);
+    CHECK(lw == 1600 && lh == 1000);
+    out_logical_size(1366, 768, 75, &lw, &lh);
+    CHECK(lw == 1821 && lh == 1024);
+    out_logical_size(1280, 800, 50, &lw, &lh);                     /* not offered → 100 */
+    CHECK(lw == 1280 && lh == 800);
 }
 
 static void view_tests(void) {
+    {   /* below 100 % (GitHub #158): the display shows more logical pixels than it has, and covers them all */
+        OutView s = out_view(0, 0, 1280, 800, 75);
+        CHECK(s.w == 1707 && s.h == 1067 && NEAR(s.k, 0.75));
+        double qx, qy, rx, ry;
+        out_to_phys(&s, 1707, 1067, &qx, &qy);
+        CHECK(qx >= 1280 - 0.5 && qx <= 1280 + 0.5 && qy >= 800 - 0.5 && qy <= 800 + 0.5);
+        for (int i = 0; i < 50; i++) {
+            double x = i * 33.5, y = i * 21.25;
+            out_to_phys(&s, x, y, &qx, &qy);
+            out_to_logical(&s, qx, qy, &rx, &ry);
+            CHECK(NEAR(rx, x) && NEAR(ry, y));
+        }
+        Rect all = out_phys_rect(&s, 0, 0, 1707, 1067);           /* the whole desktop: the whole frame, clamped */
+        CHECK(all.x0 == 0 && all.y0 == 0 && all.x1 == 1280 && all.y1 == 800);
+        Rect one = out_phys_rect(&s, 100, 100, 101, 101);         /* one logical pixel still covers a physical one */
+        CHECK(one.x1 > one.x0 && one.y1 > one.y0);
+    }
     OutView v = out_view(1280, 0, 3840, 2160, 150);
     CHECK(v.w == 2560 && v.h == 1440 && NEAR(v.k, 1.5) && v.dx == 0 && v.dy == 0);
     double px, py, lx, ly;

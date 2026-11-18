@@ -4,7 +4,7 @@
   "name": "Machines",
   "description": "Runs other systems in windows, each in its own sandbox (alpha)",
   "size": [760, 500],
-  "minSize": [620, 420],
+  "minSize": [480, 360],
   "dock": false,
   "singleWindow": true,
   "permissions": ["fs:home"],

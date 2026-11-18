@@ -57,7 +57,13 @@ function job(fn) {
   });
 }
 
-const call = (name, ...a) => { const m = api(); return m ? m[name](...a) : null; };
+// A refused request (a path outside the home or that no longer exists, a bad id) throws in C: here it is null, as with no
+// helper, so an app that opens what a restored window remembered never takes the desktop down with it (0.8.8.10).
+const call = (name, ...a) => {
+  const m = api();
+  if (!m) return null;
+  try { return m[name](...a); } catch (e) { console.error(`media: ${name}: ${e?.message || e}`); return null; }
+};
 
 export const media = {
   available: () => !!api(),
@@ -69,6 +75,27 @@ export const media = {
   },
   // play (video, music, animated GIF): returns the id
   play(app, path, opts = {}) { const id = call('play', app, path, opts); if (id) track(id); return id; },
+  // a network stream (lord-stream: cameras, IPTV, docs/MEDIA.md "Network streams"): a player like play()'s; throws on a
+  // refused address. Desktop's own context only.
+  stream(app, url, opts = {}) { const id = call('stream', app, url, opts); if (id) track(id); return id; },
+  // the channels of an http(s) M3U list, read by lord-stream: { ok, items: [{ name, group, logo, url }] } or { ok: false, code }
+  m3u(app, url) {
+    return new Promise((resolve) => {
+      let id = null;
+      try { id = call('m3u', app, url); } catch (e) { resolve({ ok: false, code: e.code || 'media.streamAddress' }); return; }
+      if (!id) { resolve({ ok: false, code: 'media.noStreamHelper' }); return; }
+      const items = [];
+      const timer = setTimeout(() => finish({ ok: items.length > 0, items, code: 'media.streamTimeout' }), 45000);
+      const finish = (r) => { clearTimeout(timer); off(); media.close(id); resolve(r); };
+      const off = media.on(id, (type, d) => {
+        if (type === 'm3u') {
+          if (!d.ok) { finish({ ok: false, code: d.code }); return; }
+          items.push(...(d.items || []));
+          if (!d.more) finish({ ok: true, items });
+        } else if (type === 'closed') finish({ ok: items.length > 0, items, code: 'media.streamCannotOpen' });
+      });
+    });
+  },
   control: (id, cmd, value) => !!call('control', id, cmd, value),
   close(id) { if (id) { untrack(id); call('close', id); listeners.delete(id); states.delete(id); } },
   view: (id, opts) => call('view', id, opts),

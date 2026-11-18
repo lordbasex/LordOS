@@ -1,7 +1,7 @@
 // About LordOS: real system data (/proc) and display server stats.
 import { version as reactVersion } from 'react';
-import { useMemo } from 'react';
-import { View, Text, Button, wm, LordOSLogo, LordOSWordmark, Lumo, screen, lordosVersion, useTheme, useSystemInfo, useServerStats, memUsedKB, formatBytes, formatDuration, formatNumber, typeScale, codeStatus, isSystemApp, t as tr } from '@lordos/sdk';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, Button, ScrollView, wm, LordOSLogo, LordOSWordmark, Lumo, screen, lordosVersion, useTheme, useSystemInfo, useServerStats, memUsedKB, formatBytes, formatDuration, formatNumber, typeScale, codeStatus, isSystemApp, t as tr } from '@lordos/sdk';
 
 export function Icon({ size }) {
   return <LordOSLogo size={size} />;
@@ -40,8 +40,23 @@ const CODE = {
   invalid: { color: '#ff453a', key: 'about.codeInvalid' },
 };
 
+// The height of a box after layout: the content keeps at least the window's height (the credits at the bottom) and
+// scrolls in a window shorter than it, such as a tile.
+function useHeight(ref) {
+  const [h, setH] = useState(0);
+  useEffect(() => {
+    const read = () => { try { if (ref.current) { const x = Math.round(lord.getLayout(ref.current.id)[3]); setH((o) => (Math.abs(o - x) > 1 ? x : o)); } } catch (e) { /* not laid out yet */ } };
+    read();
+    const id = setInterval(read, 400);
+    return () => clearInterval(id);
+  }, []);
+  return h;
+}
+
 export default function About() {
   const t = useTheme();
+  const box = useRef(null);
+  const boxH = useHeight(box);
   const info = useSystemInfo(5000);
   const st = useServerStats(2000);
   const cpu = info.cpu.replace(/\(R\)|\(TM\)|CPU|Processor/g, '').replace(/ Rev [\d.]+$/, '').replace(/\s+/g, ' ').trim();
@@ -52,7 +67,9 @@ export default function About() {
   const codeNote = code.state === 'verified' && !code.refused?.length ? tr('about.codeVerifiedNote', { count: code.files })
     : code.state === 'development' ? tr('about.codeDevNote') : null;
   return (
-    <View style={{ flex: 1, alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
+    <View ref={box} style={{ flex: 1 }}>
+    <ScrollView style={{ flex: 1 }}>
+    <View style={{ minHeight: boxH, alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 16 }}>
       <Icon size={64} />
       <View style={{ marginTop: 12 }}><LordOSWordmark size={typeScale.largeTitle} crown={false} /></View>
       <Text style={{ fontSize: typeScale.callout, color: t.textDim, marginTop: 2 }}>{ver.channel ? tr('about.versionChannel', { v: ver.version, channel: ver.channel }) : tr('about.version', { v: ver.version })}</Text>
@@ -90,6 +107,8 @@ export default function About() {
         <Lumo pose="avatar" size={24} />
         <Text style={{ flex: 1, fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('about.credits')}</Text>
       </View>
+    </View>
+    </ScrollView>
     </View>
   );
 }

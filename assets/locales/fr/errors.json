@@ -235,6 +235,7 @@
   "fs.notRegular": "Ce n’est pas un fichier ordinaire (s’agit-il d’un lien ?)",
   "fs.openFailed": "Impossible d’ouvrir le fichier : {errno}",
   "fs.outsideHome": "Cet emplacement est en dehors de votre dossier personnel ou n’est pas valide",
+  "fs.nameTooLong": "Le nom est trop long (max. {max} octets ; les lettres accentuées et non latines en prennent 2 à 4 chacune)",
   "fs.protected": "Ce dossier est protégé",
   "fs.systemFolder": "Fichiers n’affiche pas les dossiers internes du système (/proc, /sys, /dev et /run)",
   "fs.tooLarge": "Le fichier est trop volumineux (max. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Impossible de mettre à jour le chargeur d’amorçage (code {code})",
   "hw.logindFailed": "Impossible d’appliquer les réglages d’énergie (code {code})",
   "hw.noBacklight": "Ce rétroéclairage n’existe pas",
+  "hw.noChargeControl": "Cette batterie n’a pas de contrôle de charge",
+  "hw.chargeControlFailed": "Impossible de modifier la charge : {errno}",
   "hw.noCpufreq": "Cet ordinateur ne prend pas en charge la variation de fréquence du CPU",
   "hw.noEeprom": "Les outils du chargeur d’amorçage (rpi-eeprom) ne sont pas installés",
   "hw.noKernelLog": "Impossible de lire le journal du noyau",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "{name} ne peut pas être installé en 64 et en 32 bits en même temps",
   "pkg.foreignArchUnsupported": "Les paquets 32 bits ne peuvent être activés que sur un PC 64 bits (amd64) ; ce système est {arch}",
   "pkg.foreignArchFailed": "Impossible d’activer les paquets 32 bits ({arch}) (dpkg s’est terminé avec le code {code})",
-  "webapps.developerOff": "Le mode développeur est désactivé dans Réglages → Apps web"
+  "webapps.developerOff": "Le mode développeur est désactivé dans Réglages → Apps web",
+  "media.streamAddress": "Cette adresse de flux n'est pas autorisée",
+  "media.streamCannotOpen": "Impossible d'ouvrir le flux",
+  "media.streamTimeout": "Le flux n'a pas répondu à temps",
+  "media.streamAuth": "Le flux a demandé un utilisateur et un mot de passe, ou ils étaient faux",
+  "media.streamLost": "Le flux a été perdu",
+  "media.streamNoChannels": "La liste ne contient aucune chaîne",
+  "media.noStreamHelper": "L'assistant de flux (lord-stream) n'est pas disponible"
 }

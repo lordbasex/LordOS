@@ -81,7 +81,10 @@ last account goes, and ends with the session.
 XDG_RUNTIME_DIR, USER), umask 077, `nice 10`, idle I/O, `PR_SET_PDEATHSIG` (rclone unmounts and ends if `lord-server` dies),
 scope through lord-sessiond with `memory.high` 512 MB. Its log is `cloud.log` in the user's log folder
 (`/var/log/lordos/users/<user>`, docs/SYSTEM.md "Log files"; NOTICE level; over 4 MB its newest part becomes `cloud.log.old` at
-the next start), which the Logs app shows. A unit's `ProtectSystem=`/`BindPaths=` sandbox (4.5) is not
+the next start), which the Logs app shows. One rclone serves every account and its lines name none, so `lord-server`
+adds a line of its own after each rc call about an account that failed (0.8.8.10, #183: `ERROR c1a2b3c4d:
+operations/list: …`, the id only, `note_failure`), and the Logs app shows that account's provider and name on it and on
+rclone's lines of the same error (`cloudAccounts` in `sdk/logfile.js`). A unit's `ProtectSystem=`/`BindPaths=` sandbox (4.5) is not
 there: the scope and the socket are the boundary.
 
 - **Listens on a Unix socket only**: `$XDG_RUNTIME_DIR/lordos/cloud/rc.sock`, folder 0700, socket 0600. No TCP, not even
@@ -307,7 +310,13 @@ still coming down keeps the "coming down" glyph until all of them are here (0.8.
 time one file ended and the next hadn't started. `lord-server` marks a kept entry as coming down when it is kept and
 when the keeper finds a file of it missing (`keep_busy`), and clears the mark when a pass of the keeper read everything
 (a pass stopped by Pause or an unmount leaves it); `cloud_kept_busy` also gives "coming down" to the folders that hold
-such an entry. Check This Account skips **Free Up Space** on an account that keeps its files here ("Kept on this
+such an entry. A path the keeper can't read while the provider answers (#185, 0.8.8.10: a folder the provider refuses
+to list, such as a locked vault, "ObjectHandle is Invalid") no longer stops every pass there and keeps the whole entry
+coming down: it is set aside for an hour (`CloudFails`, `kfail` of the account, at most 32), the account is checked at
+once and the keeper comes back around it, so the pass ends and the mark clears; the path and what is inside it show
+the error glyph meanwhile, and it is tried again after the hour, at the next mount or when something is kept again.
+The kept entry itself failing is the provider (never set aside), and a check that finds the provider unreachable
+forgets the set. Check This Account skips **Free Up Space** on an account that keeps its files here ("Kept on this
 computer, so not freed: not a failure"): it failed with `cloud.notFreed.kept` after 40 seconds until 0.8.8.7.
 
 Context menu on files and folders of an account: **Keep on This Computer** / **Free Up Space**, **Copy Link** / **Share Link…**
@@ -452,7 +461,14 @@ In Settings' second group, next to Sharing, glyph `☁`, color `#0a84ff`:
    6.1). A row opens the account (6.3). Since 0.8.8.7 (#86) every list of accounts is by name: Settings, the menu bar
    panel, Files' sidebar and Network, and the file dialog (`sortAccounts`/`compareNames` in `sdk/cloudmodel.js`: case and
    accents aside, numbers by value, equal names by id). An account keeps the color of the order it was added in.
-2. **On this computer**: cache use per account, the free-space threshold (7.2), **Free Up Space**.
+2. **On this computer**: cache use per account, the free-space threshold (7.2), **Free Up Space**. Since 0.8.8.10
+   (#184) the line says what each figure is: everything here, the kept part, and what Free Up Space can drop (the
+   rest: `hereOf`/`here` in `sdk/cloudmodel.js`, from `cacheBytes` and `keptBytes`, measured once a minute); with
+   more than one account a row per account adds up to it, a line says what Free Up Space removes and what stays,
+   and the button is off when nothing can be freed. Each account's page has the same box with Free Up Space for
+   that account alone. Not done, waiting for a decision: showing the account's user or e-mail (rclone marks it
+   sensitive, so it lives in the keyring and JavaScript never sees it; OAuth providers don't give it at all) and a
+   color chosen per account or per provider (the color is the order the account was added in, 12).
 3. **Bandwidth**: upload and download limits, "Pause on battery", "Pause on metered networks".
 4. **Service**: state (running, its version, uptime, memory), **Restart**, **Show Log** (opens the Logs app on the unit),
    and a line "Only LordOS can reach it: it listens on no network address."

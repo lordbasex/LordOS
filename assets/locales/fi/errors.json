@@ -235,6 +235,7 @@
   "fs.notRegular": "Se ei ole tavallinen tiedosto (onko se linkki?)",
   "fs.openFailed": "Tiedostoa ei voitu avata: {errno}",
   "fs.outsideHome": "Sijainti on kotikansiosi ulkopuolella tai ei ole kelvollinen",
+  "fs.nameTooLong": "Nimi on liian pitkä (enintään {max} tavua; tarkkeelliset ja muut kuin latinalaiset kirjaimet vievät 2–4 kukin)",
   "fs.protected": "Kansio on suojattu",
   "fs.systemFolder": "Tiedostot ei näytä järjestelmän sisäisiä kansioita (/proc, /sys, /dev ja /run)",
   "fs.tooLarge": "Tiedosto on liian suuri (enint. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Käynnistyslatainta ei voitu päivittää (koodi {code})",
   "hw.logindFailed": "Virta-asetuksia ei voitu ottaa käyttöön (koodi {code})",
   "hw.noBacklight": "Taustavaloa ei ole",
+  "hw.noChargeControl": "Tässä akussa ei ole latauksen hallintaa",
+  "hw.chargeControlFailed": "Latausta ei voitu muuttaa: {errno}",
   "hw.noCpufreq": "Tässä tietokoneessa ei ole suorittimen taajuussäätöä",
   "hw.noEeprom": "Käynnistyslataimen työkaluja (rpi-eeprom) ei ole asennettu",
   "hw.noKernelLog": "Ytimen lokia ei voitu lukea",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "Pakettia {name} ei voi asentaa 64- ja 32-bittisenä samaan aikaan",
   "pkg.foreignArchUnsupported": "32-bittiset paketit voi ottaa käyttöön vain 64-bittisessä PC:ssä (amd64); tämä järjestelmä on {arch}",
   "pkg.foreignArchFailed": "32-bittisiä ({arch}) paketteja ei voitu ottaa käyttöön (dpkg päättyi koodilla {code})",
-  "webapps.developerOff": "Kehittäjätila on pois päältä kohdassa Asetukset → Verkkosovellukset"
+  "webapps.developerOff": "Kehittäjätila on pois päältä kohdassa Asetukset → Verkkosovellukset",
+  "media.streamAddress": "Tätä lähetysosoitetta ei sallita",
+  "media.streamCannotOpen": "Lähetystä ei voitu avata",
+  "media.streamTimeout": "Lähetys ei vastannut ajoissa",
+  "media.streamAuth": "Lähetys pyysi käyttäjää ja salasanaa, tai ne olivat väärät",
+  "media.streamLost": "Lähetys katkesi",
+  "media.streamNoChannels": "Listalla ei ole kanavia",
+  "media.noStreamHelper": "Lähetysapuri (lord-stream) ei ole käytettävissä"
 }

@@ -235,6 +235,7 @@
   "fs.notRegular": "Si faili ya kawaida (je, ni kiungo?)",
   "fs.openFailed": "Haikuweza kufungua faili: {errno}",
   "fs.outsideHome": "Mahali hapo ni nje ya folda yako ya nyumbani au si sahihi",
+  "fs.nameTooLong": "Jina ni refu mno (upeo {max} baiti; herufi zenye alama na zisizo za Kilatini huchukua 2 hadi 4 kila moja)",
   "fs.protected": "Folda hiyo imelindwa",
   "fs.systemFolder": "Faili haionyeshi folda za ndani za mfumo (/proc, /sys, /dev na /run)",
   "fs.tooLarge": "Faili ni kubwa mno (upeo {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Haikuweza kusasisha kipakiaji cha kuwasha (msimbo {code})",
   "hw.logindFailed": "Mipangilio ya nishati haikuweza kutumika (msimbo {code})",
   "hw.noBacklight": "Taa hiyo ya nyuma haipo",
+  "hw.noChargeControl": "Betri hii haina udhibiti wa chaji",
+  "hw.chargeControlFailed": "Haikuweza kubadilisha uchaji: {errno}",
   "hw.noCpufreq": "Kompyuta hii haina ubadilishaji wa masafa ya CPU",
   "hw.noEeprom": "Zana za kipakiaji cha kuwasha (rpi-eeprom) hazijasakinishwa",
   "hw.noKernelLog": "Kumbukumbu ya kerneli haikuweza kusomwa",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "{name} haiwezi kusakinishwa kwa biti 64 na 32 kwa wakati mmoja",
   "pkg.foreignArchUnsupported": "Vifurushi vya biti 32 vinaweza kuwezeshwa tu kwenye kompyuta ya biti 64 (amd64); mfumo huu ni {arch}",
   "pkg.foreignArchFailed": "Vifurushi vya biti 32 ({arch}) havikuweza kuwezeshwa (dpkg ilitoka kwa msimbo {code})",
-  "webapps.developerOff": "Hali ya msanidi imezimwa katika Mipangilio → Programu za Wavuti"
+  "webapps.developerOff": "Hali ya msanidi imezimwa katika Mipangilio → Programu za Wavuti",
+  "media.streamAddress": "Anwani hii ya mtiririko hairuhusiwi",
+  "media.streamCannotOpen": "Mtiririko haukuweza kufunguliwa",
+  "media.streamTimeout": "Mtiririko haukujibu kwa wakati",
+  "media.streamAuth": "Mtiririko uliomba mtumiaji na nenosiri, au yalikuwa si sahihi",
+  "media.streamLost": "Mtiririko umekatika",
+  "media.streamNoChannels": "Orodha haina chaneli",
+  "media.noStreamHelper": "Msaidizi wa mitiririko (lord-stream) haupatikani"
 }

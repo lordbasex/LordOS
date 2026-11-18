@@ -154,20 +154,21 @@ export function IconBtn({ glyph, icon, title, onClick, disabled, active, size = 
 }
 
 // an icon above its name: the mocks' main toolbar (Structure, Content, … Console)
-export function ToolItem({ icon, label, onClick, on, disabled }) {
+// compact: the icon alone (a small window), its label as the title
+export function ToolItem({ icon, label, onClick, on, disabled, compact }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   const fg = on ? '#5aa9ff' : hover && !disabled ? p.text : p.dim;
   return (
-    <View onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ minWidth: 62, paddingHorizontal: 6, paddingVertical: 5, gap: 4, borderRadius: 7, alignItems: 'center', opacity: disabled ? 0.4 : 1,
+    <View onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} title={compact ? label : undefined}
+      style={{ minWidth: compact ? 32 : 62, paddingHorizontal: 6, paddingVertical: 5, gap: 4, borderRadius: 7, alignItems: 'center', opacity: disabled ? 0.4 : 1,
         backgroundColor: on ? 'rgba(10,132,255,0.2)' : hover && !disabled ? p.hover : 'transparent' }}>
       {icon(fg, 20)}
-      <Text style={{ fontSize: 11, color: fg, whiteSpace: 'nowrap' }}>{label}</Text>
+      {compact ? null : <Text style={{ fontSize: 11, color: fg, whiteSpace: 'nowrap' }}>{label}</Text>}
     </View>
   );
 }
-export const Sep = ({ height = 34 }) => { const p = usePal(); return <View style={{ width: 1, height, marginHorizontal: 8, backgroundColor: p.line }} />; };
+export const Sep = ({ height = 34, gap = 8 }) => { const p = usePal(); return <View style={{ width: 1, height, marginHorizontal: gap, backgroundColor: p.line }} />; };
 
 // ---- form ----
 export function Check({ on, onChange, label, disabled }) {

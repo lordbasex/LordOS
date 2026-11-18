@@ -21,7 +21,7 @@ export function DesktopsSection({ tr }) {
             <Button small label="+" onClick={() => setDesktopCount(n + 1)} disabled={n >= MAX} />
           </View>
         </SettingRow>
-        {themes.current() === 'default' && (
+        {(themes.current() === 'default' || (themes.current() !== 'classic' && !!themes.info()?.desktopArrows)) && (
           <SettingRow label={tr('settings.dock.desktops.arrows')} hint={tr('settings.dock.desktops.arrowsHint')}>
             <Toggle small on={s.desktopArrows !== false} onChange={(v) => set({ desktopArrows: v })} />
           </SettingRow>

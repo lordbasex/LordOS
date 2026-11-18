@@ -8,6 +8,7 @@ their own. `lord-server` runs the theme with QuickJS and paints it with its C en
 |---|---|
 | `default` | Lord Flow: menu bar, dock with magnification, app launcher, Control Center |
 | `classic` | Lord Classic: a centered taskbar, start menu with search, tray with quick settings and notifications, window snapping and the SDK's Overview (0.8.3) |
+| `workspaces` | Lord Workspaces (in development): activities with their own apps and layouts, a Context Spine, tiling per display, Search and a Control Center, three effects styles (Opaque, Translucent, Crystal); see [`docs/WORKSPACES.md`](../docs/WORKSPACES.md) |
 
 ```sh
 npm install           # once (React + esbuild)
@@ -27,7 +28,8 @@ Note that a theme LordOS did not sign only loads on a development build (see the
 
 1. Copy `themes/classic` to `themes/mytheme` (`index.jsx` puts the pieces together; the frame,
    taskbar and panels are in `components/`, the colors and shape tokens in `tokens.js`).
-2. Edit `theme.json` (the name and description Settings shows).
+2. Edit `theme.json` (the name and description Settings shows; optionally `sketch`, `options` and `desktopArrows`,
+   which Settings reads for a theme it doesn't know by id: see `docs/THEMES-GUIDE.md`, "`theme.json`").
 3. Modify `index.jsx`. A theme must:
    - call `configureWindows({ apps, workArea })` with the free area for windows,
    - wrap everything in `<ThemeProvider tokens={...}>`,
@@ -91,7 +93,8 @@ Default's shapes.
 
 Two switches a taskbar theme usually wants: `configureWindows({ snap: true })` turns on window
 snapping (drag to the edges, `wm.snap`, `wm.snapKey`, and `snapPreview` to draw the preview; see
-`docs/WINDOWS.md`, "Snapping"), and `setBannerPlacement('bottom')` shows notification banners above
+`docs/WINDOWS.md`, "Snapping"; the person's switch in Settings → Desktop & Dock, `settings.windowSnap`, applies on
+top of it), and `setBannerPlacement('bottom')` shows notification banners above
 a bottom taskbar instead of below a menu bar.
 
 ## Native components

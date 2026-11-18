@@ -151,5 +151,10 @@
   "wifi.saved": "desada",
   "wifi.scan": "Cerca",
   "wifi.scanning": "S’està cercant…",
-  "wifi.wrongKey": "La contrasenya és incorrecta."
+  "wifi.wrongKey": "La contrasenya és incorrecta.",
+  "wifi.available": "Xarxes Wi-Fi disponibles",
+  "wifi.currentLabel": "{ssid} — Connectada",
+  "wifi.connect": "Connecta",
+  "wifi.notInRange": "Fora d’abast",
+  "wifi.knownFooter": "LordOS s’uneix tot sol a una xarxa desada quan és a l’abast. Oblida elimina la xarxa i la seva contrasenya d’aquest ordinador."
 }

@@ -141,6 +141,24 @@ static JSValue f_meter(JSContext *c, JSValueConst this_val, int argc, JSValueCon
     return JS_NewBool(c, snd_meter(idx) == 0);
 }
 
+/* spectrum(kind, index): what the sound wave widget listens to, one at a time. kind "sink" (the desktop:
+ * what an output plays), "input" (one app playing: its index) or "source" (a microphone); no index or -1 =
+ * the default output or input (not for "input"). spectrum() or spectrum(null) turns it off. Only band
+ * levels come out (sound/spectrum.c), drawn by <SoundWave> nodes in C: JS never gets the sound. */
+static JSValue f_spectrum(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || JS_IsNull(argv[0]) || JS_IsUndefined(argv[0])) return JS_NewBool(c, snd_spectrum(-1, 0xffffffffu) == 0);
+    int kind = arg_kind(c, argv[0]);
+    if (kind != SND_SINK && kind != SND_SOURCE && kind != SND_INPUT) return JS_FALSE;
+    uint32_t idx = 0xffffffffu;
+    if (argc >= 2 && JS_IsNumber(argv[1])) {
+        double d;
+        JS_ToFloat64(c, &d, argv[1]);
+        if (d >= 0 && arg_index(c, argv[1], &idx)) return JS_FALSE;
+    }
+    return JS_NewBool(c, snd_spectrum(kind, idx) == 0);
+}
+
 static JSValue f_play(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
     if (argc < 1) return JS_FALSE;
@@ -161,6 +179,7 @@ static const JSCFunctionListEntry sound_funcs[] = {
     JS_CFUNC_DEF("setProfile", 2, f_set_profile),
     JS_CFUNC_DEF("meter", 1, f_meter),
     JS_CFUNC_DEF("play", 1, f_play),
+    JS_CFUNC_DEF("spectrum", 2, f_spectrum),
 };
 
 void js_sound_register(JSContext *c, JSValue lord) {

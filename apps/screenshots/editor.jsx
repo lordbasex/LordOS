@@ -11,7 +11,7 @@
 import {
   View, Text, MediaView, Button, Toggle, Segmented, TextInput, Toolbar, ToolbarButton, ToolbarGroup, ToolbarDivider, ToolbarSpacer, Hairline,
   useTheme, useAppWindow, useKeyboard, useStore, windows, wm, t as tr, media, fs, addListener, errorText, imageEdit as M,
-  clipboard, settings,
+  clipboard, settings, useNarrow,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { ocrLangs, cleanText, transcribeRect } from './ocr.js';
@@ -28,9 +28,11 @@ const nameOf = (p) => String(p || '').split('/').pop();
 
 // props: handle (a capture, already decoded) and/or path (the file it is, or the picture to open);
 // newCapturePath() gives a free name in the Screenshots folder for a capture that was never saved.
-export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }) {
+// onNewCapture (optional): New Screenshot (and Ctrl+N) brings the capture panel back, this window staying open (GitHub #166).
+export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved, onNewCapture }) {
   const th = useTheme();
   const win = useAppWindow();
+  const narrow = useNarrow(900);
   useStore(windows, (ws) => { const w = ws.find((x) => x.id === win.id); return w ? `${w.w}x${w.h}` : ''; });   // redraw the overlays on resize
   const [path, setPath] = useState(firstPath || null);
   const [steps, setSteps] = useState(handle ? [{ id: handle, ops: [] }] : []);
@@ -246,6 +248,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
     const k = String(e.base || '').toLowerCase();
     if ((e.ctrl || e.meta) && k === 'z') undo();
     else if ((e.ctrl || e.meta) && k === 's') (e.shift ? saveCopy : save)();
+    else if ((e.ctrl || e.meta) && k === 'n' && onNewCapture) onNewCapture();
     else if (e.key === 'Enter' && crop && !text) applyCrop();
     else if (e.key === 'Escape' && (crop || size)) { setCrop(null); setSize(null); if (tool === 'crop') setTool('arrow'); }
   });
@@ -258,9 +261,11 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
   const dim = 'rgba(0,0,0,0.55)';
   const knob = (x, y) => <View style={{ position: 'absolute', left: x - 5, top: y - 5, width: 10, height: 10, borderRadius: 2, backgroundColor: '#fff', border: '1px solid rgba(0,0,0,0.5)' }} />;
   const label = (k) => <Text style={{ fontSize: 12, color: th.textDim }}>{tr(k)}</Text>;
+  // a small window (a tile): the toolbar and the crop and resize bars wrap onto more rows instead of running past the edge
+  const wrap = narrow ? { height: 'auto', minHeight: 44, flexWrap: 'wrap', paddingVertical: 6 } : null;
   return (
     <View style={{ flex: 1 }}>
-      <Toolbar>
+      <Toolbar style={wrap}>
         <ToolbarGroup>
           {TOOLS.map(([k, g, key]) => <ToolbarButton key={k} icon={g} title={tr(key)} active={tool === k} onClick={() => pickTool(k)} />)}
         </ToolbarGroup>
@@ -278,6 +283,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
         <ToolbarButton icon="⟳" title={tr('screenshots.rotateRight')} onClick={() => turn(1)} />
         <ToolbarButton icon="⤡" title={tr('screenshots.resize')} active={!!size} onClick={() => (size ? setSize(null) : openResize())} />
         <ToolbarSpacer />
+        {onNewCapture && <Button label={tr('screenshots.newCapture')} onClick={onNewCapture} />}
         <ToolbarButton icon="Ⓣ" title={tr('screenshots.tool.transcribe')} active={tool === 'transcribe'} onClick={() => pickTool(tool === 'transcribe' ? 'arrow' : 'transcribe')} />
         <ToolbarButton icon="↶" title={tr('screenshots.undo')} onClick={undo} />
         <ToolbarButton icon="⧉" title={tr('screenshots.copy')} onClick={copy} />
@@ -285,7 +291,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
         <Button primary label={tr(inPlace || !path ? 'screenshots.save' : 'screenshots.saveCopy')} onClick={inPlace ? save : saveCopy} />
       </Toolbar>
       {crop && (
-        <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 }}>
+        <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, ...wrap }}>
           <Hairline edge="bottom" />
           {label('screenshots.crop.aspect')}
           <Segmented small value={crop.preset} onChange={setPreset}
@@ -297,7 +303,7 @@ export function Editor({ handle, path: firstPath, app, newCapturePath, onSaved }
         </View>
       )}
       {size && (
-        <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12 }}>
+        <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, ...wrap }}>
           <Hairline edge="bottom" />
           {label('screenshots.width')}
           <View style={{ width: 72 }}><TextInput value={size.wText} onChange={(t) => typeSide('width', t)} onSubmit={applyResize} selectAll /></View>

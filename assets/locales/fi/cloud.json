@@ -5,8 +5,9 @@
   "accounts": "Tilit",
   "allAccounts": "Kaikki tilit",
   "onThisComputer": "Tällä tietokoneella",
-  "cacheLine": "{size} · {kept} säilytetty",
+  "hereLine": "{size} · {kept} säilytetty · {free} vapautettavissa",
   "freeUp": "Vapauta tilaa",
+  "freeUpHint": "”Vapauta tilaa” poistaa paikalliset kopiot tiedostoista, joita ei säilytetä tällä tietokoneella; säilytetyt tiedostot ja lähetystä odottavat muutokset jäävät.",
   "freed": "{size} vapautettu tällä tietokoneella",
   "freedSkipped": {
     "one": "{size} vapautettu; {count} kohde jää (auki, säilytetty tai odottaa lähetystä)",
@@ -438,5 +439,9 @@
   "details.signIn": "Kirjautuminen",
   "details.server": "Palvelin",
   "details.app": "Sovellus",
-  "details.ownApp": "Oma sovelluksesi"
+  "details.ownApp": "Oma sovelluksesi",
+  "color": "Väri",
+  "colorAuto": "Automaattinen",
+  "colorAutoHint": "Automaattinen: tilin lisäysjärjestyksen mukaan, jotta saman palvelun kaksi tiliä erottuvat.",
+  "colorChosen": "Näkyy Tiedostoissa, Pilven valikossa ja Lokeissa."
 }

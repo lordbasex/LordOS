@@ -235,11 +235,25 @@ static void arm_cpu_name(const char *txt, char *out, size_t size) {
     free(board);
 }
 
+/* The processor's name and its number of logical CPUs, read from /proc/cpuinfo once. They don't change while the
+ * session runs, and the file is costly for the kernel to generate (one block per CPU, each asking that CPU for its
+ * current clock), so the widgets that poll lord.system.info every few seconds don't regenerate it each time. */
+static char cpu_name_kept[160];
+static int cpu_cores_kept = -1;
+static void cpu_info_load(void) {
+    if (cpu_cores_kept >= 0) return;
+    char *txt = read_small("/proc/cpuinfo", 1 << 20, NULL);
+    if (!txt || field(txt, "model name", cpu_name_kept, sizeof cpu_name_kept)) arm_cpu_name(txt, cpu_name_kept, sizeof cpu_name_kept);
+    int cores = 0;
+    for (const char *p = txt; p && (p = strstr(p, "processor")); p += 9) cores++;
+    free(txt);
+    cpu_cores_kept = cores;
+}
+
 /* Processor name ("model name" on x86; on ARM, the core from "CPU part" and the board). */
 void js_sys_cpu_name(char *out, size_t size) {
-    char *txt = read_small("/proc/cpuinfo", 1 << 20, NULL);
-    if (!txt || field(txt, "model name", out, size)) arm_cpu_name(txt, out, size);
-    free(txt);
+    cpu_info_load();
+    snprintf(out, size, "%s", cpu_name_kept);
 }
 
 /* This boot's time to the first frame, from lord-sessiond's /var/lib/lordos/boot-times.jsonl (root's,
@@ -291,11 +305,9 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     if (!txt || field(txt, "PRETTY_NAME", os, sizeof os)) snprintf(os, sizeof os, "Linux");
     free(txt);
 
-    int cores = 0;
-    txt = read_small("/proc/cpuinfo", 1 << 20, NULL);
-    if (!txt || field(txt, "model name", cpu, sizeof cpu)) arm_cpu_name(txt, cpu, sizeof cpu);
-    for (const char *p = txt; p && (p = strstr(p, "processor")); p += 9) cores++;
-    free(txt);
+    cpu_info_load();
+    int cores = cpu_cores_kept;
+    snprintf(cpu, sizeof cpu, "%s", cpu_name_kept);
 
     double mem_total = 0, mem_avail = 0, mem_used = 0, uptime = 0;
     txt = read_small("/proc/meminfo", 8192, NULL);
@@ -1139,18 +1151,27 @@ static const JSCFunctionListEntry text_funcs[] = {
 
 #define FS_WRITE_MAX (32 * 1024 * 1024)
 
+static int name_long;                   /* the last destination refused had a name longer than 255 bytes (GitHub #102) */
 /* Destination path inside the home folder, even if the file doesn't exist yet: the
  * parent folder is resolved (realpath) and the last component must be a plain name.
  * Rejects the protected folders. out = real folder + "/" + name. */
 static int resolve_target(const char *path, char *out, size_t n, char *dir, size_t dn) {
     int down = 0, r = fsops_resolve_target(path, out, n, dir, dn, &down);   /* fsops.c: shared with fsasync.c */
     share_down = down;
+    name_long = r == -1 && !down && fsops_name_too_long(path);
     return r;
 }
 
-int js_sys_resolve_target(const char *path, char *out, size_t n) { return resolve_target(path, out, n, NULL, 0); }
+int js_sys_resolve_target(const char *path, char *out, size_t n) {
+    int r = resolve_target(path, out, n, NULL, 0);
+    name_long = 0;                      /* only lord.fs's own calls answer with fs_path_error */
+    return r;
+}
 
 static JSValue fs_path_error(JSContext *c, int r) {
+    int long_name = name_long;
+    name_long = 0;                      /* told once: a later refusal by another check isn't taken for this one */
+    if (r == -1 && long_name) return js_throw_code(c, "fs.nameTooLong", "max", "255", NULL);
     return js_throw_code(c, r == -2 ? "fs.protected" : share_down ? "share.notResponding" : "fs.outsideHome", NULL);
 }
 
@@ -1571,8 +1592,15 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("recent", 2, f_fs_recent),
     JS_CFUNC_DEF("volumes", 0, f_fs_volumes),
 };
+int js_sys_unseen;
+static JSValue f_sys_seen(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    return JS_NewBool(c, !js_sys_unseen);
+}
+
 static const JSCFunctionListEntry system_funcs[] = {
     JS_CFUNC_DEF("info", 0, f_sys_info),
+    JS_CFUNC_DEF("seen", 0, f_sys_seen),
     JS_CFUNC_DEF("cpuTimes", 0, f_sys_cpu),
 };
 static const JSCFunctionListEntry settings_funcs[] = {
@@ -1637,6 +1665,7 @@ static JSValue f_wl_state(JSContext *c, JSValueConst this_val, int argc, JSValue
     if (argc > 3) wl_set_minimized(id, JS_ToBool(c, argv[3]));
     if (argc > 4) wl_set_parked(id, JS_ToBool(c, argv[4]));
     if (argc > 5) wl_set_covered(id, JS_ToBool(c, argv[5]));
+    if (argc > 6) wl_set_fixed(id, JS_ToBool(c, argv[6]));
     return JS_UNDEFINED;
 }
 
@@ -1791,7 +1820,7 @@ static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("focus", 2, f_wl_focus),
     JS_CFUNC_DEF("close", 1, f_wl_close),
     JS_CFUNC_DEF("kill", 1, f_wl_kill),
-    JS_CFUNC_DEF("state", 6, f_wl_state),
+    JS_CFUNC_DEF("state", 7, f_wl_state),
     JS_CFUNC_DEF("info", 0, f_wl_info),
     JS_CFUNC_DEF("x11SelfScale", 1, f_wl_x11_self_scale),
 };
@@ -2326,6 +2355,8 @@ static JSValue f_users_list(JSContext *c, JSValueConst this_val, int argc, JSVal
     if (a) { a += 10; size_t k = strspn(a, "abcdefghijklmnopqrstuvwxyz0123456789_-"); if (k < sizeof au) { memcpy(au, a, k); au[k] = 0; } }
     free(conf);
     JS_SetPropertyStr(c, o, "autologin", JS_NewString(c, au));
+    /* Settings → Users & Login → Start in text mode (the boot-text action; docs/SESSIONS.md, "Text mode") */
+    JS_SetPropertyStr(c, o, "textMode", JS_NewBool(c, access("/etc/lordos/text-mode", F_OK) == 0));
     return o;
 }
 

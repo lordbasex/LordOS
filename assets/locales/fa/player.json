@@ -37,5 +37,15 @@
   "col.time": "زمان",
   "back": "بازگشت",
   "emptyMusicTitle": "بدون موسیقی",
-  "emptyVideosTitle": "بدون ویدیو"
+  "emptyVideosTitle": "بدون ویدیو",
+  "nav.network": "شبکه",
+  "nav.streams": "پخش زنده",
+  "streams.open": "باز کردن نشانی…",
+  "streams.list": "باز کردن فهرست M3U…",
+  "streams.save": "ذخیره",
+  "streams.remove": "برداشتن",
+  "streams.close": "بستن",
+  "streams.saved": "ذخیره‌شده",
+  "streams.channels": "کانال‌ها ({n})",
+  "streams.empty": "دوربین، پخش زنده یا کانال تلویزیون را با نشانی آن، یا کانال‌های یک فهرست M3U را باز کنید."
 }

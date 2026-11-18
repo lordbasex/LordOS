@@ -235,6 +235,7 @@
   "fs.notRegular": "এটি সাধারণ ফাইল নয় (এটি কি লিংক?)",
   "fs.openFailed": "ফাইলটি খোলা যায়নি: {errno}",
   "fs.outsideHome": "এই অবস্থানটি আপনার হোম ফোল্ডারের বাইরে বা বৈধ নয়",
+  "fs.nameTooLong": "নামটি খুব দীর্ঘ (সর্বোচ্চ {max} বাইট; অ-লাতিন অক্ষর প্রতিটি ২ থেকে ৪ বাইট নেয়)",
   "fs.protected": "এই ফোল্ডারটি সুরক্ষিত",
   "fs.systemFolder": "ফাইল সিস্টেমের অভ্যন্তরীণ ফোল্ডার (/proc, /sys, /dev ও /run) দেখায় না",
   "fs.tooLarge": "ফাইলটি অনেক বড় (সর্বোচ্চ {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "বুটলোডার আপডেট করা যায়নি (কোড {code})",
   "hw.logindFailed": "পাওয়ার সেটিংস প্রয়োগ করা যায়নি (কোড {code})",
   "hw.noBacklight": "এমন কোনো ব্যাকলাইট নেই",
+  "hw.noChargeControl": "এই ব্যাটারিতে চার্জ নিয়ন্ত্রণ নেই",
+  "hw.chargeControlFailed": "চার্জিং বদলানো যায়নি: {errno}",
   "hw.noCpufreq": "এই কম্পিউটারে CPU ফ্রিকোয়েন্সি স্কেলিং নেই",
   "hw.noEeprom": "বুটলোডার টুল (rpi-eeprom) ইনস্টল করা নেই",
   "hw.noKernelLog": "কার্নেল লগ পড়া যায়নি",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "{name} একসাথে ৬৪ ও ৩২ বিটের জন্য ইনস্টল করা যায় না",
   "pkg.foreignArchUnsupported": "৩২-বিট প্যাকেজ শুধু ৬৪-বিট পিসিতে (amd64) চালু করা যায়; এই সিস্টেমটি {arch}",
   "pkg.foreignArchFailed": "৩২-বিট ({arch}) প্যাকেজ চালু করা যায়নি (dpkg কোড {code} দিয়ে বন্ধ হয়েছে)",
-  "webapps.developerOff": "সেটিংস → ওয়েব অ্যাপ-এ ডেভেলপার মোড বন্ধ আছে"
+  "webapps.developerOff": "সেটিংস → ওয়েব অ্যাপ-এ ডেভেলপার মোড বন্ধ আছে",
+  "media.streamAddress": "এই স্ট্রিম ঠিকানার অনুমতি নেই",
+  "media.streamCannotOpen": "স্ট্রিম খোলা যায়নি",
+  "media.streamTimeout": "স্ট্রিম সময়মতো সাড়া দেয়নি",
+  "media.streamAuth": "স্ট্রিম ব্যবহারকারী ও পাসওয়ার্ড চেয়েছে, বা সেগুলো ভুল ছিল",
+  "media.streamLost": "স্ট্রিম বিচ্ছিন্ন হয়েছে",
+  "media.streamNoChannels": "তালিকায় কোনো চ্যানেল নেই",
+  "media.noStreamHelper": "স্ট্রিম সহায়ক (lord-stream) পাওয়া যাচ্ছে না"
 }

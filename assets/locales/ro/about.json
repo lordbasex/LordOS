@@ -21,7 +21,7 @@
     "few": "{cpu} · {count} nuclee",
     "other": "{cpu} · {count} de nuclee"
   },
-  "credits": "IP-țară în Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Hartă: Natural Earth (domeniu public).",
+  "credits": "IP-țară în Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Hartă: Natural Earth (domeniu public). Orașele vremii: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Afișaj",
   "engine": "Motorul interfeței",
   "host": "Computer",

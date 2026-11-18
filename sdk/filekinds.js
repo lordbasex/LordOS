@@ -101,11 +101,23 @@ export const isImage = (e) => kindOf(e) === 'image' && !/\.(svg|heic|avif|tiff?|
 // interface's thread straight down to fit px x px (server/src/ui/image.c). Until 0.8.8.7 an icon was the whole picture,
 // decoded on that thread and kept for good: a folder of phone photos took 48 MB each and ran lord-server out of memory
 // (issues #71, #82). px is the size shown, doubled for HiDPI and rounded up to 64, 128, … 2048 so near sizes share one.
-export function thumbSrc(path, size) {
+// file ({ mtime, size }, the entry as listed) adds its version, "thumb:<px>:<mtime>.<size>:<path>": lord-server keeps
+// thumbnails by that, so a picture replaced by another one under the same name is decoded again instead of showing the
+// old one until lord-server restarts (GitHub #180).
+export function thumbSrc(path, size, file) {
   const want = Math.ceil(Math.max(1, Number(size) || 0) * 2);
   let px = 64;
   while (px < want && px < 2048) px *= 2;
-  return `thumb:${px}:${path}`;
+  const v = fileVersion(file);
+  return v ? `thumb:${px}:${v}:${path}` : `thumb:${px}:${path}`;
+}
+// "<mtime>.<size>" of a listed file (whole numbers), or '' when neither is known
+export function fileVersion(file) {
+  if (!file) return '';
+  const m = Number(file.mtime), z = Number(file.size);
+  const ok = (n) => Number.isFinite(n) && n >= 0 && n < 1e18;      // printed with digits only (no exponent)
+  if (!ok(m) && !ok(z)) return '';
+  return `${ok(m) ? Math.floor(m) : 0}.${ok(z) ? Math.floor(z) : 0}`;
 }
 
 // Band color of each kind in the document icon.

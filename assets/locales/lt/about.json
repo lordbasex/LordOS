@@ -21,7 +21,7 @@
     "few": "{cpu} · {count} branduoliai",
     "other": "{cpu} · {count} branduolių"
   },
-  "credits": "IP adreso šalis programoje „Stebėjimas“: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Žemėlapis: Natural Earth (viešasis domenas).",
+  "credits": "IP adreso šalis programoje „Stebėjimas“: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Žemėlapis: Natural Earth (viešasis domenas). Orų miestai: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Ekranas",
   "engine": "Sąsajos variklis",
   "host": "Kompiuteris",

@@ -2,6 +2,7 @@
   "pick": "エントリを選択すると、メッセージ全文とそのフィールドが表示されます。",
   "field.time": "時刻",
   "field.level": "レベル",
+  "field.account": "アカウント",
   "field.process": "プロセス",
   "field.pid": "PID",
   "field.unit": "ユニット",

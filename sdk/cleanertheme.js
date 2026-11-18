@@ -37,3 +37,17 @@ export function cleanerPalette(settings, mode) {
   if (id === 'cristal') return CRISTAL;
   return mode === 'light' ? NOCHE_LIGHT : NOCHE;
 }
+
+// The panel by the clock in the theme's own colours (th: the shell's tokens), so it looks like the bar's other panels
+// (Cloud, the network); the app keeps the look chosen in Cleaner → Settings.
+export function shellPalette(th) {
+  const dark = th?.mode !== 'light';
+  const accent = th?.accent || '#7C5CFF';
+  return {
+    text: th?.text || (dark ? '#ffffff' : '#141a4d'), sub: th?.textDim || (dark ? '#b6c0e6' : '#444c80'),
+    glass: th?.hover || (dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)'), line: th?.separator || (dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'),
+    panel: th?.popupBg || th?.windowBg || (dark ? '#252239' : '#ffffff'), accent, good: dark ? '#7ff0c4' : '#0b7a4b', warn: dark ? '#ffd36b' : '#9a5b00',
+    btnA: accent, btnB: accent, btnText: th?.onAccent || '#ffffff', barA: accent, barB: accent, track: th?.hover || 'rgba(127,127,127,0.18)', danger: '#d92d4a',
+    shadow: th?.shadowSoft || th?.shadow,
+  };
+}

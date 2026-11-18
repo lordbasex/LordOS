@@ -66,6 +66,8 @@
 #include "xdg-activation-v1-protocol.h"
 #include "xdgact.h"
 #include "dndgate.h"
+#include "seatbtn.h"
+#include "fsfocus.h"
 #include "toolkitenv.h"
 #include "urilist.h"
 #include "tiutf8.h"
@@ -129,6 +131,7 @@ struct Surf {
     struct wl_resource *dlg;
     int modal;
     int kde_ssd;                    /* asked for a server frame via org_kde_kwin_server_decoration (GTK 3) */
+    int fixed;                      /* locked by the theme (wl_set_fixed): no maximize offered or done (minimize stays) */
     struct wl_resource *kde;
     /* popup menu */
     Surf *parent;
@@ -227,6 +230,38 @@ static int fs_slot = -1;                /* the display it covers (output slot), 
 static void fs_rect(float *x, float *y, float *w, float *h) {
     if (fs_slot >= 0 && fs_slot < OUT_MAX && oslots_used(fs_slot)) { oslot_rect(fs_slot, x, y, w, h); return; }
     *x = 0; *y = 0; *w = ui.width; *h = ui.height;
+}
+/* Where the pointer was last (wl_pointer), for the keyboard's fullscreen rule. */
+static float ptr_last_x = -1, ptr_last_y = -1;
+/* A fullscreen window owns its own display only: the pointer on another display goes to what is there (the desktop
+ * and its windows), and the keys go to the window chosen there (several monitors: a video full screen on one, work
+ * on the others; fsfocus.h). With one display that is the whole screen, as before. */
+static int on_fs(float x, float y) {
+    if (!fs_surf || !fs_surf->content) return 0;
+    float fx, fy, fw, fh;
+    fs_rect(&fx, &fy, &fw, &fh);
+    return x >= fx && x < fx + fw && y >= fy && y < fy + fh;
+}
+/* before the pointer ever moved, it counts as on the fullscreen window's display */
+static int ptr_on_fs(void) { return ptr_last_x < 0 ? fs_surf && fs_surf->content : on_fs(ptr_last_x, ptr_last_y); }
+static Surf *toplevel_of(Surf *s);
+/* A window hidden under the fullscreen one: its centre on that display, or any window when it covers the whole space
+ * (one display). A window with no place on screen counts as hidden. */
+static int fs_hides(Surf *s) {
+    Surf *top = toplevel_of(s);
+    if (!fs_surf || !fs_surf->content || !top || top == fs_surf) return 0;
+    float fx, fy, fw, fh;
+    fs_rect(&fx, &fy, &fw, &fh);
+    int whole = fx <= 0 && fy <= 0 && fw >= (float)ui.width && fh >= (float)ui.height;
+    Node *n = top->node ? node_get(top->node) : NULL;
+    if (!n) return 1;
+    return fsf_hidden((FsfRect){ n->ax, n->ay, n->w, n->h }, (FsfRect){ fx, fy, fw, fh }, whole);
+}
+/* The fullscreen window takes the keys instead of s (a window, or NULL for none): fsfocus.h. The keys follow the
+ * window chosen, not the pointer: one chosen on another display keeps them when the pointer comes back (issue #175). */
+static int fs_takes_keys(Surf *s) {
+    if (!fs_surf || !fs_surf->content) return 0;
+    return fsf_take(s == fs_surf, !s, s && fs_hides(s), ptr_on_fs());
 }
 
 /* cursor of the app with the pointer: 0 LordOS arrow, 1 app image, 2 hidden */
@@ -1159,6 +1194,9 @@ static void frac_gone(struct wl_resource *r) {
     if (s) s->frac = NULL;
 }
 static int pointer_scale = 100;         /* the display under the pointer: where a new window opens */
+/* What a client is asked to draw at: a display below 100 % (75, 80: GitHub #158) asks for 100 % and LordOS draws the
+ * buffer smaller, since several toolkits don't handle a scale below 1 (docs/DISPLAYS.md). */
+static int client_pct(int pct) { return pct < 100 ? 100 : pct; }
 static void fsm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void fsm_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface) {
     Surf *s = wl_resource_get_user_data(surface);
@@ -1168,7 +1206,7 @@ static void fsm_get(struct wl_client *c, struct wl_resource *r, uint32_t id, str
     wl_resource_set_implementation(f, &frac_impl, s, frac_gone);
     if (!s) return;
     s->frac = f;
-    int sc = s->pref_scale ? s->pref_scale : pointer_scale;
+    int sc = client_pct(s->pref_scale ? s->pref_scale : pointer_scale);
     wp_fractional_scale_v1_send_preferred_scale(f, (uint32_t)(sc * 120 / 100));
 }
 static const struct wp_fractional_scale_manager_v1_interface frac_mgr_impl = { .destroy = fsm_destroy, .get_fractional_scale = fsm_get };
@@ -1253,6 +1291,7 @@ static void send_enter_leave(Surf *s, unsigned mask) {
 }
 
 static void set_pref_scale(Surf *s, int pct) {
+    pct = client_pct(pct);
     if (s->pref_scale == pct) return;
     s->pref_scale = pct;
     if (s->frac) wp_fractional_scale_v1_send_preferred_scale(s->frac, (uint32_t)(pct * 120 / 100));
@@ -2367,15 +2406,19 @@ static void top_menu(struct wl_client *c, struct wl_resource *r, struct wl_resou
     if (!s || !s->mapped || !origin(s, &ox, &oy)) return;
     emit(s, "menu", "{\"x\":%.0f,\"y\":%.0f}", ox + (float)x, oy + (float)y);
 }
+/* An interactive move or resize needs the button that started it still down (xdg-shell lets the compositor ignore
+ * it otherwise). A client with its own title bar may ask after the release: Floorp, clicking Minimize while the
+ * pointer moved a little, asked to move once the button was up, and the window then followed the pointer until the
+ * next click (GitHub #189). */
 static void top_move(struct wl_client *c, struct wl_resource *r, struct wl_resource *seat, uint32_t serial) {
     (void)c; (void)seat; (void)serial;
     Surf *s = wl_resource_get_user_data(r);
-    if (s && s->mapped) { buttons_held = 0; emit(s, "move", "{\"x\":%.0f,\"y\":%.0f}", press_x, press_y); }
+    if (s && s->mapped && buttons_held > 0) { buttons_held = 0; emit(s, "move", "{\"x\":%.0f,\"y\":%.0f}", press_x, press_y); }
 }
 static void top_resize(struct wl_client *c, struct wl_resource *r, struct wl_resource *seat, uint32_t serial, uint32_t edges) {
     (void)c; (void)seat; (void)serial;
     Surf *s = wl_resource_get_user_data(r);
-    if (s && s->mapped) { buttons_held = 0; emit(s, "resize", "{\"edges\":%u,\"x\":%.0f,\"y\":%.0f}", edges, press_x, press_y); }
+    if (s && s->mapped && buttons_held > 0) { buttons_held = 0; emit(s, "resize", "{\"edges\":%u,\"x\":%.0f,\"y\":%.0f}", edges, press_x, press_y); }
 }
 static void top_max_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) {
     (void)c;
@@ -2387,12 +2430,17 @@ static void top_min_size(struct wl_client *c, struct wl_resource *r, int32_t w, 
     Surf *s = wl_resource_get_user_data(r);
     if (s) { s->min_w = w; s->min_h = h; }
 }
+/* A refused request still gets its answer: a configure with the state as it is (xdg-shell asks for one after
+ * set_maximized and unset_maximized; an app that waits for it, Google Chrome, stops responding without it). */
+static void refuse_state(Surf *s) { if (s && s->xdg && s->sent_configure) send_toplevel_configure(s); }
 static void top_maximize(struct wl_client *c, struct wl_resource *r) {
     (void)c; Surf *s = wl_resource_get_user_data(r);
+    if (s && s->fixed) { refuse_state(s); return; }
     if (s && s->mapped) emit(s, "maximize", "{}");
 }
 static void top_unmaximize(struct wl_client *c, struct wl_resource *r) {
     (void)c; Surf *s = wl_resource_get_user_data(r);
+    if (s && s->fixed) { refuse_state(s); return; }
     if (s && s->mapped) emit(s, "unmaximize", "{}");
 }
 /* Fullscreen: presented by the compositor on top of everything (and straight to the card if possible). */
@@ -2429,6 +2477,8 @@ static void enter_fullscreen(Surf *s) {
     s->conf_h = (int)fh;
     send_toplevel_configure(s);
     if (s->mapped) emit(s, "fullscreen", "{}");
+    /* the keys: its own, unless they are with a window on another display (fsfocus.h) */
+    if (s->mapped && key_focus != s && (!key_focus || fs_hides(key_focus))) wl_set_focus(s->id);
     damage_add((Box){ 0, 0, ui.width, ui.height });
     ui.dirty = 1;
 }
@@ -2455,7 +2505,7 @@ static void top_unfullscreen(struct wl_client *c, struct wl_resource *r) {
 }
 static void top_minimize(struct wl_client *c, struct wl_resource *r) {
     (void)c; Surf *s = wl_resource_get_user_data(r);
-    if (s && s->mapped) emit(s, "minimize", "{}");
+    if (s && s->mapped) emit(s, "minimize", "{}");   /* locked too: minimizing frees the slot for another app */
 }
 static const struct xdg_toplevel_interface toplevel_impl = {
     .destroy = top_destroy, .set_parent = top_parent, .set_title = top_title, .set_app_id = top_app_id,
@@ -2463,9 +2513,18 @@ static const struct xdg_toplevel_interface toplevel_impl = {
     .set_min_size = top_min_size, .set_maximized = top_maximize, .unset_maximized = top_unmaximize,
     .set_fullscreen = top_fullscreen, .unset_fullscreen = top_unfullscreen, .set_minimized = top_minimize,
 };
+/* The role object is gone: the wl_surface is unmapped and a new xdg_surface on it starts over (xdg-shell), so its
+ * first commit must get a configure again. GTK 4 keeps one wl_surface for a popover and gives it a new xdg_surface
+ * and xdg_popup each time it opens: the second opening got no configure and the app froze (GitHub #159). */
+static void role_reset(Surf *s) {
+    s->sent_configure = 0;
+    s->has_geom = s->p_geom = 0;
+    s->conf_serial = s->acked_serial = 0;
+}
 static void top_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (!s || s->top != r) return;
+    role_reset(s);
     if (s->mapped) emit(s, "unmap", "{}");
     s->mapped = 0;
     s->top = NULL;
@@ -2496,6 +2555,7 @@ static void pop_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (!s || s->popup != r) return;
     unmap_popup(s);
+    role_reset(s);
     s->popup = NULL;
     s->mapped = 0;
     if (pointer_focus == s) pointer_focus = NULL;
@@ -2504,6 +2564,17 @@ static void pop_gone(struct wl_resource *r) {
 /* ---- xdg_surface / xdg_wm_base ---- */
 
 static void xs_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+/* What the window manager offers this toplevel (xdg-shell 5): maximize and minimize, none while it is locked. */
+static void send_caps(Surf *s) {
+    if (!s || !s->top || wl_resource_get_version(s->top) < 5) return;
+    struct wl_array caps;
+    wl_array_init(&caps);
+    uint32_t *p;
+    if (!s->fixed && (p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE;
+    if ((p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE;   /* offered even locked */
+    xdg_toplevel_send_wm_capabilities(s->top, &caps);
+    wl_array_release(&caps);
+}
 static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id) {
     Surf *s = wl_resource_get_user_data(r);
     if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
@@ -2515,15 +2586,7 @@ static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id)
     s->role = R_TOPLEVEL;
     s->csd = !s->kde_ssd;                   /* until it asks for server decoration */
     if (!s->app_id[0]) set_app_id(s, c, "");
-    if (wl_resource_get_version(t) >= 5) {
-        struct wl_array caps;
-        wl_array_init(&caps);
-        uint32_t *p;
-        if ((p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE;
-        if ((p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE;
-        xdg_toplevel_send_wm_capabilities(t, &caps);
-        wl_array_release(&caps);
-    }
+    send_caps(s);
 }
 static void xs_popup(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *parent, struct wl_resource *positioner) {
     Surf *s = wl_resource_get_user_data(r);
@@ -2773,6 +2836,7 @@ static void surface_commit_role(Surf *s) {
         }
         damage_node(s);
     } else if (s->role == R_POPUP) {
+        if (!s->popup || !s->xdg) return;   /* its popup is gone (closed): unmapped until a new one is made */
         if (!s->sent_configure) {
             xdg_popup_send_configure(s->popup, s->pop_x, s->pop_y, s->conf_w, s->conf_h);
             xdg_surface_send_configure(s->xdg, wl_display_next_serial(dpy));
@@ -3109,6 +3173,19 @@ void wl_gpu_draw_layer(int layer) {
     if (icon) draw_tree(icon, ix, iy, 1, 1, all);
 }
 
+/* A fullscreen window and its subsurfaces, scaled as one (the GPU path's draw_tree): a browser such as Firefox draws
+ * its page in a subsurface and leaves the window's own buffer clear, so copying only the window showed nothing. */
+static void blit_tree(Canvas *c, Surf *s, float x, float y, float sxk, float syk) {
+    if (s->content) {
+        uint32_t *tmp = s->px ? NULL : capture_readback(s);      /* a GPU app in a screenshot */
+        if (tmp) s->px = tmp;
+        if (s->px) blit_surface(c, s, x, y, sxk, syk, 1);
+        if (tmp) { s->px = NULL; free(tmp); }
+    }
+    for (int i = 0; i < s->nkids; i++)
+        blit_tree(c, s->kids[i], x + s->kids[i]->sx * sxk, y + s->kids[i]->sy * syk, sxk, syk);
+}
+
 /* CPU path: fullscreen and its menus are copied over the already built frame. */
 void wl_paint_fullscreen(Canvas *out) {
     if (paint_capture_mode && fs_surf && fs_surf->content && node_protected(fs_surf->node)) {
@@ -3123,14 +3200,10 @@ void wl_paint_fullscreen(Canvas *out) {
     /* only on the display it covers (a mirror shows the same rect) */
     double vx1 = paint_view.x + (out->w - paint_view.dx) / paint_view.k, vy1 = paint_view.y + (out->h - paint_view.dy) / paint_view.k;
     if (fx >= vx1 || fy >= vy1 || fx + fw <= paint_view.x || fy + fh <= paint_view.y) return;
-    uint32_t *tmp = fs_surf->px ? NULL : capture_readback(fs_surf);     /* a GPU app in a screenshot */
-    if (!fs_surf->px && !tmp) return;
-    if (tmp) fs_surf->px = tmp;
     Rect oc = out->clip;
     canvas_set_clip(out, rect_and(oc, (Rect){ (int)floorf(PVX(fx)), (int)floorf(PVY(fy)), (int)ceilf(PVX(fx + fw)), (int)ceilf(PVY(fy + fh)) }));
-    blit_surface(out, fs_surf, x, y, sx, sy, 1);
+    blit_tree(out, fs_surf, x, y, sx, sy);
     canvas_set_clip(out, oc);
-    if (tmp) { fs_surf->px = NULL; free(tmp); }
     for (int i = 0; i < npopups; i++) {
         float px, py;
         if (origin(popups[i], &px, &py)) paint_tree(out, popups[i], px, py, 1, (Rect){ -65536, -65536, 65536, 65536 });
@@ -3296,7 +3369,7 @@ static Surf *surface_under_ex(float x, float y, Node *hit, float *lx, float *ly,
         if (skip_xicon && popups[i]->xw && xwm_is_dnd_icon(popups[i]->xw)) continue;   /* an X app's drag icon */
         if (origin(popups[i], &ox, &oy)) target = surface_at(popups[i], x - ox, y - oy, lx, ly);
     }
-    if (!target && fs_surf && fs_surf->content) {
+    if (!target && on_fs(x, y)) {
         float ox, oy;
         if (origin(fs_surf, &ox, &oy)) target = surface_at(fs_surf, x - ox, y - oy, lx, ly);
     } else if (!target && hit && hit->type == NODE_SURFACE) {
@@ -3367,6 +3440,7 @@ static struct {
     int xsrc;                           /* an X app's drag (xwm.c): no Source, its types in xsrc_mimes */
     uint32_t xacts;                     /* the actions that X app's drag allows */
     int xmoved;                         /* the pointer moved since it began: focus is where it is */
+    int button;                         /* the button whose press started it: its release drops (seatbtn.h) */
 } drag;
 /* An X app's drag: its MIME types (named by xwm), and which drag they belong to */
 static char xsrc_mimes[MAX_MIMES][256];
@@ -3375,7 +3449,7 @@ static unsigned xsrc_gen;
 /* The Wayland drag over (or dropped on) an X window, whose data xwm asks for (wlx_dnd_send): its Source, or
  * LordOS's paths (their generation); the X window's last status. */
 static struct { int on, dropped, accept; Source *src; unsigned lord; uint32_t action; } xdt;
-static int seat_held;                   /* buttons down, wherever they were pressed (a drag ends when none is) */
+static SeatBtn seat = { 0, -1 };        /* buttons down, wherever they were pressed (seatbtn.h: a drag ends at its button's release) */
 static int shift_down;                  /* Shift held: a Files drag into a Linux app may move (it copies otherwise) */
 /* the press a start_drag may name: its serials (one per wl_pointer of that client) and the surface it went to */
 static uint32_t press_serials[4];
@@ -3798,8 +3872,9 @@ static void dnd_drop(void) {
     dnd_end();
 }
 
-/* Pointer input while a drag runs: no app gets it, the surface under it gets the drag. The last release drops. */
-static int dnd_pointer(float x, float y, Node *hit, int nbuttons, const int *down) {
+/* Pointer input while a drag runs: no app gets it, the surface under it gets the drag. The release of the button
+ * that started it drops, and so does the release that leaves no button held (seatbtn.h). */
+static int dnd_pointer(float x, float y, Node *hit, int nbuttons, const int *down, const int *button) {
     float lx = 0, ly = 0;
     dnd_icon_damage();
     last_x = x;
@@ -3810,7 +3885,7 @@ static int dnd_pointer(float x, float y, Node *hit, int nbuttons, const int *dow
     int released = 0;
     for (int i = 0; i < nbuttons; i++) {
         buttons_held += down[i] ? 1 : -1;
-        if (!down[i] && !seat_held) released = 1;
+        if (sb_drag_released(&seat, drag.button, button[i], down[i])) released = 1;
     }
     if (buttons_held < 0) buttons_held = 0;
     if (released) {
@@ -3856,10 +3931,11 @@ static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resou
     if (icon && icon->role != R_NONE && icon->role != R_DNDICON) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_ROLE, "the icon has another role"); return; }
     if (src && src->used) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_USED_SOURCE, "the source was already used"); return; }
     if (src) src->used = 2;
-    /* the press it names: this client's, current (a button still down), on the window that got it */
+    /* the press it names: this client's, current (a button still down), on the window that got it; the serial is
+     * that press's or, as GTK 3 sends, a newer one given out while it is held (seatbtn.h sb_serial_ok) */
     int ok = !drag.on && o && o->client == c && buttons_held > 0 && press_surf && press_surf->client == c &&
-             toplevel_of(o) == toplevel_of(press_surf), known = 0;
-    for (int i = 0; ok && i < npress; i++) if (press_serials[i] == serial) known = 1;
+             toplevel_of(o) == toplevel_of(press_surf);
+    int known = ok && sb_serial_ok(serial, press_serials, npress, wl_display_get_serial(dpy));   /* GTK 3: its newest */
     if (!ok || !known) {
         if (src) wl_data_source_send_cancelled(src->res);
         return;
@@ -3870,6 +3946,7 @@ static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resou
     memset(&drag, 0, sizeof drag);
     drag.on = 1;
     drag.client = c;
+    drag.button = seat.last;
     drag.src = src;
     drag.icon = icon;
     drag.contained = dnd_contained(c);
@@ -3902,7 +3979,7 @@ static void dnd_client_gone(struct wl_client *c) {
 }
 
 int wl_drag_files(const char *const *paths, int n) {
-    if (!dpy || drag.on || seat_held <= 0) return 0;
+    if (!dpy || drag.on || !sb_any(&seat)) return 0;
     if (n < 1 || n > URIL_MAX_PATHS) return 0;
     /* the same encoder as Files' copy to the clipboard (urilist.c) */
     size_t pl = 0, un = 0, tn = 0;
@@ -3919,6 +3996,7 @@ int wl_drag_files(const char *const *paths, int n) {
     lord_gen++;
     memset(&drag, 0, sizeof drag);
     drag.on = drag.lord = 1;
+    drag.button = seat.last;
     pointer_enter(NULL, 0, 0);          /* the window under it was only hovered: now the drag goes to it */
     return 1;
 }
@@ -3931,10 +4009,10 @@ int wl_drag_files_taken(void) {
 }
 
 int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *down, const int *button, int wheel) {
+    ptr_last_x = x; ptr_last_y = y;
     if (!dpy) return 0;
-    for (int i = 0; i < nbuttons; i++) seat_held += down[i] ? 1 : -1;
-    if (seat_held < 0) seat_held = 0;
-    if (drag.on && !drag.xsrc) return dnd_pointer(x, y, hit, nbuttons, down);
+    for (int i = 0; i < nbuttons; i++) sb_event(&seat, button[i], down[i]);
+    if (drag.on && !drag.xsrc) return dnd_pointer(x, y, hit, nbuttons, down, button);
     last_x = x;
     last_y = y;
     Surf *target = NULL;
@@ -3956,7 +4034,7 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
             if (!t || t->role != R_POPUP) dismiss_popups();
         }
     pointer_enter(target, lx, ly);
-    if (!target) return fs_surf && fs_surf->content ? 2 : 0;    /* a hole in a fullscreen window: not the UI below */
+    if (!target) return on_fs(x, y) ? 2 : 0;    /* a hole in a fullscreen window: not the UI below */
     /* a window under a modal dialog gets no presses and no wheel (releases still go: a drag ends);
      * the theme still sees the click and brings the dialog forward (sdk/dialogmodel.js) */
     Surf *owner = target;
@@ -3965,6 +4043,8 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
     if (held) wheel = 0;
     for (int i = 0; i < nbuttons; i++)          /* a new press: the one a start_drag may name */
         if (down[i] && !held) { npress = 0; press_surf = target; }
+    for (int i = 0; i < nbuttons; i++)          /* a click on the fullscreen window gives it the keys back (fsfocus.h) */
+        if (down[i] && !held && fs_surf && key_focus != fs_surf && toplevel_of(target) == fs_surf) { wl_set_focus(fs_surf->id); break; }
     unsigned t = now_ms();
     struct wl_resource *p;
     if (xw_scaled(target->client)) { lx = (float)xws_to_xf(lx, xw_pct); ly = (float)xws_to_xf(ly, xw_pct); }
@@ -3990,14 +4070,13 @@ int wl_pointer(float x, float y, Node *hit, int moved, int nbuttons, const int *
     if (xheld && !buttons_held) xdrag_release();
     Surf *top = target;
     while (top && top->role == R_SUB) top = top->parent;
-    if (fs_surf && fs_surf->content) return 2;  /* fullscreen: the UI does not see the pointer */
+    if (on_fs(x, y)) return 2;                  /* over a fullscreen window: the UI does not see the pointer */
     return top && top->role == R_POPUP ? 2 : 1;
 }
 
-void wl_pointer_grab(int nbuttons, const int *down) {
+void wl_pointer_grab(int nbuttons, const int *down, const int *button) {
     if (!dpy) return;
-    for (int i = 0; i < nbuttons; i++) seat_held += down[i] ? 1 : -1;
-    if (seat_held < 0) seat_held = 0;
+    for (int i = 0; i < nbuttons; i++) sb_event(&seat, button[i], down[i]);
     dnd_cancel();                       /* a window move took the pointer: no drop at its release */
     pointer_enter(NULL, 0, 0);
     for (int i = 0; i < nbuttons; i++) buttons_held += down[i] ? 1 : -1;
@@ -4372,7 +4451,7 @@ int wl_key(int code, int value, const KeyInfo *k) {
         else if (!value && key_focus) send_key_to_focus(code, 0);   /* pressed before the switcher opened */
         return 0;
     }
-    if (fs_surf && fs_surf->content && key_focus != fs_surf) wl_set_focus(fs_surf->id);
+    if (fs_takes_keys(key_focus)) wl_set_focus(fs_surf->id);   /* not a window it hides (fsfocus.h) */
     /* An app holding the shortcuts gets every key but the few kbi_route keeps; ❖Esc turns that off, and with it
      * a locked pointer and fullscreen, so everything is LordOS's again; pressed again it holds again. */
     KbInhib *ki = value == 1 && was_to_app ? focus_inhibitor() : NULL;
@@ -4955,7 +5034,7 @@ void wl_set_focus(int id) {
     if (s && s->role != R_TOPLEVEL) s = NULL;
     if (s && s->parked) s = NULL;                      /* a window on a hidden desktop never has the keyboard */
     if (s && modal_over(s)) s = modal_over(s);         /* under a modal dialog: the keys are the dialog's */
-    if (fs_surf && fs_surf->content) s = fs_surf;      /* in fullscreen the keyboard is its own */
+    if (fs_takes_keys(s)) s = fs_surf;     /* a window under a fullscreen one never has the keys (fsfocus.h) */
     if (s == key_focus) return;
     struct wl_resource *kb;
     if (key_focus) {
@@ -5043,6 +5122,18 @@ const char *wl_kill(int id) {
     if (kill(pid, SIGKILL)) return "app.forceQuitFailed";
     fprintf(stderr, "wayland: force quit pid %d (window %d)\n", (int)pid, id);
     return NULL;
+}
+
+/* Locked by the theme (Lord Workspaces' padlock): the app is told it can't maximize or minimize (xdg-shell 5's
+ * wm_capabilities, which Chromium and GTK 4 read to hide those buttons; a new list takes effect with the next
+ * configure), and its requests to do so are answered with the state as it is. Its own close button stays: closing is
+ * the app's. */
+void wl_set_fixed(int id, int fixed) {
+    Surf *s = find(id);
+    if (!s || !s->top || s->fixed == !!fixed) return;
+    s->fixed = !!fixed;
+    send_caps(s);
+    if (s->xdg && s->sent_configure) send_toplevel_configure(s);
 }
 
 void wl_set_state(int id, int maximized, int fullscreen) {
@@ -5249,7 +5340,7 @@ struct wl_resource *wl__surface_at(float x, float y, float *lx, float *ly) {
         float ox, oy;
         if (origin(popups[i], &ox, &oy)) target = surface_at(popups[i], x - ox, y - oy, lx, ly);
     }
-    if (!target && fs_surf && fs_surf->content) {
+    if (!target && on_fs(x, y)) {
         float ox, oy;
         if (origin(fs_surf, &ox, &oy)) target = surface_at(fs_surf, x - ox, y - oy, lx, ly);
     } else if (!target) {

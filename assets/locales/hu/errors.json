@@ -235,6 +235,7 @@
   "fs.notRegular": "Ez nem normál fájl (talán hivatkozás?)",
   "fs.openFailed": "Nem sikerült megnyitni a fájlt: {errno}",
   "fs.outsideHome": "Ez a hely a saját mappáján kívül esik, vagy érvénytelen",
+  "fs.nameTooLong": "A név túl hosszú (max. {max} bájt; az ékezetes és nem latin betűk 2–4 bájtot foglalnak)",
   "fs.protected": "Ez a mappa védett",
   "fs.systemFolder": "A Fájlok nem jeleníti meg a rendszer belső mappáit (/proc, /sys, /dev és /run)",
   "fs.tooLarge": "A fájl túl nagy (max. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Nem sikerült frissíteni a rendszertöltőt (kód: {code})",
   "hw.logindFailed": "Az energiabeállításokat nem sikerült alkalmazni (kód: {code})",
   "hw.noBacklight": "Nincs ilyen háttérvilágítás",
+  "hw.noChargeControl": "Ennek az akkumulátornak nincs töltésvezérlése",
+  "hw.chargeControlFailed": "A töltés nem módosítható: {errno}",
   "hw.noCpufreq": "Ezen a számítógépen nincs CPU-frekvenciaszabályozás",
   "hw.noEeprom": "A rendszertöltő eszközei (rpi-eeprom) nincsenek telepítve",
   "hw.noKernelLog": "A kernelnaplót nem sikerült beolvasni",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "A(z) {name} nem telepíthető egyszerre 64 és 32 bitesként",
   "pkg.foreignArchUnsupported": "32 bites csomagokat csak 64 bites PC-n (amd64) lehet engedélyezni; ez a rendszer: {arch}",
   "pkg.foreignArchFailed": "Nem sikerült engedélyezni a 32 bites ({arch}) csomagokat (a dpkg {code} kóddal lépett ki)",
-  "webapps.developerOff": "A fejlesztői mód ki van kapcsolva a Beállítások → Webalkalmazások részben"
+  "webapps.developerOff": "A fejlesztői mód ki van kapcsolva a Beállítások → Webalkalmazások részben",
+  "media.streamAddress": "Ez az adáscím nem engedélyezett",
+  "media.streamCannotOpen": "Az adást nem sikerült megnyitni",
+  "media.streamTimeout": "Az adás nem válaszolt időben",
+  "media.streamAuth": "Az adás felhasználót és jelszót kért, vagy hibásak voltak",
+  "media.streamLost": "Megszakadt az adás",
+  "media.streamNoChannels": "A listán nincsenek csatornák",
+  "media.noStreamHelper": "Az adássegéd (lord-stream) nem érhető el"
 }

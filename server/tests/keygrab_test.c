@@ -102,6 +102,29 @@ int main(void) {
     CHECK(keygrab_set("classic"));
     CHECK(keygrab_match(KEY_COMMA, 'w', KG_META) == KG_PASS);
 
+    /* Lord Workspaces: Lord Flow's keys plus ⌃F2 (the bars' focus); Lord Flow itself leaves ⌃F2 to the app */
+    CHECK(keygrab_set("workspaces"));
+    CHECK(keygrab_match(KEY_F2, 0, KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_HOLD);
+    CHECK(keygrab_match(KEY_LEFT, 0, KG_CTRL) == KG_PASS);
+    CHECK(keygrab_match(KEY_3, 0, KG_META) == KG_TAKE);
+    CHECK(keygrab_match(KEY_SLASH, 0, KG_META) == KG_TAKE);
+    CHECK(keygrab_match(KEY_ESC, 0, KG_META | KG_ALT) == KG_TAKE);
+    CHECK(keygrab_set("workspaces-desktops+tab-meta"));
+    CHECK(keygrab_match(KEY_F2, 0, KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_HOLD);
+    CHECK(keygrab_match(KEY_LEFT, 0, KG_CTRL) == KG_TAKE);
+    CHECK(keygrab_set("workspaces+tab-alt"));                       /* the switcher on ⌥Tab: ❖Tab is the activities' */
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_TAKE);
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META | KG_SHIFT) == KG_TAKE);
+    CHECK(keygrab_match(KEY_TAB, 0, KG_ALT) == KG_HOLD);
+    CHECK(keygrab_set("flow+tab-alt"));
+    CHECK(keygrab_match(KEY_TAB, 0, KG_META) == KG_PASS);
+    CHECK(keygrab_match(KEY_3, 0, KG_META) == KG_PASS);
+    CHECK(keygrab_set("flow"));
+    CHECK(keygrab_match(KEY_F2, 0, KG_CTRL) == KG_PASS);
+    CHECK(!keygrab_set("workspacesx"));
+
     CHECK(keygrab_set(""));
     CHECK(keygrab_match(KEY_TAB, 0, KG_ALT) == KG_PASS);
     printf(fails ? "keygrab: %d failed\n" : "keygrab: ok\n", fails);

@@ -12,6 +12,7 @@
 #include "js_pkg.h"
 #include "../apps.h"
 #include "js_sound.h"
+#include "wave.h"
 #include "js_monitor.h"
 #include "js_sec.h"
 #include "js_doc.h"
@@ -19,6 +20,7 @@
 #include "js_vault.h"
 #include "js_mail.h"
 #include "js_sql.h"
+#include "js_weather.h"
 #include "js_webapps.h"
 #include "js_sftp.h"
 #include "js_termconf.h"
@@ -47,6 +49,7 @@
 #include "../wl/keygrab.h"
 #include "../media/media.h"
 #include "../sec/codesig.h"
+#include "../wdog.h"
 #include "ui.h"
 #include "../term/term.h"
 #include "lord_version.h"           /* build/gen: version, channel and build (Makefile) */
@@ -106,9 +109,11 @@ static JSValue f_create_node(JSContext *c, JSValueConst this_val, int argc, JSVa
     if (!t) return JS_EXCEPTION;
     int type = !strcmp(t, "text") ? NODE_TEXT : !strcmp(t, "image") ? NODE_IMAGE
              : !strcmp(t, "raw") ? NODE_RAW : !strcmp(t, "terminal") ? NODE_TERM
-             : !strcmp(t, "surface") ? NODE_SURFACE : !strcmp(t, "media") ? NODE_MEDIA : NODE_VIEW;
+             : !strcmp(t, "surface") ? NODE_SURFACE : !strcmp(t, "media") ? NODE_MEDIA
+             : !strcmp(t, "wave") ? NODE_WAVE : NODE_VIEW;
     JS_FreeCString(c, t);
     Node *n = node_new(type);
+    if (n && type == NODE_WAVE && !(n->wave = wave_conf_new())) { node_destroy(n); n = NULL; }
     return n ? JS_NewInt32(c, n->id) : JS_ThrowOutOfMemory(c);
 }
 
@@ -143,28 +148,35 @@ static void style_warn(const char *key) {
     fprintf(stderr, "js: unsupported style '%s'\n", key);
 }
 
+/* Reading a JS value can run the caller's code (a getter, a Proxy trap, valueOf), and that code can lord.destroy() the
+ * node. So every value that may be an object is read before the node is looked up, and the node pointer is never held
+ * across such a read (Claude Security, 0.8.9: setProp 'wave' and setStyle 'gradient'). */
 static JSValue f_set_style(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
-    Node *n = arg_node(c, argv[0]);
     const char *key = JS_ToCString(c, argv[1]);
-    if (!n || !key) { if (key) JS_FreeCString(c, key); return JS_UNDEFINED; }
     JSValueConst v = argv[2];
+    double grad[3] = {180, 0, 0};
+    int grad_on = 0;
+    if (key && !strcmp(key, "gradient") && JS_IsArray(c, v)) {
+        grad_on = 1;
+        for (int i = 0; i < 3; i++) {
+            JSValue e = JS_GetPropertyUint32(c, v, (uint32_t)i);
+            if (JS_IsNumber(e)) JS_ToFloat64(c, &grad[i], e);
+            JS_FreeValue(c, e);
+        }
+    }
+    Node *n = arg_node(c, argv[0]);
+    if (!n || !key) { if (key) JS_FreeCString(c, key); return JS_UNDEFINED; }
     int err = 0;
     Style before = n->s;
     StyleExt ext_before;
     if (n->s.ext) memcpy(&ext_before, n->s.ext, STYLE_EXT_VALUES);
     if (!strcmp(key, "gradient")) {
-        if (JS_IsArray(c, v)) {
-            double a[3] = {180, 0, 0};
-            for (int i = 0; i < 3; i++) {
-                JSValue e = JS_GetPropertyUint32(c, v, (uint32_t)i);
-                JS_ToFloat64(c, &a[i], e);
-                JS_FreeValue(c, e);
-            }
+        if (grad_on) {
             n->s.has_gradient = 1;
-            n->s.grad_angle = (float)a[0];
-            n->s.grad_from = (uint32_t)(int64_t)a[1];
-            n->s.grad_to = (uint32_t)(int64_t)a[2];
+            n->s.grad_angle = (float)grad[0];
+            n->s.grad_from = (uint32_t)(int64_t)grad[1];
+            n->s.grad_to = (uint32_t)(int64_t)grad[2];
         } else n->s.has_gradient = 0;
     } else if (JS_IsUndefined(v) || JS_IsNull(v)) {
         err = style_reset(&n->s, key);
@@ -185,15 +197,15 @@ static JSValue f_set_style(JSContext *c, JSValueConst this_val, int argc, JSValu
 
 static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
+    const char *key = JS_ToCString(c, argv[1]);         /* before the node: see f_set_style */
     Node *n = arg_node(c, argv[0]);
-    const char *key = JS_ToCString(c, argv[1]);
     if (n && key && !strcmp(key, "src")) {
         image_release(n->img);
         n->img = NULL;
         const char *src = JS_IsString(argv[2]) ? JS_ToCString(c, argv[2]) : NULL;
         if (src) {
             char path[2048];
-            /* "thumb:<px>:<absolute path>": a picture shown small (Files, the file dialog), decoded off this thread to
+            /* "thumb:<px>[:<stamp>]:<absolute path | asset:path>": a picture shown small (Files, the file dialog), decoded off this thread to
              * fit px x px (image.c): a folder of photos never holds full-size pictures or waits on a slow disk */
             const char *num = !strncmp(src, "thumb:", 6) ? src + 6 : NULL;
             size_t nl = num ? strspn(num, "0123456789") : 0;
@@ -203,7 +215,23 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
             size_t sl = strlen(src);
             if (svg) n->img = svgicon_get_spec(src);
             else if (num) {
-                if (nl && nl <= 5 && num[nl] == ':' && num[nl + 1] == '/') n->img = image_get_thumb(num + nl + 1, atoi(num));
+                /* an optional ":<stamp>" after the size, the file's "<mtime>.<size>" (sdk/filekinds.js thumbSrc): a
+                 * picture replaced under the same name gets its own thumbnail (GitHub #180). The path starts with '/'. */
+                const char *rest = nl && nl <= 5 && num[nl] == ':' ? num + nl + 1 : NULL;
+                char stamp[IMG_STAMP_MAX + 1] = "";
+                size_t vl = rest && rest[0] != '/' ? strspn(rest, "0123456789.") : 0;
+                if (vl && vl <= IMG_STAMP_MAX && rest[vl] == ':' && rest[vl + 1] == '/') {
+                    memcpy(stamp, rest, vl);
+                    stamp[vl] = 0;
+                    rest += vl + 1;
+                }
+                /* the path may also be an "asset:" one (0.8.9: Lord Workspaces' wallpaper slideshow decodes the next picture
+                 * off this thread, sdk/slideshow.jsx) */
+                if (rest && rest[0] == '/') n->img = image_get_thumb(rest, atoi(num), stamp);
+                else if (rest && !strncmp(rest, "asset:", 6) && !strstr(rest, "..")) {
+                    snprintf(path, sizeof path, "%s/%s", js_sys_assets(), rest + 6);
+                    n->img = image_get_thumb(path, atoi(num), stamp);
+                }
             } else if (src[0] == '/') snprintf(path, sizeof path, "%s", src);
             else if (!strncmp(src, "asset:", 6) && !strstr(src, "..")) snprintf(path, sizeof path, "%s/%s", js_sys_assets(), src + 6);
             else snprintf(path, sizeof path, "%s/%s", ui.theme_dir, src);
@@ -251,6 +279,40 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
         if (JS_IsNumber(argv[2])) JS_ToInt32(c, &id, argv[2]);
         js_media_node(n, id);
         node_invalidate(n);
+    } else if (n && key && !strcmp(key, "wave") && n->type == NODE_WAVE && n->wave && JS_IsObject(argv[2])) {
+        /* the look of <SoundWave>: { lines, colors: [0xRRGGBB × 3], gain, hideIdle } (sdk/deskwidgets.jsx). The
+         * property reads can run the caller's getters, which may destroy the node: read everything first, then
+         * look the node up again by its id (see f_set_style). */
+        int nid = n->id;
+        uint64_t serial = n->serial;           /* ids are reused; the serial never is */
+        double d, lines = -1, gain = -1, col[3] = { -1, -1, -1 };
+        int hide = -1;
+        JSValue v = JS_GetPropertyStr(c, argv[2], "lines");
+        if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 2 && d <= 24) lines = d;
+        JS_FreeValue(c, v);
+        v = JS_GetPropertyStr(c, argv[2], "gain");
+        if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 0.25 && d <= 3) gain = d;
+        JS_FreeValue(c, v);
+        v = JS_GetPropertyStr(c, argv[2], "hideIdle");
+        if (JS_IsBool(v)) hide = JS_ToBool(c, v);
+        JS_FreeValue(c, v);
+        v = JS_GetPropertyStr(c, argv[2], "colors");
+        for (uint32_t i = 0; i < 3 && JS_IsArray(c, v); i++) {
+            JSValue e = JS_GetPropertyUint32(c, v, i);
+            if (JS_IsNumber(e) && !JS_ToFloat64(c, &d, e) && d >= 0 && d <= 0xffffff) col[i] = d;
+            JS_FreeValue(c, e);
+        }
+        JS_FreeValue(c, v);
+        n = node_ref(nid, serial);
+        if (n && n->type == NODE_WAVE && n->wave) {
+            WaveConf *w = n->wave;
+            if (lines >= 0) w->lines = (int)lines;
+            if (gain >= 0) w->gain = (float)gain;
+            if (hide >= 0) w->hide_idle = hide;
+            for (int i = 0; i < 3; i++) if (col[i] >= 0) w->col[i] = (uint32_t)col[i];
+            wave_conf_changed(w);
+            node_invalidate(n);
+        }
     } else if (n && key && !strcmp(key, "protected")) {
         n->protect = JS_ToBool(c, argv[2]) ? 1 : 0;     /* protected window (wm.setProtected) */
         node_invalidate(n);
@@ -413,11 +475,36 @@ static char *load_code(const char *path, size_t *len, int *refused) {
     return src;
 }
 
+/* QuickJS asks every 10000 bytecode steps whether to go on (wdog.h): only while the compositor's main loop
+ * has stalled does the watchdog answer anything else. 1: the JS stack is logged (an error made here and
+ * dropped, an exception in flight left alone) and the task goes on; 2: the task is stopped with an
+ * uncatchable "interrupted" error, which the caller logs with its stack. */
+static int on_interrupt(JSRuntime *r, void *opaque) {
+    (void)r;
+    (void)opaque;
+    int w = wdog_js_poll();
+    if (w == 1 && ctx && !JS_HasException(ctx)) {
+        /* inside the interpreter QuickJS adds an error's stack only while it unwinds: an Error made by a
+         * line of JS called from here has every frame below it */
+        static const char probe[] = "new Error().stack";
+        JSValue st = JS_Eval(ctx, probe, sizeof probe - 1, "<watchdog>", JS_EVAL_TYPE_GLOBAL);
+        const char *s = JS_IsString(st) ? JS_ToCString(ctx, st) : NULL;
+        fprintf(stderr, "lord-server: watchdog: the JavaScript stack:\n%s\n", s ? s : "(none)");
+        if (s) JS_FreeCString(ctx, s);
+        if (JS_IsException(st)) JS_FreeValue(ctx, JS_GetException(ctx));
+        else JS_FreeValue(ctx, st);
+        return 0;
+    }
+    if (w == 2) fprintf(stderr, "lord-server: watchdog: the JavaScript task stopped (its stack follows)\n");
+    return w == 2;
+}
+
 /* A new context with the whole `lord` object of a session (or of the login screen). */
 static void session_context(void) {
     rt = JS_NewRuntime();
     JS_SetMemoryLimit(rt, 256u << 20);
     JS_SetMaxStackSize(rt, 4u << 20);
+    JS_SetInterruptHandler(rt, on_interrupt, NULL);
     ctx = JS_NewContext(rt);
 
     JSValue g = JS_GetGlobalObject(ctx);
@@ -446,6 +533,7 @@ static void session_context(void) {
     js_mail_register(ctx, lord);       /* lord.mail: Mail, Calendar, Contacts, Reminders via lord-maild (docs/MAIL.md) */
     js_sftp_register(ctx, lord);       /* lord.sftp: the Terminal's Files mode via lord-sftp (docs/TERMINAL.md) */
     js_sql_register(ctx, lord);        /* lord.sql: Databases (MySQL / MariaDB) via lord-sql (docs/DATABASES.md) */
+    js_weather_register(ctx, lord);    /* lord.weather: the weather widget's forecasts via lord-fetch (docs/WORKSPACES.md) */
     js_webapps_register(ctx, lord);    /* lord.webapps: web apps and their profiles via lord-web (docs/WEBAPPS.md) */
     js_termconf_register(ctx, lord);   /* lord.termconf: the Terminal's configuration file (docs/TERMINAL.md) */
     js_wm_register(ctx, lord);         /* lord.wm: moving and resizing windows in C (grab.c) */

@@ -1,5 +1,6 @@
 /* node.c — tree of native nodes that React creates and modifies. */
 #include "ui.h"
+#include "wave.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -89,8 +90,10 @@ void dlist_add(DamageList *l, Box b) {
     l->r[l->n++] = b;
 }
 
+void (*damage_hook)(Box b);            /* paint.c: the blurred backdrop cache, during the damage walk */
 void damage_add(Box b) {
     if (b.x1 <= b.x0 || b.y1 <= b.y0) return;
+    if (damage_hook) damage_hook(b);
     Box *d = &ui.damage;
     /* ui.damage set or cleared directly (a full repaint, the end of a frame): the list starts from it */
     if (d->x0 != ui.dlast.x0 || d->y0 != ui.dlast.y0 || d->x1 != ui.dlast.x1 || d->y1 != ui.dlast.y1) {
@@ -223,6 +226,7 @@ void node_destroy(Node *n) {
     if (node_gone_hook) node_gone_hook(n->id, n->serial);
     ui.nodes[n->id] = NULL;
     image_release(n->img);
+    wave_conf_free(n->wave);
     free(n->text);
     free(n->tf);
     free(n->s.ext);

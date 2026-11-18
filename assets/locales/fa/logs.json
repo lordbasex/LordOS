@@ -2,6 +2,7 @@
   "pick": "یک ورودی را انتخاب کنید تا پیام کامل و فیلدهایش را ببینید.",
   "field.time": "زمان",
   "field.level": "سطح",
+  "field.account": "حساب",
   "field.process": "فرایند",
   "field.pid": "PID",
   "field.unit": "واحد",

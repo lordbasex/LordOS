@@ -654,6 +654,18 @@ static void blur_up(void *ctx, int j0, int j1) {
     free(vrow);
 }
 
+/* The blur below shrinks the canvas by f, blurs it three times with a box of 2·rad + 1 and scales it back with a
+ * bilinear filter, so a pixel further than f·(3·rad + 2) from the box never reaches it, nor one further than the 2·radius
+ * it copies; +1 for the edge. 45 px for a radius of 30, where 2·radius + 1 gave 61 (0.8.8.10, canvas-test checks it
+ * against the blur itself for every radius up to 60). */
+int canvas_blur_reach(int radius) {
+    if (radius < 1) return 0;
+    int f = radius >= 12 ? 4 : radius >= 6 ? 2 : 1;
+    int rad = radius / (2 * f) > 0 ? radius / (2 * f) : 1;
+    int reach = f * (3 * rad + 2);
+    return (reach < 2 * radius ? reach : 2 * radius) + 1;
+}
+
 void canvas_backdrop_blur(Canvas *c, float x, float y, float w, float h, float r, int radius) {
     Blur b = { .c = c, .x = x, .y = y, .w = w, .h = h };
     if (radius < 1 || w <= 0 || h <= 0 || !bounds(c, x, y, w, h, &b.x0, &b.y0, &b.x1, &b.y1)) return;

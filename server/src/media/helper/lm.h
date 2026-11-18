@@ -24,7 +24,12 @@
 #define LM_SOCK 3                       /* the socket with lord-server */
 
 extern int lm_debug;
-#define LM_LOG(...) do { fprintf(stderr, "lord-media[%d]: ", (int)getpid()); fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } while (0)
+#ifdef LM_NET
+#define LM_WHO "lord-stream"
+#else
+#define LM_WHO "lord-media"
+#endif
+#define LM_LOG(...) do { fprintf(stderr, LM_WHO "[%d]: ", (int)getpid()); fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } while (0)
 #define LM_DBG(...) do { if (lm_debug) LM_LOG(__VA_ARGS__); } while (0)
 
 double lm_now_ms(void);                 /* monotonic clock */
@@ -34,6 +39,14 @@ double lm_now_ms(void);                 /* monotonic clock */
 /* Opens an input file that's already open (fd) with FFmpeg, without paths. */
 AVFormatContext *lm_open_input(int fd, char *err, size_t errlen);
 void lm_close_input(AVFormatContext **fmt);
+#ifdef LM_NET
+/* lord-stream only: an address checked against streamurl.h; network protocols only; every wait bounded */
+AVFormatContext *lm_open_url(const char *url, const char *params, char *err, size_t errlen);
+/* asks FFmpeg to check the server's certificate (system CAs, host name) on a network open (lm_io.c) */
+void lm_tls_verify(AVDictionary **o);
+void lm_net_deadline(double ms_from_now);      /* 0: none; reads past it give up (the stream is lost) */
+extern volatile int lm_net_abort;              /* set when lord-server stops it: FFmpeg's waits return */
+#endif
 /* Output context over an fd (with seek if the fd allows it). */
 AVFormatContext *lm_open_output(int fd, const char *format);
 int  lm_close_output(AVFormatContext *oc, int write_trailer);
@@ -99,6 +112,9 @@ void lm_mic_drain(void *ring, void (*fn)(const int16_t *pcm, int samples));
 /* ---- jobs ---- */
 void lm_worker(void);                                   /* lm_job.c */
 void lm_player(const char *params, int fd, int pulse, int render);      /* lm_play.c */
+#ifdef LM_NET
+void ls_m3u(const char *params);                                       /* ../stream/ls_m3u.c */
+#endif
 void lm_screenrec(const char *params, int out, int pulse, int render);  /* lm_rec.c */
 void lm_camera(const char *params, int dev, int render);                /* lm_cam.c */
 void lm_audiorec(const char *params, int out, int pulse);               /* lm_rec.c */

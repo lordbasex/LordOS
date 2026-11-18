@@ -27,12 +27,24 @@ export function findAttachments(body, repo) {
   const out = [];
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const repoRe = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(repo || '') ? esc(repo) : null;
-  const re = new RegExp(`https://github\\.com/(?:user-attachments/files|${repoRe || '(?!)'}/files)/(\\d{1,12})/([A-Za-z0-9._-]{1,128}\\.json)(?=[\\s)\\]>"']|$)`, 'g');
+  // the report itself (.json) or System Information's page, which carries it (.html, issue #171); a .json first
+  const re = new RegExp(`https://github\\.com/(?:user-attachments/files|${repoRe || '(?!)'}/files)/(\\d{1,12})/([A-Za-z0-9._-]{1,128}\\.(?:json|html))(?=[\\s)\\]>"']|$)`, 'g');
   for (const m of text.matchAll(re)) {
     if (!out.includes(m[0])) out.push(m[0]);
     if (out.length >= MAX_ATTACHMENTS) break;
   }
-  return out;
+  return out.sort((a, b) => (a.endsWith('.json') ? 0 : 1) - (b.endsWith('.json') ? 0 : 1));
+}
+
+// The report a System Information page carries (apps/sysinfo/share.js embedReport): the text of its one
+// <script type="application/json" id="lordos-hwreport"> block, or null. The JSON is then checked like any attached one.
+export function embeddedReport(html) {
+  const s = String(html || '');
+  const open = '<script type="application/json" id="lordos-hwreport">';
+  const a = s.indexOf(open);
+  if (a < 0 || s.indexOf(open, a + 1) >= 0) return null;          // none, or more than one: not System Information's page
+  const b = s.indexOf('</script>', a + open.length);
+  return b < 0 ? null : s.slice(a + open.length, b);
 }
 
 const HOSTS = [/^github\.com$/, /^objects\.githubusercontent\.com$/, /^private-user-images\.githubusercontent\.com$/,

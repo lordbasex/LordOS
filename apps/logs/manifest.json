@@ -4,7 +4,7 @@
   "name": "Logs",
   "description": "System, app and LordOS logs, with filters and live updates",
   "size": [1040, 640],
-  "minSize": [760, 440],
+  "minSize": [480, 360],
   "dock": false,
   "permissions": ["logs:read"],
   "category": "System"

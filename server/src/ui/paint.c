@@ -3,6 +3,7 @@
 #include "../term/term.h"
 #include "../wl/wl.h"
 #include "../media/media.h"
+#include "wave.h"
 #include "grab.h"
 #include "../gpu/gpu.h"
 
@@ -32,6 +33,24 @@ PaintView paint_view = { 0, 0, 1, 0, 0, 0 };
 static inline float VX(float x) { return (x - paint_view.x) * paint_view.k + paint_view.dx; }
 static inline float VY(float y) { return (y - paint_view.y) * paint_view.k + paint_view.dy; }
 
+static float reach_dev(int r) { return (float)canvas_blur_reach(r); }
+/* How far around its box a backdrop blur reads (canvas_blur_reach), in logical pixels: the widest of the scales it is
+ * painted at (the displays, the one being painted). Until 0.8.8.10 the margin was 2·blur + 1 everywhere: 61 px for the
+ * widgets' 30 instead of 45, so a change further from a frosted node than it can see still re-blurred it. */
+static float blur_reach(float blur) {
+    if (blur < 1) return 0;
+    /* the old, wider margin with the displays' scales unknown, and in the one-box mode (LORD_DAMAGE=one), whose
+     * growth passes were tuned to it (engine-test fuzz seed 259 there) */
+    if (paint_nviews <= 0 || !paint_multi_damage) return ceilf(blur * 2) + 1;
+    float best = reach_dev((int)(blur + 0.5f));
+    float ks[PAINT_VIEWS_MAX + 1];
+    int nk = 0;
+    for (int v = 0; v < paint_nviews && v < PAINT_VIEWS_MAX; v++) ks[nk++] = paint_views[v].k;
+    ks[nk++] = paint_view.k;
+    for (int i = 0; i < nk; i++) if (ks[i] > 0) { float m = reach_dev((int)(blur * ks[i] + 0.5f)) / ks[i]; if (m > best) best = m; }
+    return ceilf(best);
+}
+
 static uint32_t with_opacity(uint32_t argb, float op) {
     uint32_t a = (uint32_t)((argb >> 24) * op + 0.5f);
     return a << 24 | (argb & 0xffffff);
@@ -51,6 +70,8 @@ static int tf_paint(Canvas *c, Node *n, float opacity);
 static int tf_self, tf_unit;    /* the transformed node being rasterized; the one painted at opacity 1 */
 int paint_tf_nocache;           /* tests: transformed subtrees rasterized again, the cache untouched */
 static int tf_nest;             /* > 0: painting into a transformed node's raster, not the canvas */
+static int blur_from_cache(Canvas *c, const Node *n);
+static void blur_to_cache(Canvas *c, const Node *n, float x, float y, float w, float h, int radius);
 static void below_note_blur(float x, float y, float w, float h, int radius);
 static void below_note_affine(const float fwd[6], int sw, int sh);
 static int below_collect;       /* building the copy of what is below the dragged window (below_build) */
@@ -149,7 +170,11 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
 
     if (own && s->backdrop_blur >= 1) {
         if (below_collect && !tf_nest) below_note_blur(x, y, w, h, (int)(s->backdrop_blur * k + 0.5f));
-        PROF(1, canvas_backdrop_blur(c, x, y, w, h, rad, (int)(s->backdrop_blur * k + 0.5f)));
+        /* what is below unchanged since it was blurred: the blurred pixels kept ("Blurred backdrop cache") */
+        if (!blur_from_cache(c, n)) {
+            PROF(1, canvas_backdrop_blur(c, x, y, w, h, rad, (int)(s->backdrop_blur * k + 0.5f)));
+            blur_to_cache(c, n, x, y, w, h, (int)(s->backdrop_blur * k + 0.5f));
+        }
     }
     if (own && s->bg >> 24) {
         if (corners_differ) PROF(2, canvas_rrect4(c, x, y, w, h, r4, with_opacity(s->bg, op)));
@@ -181,6 +206,7 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
     if (n->type == NODE_TERM) term_paint(c, n->term, ix, iy, iw, ih, op);
     if (n->type == NODE_SURFACE) wl_paint(c, n->term, n->id, lix, liy, liw, lih, op);
     if (n->type == NODE_MEDIA) media_paint(c, n->term, n->id, ix, iy, iw, ih, (s->radius - bw) * k, op);
+    if (n->type == NODE_WAVE) wave_paint(c, n, ix, iy, iw, ih, k, op);
     /* text is clipped to its box: a label outside the clip (a list row scrolled away) isn't laid out */
     if (n->type == NODE_TEXT && (s->color >> 24) && x < c->clip.x1 && x + w > c->clip.x0 && y < c->clip.y1 && y + h > c->clip.y0) {
         node_gather_text(n, text_buf, sizeof text_buf);
@@ -309,7 +335,7 @@ static void tf_bounds(const Node *n, Affine rel, Box *b, int *ok, int *live) {
     if (n->s.backdrop_blur >= 1) *live = 1;
     if (n->type == NODE_MEDIA) *ok = 0;
     if (n->type == NODE_SURFACE) *live = 1;     /* GPU path: its quad goes at the scaled place (wl_tf_begin) */
-    if (n->type == NODE_TERM) *live = 1;
+    if (n->type == NODE_TERM || n->type == NODE_WAVE) *live = 1;
     Affine r = n->own_tf ? affine_mul(rel, n->tf->own) : rel;
     Box v = affine_box(r, visual_box(n));
     b->x0 = fminf(b->x0, v.x0); b->y0 = fminf(b->y0, v.y0);
@@ -1031,7 +1057,8 @@ static long rect_area(Rect r) { return r.x1 > r.x0 && r.y1 > r.y0 ? (long)(r.x1 
 static void below_note_blur(float x, float y, float w, float h, int radius) {
     if (nbl_blur == BELOW_LIST_MAX) { bl_over = 1; return; }
     Rect b = { (int)floorf(x), (int)floorf(y), (int)ceilf(x + w), (int)ceilf(y + h) };
-    int m = 2 * radius + 2;                     /* canvas_backdrop_blur reads 2 * radius around it */
+    int m = 2 * radius + 2;                     /* canvas_backdrop_blur reads 2 * radius around it (the drag's copy keeps
+                                                 * the old, wider margin: its frames are pinned by drag_golden_*.txt) */
     bl_blur[nbl_blur] = b;
     bl_near[nbl_blur++] = (Rect){ b.x0 - m, b.y0 - m, b.x1 + m, b.y1 + m };
 }
@@ -1055,7 +1082,7 @@ static void below_damage(Box b) { dlist_add(&layer.bdmg, b); }
  * (blur_walk's margin) or of its image's bounds (a transform) */
 static void below_damage_node(const Node *n, Box cur) {
     float m = 0;
-    if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;
+    if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;    /* the drag's copy: the old margin */
     if (n->own_tf && m < 4) m = 4;
     Box p = n->prev_box;
     if (p.x1 > p.x0 && p.y1 > p.y0) below_damage((Box){ p.x0 - m, p.y0 - m, p.x1 + m, p.y1 + m });
@@ -1380,7 +1407,7 @@ static void gdrag_note_after(const Node *n, Box cur) {
     if (cur.x1 <= cur.x0 || cur.y1 <= cur.y0 || !node_paints(n)) return;
     if (gdrag_after_over) return;
     float m = 0;
-    if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;
+    if (n->s.backdrop_blur >= 1) m = ceilf(n->s.backdrop_blur * 2) + 1;    /* GPU drag: the old margin */
     if (n->has_tf && m < 4) m = 4;
     Box b = { cur.x0 - m, cur.y0 - m, cur.x1 + m, cur.y1 + m };
     if (ngdrag_after) {                /* inside the box noted last (a child in its bar): meets D only if that one does */
@@ -1398,6 +1425,201 @@ static void gdrag_note_after(const Node *n, Box cur) {
 }
 
 /* ord: ORD_PATH for the window's ancestors, else whether the node is painted before or after it */
+/* ---- Blurred backdrop cache (0.8.8.10) ----
+ * A backdrop blur depends only on what is painted below the blurred node. Its blurred pixels (the node's box right
+ * after canvas_backdrop_blur, before its own background) are kept per display and reused while nothing below it
+ * changed: a clock's hand or a network speed inside a frosted widget, or a line of a translucent Terminal, is then
+ * painted alone, without blurring the backdrop again, and without the blur rule (blur_walk) growing the damage to
+ * the whole node and its margin, which joined every widget of a desktop into one repaint.
+ *   - Kept only when the blur was computed with every pixel it reads painted this pass (the clip holds the node
+ *     and the margin it samples), so the copy is what a full repaint gives.
+ *   - Dropped when any damage other than the node's own subtree meets the node or its margin (damage_walk, and
+ *     the external rectangles of terminals, app windows and videos outside the node), when the node changes or
+ *     moves, when the damage was set directly, and at a display change.
+ *   - Not used inside transforms, while a window is dragged (its layer) or outside a display's own paint.
+ * engine-test test_blur_cache and test_damage_fuzz compare it with full repaints. */
+#define BC_MAX 32
+#define BC_OWN 4
+typedef struct {
+    uint64_t id;                    /* the node's serial (ids are reused, serials never) */
+    int view, valid;
+    float k, vx, vy, vdx, vdy, blur, rad;
+    Box box;                        /* the node's logical box when kept */
+    int x0, y0, x1, y1;             /* the physical pixels kept */
+    uint32_t *px;
+    size_t cap;
+    unsigned used;
+    Box own[BC_OWN]; int nown;      /* this walk: its terminals, app windows and videos (their own damage) */
+} BlurCache;
+static BlurCache bcache[BC_MAX];
+static unsigned bc_clock;
+int paint_blur_cache_on;            /* main.c: 1 while a display's scene is painted (paint_out) */
+PaintViewBox paint_views[PAINT_VIEWS_MAX];
+int paint_nviews;
+
+static int bc_meets(Box a, Box b) { return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1; }
+static int bc_inside(Box in, Box out) { return in.x0 >= out.x0 && in.y0 >= out.y0 && in.x1 <= out.x1 && in.y1 <= out.y1; }
+static Box bc_near(Box b, float blur) {
+    float m = blur_reach(blur);
+    return (Box){ floorf(b.x0 - m), floorf(b.y0 - m), ceilf(b.x1 + m), ceilf(b.y1 + m) };
+}
+void paint_blur_cache_reset(void) {
+    for (int i = 0; i < BC_MAX; i++) { free(bcache[i].px); bcache[i] = (BlurCache){ 0 }; }
+}
+static void bc_drop_all(void) { for (int i = 0; i < BC_MAX; i++) bcache[i].valid = 0; }
+/* a damage box b from node `from` (0: from outside the tree); anc: from's ancestors, nanc of them */
+static void bc_damage(Box b, uint64_t from, const uint64_t *anc, int nanc) {
+    for (int i = 0; i < BC_MAX; i++) {
+        BlurCache *e = &bcache[i];
+        if (!e->valid || !bc_meets(bc_near(e->box, e->blur), b)) continue;
+        int mine = 0;
+        if (from && from != e->id) for (int a = 0; a < nanc; a++) if (anc[a] == e->id) { mine = 1; break; }
+        if (!mine) e->valid = 0;
+    }
+}
+static BlurCache *bc_get(uint64_t id, int view) {
+    for (int i = 0; i < BC_MAX; i++) if (bcache[i].px && bcache[i].id == id && bcache[i].view == view) return &bcache[i];
+    return NULL;
+}
+static int bc_usable(void) { return paint_blur_cache_on && !layer.want && !tf_nest && !paint_capture_mode; }
+static int bc_geom(const BlurCache *e, const Node *n, float k, float vx, float vy, float vdx, float vdy) {
+    return e->valid && e->k == k && e->vx == vx && e->vy == vy && e->vdx == vdx && e->vdy == vdy && e->blur == n->s.backdrop_blur &&
+           e->rad == n->s.radius && e->box.x0 == n->prev_box.x0 && e->box.y0 == n->prev_box.y0 && e->box.x1 == n->prev_box.x1 &&
+           e->box.y1 == n->prev_box.y1;
+}
+/* the damage pass: may the blur rule leave this node alone? Every display that shows it holds it */
+static int blur_cached(const Node *n) {
+    if (!paint_multi_damage || layer.want || n->has_tf || n->own_tf || paint_nviews <= 0) return 0;
+    Box near = bc_near(n->prev_box, n->s.backdrop_blur);
+    int seen = 0;
+    for (int v = 0; v < paint_nviews; v++) {
+        const PaintViewBox *pv = &paint_views[v];
+        if (!bc_meets(pv->b, near)) continue;
+        const BlurCache *e = bc_get(n->serial, pv->index);
+        if (!e || !bc_geom(e, n, pv->k, pv->x, pv->y, pv->dx, pv->dy)) return 0;
+        seen = 1;
+    }
+    return seen;
+}
+static int blur_from_cache(Canvas *c, const Node *n) {
+    if (!bc_usable() || n->has_tf || n->own_tf) return 0;
+    BlurCache *e = bc_get(n->serial, paint_view.index);
+    if (!e || !bc_geom(e, n, paint_view.k, paint_view.x, paint_view.y, paint_view.dx, paint_view.dy)) return 0;
+    int x0 = e->x0 > c->clip.x0 ? e->x0 : c->clip.x0, y0 = e->y0 > c->clip.y0 ? e->y0 : c->clip.y0;
+    int x1 = e->x1 < c->clip.x1 ? e->x1 : c->clip.x1, y1 = e->y1 < c->clip.y1 ? e->y1 : c->clip.y1;
+    int ew = e->x1 - e->x0;
+    e->used = ++bc_clock;
+    if (x1 <= x0 || y1 <= y0) return 1;     /* this part of the repaint doesn't reach it */
+    for (int y = y0; y < y1; y++)
+        memcpy(c->px + (size_t)y * c->stride + x0, e->px + (size_t)(y - e->y0) * ew + (x0 - e->x0), (size_t)(x1 - x0) * 4);
+    e->used = ++bc_clock;
+    return 1;
+}
+static void blur_to_cache(Canvas *c, const Node *n, float x, float y, float w, float h, int radius) {
+    if (!bc_usable() || n->has_tf || n->own_tf || radius < 1) return;
+    int x0 = (int)floorf(x), y0 = (int)floorf(y), x1 = (int)ceilf(x + w), y1 = (int)ceilf(y + h);
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > c->w) x1 = c->w;
+    if (y1 > c->h) y1 = c->h;
+    if (x1 <= x0 || y1 <= y0) return;
+    /* every pixel canvas_backdrop_blur read was painted in this pass */
+    int m = (int)reach_dev(radius);
+    int nx0 = x0 - m < 0 ? 0 : x0 - m, ny0 = y0 - m < 0 ? 0 : y0 - m;
+    int nx1 = x1 + m > c->w ? c->w : x1 + m, ny1 = y1 + m > c->h ? c->h : y1 + m;
+    if (nx0 < c->clip.x0 || ny0 < c->clip.y0 || nx1 > c->clip.x1 || ny1 > c->clip.y1) return;
+    size_t need = (size_t)(x1 - x0) * (y1 - y0);
+    if (need > (size_t)4096 * 2160) return;
+    BlurCache *e = bc_get(n->serial, paint_view.index);
+    if (!e) {
+        int pick = 0;
+        for (int i = 0; i < BC_MAX; i++) {
+            if (!bcache[i].px) { pick = i; break; }
+            if (bcache[i].used < bcache[pick].used) pick = i;
+        }
+        e = &bcache[pick];
+        e->id = n->serial;
+        e->view = paint_view.index;
+    }
+    if (e->cap < need) {
+        uint32_t *p = realloc(e->px, need * 4);
+        if (!p) { e->valid = 0; return; }
+        e->px = p;
+        e->cap = need;
+    }
+    for (int yy = y0; yy < y1; yy++) memcpy(e->px + (size_t)(yy - y0) * (x1 - x0), c->px + (size_t)yy * c->stride + x0, (size_t)(x1 - x0) * 4);
+    e->x0 = x0; e->y0 = y0; e->x1 = x1; e->y1 = y1;
+    e->k = paint_view.k; e->vx = paint_view.x; e->vy = paint_view.y; e->vdx = paint_view.dx; e->vdy = paint_view.dy;
+    e->blur = n->s.backdrop_blur;
+    e->rad = n->s.radius;
+    e->box = n->prev_box;
+    e->valid = 1;
+    e->used = ++bc_clock;
+}
+
+/* damage_walk's ancestors (the cache keeps a blurred node through its own subtree's changes) and the node whose
+ * damage it is adding: every damage_add of the walk (a node's boxes, a transformed subtree's raster area) goes
+ * through bc_hook */
+#define DW_ANC 512
+static uint64_t dw_anc[DW_ANC];
+static int dw_nanc;
+static uint64_t dw_cur;
+
+/* Paint order (0.8.8.10). A change painted above a blurred node is not in what it blurs, so it keeps its cache:
+ * the Workspaces widgets sit 16 px apart, inside each other's sampling margin, and a ring changing every 3 s in one
+ * card used to blur the next one again, which grew the damage over the next, and so on over the whole column.
+ * Paint order is each parent's children in tree order, stable by zIndex (node.c); two nodes compare at the children
+ * of their deepest common ancestor. Each damage of the walk is kept with the path to its node (serial, zIndex, place
+ * among its siblings), each kept blur notes its own path when the walk passes it, and after the walk a damage near a
+ * blur invalidates it unless it comes from inside it or from above it. Anything unsure invalidates, as before: a path
+ * deeper than BC_DEPTH, more than BC_EVENTS damages, a blur the walk didn't reach, or a child of the common ancestor
+ * whose style changed (a zIndex) or whose place among its siblings changed this frame. */
+#define BC_DEPTH 48
+#define BC_EVENTS 256
+typedef struct { uint64_t s; float z; uint32_t ix; uint8_t moved; } BcStep;
+typedef struct { Box b; int depth; BcStep p[BC_DEPTH]; } BcEvent;
+static BcStep dw_path[DW_ANC], dw_me;
+static uint32_t dw_next_ix;
+static BcEvent bc_ev[BC_EVENTS];
+static int bc_nev;
+static unsigned bc_walk;
+typedef struct { unsigned walk; int depth; BcStep p[BC_DEPTH]; } BcPath;
+static BcPath bc_path[BC_MAX];                  /* parallel to bcache: each kept blur's path this walk */
+
+static void bc_hook(Box b) {
+    int nanc = dw_nanc < DW_ANC ? dw_nanc : DW_ANC;
+    if (nanc + 1 > BC_DEPTH || dw_nanc > DW_ANC || bc_nev >= BC_EVENTS) { bc_damage(b, dw_cur, dw_anc, nanc); return; }
+    BcEvent *e = &bc_ev[bc_nev++];
+    e->b = b;
+    e->depth = nanc + 1;
+    memcpy(e->p, dw_path, (size_t)nanc * sizeof *e->p);
+    e->p[nanc] = dw_me;
+}
+
+/* after the walk: what each damage does to the kept blurs near it */
+static void bc_settle(void) {
+    for (int v = 0; v < bc_nev; v++) {
+        const BcEvent *ev = &bc_ev[v];
+        for (int i = 0; i < BC_MAX; i++) {
+            BlurCache *e = &bcache[i];
+            if (!e->valid || !bc_meets(bc_near(e->box, e->blur), ev->b)) continue;
+            const BcPath *bp = &bc_path[i];
+            if (bp->walk != bc_walk || bp->depth <= 0) { e->valid = 0; continue; }
+            int l = 0, m = ev->depth < bp->depth ? ev->depth : bp->depth;
+            while (l < m && ev->p[l].s == bp->p[l].s) l++;
+            if (l == bp->depth) {                   /* the blurred node itself (invalid) or inside it (its own) */
+                if (ev->depth == bp->depth) e->valid = 0;
+                continue;
+            }
+            if (l == ev->depth || l == 0) { e->valid = 0; continue; }   /* an ancestor of it: below */
+            const BcStep *x = &ev->p[l], *y = &bp->p[l];
+            int above = !x->moved && !y->moved && (x->z > y->z || (x->z == y->z && x->ix > y->ix));
+            if (!above) e->valid = 0;
+        }
+    }
+    bc_nev = 0;
+}
+
 static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Box clip, int ord) {
     if (n->type == NODE_RAW) {
         if (walk_sig && visible) sig_mix(walk_sig, &n->gen, sizeof n->gen);   /* the text, for a cached raster */
@@ -1407,12 +1629,26 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
     int vis = visible && !n->s.display_none;
     int dirty = parent_dirty || n->paint_dirty;
     Box cur = vis ? box_and(screen_box(n), clip) : (Box){0, 0, 0, 0};
+    dw_cur = n->serial;
+    /* its step in paint order (bc_settle): a style change (a zIndex) or a new place among its siblings is unsure */
+    uint32_t my_ix = dw_next_ix;
+    BcStep me = { n->serial, n->s.z_index, my_ix, (uint8_t)(n->paint_dirty || n->walk_ix != my_ix || n->prev_box.x1 <= n->prev_box.x0) };
+    n->walk_ix = my_ix;
+    dw_me = me;
+    if (vis && n->s.backdrop_blur >= 1)
+        for (int i = 0; i < BC_MAX; i++) {
+            if (!bcache[i].px || bcache[i].id != n->serial) continue;
+            BcPath *bp = &bc_path[i];
+            bp->walk = bc_walk;
+            bp->depth = dw_nanc + 1 <= BC_DEPTH && dw_nanc <= DW_ANC ? dw_nanc + 1 : -1;
+            if (bp->depth > 0) { memcpy(bp->p, dw_path, (size_t)dw_nanc * sizeof *bp->p); bp->p[dw_nanc] = me; }
+        }
     TfSig *outer_sig = walk_sig, sig;
     if (walk_sig && vis) {
         sig_node(walk_sig, n, 0);
         if (n->paint_dirty) walk_sig->dirty = 1;
         /* as tf_bounds */
-        if (n->s.backdrop_blur >= 1 || n->type == NODE_TERM || n->type == NODE_SURFACE) walk_sig->live |= 1;
+        if (n->s.backdrop_blur >= 1 || n->type == NODE_TERM || n->type == NODE_SURFACE || n->type == NODE_WAVE) walk_sig->live |= 1;
         if (n->type == NODE_MEDIA) walk_sig->live |= 2;
         walk_sig->area = box_or(walk_sig->area, cur);
     }
@@ -1455,7 +1691,20 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
     if (ord == ORD_PATH && !in_layer)
         for (int i = 1; i < ord_n; i++) if (ord_anc[i] == n) { p = ord_anc[i - 1]; break; }
     int seen = 0;
+    /* a terminal, an app window, a video or a sound wave inside a kept blur: its own changes (outside damage) are the node's */
+    if (vis && (n->type == NODE_TERM || n->type == NODE_SURFACE || n->type == NODE_MEDIA || n->type == NODE_WAVE))
+        for (int a = 0; a < dw_nanc && a < DW_ANC; a++)
+            for (int i = 0; i < BC_MAX; i++) {
+                BlurCache *e = &bcache[i];
+                if (!e->valid || e->id != dw_anc[a]) continue;
+                if (e->nown < BC_OWN) e->own[e->nown++] = cur;
+                else e->nown = BC_OWN + 1;          /* too many: none of them counts */
+            }
+    if (dw_nanc < DW_ANC) { dw_anc[dw_nanc] = n->serial; dw_path[dw_nanc] = me; }
+    dw_nanc++;
+    uint32_t cix = 0;
     for (Node *c = n->first; c; c = c->next) {
+        dw_next_ix = cix++;
         int co = ord;
         if (ord == ORD_PATH) {
             if (!p) co = ORD_BEFORE;
@@ -1464,6 +1713,9 @@ static void damage_walk(Node *n, int parent_dirty, int visible, int in_layer, Bo
         }
         damage_walk(c, dirty, vis, in_layer, inner, co);
     }
+    dw_nanc--;
+    dw_cur = n->serial;
+    dw_me = me;
     if (walk_sig == &sig) {
         tf_check(n, &sig);
         /* The raster's kind changed (a blur, a terminal or an app window came into the subtree or
@@ -1503,7 +1755,9 @@ static int box_meets(Box a, Box b) { return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 <
  * difference stayed until the next full repaint (engine-test test_damage_fuzz). */
 static Box blur_near(const Node *n) {
     Box b = n->prev_box;
-    float m = ceilf(n->s.backdrop_blur * 2) + 1;
+    /* while a window is dragged its copy of what is below has the old, wider margin (drag_golden_*.txt pins those
+     * frames); at rest, what the blur really reads */
+    float m = layer.want ? ceilf(n->s.backdrop_blur * 2) + 1 : blur_reach(n->s.backdrop_blur);
     Box near = { floorf(b.x0 - m), floorf(b.y0 - m), ceilf(b.x1 + m), ceilf(b.y1 + m) };
     if (ui.width > 0 && ui.height > 0) {        /* the canvas ends there: so does what it samples */
         near.x0 = fmaxf(near.x0, 0); near.y0 = fmaxf(near.y0, 0);
@@ -1559,7 +1813,7 @@ static void blur_walk(Node *n, int *grew) {
     Box b = n->prev_box;
     if (n->s.backdrop_blur >= 1 && b.x1 > b.x0 && b.y1 > b.y0) {
         Box near = blur_near(n);
-        if (box_meets(ui.damage, near) && !box_inside(near, ui.damage) && !blur_hidden(n)) { damage_add(near); *grew = 1; }
+        if (box_meets(ui.damage, near) && !box_inside(near, ui.damage) && !blur_hidden(n) && !blur_cached(n)) { damage_add(near); *grew = 1; }
     }
     for (Node *c = n->first; c; c = c->next) blur_walk(c, grew);
 }
@@ -1595,7 +1849,7 @@ static void blur_walk(Node *n, int *grew) {
  * not proven. The 0.8.2 scene was tried again on VM 116 (docs/MONITOR.md) with both modes and no
  * stale area appeared, before or after these fixes: the report is still not reproduced, so the
  * switch stays off. */
-int paint_multi_damage = 0;
+int paint_multi_damage = 1;
 static Box drects[DAMAGE_MAX];
 static int ndrects;
 
@@ -1615,7 +1869,7 @@ static Box dl_bbox(const DamageList *l) {
 static void blur_collect(Node *n, Box *bb, int *k) {
     if (n->type == NODE_RAW || n->s.display_none) return;
     Box b = n->prev_box;
-    if (n->s.backdrop_blur >= 1 && b.x1 > b.x0 && b.y1 > b.y0 && !blur_hidden(n)) {
+    if (n->s.backdrop_blur >= 1 && b.x1 > b.x0 && b.y1 > b.y0 && !blur_hidden(n) && !blur_cached(n)) {
         if (*k < BLUR_MAX) bb[*k] = blur_near(n);   /* the node and the margin it samples, as blur_walk */
         (*k)++;
     }
@@ -1673,7 +1927,7 @@ void paint_damage_settle(DamageList *l) {
 
 /* The list for this frame, or 0 if it has to be one box. */
 static int multi_rects(Node *root) {
-    if (!paint_multi_damage || layer.want || gpu_active() || !root) return 0;
+    if (!paint_multi_damage || layer.want || !root) return 0;
     Box *d = &ui.damage;
     if (d->x0 != ui.dlast.x0 || d->y0 != ui.dlast.y0 || d->x1 != ui.dlast.x1 || d->y1 != ui.dlast.y1) return 0;   /* set directly */
     if (ui.dlist.n < 2) return 0;
@@ -1746,7 +2000,30 @@ int paint_damage(Node *root) {
     }
     int ord = below_order(root);
     ngdrag_after = gdrag_after_over = 0;
+    /* the blurred backdrop cache: what came from outside the tree (terminals, app windows, videos) and a damage set
+     * directly, before the walk adds the nodes' own */
+    int bc_some = ext.x1 > ext.x0 && ext.y1 > ext.y0;
+    int bc_direct = bc_some && (ext.x0 != ui.dlast.x0 || ext.y0 != ui.dlast.y0 || ext.x1 != ui.dlast.x1 || ext.y1 != ui.dlast.y1);
+    DamageList bc_ext = { .n = 0 };
+    if (bc_some && !bc_direct) bc_ext = ui.dlist;
+    if (layer.want || bc_direct) bc_drop_all();
+    for (int i = 0; i < BC_MAX; i++) bcache[i].nown = 0;
+    dw_nanc = 0;
+    dw_next_ix = 0;
+    bc_nev = 0;
+    bc_walk++;
+    damage_hook = bc_hook;
     if (root) damage_walk(root, 0, 1, 0, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, ord);
+    damage_hook = NULL;
+    bc_settle();
+    for (int r = 0; r < bc_ext.n; r++)
+        for (int i = 0; i < BC_MAX; i++) {
+            BlurCache *e = &bcache[i];
+            if (!e->valid || !bc_meets(bc_near(e->box, e->blur), bc_ext.r[r])) continue;
+            int own = 0;
+            for (int k = 0; k < e->nown && e->nown <= BC_OWN; k++) if (bc_inside(bc_ext.r[r], e->own[k])) { own = 1; break; }
+            if (!own) e->valid = 0;
+        }
     ndrects = 0;
     if (multi_rects(root)) return 1;
     /* the damage is one box: growing it for a blurred node can reach another one (the bar and a menu) */
@@ -1789,6 +2066,49 @@ static void cover_walk(Node *n, Box d, Box clip, int *found) {
     Node *kids[MAX_KIDS];
     int k = node_children_ordered(n, kids, MAX_KIDS);
     for (int i = 0; i < k; i++) cover_walk(kids[i], d, inner, found);
+}
+
+/* Whether node `target`'s box is hidden behind something opaque painted after it (paint_node_covered): a walk in
+ * paint order that, once past the target (and its subtree), looks for an opaque node holding the whole box, with the
+ * same rules as cover_walk (no transparency, no blur, no gradient, inside the rounded corners and the clipping
+ * ancestors). */
+static void cover_after(Node *n, const Node *target, Box d, Box clip, int *seen, int *found) {
+    if (*found) return;
+    if (n == target) { *seen = 1; return; }
+    const Style *s = &n->s;
+    if (n->type == NODE_RAW || s->display_none || s->opacity < 0.999f || n->own_tf || n->has_tf) {
+        /* not a cover, but the target may be inside: walk it for the order only */
+        if (!*seen && n->type != NODE_RAW && !s->display_none) {
+            Node *kids[MAX_KIDS];
+            int k = node_children_ordered(n, kids, MAX_KIDS);
+            Box none = { 0, 0, 0, 0 };
+            for (int i = 0; i < k && !*seen; i++) cover_after(kids[i], target, d, none, seen, found);
+        }
+        return;
+    }
+    Box box = box_and((Box){ n->ax, n->ay, n->ax + n->w, n->ay + n->h }, clip);
+    if (*seen && (s->bg >> 24) == 0xff && !s->has_gradient && s->backdrop_blur < 1) {
+        float k = s->radius * 0.3f;
+        Box in = { box.x0 + k, box.y0 + k, box.x1 - k, box.y1 - k };
+        if (d.x0 >= in.x0 && d.y0 >= in.y0 && d.x1 <= in.x1 && d.y1 <= in.y1) { *found = 1; return; }
+    }
+    if (n->type == NODE_TEXT) return;
+    Box inner = s->overflow_hidden ? box : clip;
+    float rr = node_edges_plain(n) ? s->radius : max4(s->ext->r.rad);
+    if (s->overflow_hidden && rr > 0) inner = (Box){ inner.x0 + rr, inner.y0 + rr, inner.x1 - rr, inner.y1 - rr };
+    Node *kids[MAX_KIDS];
+    int k = node_children_ordered(n, kids, MAX_KIDS);
+    for (int i = 0; i < k && !*found; i++) cover_after(kids[i], target, d, inner, seen, found);
+}
+
+int paint_node_covered(const Node *target) {
+    Node *root = ui.root;
+    if (!root || !target || target == root) return 0;
+    Box d = { floorf(target->ax), floorf(target->ay), ceilf(target->ax + target->w), ceilf(target->ay + target->h) };
+    if (d.x1 <= d.x0 || d.y1 <= d.y0) return 0;
+    int seen = 0, found = 0;
+    cover_after(root, target, d, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, &seen, &found);
+    return seen && found;
 }
 
 static int opaque_cover_node(Node *root) {

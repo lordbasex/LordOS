@@ -19,7 +19,7 @@
   "cpuValue": {
     "other": "{cpu} · {count} inti"
   },
-  "credits": "IP ke negara di Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Peta: Natural Earth (domain publik).",
+  "credits": "IP ke negara di Monitor: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Peta: Natural Earth (domain publik). Kota cuaca: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Layar",
   "engine": "Mesin UI",
   "host": "Komputer",

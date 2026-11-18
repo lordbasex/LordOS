@@ -821,14 +821,37 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Release 0.8.9 (planned)
 
+- [ ] **Lord Workspaces** (approved by the maintainer on 2026-11-15; in development on `lordos-workspaces`,
+  `WORKSPACES.md`): a third theme with activities, a Context Spine, tiling per display and three effects styles
+  (Opaque, Translucent, Crystal). Built and checked in headless sessions and scene tests; still to check on a real
+  session with real monitors, Linux apps with their own bar, right to left and the GPU path, then the screenshots for
+  the site. Compositor and SDK work it leaves for later:
+  - live miniatures of hidden activities (keeping and scaling a hidden desktop's last buffers);
+  - real frosted glass over Linux apps on the GPU path (today the blur only tints there);
+  - a key table of its own over Linux apps (Alt+Space and others; `keygrab.c` is a fixed, reviewed list), reusing Lord
+    Flow's until then;
+  - a different activity per monitor (per-display desktops in the SDK and the compositor's parking) and the Overview
+    per display;
+  - ~~**Weather widget**~~: done in 0.8.8.10 (approved 2026-11-16; docs/WORKSPACES.md, "Weather").
+  - **LordBridge** (separate project, 2026-11-16; docs/LORDBRIDGE.md): Windows programs (Wine), games (Proton), Android
+    (Waydroid), engine versions side by side like nvm. Phase 0 done outside this tree; phase 1 needs a `lord.bridge` exception.
+  - **Voice assistant** (stage 4, maintainer's decision 2026-11-16, "más adelante"): speak, LordOS turns it into text
+    (whisper.cpp, local), an AI answers and LordOS reads it aloud (lord-say). Decisions first: which AI answers (local or
+    a cloud service, and with which account) and the microphone permission (the broker's device grant).
+  - More widgets suggested 2026-11-16: world clocks, countdown and timer (with the Clock app), recent files, LordOS
+    updates, an app launcher of 4 or 8 pinned apps; the Wi‑Fi network's name in the Network widget needs a `lord.net`
+    call for the connected SSID (today only an admin scan reports it).
+
 - [ ] **Later, from GitHub suggestions** (maintainer's decisions 2026-11-15, "más adelante"):
-  - Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)): 75 % and 80 % first, never 50 %;
-    the UI engine, pointer, captures, Wayland `int_scale`/fractional scale below 1 and Xwayland's DPI.
+  - [x] Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)), in development for 0.8.8.10:
+    75 % and 80 % only, never 50 % (docs/DISPLAYS.md, "Below 100 %"); Wayland and X11 clients stay at 100 % and are drawn
+    smaller. Still to check with a screenshot on the VM and on a real 1280 × 800 laptop.
   - Lord Flow personalisation ([#151](https://github.com/lordbasex/LordOS/issues/151)): the menu bar at the bottom,
     window-button size, hiding the tiling submenu.
   - Copy and paste with a VMware host ([#76](https://github.com/lordbasex/LordOS/issues/76)): start Debian's
     `vmware-user` only inside VMware (a new AGENTS.md exception), then LordOS → host through an authenticated X
-    requestor; never tested on a real VMware host yet.
+    requestor (`vmtoolsd -n vmusr` by X-Resource pid and `/proc/<pid>/exe`); the design is in WAYLAND.md, "Proposed for
+    guest → host", waiting for approval. Host → guest confirmed by the reporter on 0.8.8.8.
   - Mounting non-LordOS partitions automatically at startup ([#122](https://github.com/lordbasex/LordOS/issues/122),
     second step after mounting by hand).
 
@@ -890,7 +913,10 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   2026-11-15: before 1.0 and before Debian 14). With systemd 258 or later, `systemctl restart lordos` fails while
   sessions are alive (EBUSY): move each session out of `lordos.service` into a delegated `lordos-session-<uid>.scope`
   (fixed `systemd-run --scope` from lord-sessiond's root child, or StartTransientUnit), and adapt the cgroup
-  delegation and the app scopes inside it.
+  delegation and the app scopes inside it. Meanwhile (0.8.8.10) the restart works on 258+ without moving anything:
+  `lord-sessiond --release-cgroups` (ExecStartPre) turns the controllers off for the start and the new lord-sessiond
+  turns them on again with the noted limits (docs/SESSIONS.md, "cgroups"); this item stays for the cleaner layout
+  (no controller round trip, the firewall's attach point and `sec/appid.c`'s trusted path reviewed with it).
 
 - [x] **Monitor → Network, second generation (0.8.5)** — done 2026-10-19 on VM 118, see
   `MONITOR.md` ("Network, second generation", "The menu bar network item", "Blocklists") and

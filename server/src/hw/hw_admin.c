@@ -831,6 +831,27 @@ void hw_act_browser_restore(const AdminReq *r, const char *arg, size_t len) {
     admin_say("OK", "%s", a);   /* i18n-ok */
 }
 
+/* boot-text on|off: the next boots start in text mode (docs/SESSIONS.md, "Text mode"): on writes the fixed file
+ * /etc/lordos/text-mode, off removes it. lord-sessiond then leaves the monitor alone and lordos-text-login.service puts
+ * a login prompt on tty1, where startlordos starts the desktop. Nothing else is touched (the boot menu's
+ * "LordOS (text mode)" entry is the package's, /etc/grub.d/11_lordos_text). */
+void hw_act_boot_text(const AdminReq *r, const char *arg, size_t len) {
+    (void)r;
+    char a[8];
+    if (arg_copy(arg, len, a, sizeof a) || (strcmp(a, "on") && strcmp(a, "off"))) { admin_err("admin.invalidArgument", NULL); return; }
+    const char *p = "/etc/lordos/text-mode";
+    if (!strcmp(a, "off")) {
+        if (unlink(p) && errno != ENOENT) { admin_err("sys.writeFailed", "path", p, NULL); return; }
+    } else {
+        mkdir("/etc/lordos", 0755);
+        if (write_atomic(p, "# LordOS: Settings -> Users & Login -> Start in text mode. Remove this file for the login screen.\n")) {
+            admin_err("sys.writeFailed", "path", p, NULL);
+            return;
+        }
+    }
+    admin_say("OK", "%s", a);   /* i18n-ok */
+}
+
 /* ---- LordBench's boot time test (bench/boottest.h, docs/BENCHMARK.md "Boot") ---- */
 
 /* boot-test <n>: n restarts in a row (BT_MIN..BT_MAX), each boot's time recorded by lord-sessiond. Only

@@ -145,7 +145,7 @@ export function ShareSheet({ e, cf, onClose }) {
   const where = M.whereLine(e.path, acc, '·');
   return (
     <View onMouseDown={(ev) => ev.stopPropagation()} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', paddingTop: 70 }}>
-      <View style={{ width: 500, padding: 22, gap: 16, borderRadius: 14, backgroundColor: t.mode === 'dark' ? '#2a2a30' : t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 30px 80px rgba(0,0,0,0.55)' }}>
+      <View style={{ width: 500, maxWidth: '94%', padding: 22, gap: 16, borderRadius: 14, backgroundColor: t.mode === 'dark' ? '#2a2a30' : t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 30px 80px rgba(0,0,0,0.55)' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
           <EntryIcon e={e} size={48} dark={t.mode === 'dark'} thumb={false} />
           <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
@@ -268,7 +268,7 @@ export function OfflineDialog({ e, onClose }) {
   useEffect(() => addListener('keydown', (ev) => { if (ev.key === 'Escape' || ev.key === 'Enter') onClose(); }), []);
   return (
     <View onMouseDown={(ev) => ev.stopPropagation()} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: 420, padding: 16, gap: 12, borderRadius: 12, backgroundColor: t.mode === 'dark' ? '#2a2a30' : t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
+      <View style={{ width: 420, maxWidth: '94%', padding: 16, gap: 12, borderRadius: 12, backgroundColor: t.mode === 'dark' ? '#2a2a30' : t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
           <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#636366', alignItems: 'center', justifyContent: 'center' }}><CloudGlyph kind="cloud" size={20} color="#ffffff" /></View>
           <View style={{ flex: 1, minWidth: 0, gap: 4 }}>

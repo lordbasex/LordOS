@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} ядро",
     "other": "{cpu} · {count} ядра"
   },
-  "credits": "Държава по IP в Монитор: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Карта: Natural Earth (обществено достояние).",
+  "credits": "Държава по IP в Монитор: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Карта: Natural Earth (обществено достояние). Градове за времето: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Дисплей",
   "engine": "Двигател на интерфейса",
   "host": "Компютър",

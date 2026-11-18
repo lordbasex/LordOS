@@ -151,5 +151,10 @@
   "wifi.saved": "đã lưu",
   "wifi.scan": "Quét",
   "wifi.scanning": "Đang quét…",
-  "wifi.wrongKey": "Mật khẩu không đúng."
+  "wifi.wrongKey": "Mật khẩu không đúng.",
+  "wifi.available": "Mạng Wi-Fi khả dụng",
+  "wifi.currentLabel": "{ssid} — Đã kết nối",
+  "wifi.connect": "Kết nối",
+  "wifi.notInRange": "Ngoài vùng phủ sóng",
+  "wifi.knownFooter": "LordOS tự kết nối vào mạng đã lưu khi mạng đó trong vùng phủ sóng. Quên sẽ xóa mạng và mật khẩu của nó khỏi máy tính này."
 }

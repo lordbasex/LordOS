@@ -4,9 +4,10 @@
 // lord-server (lord.clean). Sections appear only for what works.
 import {
   View, cleaner, wm, windows, useStore, useAppWindow, useSettings, useWindowButtons, themes, userDirs, t as tr, formatBytes, spacing,
+ Tooltip,
 } from '@lordos/sdk';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Label, Sky, Tints, Tile, Orb, Enter, Pill, GlassButton, PalProvider, usePal, tween } from './ui.jsx';
+import { Label, Sky, Tints, Tile, Orb, Enter, Pill, GlassButton, PalProvider, usePal, tween, useRail, PAD } from './ui.jsx';
 import { Dashboard, MODULES, moduleResult } from './dashboard.jsx';
 import { ReviewBoard } from './review.jsx';
 import { PlanConfirm, PlanResult, AskDialog } from './flow.jsx';
@@ -45,7 +46,9 @@ function SideItem({ id, section, go, rail, badge }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   const on = section === id;
+  // a rail of icons (a small window, or while a scan runs): the section's name as a tooltip
   return (
+    <Tooltip text={rail ? tr(`cleaner.section.${id}`) : ''}>
     <View onClick={() => go(id)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ height: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m, borderRadius: 13, border: `1px solid ${on ? p.line : 'transparent'}`,
         backgroundColor: on || hover ? p.glass : 'transparent' }}>
@@ -53,6 +56,7 @@ function SideItem({ id, section, go, rail, badge }) {
       {rail ? null : <Label size={14} lines={1}>{tr(`cleaner.section.${id}`)}</Label>}
       {badge ? <View style={{ position: 'absolute', left: 30, top: 2, paddingHorizontal: 5, height: 16, borderRadius: 8, justifyContent: 'center', backgroundColor: p.accent }}><Label size={10} weight={700} style={{ color: p.btnText }}>{badge}</Label></View> : null}
     </View>
+    </Tooltip>
   );
 }
 
@@ -94,6 +98,7 @@ function Body() {
   const [board, setBoard] = useState(false);
   const [under, setUnder] = useState('');
   const side = useRef(null);
+  const rail = useRail();      // a small window: the sidebar is only icons
   const [hold, setHold] = useState(false);
   const holdTimer = useRef(0), stepAt = useRef(0);
   useEffect(() => () => clearTimeout(holdTimer.current), []);
@@ -187,8 +192,12 @@ function Body() {
     startModule(0);
     setPolling(true);
   });
+  // the sidebar narrows to icons while a scan runs and widens after; never on opening (the window may be tiled into a
+  // small tile right then, and a running tween would keep the wide sidebar over the rail), never in a small window
+  const sideRun = useRef(false);
   useEffect(() => {
-    if (!side.current) return;
+    if (!sideRun.current) { sideRun.current = true; return; }
+    if (!side.current || rail) return;
     const to = pipe ? 76 : 236, from = pipe ? 236 : 76;
     tween(side.current, { width: [from, to] }, { ms: 420 });
   }, [!!pipe]);
@@ -261,7 +270,7 @@ function Body() {
     if (pipe) {
       const l = cleaner.poll();
       const g = win ? wm.frame(win) : { w: 1100, h: 700 };
-      return <Dashboard W={g.w - 76 - 76} H={g.h - 150} step={pipe.step} results={pipe.results} scan={l.job === 'scan' ? l.scan : null} />;
+      return <Dashboard W={g.w - 76 - 2 * PAD(rail)} H={g.h - 150} step={pipe.step} results={pipe.results} scan={l.job === 'scan' ? l.scan : null} />;
     }
     if ((running || hold) && info.job !== 'emptyTrash') return <Working info={cleaner.poll()} art={ART[section] || 'scan'} />;
     if (section === 'scan' && board) return <ReviewBoard rules={cleaner.poll('rules').scan} tree={cleaner.poll('tree').scan} dups={cleaner.poll('dups').scan} go={go} />;
@@ -294,11 +303,11 @@ function Body() {
 
   const failed = info.state === 'failed' && info.error ? tr(`cleaner.error.${info.error}`) : '';
 
-  // own frame: the window moves from the top edge and the sidebar's row, which stay free of controls. Lord Classic
-  // draws its own buttons on the top edge (themes/classic/components/Window.jsx), so that edge is taller. In Lord Flow
-  // the lights are the sidebar's, unless the window buttons go at the end: the theme draws them there (issue #58).
-  // the theme that is running (settings.theme is null until one is chosen in Appearance)
-  const classic = themes.current() === 'classic', topEdge = classic ? 34 : 14;
+  // own frame: the window moves from the top edge and the sidebar's row, which stay free of controls. Lord Classic and
+  // Lord Workspaces draw their own buttons on the top edge (their components/Window.jsx), so that edge is taller and the
+  // app draws no lights. In Lord Flow the lights are the sidebar's, unless the window buttons go at the end: the theme
+  // draws them there (issue #58). The theme that is running (settings.theme is null until one is chosen in Appearance).
+  const classic = ['classic', 'workspaces'].includes(themes.current()), topEdge = classic ? 34 : 14;
   const lightsAtStart = useWindowButtons(true).atStart, ownLights = !classic && lightsAtStart;
   const move = () => wm.beginMove(winId), zoom = () => wm.toggleMaximize(winId);
 
@@ -306,18 +315,18 @@ function Body() {
     <View style={{ flex: 1, flexDirection: 'row', overflow: 'hidden', borderRadius: 12 }}>
       <Sky />
       <Tints section={section} />
-      <View ref={side} style={{ width: 236, flexShrink: 0, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 14, gap: 4, overflow: 'hidden', backgroundColor: p.side, borderInlineEnd: `1px solid ${p.line}` }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, marginBottom: spacing.m }}>{ownLights ? <Lights id={winId} /> : null}<View onMouseDown={move} onDoubleClick={zoom} style={{ flex: 1, alignSelf: 'stretch', minHeight: 16 }} /></View>
-        {SECTIONS.map((id) => <SideItem key={id} id={id} section={section} go={go} rail={!!pipe} badge={pipe && id === 'scan' ? `${pipe.step + 1}/${MODULES.length}` : ''} />)}
+      <View ref={side} style={{ width: rail ? 76 : 236, flexShrink: 0, paddingHorizontal: rail ? 8 : 14, paddingTop: 14, paddingBottom: 14, gap: 4, overflow: 'hidden', backgroundColor: p.side, borderInlineEnd: `1px solid ${p.line}` }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: rail ? 0 : 6, marginBottom: spacing.m }}>{ownLights ? <Lights id={winId} /> : null}<View onMouseDown={move} onDoubleClick={zoom} style={{ flex: 1, alignSelf: 'stretch', minHeight: 16 }} /></View>
+        {SECTIONS.map((id) => <SideItem key={id} id={id} section={section} go={go} rail={!!pipe || rail} badge={pipe && id === 'scan' ? `${pipe.step + 1}/${MODULES.length}` : ''} />)}
         <View style={{ flex: 1 }} />
-        {BOTTOM.map((id) => <SideItem key={id} id={id} section={section} go={go} rail={!!pipe} />)}
+        {BOTTOM.map((id) => <SideItem key={id} id={id} section={section} go={go} rail={!!pipe || rail} />)}
       </View>
-      <View style={{ flex: 1, minWidth: 0, paddingHorizontal: 38, paddingTop: classic ? 52 : 34 }}>
+      <View style={{ flex: 1, minWidth: 0, paddingHorizontal: PAD(rail), paddingTop: classic ? 52 : 34 }}>
         {board && section === 'scan' && !pipe ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.s, marginTop: -18 }}>
-            <View onClick={() => setBoard(false)} style={{ width: 170 }}><Label size={13} lines={1} style={{ color: p.accent }}>{tr('cleaner.startOver')}</Label></View>
-            <View style={{ flex: 1 }}><Label size={13} weight={600} align="center">{tr('cleaner.section.scan')}</Label></View>
-            <View style={{ width: 170, alignItems: 'flex-end' }}><GlassButton small label={tr('cleaner.rescan')} onClick={startAll} /></View>
+            <View onClick={() => setBoard(false)} style={rail ? { flexShrink: 1, minWidth: 0 } : { width: 170 }}><Label size={13} lines={1} style={{ color: p.accent }}>{tr('cleaner.startOver')}</Label></View>
+            <View style={{ flex: 1, minWidth: 0 }}><Label size={13} weight={600} align="center" lines={1}>{tr('cleaner.section.scan')}</Label></View>
+            <View style={rail ? { alignItems: 'flex-end' } : { width: 170, alignItems: 'flex-end' }}><GlassButton small label={tr('cleaner.rescan')} onClick={startAll} /></View>
           </View>
         ) : null}
         {!status.available ? <Label>{tr('cleaner.unavailable')}</Label> : null}

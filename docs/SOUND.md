@@ -77,6 +77,7 @@ That code was only read to follow the format: it isn't linked or copied.
 | `move('input', app, sink)` / `move('output', app, source)` | moves an app to another output or input |
 | `setProfile(card, profile)` | a Bluetooth card's profile (one of `cards`, one of its `profiles`): high fidelity or headset mode |
 | `meter(sourceIndex)` / `meter(-1)` | turns the meter on or off; for an output, its `monitor` is used |
+| `spectrum('sink' \| 'input' \| 'source', index)` / `spectrum(null)` | what the sound wave widget listens to, one at a time: the desktop (an output's monitor; `-1` = the default output), one app playing (its `inputs` index) or a microphone (`-1` = the default input); `null` turns it off. See "Sound wave" below |
 | `play('pop' \| 'notify' \| 'error' \| 'chime' \| 'ping' \| 'drop')` | system sound (the per-app notification sound is chosen from `sdk/notifytones.js`) |
 
 - `kind` is `'sink'` (output), `'source'` (input), `'input'` (app playing) or `'output'`
@@ -115,6 +116,25 @@ Shape of the state:
 
 Inputs with `monitorOf >= 0` are the "monitor" of an output, what plays through it. The UI
 normally hides them from the microphone list.
+
+## Sound wave (0.8.8.10, Lord Workspaces' widget)
+
+`lord.sound.spectrum` opens one more recording stream from our own client, like the meter (mono float at 48 kHz,
+fragments of 1600 samples: 30 a second). The desktop is the monitor of an output; one app is that same monitor with
+`direct_on_input` set to the app's stream, so only its sound arrives (what pavucontrol's per-app meters use); a
+microphone is the input itself. `server/src/sound/spectrum.c` keeps the last 2048 samples, and per block takes a
+Hann-windowed FFT, the largest bin of each of 48 log-spaced bands (40 Hz … 16 kHz; below ~500 Hz each band is one
+bin) in dB mapped to 0..1 (-72 … -12 dBFS), smoothed (quick to rise, slow to fall). The samples are dropped as they
+arrive: nothing but these levels leaves the sound client, and they don't go to JS either; the `<SoundWave>` node
+(`server/src/ui/wave.c`) draws them in C. A block of digital silence skips the FFT; once every band is at zero the
+spectrum is quiet, `seq` stops moving and `wave_tick` damages nothing.
+
+The state says what is on: `spectrum: null` or `{ kind, index, live }` (`live` false while an app isn't playing or
+the device is gone; it is opened again on the next state that has it). The stream to a microphone is shown in
+`outputs` as "Sound wave" by LordOS (`org.lordos.SoundWave`), so the microphone indicator lights while it listens;
+the other two are our own hidden streams, like the meter. The widget's choices are in `sdk/soundwavemodel.js`
+(tests: `server/tests/soundwave_model_test.mjs`); `useSpectrumSource` in `sdk/sound.js` lets the most recently
+shown widget decide and turns it off when none is shown.
 
 ## Bluetooth headsets (0.8.8.7, issue #78)
 

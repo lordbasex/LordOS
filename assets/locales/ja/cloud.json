@@ -5,8 +5,9 @@
   "accounts": "アカウント",
   "allAccounts": "すべてのアカウント",
   "onThisComputer": "このコンピュータ上",
-  "cacheLine": "{size} · 保持 {kept}",
+  "hereLine": "{size} · 保持 {kept} · 解放可能 {free}",
   "freeUp": "空き領域を確保",
+  "freeUpHint": "「空き領域を確保」は、このコンピュータに保持していないファイルのローカルコピーを削除します。保持しているファイルとアップロード待ちの変更は残ります。",
   "freed": "このコンピュータで {size} を解放しました",
   "freedSkipped": {
     "other": "{size} を解放しました。{count} 項目は残ります（開いている、保持中、またはアップロード待ち）"
@@ -417,5 +418,9 @@
   "details.signIn": "サインイン",
   "details.server": "サーバ",
   "details.app": "アプリ",
-  "details.ownApp": "自分のアプリ"
+  "details.ownApp": "自分のアプリ",
+  "color": "色",
+  "colorAuto": "自動",
+  "colorAutoHint": "自動：アカウントを追加した順に決まり、同じサービスの 2 つのアカウントを区別できます。",
+  "colorChosen": "ファイル、クラウドメニュー、ログに表示されます。"
 }

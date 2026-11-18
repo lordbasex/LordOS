@@ -8,7 +8,7 @@ export function Sheet({ children, onClose, width = 460 }) {
   const th = useTheme();
   return (
     <View onMouseDown={(e) => { e.stopPropagation?.(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.32)', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-      <View onClick={(e) => e.stopPropagation?.()} style={{ width, maxHeight: '92%', padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg,
+      <View onClick={(e) => e.stopPropagation?.()} style={{ width, maxWidth: '94%', maxHeight: '92%', padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg,
         border: `1px solid ${th.separator}`, boxShadow: '0 20px 50px rgba(0,0,0,0.45)' }}>
         {children}
         {onClose ? null : null}

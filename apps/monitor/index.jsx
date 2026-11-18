@@ -6,6 +6,7 @@
 import {
   View, Text, Image, ScrollView, Segmented, Toolbar, typeScale, useTheme, useLocale, useStore, useSettings, useAppWindow,
   useMonitor, monitor, monitorSamples, monitorProcesses, formatBytes, formatNumber, LordOSLogo, iconFromFile, getApp, appName,
+  Dropdown, useNarrow, useBattery, useDevices,
 } from '@lordos/sdk';
 import { registerDockActions } from '@lordos/sdk';
 import * as sdk from '@lordos/sdk';
@@ -20,6 +21,7 @@ import { BlocklistsPrivacy } from './Blocklists.jsx';
 import { FirewallPrivacy } from './Firewall.jsx';
 import { FirewallRulesPrivacy } from './FwRules.jsx';
 import { CoolingTab } from './Cooling.jsx';
+import { DevicesTab, BatteryTab } from './Devices.jsx';
 import { ProcessesTab, ProcessLayers } from './Processes.jsx';
 import { DisksTab } from './DisksTab.jsx';
 import { VoltageTab } from './Voltage.jsx';
@@ -105,8 +107,9 @@ export function Pair({ items }) {
 export function Stat({ label, value, unit, icon, children }) {
   const t = useTheme();
   const card = useCardStyle();
+  const narrow = useNarrow(TABS_AT);
   return (
-    <View style={{ flex: 1, minWidth: 120, borderRadius: 10, backgroundColor: card.bg, border: `1px solid ${t.separator}`, paddingHorizontal: 12, paddingVertical: 10, gap: 4 }}>
+    <View style={{ ...(narrow ? { flexGrow: 1, flexShrink: 1, flexBasis: 120 } : { flex: 1 }), minWidth: 120, borderRadius: 10, backgroundColor: card.bg, border: `1px solid ${t.separator}`, paddingHorizontal: 12, paddingVertical: 10, gap: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
         {icon ? <Glyph name={icon} color={t.textDim} size={11} /> : null}
         <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap' }}>{label}</Text>
@@ -118,6 +121,12 @@ export function Stat({ label, value, unit, icon, children }) {
       {children}
     </View>
   );
+}
+
+// A row of Stats; in a small window it wraps onto more lines instead of running past the edge
+export function StatRow({ gap = 10, style, children }) {
+  const narrow = useNarrow(TABS_AT);
+  return <View style={{ flexDirection: 'row', gap, flexWrap: narrow ? 'wrap' : 'nowrap', ...style }}>{children}</View>;
 }
 
 // Series derived from the sample history
@@ -171,9 +180,11 @@ function Overview({ s, last, onTab }) {
   const { t: tr } = useLocale();
   const info = monitor.info();
   const card = useCardStyle();
+  // a narrow window (a Workspaces tile): the paired cards go one under the other
+  const pairRow = { flexDirection: useNarrow(640) ? 'column' : 'row', gap: 12 };
   return (
     <>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
+      <View style={pairRow}>
         <Card icon="cpu" title={tr('monitor.cpu')} style={{ flex: 1 }}
           right={<Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap' }}>{info ? tr('monitor.cpuModel', { model: info.cpuModel || tr('monitor.cpu'), count: info.cores }) : ''}</Text>}>
           <Big value={fmt.pct(tr, last.cpu)} />
@@ -184,7 +195,7 @@ function Overview({ s, last, onTab }) {
           <Chart series={[{ label: tr('monitor.used'), values: s.mem, color: C.mem }]} max={last.mem.total} format={fmt.mem} times={s.times} height={86} bg={card.bg} />
         </Card>
       </View>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
+      <View style={pairRow}>
         <Card icon="network" title={tr('monitor.network')} style={{ flex: 1 }}>
           <Pair items={[{ label: tr('monitor.received'), value: fmt.rate(tr, last.net.rx), color: C.rx }, { label: tr('monitor.sent'), value: fmt.rate(tr, last.net.tx), color: C.tx }]} />
           <Chart series={[{ label: tr('monitor.received'), values: s.rx, color: C.rx }, { label: tr('monitor.sent'), values: s.tx, color: C.tx }]}
@@ -197,17 +208,17 @@ function Overview({ s, last, onTab }) {
         </Card>
       </View>
       {/* (0.8.8.6) the GPU, LordOS's AI and the virtual machines: read once per second while the Overview is on screen */}
-      <View style={{ flexDirection: 'row', gap: 12 }}>
+      <View style={pairRow}>
         <OverviewGpu onOpen={() => onTab?.('gpu')} style={{ flex: 2 }} />
         <OverviewAiVms style={{ flex: 1, flexDirection: 'column' }} />
       </View>
-      <View style={{ flexDirection: 'row', gap: 10 }}>
+      <StatRow>
         <TempStat last={last} />
         <Stat icon="fan" label={tr('monitor.fan')} value={last.fan != null ? formatNumber(last.fan, 0) : '—'} unit={last.fan != null ? tr('monitor.rpm') : null} />
         <Stat label={tr('monitor.load1')} value={fmt.load(last.load[0])} />
         <Stat label={tr('monitor.load515')} value={`${fmt.load(last.load[1])} · ${fmt.load(last.load[2])}`} />
         <Stat label={tr('monitor.cached')} value={fmt.mem(last.mem.cache)} />
-      </View>
+      </StatRow>
     </>
   );
 }
@@ -219,7 +230,7 @@ function CpuTab({ s, last }) {
   const { t: tr } = useLocale();
   const info = monitor.info();
   const card = useCardStyle();
-  const cols = 4;
+  const cols = useNarrow(640) ? 2 : 4;      // a small window: two cores a row
   const rows = [];
   for (let i = 0; i < s.cores.length; i += cols) rows.push(s.cores.slice(i, i + cols).map((v, k) => [i + k, v]));
   return (
@@ -245,13 +256,13 @@ function CpuTab({ s, last }) {
           {row.length < cols && Array.from({ length: cols - row.length }, (_, k) => <View key={`e${k}`} style={{ flex: 1 }} />)}
         </View>
       ))}
-      <View style={{ flexDirection: 'row', gap: 10 }}>
+      <StatRow>
         <Stat label={tr('monitor.load1m')} value={fmt.load(last.load[0])} />
         <Stat label={tr('monitor.load5m')} value={fmt.load(last.load[1])} />
         <Stat label={tr('monitor.load15m')} value={fmt.load(last.load[2])} />
         <Stat label={tr('monitor.temperature')} value={last.temp != null ? formatNumber(Math.round(last.temp), 0) : '—'} unit={last.temp != null ? '°C' : null} />
         <Stat label={tr('monitor.tasks')} value={formatNumber(last.tasks.total, 0)} unit={tr('monitor.running', { n: last.tasks.running })} />
-      </View>
+      </StatRow>
     </>
   );
 }
@@ -403,18 +414,21 @@ export function AppGlyph({ item, size = 16 }) {
 // ---- window ----
 
 let lastTab = 'overview';
+// a small window (a Lord Workspaces tile): below TABS_AT the tabs become a pop-up menu and the pages lose some margin
+const TABS_AT = 900;
 
 // Each tab subscribes to what it shows, at the rate it needs: the chart tabs on every sample (4 per
 // second in front, 1 in the background); Processes and Network, once per second. The window itself
 // doesn't redraw on every sample.
 function Charts({ tab, rate, onTab }) {
+  const narrow = useNarrow(TABS_AT);
   const samples = useMonitor({ everyMs: rate });
   const s = useSeries(samples);
   const last = samples[samples.length - 1];
   if (!last) return null;
   return (
     <ScrollView resetKey={tab} style={{ flex: 1 }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}>
+      <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}>
         {tab === 'overview' && <Overview s={s} last={last} onTab={onTab} />}
         {tab === 'cpu' && <CpuTab s={s} last={last} />}
         {tab === 'memory' && <MemTab s={s} last={last} />}
@@ -452,6 +466,7 @@ export default function Monitor() {
   const { args, focused } = useAppWindow() || {};
   const [settings] = useSettings();
   const prefs = settings.monitor || {};
+  const narrow = useNarrow(TABS_AT);
   const [tab, setTabState] = useState(lastTab);
   const setTab = (v) => { lastTab = v; setTabState(v); };
   useEffect(() => { if (args?.tab) setTab(args.tab); }, [args?.tab, args?.nonce]);
@@ -461,43 +476,59 @@ export default function Monitor() {
   const ready = useStore(monitorSamples, (l) => l.length > 0);
   // Voltage only exists where the machine reports something (not in a virtual machine, for one)
   const hasVolt = useStore(monitorSamples, (l) => !!l[l.length - 1]?.volt);
-  const view = tab === 'voltage' && !hasVolt ? 'overview' : tab;
+  // Battery only on a computer with one; Devices when something connected has a battery (docs/DEVICES.md)
+  const hasBattery = !!useBattery()?.hasBattery;
+  const hasDevices = useDevices().length > 0;
+  const view = (tab === 'voltage' && !hasVolt) || (tab === 'battery' && !hasBattery) || (tab === 'devices' && !hasDevices) ? 'overview' : tab;
   const tabs = [
     ['overview', tr('monitor.tab.overview')], ['cpu', tr('monitor.cpu')], ['memory', tr('monitor.memory')], ['gpu', tr('monitor.gpu.title')],
     ['network', tr('monitor.network')], ['disks', tr('monitor.disks')], ['processes', tr('monitor.processes')], ['cooling', tr('monitor.tab.cooling')],
     ...(hasVolt ? [['voltage', tr('monitor.tab.voltage')]] : []),
+    ...(hasBattery ? [['battery', tr('monitor.tab.battery')]] : []),
+    ...(hasDevices ? [['devices', tr('monitor.tab.devices')]] : []),
   ];
   if (!monitor.available()) {
     return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.unavailable')}</Text></View>;
   }
   return (
     <View style={{ flex: 1 }}>
-      <Toolbar style={{ paddingHorizontal: 20 }}>
-        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, width: 110, whiteSpace: 'nowrap' }}>{tr('monitor.title')}</Text>
-        <View style={{ flex: 1, alignItems: 'center' }}>
-          <Segmented value={view} onChange={setTab} options={tabs} />
-        </View>
-        <View style={{ width: 110 }} />
-      </Toolbar>
+      {narrow ? (
+        <Toolbar style={{ paddingHorizontal: 12 }}>
+          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tr('monitor.title')}</Text>
+          <Dropdown value={view} onChange={setTab} options={tabs} width={180} />
+        </Toolbar>
+      ) : (
+        <Toolbar style={{ paddingHorizontal: 20 }}>
+          <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, width: 110, whiteSpace: 'nowrap' }}>{tr('monitor.title')}</Text>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Segmented value={view} onChange={setTab} options={tabs} />
+          </View>
+          <View style={{ width: 110 }} />
+        </Toolbar>
+      )}
       {!ready ? (
         <View style={{ flex: 1, padding: 20 }}><Text style={{ fontSize: 13, color: t.textDim }}>{tr('monitor.waiting')}</Text></View>
       ) : view === 'network' ? (
         <Network prefs={prefs} />
       ) : view === 'gpu' ? (
         <ScrollView resetKey="gpu" style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><GpuTab /></View>
+          <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><GpuTab /></View>
         </ScrollView>
       ) : view === 'voltage' ? (
         <ScrollView resetKey="voltage" style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><VoltageTab /></View>
+          <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><VoltageTab /></View>
+        </ScrollView>
+      ) : view === 'battery' || view === 'devices' ? (
+        <ScrollView resetKey={view} style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}>{view === 'battery' ? <BatteryTab /> : <DevicesTab />}</View>
         </ScrollView>
       ) : view === 'cooling' ? (
         <ScrollView resetKey="cooling" style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><CoolingTab /></View>
+          <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><CoolingTab /></View>
         </ScrollView>
       ) : view === 'processes' ? (
         <ScrollView resetKey="processes" style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24, gap: 16 }}><ProcessesTab /></View>
+          <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><ProcessesTab /></View>
         </ScrollView>
       ) : (
         <Charts tab={view} rate={focused === false ? 1000 : 250} onTab={setTab} />

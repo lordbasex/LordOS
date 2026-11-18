@@ -9,7 +9,7 @@
 // The panel scrolls when a short screen can't hold it all.
 import {
   View, Text, Image, Slider, useSettings, settings, useCpuUsage, useSystemInfo, memUsedKB, formatBytes, wm, session, addListener, t as tr,
-  useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb, menuBarPrefs, SoundOutputList, useSoundOutputs, useBluetooth, setBluetoothPower,
+  useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, screenDisplays, menuBarPrefs, SoundOutputList, useSoundOutputs, useBluetooth, setBluetoothPower,
   panelLeft, inBar, ScrollView, screen, nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiBars, DisclosureGlyph,
   MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, BluetoothGlyph, SignalGlyph,
 } from '@lordos/sdk';
@@ -207,8 +207,11 @@ const inside = (inst, ref) => { for (let n = inst; n; n = n.parent) if (n === re
 const W = 340;       // (issue #114) 20 px wider than before, for a name next to each switch tile's icon
 export function ControlCenter({ t, top, onClose, area = null, at = null }) {
   const left = panelLeft(at, W, area), ay = area ? area.y : 0;
+  // several displays: the quick wallpapers are the picture of the display it opened on (sdk/wallpapers.js)
+  const wd = area && screenDisplays().length > 1 ? screenDisplays().find((d) => d.id === area.id) || null : null;
   const maxH = Math.max(240, (area ? area.h : screen.height) - top - 16);
   const [s, set] = useSettings();
+  const curWall = wallpaperIdFor(s, wd);
   const p = menuBarPrefs(s);
   let ifs = [];
   try { ifs = typeof lord.net !== 'undefined' ? lord.net.interfaces() : []; } catch (e) { ifs = []; }
@@ -265,16 +268,16 @@ export function ControlCenter({ t, top, onClose, area = null, at = null }) {
           <View style={{ flexDirection: 'row', gap: 10 }}>
             {Object.entries(t.accents).map(([name, c]) => (
               <View key={name} onClick={() => set({ accent: name })} style={{ width: 22, height: 22, borderRadius: 11,
-                backgroundColor: c, border: s.accent === name ? `2px solid ${t.text}` : '0 solid transparent' }} />
+                backgroundColor: c, border: (s.accent || t.accentName) === name ? `2px solid ${t.text}` : '0 solid transparent' }} />
             ))}
           </View>
         </Tile>
         <Tile t={t} style={{ gap: 8 }}>
           <TileTitle t={t} onClick={() => openSettings(onClose, 'wallpaper')}>{tr('shell.cc.wallpaper')}</TileTitle>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            {quickWallpapers(t.wallpapers, s.wallpaper).map((w) => (
-              <View key={w.id} onClick={() => set({ wallpaper: w.id })} style={{ width: 62, height: 40, borderRadius: 6, overflow: 'hidden',
-                border: s.wallpaper === w.id ? `2px solid ${t.accent}` : `1px solid ${t.separator}` }}>
+            {quickWallpapers(t.wallpapers, curWall).map((w) => (
+              <View key={w.id} onClick={() => set(wd ? wallpaperPatch(s, w.id, wd) : { wallpaper: w.id })} style={{ width: 62, height: 40, borderRadius: 6, overflow: 'hidden',
+                border: curWall === w.id ? `2px solid ${t.accent}` : `1px solid ${t.separator}` }}>
                 <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               </View>
             ))}

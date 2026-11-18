@@ -11,7 +11,9 @@
  *   cancelled; the icon surface is destroyed mid-drag; accept and set_actions reach the source (target, action);
  *   text/uri-list is received through the offer; the release drops: drop, dnd_drop_performed, and after finish,
  *   dnd_finished.
- *   Press 2: a drag whose source is destroyed mid-drag: the window gets leave and the compositor stays up.
+ *   Press 2: a drag started as GTK 3 starts one, with the newest serial the client has seen (a configure, an enter
+ *   or the press itself; seatbtn.h sb_serial_ok, issue #177), whose source is destroyed mid-drag: the window gets
+ *   leave and the compositor stays up.
  *   Press 3 (drag out of the window onto the desktop, not onto a Files folder, and release there): over LordOS
  *   the source is told text/uri-list; nobody claims the drop at its release, so it is cancelled at once and the
  *   list is never asked for.
@@ -65,7 +67,10 @@ static const struct wl_registry_listener reg_l = { reg_global, reg_remove };
 static void wm_ping(void *d, struct xdg_wm_base *b, uint32_t serial) { (void)d; xdg_wm_base_pong(b, serial); }
 static const struct xdg_wm_base_listener wm_l = { wm_ping };
 static int configured;
-static void xs_configure(void *d, struct xdg_surface *s, uint32_t serial) { (void)d; xdg_surface_ack_configure(s, serial); configured = 1; }
+/* the newest serial the display gave this client: what GTK 3 names in start_drag */
+static uint32_t newest_serial;
+static void seen(uint32_t serial) { if ((int32_t)(serial - newest_serial) > 0 || !newest_serial) newest_serial = serial; }
+static void xs_configure(void *d, struct xdg_surface *s, uint32_t serial) { (void)d; seen(serial); xdg_surface_ack_configure(s, serial); configured = 1; }
 static const struct xdg_surface_listener xs_l = { xs_configure };
 static void top_configure(void *d, struct xdg_toplevel *t, int32_t w, int32_t h, struct wl_array *st) { (void)d; (void)t; (void)w; (void)h; (void)st; }
 static void top_close(void *d, struct xdg_toplevel *t) { (void)d; (void)t; }
@@ -74,11 +79,12 @@ static const struct xdg_toplevel_listener top_l = { .configure = top_configure, 
 /* the pointer: the serial of the last press on the window, and the release */
 static uint32_t press_serial;
 static int presses, releases;
-static void p_enter(void *d, struct wl_pointer *p, uint32_t s, struct wl_surface *sf, wl_fixed_t x, wl_fixed_t y) { (void)d; (void)p; (void)s; (void)sf; (void)x; (void)y; }
-static void p_leave(void *d, struct wl_pointer *p, uint32_t s, struct wl_surface *sf) { (void)d; (void)p; (void)s; (void)sf; }
+static void p_enter(void *d, struct wl_pointer *p, uint32_t s, struct wl_surface *sf, wl_fixed_t x, wl_fixed_t y) { (void)d; (void)p; seen(s); (void)sf; (void)x; (void)y; }
+static void p_leave(void *d, struct wl_pointer *p, uint32_t s, struct wl_surface *sf) { (void)d; (void)p; seen(s); (void)sf; }
 static void p_motion(void *d, struct wl_pointer *p, uint32_t t, wl_fixed_t x, wl_fixed_t y) { (void)d; (void)p; (void)t; (void)x; (void)y; }
 static void p_button(void *d, struct wl_pointer *p, uint32_t serial, uint32_t t, uint32_t b, uint32_t st) {
     (void)d; (void)p; (void)t; (void)b;
+    seen(serial);
     if (st == WL_POINTER_BUTTON_STATE_PRESSED) { press_serial = serial; presses++; }
     else releases++;
 }
@@ -134,7 +140,8 @@ static void o_action(void *d, struct wl_data_offer *o, uint32_t a) { (void)d; (v
 static const struct wl_data_offer_listener off_l = { o_offer, o_src_actions, o_action };
 static void d_offer(void *d, struct wl_data_device *dv, struct wl_data_offer *o) { (void)d; (void)dv; new_offer = o; offer_mimes = 0; wl_data_offer_add_listener(o, &off_l, NULL); }
 static void d_enter(void *d, struct wl_data_device *dv, uint32_t s, struct wl_surface *sf, wl_fixed_t x, wl_fixed_t y, struct wl_data_offer *o) {
-    (void)d; (void)dv; (void)s; (void)sf; (void)x; (void)y;
+    (void)d; (void)dv; (void)sf; (void)x; (void)y;
+    seen(s);
     cur_offer = o;
     enters++;
 }
@@ -342,9 +349,11 @@ int main(int argc, char **argv) {
     Src st3;
     int leaves0 = leaves, enters0 = enters;
     struct wl_data_source *s3 = new_source(&st3);
-    wl_data_device_start_drag(dev, s3, win, NULL, press_serial);
+    wl_display_roundtrip(dpy);                  /* whatever came after the press (the window focused by it) */
+    printf("     (GTK 3's way: serial %u, the press's %u)\n", newest_serial, press_serial);
+    wl_data_device_start_drag(dev, s3, win, NULL, newest_serial);
     wl_display_roundtrip(dpy);
-    check("the second drag enters", enters, enters0 + 1);
+    check("the second drag, with the newest serial (GTK 3), enters", enters, enters0 + 1);
     wl_data_source_destroy(s3);
     wl_display_roundtrip(dpy);
     check("its source destroyed: the window gets leave", leaves, leaves0 + 1);

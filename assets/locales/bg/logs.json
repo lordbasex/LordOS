@@ -2,6 +2,7 @@
   "pick": "Изберете запис, за да видите цялото съобщение и полетата му.",
   "field.time": "Време",
   "field.level": "Ниво",
+  "field.account": "Акаунт",
   "field.process": "Процес",
   "field.pid": "PID",
   "field.unit": "Модул",

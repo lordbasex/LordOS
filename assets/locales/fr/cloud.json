@@ -5,8 +5,9 @@
   "accounts": "Comptes",
   "allAccounts": "Tous les comptes",
   "onThisComputer": "Sur cet ordinateur",
-  "cacheLine": "{size} · {kept} conservés",
+  "hereLine": "{size} · {kept} conservés · {free} libérables",
   "freeUp": "Libérer de l’espace",
+  "freeUpHint": "« Libérer de l’espace » supprime les copies locales des fichiers qui ne sont pas conservés sur cet ordinateur ; les fichiers conservés et les modifications en attente d’envoi restent.",
   "freed": "{size} libérés sur cet ordinateur",
   "freedSkipped": {
     "one": "{size} libérés ; {count} élément reste (ouvert, conservé ou en attente d’envoi)",
@@ -438,5 +439,9 @@
   "details.signIn": "Connexion",
   "details.server": "Serveur",
   "details.app": "Application",
-  "details.ownApp": "Votre propre application"
+  "details.ownApp": "Votre propre application",
+  "color": "Couleur",
+  "colorAuto": "Automatique",
+  "colorAutoHint": "Automatique : selon l’ordre d’ajout du compte, pour que deux comptes d’un même fournisseur se distinguent.",
+  "colorChosen": "Affichée dans Fichiers, le menu Cloud et les Journaux."
 }

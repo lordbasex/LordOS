@@ -4,7 +4,7 @@
   "name": "Mail",
   "description": "Mail with IMAP and SMTP accounts, conversations, offline search and safe HTML",
   "size": [1120, 640],
-  "minSize": [820, 480],
+  "minSize": [480, 360],
   "dock": true,
   "category": "Office",
   "permissions": ["network", "fs:home"],

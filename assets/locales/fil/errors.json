@@ -235,6 +235,7 @@
   "fs.notRegular": "Hindi ito karaniwang file (link ba ito?)",
   "fs.openFailed": "Hindi mabuksan ang file: {errno}",
   "fs.outsideHome": "Nasa labas ng iyong home folder ang lokasyong iyan o hindi ito wasto",
+  "fs.nameTooLong": "Masyadong mahaba ang pangalan (max. {max} byte; ang mga titik na may tuldik at hindi Latin ay tig-2 hanggang 4)",
   "fs.protected": "Protektado ang folder na iyan",
   "fs.systemFolder": "Hindi ipinapakita ng Mga File ang mga internal na folder ng system (/proc, /sys, /dev at /run)",
   "fs.tooLarge": "Masyadong malaki ang file (max. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Hindi ma-update ang bootloader (code {code})",
   "hw.logindFailed": "Hindi mailapat ang mga setting ng power (code {code})",
   "hw.noBacklight": "Walang ganyang backlight",
+  "hw.noChargeControl": "Walang kontrol sa pag-charge ang bateryang ito",
+  "hw.chargeControlFailed": "Hindi mabago ang pag-charge: {errno}",
   "hw.noCpufreq": "Walang CPU frequency scaling ang computer na ito",
   "hw.noEeprom": "Hindi naka-install ang mga tool ng bootloader (rpi-eeprom)",
   "hw.noKernelLog": "Hindi mabasa ang log ng kernel",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "Hindi maaaring i-install ang {name} para sa 64 at 32 bit nang sabay",
   "pkg.foreignArchUnsupported": "Maaari lang i-enable ang mga 32-bit na package sa 64-bit na PC (amd64); ang system na ito ay {arch}",
   "pkg.foreignArchFailed": "Hindi na-enable ang mga 32-bit ({arch}) na package (lumabas ang dpkg na may code {code})",
-  "webapps.developerOff": "Naka-off ang developer mode sa Mga Setting → Mga Web App"
+  "webapps.developerOff": "Naka-off ang developer mode sa Mga Setting → Mga Web App",
+  "media.streamAddress": "Hindi pinapayagan ang stream address na ito",
+  "media.streamCannotOpen": "Hindi mabuksan ang stream",
+  "media.streamTimeout": "Hindi sumagot sa oras ang stream",
+  "media.streamAuth": "Humingi ng user at password ang stream, o mali ang mga ito",
+  "media.streamLost": "Naputol ang stream",
+  "media.streamNoChannels": "Walang channel ang list",
+  "media.noStreamHelper": "Hindi available ang stream helper (lord-stream)"
 }

@@ -2,11 +2,13 @@
 // icons, and the open page under a title bar) plus the appearance, wallpaper, language and region,
 // keyboard, themes and session pages. The other pages are in their own files; all of them are built
 // from ./ui.jsx (docs/DESIGN.md, "Settings").
+import { BatterySettings } from './Battery.jsx';
 import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, DEFAULT_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
+  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop, displayWallpaperKey, displayLabel, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionCountry,
+  useSidebar, SidebarToggle, SidebarOverlay, battery, deviceList,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
@@ -20,6 +22,9 @@ import { PrivacySettings } from './Privacy.jsx';
 import { PrintersSettings } from './Printers.jsx';
 import { TrackpadSettings } from './Trackpad.jsx';
 import { DockSettings } from './Dock.jsx';
+import { ThemeOptions } from './ThemeExtras.jsx';
+import { SlideshowSettings } from './Slideshow.jsx';
+import { DesktopStyleThumb } from '@lordos/sdk';   // Desktop style's pictures (sdk/stylethumb.jsx, also the first-start chooser's)
 import { SwitcherSettings } from './Switcher.jsx';
 import { GlobalShortcutsSettings } from './GlobalShortcuts.jsx';
 import { BrowserFrameSettings } from './BrowserFrame.jsx';
@@ -97,39 +102,6 @@ function ModeThumb({ mode, accent }) {
   );
 }
 
-// A small picture of a desktop style: a menu bar and a Dock ('default') or a centered taskbar
-// ('classic'). Drawn with views: our own sketch, no screenshots.
-function StyleThumb({ id, accent, dark }) {
-  const glass = dark ? 'rgba(30,30,36,0.85)' : 'rgba(255,255,255,0.82)';
-  const win = dark ? '#2c2c30' : '#ffffff';
-  const classic = id === 'classic';
-  return (
-    <View style={{ width: 132, height: 82, borderRadius: 7, overflow: 'hidden', direction: 'ltr',
-      background: dark ? 'linear-gradient(160deg, #2b2d4a, #121218)' : 'linear-gradient(160deg, #cfe0ff, #eef1f7)' }}>
-      {classic ? null : <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 6, backgroundColor: glass }} />}
-      <View style={{ position: 'absolute', left: 22, top: classic ? 10 : 14, width: 86, height: 50, borderRadius: classic ? 3 : 5, backgroundColor: win,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }}>
-        <View style={{ flexDirection: 'row', gap: 3, padding: 4, justifyContent: classic ? 'flex-end' : 'flex-start' }}>
-          {classic ? [0, 1, 2].map((i) => <View key={i} style={{ width: 5, height: 3, borderRadius: 1, backgroundColor: dark ? '#6a6a72' : '#b8b8c0' }} />)
-            : ['#ff5f57', '#febc2e', '#28c840'].map((c) => <View key={c} style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: c }} />)}
-        </View>
-        <View style={{ marginLeft: 6, height: 4, borderRadius: 2, backgroundColor: accent, width: 30 }} />
-      </View>
-      {classic ? (
-        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 11, backgroundColor: glass, flexDirection: 'row',
-          alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-          {[accent, '#8e8e93', '#8e8e93', '#8e8e93', '#8e8e93'].map((c, i) => <View key={i} style={{ width: 6, height: 6, borderRadius: 1.5, backgroundColor: c }} />)}
-        </View>
-      ) : (
-        <View style={{ position: 'absolute', left: 36, right: 36, bottom: 3, height: 9, borderRadius: 3, backgroundColor: glass, flexDirection: 'row',
-          alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-          {[0, 1, 2, 3].map((i) => <View key={i} style={{ width: 5, height: 5, borderRadius: 1.5, backgroundColor: i ? '#8e8e93' : accent }} />)}
-        </View>
-      )}
-    </View>
-  );
-}
-
 // Desktop style: every installed theme (Lord Flow and Lord Classic first; the login screen's is hidden),
 // switched live. The open app windows come back in the new one (sdk/index.js themes.use), Settings on
 // this page. Since 0.8.5 this is the only place to choose a theme (there is no separate Themes page).
@@ -151,7 +123,7 @@ function StylePicker() {
           return (
             <View key={id} onClick={() => { if (!th.current) pick(id); }} style={{ alignItems: 'center', gap: 6 }}>
               <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${th.current ? t.accent : 'transparent'}` }}>
-                <StyleThumb id={id} accent={t.accent} dark={t.mode === 'dark'} />
+                <DesktopStyleThumb id={id} accent={t.accent} dark={t.mode === 'dark'} sketch={th.sketch} />
               </View>
               <Text style={{ fontSize: typeScale.callout, fontWeight: th.current ? 600 : 400, color: t.text }}>{th.name}</Text>
             </View>
@@ -169,6 +141,7 @@ function Appearance() {
   return (
     <Stack>
       <StylePicker />
+      <ThemeOptions theme={themes.info()} />
       <Section title={tr('settings.mode')}>
         <View style={{ flexDirection: 'row', gap: spacing.xxl, paddingVertical: spacing.m, justifyContent: 'center' }}>
           {[['dark', tr('settings.dark')], ['light', tr('settings.light')]].map(([id, label]) => (
@@ -187,7 +160,7 @@ function Appearance() {
             {Object.entries(t.accents || {}).map(([name, c]) => (
               <View key={name} onClick={() => set({ accent: name })} style={{ width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
                 background: `linear-gradient(180deg, ${shade(c, 1.15)}, ${c})`, boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }}>
-                {s.accent === name ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} /> : null}
+                {(s.accent || t.accentName) === name ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} /> : null}
               </View>
             ))}
           </View>
@@ -262,7 +235,8 @@ function MotionWallpapers({ login }) {
   const main = displays[0] || { w: 1920, h: 1080 };
   const motion = s.motion || {};
   const cur = motion[scope] || null;
-  const choose = (id) => { const m = { ...motion }; if (id) m[scope] = id; else delete m[scope]; set({ motion: m }); };
+  // a video chosen ends the slideshow, which it would hide (sdk/slideshowmodel.js)
+  const choose = (id) => { const m = { ...motion }; if (id) m[scope] = id; else delete m[scope]; set({ motion: m, ...(id ? slideshowStop(s) : null) }); };
   const select = (it) => {
     setMsg('');
     const apply = () => (login ? setLoginMotion(it).then(() => { set({ loginWallpaper: it.id }); setMsg(tr('settings.motion.loginDone')); }, (e) => setMsg(errorText(e))) : choose(it.id));
@@ -289,7 +263,7 @@ function MotionWallpapers({ login }) {
         {msg ? <Note tone="warn">{msg}</Note> : null}
         {can && displays.length > 1 ? (
           <SettingRow label={tr('settings.motion.display')}>
-            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, d.name || String(d.id)])]} />
+            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />
           </SettingRow>
         ) : null}
         {can ? (
@@ -362,7 +336,9 @@ function UserImages({ login, curId, onChoose, onDefault, setNote }) {
   const cur = ids.includes(curId) ? curId : null;
   const remove = () => {
     removeWallpaperImage(cur).then(() => {
-      set({ wallpaperImages: ids.filter((x) => x !== cur), ...(s.wallpaper === cur ? { wallpaper: DEFAULT_WALLPAPER } : {}) });
+      // a display that showed it goes back to the picture of every display, and that one to the theme's default
+      const own = Object.fromEntries(Object.entries(s.wallpapers || {}).filter(([, v]) => v !== cur));
+      set({ wallpaperImages: ids.filter((x) => x !== cur), wallpapers: own, ...(s.wallpaper === cur ? { wallpaper: null } : {}) });
     }, (e) => setNote(errorText(e)));
   };
   return (
@@ -410,10 +386,19 @@ function Wallpapers() {
   const [target, setTarget] = useState('desktop');
   const login = target === 'login';
   const [note, setNote] = useState('');
-  const shown = login ? s.loginWallpaper : s.wallpaper;
-  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) || userWallpaperName(shown) ? shown : GREETER_WALLPAPER) : s.wallpaper);
+  // several displays: the picture of every display ('*') or of one (its own, settings.wallpapers; sdk/wallpapers.js)
+  const displays = screenDisplays() || [];
+  const [scope, setScope] = useState('*');
+  const scopeDisplay = !login && displays.length > 1 ? displays.find((d) => d.id === scope) || null : null;
+  const desk = wallpaperIdFor(s, scopeDisplay, t.defaultWallpaper);
+  const shown = login ? s.loginWallpaper : desk;
+  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) || userWallpaperName(shown) ? shown : GREETER_WALLPAPER) : desk, t.defaultWallpaper);
+  // a picture chosen ends the slideshow (sdk/slideshowmodel.js)
+  const chooseDesk = (id) => set({ ...wallpaperPatch(s, id, scopeDisplay), ...slideshowStop(s) });
+  const slideshow = !login && !!themes.info()?.wallpaperSlideshow;
+  const ownCount = Object.keys(s.wallpapers || {}).filter((k) => displays.some((d) => displayWallpaperKey(d) === k)).length;
   const stillPick = (id) => {
-    if (!login) { set({ wallpaper: id, motion: {} }); return; }
+    if (!login) { chooseDesk(id); return; }
     setLoginStill(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }, (e) => setNote(errorText(e)));
   };
   const cats = [...new Set([...WALLPAPER_CATEGORIES, ...list.map((w) => w.category || 'other')])]
@@ -426,6 +411,13 @@ function Wallpapers() {
     <Stack>
       <Segmented value={target} onChange={(v) => { setTarget(v); setNote(''); }} options={[['desktop', tr('settings.wallpaperFor.desktop')], ['login', tr('settings.wallpaperFor.login')]]} />
       {note ? <Note>{note}</Note> : null}
+      {!login && displays.length > 1 ? (
+        <Section footer={scope === '*' && ownCount ? tr('settings.wallpaperFor.allResets') : tr('settings.wallpaperFor.displayHint')}>
+          <SettingRow label={tr('settings.wallpaperFor.display')}>
+            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />
+          </SettingRow>
+        </Section>
+      ) : null}
       <Section>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l, paddingVertical: spacing.m }}>
           <View style={{ width: 128, height: 72, borderRadius: 8, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
@@ -444,8 +436,9 @@ function Wallpapers() {
           </View>
         </SettingRow>
       </Section>
+      {slideshow ? <SlideshowSettings displays={displays} /> : null}
       <UserImages login={login} curId={shown} setNote={setNote}
-        onChoose={(id) => (login ? setLoginImage(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }) : set({ wallpaper: id, motion: {} }))}
+        onChoose={(id) => (login ? setLoginImage(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }) : chooseDesk(id))}
         onDefault={() => setLoginMotion(null).then(() => { set({ loginWallpaper: null }); setNote(tr('settings.motion.loginReset')); }, (e) => setNote(errorText(e)))} />
       <MotionWallpapers login={login} />
       {cats.map(([c, ws]) => (
@@ -877,13 +870,15 @@ const GROUPS = [
   [['general', General, '#8e8e93', 'i'], ['appearance', Appearance, '#3a3a3c', '◐'], ['wallpaper', Wallpapers, '#30b0c7', '▣'], ['dock', DockSettings, '#3a3a3c', '▁'], ['displays', DisplaysSettings, '#0a84ff', '▭']],
   [['network', NetworkSettings, '#0a84ff', '⇅'], ['bluetooth', BluetoothSettings, '#0a84ff', 'ᛒ'], ['sound', SoundSettings, '#ff375f', '♪'], ['notifications', NotificationsSettings, '#ff3b30', '◉'], ['printers', PrintersSettings, '#636366', '⎙'], ['clipboard', ClipboardSettings, '#5e5ce6', '⎘'], ['sharing', SharingSettings, '#34c759', '⇄'], ['cloud', CloudSettings, '#0a84ff', '☁']],
   [['language', LanguageRegion, '#30b0c7', 'A'], ['datetime', DateTimeSettings, '#0a84ff', '◷'], ['keyboard', Keyboard, '#8e8e93', '⌨'], ['trackpad', TrackpadSettings, '#8e8e93', '▭'], ['defaultapps', DefaultAppsSettings, '#8e8e93', '◫'], ['webapps', WebAppsSettings, '#5e5ce6', '◎'], ['ai', AISettings, '#bf5af2', '✦']],
-  [['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
+  [['battery', BatterySettings, '#30d158', '▮'], ['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
 ];
 const SECTIONS = GROUPS.flat();
 // Board firmware
 // only on a BCM2712 board (Raspberry Pi 5, 500, CM5: lord.system.info().board)
 const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
-const sectionShown = (id, hasPad, pi5 = isPi5()) => id !== 'firmware' || pi5;
+// Battery: on a computer with one, or when something connected has a battery (docs/BATTERY.md)
+const hasAnyBattery = () => { try { return !!battery.get()?.hasBattery || deviceList().length > 0; } catch (e) { return false; } };
+const sectionShown = (id, hasPad, pi5 = isPi5()) => (id !== 'firmware' || pi5) && (id !== 'battery' || hasAnyBattery());
 
 // The Dock's right-click menu lists every section, in the sidebar's order and with its names; one
 // opens Settings on that page (sdk/dock.js, quick actions). Built from SECTIONS, so it never drifts.
@@ -922,6 +917,8 @@ function UserCard({ onClick, selected }) {
 
 // The open section survives the interface being remounted when the language changes.
 let lastSection = 'general';
+// a small window (a Lord Workspaces tile): below SIDE_AT the sections hide behind a button in the title bar
+const SIDE_AT = 700;
 
 // Other apps open a section: wm.open('settings', { args: { section: 'network', page: 'vpn' } }).
 export default function Settings() {
@@ -930,7 +927,8 @@ export default function Settings() {
   const { args } = useAppWindow();
   const [section, setSectionState] = useState(lastSection);
   const [query, setQuery] = useState('');
-  const setSection = (s) => { lastSection = s; setSectionState(s); };
+  const side = useSidebar(SIDE_AT);
+  const setSection = (s) => { lastSection = s; setSectionState(s); if (side.narrow) side.close(); };
   // 'themes' (the old Themes page, links from older help) now opens Appearance
   useEffect(() => { const sec = args?.section === 'themes' ? 'appearance' : args?.section; if (sec && SECTIONS.some(([id]) => id === sec)) setSection(sec); }, [args?.nonce]);
   const [, Body] = SECTIONS.find(([id]) => id === section) || SECTIONS[0];
@@ -941,9 +939,9 @@ export default function Settings() {
   const [pi5] = useState(isPi5);
   const visible = (id) => sectionShown(id, hasPad, pi5) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
   const groups = GROUPS.map((g) => g.filter(([id]) => visible(id))).filter((g) => g.length);
-  return (
-    <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 220, backgroundColor: t.sidebarBg, paddingTop: spacing.m }}>
+  const pad = side.narrow ? spacing.l : spacing.xxl;
+  const sidebar = (
+      <View style={{ width: 220, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg, paddingTop: spacing.m }}>
         <Hairline edge="end" />
         <View style={{ paddingHorizontal: 10, gap: spacing.s }}>
           <SearchField value={query} onChange={setQuery} placeholder={tr('settings.search')}
@@ -964,15 +962,20 @@ export default function Settings() {
           </View>
         </ScrollView>
       </View>
+  );
+  return (
+    <View style={{ flex: 1, flexDirection: 'row' }}>
+      {side.narrow ? null : sidebar}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={{ height: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.xxl }}>
+        <View style={{ height: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: pad }}>
           <Hairline edge="bottom" />
+          {side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null}
           <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.title, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
             {tr(`settings.section.${section}`)}</Text>
           {section === 'cloud' ? <CloudHeaderAction /> : null}
         </View>
         <ScrollView resetKey={section} style={{ flex: 1 }}>
-          <View style={{ paddingHorizontal: spacing.xxl, paddingTop: spacing.xl, alignItems: 'center' }}>
+          <View style={{ paddingHorizontal: pad, paddingTop: side.narrow ? spacing.l : spacing.xl, alignItems: 'center' }}>
             {/* Cloud's account page has two columns: it takes a wider column on wide windows */}
             <View style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : 680 }}>
               <Body page={section === 'network' || section === 'cloud' ? args?.page : undefined} />
@@ -980,6 +983,7 @@ export default function Settings() {
           </View>
         </ScrollView>
       </View>
+      {side.narrow && side.shown ? <SidebarOverlay width={220} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
       {/* Cloud's sheets: inside this window, over its content, never in the shell's modal layer (docs/CLOUD.md 18.2) */}
       {section === 'cloud' ? <CloudSheets /> : null}
     </View>

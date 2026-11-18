@@ -151,5 +151,10 @@
   "wifi.saved": "gespeichert",
   "wifi.scan": "Suchen",
   "wifi.scanning": "Wird gesucht …",
-  "wifi.wrongKey": "Das Passwort ist falsch."
+  "wifi.wrongKey": "Das Passwort ist falsch.",
+  "wifi.available": "Verfügbare WLAN-Netzwerke",
+  "wifi.currentLabel": "{ssid} – Verbunden",
+  "wifi.connect": "Verbinden",
+  "wifi.notInRange": "Nicht in Reichweite",
+  "wifi.knownFooter": "LordOS verbindet sich von selbst mit einem gespeicherten Netzwerk, wenn es in Reichweite ist. „Vergessen“ entfernt das Netzwerk und sein Passwort von diesem Computer."
 }

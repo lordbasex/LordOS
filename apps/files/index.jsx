@@ -7,7 +7,7 @@ import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl, Layer, shellLayers,
-  wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText,
+  wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -26,7 +26,7 @@ import { parseAddress, sshLine, hostAddress, looksDav, davOf } from './connect.j
 import { filesPrefs, setPrefs, useFilesPrefs, columnsOf, noteFolder, noteServer, noteOrigin, originOf, togglePin, addFavoriteFolder, removeFavoriteFolder, viewFor, viewKey, folderViewsWith, clampSide } from './prefs.js';
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_VIEWS, zoomOf, zoomWith, iconColumns } from './viewprefs.js';
 import { ALL_COLUMNS, toggleColumn } from './columns.js';
-import { columnEntries, columnRange, byFolder, folderReadOnly, colWidthsWith, chainStep, historyStep, newFolderDir, listEntries, readOnlyWhy } from './colview.js';
+import { columnEntries, columnRange, columnAll, byFolder, folderReadOnly, colWidthsWith, chainStep, historyStep, newFolderDir, listEntries, readOnlyWhy } from './colview.js';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, useWidth, ZoomControl } from '../../sdk/fileparts.jsx';
 import { pathCrumbs } from '../../sdk/filepickermodel.js';
 import { pasteAsk } from './clipfiles.js';
@@ -182,6 +182,9 @@ export default function Files() {
   // the sidebar's width, dragged from its edge and kept
   const [dragW, setDragW] = useState(null);
   const sideW = clampSide(dragW ?? prefs.sideWidth);
+  // a narrow window (a Workspaces tile): the sidebar hides behind a toolbar button and lays over the files when shown
+  const sb = useSidebar(640);
+  const sideInW = sb.narrow ? 0 : sideW;
   const startSide = (e) => {
     const x0 = e.x, w0 = sideW;
     const off = [addListener('pointermove', (m) => setDragW(clampSide(w0 + (m.x - x0)))),
@@ -227,6 +230,8 @@ export default function Files() {
 
   const dirs = useMemo(() => userDirs(), []);
   const baseLoc = tab.loc;
+  // a place picked in a narrow window's sidebar closes it
+  useEffect(() => { if (sb.narrow && sb.shown) sb.close(); }, [JSON.stringify(baseLoc)]);
   const loc = debounced ? { type: 'search', root: scope === 'home' || baseLoc.type !== 'dir' ? fs.home() : baseLoc.path, query: debounced } : baseLoc;
   const [netState, searchLan] = useLan(baseLoc.type === 'network', (m) => setMsg(m));
   // a search inside a cloud account goes to cloud.search, off the interface's thread (docs/CLOUD.md 17.2 item 31)
@@ -847,7 +852,10 @@ export default function Files() {
   const onBgContext = (ev) => { setSelected(new Set()); const p = local(ev); setMenu({ x: p.x, y: p.y, items: bgMenu() }); };
 
   // ---- keyboard ----
-  const cols = () => iconColumns(root.current ? lord.getLayout(root.current.id)[2] - sideW : 600, zoom);
+  const cols = () => iconColumns(root.current ? lord.getLayout(root.current.id)[2] - sideInW : 600, zoom);
+  // Select All: the column the selection is in (not the first one, GitHub #170), every row the list shows (an unfolded
+  // folder's items too), else the folder's items
+  const selectAll = () => setSelected(new Set((colItems ? columnAll(colItems, anchor.current, selected) : listItems || flat).map((x) => x.path)));
   const moveSel = (d, ev) => {
     if (!flat.length) return;
     const i = first ? flat.findIndex((x) => x.path === (anchor.current && selected.has(anchor.current) ? anchor.current : first.path)) : -1;
@@ -891,7 +899,7 @@ export default function Files() {
     if (mod && b === 'c') { if (selPaths.length) copyFiles(selPaths); return; }
     if (mod && b === 'x') { cutSel(); return; }
     if (e.ctrl && b === 'v') { doPaste(); return; }
-    if (mod && b === 'a') { setSelected(new Set(flat.map((x) => x.path))); return; }
+    if (mod && b === 'a') { selectAll(); return; }
     // [ and ] need a modifier on many layouts: the character itself counts, and ⌥← and ⌥→ work on all of them
     if ((mod && (b === '[' || e.key === '[')) || (e.alt && e.key === 'ArrowLeft')) { goBack(); return; }
     if ((mod && (b === ']' || e.key === ']')) || (e.alt && e.key === 'ArrowRight')) { goForward(); return; }
@@ -937,7 +945,7 @@ export default function Files() {
         { label: tr('files.menu.copy'), hint: '❖C', onClick: () => copyFiles(selPaths), disabled: !sel.length },
         { label: tr('files.menu.cut'), hint: '❖X', onClick: () => cutSel(), disabled: !sel.length || (readOnly && !roWhy) },
         { label: tr('files.menu.paste'), hint: 'Ctrl+V', onClick: doPaste, disabled: !canPaste(clip) || (!wDir && !roWhy) },
-        { label: tr('files.menu.selectAll'), hint: '❖A', onClick: () => setSelected(new Set(flat.map((x) => x.path))) },
+        { label: tr('files.menu.selectAll'), hint: '❖A', onClick: () => selectAll() },
       ] },
       { label: tr('files.menu.view'), items: [
         ...VIEWS.map((v, i) => ({ label: tr(`files.view.${v}`), hint: `❖${i + 1}`, checked: tab.view === v, onClick: () => setView(v) })), '-',
@@ -963,7 +971,7 @@ export default function Files() {
       ] },
       { label: tr('files.settings.title'), items: [{ label: tr('files.settings.open'), hint: '❖,', onClick: () => setSheet('settings') }] },
     ]));
-  }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, tab.chain, hidden, selected, sel.length, clip, curDir, readOnly, roWhy, active, tabs.length, prefs.recentFolders.length, zoom, zoomable]);
+  }, [tab.view, tab.back.length, tab.fwd.length, tab.loc, tab.chain, flat, colItems, listItems, hidden, selected, sel.length, clip, curDir, readOnly, roWhy, active, tabs.length, prefs.recentFolders.length, zoom, zoomable]);
 
   // ---- view ----
   const columns = columnsOf(prefs);
@@ -973,7 +981,7 @@ export default function Files() {
     const p = local(ev);
     setMenu({ x: p.x, y: p.y, items: ALL_COLUMNS.map((k) => ({ label: tr(`files.col.${k}`), checked: columns.shown.includes(k), onClick: () => setPrefs({ columns: toggleColumn(columnsOf(filesPrefs()), k) }) })) });
   };
-  const content = (rootWidthRef.current || 960) - sideW;
+  const content = (rootWidthRef.current || 960) - sideInW;
   const toggleExpanded = (p) => setExpanded((x) => { const n = new Set(x); if (n.has(p)) n.delete(p); else n.add(p); return n; });
   const cut = new Set(clip?.mode === 'cut' ? clip.paths : []);
   // a cloud account waiting for a new sign-in is not tried again by itself: its folder says so instead of "empty", with
@@ -1048,7 +1056,7 @@ export default function Files() {
   const width = useWidth(root, 960);
   rootWidthRef.current = width;
   const narrow = content < 600;
-  const tight = content < 470;
+  const tight = content < 520;
   const viewBtn = useRef(null), sortBtn = useRef(null), tagBtn = useRef(null), moreBtn = useRef(null);
   const side = (id) => !prefs.hiddenSide.includes(id);
   const sideScroll = (
@@ -1106,15 +1114,16 @@ export default function Files() {
   return (
     <View ref={root} style={{ flex: 1, flexDirection: 'row' }}>
       {/* sidebar (source list) */}
-      <View style={{ width: sideW, backgroundColor: t.sidebarBg }}>
+      {sb.narrow ? null : <View style={{ width: sideW, backgroundColor: t.sidebarBg }}>
         <Hairline edge="end" />
         {sideScroll}
         <View onMouseDown={startSide} style={{ position: 'absolute', top: 0, bottom: 0, ...(direction() === 'rtl' ? { left: 0 } : { right: 0 }), width: 6, cursor: 'ew-resize' }} />
-      </View>
+      </View>}
 
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         {/* toolbar */}
         <Toolbar>
+          {sb.narrow ? <SidebarToggle shown={sb.shown} onClick={sb.toggle} /> : null}
           <ToolbarGroup>
             <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} small title={tr('files.menu.back')} onClick={goBack} disabled={!tab.back.length} />
             <ToolbarButton icon={direction() === 'rtl' ? '‹' : '›'} iconSize={20} small title={tr('files.menu.forward')} onClick={goForward} disabled={!tab.fwd.length} />
@@ -1222,6 +1231,7 @@ export default function Files() {
         </View>
       </View>
 
+      {sb.narrow && sb.shown ? <SidebarOverlay width={sideW} onClose={sb.close}>{sideScroll}</SidebarOverlay> : null}
       {/* what is being dragged: in the desktop's drag layer, above every window, so it follows the pointer into another
           app (a window that takes files shows a +); in its own window only when there are no desktop layers */}
       {drag && (shellLayers() || dragLocal) && (() => {

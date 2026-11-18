@@ -5,8 +5,9 @@
   "accounts": "Konta",
   "allAccounts": "Wszystkie konta",
   "onThisComputer": "Na tym komputerze",
-  "cacheLine": "{size} · zachowane: {kept}",
+  "hereLine": "{size} · zachowane: {kept} · do zwolnienia: {free}",
   "freeUp": "Zwolnij miejsce",
+  "freeUpHint": "„Zwolnij miejsce” usuwa lokalne kopie plików, które nie są zachowane na tym komputerze; zachowane pliki i zmiany czekające na wysłanie zostają.",
   "freed": "Zwolniono {size} na tym komputerze",
   "freedSkipped": {
     "one": "Zwolniono {size}; {count} element pozostaje (otwarty, zachowany lub czekający na wysłanie)",
@@ -480,5 +481,9 @@
   "details.signIn": "Logowanie",
   "details.server": "Serwer",
   "details.app": "Aplikacja",
-  "details.ownApp": "Twoja własna aplikacja"
+  "details.ownApp": "Twoja własna aplikacja",
+  "color": "Kolor",
+  "colorAuto": "Automatyczny",
+  "colorAutoHint": "Automatyczny: według kolejności dodania konta, aby dwa konta tego samego dostawcy się różniły.",
+  "colorChosen": "Widoczny w Plikach, menu Chmury i Dziennikach."
 }

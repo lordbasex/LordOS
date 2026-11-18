@@ -50,6 +50,11 @@ int main(void) {
     CHECK(input_evdev_button(3) == BTN_SIDE && input_evdev_button(4) == BTN_EXTRA);
     for (int b = 0; b < 5; b++) CHECK(input_dom_button((int)input_evdev_button(b)) == b);
 
+    /* Ctrl+Alt+F1…F12: text consoles 1 to 12; nothing else is one */
+    CHECK(input_vt_key(KEY_F1) == 1 && input_vt_key(KEY_F2) == 2 && input_vt_key(KEY_F10) == 10);
+    CHECK(input_vt_key(KEY_F11) == 11 && input_vt_key(KEY_F12) == 12);
+    CHECK(input_vt_key(KEY_F13) == 0 && input_vt_key(KEY_A) == 0 && input_vt_key(KEY_ESC) == 0 && input_vt_key(KEY_NUMLOCK) == 0);
+
     puts(fails ? "inputkind: FAILED" : "inputkind: ok");
     return fails != 0;
 }

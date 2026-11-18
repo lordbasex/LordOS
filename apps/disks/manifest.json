@@ -4,7 +4,7 @@
   "name": "Disks",
   "description": "Disks and USB sticks: usage, health (SMART), mount, format, erase and create a bootable USB",
   "size": [960, 620],
-  "minSize": [760, 480],
+  "minSize": [480, 360],
   "dock": false,
   "permissions": ["disks:manage"],
   "category": "System"

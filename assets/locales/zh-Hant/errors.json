@@ -235,6 +235,7 @@
   "fs.notRegular": "這不是一般檔案（是連結嗎？）",
   "fs.openFailed": "無法打開檔案：{errno}",
   "fs.outsideHome": "該位置不在你的個人資料夾內，或無效",
+  "fs.nameTooLong": "名稱太長（最多 {max} 位元組；中文等非拉丁字元每個佔 2 到 4 位元組）",
   "fs.protected": "該資料夾受保護",
   "fs.systemFolder": "「檔案」不會顯示系統的內部資料夾（/proc、/sys、/dev 與 /run）",
   "fs.tooLarge": "檔案太大（上限 {max}）",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "無法更新開機載入程式（代碼 {code}）",
   "hw.logindFailed": "無法套用電源設定（代碼 {code}）",
   "hw.noBacklight": "沒有此背光",
+  "hw.noChargeControl": "此電池不支援充電控制",
+  "hw.chargeControlFailed": "無法變更充電：{errno}",
   "hw.noCpufreq": "這部電腦不支援 CPU 頻率調整",
   "hw.noEeprom": "未安裝開機載入程式工具（rpi-eeprom）",
   "hw.noKernelLog": "無法讀取核心記錄",
@@ -875,5 +878,12 @@
   "pkg.multiarchConflict": "{name} 不能同時以 64 位元和 32 位元安裝",
   "pkg.foreignArchUnsupported": "只能在 64 位元電腦（amd64）上啟用 32 位元套件；本系統為 {arch}",
   "pkg.foreignArchFailed": "無法啟用 32 位元（{arch}）套件（dpkg 以代碼 {code} 結束）",
-  "webapps.developerOff": "「設定 → 網頁 App」中的開發者模式已關閉"
+  "webapps.developerOff": "「設定 → 網頁 App」中的開發者模式已關閉",
+  "media.streamAddress": "不允許此直播串流位址",
+  "media.streamCannotOpen": "無法開啟直播串流",
+  "media.streamTimeout": "直播串流未及時回應",
+  "media.streamAuth": "直播串流要求使用者與密碼，或輸入錯誤",
+  "media.streamLost": "直播串流已中斷",
+  "media.streamNoChannels": "清單中沒有頻道",
+  "media.noStreamHelper": "直播串流輔助程式（lord-stream）無法使用"
 }

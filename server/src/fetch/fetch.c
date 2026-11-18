@@ -1,6 +1,8 @@
 /* fetch.c — lord-fetch: downloads the subscribed blocklists over HTTPS for lord-server, sandboxed
- * (see fetchproto.h). With lord-sessiond and lord-maild, the only binaries that link OpenSSL. */
+ * (see fetchproto.h), and since 0.8.8.10 the weather widget's forecast from one fixed host
+ * (weather.h). With lord-sessiond and lord-maild, the only binaries that link OpenSSL. */
 #include "fetchproto.h"
+#include "weather.h"
 #include "../doc/wire.h"
 #include "../fw/fwlists.h"
 #include "../mail/http.h"
@@ -115,6 +117,52 @@ static void get(uint32_t id, const char *json, size_t len, int fd) {
     close(mfd);
 }
 
+/* The forecast: one GET to WX_HOST on the socket lord-server connected there, the path built here from
+ * two numbers, the answer parsed strictly into numbers (weather.h). No redirect is followed. */
+static void weather(uint32_t id, const char *json, size_t len, int fd) {
+    JDoc d;
+    if (json_parse(json, len, &d, NULL, 0)) { close(fd); fail(id, "bad-request", ""); return; }
+    const JVal *la = json_get(d.root, "lat"), *lo = json_get(d.root, "lon");
+    char path[256];
+    int ok = la && lo && la->type == J_NUM && lo->type == J_NUM && !wx_path(la->num, lo->num, path, sizeof path);
+    json_free(&d);
+    if (!ok) { close(fd); fail(id, "bad-request", ""); return; }
+    Conn *c = conn_new(fd, WX_HOST, 20000);
+    if (!c) { close(fd); fail(id, "oom", ""); return; }
+    TlsInfo info;
+    memset(&info, 0, sizeof info);
+    if (conn_tls(c, NULL, &info)) {
+        fail(id, info.code ? "cert" : "tls", info.code ? info.reason : conn_error(c));
+        conn_close(c);
+        return;
+    }
+    HttpResp r;
+    memset(&r, 0, sizeof r);
+    int rc = http_request(c, "GET", WX_HOST, path, "Accept-Encoding: identity\r\nAccept: application/json\r\nUser-Agent: LordOS-weather/1\r\n",
+                          NULL, 0, WX_ANSWER_MAX, 30000, &r);
+    conn_close(c);
+    if (rc == -2) { fail(id, "big", ""); return; }
+    if (rc) { fail(id, "http", ""); http_resp_free(&r); return; }
+    if (r.status != 200) {
+        char s[16];
+        snprintf(s, sizeof s, "%d", r.status);
+        fail(id, "status", s);
+        http_resp_free(&r);
+        return;
+    }
+    WxData w;
+    int bad = wx_parse(r.body ? r.body : "", r.blen, &w);
+    http_resp_free(&r);
+    char out[1024];
+    size_t n = bad ? 0 : wx_compact(&w, out, sizeof out);
+    if (!n) { fail(id, "format", ""); return; }
+    JBuf b;
+    jb_init(&b);
+    jb_rawn(&b, out, n);
+    reply(FR_WEATHER, id, &b, -1);
+    jb_free(&b);
+}
+
 int main(void) {
     prctl(PR_SET_PDEATHSIG, SIGKILL);
     prctl(PR_SET_DUMPABLE, 0);
@@ -145,6 +193,11 @@ int main(void) {
             m.fds[0] = -1;
             m.nfds = 0;
             get(m.h.id, m.json, m.len, fd);     /* conn_close closes fd */
+        } else if (m.h.op == FQ_WEATHER && m.nfds == 1 && m.json) {
+            int fd = m.fds[0];
+            m.fds[0] = -1;
+            m.nfds = 0;
+            weather(m.h.id, m.json, m.len, fd);
         } else fail(m.h.id, "bad-request", "");
         doc_msg_free(&m);
     }

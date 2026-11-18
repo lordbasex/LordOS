@@ -5,8 +5,9 @@
   "accounts": "Hesablar",
   "allAccounts": "Bütün hesablar",
   "onThisComputer": "Bu kompüterdə",
-  "cacheLine": "{size} · {kept} saxlanılır",
+  "hereLine": "{size} · {kept} saxlanılır · {free} boşaldıla bilər",
   "freeUp": "Yer boşalt",
+  "freeUpHint": "«Yer boşalt» bu kompüterdə saxlanılmayan faylların yerli nüsxələrini silir; saxlanılan fayllar və yüklənməyi gözləyən dəyişikliklər qalır.",
   "freed": "Bu kompüterdə {size} boşaldıldı",
   "freedSkipped": {
     "one": "{size} boşaldıldı; {count} element qalır (açıq, saxlanılan və ya yüklənməyi gözləyən)",
@@ -438,5 +439,9 @@
   "details.signIn": "Giriş",
   "details.server": "Server",
   "details.app": "Tətbiq",
-  "details.ownApp": "Öz tətbiqiniz"
+  "details.ownApp": "Öz tətbiqiniz",
+  "color": "Rəng",
+  "colorAuto": "Avtomatik",
+  "colorAutoHint": "Avtomatik: hesabı əlavə etdiyiniz sıraya görə, eyni provayderin iki hesabı fərqlənsin deyə.",
+  "colorChosen": "Fayllarda, Bulud menyusunda və Jurnallarda göstərilir."
 }

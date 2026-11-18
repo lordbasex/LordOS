@@ -235,6 +235,7 @@
   "fs.notRegular": "فایل عادی نیست (آیا پیوند است؟)",
   "fs.openFailed": "فایل باز نشد: {errno}",
   "fs.outsideHome": "آن مکان بیرون از پوشهٔ خانگی شماست یا معتبر نیست",
+  "fs.nameTooLong": "نام خیلی طولانی است (حداکثر {max} بایت؛ هر حرف غیرلاتین ۲ تا ۴ بایت می‌گیرد)",
   "fs.protected": "آن پوشه محافظت‌شده است",
   "fs.systemFolder": "فایل‌ها پوشه‌های داخلی سیستم (/proc، /sys، /dev و /run) را نشان نمی‌دهد",
   "fs.tooLarge": "فایل بیش از حد بزرگ است (حداکثر {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "بوت‌لودر به‌روز نشد (کد {code})",
   "hw.logindFailed": "تنظیمات توان اعمال نشد (کد {code})",
   "hw.noBacklight": "چنین نور پس‌زمینه‌ای نیست",
+  "hw.noChargeControl": "این باتری کنترل شارژ ندارد",
+  "hw.chargeControlFailed": "تغییر شارژ ممکن نشد: {errno}",
   "hw.noCpufreq": "این رایانه تنظیم بسامد پردازنده ندارد",
   "hw.noEeprom": "ابزارهای بوت‌لودر (rpi-eeprom) نصب نیستند",
   "hw.noKernelLog": "گزارش هسته خوانده نشد",
@@ -876,5 +879,12 @@
   "pkg.multiarchConflict": "{name} را نمی‌توان هم‌زمان برای ۶۴ و ۳۲ بیت نصب کرد",
   "pkg.foreignArchUnsupported": "بسته‌های ۳۲ بیتی فقط روی رایانهٔ ۶۴ بیتی (amd64) فعال می‌شوند؛ این سیستم {arch} است",
   "pkg.foreignArchFailed": "بسته‌های ۳۲ بیتی ({arch}) فعال نشدند (dpkg با کد {code} پایان یافت)",
-  "webapps.developerOff": "حالت توسعه‌دهنده در تنظیمات ← برنامه‌های وب خاموش است"
+  "webapps.developerOff": "حالت توسعه‌دهنده در تنظیمات ← برنامه‌های وب خاموش است",
+  "media.streamAddress": "این نشانی پخش مجاز نیست",
+  "media.streamCannotOpen": "پخش باز نشد",
+  "media.streamTimeout": "پخش به‌موقع پاسخ نداد",
+  "media.streamAuth": "پخش کاربر و گذرواژه خواست یا نادرست بودند",
+  "media.streamLost": "پخش قطع شد",
+  "media.streamNoChannels": "فهرست کانالی ندارد",
+  "media.noStreamHelper": "دستیار پخش (lord-stream) در دسترس نیست"
 }

@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} çekirdek",
     "other": "{cpu} · {count} çekirdek"
   },
-  "credits": "Monitör’deki IP-ülke eşlemesi: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Harita: Natural Earth (kamu malı).",
+  "credits": "Monitör’deki IP-ülke eşlemesi: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Harita: Natural Earth (kamu malı). Hava durumu şehirleri: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Ekran",
   "engine": "Arayüz motoru",
   "host": "Bilgisayar",

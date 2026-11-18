@@ -18,7 +18,7 @@ export function OptionsDialog({ s }) {
   return (
     <View onClick={close} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }}>
       <View onClick={(e) => e.stopPropagation?.()} {...platform.a11y({ role: 'dialog', label: tr('imager.options.title') })}
-        style={{ width: 480, padding: 20, gap: spacing.l, borderRadius: t.groupRadius + 2, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
+        style={{ width: 480, maxWidth: '94%', padding: 20, gap: spacing.l, borderRadius: t.groupRadius + 2, backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
         <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text }}>{tr('imager.options.title')}</Text>
         <Group>
           <SwitchRow id="o-sound" label={tr('imager.options.sound')} on={o.sound} onChange={(sound) => setOptions({ sound })} />

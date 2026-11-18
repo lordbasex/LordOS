@@ -2,7 +2,7 @@
 # Bluetooth (BlueZ over our own D-Bus client), battery and power, date and time, default apps.
 # Objects are added to lord-server as extra prerequisites ($^ in its link rule takes them).
 HW_SRC := src/hw/tabletpower.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/jbuf.c src/hw/display.c src/hw/accel.c \
-          src/hw/uevent.c src/hw/sysbus.c src/hw/bt.c src/hw/ppd.c src/hw/hw.c src/hw/hw_admin.c src/bench/boottest.c src/hw/defaults.c src/hw/notifyd.c src/hw/mpris.c src/hw/mprismeta.c src/hw/hwscan.c src/hw/brframe.c src/hw/pkagent.c src/hw/pkfield.c src/hw/sleeplock.c src/hw/lockstate.c src/hw/logindlock.c src/hw/lid.c src/ui/js_hw.c \
+          src/hw/uevent.c src/hw/sysbus.c src/hw/bt.c src/hw/ppd.c src/hw/hw.c src/hw/hw_admin.c src/hw/battery_admin.c src/hw/batthist.c src/bench/boottest.c src/hw/defaults.c src/hw/notifyd.c src/hw/mpris.c src/hw/mprismeta.c src/hw/hwscan.c src/hw/brframe.c src/hw/pkagent.c src/hw/pkfield.c src/hw/sleeplock.c src/hw/lockstate.c src/hw/logindlock.c src/hw/lid.c src/ui/js_hw.c \
           src/sysreport/sysreport.c src/sysreport/sysreport_out.c src/sysreport/periph.c src/sysreport/ids.c src/sysreport/smbios.c src/sysreport/facts.c src/sysreport/hwsnap.c src/hw/rpifw.c \
           src/ui/js_fan.c src/fan/fancurve.c
 HW_HDR := $(wildcard src/hw/*.h) src/apps.h $(wildcard src/sysreport/*.h) $(wildcard src/fan/*.h) src/ui/js_hw.h src/ui/js_fan.h src/kms.h src/vault/dbus.h
@@ -12,9 +12,9 @@ build/lord-server: $(HW_OBJ)
 # pure parts: EDID, mode selection, gamma/temperature/sun math, mimeapps.list and globs2, power_supply,
 # and the admin actions' validators
 test: build/settings-hw-test
-build/settings-hw-test: tests/settings_hw_test.c src/hw/rpifw.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/hw_admin.c src/hw/tabletpower.c src/bench/boottest.c src/hw/hwscan.c src/sysreport/smbios.c src/hw/jbuf.c src/sec/json.c $(HW_HDR) src/bench/boottest.h
+build/settings-hw-test: tests/settings_hw_test.c src/hw/rpifw.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/hw_admin.c src/hw/battery_admin.c src/hw/tabletpower.c src/bench/boottest.c src/hw/hwscan.c src/sysreport/smbios.c src/hw/jbuf.c src/sec/json.c $(HW_HDR) src/bench/boottest.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/settings_hw_test.c src/hw/rpifw.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/hw_admin.c src/hw/tabletpower.c src/bench/boottest.c src/hw/hwscan.c src/sysreport/smbios.c src/hw/jbuf.c src/sec/json.c -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/settings_hw_test.c src/hw/rpifw.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/hw_admin.c src/hw/battery_admin.c src/hw/tabletpower.c src/bench/boottest.c src/hw/hwscan.c src/sysreport/smbios.c src/hw/jbuf.c src/sec/json.c -lm
 	./$@ || { rm -f $@; exit 1; }
 # BlueZ parsing (GetManagedObjects, PropertiesChanged, Battery1, paths, state JSON) without a bus
 test: build/bt-test
@@ -89,3 +89,10 @@ build/accel-test: tests/accel_test.c src/hw/accel.c src/hw/accel.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/accel_test.c src/hw/accel.c -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
+
+# Settings → Battery's history (hw/batthist.c): ticks, saving and loading, the JSON
+test: build/batthist-test
+build/batthist-test: tests/batthist_test.c src/hw/batthist.c src/hw/batthist.h src/hw/power.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/batthist_test.c src/hw/batthist.c
+	./$@ || (rm -f $@; exit 1)

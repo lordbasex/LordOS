@@ -3,7 +3,8 @@
 // the production / read-only switches; Test Connection and Connect. The password is asked in a sheet when Passwords
 // doesn't keep it or the server refuses it; a certificate that doesn't check asks to be trusted by its sha256. The first
 // run (and File > Import Connections) offers Sequel Ace's and Sequel Pro's favorites.
-import { View, Text, ScrollView, TextInput, FilePicker, ConfirmDialog, AutofillButton, ContextMenu, useStore, sqlAvailable, sqlPasswords, t as tr } from '@lordos/sdk';
+import { View, Text, ScrollView, TextInput, FilePicker, ConfirmDialog, AutofillButton, ContextMenu, useStore, sqlAvailable, sqlPasswords, t as tr,
+  useSidebar, SidebarToggle, SidebarOverlay } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePal, Icons, Dot, Btn, IconBtn, Check, Popup, Field, Box, Note, Sheet, MONO, MenuGlyph } from './ui.jsx';
 import { store, favRev, readFavorites, writeFavorites, openSession, testFavorite, prefs, setPrefs } from './conn.js';
@@ -16,6 +17,8 @@ import { mergeImport } from './plist.js';
 export const connectAsks = { importNow: null };
 
 const QUICK = '__quick';
+// a small window (a Lord Workspaces tile): below SIDE_AT the favorites hide behind a button over the form
+const SIDE_AT = 760;
 
 export function Connect({ onConnected }) {
   const p = usePal();
@@ -24,6 +27,8 @@ export function Connect({ onConnected }) {
   const file = useMemo(() => readFavorites(), [rev]);
   const avail = sqlAvailable();
   const [sel, setSel] = useState(() => file.favorites.find((f) => !f.quick)?.id || QUICK);
+  const side = useSidebar(SIDE_AT, 'favorites');
+  const pickFav = (id) => { setSel(id); if (side.narrow) side.close(); };
   const [draft, setDraft] = useState(null);           // the form: a copy of the selected favorite
   const [dirty, setDirty] = useState(false);
   const [password, setPassword] = useState('');
@@ -240,7 +245,7 @@ export function Connect({ onConnected }) {
   const curGroup = (id) => file.groups.find((g) => g.id === id);
 
   const favRow = (f, depth = 0) => (
-    <SideFav key={f.id} name={f.name} sub={favLine(f, servers[f.id])} color={colorOf(f)} on={sel === f.id} depth={depth} onClick={() => setSel(f.id)} />
+    <SideFav key={f.id} name={f.name} sub={favLine(f, servers[f.id])} color={colorOf(f)} on={sel === f.id} depth={depth} onClick={() => pickFav(f.id)} />
   );
   const actions = [
     { label: tr('databases.fav.duplicate'), disabled: draft.quick, onClick: duplicate },
@@ -269,14 +274,12 @@ export function Connect({ onConnected }) {
     </View>
   );
 
-  return (
-    <View ref={rootRef} style={{ flex: 1, flexDirection: 'row', minHeight: 0 }}>
-      {/* favorites */}
-      <View style={{ width: 260, backgroundColor: p.side }}>
+  const favorites = (
+      <View style={{ width: 260, flex: side.narrow ? 1 : undefined, backgroundColor: p.side }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: p.line }} />
         <ScrollView style={{ flex: 1 }} contentStyle={{ paddingBottom: 8 }}>
           <View style={{ paddingHorizontal: 8, paddingTop: 10 }}>
-            <SideFav name={tr('databases.quick')} icon={Icons.bolt('#ffd60a', 18)} on={sel === QUICK} onClick={() => setSel(QUICK)} />
+            <SideFav name={tr('databases.quick')} icon={Icons.bolt('#ffd60a', 18)} on={sel === QUICK} onClick={() => pickFav(QUICK)} />
           </View>
           <Text style={{ paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6, fontSize: 11, fontWeight: 600, color: p.dim, letterSpacing: 0.5, textAlign: 'start' }}>{tr('databases.favorites')}</Text>
           {visible.filter((f) => !f.group || !curGroup(f.group)).map((f) => favRow(f))}
@@ -300,7 +303,7 @@ export function Connect({ onConnected }) {
           {recent.length ? <Text style={{ paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6, fontSize: 11, fontWeight: 600, color: p.dim, letterSpacing: 0.5, textAlign: 'start' }}>{tr('databases.recent')}</Text> : null}
           {recent.map(({ r, f }) => (
             <SideFav key={`r${f.id}`} name={f.quick ? f.name : f.name} sub={ago(r.at)} icon={Icons.clock(p.dim, 14)} on={false}
-              onClick={() => setSel(f.id)} />
+              onClick={() => pickFav(f.id)} />
           ))}
         </ScrollView>
         <View style={{ height: 38, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 8 }}>
@@ -311,9 +314,15 @@ export function Connect({ onConnected }) {
           <MenuGlyph title={tr('databases.fav.actions')} items={actions} />
         </View>
       </View>
+  );
+
+  return (
+    <View ref={rootRef} style={{ flex: 1, flexDirection: 'row', minHeight: 0 }}>
+      {/* favorites */}
+      {side.narrow ? null : favorites}
 
       {/* the form */}
-      <ScrollView style={{ flex: 1 }} contentStyle={{ alignItems: 'center', paddingHorizontal: 40, paddingVertical: 24 }}>
+      <ScrollView style={{ flex: 1 }} contentStyle={{ alignItems: 'center', paddingHorizontal: side.narrow ? 16 : 40, paddingVertical: side.narrow ? 16 : 24 }}>
         <View style={{ width: 600, maxWidth: '100%', gap: 16 }}>
           {!avail ? <Note kind="warn">{tr('databases.unavailable')}</Note> : null}
           {banner ? (
@@ -325,6 +334,7 @@ export function Connect({ onConnected }) {
             )}>{bannerText(banner)}</Note>
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+            {side.narrow ? <SidebarToggle shown={side.shown} onClick={side.toggle} /> : null}
             <View style={{ width: 44, height: 44, borderRadius: 11, alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #2f7cf6, #1858c9)' }}>{Icons.db('#fff', 26)}</View>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ fontSize: 18, fontWeight: 700, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{draft.quick ? tr('databases.quick') : draft.name || tr('databases.fav.untitled')}</Text>
@@ -344,7 +354,7 @@ export function Connect({ onConnected }) {
             <>
               <Box title={tr('databases.box.cloud')}>
                 {!draft.quick ? <Field label={tr('databases.f.name')}><TextInput value={draft.name} onChange={(v) => set({ name: v })} /></Field> : null}
-                <Field label={tr('databases.f.service')}><Popup width={400} value={draft.cloud.service || 'rds'} options={cloudOptions()} onChange={(v) => setIn('cloud', { service: v })} /></Field>
+                <Field label={tr('databases.f.service')}><Popup width={side.narrow ? 240 : 400} value={draft.cloud.service || 'rds'} options={cloudOptions()} onChange={(v) => setIn('cloud', { service: v })} /></Field>
                 <Field label={tr('databases.f.endpoint')}><TextInput value={draft.host} onChange={(v) => set({ host: v.trim() })} placeholder={tr('databases.f.endpointHint')} /></Field>
                 <Field label={tr('databases.f.port')}><TextInput value={String(draft.port ?? '')} onChange={(v) => set({ port: v.replace(/\D/g, '').slice(0, 5) })} style={{ width: 100 }} /></Field>
                 <Field label={tr('databases.f.database')}><TextInput value={draft.database} onChange={(v) => set({ database: v })} placeholder={tr('databases.f.optional')} /></Field>
@@ -363,7 +373,7 @@ export function Connect({ onConnected }) {
               <Box title={tr('databases.box.encryption')}>
                 <Field label={tr('databases.f.tls')}><Check on label={tr('databases.tls.cloudRequired')} disabled onChange={() => {}} /></Field>
                 <Field label={tr('databases.f.certificate')}>
-                  <Popup width={400} value={draft.tls.ca ? 'file' : 'system'} options={[['system', tr('databases.tls.systemCa')], ['file', draft.tls.ca ? draft.tls.ca.split('/').pop() : tr('databases.tls.caFile')]]}
+                  <Popup width={side.narrow ? 240 : 400} value={draft.tls.ca ? 'file' : 'system'} options={[['system', tr('databases.tls.systemCa')], ['file', draft.tls.ca ? draft.tls.ca.split('/').pop() : tr('databases.tls.caFile')]]}
                     onChange={(v) => (v === 'file' ? setSheet({ kind: 'pick', key: 'ca' }) : setIn('tls', { ca: '' }))} />
                 </Field>
                 <Field label={tr('databases.f.identity')}><Check on={draft.tls.mode === 'verify'} onChange={(on) => setIn('tls', { mode: on ? 'verify' : 'required' })} label={tr('databases.tls.identity')} /></Field>
@@ -436,6 +446,7 @@ export function Connect({ onConnected }) {
           </View>
         </View>
       </ScrollView>
+      {side.narrow && side.shown ? <SidebarOverlay width={260} onClose={side.close}>{favorites}</SidebarOverlay> : null}
 
       {sheet?.kind === 'password' ? <PasswordSheet sheet={sheet} busy={busy === 'connect'} onCancel={() => setSheet(null)} onGo={(pw, keep) => connect(sheet.fav, pw, keep)} /> : null}
       {sheet?.kind === 'hostkey' ? <HostKeySheet sheet={sheet} onCancel={() => setSheet(null)} onTrust={() => trustHost(sheet)} /> : null}

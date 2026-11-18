@@ -267,3 +267,23 @@ export function stripLayout(list, a, { aspect = 1.6, canAdd = true, rtl = false 
 }
 
 export const hitRect = (r, x, y) => !!r && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+
+// The Overview's keys: the window above or below (dir 'up' | 'down') the one with the keyboard in the grid. places:
+// Map id → { x, y, w, h, scale } (gridLayout); ids: the windows in order. The nearest whose centre lies past this one's
+// edge in that direction, the horizontal distance counting most; none there: the same one.
+export function gridNeighbor(places, ids, id, dir) {
+  const box = (k) => { const p = places.get(k); return p ? { cx: p.x + (p.w * (p.scale ?? 1)) / 2, cy: p.y + (p.h * (p.scale ?? 1)) / 2, h: p.h * (p.scale ?? 1) } : null; };
+  const me = box(id);
+  if (!me) return id;
+  let best = id, bestD = Infinity;
+  for (const k of ids) {
+    if (k === id) continue;
+    const o = box(k);
+    if (!o) continue;
+    const dy = dir === 'up' ? me.cy - o.cy : o.cy - me.cy;
+    if (dy < me.h / 4) continue;
+    const d = Math.abs(o.cx - me.cx) * 2 + dy;
+    if (d < bestD) { bestD = d; best = k; }
+  }
+  return best;
+}

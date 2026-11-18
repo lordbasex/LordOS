@@ -235,6 +235,7 @@
   "fs.notRegular": "ไม่ใช่ไฟล์ปกติ (เป็นลิงก์หรือไม่)",
   "fs.openFailed": "ไม่สามารถเปิดไฟล์ได้: {errno}",
   "fs.outsideHome": "ตำแหน่งนั้นอยู่นอกโฟลเดอร์บ้านของคุณหรือไม่ถูกต้อง",
+  "fs.nameTooLong": "ชื่อยาวเกินไป (สูงสุด {max} ไบต์ อักษรที่ไม่ใช่ละตินใช้ตัวละ 2 ถึง 4 ไบต์)",
   "fs.protected": "โฟลเดอร์นั้นได้รับการป้องกัน",
   "fs.systemFolder": "ไฟล์ไม่แสดงโฟลเดอร์ภายในของระบบ (/proc, /sys, /dev และ /run)",
   "fs.tooLarge": "ไฟล์ใหญ่เกินไป (สูงสุด {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "ไม่สามารถอัปเดตบูตโหลดเดอร์ได้ (รหัส {code})",
   "hw.logindFailed": "ไม่สามารถใช้การตั้งค่าพลังงานได้ (รหัส {code})",
   "hw.noBacklight": "ไม่มีไฟพื้นหลังนี้",
+  "hw.noChargeControl": "แบตเตอรี่นี้ไม่มีการควบคุมการชาร์จ",
+  "hw.chargeControlFailed": "เปลี่ยนการชาร์จไม่ได้: {errno}",
   "hw.noCpufreq": "คอมพิวเตอร์นี้ไม่มีการปรับความถี่ CPU",
   "hw.noEeprom": "ไม่ได้ติดตั้งเครื่องมือบูตโหลดเดอร์ (rpi-eeprom)",
   "hw.noKernelLog": "ไม่สามารถอ่านบันทึกของเคอร์เนลได้",
@@ -875,5 +878,12 @@
   "pkg.multiarchConflict": "ไม่สามารถติดตั้ง {name} สำหรับ 64 และ 32 บิตพร้อมกันได้",
   "pkg.foreignArchUnsupported": "เปิดใช้แพ็กเกจ 32 บิตได้เฉพาะบนพีซี 64 บิต (amd64) เท่านั้น ระบบนี้คือ {arch}",
   "pkg.foreignArchFailed": "ไม่สามารถเปิดใช้แพ็กเกจ 32 บิต ({arch}) ได้ (dpkg จบด้วยรหัส {code})",
-  "webapps.developerOff": "โหมดนักพัฒนาปิดอยู่ใน การตั้งค่า → เว็บแอป"
+  "webapps.developerOff": "โหมดนักพัฒนาปิดอยู่ใน การตั้งค่า → เว็บแอป",
+  "media.streamAddress": "ไม่อนุญาตที่อยู่สตรีมนี้",
+  "media.streamCannotOpen": "เปิดสตรีมไม่ได้",
+  "media.streamTimeout": "สตรีมไม่ตอบกลับทันเวลา",
+  "media.streamAuth": "สตรีมขอผู้ใช้และรหัสผ่าน หรือข้อมูลไม่ถูกต้อง",
+  "media.streamLost": "สตรีมขาดหาย",
+  "media.streamNoChannels": "รายการไม่มีช่อง",
+  "media.noStreamHelper": "ตัวช่วยสตรีม (lord-stream) ไม่พร้อมใช้งาน"
 }

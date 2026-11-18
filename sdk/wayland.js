@@ -8,7 +8,7 @@
 // menu from the app's own bar arrive as requests from the compositor.
 import { createElement as h } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor } from '@lordos/runtime';
-import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf } from './windows.js';
+import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf, isWindowLocked, windowLocks } from './windows.js';
 import { followParents, overParent } from './dialogmodel.js';
 import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, coveredIds, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
@@ -49,7 +49,7 @@ let drag = null;
 addListener('pointermove', (e) => {
   if (!drag) return;
   const w = wm.get(drag.id);
-  if (!w) { drag = null; return; }
+  if (!w || isWindowLocked(drag.id)) { drag = null; return; }
   if (!drag.start || drag.start.x == null) { drag.start = { x: e.x, y: e.y, f: wm.frame(w) }; return; }
   const dx = e.x - drag.start.x, dy = e.y - drag.start.y, f = drag.start.f;
   if (drag.edges == null && w.maximized) {
@@ -166,7 +166,11 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     case 'resize': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); if (!wm.beginResize(id, d.edges || 10)) drag = { id, edges: d.edges || 10, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;
     case 'maximize': if (win && !win.maximized) wm.toggleMaximize(id); break;
     case 'unmaximize': if (win && win.maximized) wm.toggleMaximize(id); break;
-    case 'minimize': if (win) wm.minimize(id); break;
+    case 'minimize':        // a move still under way ends with it: a minimized window never follows the pointer (#189)
+      if (drag && drag.id === id) drag = null;
+      wm.cancelGrab(id);
+      if (win) wm.minimize(id);
+      break;
     // The app switched who draws the frame while open (Chromium's «Use system title bar and borders»,
     // Firefox's «Title Bar»): same window, place, size, maximized state, focus and Dock entry; only the
     // theme's frame comes or goes (the content area grows or shrinks by it, and the app is configured).
@@ -238,8 +242,10 @@ function sync() {
     if (!s) continue;
     const st = surfaceState(w, active);
     const cov = covered.has(w.id);
-    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0);
-    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov); }
+    // locked (the theme's padlock, isWindowLocked): the app is told it can't maximize (minimize stays), and its own buttons go
+    const fixed = isWindowLocked(w.id);
+    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0) | (fixed ? 16 : 0);
+    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov, fixed); }
   }
   // search, the launcher, a sheet or a system prompt is open: the keys are LordOS's, not the app's
   const f = keyboardSurface(list, active, shellHasKeyboard(), surfaceOf);
@@ -249,6 +255,7 @@ function sync() {
   if (top?.attention) setTimeout(() => wm.setAttention(top.id, false), 0);
 }
 windows.subscribe(sync);
+windowLocks.subscribe(sync);
 activeDesktop.subscribe(sync);
 overviewShowing.subscribe(sync);
 if (typeof onShellKeyboard === 'function') onShellKeyboard(() => sync());

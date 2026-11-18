@@ -37,5 +37,15 @@
   "col.time": "Durée",
   "back": "Retour",
   "emptyMusicTitle": "Aucune musique",
-  "emptyVideosTitle": "Aucune vidéo"
+  "emptyVideosTitle": "Aucune vidéo",
+  "nav.network": "Réseau",
+  "nav.streams": "Flux",
+  "streams.open": "Ouvrir une adresse…",
+  "streams.list": "Ouvrir une liste M3U…",
+  "streams.save": "Enregistrer",
+  "streams.remove": "Retirer",
+  "streams.close": "Fermer",
+  "streams.saved": "Enregistrés",
+  "streams.channels": "Chaînes ({n})",
+  "streams.empty": "Ouvrez une caméra, un flux ou une chaîne TV par son adresse, ou les chaînes d'une liste M3U."
 }

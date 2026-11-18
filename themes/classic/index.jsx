@@ -13,8 +13,8 @@
 //   placement.js                the work areas and the panels' places, with a taskbar on every display
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows,
-  getApp, wm, t as tr, DesktopWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
-  emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text,
+  getApp, wm, t as tr, DesktopWidgets, displayAt, WidgetDropTarget, WidgetPicker, widgetPicker, startDeskWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
+  emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text,
   useShortcuts, runShortcut, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, toggleShowDesktop, spotlight, launchApp, dockActivate,
   classicDesktopKeys, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   menuBarPrefs, menuBarEveryDisplay, barDisplays, pointerDisplay, keepWindowsInWorkAreas,
@@ -122,6 +122,7 @@ const classicTable = (ui) => {
 };
 
 function App() {
+  startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Lord Workspaces
   const [s] = useSettings();
   const t = makeTheme(s);
   const { mounted, focused } = useWindows();
@@ -176,7 +177,6 @@ function App() {
     left: desktopSwipe('left'), right: desktopSwipe('right'),
   }), []);
 
-  const wallpaper = findWallpaper(t.wallpapers, s.wallpaper);
   const isOnBar = (x, y) => onBar(pos, x, y, bars);
   const preview = useStore(snapPreview);
   const top = mounted[mounted.length - 1];
@@ -190,12 +190,13 @@ function App() {
     <ThemeProvider tokens={t}>
       <View style={{ width: '100%', height: '100%', backgroundColor: t.mode === 'dark' ? '#101216' : '#c9d3e0' }}>
         {all.map((d) => (
-          <Image key={d.id + ':' + d.x} src={wallpaperSrc(wallpaper, d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)}
+          <Image key={d.id + ':' + d.x} src={wallpaperSrc(findWallpaper(t.wallpapers, wallpaperIdFor(s, d)), d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)}
             onContextMenu={(e) => setDesk({ x: e.x, y: e.y })}
             style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
         ))}
         {all.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
         <DesktopWidgets layer="below" />
+        <WidgetDropTarget />
         <OverviewBackdrop />
         {/* keyed on the window: raising one reorders this list, and it must move, not mount again */}
         {mounted.map((w) => (
@@ -205,6 +206,7 @@ function App() {
           </Fragment>
         ))}
         <DesktopWidgets layer="above" />
+        <WidgetPicker />
         {/* a bar on each display and the panels above them: each in its layer (sdk/layers.js,
             docs/LAYERS.md), so the order and the clicks are the layers' */}
         <Layer name="dock">
@@ -228,6 +230,7 @@ function App() {
             '-',
             { label: tr('shell.classic.personalize'), onClick: () => wm.open('settings', { args: { section: 'appearance' } }) },
             { label: tr('shell.desktop.wallpaper'), onClick: () => wm.open('settings', { args: { section: 'wallpaper' } }) },
+            { label: tr('shell.widgets.add'), onClick: () => widgetPicker.set({ display: displayAt(desk.x, desk.y) || mainDisplay(), x: desk.x, y: desk.y }) },
             { label: tr('shell.classic.displaySettings'), onClick: () => wm.open('settings', { args: { section: 'displays' } }) },
           ]} />
         )}

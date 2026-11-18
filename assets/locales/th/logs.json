@@ -2,6 +2,7 @@
   "pick": "เลือกรายการเพื่อดูข้อความทั้งหมดและฟิลด์ต่างๆ",
   "field.time": "เวลา",
   "field.level": "ระดับ",
+  "field.account": "บัญชี",
   "field.process": "โปรเซส",
   "field.pid": "PID",
   "field.unit": "ยูนิต",

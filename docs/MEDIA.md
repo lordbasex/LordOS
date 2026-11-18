@@ -101,6 +101,50 @@ The same windows are black when a Linux app shares a screen or a window through 
  lord-media    media/helper/*  (FFmpeg + libva; sandbox; no network or files)
 ```
 
+### Network streams: `lord-stream` (0.8.8.10)
+
+Cameras, streams and TV channels for the desktop's **Video** widget and the Player's **Streams** (maintainer's approval
+2026-11-16). `lord-media` keeps no network at all; a second binary does this one job.
+
+- **What it is:** lord-media's own player (`helper/lm_play.c`) built with `LM_NET` as `lord-stream`, plus the M3U
+  reader (`media/stream/ls_m3u.c`). It refuses every other job. lord-server launches it like lord-media
+  (`media_spawn_stream`: fixed path next to lord-server, no arguments, `LANG` only, the socket on fd 3).
+- **Addresses** (`media/streamurl.c`, `tests/streamurl_test.c`, checked in lord-server and again in the helper):
+  `rtsp`, `rtsps`, `rtmp`, `rtmps`, `rtmpt`, `srt`, `rtp`, `udp`, `http`, `https` (HLS, DASH, MPEG-TS, MJPEG), printable
+  ASCII without spaces, quotes, `|` or backslashes, at most 2048 bytes. FFmpeg's `protocol_whitelist` is the
+  network-only list (`STREAM_FF_PROTOCOLS`): never `file:`, `pipe:`, `concat:` or `data:`.
+- **Sandbox:** the helpers' one (`sandbox_apply_helper`) with `network = 1`: socket(2) only for AF_INET/AF_INET6,
+  plus connect, bind (UDP: RTP ports, multicast) and sendmmsg/recvmmsg (glibc's resolver); never AF_UNIX, netlink or
+  socketpair; no exec or fork; read-only the system's libraries and what name resolution and TLS read
+  (`/etc/resolv.conf`, `/etc/hosts`, `/etc/nsswitch.conf`, `/etc/ssl`…). It runs in `lordos-net-streams.scope`, the
+  firewall app **`lordos:streams`** ("Cameras & TV" in Monitor → Network). `build/sandbox-test helper-net`.
+- **Never stuck:** every open and read is bounded (20 s to open, 6 s without data on a live stream; an
+  `interrupt_callback` also ends a read when lord-server stops it). A live stream that ends was lost: the helper says
+  `media.streamLost` and exits; the desktop shows Reconnecting and starts a new one after 1, 2, 4… 30 s
+  (`sdk/streams.jsx` `useStream`, `sdk/streammodel.js`). A wrong address or password stays failed. A live stream
+  without sound follows its frames' timing (bursts of segments are not dropped as late); an address with a duration
+  (a film over HLS) seeks and ends like a file.
+- **TLS (0.8.9):** https, HLS and DASH over https, rtmps and https M3U lists check the server's certificate against
+  the system's CAs (`/etc/ssl/certs/ca-certificates.crt`) and its host name (`lm_tls_verify` in `helper/lm_io.c`:
+  `tls_verify=1` and `ca_file` on the first open and, through the context's `io_open`, on every nested one, since
+  FFmpeg's demuxers don't pass those options on to playlists, segments and keys). FFmpeg checks nothing unless asked,
+  so before 0.8.9 any server was accepted (Claude Security). A self-signed server now fails with
+  `media.streamCannotOpen`. **rtsps is the exception:** FFmpeg 7.1's RTSP demuxer opens its `tls://` connection with no
+  options at all, so its certificate can't be checked; an rtsps camera is encrypted against someone listening but not
+  protected from someone in the middle, the same as plain rtsp. Checked with `build/lordstream-e2e`: a self-signed
+  https list is refused ("Peer certificate failed verification"), a public https list and a public HLS stream work.
+- **Passwords:** an address may carry `user:password@`; the desktop keeps the address without it and the password in
+  the keyring (Passwords, owner `player`, service `stream:<scheme>://<host:port>`), and puts it back only inside the
+  job's parameters. Nothing writes it to settings.json, a file or a command line.
+- **M3U lists:** an http(s) list is read by lord-stream (at most 4 MB and 5000 channels, parsed in the sandbox) and its
+  channels reach JS rebuilt by lord-server (`m3u_result`: each address checked again); a list file in the home folder
+  is parsed in JS by the same rules (`parseM3U`).
+- **Checked** with `build/lordstream-e2e` against local servers made with FFmpeg (HLS, DASH, SRT, UDP, RTP,
+  HTTP MPEG-TS, MJPEG, RTMP), an http M3U list, a public HTTPS HLS stream (DNS and TLS in the sandbox), and RTSP from
+  a webcam served by VLC on 127.0.0.1 (VLC refuses RTSP over TCP, so lord-stream falls back to UDP by itself; a camera
+  starts with a 1 s analysis, the first frame in about 4 s there; stopping VLC was noticed within a second). Not yet:
+  ONVIF discovery; NDI (closed SDK: not possible).
+
 ### The `lord-media` helper
 
 - **How it's launched:** lord-server launches it on demand (`media_spawn`), with a fixed path:

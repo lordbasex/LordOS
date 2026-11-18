@@ -9,7 +9,7 @@ import {
   formatNumber, typeScale, useFan, fanControl, GpuArt, scanVoices, voiceConf, VOICE_LANGS, appName, wm,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, Big, Stat, useCardStyle, AppGlyph, isolatedAppOf } from './index.jsx';
+import { Card, Big, Stat, StatRow, useCardStyle, AppGlyph, isolatedAppOf } from './index.jsx';
 import { Chart } from './Chart.jsx';
 import { Glyph } from './icons.jsx';
 import { createGpuState, gpuStep, pushHistory, mainCard, topApp, GPU_HISTORY } from './gpumodel.js';
@@ -339,7 +339,7 @@ export function GpuTab() {
         <AppsCard view={view} card={c} style={{ flex: 1 }} />
         <HistoryCard card={c} hist={h} style={{ flex: 1 }} />
       </View>
-      <View style={{ flexDirection: 'row', gap: 10 }}>
+      <StatRow>
         {temps.length > 1
           ? temps.map((x, k) => <Stat key={`${k}${x.label}`} icon="temp" label={sensor(tr, x.label)} value={formatNumber(Math.round(x.c), 0)} unit="°C" />)
           : <Stat icon="temp" label={tr('cooling.temperature')} value={c.temp != null ? formatNumber(Math.round(c.temp), 0) : '—'} unit={c.temp != null ? '°C' : null} />}
@@ -348,7 +348,7 @@ export function GpuTab() {
           unit={c.powerW != null ? (c.powerCapW ? tr('monitor.gpu.wattsOf', { cap: formatNumber(c.powerCapW, 0) }) : tr('monitor.volt.wattsUnit')) : null} />
         <Stat icon="cpu" label={tr('monitor.gpu.coreClock')} value={mhz(tr, c.sclk)} unit={c.sclkMax ? tr('monitor.gpu.ofMhz', { v: formatNumber(c.sclkMax, 0) }) : null} />
         {(c.mclk != null || c.mclkMax != null) && <Stat icon="memory" label={tr('monitor.gpu.memClock')} value={mhz(tr, c.mclk)} unit={c.mclkMax ? tr('monitor.gpu.ofMhz', { v: formatNumber(c.mclkMax, 0) }) : null} />}
-      </View>
+      </StatRow>
       {gf && <FanControl key={`${gf.id}${gf.mode}`} card={c} gf={gf} canChange={!!fan?.canChange} />}
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1, minWidth: 0, gap: 12 }}><MemoryCard card={c} hist={h} /></View>
@@ -405,11 +405,11 @@ export function OverviewAiVms({ style }) {
   }) + (voice.quality ? ` · ${tr(`settings.ai.quality.${voice.quality}`)}` : '') : tr('monitor.gpu.ai.idle');
   const vms = view.vms.count ? tr('monitor.gpu.vms', { n: view.vms.count, cpu: view.vms.cpu != null ? formatNumber(Math.round(view.vms.cpu * 100), 0) : '—', mem: formatBytes(view.vms.rss) }) : null;
   return (
-    <View style={{ flexDirection: 'row', gap: 10, ...style }}>
+    <StatRow style={style}>
       <Stat icon="ai" label={tr('monitor.gpu.ai.title')} value={voice ? tr(`monitor.gpu.ai.state.${voice.state}`) : tr('monitor.gpu.ai.idleShort')}>
         <Hint>{ai}</Hint>
       </Stat>
       {vms && <Stat icon="cpu" label={tr('monitor.gpu.machines')} value={formatNumber(view.vms.count, 0)}><Hint>{vms}</Hint></Stat>}
-    </View>
+    </StatRow>
   );
 }

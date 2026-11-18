@@ -235,6 +235,7 @@
   "fs.notRegular": "일반 파일이 아닙니다(링크인가요?)",
   "fs.openFailed": "파일을 열 수 없습니다: {errno}",
   "fs.outsideHome": "그 위치는 홈 폴더 밖에 있거나 올바르지 않습니다",
+  "fs.nameTooLong": "이름이 너무 깁니다(최대 {max}바이트, 한글 등 비라틴 문자는 한 글자에 2~4바이트)",
   "fs.protected": "그 폴더는 보호되어 있습니다",
   "fs.systemFolder": "파일 앱은 시스템 내부 폴더(/proc, /sys, /dev, /run)를 표시하지 않습니다",
   "fs.tooLarge": "파일이 너무 큽니다(최대 {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "부트로더를 업데이트할 수 없습니다(코드 {code})",
   "hw.logindFailed": "전원 설정을 적용할 수 없습니다(코드 {code})",
   "hw.noBacklight": "그런 백라이트가 없습니다",
+  "hw.noChargeControl": "이 배터리는 충전 제어를 지원하지 않습니다",
+  "hw.chargeControlFailed": "충전을 바꿀 수 없습니다: {errno}",
   "hw.noCpufreq": "이 컴퓨터는 CPU 주파수 조절을 지원하지 않습니다",
   "hw.noEeprom": "부트로더 도구(rpi-eeprom)가 설치되어 있지 않습니다",
   "hw.noKernelLog": "커널 로그를 읽을 수 없습니다",
@@ -875,5 +878,12 @@
   "pkg.multiarchConflict": "{name}을(를) 64비트와 32비트로 동시에 설치할 수 없습니다",
   "pkg.foreignArchUnsupported": "32비트 패키지는 64비트 PC(amd64)에서만 활성화할 수 있습니다. 이 시스템은 {arch}입니다",
   "pkg.foreignArchFailed": "32비트({arch}) 패키지를 활성화하지 못했습니다(dpkg 종료 코드 {code})",
-  "webapps.developerOff": "설정 → 웹 앱에서 개발자 모드가 꺼져 있습니다"
+  "webapps.developerOff": "설정 → 웹 앱에서 개발자 모드가 꺼져 있습니다",
+  "media.streamAddress": "이 스트림 주소는 허용되지 않습니다",
+  "media.streamCannotOpen": "스트림을 열 수 없습니다",
+  "media.streamTimeout": "스트림이 제시간에 응답하지 않았습니다",
+  "media.streamAuth": "스트림이 사용자와 암호를 요구했거나 틀렸습니다",
+  "media.streamLost": "스트림이 끊겼습니다",
+  "media.streamNoChannels": "목록에 채널이 없습니다",
+  "media.noStreamHelper": "스트림 도우미(lord-stream)를 사용할 수 없습니다"
 }

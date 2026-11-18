@@ -235,6 +235,7 @@
   "fs.notRegular": "Ia bukan fail biasa (adakah ia pautan?)",
   "fs.openFailed": "Tidak dapat membuka fail: {errno}",
   "fs.outsideHome": "Lokasi itu berada di luar folder rumah anda atau tidak sah",
+  "fs.nameTooLong": "Nama terlalu panjang (maks. {max} bait; huruf beraksen dan bukan Latin mengambil 2 hingga 4 setiap satu)",
   "fs.protected": "Folder itu dilindungi",
   "fs.systemFolder": "Fail tidak menunjukkan folder dalaman sistem (/proc, /sys, /dev dan /run)",
   "fs.tooLarge": "Fail terlalu besar (maks. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Tidak dapat mengemas kini pemuat but (kod {code})",
   "hw.logindFailed": "Tetapan kuasa tidak dapat digunakan (kod {code})",
   "hw.noBacklight": "Tiada lampu latar sedemikian",
+  "hw.noChargeControl": "Bateri ini tiada kawalan cas",
+  "hw.chargeControlFailed": "Tidak dapat menukar pengecasan: {errno}",
   "hw.noCpufreq": "Komputer ini tiada penskalaan frekuensi CPU",
   "hw.noEeprom": "Alat pemuat but (rpi-eeprom) tidak dipasang",
   "hw.noKernelLog": "Log kernel tidak dapat dibaca",
@@ -875,5 +878,12 @@
   "pkg.multiarchConflict": "{name} tidak boleh dipasang untuk 64 dan 32 bit pada masa yang sama",
   "pkg.foreignArchUnsupported": "Pakej 32-bit hanya boleh didayakan pada PC 64-bit (amd64); sistem ini ialah {arch}",
   "pkg.foreignArchFailed": "Pakej 32-bit ({arch}) tidak dapat didayakan (dpkg keluar dengan kod {code})",
-  "webapps.developerOff": "Mod pembangun dimatikan dalam Tetapan → Apl Web"
+  "webapps.developerOff": "Mod pembangun dimatikan dalam Tetapan → Apl Web",
+  "media.streamAddress": "Alamat strim ini tidak dibenarkan",
+  "media.streamCannotOpen": "Strim tidak dapat dibuka",
+  "media.streamTimeout": "Strim tidak menjawab tepat pada masanya",
+  "media.streamAuth": "Strim meminta pengguna dan kata laluan, atau ia salah",
+  "media.streamLost": "Strim terputus",
+  "media.streamNoChannels": "Senarai tiada saluran",
+  "media.noStreamHelper": "Pembantu strim (lord-stream) tiada"
 }

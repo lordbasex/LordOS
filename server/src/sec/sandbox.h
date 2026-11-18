@@ -63,6 +63,10 @@ typedef struct {
     const char *const *dev_files;
     /* folders listed but not opened: lord-tts's /dev/dri, which libdrm lists to find the render node */
     const char *const *list_dirs;
+    /* 1: internet sockets (AF_INET/AF_INET6 socket, connect, bind) and no Landlock TCP limit; never AF_UNIX,
+     * netlink or socketpair. Only lord-stream (0.8.8.10, maintainer's approval 2026-11-16: cameras and IPTV), which
+     * runs in its own firewall scope lordos-net-streams.scope. 0 for every other helper. */
+    int network;
 } SandboxHelperCfg;
 
 /* Callers can detect the ro_dir_fds/rw_dir_fds fields. */

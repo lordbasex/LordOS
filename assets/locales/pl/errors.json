@@ -235,6 +235,7 @@
   "fs.notRegular": "To nie jest zwykły plik (czy to dowiązanie?)",
   "fs.openFailed": "Nie udało się otworzyć pliku: {errno}",
   "fs.outsideHome": "To miejsce jest poza katalogiem domowym lub jest nieprawidłowe",
+  "fs.nameTooLong": "Nazwa jest za długa (maks. {max} bajtów; litery z ogonkami i niełacińskie zajmują po 2 do 4)",
   "fs.protected": "Ten folder jest chroniony",
   "fs.systemFolder": "Pliki nie pokazują wewnętrznych folderów systemu (/proc, /sys, /dev i /run)",
   "fs.tooLarge": "Plik jest za duży (maks. {max})",
@@ -278,6 +279,8 @@
   "hw.eepromUpdateFailed": "Nie udało się zaktualizować programu rozruchowego (kod {code})",
   "hw.logindFailed": "Nie udało się zastosować ustawień zasilania (kod {code})",
   "hw.noBacklight": "Nie ma takiego podświetlenia",
+  "hw.noChargeControl": "Ta bateria nie ma sterowania ładowaniem",
+  "hw.chargeControlFailed": "Nie udało się zmienić ładowania: {errno}",
   "hw.noCpufreq": "Ten komputer nie ma skalowania częstotliwości procesora",
   "hw.noEeprom": "Narzędzia programu rozruchowego (rpi-eeprom) nie są zainstalowane",
   "hw.noKernelLog": "Nie udało się odczytać dziennika jądra",
@@ -877,5 +880,12 @@
   "pkg.multiarchConflict": "Nie można zainstalować {name} jednocześnie dla 64 i 32 bitów",
   "pkg.foreignArchUnsupported": "Pakiety 32-bitowe można włączyć tylko na 64-bitowym komputerze (amd64); ten system to {arch}",
   "pkg.foreignArchFailed": "Nie udało się włączyć pakietów 32-bitowych ({arch}) (dpkg zakończył się kodem {code})",
-  "webapps.developerOff": "Tryb dewelopera jest wyłączony w Ustawienia → Aplikacje webowe"
+  "webapps.developerOff": "Tryb dewelopera jest wyłączony w Ustawienia → Aplikacje webowe",
+  "media.streamAddress": "Ten adres transmisji jest niedozwolony",
+  "media.streamCannotOpen": "Nie udało się otworzyć transmisji",
+  "media.streamTimeout": "Transmisja nie odpowiedziała na czas",
+  "media.streamAuth": "Transmisja wymagała użytkownika i hasła albo były błędne",
+  "media.streamLost": "Transmisja została przerwana",
+  "media.streamNoChannels": "Lista nie ma kanałów",
+  "media.noStreamHelper": "Pomocnik transmisji (lord-stream) jest niedostępny"
 }

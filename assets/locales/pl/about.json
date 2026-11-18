@@ -21,7 +21,7 @@
     "few": "{cpu} · {count} rdzenie",
     "many": "{cpu} · {count} rdzeni"
   },
-  "credits": "Kraj według IP w Monitorze: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Mapa: Natural Earth (domena publiczna).",
+  "credits": "Kraj według IP w Monitorze: DB-IP Lite Country, © db-ip.com, CC BY 4.0. Mapa: Natural Earth (domena publiczna). Miasta pogody: GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Ekran",
   "engine": "Silnik interfejsu",
   "host": "Komputer",

@@ -38,7 +38,8 @@ export function useCodecs() {
 }
 
 const pathOf = (v) => `${STORE}/${v.sha256}.mp4`;
-const wanted = (s, display) => (s.motion || {})[display] || (s.motion || {})['*'] || null;
+// a display's own entry wins, even null (a still picture chosen for that display: sdk/wallpapers.js wallpaperPatch)
+const wanted = (s, display) => { const m = s.motion || {}; return display in m ? m[display] || null : m['*'] || null; };
 
 export function downloadMotion(it, variant) {
   const arg = `${it.id} ${variant.name}`;

@@ -7,6 +7,7 @@
 import {
   View, Text, Button, TextInput, ScrollView, Toggle, Segmented, SearchField, Hairline, GroupBox, FormRow, MenuButton, useTheme, useLocale, useStore, createStore,
   admin, keyboard, languages, setLanguage, formatBytes, locale, regionOf, localeOf, regionCountry, localeLanguage, tOptional, wm, useAppWindow, useSystemInfo, typeScale, statusText, errorText, Lumo,
+  useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { emptyManual, actionsFor, setAction, addPartition, removeAdded, placeIn, rows as manualRows, review as manualReview } from './manualmodel.js';
@@ -225,7 +226,7 @@ function DiskStep() {
           <Text style={{ fontSize: 12, color: t.textDim, lineHeight: 1.4 }}>{tr('installer.disk.freeBoot')}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Toggle on={s.confirmFree} onChange={(confirmFree) => set({ confirmFree })} />
-            <Text style={{ fontSize: 12, color: t.text }}>{tr('installer.disk.freeUnderstand')}</Text>
+            <Text style={{ flex: 1, minWidth: 0, fontSize: 12, color: t.text }}>{tr('installer.disk.freeUnderstand')}</Text>
           </View>
           <Field label={tr('installer.disk.swap')} hint={tr('installer.disk.swapHint')}>
             <Segmented value={String(s.swap)} onChange={(v) => set({ swap: Number(v) })}
@@ -239,7 +240,7 @@ function DiskStep() {
           <Text style={{ fontSize: 12, color: t.text, lineHeight: 1.4 }}>{tr('installer.disk.eraseText')}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Toggle on={s.confirmBox} onChange={(confirmBox) => set({ confirmBox })} />
-            <Text style={{ fontSize: 12, color: t.text }}>{tr('installer.disk.understand')}</Text>
+            <Text style={{ flex: 1, minWidth: 0, fontSize: 12, color: t.text }}>{tr('installer.disk.understand')}</Text>
           </View>
           <Field label={tr('installer.disk.typeName', { name: s.disk.name })}>
             <TextInput value={s.confirmDisk} onChange={(confirmDisk) => set({ confirmDisk: confirmDisk.trim() })} placeholder={s.disk.name} />
@@ -509,7 +510,7 @@ function Install() {
       <Text style={{ fontSize: typeScale.largeTitle, fontWeight: 600, color: t.text }}>
         {s.done ? tr(FIRST_ACCOUNT ? 'installer.account.doneTitle' : 'installer.done.title') : s.error ? tr('installer.error.title') : tr(FIRST_ACCOUNT ? 'installer.account.working' : 'installer.install.title')}</Text>
       {!s.error && (
-        <View style={{ width: 460, gap: 6 }}>
+        <View style={{ width: 460, maxWidth: '100%', gap: 6 }}>
           <View style={{ height: 8, borderRadius: 4, backgroundColor: t.control, direction: 'ltr' }}>
             <View style={{ width: `${Math.round(f * 100)}%`, height: 8, borderRadius: 4, backgroundColor: s.done ? '#30d158' : t.accent }} />
           </View>
@@ -518,7 +519,7 @@ function Install() {
         </View>
       )}
       {s.error && <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'center', maxWidth: 480 }}>{s.error}</Text>}
-      <View style={{ width: 520, gap: 2 }}>
+      <View style={{ width: 520, maxWidth: '100%', gap: 2 }}>
         {s.log.slice(-4).map((l, i) => <Text key={i} style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{statusText(l)}</Text>)}
       </View>
       {s.done && <Text style={{ fontSize: 12, color: t.text, maxWidth: 480, textAlign: 'center' }}>{tr(FIRST_ACCOUNT ? 'installer.account.doneText' : 'installer.done.usb')}</Text>}
@@ -573,33 +574,40 @@ export default function Installer() {
   }[name];
   const Body = { welcome: Welcome, language: Language, keyboard: Keyboard, disk: DiskStep, user: UserStep, summary: Summary, install: Install }[name];
   const steps = STEPS.slice(1, -1);
+  // a small window: the list of steps hides behind a button in the footer and opens over the step
+  const side = useSidebar(640, 'installer');
+  const list = (
+    <View style={{ width: 200, ...(side.narrow ? { flex: 1 } : null), backgroundColor: t.sidebarBg, paddingHorizontal: 16, paddingTop: 20, gap: 4 }}>
+      <Hairline edge="end" />
+      <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, marginBottom: 12, paddingHorizontal: 4 }}>{tr(FIRST_ACCOUNT ? 'installer.account.title' : 'installer.title')}</Text>
+      {steps.map((st) => {
+        const i = STEPS.indexOf(st);
+        const cur = i === s.step, past = i < s.step;
+        return (
+          <View key={st} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 30, paddingHorizontal: 4, borderRadius: 6,
+            backgroundColor: cur ? t.hover : 'transparent' }}>
+            <View style={{ width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: cur ? t.accent : past ? '#30d158' : t.control }}>
+              <Text style={{ fontSize: 11, fontWeight: 600, color: cur || past ? '#fff' : t.textDim }}>{past ? '✓' : String(i)}</Text>
+            </View>
+            <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: cur ? 600 : 400, color: cur ? t.text : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{tr(`installer.step.${st}`)}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      <View style={{ width: 200, backgroundColor: t.sidebarBg, paddingHorizontal: 16, paddingTop: 20, gap: 4 }}>
-        <Hairline edge="end" />
-        <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, marginBottom: 12, paddingHorizontal: 4 }}>{tr(FIRST_ACCOUNT ? 'installer.account.title' : 'installer.title')}</Text>
-        {steps.map((st) => {
-          const i = STEPS.indexOf(st);
-          const cur = i === s.step, past = i < s.step;
-          return (
-            <View key={st} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 30, paddingHorizontal: 4, borderRadius: 6,
-              backgroundColor: cur ? t.hover : 'transparent' }}>
-              <View style={{ width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
-                backgroundColor: cur ? t.accent : past ? '#30d158' : t.control }}>
-                <Text style={{ fontSize: 11, fontWeight: 600, color: cur || past ? '#fff' : t.textDim }}>{past ? '✓' : String(i)}</Text>
-              </View>
-              <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: cur ? 600 : 400, color: cur ? t.text : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{tr(`installer.step.${st}`)}</Text>
-            </View>
-          );
-        })}
-      </View>
+      {side.narrow ? null : list}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <ScrollView style={{ flex: 1, paddingHorizontal: 24, paddingTop: 20 }}>
+        <ScrollView style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: 20 }}>
           {name !== 'welcome' && name !== 'install' && <Text style={{ fontSize: typeScale.largeTitle, fontWeight: 600, color: t.text, marginBottom: 16 }}>{tr(`installer.step.${name}`)}</Text>}
           <Body />
         </ScrollView>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, paddingHorizontal: 16, paddingVertical: 14 }}>
           <Hairline edge="top" />
+          {side.narrow ? <SidebarToggle shown={side.shown} onClick={side.toggle} /> : null}
+          {side.narrow ? <View style={{ flex: 1 }} /> : null}
           {name !== 'install' && s.step > 0 && <Button label={tr('installer.back')} onClick={() => set({ step: s.step - 1 })} />}
           {name === 'summary' && <Button primary label={tr(FIRST_ACCOUNT ? 'installer.account.create' : 'installer.summary.install')} onClick={startInstall} />}
           {name !== 'summary' && name !== 'install' && <Button primary disabled={!canNext} label={tr('installer.next')} onClick={() => canNext && set({ step: s.step + 1 })} />}
@@ -608,6 +616,7 @@ export default function Installer() {
             onClick={() => { if (!s.rebooting) { set({ rebooting: true }); admin.run('install-reboot').catch((e) => set({ rebooting: false, error: e.message })); } }} />}
         </View>
       </View>
+      {side.narrow && side.shown ? <SidebarOverlay width={200} onClose={side.close}>{list}</SidebarOverlay> : null}
     </View>
   );
 }

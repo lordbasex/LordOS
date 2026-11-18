@@ -20,7 +20,7 @@
     "one": "{cpu} · {count} cœur",
     "other": "{cpu} · {count} cœurs"
   },
-  "credits": "IP vers pays dans Moniteur : DB-IP Lite Country, © db-ip.com, CC BY 4.0. Carte : Natural Earth (domaine public).",
+  "credits": "IP vers pays dans Moniteur : DB-IP Lite Country, © db-ip.com, CC BY 4.0. Carte : Natural Earth (domaine public). Villes de la météo : GeoNames, © geonames.org, CC BY 4.0.",
   "display": "Écran",
   "engine": "Moteur d’interface",
   "host": "Ordinateur",

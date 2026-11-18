@@ -8,6 +8,7 @@
 //                                               and overlaps none (the nearest one to the snapped position)
 //   placementOk(rects, i, x, y)                 the rule lord-server checks too (out_fits in outputs.c)
 //   scaleChoices(pw, ph)                        the scales (percent) offered for a pw × ph display
+//   scaleValid(pct)                             one lord-server accepts (75, 80, 100, 125 … 300)
 //   scaleTiles(choices, value, rec)             the five of them shown as tiles (always with the
 //                                               current and the recommended one)
 //
@@ -16,9 +17,15 @@
 
 export const SNAP_PREVIEW_PX = 12;
 
-// The scales lord-server accepts (OUT_SCALE_MIN, OUT_SCALE_MAX and OUT_SCALE_STEP in server/src/outputs.h).
+// The scales lord-server accepts (OUT_SCALE_MIN, OUT_SCALE_MAX, OUT_SCALE_STEP and OUT_SCALE_SMALL_A/B in
+// server/src/outputs.h): 100 to 300 % in 25 % steps, and 75 and 80 % below (GitHub #158).
 export const SCALE_MIN = 100, SCALE_MAX = 300, SCALE_STEP = 25;
+export const SCALE_SMALL = [75, 80];
 const ROOM_W = 1024, ROOM_H = 600;              // the smallest useful logical desktop (as out_scale_recommended)
+// Below 100 % the desktop has more logical pixels than the display: offered only while it stays within 2560 × 1600
+// logical (a 1080p display at 75 %), so a large display never gets a desktop the UI engine lays out slowly.
+const MORE_W = 2560, MORE_H = 1600;
+export const scaleValid = (v) => Number.isInteger(v) && (SCALE_SMALL.includes(v) || (v >= SCALE_MIN && v <= SCALE_MAX && (v - SCALE_MIN) % SCALE_STEP === 0));
 
 const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 const shared = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0);
@@ -141,9 +148,10 @@ export function resolveDrop(rects, i, x, y, threshold) {
 
 // Every step from 100 % up to the largest that still leaves a 1024 × 600 logical desktop on a
 // pw × ph display (physical px, after rotation), and always at least up to 200 % (what Settings has
-// always offered): a 15" 4K panel gets 100–300 %, a 1080p one 100–200 %.
+// always offered): a 15" 4K panel gets 100–300 %, a 1080p one 100–200 %. Before them, 75 and 80 % ("more space",
+// GitHub #158) while the desktop stays within 2560 × 1600 logical: a 1280 × 800 or 1080p display gets 75–200 %.
 export function scaleChoices(pw, ph) {
-  const out = [];
+  const out = SCALE_SMALL.filter((n) => Math.max(pw, ph) * 100 / n <= MORE_W && Math.min(pw, ph) * 100 / n <= MORE_H);
   for (let n = SCALE_MIN; n <= SCALE_MAX; n += SCALE_STEP) {
     if (n > 200 && !(pw * 100 / n >= ROOM_W && ph * 100 / n >= ROOM_H)) break;
     out.push(n);
@@ -153,9 +161,17 @@ export function scaleChoices(pw, ph) {
 
 // Up to `count` of the choices for the "Larger text … More space" tiles, ascending: spread evenly from
 // the smallest to the largest (100–200 % shows every step, 100–300 % every other one), then the
-// current and the recommended scale put in place of the nearest pick when they are missing.
+// current and the recommended scale put in place of the nearest pick when they are missing. A scale below 100 %
+// (GitHub #158) adds one more tile before them: the current one when it is below 100, else the smallest offered.
 export function scaleTiles(choices, value, rec, count = 5) {
-  const ok = (v) => Number.isInteger(v) && v >= SCALE_MIN && v <= SCALE_MAX && (v - SCALE_MIN) % SCALE_STEP === 0;
+  const list = choices || [];
+  const small = list.filter((v) => v < SCALE_MIN);
+  const more = SCALE_SMALL.includes(value) ? value : small.length ? small[0] : null;
+  const regular = pickTiles(list.filter((v) => v >= SCALE_MIN), value >= SCALE_MIN ? value : null, rec, count);
+  return more != null ? [more, ...regular.filter((v) => v !== more)] : regular;
+}
+function pickTiles(choices, value, rec, count) {
+  const ok = (v) => scaleValid(v) && v >= SCALE_MIN;
   const all = [...(choices || [])];
   for (const v of [value, rec]) if (ok(v) && !all.includes(v)) all.push(v);
   all.sort((a, b) => a - b);

@@ -37,5 +37,15 @@
   "col.time": "Kesto",
   "back": "Takaisin",
   "emptyMusicTitle": "Ei musiikkia",
-  "emptyVideosTitle": "Ei videoita"
+  "emptyVideosTitle": "Ei videoita",
+  "nav.network": "Verkko",
+  "nav.streams": "Lähetykset",
+  "streams.open": "Avaa osoite…",
+  "streams.list": "Avaa M3U-lista…",
+  "streams.save": "Tallenna",
+  "streams.remove": "Poista",
+  "streams.close": "Sulje",
+  "streams.saved": "Tallennetut",
+  "streams.channels": "Kanavat ({n})",
+  "streams.empty": "Avaa kamera, lähetys tai tv-kanava osoitteella tai M3U-listan kanavat."
 }

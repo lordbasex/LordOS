@@ -13,7 +13,7 @@ import { wm } from './windows.js';
 import { Overlay } from './layers.js';
 import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { cleaner } from './cleaner.js';
-import { cleanerPalette } from './cleanertheme.js';
+import { shellPalette } from './cleanertheme.js';
 import { lordosUpdateWaiting } from './updates.js';
 import { cleanerItemShown, cleanerPanelAction } from './menubarmodel.js';
 import { isAppOff } from './appsoff.js';
@@ -65,7 +65,7 @@ function Panel({ p, onClose }) {
   const memTotal = d.mem ? d.mem.total : 0;
   // both cards read "used of total", as the bars below them and the Control Center and Monitor do (GitHub #118)
   const diskUsed = d.st.total > 0 ? Math.max(0, d.st.total - d.st.free) : 0;
-  return h(View, { style: { width: 384, padding: 16, gap: 10, borderRadius: 20, backgroundColor: p.panel, border: `1px solid ${p.line}`, boxShadow: '0 24px 60px rgba(8,4,30,0.5)' } },
+  return h(View, { style: { width: 384, padding: 16, gap: 10, borderRadius: 20, backgroundColor: p.panel, border: `1px solid ${p.line}`, boxShadow: p.shadow || '0 24px 60px rgba(8,4,30,0.5)' } },
     h(View, null,
       h(Text, { style: { fontSize: 17, fontWeight: 600, color: p.text, textAlign: 'start' } }, host),
       word ? h(Text, { style: { fontSize: 12, color: word === 'good' ? p.good : p.warn, textAlign: 'start' } }, t(`cleaner.panel.word.${word}`)) : null),
@@ -98,7 +98,7 @@ function CleanerItem({ height }) {
     });
   }, [open]);
   if (!on) return null;
-  const p = cleanerPalette(all, th.mode);
+  const p = shellPalette(th);           // the bar's panels look like the theme, not like Cleaner's own window
   return h(View, { ref: btn, onClick: () => setOpen((o) => !o), style: { height, width: 26, alignItems: 'center', justifyContent: 'center' } },
     h(Image, { src: `asset:cleaner/status-${th.mode === 'light' ? 'dark' : 'light'}.png`, style: { width: 16, height: 16 } }),
     open ? h(Overlay, { anchor: btn }, h(View, { ref: panel, style: statusPanelAt(btn) }, h(Panel, { p, onClose: () => setOpen(false) }))) : null);
