@@ -36,9 +36,9 @@ const THUMB = [320, 180];
 const BASE = [1920, 1080];
 const ENCODE = {
   default: { base: [90, '1x1'], large: [90, '1x1'] },
-  // upscaled from 1672×941: the base keeps 4:4:4 for the neon edges; at 4K, 4:2:0 still has more colour detail than
-  // the picture ever had
-  cyberpunk: { base: [85, '1x1'], large: [80, '2x2'] },
+  // neon art: 4:2:0 and quality 80 visibly softened the magenta and red edges against the originals (0.8.9), so both
+  // files keep full colour; the 4K one at 95 is as close to the original as JPEG gets
+  cyberpunk: { base: [92, '1x1'], large: [95, '1x1'] },
 };
 const out = path.join(root, 'assets', 'wallpapers');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lordos-wp-'));

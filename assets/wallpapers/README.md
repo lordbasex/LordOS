@@ -43,9 +43,9 @@ is a proper name and stays the same in every language, like Lumo.
   not kept in the repository (the JPEGs measure 39–46 dB PSNR against them and look the same).
 - **Cyberpunk City HD** (`cyberpunk/`, 0.8.9): eleven 3840×2160 pictures the maintainer made for LordOS, upscaled
   from 1672×941 (no text or marks in them). An original larger than 1920×1080 gets a 1920×1080 base
-  (`lordos-cyberpunk-<name>.jpg`, Lanczos, quality 85, 4:4:4) and keeps its own size as the `@3840x2160` variant
-  (quality 80, 4:2:0: an upscaled picture has no colour detail finer than that). 15.5 MB for the 22 files and the
-  thumbnails (5.7 MB of bases, 9.2 MB of 4K). The 2.2–3.4 MB source JPEGs are not kept here.
+  (`lordos-cyberpunk-<name>.jpg`, Lanczos, quality 92, 4:4:4) and keeps its own size as the `@3840x2160` variant
+  (quality 95, 4:4:4: 4:2:0 at 80 visibly softened the neon edges against the originals). 36.3 MB for the 22 files
+  and the thumbnails (7.9 MB of bases, 28.1 MB of 4K). The 2.2–3.4 MB source JPEGs are not kept here.
 - `thumbs/<category>/lordos-<name>.jpg`: 320×180 thumbnails for Settings and the Control Center,
   so the pickers never decode the full images.
 - `index.json`: the list (ids, categories, sizes) that the SDK bundles (`sdk/wallpapers.js`).
