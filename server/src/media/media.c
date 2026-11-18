@@ -474,7 +474,12 @@ static void m3u_result(MediaSrc *s, const MediaMsg *m, const char *payload) {
         return;
     }
     JDoc d;
-    if (!m->len || json_parse(payload, m->len, &d, NULL, 0) || !d.root || d.root->type != J_ARR) {
+    if (!m->len || json_parse(payload, m->len, &d, NULL, 0)) {
+        media_event(s->id, "m3u", "{\"ok\":false,\"code\":\"media.streamNoChannels\"}");
+        return;
+    }
+    if (!d.root || d.root->type != J_ARR) {      /* parsed but not a list: the document is freed all the same */
+        json_free(&d);
         media_event(s->id, "m3u", "{\"ok\":false,\"code\":\"media.streamNoChannels\"}");
         return;
     }

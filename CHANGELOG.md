@@ -19,6 +19,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   polygons in the signed-distance shapes, a colour fill), `lord.input.pointerAccent('#RRGGBB' | null)` takes only a
   colour, and `setPointerAccent` in the SDK; `build/cursor-test` checks the fill, the size, the text cursor and going
   back. Linux apps that ask for the default shape get it too.
+- **Security (Claude Security review of the 0.8.9 branch).** Four findings, all in code new in this version, fixed:
+  - Streams checked no TLS certificate: FFmpeg only verifies when asked, so an https, HLS-over-https or rtmps camera
+    or channel accepted any server, and a camera password from the keyring could go to someone in the middle. lord-stream
+    now asks for the certificate against the system's CAs and the host name on every open, nested HLS and DASH opens
+    included (`lm_tls_verify`, `server/src/media/helper/lm_io.c`); a self-signed server fails with "can't open". rtsps
+    can't be checked with FFmpeg 7.1 (its RTSP demuxer passes no TLS options), which docs/MEDIA.md says.
+  - The https M3U list download checked no certificate either (`server/src/media/stream/ls_m3u.c`).
+  - lord-server leaked a parsed list when lord-stream sent JSON that wasn't an array (`m3u_result`,
+    `server/src/media/media.c`).
+  - A use-after-free in `lord.setProp(id, 'wave', …)`: a getter on the object could destroy the node while it was
+    being written. The values are now read first and the node looked up again by id and serial; `lord.setStyle(id,
+    'gradient', …)` and the property key of `setProp` had the same pattern and are fixed the same way
+    (`server/src/ui/js.c`). `tests/js_getter_destroy.sh` runs it headless (found with AddressSanitizer on the old code).
 - **The clock widget can show a second hand.** Its menu has a third style, "Analog with seconds", next to Analog and
   Digital: a thin hand in the accent colour (and an accent centre) that moves every second; the other two still change
   once a minute. The hand is its own node on a shared one-second feed, so each tick repaints only the square it sweeps,

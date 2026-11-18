@@ -241,6 +241,13 @@ EOF
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
     esac
+    # a getter that destroys the node lord.setProp / lord.setStyle are writing (Claude Security, 0.8.9)
+    sh tests/js_getter_destroy.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "js-getter-destroy (tests/js_getter_destroy.js, headless lord-server)" ;;
+        77) skip "js-getter-destroy" "build/lord-server (make)" ;;
+        *) bad "js-getter-destroy (tests/js_getter_destroy.js, headless lord-server)" ;;
+    esac
     if have node; then run "hwkeys-test (sdk/hwkeymodel.js)" node ../tests/hwkeys_test.mjs; fi
     if have node; then run "fwrule-input-test (sdk/fwrule.js)" node tests/fwrule_input_test.mjs
     else skip "fwrule-input-test" "node"; fi

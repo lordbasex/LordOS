@@ -42,6 +42,8 @@ void lm_close_input(AVFormatContext **fmt);
 #ifdef LM_NET
 /* lord-stream only: an address checked against streamurl.h; network protocols only; every wait bounded */
 AVFormatContext *lm_open_url(const char *url, const char *params, char *err, size_t errlen);
+/* asks FFmpeg to check the server's certificate (system CAs, host name) on a network open (lm_io.c) */
+void lm_tls_verify(AVDictionary **o);
 void lm_net_deadline(double ms_from_now);      /* 0: none; reads past it give up (the stream is lost) */
 extern volatile int lm_net_abort;              /* set when lord-server stops it: FFmpeg's waits return */
 #endif

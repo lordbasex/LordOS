@@ -57,6 +57,7 @@ void ls_m3u(const char *params) {
     av_dict_set(&o, "protocol_whitelist", "http,https,tls,tcp,httpproxy", 0);
     av_dict_set(&o, "rw_timeout", "10000000", 0);
     av_dict_set(&o, "user_agent", "LordOS-stream/1", 0);
+    lm_tls_verify(&o);                       /* an https list: the server's certificate is checked (lm_io.c) */
     AVIOContext *io = NULL;
     int r = avio_open2(&io, url, AVIO_FLAG_READ, &cb, &o);
     av_dict_free(&o);

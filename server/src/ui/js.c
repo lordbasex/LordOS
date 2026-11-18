@@ -148,28 +148,35 @@ static void style_warn(const char *key) {
     fprintf(stderr, "js: unsupported style '%s'\n", key);
 }
 
+/* Reading a JS value can run the caller's code (a getter, a Proxy trap, valueOf), and that code can lord.destroy() the
+ * node. So every value that may be an object is read before the node is looked up, and the node pointer is never held
+ * across such a read (Claude Security, 0.8.9: setProp 'wave' and setStyle 'gradient'). */
 static JSValue f_set_style(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
-    Node *n = arg_node(c, argv[0]);
     const char *key = JS_ToCString(c, argv[1]);
-    if (!n || !key) { if (key) JS_FreeCString(c, key); return JS_UNDEFINED; }
     JSValueConst v = argv[2];
+    double grad[3] = {180, 0, 0};
+    int grad_on = 0;
+    if (key && !strcmp(key, "gradient") && JS_IsArray(c, v)) {
+        grad_on = 1;
+        for (int i = 0; i < 3; i++) {
+            JSValue e = JS_GetPropertyUint32(c, v, (uint32_t)i);
+            if (JS_IsNumber(e)) JS_ToFloat64(c, &grad[i], e);
+            JS_FreeValue(c, e);
+        }
+    }
+    Node *n = arg_node(c, argv[0]);
+    if (!n || !key) { if (key) JS_FreeCString(c, key); return JS_UNDEFINED; }
     int err = 0;
     Style before = n->s;
     StyleExt ext_before;
     if (n->s.ext) memcpy(&ext_before, n->s.ext, STYLE_EXT_VALUES);
     if (!strcmp(key, "gradient")) {
-        if (JS_IsArray(c, v)) {
-            double a[3] = {180, 0, 0};
-            for (int i = 0; i < 3; i++) {
-                JSValue e = JS_GetPropertyUint32(c, v, (uint32_t)i);
-                JS_ToFloat64(c, &a[i], e);
-                JS_FreeValue(c, e);
-            }
+        if (grad_on) {
             n->s.has_gradient = 1;
-            n->s.grad_angle = (float)a[0];
-            n->s.grad_from = (uint32_t)(int64_t)a[1];
-            n->s.grad_to = (uint32_t)(int64_t)a[2];
+            n->s.grad_angle = (float)grad[0];
+            n->s.grad_from = (uint32_t)(int64_t)grad[1];
+            n->s.grad_to = (uint32_t)(int64_t)grad[2];
         } else n->s.has_gradient = 0;
     } else if (JS_IsUndefined(v) || JS_IsNull(v)) {
         err = style_reset(&n->s, key);
@@ -190,8 +197,8 @@ static JSValue f_set_style(JSContext *c, JSValueConst this_val, int argc, JSValu
 
 static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
+    const char *key = JS_ToCString(c, argv[1]);         /* before the node: see f_set_style */
     Node *n = arg_node(c, argv[0]);
-    const char *key = JS_ToCString(c, argv[1]);
     if (n && key && !strcmp(key, "src")) {
         image_release(n->img);
         n->img = NULL;
@@ -273,27 +280,39 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
         js_media_node(n, id);
         node_invalidate(n);
     } else if (n && key && !strcmp(key, "wave") && n->type == NODE_WAVE && n->wave && JS_IsObject(argv[2])) {
-        /* the look of <SoundWave>: { lines, colors: [0xRRGGBB × 3], gain, hideIdle } (sdk/deskwidgets.jsx) */
-        WaveConf *w = n->wave;
-        double d;
+        /* the look of <SoundWave>: { lines, colors: [0xRRGGBB × 3], gain, hideIdle } (sdk/deskwidgets.jsx). The
+         * property reads can run the caller's getters, which may destroy the node: read everything first, then
+         * look the node up again by its id (see f_set_style). */
+        int nid = n->id;
+        uint64_t serial = n->serial;           /* ids are reused; the serial never is */
+        double d, lines = -1, gain = -1, col[3] = { -1, -1, -1 };
+        int hide = -1;
         JSValue v = JS_GetPropertyStr(c, argv[2], "lines");
-        if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 2 && d <= 24) w->lines = (int)d;
+        if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 2 && d <= 24) lines = d;
         JS_FreeValue(c, v);
         v = JS_GetPropertyStr(c, argv[2], "gain");
-        if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 0.25 && d <= 3) w->gain = (float)d;
+        if (JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d >= 0.25 && d <= 3) gain = d;
         JS_FreeValue(c, v);
         v = JS_GetPropertyStr(c, argv[2], "hideIdle");
-        if (JS_IsBool(v)) w->hide_idle = JS_ToBool(c, v);
+        if (JS_IsBool(v)) hide = JS_ToBool(c, v);
         JS_FreeValue(c, v);
         v = JS_GetPropertyStr(c, argv[2], "colors");
         for (uint32_t i = 0; i < 3 && JS_IsArray(c, v); i++) {
             JSValue e = JS_GetPropertyUint32(c, v, i);
-            if (JS_IsNumber(e) && !JS_ToFloat64(c, &d, e) && d >= 0 && d <= 0xffffff) w->col[i] = (uint32_t)d;
+            if (JS_IsNumber(e) && !JS_ToFloat64(c, &d, e) && d >= 0 && d <= 0xffffff) col[i] = d;
             JS_FreeValue(c, e);
         }
         JS_FreeValue(c, v);
-        wave_conf_changed(w);
-        node_invalidate(n);
+        n = node_ref(nid, serial);
+        if (n && n->type == NODE_WAVE && n->wave) {
+            WaveConf *w = n->wave;
+            if (lines >= 0) w->lines = (int)lines;
+            if (gain >= 0) w->gain = (float)gain;
+            if (hide >= 0) w->hide_idle = hide;
+            for (int i = 0; i < 3; i++) if (col[i] >= 0) w->col[i] = (uint32_t)col[i];
+            wave_conf_changed(w);
+            node_invalidate(n);
+        }
     } else if (n && key && !strcmp(key, "protected")) {
         n->protect = JS_ToBool(c, argv[2]) ? 1 : 0;     /* protected window (wm.setProtected) */
         node_invalidate(n);

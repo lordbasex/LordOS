@@ -125,14 +125,40 @@ static double net_deadline;                 /* ms: an open or a read past this g
 static int net_interrupt(void *op) { (void)op; return lm_net_abort || (net_deadline && lm_now_ms() > net_deadline); }
 void lm_net_deadline(double ms_from_now) { net_deadline = ms_from_now > 0 ? lm_now_ms() + ms_from_now : 0; }
 
+/* TLS: FFmpeg checks no certificate unless asked (tls_verify defaults to 0), so https, HLS over https and rtmps
+ * accepted any server, and a camera's keyring password went to whoever answered (Claude Security, 0.8.9). Every open
+ * asks for the peer's certificate against the system's CAs and the host name; a self-signed camera fails with
+ * media.streamCannotOpen instead of being trusted. The options go on the first open and, through io_open, on every
+ * nested one (HLS playlists, segments and keys), which FFmpeg's demuxers don't pass on themselves.
+ * rtsps is the exception FFmpeg 7.1 leaves no way around: the RTSP demuxer opens its tls:// connection with no
+ * options, so it can't be verified (docs/MEDIA.md says so; it is no weaker than plain rtsp). */
+#define LM_CA_FILE "/etc/ssl/certs/ca-certificates.crt"
+void lm_tls_verify(AVDictionary **o) {
+    av_dict_set(o, "tls_verify", "1", 0);
+    av_dict_set(o, "ca_file", LM_CA_FILE, 0);
+}
+static int (*default_io_open)(AVFormatContext *, AVIOContext **, const char *, int, AVDictionary **);
+static int verified_io_open(AVFormatContext *s, AVIOContext **pb, const char *url, int flags, AVDictionary **options) {
+    AVDictionary *own = NULL, **o = options ? options : &own;
+    lm_tls_verify(o);
+    int r = default_io_open(s, pb, url, flags, o);
+    av_dict_free(&own);
+    return r;
+}
+static void net_context(AVFormatContext *fmt) {
+    fmt->interrupt_callback.callback = net_interrupt;
+    fmt->protocol_whitelist = av_strdup(STREAM_FF_PROTOCOLS);
+    fmt->flags |= AVFMT_FLAG_NOBUFFER;
+    if (fmt->io_open && fmt->io_open != verified_io_open) { default_io_open = fmt->io_open; fmt->io_open = verified_io_open; }
+}
+
 AVFormatContext *lm_open_url(const char *url, const char *params, char *err, size_t errlen) {
     if (!stream_url_ok(url)) { lerr_set(err, errlen, "media.streamAddress", NULL); return NULL; }
     AVFormatContext *fmt = avformat_alloc_context();
     if (!fmt) { lerr_set(err, errlen, "sys.outOfMemory", NULL); return NULL; }
-    fmt->interrupt_callback.callback = net_interrupt;
-    fmt->protocol_whitelist = av_strdup(STREAM_FF_PROTOCOLS);
-    fmt->flags |= AVFMT_FLAG_NOBUFFER;
+    net_context(fmt);
     AVDictionary *o = NULL;
+    lm_tls_verify(&o);
     /* RTSP over TCP by default (cameras behind NAT, no lost packets); transport=udp asks for UDP */
     char tr[8] = "tcp";
     if (mp_param_int(params, "udp", 0)) snprintf(tr, sizeof tr, "udp");
@@ -152,9 +178,8 @@ AVFormatContext *lm_open_url(const char *url, const char *params, char *err, siz
         LM_LOG("RTSP over TCP refused; trying UDP");
         fmt = avformat_alloc_context();
         if (!fmt) { lerr_set(err, errlen, "sys.outOfMemory", NULL); return NULL; }
-        fmt->interrupt_callback.callback = net_interrupt;
-        fmt->protocol_whitelist = av_strdup(STREAM_FF_PROTOCOLS);
-        fmt->flags |= AVFMT_FLAG_NOBUFFER;
+        net_context(fmt);
+        lm_tls_verify(&o);
         av_dict_set(&o, "rtsp_transport", "udp", 0);
         av_dict_set(&o, "timeout", "8000000", 0);
         av_dict_set(&o, "probesize", "500000", 0);

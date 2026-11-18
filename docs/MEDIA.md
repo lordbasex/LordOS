@@ -124,6 +124,15 @@ Cameras, streams and TV channels for the desktop's **Video** widget and the Play
   (`sdk/streams.jsx` `useStream`, `sdk/streammodel.js`). A wrong address or password stays failed. A live stream
   without sound follows its frames' timing (bursts of segments are not dropped as late); an address with a duration
   (a film over HLS) seeks and ends like a file.
+- **TLS (0.8.9):** https, HLS and DASH over https, rtmps and https M3U lists check the server's certificate against
+  the system's CAs (`/etc/ssl/certs/ca-certificates.crt`) and its host name (`lm_tls_verify` in `helper/lm_io.c`:
+  `tls_verify=1` and `ca_file` on the first open and, through the context's `io_open`, on every nested one, since
+  FFmpeg's demuxers don't pass those options on to playlists, segments and keys). FFmpeg checks nothing unless asked,
+  so before 0.8.9 any server was accepted (Claude Security). A self-signed server now fails with
+  `media.streamCannotOpen`. **rtsps is the exception:** FFmpeg 7.1's RTSP demuxer opens its `tls://` connection with no
+  options at all, so its certificate can't be checked; an rtsps camera is encrypted against someone listening but not
+  protected from someone in the middle, the same as plain rtsp. Checked with `build/lordstream-e2e`: a self-signed
+  https list is refused ("Peer certificate failed verification"), a public https list and a public HLS stream work.
 - **Passwords:** an address may carry `user:password@`; the desktop keeps the address without it and the password in
   the keyring (Passwords, owner `player`, service `stream:<scheme>://<host:port>`), and puts it back only inside the
   job's parameters. Nothing writes it to settings.json, a file or a command line.
