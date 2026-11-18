@@ -6,7 +6,7 @@ It is not a native client of any service. **LordOS doesn't change the sites or t
 
 [[shot:6]]
 
-It is new in **LordOS 0.8.8.8**, released on 12 November 2026; the latest release is 0.8.8.9. It lives in an optional package, `lordos-web`: without it the rest of LordOS works the same, and the Store installs it for you with your first web app.
+It is new in **LordOS 0.8.8.8**, released on 12 November 2026; the latest release is 0.8.9. It lives in an optional package, `lordos-web`: without it the rest of LordOS works the same, and the Store installs it for you with your first web app.
 
 [[figure:web-runtime]]
 
@@ -86,7 +86,7 @@ Web apps follow the desktop's light or dark mode, live: switch Dark Mode in the 
 
 **The honest limit:** WPE WebKit 2.48 gives LordOS no way to set the page's color scheme itself, so a page that chooses its colors only through CSS (`@media (prefers-color-scheme: dark)` rules) stays light until a newer WebKit allows it. Such sites usually have a theme setting of their own: choose Dark there. The Store's page of an app says so when it is known.
 
-**Each app's own Appearance** (Light or Dark per app instead of following LordOS) is built, but it waits for LordOS's new web engine (WPEPlatform), which we're moving to before 1.0: today's WPE WebKit 2.48 can't tell a page's CSS the scheme, so the choice only half worked. Since 0.8.8.9, the latest release, Settings → Web Apps shows Appearance with Automatic selected and Light and Dark unavailable, and an app already set to Light or Dark follows LordOS's mode again. For now each web app follows LordOS's mode, and a site with its own theme setting (WhatsApp, for example) keeps it.
+**Each app's own Appearance** (Light or Dark per app instead of following LordOS) is built, but it waits for LordOS's new web engine (WPEPlatform), which we're moving to before 1.0: today's WPE WebKit 2.48 can't tell a page's CSS the scheme, so the choice only half worked. Since 0.8.8.9, Settings → Web Apps shows Appearance with Automatic selected and Light and Dark unavailable, and an app already set to Light or Dark follows LordOS's mode again. For now each web app follows LordOS's mode, and a site with its own theme setting (WhatsApp, for example) keeps it.
 
 [[shot:12]]
 
@@ -94,7 +94,7 @@ Web apps follow the desktop's light or dark mode, live: switch Dark Mode in the 
 
 ## Developer tools for web developers
 
-Since 0.8.8.9, the latest release. Turn on **Developer mode** in Settings → Web Apps (one switch for every web app, off by default) and each web app window's Window menu gets **Inspect (developer tools)**. Choose it and LordOS asks first, every time: developer tools can see everything in that app, including messages and sessions. Say yes and that window opens again with WebKit's Web Inspector on, which opens in your browser: elements, console, network and storage of that one window.
+Since 0.8.8.9. Turn on **Developer mode** in Settings → Web Apps (one switch for every web app, off by default) and each web app window's Window menu gets **Inspect (developer tools)**. Choose it and LordOS asks first, every time: developer tools can see everything in that app, including messages and sessions. Say yes and that window opens again with WebKit's Web Inspector on, which opens in your browser: elements, console, network and storage of that one window.
 
 - **Only on your computer, only while the window lives.** The inspector listens on 127.0.0.1 only and ends when you close the window (even for an app that runs in the background) or turn Developer mode off. The next start is a normal one.
 - **Only your own tab gets in.** Your browser opens a one-time address with a long random secret, which LordOS never shows in the notification; it gives that tab a private cookie and stops working. Every later request goes through a small gate in the app's process that checks the cookie and that the request comes from that same tab, so a web page open in your browser can't reach the inspector, not by scanning ports, over a WebSocket or by DNS rebinding. WebKit's own port is one that browsers refuse to open. If you close the tab, the notification's *Open in browser* opens it again.
@@ -123,7 +123,7 @@ Every installed web app has its page: its site and where it came from, its profi
 - **No DRM video or music** (Widevine is not available for WPE on Linux), so protected catalogs of music and video services won't play.
 - **Calls** depend on WebRTC in WPE WebKit and on the service; they may not work yet and were not checked.
 - **CSS-only dark mode** stays light, as above.
-- **No network at start.** In 0.8.8.8 an app opened before the network is up keeps the engine's error page; since 0.8.8.9 (the latest release) it shows its own *No connection* page and loads by itself once the network is back, or at Ctrl+R.
+- **No network at start.** In 0.8.8.8 an app opened before the network is up keeps the engine's error page; since 0.8.8.9 it shows its own *No connection* page and loads by itself once the network is back, or at Ctrl+R.
 - **Undo** works only in pages with their own history (a rich editor); a plain text field can't undo.
 - **The unread count** comes from the page's title ("(3) …"), the only source WPE gives; the notifications' sender photo is not shown.
 - Some services move to another address after you sign in; the page works, but its links may then open in your browser.

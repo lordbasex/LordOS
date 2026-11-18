@@ -6,7 +6,7 @@ No es un cliente nativo de ningún servicio. **LordOS no cambia los sitios ni su
 
 [[shot:6]]
 
-Es nuevo en **LordOS 0.8.8.8**, publicada el 12 de noviembre de 2026; el último lanzamiento es la 0.8.8.9. Vive en un paquete opcional, `lordos-web`: sin él, el resto de LordOS funciona igual, y la Tienda lo instala por vos con tu primera app web.
+Es nuevo en **LordOS 0.8.8.8**, publicada el 12 de noviembre de 2026; el último lanzamiento es la 0.8.9. Vive en un paquete opcional, `lordos-web`: sin él, el resto de LordOS funciona igual, y la Tienda lo instala por vos con tu primera app web.
 
 [[figure:web-runtime]]
 
@@ -86,7 +86,7 @@ Las apps web siguen el modo claro u oscuro del escritorio, en vivo: cambiá el M
 
 **El límite honesto:** WPE WebKit 2.48 no le da a LordOS ninguna forma de fijar el esquema de colores de la página, así que una página que elige sus colores solo con CSS (reglas `@media (prefers-color-scheme: dark)`) queda clara hasta que un WebKit más nuevo lo permita. Esos sitios suelen tener un ajuste de tema propio: elegí Oscuro ahí. La página de la app en la Tienda lo dice cuando se sabe.
 
-**La Apariencia propia de cada app** (Claro u Oscuro por app en vez de seguir a LordOS) está hecha, pero espera al nuevo motor web de LordOS (WPEPlatform), al que estamos migrando antes de la 1.0: el WPE WebKit 2.48 de hoy no puede decirle el esquema al CSS de una página, así que la elección funcionaba a medias. Desde la 0.8.8.9, la última versión publicada, Ajustes → Apps web muestra Apariencia con Automático elegido y Claro y Oscuro no disponibles, y una app que ya estaba en Claro u Oscuro vuelve a seguir el modo de LordOS. Por ahora cada app web sigue el modo de LordOS, y un sitio con su propio ajuste de tema (WhatsApp, por ejemplo) lo mantiene.
+**La Apariencia propia de cada app** (Claro u Oscuro por app en vez de seguir a LordOS) está hecha, pero espera al nuevo motor web de LordOS (WPEPlatform), al que estamos migrando antes de la 1.0: el WPE WebKit 2.48 de hoy no puede decirle el esquema al CSS de una página, así que la elección funcionaba a medias. Desde la 0.8.8.9, Ajustes → Apps web muestra Apariencia con Automático elegido y Claro y Oscuro no disponibles, y una app que ya estaba en Claro u Oscuro vuelve a seguir el modo de LordOS. Por ahora cada app web sigue el modo de LordOS, y un sitio con su propio ajuste de tema (WhatsApp, por ejemplo) lo mantiene.
 
 [[shot:12]]
 
@@ -94,7 +94,7 @@ Las apps web siguen el modo claro u oscuro del escritorio, en vivo: cambiá el M
 
 ## Herramientas para desarrolladores web
 
-Desde la 0.8.8.9, la última versión. Activá el **Modo desarrollador** en Ajustes → Apps web (un solo interruptor para todas las apps web, apagado de entrada) y el menú Ventana de cada app web suma **Inspeccionar (herramientas para desarrolladores)**. Al elegirlo, LordOS pregunta primero, cada vez: las herramientas para desarrolladores pueden ver todo en esa app, incluidos los mensajes y las sesiones. Si decís que sí, esa ventana se abre de nuevo con el Web Inspector de WebKit activado, que se abre en tu navegador: elementos, consola, red y almacenamiento de esa ventana sola.
+Desde la 0.8.8.9. Activá el **Modo desarrollador** en Ajustes → Apps web (un solo interruptor para todas las apps web, apagado de entrada) y el menú Ventana de cada app web suma **Inspeccionar (herramientas para desarrolladores)**. Al elegirlo, LordOS pregunta primero, cada vez: las herramientas para desarrolladores pueden ver todo en esa app, incluidos los mensajes y las sesiones. Si decís que sí, esa ventana se abre de nuevo con el Web Inspector de WebKit activado, que se abre en tu navegador: elementos, consola, red y almacenamiento de esa ventana sola.
 
 - **Solo en tu computadora, solo mientras vive la ventana.** El inspector escucha solo en 127.0.0.1 y termina cuando cerrás la ventana (aunque la app funcione en segundo plano) o apagás el Modo desarrollador. El próximo inicio es uno normal.
 - **Solo entra tu propia pestaña.** Tu navegador abre una dirección de un solo uso con un secreto aleatorio largo, que LordOS nunca muestra en la notificación; le da a esa pestaña una cookie privada y deja de funcionar. Cada pedido siguiente pasa por una pequeña puerta en el proceso de la app que verifica la cookie y que el pedido venga de esa misma pestaña, así que una página web abierta en tu navegador no puede llegar al inspector, ni escaneando puertos, ni por WebSocket, ni con DNS rebinding. El puerto propio de WebKit es uno que los navegadores se niegan a abrir. Si cerrás la pestaña, *Abrir en el navegador* en la notificación la abre de nuevo.
@@ -123,7 +123,7 @@ Cada app web instalada tiene su página: su sitio y de dónde vino, sus perfiles
 - **Sin video ni música con DRM** (Widevine no está disponible para WPE en Linux), así que los catálogos protegidos de los servicios de música y video no se reproducen.
 - **Las llamadas** dependen del WebRTC de WPE WebKit y del servicio; puede que todavía no anden y no se probaron.
 - **El modo oscuro solo por CSS** queda claro, como arriba.
-- **Sin red al abrir.** En la 0.8.8.8 una app abierta antes de que haya red se queda con la página de error del motor; desde la 0.8.8.9 (el último lanzamiento) muestra su propia página *Sin conexión* y carga sola cuando vuelve la red, o con Ctrl+R.
+- **Sin red al abrir.** En la 0.8.8.8 una app abierta antes de que haya red se queda con la página de error del motor; desde la 0.8.8.9 muestra su propia página *Sin conexión* y carga sola cuando vuelve la red, o con Ctrl+R.
 - **Deshacer** funciona solo en páginas con su propio historial (un editor enriquecido); un campo de texto simple no puede deshacer.
 - **El contador de no leídos** sale del título de la página ("(3) …"), la única fuente que da WPE; no se muestra la foto de quien manda la notificación.
 - Algunos servicios se pasan a otra dirección después de iniciar sesión; la página funciona, pero sus enlaces pueden abrirse entonces en tu navegador.
