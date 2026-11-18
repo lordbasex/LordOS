@@ -10,6 +10,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9-beta] - 2026-11-18
+
 ### Added
 
 - **Lord Workspaces has its own pointer**: the default arrow becomes a rounded tip with no tail, filled with the
@@ -7132,7 +7134,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.9-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9-beta...HEAD
+[0.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.9-beta...v0.8.9-beta
 [0.8.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.8-beta...v0.8.8.9-beta
 [0.8.8.8-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.7-beta...v0.8.8.8-beta
 [0.8.8.7-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.6-beta...v0.8.8.7-beta
