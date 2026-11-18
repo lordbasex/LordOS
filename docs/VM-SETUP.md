@@ -1934,3 +1934,11 @@ The rest came in as their dependencies: `gir1.2-soup-3.0 libgav1-1 libyuv0 libav
 libglvnd-dev libegl1-mesa-dev libgssdp-1.6-0 libgstreamer-gl1.0-0 libgupnp-1.6-0 libgupnp-igd-1.6-0 libnice10
 libgstreamer-plugins-bad1.0-0 libharfbuzz-icu0 libsqlite3-dev libwebpdemux2 libwoff1 libwpe-1.0-1 libwpebackend-fdo-1.0-1`.
 About 0.1 GB of the SD card.
+
+## Step — the 0.8.9-beta release on VM 116 `lordos-gpu` (2026-11-18)
+
+The ISO's helper check refused a package without `lord-screencast` (new in 0.8.8.10): installed `libpipewire-0.3-dev`
+(`sudo apt-get install -y --no-install-recommends libpipewire-0.3-dev`), then `make -C server RELEASE=1` and
+`sudo RELEASE=1 REQUIRE_SIGNED_CODE=1 tools/iso/build.sh /var/tmp/lordos-iso` again. Old work folders of earlier releases
+in `/var/tmp` (`wk-auto-iso`, `lordos-iso-0888`, `wk-rel-iso`, `i37-pkg`, `rel085`) and `~/LordOS-0884`, `~/LordOS-0888`,
+`~/LordOS-rel0885` were removed to make room (36 GB free after).
