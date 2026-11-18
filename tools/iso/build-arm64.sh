@@ -7,7 +7,8 @@
 # BUILD_CHROOT (default /var/tmp/lordos-arm64-br) is an arm64 Debian 13 with the build packages, as
 # tools/rpi/build-img.sh makes it. It is only read: an overlay in a private mount namespace takes every
 # change, so it stays as it was. The tree's server/build must be for aarch64 or empty; it is compiled
-# with GPU=1 in the chroot. RELEASE=1 and REQUIRE_SIGNED_CODE=1 pass through. On an arm64 host, run
+# with GPU=1 in the chroot. RELEASE=1 and REQUIRE_SIGNED_CODE=1 pass through; RCLONE_DEB (a host path) is
+# copied into the work folder's out/, where build.sh finds it. On an arm64 host, run
 # tools/iso/build.sh directly.
 set -eu
 [ "$(id -u)" = 0 ] || { echo "build-arm64.sh: run as root (sudo)" >&2; exit 1; }
@@ -17,7 +18,12 @@ WORK=${1:-/var/tmp/lordos-iso-arm64}
 BR=${BUILD_CHROOT:-/var/tmp/lordos-arm64-br}
 [ -x "$BR/usr/bin/gcc" ] || { echo "build-arm64.sh: no arm64 build chroot in $BR" >&2; exit 1; }
 J=${JOBS:-4}
-mkdir -p "$WORK/upper" "$WORK/ofs" "$WORK/merged" "$WORK/iso"
+mkdir -p "$WORK/upper" "$WORK/ofs" "$WORK/merged" "$WORK/iso/out"
+# a host path in RCLONE_DEB means nothing inside the chroot: copy the package to where build.sh looks for it
+if [ -n "${RCLONE_DEB:-}" ]; then
+    [ -f "$RCLONE_DEB" ] || { echo "build-arm64.sh: RCLONE_DEB $RCLONE_DEB not found" >&2; exit 1; }
+    cp "$RCLONE_DEB" "$WORK/iso/out/"
+fi
 
 # the new namespace's mounts go away with this process, and none reaches the host's /dev or /run
 exec unshare --mount --propagation private sh -eu -c '

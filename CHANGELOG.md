@@ -10,6 +10,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- `tools/iso/build-arm64.sh` copies `RCLONE_DEB` into the work folder's `out/` before entering the arm64 chroot.
+  The host path meant nothing inside the chroot, so the 0.8.9-beta arm64 ISO stopped with "no lordos-rclone"
+  until the package was copied there by hand.
+
 ## [0.8.9-beta] - 2026-11-18
 
 ### Added
