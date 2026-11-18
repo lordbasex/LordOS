@@ -641,6 +641,7 @@
   "widgets.size.w": "가로형",
   "widgets.size.xl": "아주 크게",
   "widgets.clock.analog": "아날로그",
+  "widgets.clock.analogSeconds": "아날로그(초침 표시)",
   "widgets.clock.digital": "디지털",
   "widgets.clock.cities": "시계 앱에서 도시 선택…",
   "widgets.clock.tomorrow": "내일",

@@ -648,6 +648,7 @@
   "widgets.size.w": "Pana",
   "widgets.size.xl": "Kubwa sana",
   "widgets.clock.analog": "Ya mishale",
+  "widgets.clock.analogSeconds": "Analogi yenye mshale wa sekunde",
   "widgets.clock.digital": "Dijitali",
   "widgets.clock.cities": "Chagua miji katika Saa…",
   "widgets.clock.tomorrow": "Kesho",

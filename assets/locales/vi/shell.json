@@ -641,6 +641,7 @@
   "widgets.size.w": "Rộng",
   "widgets.size.xl": "Rất lớn",
   "widgets.clock.analog": "Kim",
+  "widgets.clock.analogSeconds": "Kim, có kim giây",
   "widgets.clock.digital": "Số",
   "widgets.clock.cities": "Chọn thành phố trong Đồng hồ…",
   "widgets.clock.tomorrow": "Ngày mai",

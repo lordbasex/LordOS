@@ -648,6 +648,7 @@
   "widgets.size.w": "চওড়া",
   "widgets.size.xl": "অনেক বড়",
   "widgets.clock.analog": "অ্যানালগ",
+  "widgets.clock.analogSeconds": "সেকেন্ডের কাঁটাসহ অ্যানালগ",
   "widgets.clock.digital": "ডিজিটাল",
   "widgets.clock.cities": "ঘড়িতে শহর বেছে নিন…",
   "widgets.clock.tomorrow": "আগামীকাল",

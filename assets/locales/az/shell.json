@@ -648,6 +648,7 @@
   "widgets.size.w": "Geniş",
   "widgets.size.xl": "Çox böyük",
   "widgets.clock.analog": "Analoq",
+  "widgets.clock.analogSeconds": "Saniyə əqrəbli analoq",
   "widgets.clock.digital": "Rəqəmsal",
   "widgets.clock.cities": "Şəhərləri Saatda seçin…",
   "widgets.clock.tomorrow": "Sabah",

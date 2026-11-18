@@ -648,6 +648,7 @@
   "widgets.size.w": "چوڑا",
   "widgets.size.xl": "بہت بڑا",
   "widgets.clock.analog": "سوئیوں والی",
+  "widgets.clock.analogSeconds": "سیکنڈ کی سوئی کے ساتھ اینالاگ",
   "widgets.clock.digital": "ڈیجیٹل",
   "widgets.clock.cities": "گھڑی میں شہر منتخب کریں…",
   "widgets.clock.tomorrow": "کل",

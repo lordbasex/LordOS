@@ -19,6 +19,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   polygons in the signed-distance shapes, a colour fill), `lord.input.pointerAccent('#RRGGBB' | null)` takes only a
   colour, and `setPointerAccent` in the SDK; `build/cursor-test` checks the fill, the size, the text cursor and going
   back. Linux apps that ask for the default shape get it too.
+- **The clock widget can show a second hand.** Its menu has a third style, "Analog with seconds", next to Analog and
+  Digital: a thin hand in the accent colour (and an accent centre) that moves every second; the other two still change
+  once a minute. The hand is its own node on a shared one-second feed, so each tick repaints only the square it sweeps,
+  and like every widget feed it stops while the widget is behind a window, the displays are off or the session is
+  locked. Named in all 35 languages. (`sdk/deskwidgets.jsx`)
 - **Cyberpunk City HD, a new wallpaper category** (all themes' Settings → Wallpaper): seventeen pictures made for
   LordOS, in the order of a journey from the road outside into the city: Panorama, Neon Road Entrance, Heart of the
   City, Skyline Highway, Rings and Bridges, Flower Boulevard, Neon Cherry Avenue, Maglev Station, Pier and Train, Sky

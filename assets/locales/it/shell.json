@@ -648,6 +648,7 @@
   "widgets.size.w": "Largo",
   "widgets.size.xl": "Extra grande",
   "widgets.clock.analog": "Analogico",
+  "widgets.clock.analogSeconds": "Analogico con lancetta dei secondi",
   "widgets.clock.digital": "Digitale",
   "widgets.clock.cities": "Scegli le città in Orologio…",
   "widgets.clock.tomorrow": "Domani",

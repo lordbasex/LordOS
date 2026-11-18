@@ -648,6 +648,7 @@
   "widgets.size.w": "Széles",
   "widgets.size.xl": "Extra nagy",
   "widgets.clock.analog": "Analóg",
+  "widgets.clock.analogSeconds": "Analóg másodpercmutatóval",
   "widgets.clock.digital": "Digitális",
   "widgets.clock.cities": "Városok kiválasztása az Órában…",
   "widgets.clock.tomorrow": "Holnap",

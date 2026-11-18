@@ -648,6 +648,7 @@
   "widgets.size.w": "Malapad",
   "widgets.size.xl": "Napakalaki",
   "widgets.clock.analog": "Analog",
+  "widgets.clock.analogSeconds": "Analog na may segundero",
   "widgets.clock.digital": "Digital",
   "widgets.clock.cities": "Pumili ng mga lungsod sa Orasan…",
   "widgets.clock.tomorrow": "Bukas",

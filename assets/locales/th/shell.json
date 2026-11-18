@@ -641,6 +641,7 @@
   "widgets.size.w": "แบบกว้าง",
   "widgets.size.xl": "ใหญ่พิเศษ",
   "widgets.clock.analog": "เข็ม",
+  "widgets.clock.analogSeconds": "อนาล็อกพร้อมเข็มวินาที",
   "widgets.clock.digital": "ดิจิทัล",
   "widgets.clock.cities": "เลือกเมืองในนาฬิกา…",
   "widgets.clock.tomorrow": "พรุ่งนี้",

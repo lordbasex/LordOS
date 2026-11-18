@@ -648,6 +648,7 @@
   "widgets.size.w": "پهن",
   "widgets.size.xl": "خیلی بزرگ",
   "widgets.clock.analog": "عقربه‌ای",
+  "widgets.clock.analogSeconds": "عقربه‌ای با ثانیه‌شمار",
   "widgets.clock.digital": "دیجیتال",
   "widgets.clock.cities": "انتخاب شهرها در ساعت…",
   "widgets.clock.tomorrow": "فردا",

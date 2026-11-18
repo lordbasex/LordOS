@@ -648,6 +648,7 @@
   "widgets.size.w": "Leveä",
   "widgets.size.xl": "Erittäin suuri",
   "widgets.clock.analog": "Analoginen",
+  "widgets.clock.analogSeconds": "Analoginen sekuntiviisarilla",
   "widgets.clock.digital": "Digitaalinen",
   "widgets.clock.cities": "Valitse kaupungit Kellosta…",
   "widgets.clock.tomorrow": "Huomenna",

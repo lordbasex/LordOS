@@ -676,6 +676,7 @@
   "widgets.size.w": "عريض",
   "widgets.size.xl": "كبير جدًا",
   "widgets.clock.analog": "تناظري",
+  "widgets.clock.analogSeconds": "تناظري بعقرب الثواني",
   "widgets.clock.digital": "رقمي",
   "widgets.clock.cities": "اختيار المدن في الساعة…",
   "widgets.clock.tomorrow": "غدًا",

@@ -18,8 +18,9 @@
 // dragging it puts it back on the grid. opts.frame 'none' draws it without its card (the sound wave).
 //
 // The look follows TangoOS's widgets (the maintainer's own design): 22 px corners, the Crystal blur, 12 px headings,
-// large figures. Nothing on them runs per second: clocks move once a minute; System, Network, Temperatures and Claude
-// Code read only while shown.
+// large figures. Nothing on them runs per second but the analog clock's second hand when the person picks it (its own
+// node, the only one that changes each second); otherwise clocks move once a minute. System, Network, Temperatures and
+// Claude Code read only while shown.
 import { memo, useEffect, useRef, useState } from 'react';
 import { View, Text, SoundWave, addListener, screen, onScreenChange, displays as screenDisplays, mainDisplay } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
@@ -338,6 +339,7 @@ function useEvery(fn, ms, deps = []) {
 // The shared sources: one read for every widget that shows them.
 const minuteNow = () => Math.floor(Date.now() / 60000) * 60000;
 const useMinute = () => useFeed('minute', minuteNow, 60000);
+const secondNow = () => Math.floor(Date.now() / 1000) * 1000;
 // CPU usage (0..1, in whole percents) between two reads of /proc/stat; null on the first
 function cpuRead(st) {
   const [t, i] = lord.system.cpuTimes();
@@ -377,13 +379,21 @@ function cities(n) {
   const list = (Array.isArray(settings.get().clock?.cities) && settings.get().clock.cities.length ? settings.get().clock.cities : DEFAULT_CITIES).filter((z) => z && z !== own);
   return list.slice(0, n);
 }
-function AnalogFace({ L, size, date }) {
+// a hand of a face of radius c: deg from 12 o'clock, len past the centre, tail behind it
+function hand(c, deg, len, tail, w, color) {
+  const a = (deg * Math.PI) / 180, d = (len - tail) / 2;
+  return <View style={{ position: 'absolute', left: c + Math.sin(a) * d - w / 2, top: c - Math.cos(a) * d - (len + tail) / 2, width: w, height: len + tail, borderRadius: w / 2, backgroundColor: color, transform: `rotate(${deg}deg)` }} />;
+}
+// The second hand (opts.style 'analog-seconds'), in the accent: its own component on a shared one-second feed, so
+// each second re-renders this one node and repaints only the square it sweeps, never the face. Seconds are the same
+// in every time zone, so the world cities' faces share it.
+function SecondHand({ L, c, k }) {
+  const s = new Date(useFeed('second', secondNow, 1000)).getSeconds();
+  return hand(c, s * 6, 44 * k, 12 * k, 1.2 * k, L.accent);
+}
+function AnalogFace({ L, size, date, seconds }) {
   const k = size / 112, c = size / 2;
   const h = date.getHours(), m = date.getMinutes();
-  const hand = (deg, len, tail, w, color) => {
-    const a = (deg * Math.PI) / 180, d = (len - tail) / 2;
-    return <View style={{ position: 'absolute', left: c + Math.sin(a) * d - w / 2, top: c - Math.cos(a) * d - (len + tail) / 2, width: w, height: len + tail, borderRadius: w / 2, backgroundColor: color, transform: `rotate(${deg}deg)` }} />;
-  };
   return (
     <View style={{ width: size, height: size, borderRadius: c, backgroundColor: L.face, border: `0.5px solid ${L.sep}`, direction: 'ltr' }}>
       {Array.from({ length: 60 }, (_, i) => {
@@ -395,9 +405,10 @@ function AnalogFace({ L, size, date }) {
         const n = i + 1, a = (n / 12) * Math.PI * 2, r = c - 19 * k, fs = 11.5 * k;
         return <Text key={n} style={{ position: 'absolute', left: c + Math.sin(a) * r - fs, top: c - Math.cos(a) * r - fs * 0.62, width: fs * 2, fontSize: fs, fontWeight: 600, color: L.text, textAlign: 'center' }}>{String(n)}</Text>;
       }) : null}
-      {hand(((h % 12) + m / 60) * 30, 26 * k, 6 * k, 3.6 * k, L.text)}
-      {hand(m * 6, 40 * k, 8 * k, 2.6 * k, L.text)}
-      <View style={{ position: 'absolute', left: c - 3 * k, top: c - 3 * k, width: 6 * k, height: 6 * k, borderRadius: 3 * k, backgroundColor: '#F97316' }} />
+      {hand(c, ((h % 12) + m / 60) * 30, 26 * k, 6 * k, 3.6 * k, L.text)}
+      {hand(c, m * 6, 40 * k, 8 * k, 2.6 * k, L.text)}
+      {seconds ? <SecondHand L={L} c={c} k={k} /> : null}
+      <View style={{ position: 'absolute', left: c - 3 * k, top: c - 3 * k, width: 6 * k, height: 6 * k, borderRadius: 3 * k, backgroundColor: seconds ? L.accent : '#F97316' }} />
     </View>
   );
 }
@@ -417,12 +428,12 @@ function CityRow({ L, zone, now }) {
 function ClockBody({ w, L }) {
   const now = useMinute();
   const date = new Date(now);
-  const digital = w.opts?.style === 'digital';
+  const digital = w.opts?.style === 'digital', seconds = w.opts?.style === 'analog-seconds';
   const here = cityName(localZone()) || t('shell.widgets.clock.name');
   if (w.size === 's') {
     return (
       <View style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-        {digital ? <View style={{ flex: 1, justifyContent: 'center' }}><Big L={L} size={44}>{formatTime(date)}</Big></View> : <AnalogFace L={L} size={104} date={date} />}
+        {digital ? <View style={{ flex: 1, justifyContent: 'center' }}><Big L={L} size={44}>{formatTime(date)}</Big></View> : <AnalogFace L={L} size={104} date={date} seconds={seconds} />}
         <Text style={{ fontSize: 12, fontWeight: 650, color: L.text, textAlign: 'center' }}>{here}</Text>
         <Sub L={L} center>{formatDate(date, 'short')}</Sub>
       </View>
@@ -432,7 +443,7 @@ function ClockBody({ w, L }) {
     return (
       <View style={{ flex: 1, flexDirection: 'row', gap: 16 }}>
         <View style={{ alignItems: 'center', justifyContent: 'center', gap: 4, width: 128 }}>
-          {digital ? <Big L={L} size={40}>{formatTime(date)}</Big> : <AnalogFace L={L} size={116} date={date} />}
+          {digital ? <Big L={L} size={40}>{formatTime(date)}</Big> : <AnalogFace L={L} size={116} date={date} seconds={seconds} />}
           <Sub L={L} center>{here}</Sub>
         </View>
         <View style={{ flex: 1, justifyContent: 'center', gap: 4, minWidth: 0 }}>
@@ -445,7 +456,7 @@ function ClockBody({ w, L }) {
     return (
       <View style={{ flex: 1, gap: 10 }}>
         <View style={{ alignItems: 'center', gap: 4 }}>
-          {digital ? <Big L={L} size={64}>{formatTime(date)}</Big> : <AnalogFace L={L} size={170} date={date} />}
+          {digital ? <Big L={L} size={64}>{formatTime(date)}</Big> : <AnalogFace L={L} size={170} date={date} seconds={seconds} />}
           <Text style={{ fontSize: 12.5, fontWeight: 650, color: L.text }}>{here} · {formatDate(date, 'short')}</Text>
         </View>
         <View style={{ gap: 2 }}>{cities(4).map((z) => <CityRow key={z} L={L} zone={z} now={now} />)}</View>
@@ -460,7 +471,7 @@ function ClockBody({ w, L }) {
         const d = zoneDate(z, now) || date;
         return (
           <View key={z || 'here'} style={{ alignItems: 'center', gap: 3, width: 160 }}>
-            {digital ? <View style={{ height: 100, justifyContent: 'center' }}><Big L={L} size={36}>{formatTime(d)}</Big></View> : <AnalogFace L={L} size={100} date={d} />}
+            {digital ? <View style={{ height: 100, justifyContent: 'center' }}><Big L={L} size={36}>{formatTime(d)}</Big></View> : <AnalogFace L={L} size={100} date={d} seconds={seconds} />}
             <Text style={{ fontSize: 12, fontWeight: 650, color: L.text, textAlign: 'center', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 160 }}>{cityName(z) || here}</Text>
             <Sub L={L} center>{formatTime(d)}</Sub>
           </View>
@@ -1793,7 +1804,8 @@ const KIND_MENU = {
     ...(wxOn() ? [{ label: t('shell.widgets.weather.turnOff'), onClick: () => settings.set({ weather: { ...(settings.get().weather || {}), on: false } }) }] : []),
   ],
   clock: (w) => [
-    { label: t('shell.widgets.clock.analog'), checked: w.opts?.style !== 'digital', onClick: () => setDeskWidget(w.id, { opts: { style: 'analog' } }) },
+    { label: t('shell.widgets.clock.analog'), checked: w.opts?.style !== 'digital' && w.opts?.style !== 'analog-seconds', onClick: () => setDeskWidget(w.id, { opts: { style: 'analog' } }) },
+    { label: t('shell.widgets.clock.analogSeconds'), checked: w.opts?.style === 'analog-seconds', onClick: () => setDeskWidget(w.id, { opts: { style: 'analog-seconds' } }) },
     { label: t('shell.widgets.clock.digital'), checked: w.opts?.style === 'digital', onClick: () => setDeskWidget(w.id, { opts: { style: 'digital' } }) },
     { label: t('shell.widgets.clock.cities'), onClick: () => wm.open('clock') },
   ],

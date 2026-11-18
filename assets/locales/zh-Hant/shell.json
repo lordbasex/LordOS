@@ -641,6 +641,7 @@
   "widgets.size.w": "寬",
   "widgets.size.xl": "特大",
   "widgets.clock.analog": "指針",
+  "widgets.clock.analogSeconds": "指針（含秒針）",
   "widgets.clock.digital": "數字",
   "widgets.clock.cities": "在「時鐘」中選擇城市…",
   "widgets.clock.tomorrow": "明天",

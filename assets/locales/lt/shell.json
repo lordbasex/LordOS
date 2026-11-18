@@ -655,6 +655,7 @@
   "widgets.size.w": "Platus",
   "widgets.size.xl": "Labai didelis",
   "widgets.clock.analog": "Analoginis",
+  "widgets.clock.analogSeconds": "Analoginis su sekundine rodykle",
   "widgets.clock.digital": "Skaitmeninis",
   "widgets.clock.cities": "Pasirinkti miestus Laikrodyje…",
   "widgets.clock.tomorrow": "Rytoj",

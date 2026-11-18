@@ -641,6 +641,7 @@
   "widgets.size.w": "横長",
   "widgets.size.xl": "特大",
   "widgets.clock.analog": "アナログ",
+  "widgets.clock.analogSeconds": "アナログ（秒針付き）",
   "widgets.clock.digital": "デジタル",
   "widgets.clock.cities": "「時計」で都市を選ぶ…",
   "widgets.clock.tomorrow": "明日",

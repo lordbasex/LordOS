@@ -655,6 +655,7 @@
   "widgets.size.w": "Lat",
   "widgets.size.xl": "Foarte mare",
   "widgets.clock.analog": "Analogic",
+  "widgets.clock.analogSeconds": "Analogic cu secundar",
   "widgets.clock.digital": "Digital",
   "widgets.clock.cities": "Alege orașe în Ceas…",
   "widgets.clock.tomorrow": "Mâine",

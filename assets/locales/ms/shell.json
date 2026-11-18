@@ -641,6 +641,7 @@
   "widgets.size.w": "Lebar",
   "widgets.size.xl": "Sangat besar",
   "widgets.clock.analog": "Analog",
+  "widgets.clock.analogSeconds": "Analog dengan jarum saat",
   "widgets.clock.digital": "Digital",
   "widgets.clock.cities": "Pilih bandar dalam Jam…",
   "widgets.clock.tomorrow": "Esok",

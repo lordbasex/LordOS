@@ -648,6 +648,7 @@
   "widgets.size.w": "Φαρδύ",
   "widgets.size.xl": "Πολύ μεγάλο",
   "widgets.clock.analog": "Αναλογικό",
+  "widgets.clock.analogSeconds": "Αναλογικό με δείκτη δευτερολέπτων",
   "widgets.clock.digital": "Ψηφιακό",
   "widgets.clock.cities": "Επιλογή πόλεων στο Ρολόι…",
   "widgets.clock.tomorrow": "Αύριο",

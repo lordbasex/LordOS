@@ -648,6 +648,7 @@
   "widgets.size.w": "Bred",
   "widgets.size.xl": "Extra stor",
   "widgets.clock.analog": "Analog",
+  "widgets.clock.analogSeconds": "Analog med sekundvisare",
   "widgets.clock.digital": "Digital",
   "widgets.clock.cities": "Välj städer i Klocka…",
   "widgets.clock.tomorrow": "I morgon",

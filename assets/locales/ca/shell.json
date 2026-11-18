@@ -648,6 +648,7 @@
   "widgets.size.w": "Ample",
   "widgets.size.xl": "Molt gran",
   "widgets.clock.analog": "Analògic",
+  "widgets.clock.analogSeconds": "Analògic amb segonera",
   "widgets.clock.digital": "Digital",
   "widgets.clock.cities": "Tria ciutats al Rellotge…",
   "widgets.clock.tomorrow": "Demà",

@@ -648,6 +648,7 @@
   "widgets.size.w": "Breed",
   "widgets.size.xl": "Extra groot",
   "widgets.clock.analog": "Analoog",
+  "widgets.clock.analogSeconds": "Analoog met secondewijzer",
   "widgets.clock.digital": "Digitaal",
   "widgets.clock.cities": "Steden kiezen in Klok…",
   "widgets.clock.tomorrow": "Morgen",

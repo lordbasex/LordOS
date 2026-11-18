@@ -655,6 +655,7 @@
   "widgets.size.w": "Широкий",
   "widgets.size.xl": "Очень большой",
   "widgets.clock.analog": "Стрелочные",
+  "widgets.clock.analogSeconds": "Аналоговые с секундной стрелкой",
   "widgets.clock.digital": "Цифровые",
   "widgets.clock.cities": "Выбрать города в Часах…",
   "widgets.clock.tomorrow": "Завтра",

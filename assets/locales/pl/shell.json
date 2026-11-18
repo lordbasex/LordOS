@@ -655,6 +655,7 @@
   "widgets.size.w": "Szeroki",
   "widgets.size.xl": "Bardzo duży",
   "widgets.clock.analog": "Analogowy",
+  "widgets.clock.analogSeconds": "Analogowy ze wskazówką sekundową",
   "widgets.clock.digital": "Cyfrowy",
   "widgets.clock.cities": "Wybierz miasta w Zegarze…",
   "widgets.clock.tomorrow": "Jutro",
