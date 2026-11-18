@@ -77,7 +77,7 @@ Esses números vêm de máquinas virtuais e de uma placa. Os relatórios de 22 m
 
 Na 0.8.7: várias áreas de trabalho no Lord Flow e no Lord Classic, com uma visão geral das janelas ao vivo, uma faixa de áreas de trabalho e arrastar uma janela de uma para outra. Cada janela volta à sua área de trabalho depois de reiniciar, e uma janela de uma área de trabalho oculta nunca tem o teclado, nem se pedir tela cheia de lá. Testado em uma sessão isolada em uma máquina virtual, com apps X11 numa sessão completa em outra, e a visão geral no monitor de um Raspberry Pi 5; falta conferir um idioma da direita para a esquerda na tela e gestos reais de trackpad.
 
-Em desenvolvimento depois da 0.8.8.9: um terceiro estilo de desktop, o **Lord Workspaces**. Cada atividade é uma área de trabalho com nome, ícone, cor, apps fixados e um layout por monitor; uma coluna de contexto ao lado abre Atividades, Apps, Arquivos e a Central de controle; as janelas ficam lado a lado por tela, e Salvar layout lembra qual app vai em qual lugar de qual monitor. As superfícies usam um de três estilos de efeitos, Opaco, Translúcido ou Cristal. O Lord Flow e o Lord Classic não mudam. Por enquanto verificado em sessões de teste sem monitor, ainda não em monitores reais.
+Na 0.8.9, em desenvolvimento: um terceiro estilo de desktop, o **Lord Workspaces**. Cada atividade é uma área de trabalho com nome, ícone, cor, apps fixados e um layout por monitor, com até três grupos dentro; uma coluna de contexto ao lado abre Atividades, Apps, Arquivos e o Atlas de controle, a Central de controle com seções para o mosaico, as atividades, as telas e a segurança; as janelas ficam lado a lado por tela, e Salvar layout lembra qual app vai em qual lugar de qual monitor. As superfícies usam um de três estilos de efeitos, Opaco, Translúcido ou Cristal, e um modo de alto contraste deixa cada superfície sólida. Tem seu próprio ponteiro na cor de destaque, rosa por padrão, o panorama do Cyberpunk City HD como fundo e, se você quiser, uma apresentação com uma imagem diferente em cada monitor. O Lord Flow e o Lord Classic não mudam. Verificado em sessões de teste sem monitor e no próprio computador do mantenedor com versões de teste; ainda não em idiomas da direita para a esquerda.
 
 ## Arquivos, servidores e outros discos
 
@@ -100,6 +100,21 @@ Tudo na 0.8.7, menos os dois itens marcados 0.8.8.
 - **Teclado na tela.** Abre-se manualmente pelo botão ao lado do relógio, para um computador sem teclado físico, em campos do LordOS, apps Linux, apps isolados e nas telas de entrada e de bloqueio. Recebe uma lista fechada de teclas, então não pode ser um atalho, nada guarda o que é digitado, e seu painel sai preto em capturas e gravações. Não há registro de teste numa tela de toque real.
 - **As janelas abrem onde estavam.** Tamanho, posição, maximizada e tela, por app, nos dois temas, para apps do LordOS e Linux; se uma tela sumiu ou o lugar ficou fora da tela, a janela abre num lugar visível. Sem teste entre duas telas.
 - **Restauração da sessão.** Os apps abertos ao sair, reiniciar ou desligar voltam com suas janelas e sua área de trabalho, e depois de uma queda de energia ou de uma falha o LordOS pergunta antes. Só identificadores de apps são salvos, nunca caminhos de documentos. Testado numa máquina virtual, com reinicializações, um desligamento real e um desligamento forçado.
+
+## Em desenvolvimento: 0.8.9
+
+Ainda não lançada; a última versão lançada é a 0.8.8.9.
+
+- **Escolha seu desktop.** Na primeira vez que uma conta nova entra num sistema instalado, o LordOS mostra o Lord Flow, o Lord Classic e o Lord Workspaces lado a lado, numa ordem aleatória e sem nenhum escolhido por você, deixa você experimentar ao vivo o que escolher e mostra onde mudar depois.
+- **Widgets de área de trabalho em todos os temas.** "Adicionar widget" no menu do fundo: um relógio (com ponteiro de segundos, se quiser), o clima da cidade que você escolhe numa lista que nunca sai do computador, um calendário, as baterias dos seus dispositivos, uma onda de som que segue a música, uma câmera ou um canal de TV, os limites do Claude Code e mais. Eles leem seus dados só enquanto você pode vê-los.
+- **Baterias.** Ajustes → Bateria para qualquer notebook, com o histórico guardado no computador e uma carga otimizada que um administrador pode ativar; as abas Bateria e Dispositivos do Monitor; e a carga exata de muitos mouses e teclados Logitech. Ainda não testado em hardware de notebook.
+- **Câmeras, transmissões e TV.** As Transmissões do Player e o widget de Vídeo reproduzem endereços RTSP, HLS, SRT e outros, e listas M3U, num ajudante em sandbox com sua própria linha no firewall.
+- **Consoles de texto.** Ctrl+Alt+F1…F12 passam para um console de texto e antes bloqueiam o desktop; uma entrada de boot em "modo texto" e o `startlordos` iniciam o desktop à mão, como o `startx`.
+- **Um fundo por tela, em todos os temas,** e o Cyberpunk City HD, dezessete imagens feitas para o LordOS.
+- **Encaixar janelas nas bordas também no Lord Flow,** com um botão para todos os temas, e escalas de tela de 75 % e 80 % para ter mais espaço em telas pequenas.
+- **Correções a partir dos seus relatos no GitHub,** entre elas arrastar e soltar em apps Linux, menus do GTK 4 que travavam, a tela cheia com vários monitores, um notebook que acordava logo depois de dormir com a tampa aberta e reiniciar o LordOS com sessões abertas em systemd mais novo.
+
+O Lord Workspaces, os ajustes de bateria, as escalas de 75 % e 80 % e a correção da tampa ainda não foram verificados em monitores nem notebooks reais.
 
 ## Novo na 0.8.8.8
 
@@ -144,7 +159,7 @@ Lançada em 8 de novembro de 2026.
 
 ## Várias telas, texto nítido
 
-O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e desenha cada uma na sua própria escala: de 100 a 200 % em passos de 25 %, e desde a 0.8.8.6 até 300 % para painéis 4K de notebook, desde que o desktop mantenha pelo menos 1024 × 600 (um painel de 3840 × 2160 a 300 % é um desktop de 1280 × 720). Texto, vetores e imagens são rasterizados na resolução real de cada tela, então um painel 4K a 150 % ao lado de um 1080p a 100 % fica nítido nos dois. Os apps Linux recebem um `wl_output` por tela e o protocolo de escala fracionária, então GTK 4, Qt 6 e Chromium também renderizam com nitidez. Desde a 0.8.5, Ajustes → Telas numera cada tela, Identificar mostra esse número grande no próprio monitor, e uma tela arrastada se encaixa borda com borda sem sobrepor. O menu Janela pode mover uma janela para outra tela, e o Dock pode atribuir um app a uma delas.
+O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e desenha cada uma na sua própria escala: de 100 a 200 % em passos de 25 %, e desde a 0.8.8.6 até 300 % para painéis 4K de notebook, desde que o desktop mantenha pelo menos 1024 × 600 (um painel de 3840 × 2160 a 300 % é um desktop de 1280 × 720); a 0.8.9, em desenvolvimento, acrescenta 75 % e 80 % para ter mais espaço em telas pequenas. Texto, vetores e imagens são rasterizados na resolução real de cada tela, então um painel 4K a 150 % ao lado de um 1080p a 100 % fica nítido nos dois. Os apps Linux recebem um `wl_output` por tela e o protocolo de escala fracionária, então GTK 4, Qt 6 e Chromium também renderizam com nitidez. Desde a 0.8.5, Ajustes → Telas numera cada tela, Identificar mostra esse número grande no próprio monitor, e uma tela arrastada se encaixa borda com borda sem sobrepor. O menu Janela pode mover uma janela para outra tela, e o Dock pode atribuir um app a uma delas.
 
 [[shot:1]]
 
@@ -158,7 +173,7 @@ O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e 
 - **Os fundos em movimento copiam cada quadro no caminho até a tela.** No Raspberry Pi 5, na tela de login, em 1080p e 60 quadros por segundo, o `lord-media` usou 41 % de um núcleo e o `lord-server` 147 %; um caminho sem essa cópia está planejado para uma versão futura. O decodificador por hardware do Pi 5 lida só com HEVC, então clipes H.264, VP9 e AV1 não tocam ali.
 - **Trocar de tema fecha e reabre as janelas do LordOS,** e o texto não salvo se perde, sem aviso.
 - **Os apps X11 rodam pelo Xwayland desde a 0.8.3** e podem ver uns aos outros, como em qualquer desktop X11. Desde a 0.8.8.8 eles se escalam sozinhos em HiDPI (antes eram nítidos só em 100 %) e aceitam arrastes por XDND, as duas coisas já construídas mas ainda não verificadas na nossa máquina de testes. Os métodos de entrada do LordOS compõem nos apps Wayland, não nos X11 (`docs/WAYLAND.md`).
-- **A acessibilidade ainda está quase toda pela frente:** hoje existe um ajuste para "reduzir movimento", um teclado na tela e, desde a 0.8.8.6, ler em voz alta e a Fala ao vivo, e desde a 0.8.8.8 a navegação pelo teclado com um anel de foco; leitor de tela, zoom e alto contraste estão no roadmap.
+- **A acessibilidade ainda está quase toda pela frente:** hoje existe um ajuste para "reduzir movimento", um teclado na tela e, desde a 0.8.8.6, ler em voz alta e a Fala ao vivo, e desde a 0.8.8.8 a navegação pelo teclado com um anel de foco; leitor de tela e zoom estão no roadmap, e o alto contraste chega só com o Lord Workspaces na 0.8.9, em desenvolvimento.
 
 ## Leia o código
 

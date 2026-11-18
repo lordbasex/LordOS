@@ -105,7 +105,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   step; the step, the pick, the order and the box's place are kept in `settings.firstStart` across the theme switch
   (the JS context is discarded) and checked when read back, and a failed switch leaves the theme as it was. Tab, Space,
   Enter and Escape (Back) work throughout, and it follows right-to-left languages. It never shows on the live system,
-  on the OVA's first boot, on the login screen or to anyone who already used LordOS: settings migration 5 marks
+  on the OVA's first boot, on the login screen or to anyone who already used LordOS: settings migration 6 marks
   `desktopChosen` on a settings file that shows an earlier session (`welcomeShown`, `sessionSaved` or a chosen
   `theme`), while the files the installer, the OVA's first boot and Settings → Users write for a new account don't
   count. It is mounted by the SDK for all three themes, "Welcome to LordOS" and Lord Workspaces' activity onboarding
