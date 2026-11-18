@@ -898,6 +898,17 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   for every app, since 0.8.8.1 they all share the dialog: [#13](https://github.com/lordbasex/LordOS/issues/13),
   [#22](https://github.com/lordbasex/LordOS/issues/22). Done for 0.8.8.3 (`FILES.md`, "The system file dialog").
 
+## Release 0.8.9.1 (planned)
+
+- **Lord Workspaces: a window brought back from Minimized fills its slot.** Today it keeps the size it had: when the
+  display's layout changed while it was minimized (Two halves to Main and side, for example), it comes back at its old
+  width (923 px in a 1231 px slot in the scene test) and only fits once the layout is picked again. Found while taking the
+  screenshots for the 0.8.9 article (2026-11-18). The tiler keeps the tile it gave each window (`applied` in
+  `themes/workspaces/tiler.js`) and skips a window whose tile looks unchanged; a first fix (forgetting that tile when the
+  window comes back) was not enough in `server/tests/workspaces_scene.mjs`, whose harness also showed no tiler pass
+  after the restore, so the scene's timing needs a look too. Fix it with a scene test that changes the layout while the
+  window is minimized, and check it on VM 127.
+
 ## Before 1.0
 
 - [ ] **lord-web on the new WPE API (WPEPlatform)** ([#142](https://github.com/lordbasex/LordOS/issues/142), maintainer's
