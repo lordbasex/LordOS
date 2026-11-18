@@ -444,5 +444,86 @@
         "https://www.reddit.com/r/LordOS/"
       ]
     ]
+  },
+  "faces": {
+    "eyebrow": "One system · many faces",
+    "title1": "We didn't copy a desktop.",
+    "title2": "We built the engine to create many.",
+    "lead": "LordOS draws its own desktop: a display server, a compositor and an interface engine of its own, written for it. That's why it doesn't have just one face. Pick the one that fits how you work and switch live, without logging out: your windows and apps stay.",
+    "tabs": "The faces of LordOS",
+    "since": "Since {v}",
+    "newIn": "New in {v}",
+    "coming": "Coming",
+    "who": "Who it's for:",
+    "prev": "Previous face",
+    "next": "Next face",
+    "items": {
+      "flow": {
+        "name": "Lord Flow",
+        "kicker": "Familiar from the first minute",
+        "lead": "A menu bar on top and a Dock at the bottom, with soft glass and rounded corners. Open it and you already know how to use it.",
+        "points": [
+          "A Dock that magnifies, with each app's actions",
+          "An app launcher and the Control Center",
+          "Snap windows to the edges of the screen"
+        ],
+        "who": "anyone who wants to start working without learning anything new.",
+        "cta": "Meet Lord Flow",
+        "alt": "Lord Flow: the menu bar on top, the Dock at the bottom and apps open"
+      },
+      "classic": {
+        "name": "Lord Classic",
+        "kicker": "Taskbar and start menu",
+        "lead": "Everything in one bar at the bottom: the start menu with search, your open windows and quick settings.",
+        "points": [
+          "A start menu with search",
+          "Quick settings by the clock",
+          "A taskbar on every display"
+        ],
+        "who": "anyone coming from a desktop with a taskbar who wants to feel at home.",
+        "cta": "Meet Lord Classic",
+        "alt": "Lord Classic: the start menu open over the taskbar"
+      },
+      "workspaces": {
+        "name": "Lord Workspaces",
+        "kicker": "Organized by activities",
+        "lead": "Your work is not a pile of windows: it's a set of things you're doing. Each activity has its own apps and layout.",
+        "points": [
+          "Up to nine activities, each with its own apps",
+          "Six layouts per display, every screen its own",
+          "Widgets that read nothing while you can't see them"
+        ],
+        "who": "anyone who works with many windows, or with two or three monitors.",
+        "cta": "Meet Lord Workspaces",
+        "alt": "Lord Workspaces: the Context Spine, the activity strip and widgets over the Cyberpunk City HD panorama"
+      }
+    },
+    "nextFace": {
+      "name": "Your next face",
+      "placeholder": "Your next face goes here",
+      "lead": "Every LordOS desktop is a theme on the same engine. More will come, and one of them can come from your idea.",
+      "cta": "Propose yours"
+    },
+    "facts": [
+      [
+        "One engine, every face",
+        "The same compositor, the same interface engine and the same apps in every desktop."
+      ],
+      [
+        "Switch live",
+        "In Settings → Appearance, without logging out: your open windows come back."
+      ],
+      [
+        "Your choice, no nudging",
+        "At first start the three come in a random order, and none is marked as recommended."
+      ],
+      [
+        "Built for LordOS",
+        "A display server and an engine of its own in C, on Debian and Wayland, without X11, without wlroots and without another project's desktop underneath."
+      ]
+    ],
+    "closeQ": "What would your ideal desktop look like?",
+    "closeLink": "Tell us on GitHub",
+    "closeEnd": ": that's how the next face starts."
   }
 }

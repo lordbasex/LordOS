@@ -625,6 +625,78 @@ function banner() {
   return `<div class="lbar" id="lbar" role="region" aria-label="Language" hidden data-es="${data('es')}" data-pt="${data('pt')}"><p></p><a href="/es/"></a><button type="button"></button></div>`;
 }
 
+// ---------- home: "The faces of LordOS" ----------
+// One entry per desktop theme, in the order the tabs show them. Adding a desktop is one entry here, its texts in
+// web/i18n/{en,es,pt}.json under faces.items.<id> (name, kicker, lead, points, who, cta, alt) and a "## <name>"
+// section on the Desktops page (web/content/features/desktops.*.md), whose heading id is the anchor. `since` is the
+// release that brought it ("New in" while it is the latest release, "Since" after); shots are [light, dark] or one
+// picture; accent colours need 4.5:1 on --night. The "next face" card always goes last.
+const FACES = [
+  { id: 'flow', anchor: 'lord-flow', since: '0.8.0', accent: '#7AA2FF', shots: ['docs/screenshots/desktop-overview-light.png', 'docs/screenshots/desktop-overview-dark.png'] },
+  { id: 'classic', anchor: 'lord-classic', since: '0.8.3', accent: '#5AD1C8', shots: ['docs/screenshots/desktop-classic.png'] },
+  { id: 'workspaces', anchor: 'lord-workspaces', since: '0.8.9', accent: '#FF4F9A', shots: ['docs/screenshots/desktop-workspaces.png'] },
+];
+const FACES_IDEA = `${GITHUB}/issues/new?template=feature_request.yml`;
+
+function faces(t) {
+  const F = t.faces, l = t.lang, page = pageUrl(l, 'features/desktops');
+  const ico = (d0) => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d0}"/></svg>`;
+  const nav = `<span class="fc-nav"><button type="button" class="fc-rb fc-prev" aria-label="${esc(F.prev)}">${ico('M15 5l-7 7 7 7')}</button><button type="button" class="fc-rb fc-next" aria-label="${esc(F.next)}">${ico('M9 5l7 7-7 7')}</button></span>`;
+  const img = (f, cls, alt) => {
+    const s1 = webp(r(f), 720), s2 = webp(r(f), 1600);
+    return `<img${cls ? ` class="${cls}"` : ''} src="${s2.url}" srcset="${s1.url} ${s1.w}w, ${s2.url} ${s2.w}w" sizes="(max-width: 900px) 92vw, 700px" width="${s2.w}" height="${s2.h}" alt="${esc(alt)}" loading="lazy" decoding="async">`;
+  };
+  const tabs = [], panels = [];
+  FACES.forEach((f, i) => {
+    const it = F.items[f.id];
+    const tag = (f.since === LATEST_RELEASE ? F.newIn : F.since).replace('{v}', f.since);
+    const shots = f.shots.filter((x) => fs.existsSync(r(x)));
+    if (!shots.length) throw new Error(`faces: no screenshot for ${f.id}`);
+    const pics = shots.length === 2 ? img(shots[0], 'lp-l', it.alt) + img(shots[1], 'lp-d', it.alt) : img(shots[0], '', it.alt);
+    tabs.push(`<button type="button" role="tab" class="fc-tab" id="fc-tab-${f.id}" aria-controls="fc-${f.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" style="--fc:${f.accent}"><span class="fc-dot" aria-hidden="true"></span><span class="fc-tn">${esc(it.name)}</span><span class="fc-ts">${esc(tag)}</span></button>`);
+    panels.push(`<div class="fc-panel" id="fc-${f.id}" role="tabpanel" aria-labelledby="fc-tab-${f.id}" style="--fc:${f.accent}">
+<div class="fc-shot"><div class="fc-mon"><div class="fc-scr">${pics}</div></div><div class="fc-stand" aria-hidden="true"></div></div>
+<div class="fc-txt">
+<p class="fc-kick">${esc(it.kicker)}</p>
+<h3>${esc(it.name)} <span class="fc-tag">${esc(tag)}</span></h3>
+<p class="fc-lead">${esc(it.lead)}</p>
+<ul class="fc-pts">${it.points.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>
+<p class="fc-who"><strong>${esc(F.who)}</strong> ${esc(it.who)}</p>
+<div class="fc-act"><a class="btn fc-btn" href="${page}#${f.anchor}">${esc(it.cta)}</a>${nav}</div>
+</div>
+</div>`);
+  });
+  const N = F.nextFace;
+  tabs.push(`<button type="button" role="tab" class="fc-tab fc-tab-next" id="fc-tab-next" aria-controls="fc-next" aria-selected="false" tabindex="-1"><span class="fc-dot" aria-hidden="true"></span><span class="fc-tn">${esc(N.name)}</span><span class="fc-ts">${esc(F.coming)}</span></button>`);
+  panels.push(`<div class="fc-panel fc-panel-next" id="fc-next" role="tabpanel" aria-labelledby="fc-tab-next">
+<div class="fc-shot"><div class="fc-mon"><div class="fc-scr fc-empty"><span><span class="fc-plus" aria-hidden="true">+</span>${esc(N.placeholder)}</span></div></div><div class="fc-stand" aria-hidden="true"></div></div>
+<div class="fc-txt">
+<p class="fc-kick">${esc(F.coming)}</p>
+<h3>${esc(N.name)}</h3>
+<p class="fc-lead">${esc(N.lead)}</p>
+<div class="fc-act"><a class="btn fc-btn" href="${FACES_IDEA}" rel="noopener">${esc(N.cta)}</a>${nav}</div>
+</div>
+</div>`);
+  const facts = F.facts.map(([h, x]) => `<li><h3>${esc(h)}</h3><p>${esc(x)}</p></li>`).join('');
+  return `<section id="faces" class="faces" aria-labelledby="faces-h">
+<div class="wrap">
+<div class="fc-head">
+<p class="fc-eyebrow">${esc(F.eyebrow)}</p>
+<h2 id="faces-h" class="h2">${esc(F.title1)} <span>${esc(F.title2)}</span></h2>
+<p class="fc-intro">${esc(F.lead)}</p>
+</div>
+<div class="fc-show" id="faces-show">
+<div class="fc-tabs" role="tablist" aria-label="${esc(F.tabs)}">${tabs.join('')}</div>
+<div class="fc-panels">
+${panels.join('\n')}
+</div>
+</div>
+<ul class="fc-facts">${facts}</ul>
+<p class="fc-close">${esc(F.closeQ)} <a href="${FACES_IDEA}" rel="noopener">${esc(F.closeLink)}</a>${esc(F.closeEnd)}</p>
+</div>
+</section>`;
+}
+
 const countPill = (t, n) => `<span class="n" aria-label="${esc(t.gallery.imagesCount.replace('{n}', n))}">${n}</span>`;
 const appName = (a, l) => (a.name && (a.name[l] || a.name.en)) || a.id;
 
@@ -671,7 +743,7 @@ ${featureList[i] ? `<a class="more" href="${pageUrl(l, 'features/' + featureList
 <div class="show-img">${picture(SHOWCASE_IMG[i], alt, { sizes: '(max-width: 900px) 100vw, 640px' })}</div>
 </div>`).join('\n');
   write(path.join(pageUrl(l, 'home'), 'index.html'), render(tpl.home, {
-    ...common('home', null, 'home'), features, showcase, teaser: teaser(t),
+    ...common('home', null, 'home'), features, showcase, teaser: teaser(t), faces: faces(t),
     vmGuide: pageUrl(l, 'virtual-machine'), reqUrl: pageUrl(l, 'requirements'),
     // straight to the files (downloads.json): update-only releases carry no media (#35)
     ...(() => { const d = `${GITHUB}/releases/download/v${MEDIA_VERSION}${CHANNEL}/`;

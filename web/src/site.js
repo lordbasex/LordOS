@@ -227,6 +227,46 @@
     }
   }
 
+  // Home "faces of LordOS": tabs (role=tab, arrows/Home/End move between them) with one face at a time, prev/next
+  // buttons, and autoplay every 6 s that stops for good on any interaction, pauses on hover or focus and never runs
+  // with prefers-reduced-motion. Without JS (no .jt styles applied by this code) every face shows, stacked.
+  var fshow = $('#faces-show');
+  if (fshow) {
+    var ftabs = $$('[role=tab]', fshow), fp = ftabs.map(function (b) { return d.getElementById(b.getAttribute('aria-controls')); });
+    var fcur = 0, ft, fstop = !!reduce, fhov, ffoc, fseen = !window.IntersectionObserver;
+    fp.forEach(function (p, k) { p.hidden = k > 0; });
+    var fgo = function (i, foc) {
+      fcur = i = (i + ftabs.length) % ftabs.length;
+      ftabs.forEach(function (b, k) { b.setAttribute('aria-selected', String(k === i)); b.tabIndex = k === i ? 0 : -1; fp[k].hidden = k !== i; });
+      var tb = ftabs[i], bar = tb.parentNode;
+      bar.scrollLeft = tb.offsetLeft - bar.offsetLeft - (bar.clientWidth - tb.offsetWidth) / 2;
+      if (foc) tb.focus();
+    };
+    var fsync = function () {
+      clearInterval(ft);
+      if (fseen && !fstop && !fhov && !ffoc && !d.hidden) ft = setInterval(function () { fgo(fcur + 1); }, 6000);
+    };
+    var fon = fshow.addEventListener.bind(fshow);
+    var fuser = function (i, foc) { fstop = true; fsync(); fgo(i, foc); };
+    fon('click', function (e) {
+      var b = e.target.closest('button'), k = ftabs.indexOf(b), c = b && b.classList[1];
+      if (!b) return;
+      fuser(k < 0 ? fcur + (c === 'fc-prev' ? -1 : 1) : k);
+      if (k < 0) $('.' + c, fp[fcur]).focus();
+    });
+    fon('keydown', function (e) {
+      var j = { ArrowRight: fcur + 1, ArrowLeft: fcur - 1, Home: 0, End: -1 }[e.key];
+      if (j !== undefined && e.target.getAttribute('role') === 'tab') { e.preventDefault(); fuser(j, true); }
+    });
+    fon('mouseenter', function () { fhov = true; fsync(); });
+    fon('mouseleave', function () { fhov = false; fsync(); });
+    fon('focusin', function () { ffoc = true; fsync(); });
+    fon('focusout', function (e) { if (!fshow.contains(e.relatedTarget)) { ffoc = false; fsync(); } });
+    d.addEventListener('visibilitychange', fsync);
+    if (!fseen) new IntersectionObserver(function (es) { fseen = es[0].isIntersecting; fsync(); }, { threshold: 0.35 }).observe(fshow);
+    fsync();
+  }
+
   // Paper: highlight the section being read in the table of contents
   var tocLinks = $$('.toc a');
   if (tocLinks.length && 'IntersectionObserver' in window) {

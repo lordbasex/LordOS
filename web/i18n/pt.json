@@ -444,5 +444,86 @@
         "https://www.reddit.com/r/LordOS/"
       ]
     ]
+  },
+  "faces": {
+    "eyebrow": "Um sistema · muitas caras",
+    "title1": "Não copiamos um desktop.",
+    "title2": "Fizemos o motor para criar muitos.",
+    "lead": "O LordOS desenha o próprio desktop: servidor gráfico, compositor e motor de interface próprios, escritos para ele. Por isso não tem uma cara só. Escolha a que combina com o seu jeito de trabalhar e troque ao vivo, sem sair da sessão: suas janelas e seus apps ficam.",
+    "tabs": "As caras do LordOS",
+    "since": "Desde a {v}",
+    "newIn": "Novo na {v}",
+    "coming": "Em breve",
+    "who": "Para quem é:",
+    "prev": "Cara anterior",
+    "next": "Próxima cara",
+    "items": {
+      "flow": {
+        "name": "Lord Flow",
+        "kicker": "Familiar desde o primeiro minuto",
+        "lead": "Uma barra de menus em cima e um Dock embaixo, com vidro suave e cantos arredondados. Você abre e já sabe usar.",
+        "points": [
+          "Um Dock que se amplia, com as ações de cada app",
+          "Lançador de apps e Central de controle",
+          "Janelas que se encaixam nas bordas da tela"
+        ],
+        "who": "quem quer começar a trabalhar sem aprender nada novo.",
+        "cta": "Conheça o Lord Flow",
+        "alt": "Lord Flow: a barra de menus em cima, o Dock embaixo e apps abertos"
+      },
+      "classic": {
+        "name": "Lord Classic",
+        "kicker": "Barra de tarefas e menu iniciar",
+        "lead": "Tudo numa barra embaixo: o menu iniciar com busca, suas janelas abertas e as configurações rápidas.",
+        "points": [
+          "Menu iniciar com busca",
+          "Configurações rápidas junto ao relógio",
+          "Uma barra de tarefas em cada tela"
+        ],
+        "who": "quem vem de um desktop com barra de tarefas e quer se sentir em casa.",
+        "cta": "Conheça o Lord Classic",
+        "alt": "Lord Classic: o menu iniciar aberto sobre a barra de tarefas"
+      },
+      "workspaces": {
+        "name": "Lord Workspaces",
+        "kicker": "Organizado por atividades",
+        "lead": "Seu trabalho não é uma pilha de janelas: é um conjunto de coisas que você está fazendo. Cada atividade tem seus apps e seu layout.",
+        "points": [
+          "Até nove atividades, cada uma com seus apps",
+          "Seis layouts por tela, cada tela com o seu",
+          "Widgets que não leem nada enquanto você não os vê"
+        ],
+        "who": "quem trabalha com muitas janelas, ou com dois ou três monitores.",
+        "cta": "Conheça o Lord Workspaces",
+        "alt": "Lord Workspaces: a Context Spine, a faixa de atividades e widgets sobre o panorama de Cyberpunk City HD"
+      }
+    },
+    "nextFace": {
+      "name": "Sua próxima cara",
+      "placeholder": "Aqui vai sua próxima cara",
+      "lead": "Cada desktop do LordOS é um tema sobre o mesmo motor. Virão mais, e um deles pode vir da sua ideia.",
+      "cta": "Proponha a sua"
+    },
+    "facts": [
+      [
+        "Um motor, todas as caras",
+        "O mesmo compositor, o mesmo motor de interface e os mesmos apps em cada desktop."
+      ],
+      [
+        "Troque ao vivo",
+        "Em Ajustes → Aparência, sem sair da sessão: suas janelas abertas voltam."
+      ],
+      [
+        "Sua escolha, sem empurrão",
+        "No primeiro início os três aparecem em ordem aleatória, e nenhum vem marcado como recomendado."
+      ],
+      [
+        "Feito para o LordOS",
+        "Um servidor gráfico e um motor próprios em C, sobre Debian e Wayland, sem X11, sem wlroots e sem o desktop de outro projeto por baixo."
+      ]
+    ],
+    "closeQ": "Como seria seu desktop ideal?",
+    "closeLink": "Conte para a gente no GitHub",
+    "closeEnd": ": é assim que começa a próxima cara."
   }
 }

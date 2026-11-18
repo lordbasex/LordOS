@@ -16,6 +16,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   The host path meant nothing inside the chroot, so the 0.8.9-beta arm64 ISO stopped with "no lordos-rclone"
   until the package was copied there by hand.
 
+### Website
+
+- **Home: "The faces of LordOS"**, a new dark band between the hero (its slideshow stays) and the features (en, es,
+  pt). An eyebrow ("One system · many faces"), a two-line title ("We didn't copy a desktop. / We built the engine to
+  create many."), and tabs for Lord Flow (since 0.8.0), Lord Classic (since 0.8.3), Lord Workspaces (new in 0.8.9) and a
+  dashed "Your next face". Each face shows a real screenshot in a drawn monitor (Lord Flow in light or dark with the
+  site's theme; Lord Classic is the new `docs/screenshots/desktop-classic.png`, Lord Workspaces the new
+  `docs/screenshots/desktop-workspaces.png`), a kicker, a lead, three points, a "Who it's for" box and a button to its
+  section of the new Desktops page; "Your next face" asks for ideas through a GitHub feature request. Below: four cards
+  (one engine, switch live, no nudging at first start, built for LordOS; the mockup's wording for this card and the lead
+  changed because the site's build refuses its "written from nothing" phrasing) and a closing line to GitHub. `site.js`
+  runs the tabs (role=tab, arrows, Home and End, prev and next buttons) and an autoplay every 6 s that only runs while
+  the band is in view, pauses on hover and focus, stops for good at the first interaction and never runs with
+  prefers-reduced-motion; the faces share one grid cell, so switching never moves the page below. Without JS every
+  face shows, stacked. The faces come from one list, `FACES` in `web/build.mjs` (id, anchor, since, accent, shots), so
+  another desktop is one entry plus its texts (`faces.items.<id>` in `web/i18n/*.json`); "New in" turns into "Since"
+  by itself after the next release. Accents #7AA2FF, #5AD1C8 and #FF4F9A are 6.0:1 to 9.9:1 on the band, and the
+  buttons put dark text on them. Workspaces' third point says its widgets "read nothing while you can't see them"
+  (docs/WORKSPACES.md, "Widget data") rather than "cost nothing".
+- **A new feature page, Desktops** (`/features/desktops/`, "Three desktops, one engine"; order 10, so the home
+  features grid keeps its links): the short version; Lord Flow, Lord Classic and Lord Workspaces with the anchors
+  `#lord-flow`, `#lord-classic` and `#lord-workspaces` the home buttons use; switching in Settings → Appearance; the
+  first-start chooser; why one engine can carry many desktops; and honest limits from docs/WORKSPACES.md, the paper
+  and docs/THEMES-GUIDE.md (Lord Workspaces on real monitors and the GPU only on the maintainer's computer and not yet
+  in right to left, what it doesn't do yet, the slideshow on test displays only, the chooser not yet seen on a real
+  first start, themes of your own only on development builds). docs/WORKSPACES.md still lists the weather widget as
+  "not yet" under "Changed from the proposal", though it shipped; the page doesn't repeat that.
+
 ## [0.8.9-beta] - 2026-11-18
 
 ### Added

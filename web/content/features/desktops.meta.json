@@ -1,0 +1,107 @@
+{
+  "slug": "desktops",
+  "order": 10,
+  "title": {
+    "en": "Three desktops, one engine",
+    "es": "Tres escritorios, un motor",
+    "pt": "Três desktops, um motor"
+  },
+  "tagline": {
+    "en": "Lord Flow, Lord Classic and Lord Workspaces: three complete desktops on the same engine, with the same apps, switched live without logging out.",
+    "es": "Lord Flow, Lord Classic y Lord Workspaces: tres escritorios completos sobre el mismo motor, con las mismas apps, que se cambian en vivo sin cerrar sesión.",
+    "pt": "Lord Flow, Lord Classic e Lord Workspaces: três desktops completos sobre o mesmo motor, com os mesmos apps, trocados ao vivo sem sair da sessão."
+  },
+  "lumo": {
+    "pose": "three-quarter",
+    "intro": {
+      "en": "Same house, three ways to arrange the furniture. Pick the one that feels like yours, and move it around whenever you like: your things stay where they are.",
+      "es": "La misma casa, tres formas de acomodar los muebles. Elegí la que sientas tuya y cambiala cuando quieras: tus cosas se quedan donde están.",
+      "pt": "A mesma casa, três jeitos de arrumar os móveis. Escolha a que parece sua e mude quando quiser: suas coisas ficam onde estão."
+    }
+  },
+  "screenshots": [
+    {
+      "file": "docs/screenshots/desktop-overview-light.png",
+      "caption": {
+        "en": "Lord Flow: the menu bar on top, the Dock at the bottom and apps open.",
+        "es": "Lord Flow: la barra de menús arriba, el Dock abajo y apps abiertas.",
+        "pt": "Lord Flow: a barra de menus em cima, o Dock embaixo e apps abertos."
+      }
+    },
+    {
+      "file": "docs/screenshots/desktop-classic.png",
+      "caption": {
+        "en": "Lord Classic: the start menu with search, pinned and recent apps, over the taskbar.",
+        "es": "Lord Classic: el menú de inicio con búsqueda, apps fijadas y recientes, sobre la barra de tareas.",
+        "pt": "Lord Classic: o menu iniciar com busca, apps fixados e recentes, sobre a barra de tarefas."
+      }
+    },
+    {
+      "file": "docs/screenshots/desktop-workspaces.png",
+      "caption": {
+        "en": "Lord Workspaces: the Context Spine on the left, the activity strip on top and widgets on the Cyberpunk City HD panorama.",
+        "es": "Lord Workspaces: la Context Spine a la izquierda, la franja de actividades arriba y widgets sobre el panorama de Cyberpunk City HD.",
+        "pt": "Lord Workspaces: a Context Spine à esquerda, a faixa de atividades em cima e widgets sobre o panorama de Cyberpunk City HD."
+      }
+    }
+  ],
+  "diagrams": [],
+  "sources": [
+    {
+      "path": "docs/WORKSPACES.md",
+      "what": {
+        "en": "Lord Workspaces: activities, tiling, widgets and what is not done yet",
+        "es": "Lord Workspaces: actividades, distribuciones, widgets y lo que todavía falta",
+        "pt": "Lord Workspaces: atividades, layouts, widgets e o que ainda falta"
+      }
+    },
+    {
+      "path": "docs/THEMES-GUIDE.md",
+      "what": {
+        "en": "How a desktop theme is made",
+        "es": "Cómo se hace un tema de escritorio",
+        "pt": "Como um tema de desktop é feito"
+      }
+    },
+    {
+      "path": "docs/SETTINGS.md",
+      "what": {
+        "en": "First start: choose your desktop",
+        "es": "Primer inicio: elegí tu escritorio",
+        "pt": "Primeiro início: escolha seu desktop"
+      }
+    },
+    {
+      "path": "themes/default",
+      "what": {
+        "en": "Lord Flow",
+        "es": "Lord Flow",
+        "pt": "Lord Flow"
+      }
+    },
+    {
+      "path": "themes/classic",
+      "what": {
+        "en": "Lord Classic",
+        "es": "Lord Classic",
+        "pt": "Lord Classic"
+      }
+    },
+    {
+      "path": "themes/workspaces",
+      "what": {
+        "en": "Lord Workspaces",
+        "es": "Lord Workspaces",
+        "pt": "Lord Workspaces"
+      }
+    },
+    {
+      "path": "sdk/firststart.jsx",
+      "what": {
+        "en": "The first-start chooser",
+        "es": "El selector del primer inicio",
+        "pt": "O seletor do primeiro início"
+      }
+    }
+  ]
+}
