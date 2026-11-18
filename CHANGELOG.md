@@ -10,6 +10,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9-beta] - 2026-11-18
+
 ### Added
 
 - **Lord Workspaces has its own pointer**: the default arrow becomes a rounded tip with no tail, filled with the
@@ -19,6 +21,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   polygons in the signed-distance shapes, a colour fill), `lord.input.pointerAccent('#RRGGBB' | null)` takes only a
   colour, and `setPointerAccent` in the SDK; `build/cursor-test` checks the fill, the size, the text cursor and going
   back. Linux apps that ask for the default shape get it too.
+- **The password-and-code drive (`iclouddrive`) confirmed on a Raspberry Pi (GitHub #165).** A user's Check This Account on aarch64 passed
+  every step, added to the provider's evidence next to the maintainer's own test on a PC (`assets/cloud/providers.json`).
 - **A window that draws its own title bar no longer sticks to the pointer after Minimize (GitHub #189).** Floorp,
   clicked on Minimize while the pointer moved a little, asked to be moved once the button was already up; the move
   then had no release to end it and the minimized window followed the pointer until the next click. lord-server now
@@ -7173,7 +7177,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.8.9-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9-beta...HEAD
+[0.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.9-beta...v0.8.9-beta
 [0.8.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.8-beta...v0.8.8.9-beta
 [0.8.8.8-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.7-beta...v0.8.8.8-beta
 [0.8.8.7-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.6-beta...v0.8.8.7-beta
