@@ -1942,3 +1942,8 @@ The ISO's helper check refused a package without `lord-screencast` (new in 0.8.8
 `sudo RELEASE=1 REQUIRE_SIGNED_CODE=1 tools/iso/build.sh /var/tmp/lordos-iso` again. Old work folders of earlier releases
 in `/var/tmp` (`wk-auto-iso`, `lordos-iso-0888`, `wk-rel-iso`, `i37-pkg`, `rel085`) and `~/LordOS-0884`, `~/LordOS-0888`,
 `~/LordOS-rel0885` were removed to make room (36 GB free after).
+In the arm64 build chroot `/var/tmp/lordos-arm64-br` (read by `tools/iso/build-arm64.sh` and `tools/rpi/build-img.sh`
+through an overlay), the same helpers' build packages for aarch64 were added, so the arm64 ISO and the Pi image ship
+`lord-ocr`, `lord-tts` and `lord-screencast` like the packages: `sudo chroot /var/tmp/lordos-arm64-br apt-get install -y
+--no-install-recommends libpipewire-0.3-dev libtesseract-dev cmake glslc libvulkan-dev spirv-headers` (with `/proc`
+mounted for the call).
