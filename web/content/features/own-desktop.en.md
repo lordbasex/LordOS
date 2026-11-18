@@ -77,7 +77,7 @@ These numbers come from virtual machines and one board. Reports from 22 real mac
 
 In 0.8.7: several desktops in both Lord Flow and Lord Classic, with an Overview of live windows, a strip of desktops and dragging a window from one to another. Each window comes back on its desktop after a restart, and a window on a hidden desktop never has the keyboard, not even one that asks for fullscreen from there. Checked in an isolated session on a virtual machine, with X11 apps in a full session on another, and the Overview on a Raspberry Pi 5's monitor; a right-to-left language on screen and real trackpad swipes are still to check.
 
-In 0.8.9, in development: a third desktop style, **Lord Workspaces**. Each activity is a desktop with its own name, icon, colour, pinned apps and a layout per monitor, with up to three groups inside it; a Context Spine on the side opens Activities, Apps, Files and the Control Atlas, the Control Center with sections for tiling, activities, displays and security; windows tile per display, and Save layout remembers which app goes in which place of which monitor. Its surfaces take one of three effects styles, Opaque, Translucent or Crystal, and a high-contrast mode turns every surface solid. It has its own pointer in the accent colour, pink by default, Cyberpunk City HD's panorama as its wallpaper and, if you want, a slideshow with a different picture on each monitor. Lord Flow and Lord Classic don't change. Checked in test sessions without a monitor and on the maintainer's own computer with test builds; not yet in right-to-left languages.
+In 0.8.9: a third desktop style, **Lord Workspaces**. Each activity is a desktop with its own name, icon, colour, pinned apps and a layout per monitor, with up to three groups inside it; a Context Spine on the side opens Activities, Apps, Files and the Control Atlas, the Control Center with sections for tiling, activities, displays and security; windows tile per display, and Save layout remembers which app goes in which place of which monitor. Its surfaces take one of three effects styles, Opaque, Translucent or Crystal, and a high-contrast mode turns every surface solid. It has its own pointer in the accent colour, pink by default, Cyberpunk City HD's panorama as its wallpaper and, if you want, a slideshow with a different picture on each monitor. Lord Flow and Lord Classic don't change. Checked in test sessions without a monitor and on the maintainer's own computer with test builds; not yet in right-to-left languages.
 
 ## Files, servers and other disks
 
@@ -85,7 +85,7 @@ All in 0.8.7.
 
 - **Connect to a server.** Network lists each computer like a folder, and its shares unfold in place; you sign in with a user and password or as a guest, which passed against one real shared folder and one test server. Go → Connect to Server takes smb, nfs, sftp, ftp, ftps and WebDAV addresses, and all of them open as folders in Files, with SSH keys and certificates checked first.
 - **Remote screens.** Remote Desk, one app for RDP and VNC, comes with the system and draws with LordOS's own engine: no client window, no X11 session, no toolkit. Both protocols were tried against a throwaway test machine; RDP to a real desktop session and RDP's shared folders are not verified yet.
-- **Disks from other systems.** Disk Formats, one Store item, opens NTFS, exFAT and FAT for reading and writing, journaled HFS+ read-only and, on amd64 as an optional part, APFS read-only. These are commercial formats; the drivers are free software at no cost. Since 0.8.8.9 (the latest release): with two systems on one disk, an administrator can mount the other system's partition from Files or Disks, and an NTFS volume left hibernated opens read-only.
+- **Disks from other systems.** Disk Formats, one Store item, opens NTFS, exFAT and FAT for reading and writing, journaled HFS+ read-only and, on amd64 as an optional part, APFS read-only. These are commercial formats; the drivers are free software at no cost. Since 0.8.8.9: with two systems on one disk, an administrator can mount the other system's partition from Files or Disks, and an NTFS volume left hibernated opens read-only.
 - **Your way of working.** Choose, reorder and resize list columns, zoom the icons and the list (the slider in the status bar, Ctrl and + or −, or Ctrl and the wheel) with each folder remembering its own size, set Files' own Settings, and open Terminal in the folder you're in.
 
 ## Keys, the on-screen keyboard and coming back
@@ -101,9 +101,9 @@ All in 0.8.7, except the two items marked 0.8.8.
 - **Windows reopen where they were.** Size, position, maximized state and display, per app, in both themes, for LordOS and Linux apps; if a display is gone or the place is off screen, the window opens somewhere visible. Not tested across two displays.
 - **Session restore.** Apps open at logout, Restart or Shut Down come back with their windows and desktop, and after a power cut or a crash LordOS asks first. Only app identifiers are saved, never document paths. Tested on a virtual machine, with reboots, a real shutdown and a forced power-off.
 
-## In development: 0.8.9
+## New in 0.8.9
 
-Not released yet; the latest release is 0.8.8.9.
+The latest release, 0.8.9 Beta, published on 18 November 2026.
 
 - **Choose your desktop.** The first time a new account signs in on an installed system, LordOS shows Lord Flow, Lord Classic and Lord Workspaces side by side, in a random order and with none chosen for you, lets you try the one you pick live and shows where to change it later.
 - **Desk widgets in every theme.** "Add widget" in the wallpaper's menu: a clock (with a second hand if you like), weather for the city you choose from a list that never leaves the computer, a calendar, your devices' batteries, a sound wave that follows the music, a camera or TV channel, Claude Code's limits and more. They read their data only while you can see them.
@@ -159,7 +159,7 @@ Released on 8 November 2026.
 
 ## Many displays, sharp text
 
-The compositor drives several displays at once, extended or mirrored, and draws each one at its own scale: 100 to 200 % in 25 % steps, and since 0.8.8.6 up to 300 % for 4K laptop panels, as long as the desktop keeps at least 1024 × 600 (a 3840 × 2160 panel at 300 % is a 1280 × 720 desktop); 0.8.9, in development, adds 75 % and 80 % for more space on small screens. Text, vectors and images are rasterized at each display's real resolution, so a 4K panel at 150 % next to a 1080p one at 100 % is sharp on both. Linux apps get one `wl_output` per display and the fractional scale protocol, so GTK 4, Qt 6 and Chromium render sharp too. Since 0.8.5, Settings → Displays numbers each display, Identify shows that number big on the monitor itself, and a dragged display snaps edge to edge without overlapping. The Window menu can move a window to another display, and the Dock can assign an app to one.
+The compositor drives several displays at once, extended or mirrored, and draws each one at its own scale: 100 to 200 % in 25 % steps, and since 0.8.8.6 up to 300 % for 4K laptop panels, as long as the desktop keeps at least 1024 × 600 (a 3840 × 2160 panel at 300 % is a 1280 × 720 desktop); since 0.8.9 it also offers 75 % and 80 % for more space on small screens. Text, vectors and images are rasterized at each display's real resolution, so a 4K panel at 150 % next to a 1080p one at 100 % is sharp on both. Linux apps get one `wl_output` per display and the fractional scale protocol, so GTK 4, Qt 6 and Chromium render sharp too. Since 0.8.5, Settings → Displays numbers each display, Identify shows that number big on the monitor itself, and a dragged display snaps edge to edge without overlapping. The Window menu can move a window to another display, and the Dock can assign an app to one.
 
 [[shot:1]]
 
@@ -173,7 +173,7 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 - **Moving wallpapers copy each frame on its way to the screen.** On the Raspberry Pi 5 at the login screen, at 1080p and 60 frames a second, `lord-media` took 41 % of a core and `lord-server` 147 %; a path without that copy is planned for a later release. The Pi 5's hardware decoder handles HEVC only, so H.264, VP9 and AV1 clips don't play there.
 - **Switching theme closes and reopens LordOS windows,** and unsaved text in them is lost, with no warning.
 - **X11 apps run through Xwayland since 0.8.3** and can see each other, as on any X11 desktop. Since 0.8.8.8 they scale themselves on HiDPI (before, they were sharp only at 100 %) and take drags through XDND, both built but not yet checked on our test machine. LordOS input methods compose in Wayland apps, not in X11 ones (`docs/WAYLAND.md`).
-- **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting, an on-screen keyboard and, since 0.8.8.6, reading aloud and Live Speech, and since 0.8.8.8 keyboard navigation with a focus ring; a screen reader and zoom are on the roadmap, and high contrast comes only with Lord Workspaces in 0.8.9, in development.
+- **Accessibility is mostly ahead of us:** today there is a "reduce motion" setting, an on-screen keyboard and, since 0.8.8.6, reading aloud and Live Speech, and since 0.8.8.8 keyboard navigation with a focus ring; a screen reader and zoom are on the roadmap, and high contrast exists only in Lord Workspaces, since 0.8.9.
 
 ## Read the source
 
