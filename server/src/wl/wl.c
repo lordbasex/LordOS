@@ -2406,15 +2406,19 @@ static void top_menu(struct wl_client *c, struct wl_resource *r, struct wl_resou
     if (!s || !s->mapped || !origin(s, &ox, &oy)) return;
     emit(s, "menu", "{\"x\":%.0f,\"y\":%.0f}", ox + (float)x, oy + (float)y);
 }
+/* An interactive move or resize needs the button that started it still down (xdg-shell lets the compositor ignore
+ * it otherwise). A client with its own title bar may ask after the release: Floorp, clicking Minimize while the
+ * pointer moved a little, asked to move once the button was up, and the window then followed the pointer until the
+ * next click (GitHub #189). */
 static void top_move(struct wl_client *c, struct wl_resource *r, struct wl_resource *seat, uint32_t serial) {
     (void)c; (void)seat; (void)serial;
     Surf *s = wl_resource_get_user_data(r);
-    if (s && s->mapped) { buttons_held = 0; emit(s, "move", "{\"x\":%.0f,\"y\":%.0f}", press_x, press_y); }
+    if (s && s->mapped && buttons_held > 0) { buttons_held = 0; emit(s, "move", "{\"x\":%.0f,\"y\":%.0f}", press_x, press_y); }
 }
 static void top_resize(struct wl_client *c, struct wl_resource *r, struct wl_resource *seat, uint32_t serial, uint32_t edges) {
     (void)c; (void)seat; (void)serial;
     Surf *s = wl_resource_get_user_data(r);
-    if (s && s->mapped) { buttons_held = 0; emit(s, "resize", "{\"edges\":%u,\"x\":%.0f,\"y\":%.0f}", edges, press_x, press_y); }
+    if (s && s->mapped && buttons_held > 0) { buttons_held = 0; emit(s, "resize", "{\"edges\":%u,\"x\":%.0f,\"y\":%.0f}", edges, press_x, press_y); }
 }
 static void top_max_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) {
     (void)c;

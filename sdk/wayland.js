@@ -166,7 +166,11 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     case 'resize': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); if (!wm.beginResize(id, d.edges || 10)) drag = { id, edges: d.edges || 10, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;
     case 'maximize': if (win && !win.maximized) wm.toggleMaximize(id); break;
     case 'unmaximize': if (win && win.maximized) wm.toggleMaximize(id); break;
-    case 'minimize': if (win) wm.minimize(id); break;
+    case 'minimize':        // a move still under way ends with it: a minimized window never follows the pointer (#189)
+      if (drag && drag.id === id) drag = null;
+      wm.cancelGrab(id);
+      if (win) wm.minimize(id);
+      break;
     // The app switched who draws the frame while open (Chromium's «Use system title bar and borders»,
     // Firefox's «Title Bar»): same window, place, size, maximized state, focus and Dock entry; only the
     // theme's frame comes or goes (the content area grows or shrinks by it, and the app is configured).

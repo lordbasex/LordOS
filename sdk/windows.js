@@ -554,6 +554,16 @@ export const wm = {
   // edges as in xdg_toplevel.resize: 1 top, 2 bottom, 4 left, 8 right (5 = top-left…).
   frameRef,
   beginMove: (id) => beginGrab(id, 0),
+  // ends a move or resize of this window still under way, where it is (minimizing it: GitHub #189)
+  cancelGrab: (id) => {
+    if (!grab || grab.id !== id) return;
+    grab = null;
+    moveGrab.set(null);
+    clearInterval(previewTimer);
+    previewTimer = 0;
+    if (snapPreview.get()) snapPreview.set(null);
+    try { lord.wm.cancel(); } catch (e) { /* no compositor */ }
+  },
   beginResize: (id, edges) => beginGrab(id, edges & 15),
   // LordBench's desktop scene (apps/sysinfo/scene.jsx): lord-server moves the window along a figure of
   // eight (rx × ry px, one turn every periodMs) through the drag's own path, one step per frame, until

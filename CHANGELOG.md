@@ -19,6 +19,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   polygons in the signed-distance shapes, a colour fill), `lord.input.pointerAccent('#RRGGBB' | null)` takes only a
   colour, and `setPointerAccent` in the SDK; `build/cursor-test` checks the fill, the size, the text cursor and going
   back. Linux apps that ask for the default shape get it too.
+- **A window that draws its own title bar no longer sticks to the pointer after Minimize (GitHub #189).** Floorp,
+  clicked on Minimize while the pointer moved a little, asked to be moved once the button was already up; the move
+  then had no release to end it and the minimized window followed the pointer until the next click. lord-server now
+  ignores a move or resize request with no button down (xdg-shell allows it), and minimizing a window ends a move of
+  it still under way (`wm.cancelGrab`). (`server/src/wl/wl.c`, `sdk/wayland.js`, `sdk/windows.js`)
 - **Security (Claude Security review of the 0.8.9 branch).** Four findings, all in code new in this version, fixed:
   - Streams checked no TLS certificate: FFmpeg only verifies when asked, so an https, HLS-over-https or rtmps camera
     or channel accepted any server, and a camera password from the keyring could go to someone in the middle. lord-stream
