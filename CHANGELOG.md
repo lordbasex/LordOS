@@ -37,6 +37,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   original larger than that (and, for a category that asks for it, for a smaller one), has per-category quality,
   takes the category's order from an `order.txt`, and keeps the categories it isn't given in `index.json`.
   (`assets/wallpapers/cyberpunk/`, `assets/wallpapers/README.md`, `sdk/wallpapers.js`)
+- **Lord Workspaces' own default accent: rosa**, to go with Cyberpunk City HD's neon. `settings.accent` is now `null`
+  until the person chooses one, and `null` means the theme's default: azul in Lord Flow and Lord Classic, rosa in Lord
+  Workspaces (`DEFAULT_ACCENT`, `themes/workspaces/tokens.js`). Each theme's tokens carry `accentName`, so the pickers
+  (Settings → Appearance, the Control Centers) mark the accent in use and Linux apps get its name through the portal.
+  Settings migration 7 turns the saved `azul` (everyone's default until now, saved with the rest of the settings)
+  into `null`, like migration 5 did for the wallpaper; any other accent stays. A new install that picks Lord
+  Workspaces starts with the panorama and the pink accent. (`sdk/settings.js`, `themes/*/tokens.js`,
+  `apps/settings/index.jsx`, `sdk/theme.js`)
 - **Lord Workspaces' own default wallpaper: Cyberpunk City HD's panorama.** `settings.wallpaper` is now `null` until
   a picture is chosen, and `null` is the theme's default: Lord Workspaces declares its own (theme.json
   `"wallpaper": { "default" }`, tokens `defaultWallpaper`), Lord Flow and Lord Classic keep Lumo Celestial

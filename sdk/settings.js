@@ -4,7 +4,7 @@ import { markExistingUser } from './firststartmodel.js';
 
 const DEFAULTS = {
   mode: 'dark',          // 'dark' | 'light'
-  accent: 'azul',
+  accent: null,          // 0.8.9: null = the theme's default (azul; Lord Workspaces: rosa, to go with its wallpaper), migration 7
   effects: true,         // transparency with blur
   reduceMotion: false,   // decorative animations off (Settings → Appearance)
   browserTabsInTitlebar: true,   // 0.8.4, Settings → Appearance: Chromium and Firefox draw their own bar (browserframe.js)
@@ -59,7 +59,7 @@ const DEFAULTS = {
 // meaning of a setting, it appends [schema, (settings) => newSettings] here. Each runs once per user,
 // in order, when the session loads the file; "schema" records the last one applied. The system-wide
 // migrations (as root) are the lordos package's (packaging/migrations).
-export const SETTINGS_SCHEMA = 6;
+export const SETTINGS_SCHEMA = 7;
 // A Terminal key mapping that sends what a US keyboard's key types anyway (keys.js names keys by their
 // US position): on a US keyboard it does nothing, on any other it types the wrong character. The iTerm2
 // importer made them from keypad entries before 0.8.8.6 ("-" typed "/" on a Latin American keyboard).
@@ -103,6 +103,11 @@ const MIGRATIONS = [
     return s.wallpaper === 'lumo-celestial' ? { ...s, wallpaper: null } : s;
   }],
   [6, markExistingUser],  // 0.8.9: someone who already used LordOS never sees the first-start desktop chooser (firststartmodel.js)
+  [7, (s) => {            // 0.8.9: the default accent became the theme's (null), so Lord Workspaces can have its own (rosa,
+    // which goes with Cyberpunk City HD). Azul was every user's default and was saved with the rest of the settings,
+    // like the wallpaper in migration 5: Lord Flow and Lord Classic show it all the same; any other accent stays.
+    return s.accent === 'azul' ? { ...s, accent: null } : s;
+  }],
 ];
 export function migrateSettings(s) {
   let out = s;

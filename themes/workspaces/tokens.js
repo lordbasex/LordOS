@@ -36,6 +36,9 @@ export const deep = {
   ambar: '#A9650A',
 };
 
+// The accent of a user who never chose one (settings.accent null): rosa, which goes with the default wallpaper's neon.
+export const DEFAULT_ACCENT = 'rosa';
+
 export const BRAND_GRADIENT = 'linear-gradient(135deg, #B46CFF, #4F46E5)';
 
 // One material for every surface of the theme, per effects style and mode.
@@ -94,11 +97,12 @@ export function makeTheme({ mode, accent, effects, surface, contrast = false }, 
   const dark = mode === 'dark';
   const s = effects === false ? 'opaque' : surface || 'crystal';
   const m = material(s, dark);
-  const name = accents[accent] ? accent : 'violeta';
+  const name = accents[accent] ? accent : DEFAULT_ACCENT;
   const acc = dark ? accents[name] : deep[name];
   return {
     mode,
     accent: acc,
+    accentName: name,
     accents,
     wallpapers,
     defaultWallpaper: DEFAULT_WALLPAPER,

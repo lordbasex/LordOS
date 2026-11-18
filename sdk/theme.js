@@ -64,7 +64,7 @@ let portalSent = '';
 function syncPortal(value) {
   try {
     if (typeof lord === 'undefined' || !lord.portal) return;
-    const name = settings.get().accent || '';
+    const name = settings.get().accent || value.accentName || '';
     const msg = { dark: value.mode !== 'light', accent: /^#[0-9a-f]{6}$/i.test(value.accent) ? value.accent : '#0a84ff',
       accentName: GNOME_ACCENTS[name] || 'blue', buttons: gtkButtonLayout(windowButtonsPref(settings.get()), value.gtkButtons) };
     const json = JSON.stringify(msg);

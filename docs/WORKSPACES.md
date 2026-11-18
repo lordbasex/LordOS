@@ -257,7 +257,8 @@ Settings → Appearance → Transparency off (`settings.effects === false`) is a
 Gradients have two stops (what the renderer draws). The colours are the brand's violets (`#7C5CFF`, `#5B3FE0`; the
 gradient `#B46CFF → #4F46E5` on the onboarding's primary button) with violet-biased neutrals, and the shared accent
 names (azul, violeta, rosa, naranja, verde, grafito) so the person's accent survives a theme switch; in light mode each
-accent is one step deeper. Contrast is checked in the model test: text on windows, panels and title bars ≥ 7:1, dim
+accent is one step deeper. A person who never chose an accent (`settings.accent` null, since 0.8.9) gets rosa, which
+goes with the default wallpaper (`DEFAULT_ACCENT`; Lord Flow and Lord Classic keep azul). Contrast is checked in the model test: text on windows, panels and title bars ≥ 7:1, dim
 text ≥ 4.5:1, white on every accent ≥ 3:1 (large text and controls) in both modes. The crown is the brand's
 full-colour render, never recoloured, with no glow.
 

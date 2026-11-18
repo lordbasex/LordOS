@@ -198,9 +198,12 @@ for (const mode of ['dark', 'light']) {
 }
 eq('the shared accent names, and the proposal\'s amber', Object.keys(accents), ['azul', 'violeta', 'rosa', 'naranja', 'verde', 'grafito', 'ambar']);
 eq('amber: the focus ring stays violet', [makeTheme({ mode: 'dark', accent: 'ambar' }).focusRing, makeTheme({ mode: 'light', accent: 'ambar' }).focusRing], ['#7C5CFF', '#5B3FE0']);
+// a user who never chose an accent (settings.accent null) gets the theme's rosa, named for the pickers; theirs otherwise
+eq('the default accent is rosa', [makeTheme({ mode: 'dark', accent: null }).accent, makeTheme({ mode: 'light', accent: null }).accent, makeTheme({ mode: 'dark', accent: null }).accentName], [accents.rosa, deep.rosa, 'rosa']);
+eq('a chosen accent wins', makeTheme({ mode: 'dark', accent: 'verde' }).accentName, 'verde');
 eq('deep accents for every name', Object.keys(deep), Object.keys(accents));
 eq('brand violets', [accents.violeta, deep.violeta], ['#7C5CFF', '#5B3FE0']);
-eq('an unknown accent is the brand violet', makeTheme({ mode: 'dark', accent: 'x' }).accent, '#7C5CFF');
+eq('an unknown accent is the theme\'s default, rosa', makeTheme({ mode: 'dark', accent: 'x' }).accent, '#E5487F');
 eq('material is plain data', JSON.parse(JSON.stringify(material('crystal', true))).blur, SPINE_BLUR);
 
 // ---- two halves ----

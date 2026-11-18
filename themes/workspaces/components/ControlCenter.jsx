@@ -305,7 +305,7 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome, onEdi
           <View style={{ flexDirection: 'row', gap: 10, direction: 'ltr' }}>
             {Object.entries(t.accents).map(([name, c]) => (
               <View key={name} onClick={() => set({ accent: name })} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c,
-                border: s.accent === name ? `2px solid ${t.text}` : '0 solid transparent' }} />
+                border: (s.accent || t.accentName) === name ? `2px solid ${t.text}` : '0 solid transparent' }} />
             ))}
           </View>
         </Tile>

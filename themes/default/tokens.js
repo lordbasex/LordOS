@@ -27,6 +27,8 @@ export function makeTheme({ mode, accent, effects }) {
   return {
     mode,
     accent: accents[accent] || accents.azul,
+    // the accent's name, for the pickers: the person's, or this theme's default when they never chose one (null)
+    accentName: accents[accent] ? accent : 'azul',
     accents,
     wallpapers,
     effects,
