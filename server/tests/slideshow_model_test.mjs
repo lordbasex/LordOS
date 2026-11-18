@@ -34,7 +34,7 @@ eq('nothing to stop', slideshowStop({ slideshow: { on: false } }), {});
 const index = JSON.parse(readFileSync(new URL('../../assets/wallpapers/index.json', import.meta.url)));
 const list = index.map((e) => ({ id: e.id, category: e.category }));
 const cyber = list.filter((w) => w.category === 'cyberpunk').map((w) => w.id);
-eq('Cyberpunk City HD has eleven pictures', cyber.length, 11);
+eq('Cyberpunk City HD has seventeen pictures', cyber.length, 17);
 eq('the panorama is one of them', cyber.includes('cyberpunk-panorama'), true);
 eq('categories with two pictures or more, in order', slideshowCategories([...list, { id: 'mine1', category: 'mine' }, { id: 'mine2', category: 'mine' }], ['signature', 'lumo', 'cosmos', 'cyberpunk', 'gradients']),
   ['signature', 'lumo', 'cosmos', 'cyberpunk']);
@@ -58,7 +58,7 @@ eq('two pictures: the other first', shuffled(['a', 'b'], () => 0, 'a')[0], 'b');
   eq('one display: each round has every picture', [0, 5, 10, 15, 20].map((k) => [...seen.slice(k, k + 5)].sort().join('')), ['abcde', 'abcde', 'abcde', 'abcde', 'abcde']);
   eq('one display: never the same twice in a row', seen.every((x, i) => i === 0 || x !== seen[i - 1]), true);
 }
-// three displays, eleven pictures: never the same picture on two displays at once, each with its own order
+// three displays, seventeen pictures: never the same picture on two displays at once, each with its own order
 {
   const r = rng(3);
   const disp = [{ deck: null, cur: null }, { deck: null, cur: null }, { deck: null, cur: null }];
@@ -74,8 +74,8 @@ eq('two pictures: the other first', shuffled(['a', 'b'], () => 0, 'a')[0], 'b');
     if (new Set(disp.map((d) => d.cur).filter(Boolean)).size !== disp.filter((d) => d.cur).length) clash++;
   }
   eq('three displays: never one picture on two at once', clash, 0);
-  eq('three displays: every picture shows on each', orders.map((o) => new Set(o).size), [11, 11, 11]);
-  eq('three displays: their orders differ', new Set(orders.map((o) => o.slice(0, 11).join())).size, 3);
+  eq('three displays: every picture shows on each', orders.map((o) => new Set(o).size), [cyber.length, cyber.length, cyber.length]);
+  eq('three displays: their orders differ', new Set(orders.map((o) => o.slice(0, cyber.length).join())).size, 3);
   eq('three displays: no display repeats itself', orders.every((o) => o.every((x, k) => k === 0 || x !== o[k - 1])), true);
 }
 // the arriving pictures count as busy too

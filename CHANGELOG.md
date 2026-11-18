@@ -19,14 +19,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   polygons in the signed-distance shapes, a colour fill), `lord.input.pointerAccent('#RRGGBB' | null)` takes only a
   colour, and `setPointerAccent` in the SDK; `build/cursor-test` checks the fill, the size, the text cursor and going
   back. Linux apps that ask for the default shape get it too.
-- **Cyberpunk City HD, a new wallpaper category** (all themes' Settings → Wallpaper): eleven 3840×2160 pictures made
-  for LordOS (Panorama, Neon Road Entrance, Heart of the City, Skyline Highway, Flower Boulevard, Maglev Station, Sky
-  Terrace, Rings and Bridges, Neon Cherry Avenue, Pier and Train, Metropolis Lookout), named in every language; the
-  category's name is a proper name and stays the same everywhere. Each has a 1920×1080 base (quality 92, 4:4:4) and
-  its 4K size as an `@3840x2160` variant (quality 95, 4:4:4, as close to the originals as JPEG gets: neon edges blur
-  with 4:2:0), so a 1080p screen never decodes the 4K file; 36.3 MB with the thumbnails. `tools/gen-wallpapers.mjs` now takes JPEG originals, makes the
-  1920×1080 base for an original larger than that, has per-category quality, and keeps the categories it isn't given
-  in `index.json`. (`assets/wallpapers/cyberpunk/`, `assets/wallpapers/README.md`, `sdk/wallpapers.js`)
+- **Cyberpunk City HD, a new wallpaper category** (all themes' Settings → Wallpaper): seventeen pictures made for
+  LordOS, in the order of a journey from the road outside into the city: Panorama, Neon Road Entrance, Heart of the
+  City, Skyline Highway, Rings and Bridges, Flower Boulevard, Neon Cherry Avenue, Maglev Station, Pier and Train, Sky
+  Terrace, Metropolis Lookout, and a closing series with a woman in the same city (Neon Rider, Night Watch, Hooded,
+  Unmasked, Night Pose, Portrait). Named in every language; the category's name is a proper name and stays the same
+  everywhere. Panorama and Neon Road Entrance are 3840×2160 originals: a 1920×1080 base (quality 92, 4:4:4) and the 4K
+  size as an `@3840x2160` variant (quality 95, 4:4:4: neon edges blur with 4:2:0), so a 1080p screen never decodes
+  the 4K file. The other fifteen were made again at 1672×941 (the first versions were crops of one picture and looked
+  soft) and are brought up to 1920×1080 once with Lanczos, with no 4K file that would add bytes and no detail;
+  22.4 MB with the thumbnails. `tools/gen-wallpapers.mjs` now takes JPEG originals, makes the 1920×1080 base for an
+  original larger than that (and, for a category that asks for it, for a smaller one), has per-category quality,
+  takes the category's order from an `order.txt`, and keeps the categories it isn't given in `index.json`.
+  (`assets/wallpapers/cyberpunk/`, `assets/wallpapers/README.md`, `sdk/wallpapers.js`)
 - **Lord Workspaces' own default wallpaper: Cyberpunk City HD's panorama.** `settings.wallpaper` is now `null` until
   a picture is chosen, and `null` is the theme's default: Lord Workspaces declares its own (theme.json
   `"wallpaper": { "default" }`, tokens `defaultWallpaper`), Lord Flow and Lord Classic keep Lumo Celestial

@@ -280,7 +280,7 @@ jumps to its end, and the SDK's own desktop slide is off too.
 
 ## Wallpaper and slideshow
 
-**The default picture** is Cyberpunk City HD's panorama (`cyberpunk-panorama`, eleven 3840×2160 pictures made for
+**The default picture** is Cyberpunk City HD's panorama (`cyberpunk-panorama`, a category of seventeen pictures made for
 LordOS; `assets/wallpapers/README.md`). Since 0.8.9 `settings.wallpaper` is `null` until the person chooses one, and
 `null` means the theme's default: theme.json says `"wallpaper": { "default": "cyberpunk-panorama" }` for Settings
 (`sdk/thememeta.js`) and the theme's tokens say the same to the SDK (`defaultWallpaper`; `wallpaperIdFor(s, d, def)`

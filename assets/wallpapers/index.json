@@ -143,94 +143,22 @@
   "file": "cosmos/lordos-stellar-voyage.jpg"
  },
  {
-  "id": "cyberpunk-flower-boulevard",
+  "id": "cyberpunk-panorama",
   "category": "cyberpunk",
-  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-flower-boulevard.jpg",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-panorama.jpg",
   "variants": [
    {
     "w": 1920,
     "h": 1080,
-    "file": "cyberpunk/lordos-cyberpunk-flower-boulevard.jpg"
+    "file": "cyberpunk/lordos-cyberpunk-panorama.jpg"
    },
    {
     "w": 3840,
     "h": 2160,
-    "file": "cyberpunk/lordos-cyberpunk-flower-boulevard@3840x2160.jpg"
+    "file": "cyberpunk/lordos-cyberpunk-panorama@3840x2160.jpg"
    }
   ],
-  "file": "cyberpunk/lordos-cyberpunk-flower-boulevard.jpg"
- },
- {
-  "id": "cyberpunk-heart-of-the-city",
-  "category": "cyberpunk",
-  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-heart-of-the-city.jpg",
-  "variants": [
-   {
-    "w": 1920,
-    "h": 1080,
-    "file": "cyberpunk/lordos-cyberpunk-heart-of-the-city.jpg"
-   },
-   {
-    "w": 3840,
-    "h": 2160,
-    "file": "cyberpunk/lordos-cyberpunk-heart-of-the-city@3840x2160.jpg"
-   }
-  ],
-  "file": "cyberpunk/lordos-cyberpunk-heart-of-the-city.jpg"
- },
- {
-  "id": "cyberpunk-maglev-station",
-  "category": "cyberpunk",
-  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-maglev-station.jpg",
-  "variants": [
-   {
-    "w": 1920,
-    "h": 1080,
-    "file": "cyberpunk/lordos-cyberpunk-maglev-station.jpg"
-   },
-   {
-    "w": 3840,
-    "h": 2160,
-    "file": "cyberpunk/lordos-cyberpunk-maglev-station@3840x2160.jpg"
-   }
-  ],
-  "file": "cyberpunk/lordos-cyberpunk-maglev-station.jpg"
- },
- {
-  "id": "cyberpunk-metropolis-lookout",
-  "category": "cyberpunk",
-  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-metropolis-lookout.jpg",
-  "variants": [
-   {
-    "w": 1920,
-    "h": 1080,
-    "file": "cyberpunk/lordos-cyberpunk-metropolis-lookout.jpg"
-   },
-   {
-    "w": 3840,
-    "h": 2160,
-    "file": "cyberpunk/lordos-cyberpunk-metropolis-lookout@3840x2160.jpg"
-   }
-  ],
-  "file": "cyberpunk/lordos-cyberpunk-metropolis-lookout.jpg"
- },
- {
-  "id": "cyberpunk-neon-cherry-avenue",
-  "category": "cyberpunk",
-  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-neon-cherry-avenue.jpg",
-  "variants": [
-   {
-    "w": 1920,
-    "h": 1080,
-    "file": "cyberpunk/lordos-cyberpunk-neon-cherry-avenue.jpg"
-   },
-   {
-    "w": 3840,
-    "h": 2160,
-    "file": "cyberpunk/lordos-cyberpunk-neon-cherry-avenue@3840x2160.jpg"
-   }
-  ],
-  "file": "cyberpunk/lordos-cyberpunk-neon-cherry-avenue.jpg"
+  "file": "cyberpunk/lordos-cyberpunk-panorama.jpg"
  },
  {
   "id": "cyberpunk-neon-road-entrance",
@@ -251,76 +179,17 @@
   "file": "cyberpunk/lordos-cyberpunk-neon-road-entrance.jpg"
  },
  {
-  "id": "cyberpunk-panorama",
+  "id": "cyberpunk-heart-of-the-city",
   "category": "cyberpunk",
-  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-panorama.jpg",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-heart-of-the-city.jpg",
   "variants": [
    {
     "w": 1920,
     "h": 1080,
-    "file": "cyberpunk/lordos-cyberpunk-panorama.jpg"
-   },
-   {
-    "w": 3840,
-    "h": 2160,
-    "file": "cyberpunk/lordos-cyberpunk-panorama@3840x2160.jpg"
+    "file": "cyberpunk/lordos-cyberpunk-heart-of-the-city.jpg"
    }
   ],
-  "file": "cyberpunk/lordos-cyberpunk-panorama.jpg"
- },
- {
-  "id": "cyberpunk-pier-and-train",
-  "category": "cyberpunk",
-  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-pier-and-train.jpg",
-  "variants": [
-   {
-    "w": 1920,
-    "h": 1080,
-    "file": "cyberpunk/lordos-cyberpunk-pier-and-train.jpg"
-   },
-   {
-    "w": 3840,
-    "h": 2160,
-    "file": "cyberpunk/lordos-cyberpunk-pier-and-train@3840x2160.jpg"
-   }
-  ],
-  "file": "cyberpunk/lordos-cyberpunk-pier-and-train.jpg"
- },
- {
-  "id": "cyberpunk-rings-and-bridges",
-  "category": "cyberpunk",
-  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-rings-and-bridges.jpg",
-  "variants": [
-   {
-    "w": 1920,
-    "h": 1080,
-    "file": "cyberpunk/lordos-cyberpunk-rings-and-bridges.jpg"
-   },
-   {
-    "w": 3840,
-    "h": 2160,
-    "file": "cyberpunk/lordos-cyberpunk-rings-and-bridges@3840x2160.jpg"
-   }
-  ],
-  "file": "cyberpunk/lordos-cyberpunk-rings-and-bridges.jpg"
- },
- {
-  "id": "cyberpunk-sky-terrace",
-  "category": "cyberpunk",
-  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-sky-terrace.jpg",
-  "variants": [
-   {
-    "w": 1920,
-    "h": 1080,
-    "file": "cyberpunk/lordos-cyberpunk-sky-terrace.jpg"
-   },
-   {
-    "w": 3840,
-    "h": 2160,
-    "file": "cyberpunk/lordos-cyberpunk-sky-terrace@3840x2160.jpg"
-   }
-  ],
-  "file": "cyberpunk/lordos-cyberpunk-sky-terrace.jpg"
+  "file": "cyberpunk/lordos-cyberpunk-heart-of-the-city.jpg"
  },
  {
   "id": "cyberpunk-skyline-highway",
@@ -331,13 +200,177 @@
     "w": 1920,
     "h": 1080,
     "file": "cyberpunk/lordos-cyberpunk-skyline-highway.jpg"
-   },
-   {
-    "w": 3840,
-    "h": 2160,
-    "file": "cyberpunk/lordos-cyberpunk-skyline-highway@3840x2160.jpg"
    }
   ],
   "file": "cyberpunk/lordos-cyberpunk-skyline-highway.jpg"
+ },
+ {
+  "id": "cyberpunk-rings-and-bridges",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-rings-and-bridges.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-rings-and-bridges.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-rings-and-bridges.jpg"
+ },
+ {
+  "id": "cyberpunk-flower-boulevard",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-flower-boulevard.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-flower-boulevard.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-flower-boulevard.jpg"
+ },
+ {
+  "id": "cyberpunk-neon-cherry-avenue",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-neon-cherry-avenue.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-neon-cherry-avenue.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-neon-cherry-avenue.jpg"
+ },
+ {
+  "id": "cyberpunk-maglev-station",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-maglev-station.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-maglev-station.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-maglev-station.jpg"
+ },
+ {
+  "id": "cyberpunk-pier-and-train",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-pier-and-train.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-pier-and-train.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-pier-and-train.jpg"
+ },
+ {
+  "id": "cyberpunk-sky-terrace",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-sky-terrace.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-sky-terrace.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-sky-terrace.jpg"
+ },
+ {
+  "id": "cyberpunk-metropolis-lookout",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-metropolis-lookout.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-metropolis-lookout.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-metropolis-lookout.jpg"
+ },
+ {
+  "id": "cyberpunk-hover-rider",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-hover-rider.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-hover-rider.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-hover-rider.jpg"
+ },
+ {
+  "id": "cyberpunk-terrace-woman",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-terrace-woman.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-terrace-woman.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-terrace-woman.jpg"
+ },
+ {
+  "id": "cyberpunk-hooded",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-hooded.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-hooded.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-hooded.jpg"
+ },
+ {
+  "id": "cyberpunk-unmasked",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-unmasked.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-unmasked.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-unmasked.jpg"
+ },
+ {
+  "id": "cyberpunk-fashion",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-fashion.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-fashion.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-fashion.jpg"
+ },
+ {
+  "id": "cyberpunk-portrait",
+  "category": "cyberpunk",
+  "thumb": "thumbs/cyberpunk/lordos-cyberpunk-portrait.jpg",
+  "variants": [
+   {
+    "w": 1920,
+    "h": 1080,
+    "file": "cyberpunk/lordos-cyberpunk-portrait.jpg"
+   }
+  ],
+  "file": "cyberpunk/lordos-cyberpunk-portrait.jpg"
  }
 ]

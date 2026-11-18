@@ -24,13 +24,19 @@ The collection that LordOS ships in `/usr/share/backgrounds/lordos/` and shows i
 | Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-neon-road-entrance.jpg` | Neon Road Entrance / Entrada de neón / Entrada de neon |
 | Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-heart-of-the-city.jpg` | Heart of the City / Rumbo al corazón de la ciudad / Rumo ao coração da cidade |
 | Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-skyline-highway.jpg` | Skyline Highway / Autopista panorámica / Rodovia panorâmica |
-| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-flower-boulevard.jpg` | Flower Boulevard / Bulevar florido / Bulevar florido |
-| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-maglev-station.jpg` | Maglev Station / Estación maglev / Estação maglev |
-| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-sky-terrace.jpg` | Sky Terrace / Terraza en las alturas / Terraço nas alturas |
 | Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-rings-and-bridges.jpg` | Rings and Bridges / Anillos y puentes / Anéis e pontes |
+| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-flower-boulevard.jpg` | Flower Boulevard / Bulevar florido / Bulevar florido |
 | Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-neon-cherry-avenue.jpg` | Neon Cherry Avenue / Avenida de cerezos de neón / Avenida das cerejeiras de neon |
+| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-maglev-station.jpg` | Maglev Station / Estación maglev / Estação maglev |
 | Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-pier-and-train.jpg` | Pier and Train / Muelle y tren / Cais e trem |
+| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-sky-terrace.jpg` | Sky Terrace / Terraza en las alturas / Terraço nas alturas |
 | Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-metropolis-lookout.jpg` | Metropolis Lookout / Mirador sobre la metrópolis / Mirante sobre a metrópole |
+| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-hover-rider.jpg` | Neon Rider / Jinete de neón / Piloto de neon |
+| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-terrace-woman.jpg` | Night Watch / Vigía nocturna / Vigia noturna |
+| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-hooded.jpg` | Hooded / Encapuchada / Encapuzada |
+| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-unmasked.jpg` | Unmasked / Sin máscara / Sem máscara |
+| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-fashion.jpg` | Night Pose / Pose nocturna / Pose noturna |
+| Cyberpunk City HD | `cyberpunk/lordos-cyberpunk-portrait.jpg` | Portrait / Retrato / Retrato |
 
 The names shown in the interface come from `assets/locales/<lang>/shell.json`
 (`shell.wallpaper.<id>`) and the categories from `settings.json` (`settings.wallpaperCategory.*`). "Cyberpunk City HD"
@@ -41,11 +47,12 @@ is a proper name and stays the same in every language, like Lumo.
 - `<category>/lordos-<name>.jpg`: the wallpaper at the original's native size (1672×941 today),
   JPEG quality 90, 4:4:4 chroma, baseline. About 4 MB for all eleven; the 2 MB PNG originals are
   not kept in the repository (the JPEGs measure 39–46 dB PSNR against them and look the same).
-- **Cyberpunk City HD** (`cyberpunk/`, 0.8.9): eleven 3840×2160 pictures the maintainer made for LordOS, upscaled
-  from 1672×941 (no text or marks in them). An original larger than 1920×1080 gets a 1920×1080 base
-  (`lordos-cyberpunk-<name>.jpg`, Lanczos, quality 92, 4:4:4) and keeps its own size as the `@3840x2160` variant
-  (quality 95, 4:4:4: 4:2:0 at 80 visibly softened the neon edges against the originals). 36.3 MB for the 22 files
-  and the thumbnails (7.9 MB of bases, 28.1 MB of 4K). The 2.2–3.4 MB source JPEGs are not kept here.
+- **Cyberpunk City HD** (`cyberpunk/`, 0.8.9): seventeen pictures the maintainer made for LordOS (no text or marks in
+  them), listed in the order of a journey into the city (`order.txt` next to the originals). Panorama and Neon Road
+  Entrance are 3840×2160: a 1920×1080 base (Lanczos, quality 92, 4:4:4) and the original as the `@3840x2160` variant
+  (quality 95, 4:4:4: 4:2:0 at 80 visibly softened the neon edges). The other fifteen are 1672×941 originals brought
+  up to 1920×1080 once (Lanczos, quality 92, 4:4:4; `fill` in the generator's ENCODE), with no 4K file. 22.4 MB with
+  the thumbnails. The source files are not kept here.
 - `thumbs/<category>/lordos-<name>.jpg`: 320×180 thumbnails for Settings and the Control Center,
   so the pickers never decode the full images.
 - `index.json`: the list (ids, categories, sizes) that the SDK bundles (`sdk/wallpapers.js`).
@@ -60,7 +67,7 @@ hand.
 Lord Workspaces can go through a category's pictures on its own (Settings → Wallpaper, "Change the wallpaper
 automatically"; `sdk/slideshow.jsx`, docs/WORKSPACES.md "Wallpaper slideshow"). It decodes each picture off the
 interface's thread at the size it is drawn at (`thumb:<px>:asset:wallpapers/…`): the display plus 2 % on each side for
-the transition's pan, so a 1080p display decodes the `@3840x2160` file down to 1999×1124. The still wallpaper of a
+the transition's pan, so a 1080p display decodes an `@3840x2160` file down to 1999×1124. The still wallpaper of a
 1080p display keeps using the 1920×1080 base.
 
 ## Higher resolutions

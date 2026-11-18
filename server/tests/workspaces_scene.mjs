@@ -678,8 +678,9 @@ await flush();
   sdk.settings.set(sdk.slideshowPatch(sdk.settings.get(), { on: true, category: 'cyberpunk', perDisplay: true }));
   await flush();
   check('slideshow: a picture per display, three different ones', [slides().length, new Set(slides()).size], [3, 3]);
-  // 1920×1080 plus the drift's 2 % margin on each side (1996×1124): the 4K file, decoded down to that by the workers
-  check('slideshow: at the displays\' size and margin', slides().every((src) => /^thumb:1999:asset:wallpapers\/cyberpunk\/lordos-cyberpunk-[a-z-]+@3840x2160\.jpg$/.test(src)), true);
+  // 1920×1080 plus the drift's 2 % margin on each side (1996×1124): the smallest file that covers it (the 4K one where
+  // a picture has one, decoded down to that by the workers; else its 1920×1080 base, decoded at its own size)
+  check('slideshow: at the displays\' size and margin', slides().every((src) => /^thumb:(1999:asset:wallpapers\/cyberpunk\/lordos-cyberpunk-[a-z-]+@3840x2160|1920:asset:wallpapers\/cyberpunk\/lordos-cyberpunk-[a-z-]+)\.jpg$/.test(src)), true);
   check('slideshow: turning it on keeps the interval\'s default (a minute)', sdk.settings.get().slideshow.every, 60);
   sdk.settings.set(sdk.slideshowPatch(sdk.settings.get(), { perDisplay: false }));
   await flush();
