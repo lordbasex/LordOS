@@ -41,7 +41,7 @@ static float prim_sdf(const Prim *q, float x, float y) {
         if (s < d) d = s;
         if ((by > y) != (ay > y) && x < (ax - bx) * (y - by) / (ay - by) + bx) inside = !inside;
     }
-    return inside ? -d : d;
+    return (inside ? -d : d) - q->r;           /* r > 0: the polygon grown by r, its corners rounded */
 }
 
 static float shape_sdf(const Shape *s, float x, float y) {
@@ -102,6 +102,20 @@ static void arrow(Shape *s, float ox, float oy) {
     s->hx = ox;
     s->hy = oy;
 }
+
+/* The accent arrow (a theme's own pointer, cursor_set_accent): a tip with no tail and a notch at its back, its corners
+ * rounded, drawn in the theme's accent colour. Only the default pointer; the other shapes keep LordOS's. */
+static void tip(Shape *s, float ox, float oy) {
+    static const float a[4][2] = { { 0.8f, 0.8f }, { 17.6f, 7.4f }, { 10.4f, 10.4f }, { 7.4f, 17.6f } };
+    float t[4][2];
+    for (int i = 0; i < 4; i++) { t[i][0] = a[i][0] + ox; t[i][1] = a[i][1] + oy; }
+    poly(s, 4, (const float (*)[2])t);
+    s->prim[s->n - 1].r = 0.8f;
+    s->hx = ox;
+    s->hy = oy;
+}
+
+static uint32_t accent_rgb;     /* 0 = LordOS's black arrow, else 0x01RRGGBB (the 0x01 marks it set) */
 
 /* Hand: index finger up (pointer), fingers open (grab) or closed (grabbing). */
 static void hand(Shape *s, int kind) {
@@ -175,7 +189,7 @@ static void build(int shape, Shape *s) {
     case CUR_NS: case CUR_N: case CUR_S: double_arrow(s, 90); break;
     case CUR_NWSE: case CUR_NW: case CUR_SE: double_arrow(s, 45); break;
     case CUR_NESW: case CUR_NE: case CUR_SW: double_arrow(s, -45); break;
-    default: arrow(s, 3, 3); break;
+    default: if (accent_rgb && shape == CUR_DEFAULT) tip(s, 3, 3); else arrow(s, 3, 3); break;
     }
 }
 
@@ -209,6 +223,18 @@ int cursor_set_boost(double level) {
 void cursor_set_shake(int on) { shake_on = on != 0; if (!shake_on) cursor_set_boost(0); }
 int cursor_shake(void) { return shake_on; }
 unsigned cursor_size_serial(void) { return size_serial; }
+
+int cursor_set_accent(int on, uint32_t rgb) {
+    uint32_t v = on ? 0x01000000u | (rgb & 0xFFFFFFu) : 0;
+    if (v == accent_rgb) return 0;
+    accent_rgb = v;
+    for (size_t i = 0; i < sizeof cache / sizeof cache[0]; i++) {   /* only the default pointer is drawn again */
+        free((void *)cache[i][CUR_DEFAULT].px);
+        memset(&cache[i][CUR_DEFAULT], 0, sizeof cache[i][CUR_DEFAULT]);
+    }
+    size_serial++;
+    return 1;
+}
 
 /* Shaken, the pointer grows to 200 % (64 px); one already that large or larger grows to the largest. */
 static int cursor_shake_target(int pct) { return pct < 200 ? 200 : CURSOR_PCT_MAX; }
@@ -247,14 +273,18 @@ const CursorImage *cursor_image_pct(int shape, int pct) {
     uint32_t *px = calloc((size_t)size * size, 4);
     if (!px) return NULL;
     const float outline = 1.25f, inv = 1.0f / scale;
+    /* the fill: black, or the accent for the accent arrow */
+    int tinted = accent_rgb && shape == CUR_DEFAULT;
+    float fr = tinted ? (float)(accent_rgb >> 16 & 255) / 255 : 0, fg = tinted ? (float)(accent_rgb >> 8 & 255) / 255 : 0,
+          fb = tinted ? (float)(accent_rgb & 255) / 255 : 0;
     for (int y = 0; y < size; y++)
         for (int x = 0; x < size; x++) {
-            float a = 0, lum = 0;          /* alpha and light sums (premultiplied) */
+            float a = 0, lum = 0, fill = 0;  /* alpha, white outline and fill sums (premultiplied) */
             for (int sy = 0; sy < 4; sy++)
                 for (int sx = 0; sx < 4; sx++) {
                     float ux = (x + (sx + 0.5f) / 4) * inv, uy = (y + (sy + 0.5f) / 4) * inv;
                     float d = shape_sdf(&s, ux, uy);
-                    if (d < 0) { a += 1; }                          /* black fill */
+                    if (d < 0) { a += 1; fill += 1; }               /* fill */
                     else if (d < outline) { a += 1; lum += 1; }     /* white outline */
                     else {                                          /* shadow: the shape shifted 1 unit down */
                         float ds = shape_sdf(&s, ux - 0.4f, uy - 1.0f) - outline;
@@ -263,7 +293,16 @@ const CursorImage *cursor_image_pct(int shape, int pct) {
                 }
             a /= 16;
             lum /= 16;
-            px[(size_t)y * size + x] = pack(a, a > 0 ? lum / a : 0);
+            fill /= 16;
+            if (!tinted) { px[(size_t)y * size + x] = pack(a, a > 0 ? lum / a : 0); continue; }
+            if (a > 1) a = 1;
+            uint32_t A = (uint32_t)(a * 255 + 0.5f);
+            uint32_t R = (uint32_t)((lum + fill * fr) * 255 + 0.5f), G = (uint32_t)((lum + fill * fg) * 255 + 0.5f),
+                     B = (uint32_t)((lum + fill * fb) * 255 + 0.5f);
+            if (R > A) R = A;
+            if (G > A) G = A;
+            if (B > A) B = A;
+            px[(size_t)y * size + x] = A << 24 | R << 16 | G << 8 | B;
         }
     ci->px = px;
     ci->w = ci->h = size;

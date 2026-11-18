@@ -12,6 +12,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Lord Workspaces has its own pointer**: the default arrow becomes a rounded tip with no tail, filled with the
+  person's accent colour, with LordOS's white outline and soft shadow; it follows the accent when it changes. Only the
+  default pointer: the hand, the text cursor and the resize arrows stay LordOS's. Lord Flow and Lord Classic keep the
+  black arrow (`startShell` puts it back for every theme). `cursor_set_accent` in `cursor.c` draws it (rounded
+  polygons in the signed-distance shapes, a colour fill), `lord.input.pointerAccent('#RRGGBB' | null)` takes only a
+  colour, and `setPointerAccent` in the SDK; `build/cursor-test` checks the fill, the size, the text cursor and going
+  back. Linux apps that ask for the default shape get it too.
 - **Cyberpunk City HD, a new wallpaper category** (all themes' Settings → Wallpaper): eleven 3840×2160 pictures made
   for LordOS (Panorama, Neon Road Entrance, Heart of the City, Skyline Highway, Flower Boulevard, Maglev Station, Sky
   Terrace, Rings and Bridges, Neon Cherry Avenue, Pier and Train, Metropolis Lookout), named in every language; the

@@ -20,7 +20,7 @@ import {
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
   switchDesktop, windows as windowsStore, windowTitle, windowIcon, appName, removeDesktopById, renameDesktop, createStore, lordosWallpapers,
-  VideoSetup, setDesktopDecor, setStatusPanelPlacer, WidgetPicker, widgetPicker,
+  VideoSetup, setDesktopDecor, setStatusPanelPlacer, WidgetPicker, widgetPicker, setPointerAccent,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useFirstStartOpen } from '@lordos/sdk';   // (0.8.9) the activity onboarding waits for the first-start desktop chooser
@@ -200,6 +200,8 @@ function App() {
   const surface = effectiveSurface(prefs, s);
   const t = useMemo(() => makeTheme({ mode: s.mode, accent: s.accent, effects: s.effects, surface, contrast: prefs.contrast }, lordosWallpapers),
     [s.mode, s.accent, s.effects, surface, prefs.contrast]);
+  // the theme's own pointer: the arrow in the accent colour (cursor.c), changed with the accent
+  useEffect(() => { setPointerAccent(t.accent); }, [t.accent]);
   const { windows: all, mounted, focused, desktop } = useWindows();
   const meta = useStore(activities);
   const list = useStore(desktopList);

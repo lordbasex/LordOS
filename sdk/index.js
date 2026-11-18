@@ -278,6 +278,7 @@ export function startShell(element) {
   const wanted = settings.get().theme;
   const current = themes.current();
   if (wanted && current && wanted !== current && lord.themes.use(wanted)) return;
+  try { lord.input?.pointerAccent?.(null); } catch (e) { /* older server */ }   // LordOS's black arrow; a theme may tint it (setPointerAccent)
   refreshPackages();                    // after the theme's configureWindows
   startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
   enableShellLayers();                  // menus, popovers and prompts go to their layer (sdk/layers.js)
@@ -386,3 +387,7 @@ export { WidgetPicker, widgetPicker } from './widgetpicker.jsx';
 // (0.8.9) the first-start desktop chooser and Desktop style's drawn pictures (Settings → Appearance)
 export { FirstStart, startFirstStart, firstStartState, useFirstStartOpen } from './firststart.jsx';
 export { DesktopStyleThumb, SketchThumb, knownStyleTheme } from './stylethumb.jsx';   // Add widget, in every theme (0.8.8.10)
+
+// A theme's own pointer (0.8.9, Lord Workspaces): the default arrow as a rounded tip in its accent colour ('#RRGGBB'),
+// or null for LordOS's black arrow. Only the default pointer changes. startShell puts the black one back for every theme.
+export const setPointerAccent = (color) => { try { return !!lord.input?.pointerAccent?.(color || null); } catch (e) { return false; } };
