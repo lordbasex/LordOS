@@ -178,7 +178,7 @@ RSS of the session with 7 widgets and a Terminal running Claude Code at rest, 3 
 | ws05 | The history table grows on demand; raster slots give back oversized buffers | **197 MB** |
 | ws06 | Counters for nodes, frames, arenas, plus heaptrack | 205 MB |
 | ws07 | App and font tables cut to what the scan found | 197 MB (no change: see above) |
-| ws08 | The static arrays (`.bss`) opt out of huge pages | *in progress* |
+| ws08 | The static arrays (`.bss`) opt out of huge pages | **183 MB** |
 
 \* ws03 was read right after Claude Code started.
 
