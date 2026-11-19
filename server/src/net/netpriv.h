@@ -35,6 +35,9 @@ struct nlmsghdr;
 typedef void (*NlFn)(const struct nlmsghdr *h, void *ud);
 int  nl_dump(int fd, NlMsg *m, NlFn fn, void *ud);
 
+/* A generic netlink family's id ("wireguard", "nl80211") on a NETLINK_GENERIC socket, or -1. */
+int  genl_family(int fd, const char *name);
+
 /* Attributes of a message: tb[type] points to the rtattr (or NULL). */
 #define NL_MAXATTR 64
 struct rtattr;

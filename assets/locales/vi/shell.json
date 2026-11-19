@@ -35,6 +35,8 @@
   "cc.wallpaper": "Hình nền",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Chưa kết nối",
+  "cc.connected": "Đã kết nối",
+  "cc.wifiSwitch": "Bật hoặc tắt Wi-Fi",
   "cc.off": "Tắt",
   "cc.on": "Bật",
   "cc.output": "Đầu ra",

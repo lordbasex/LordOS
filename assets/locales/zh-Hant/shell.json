@@ -35,6 +35,8 @@
   "cc.wallpaper": "背景圖片",
   "cc.bluetooth": "藍牙",
   "cc.notConnected": "未連線",
+  "cc.connected": "已連線",
+  "cc.wifiSwitch": "開啟或關閉 Wi-Fi",
   "cc.off": "關閉",
   "cc.on": "開啟",
   "cc.output": "輸出",

@@ -35,6 +35,8 @@
   "cc.wallpaper": "ภาพพื้นหลัง",
   "cc.bluetooth": "บลูทูธ",
   "cc.notConnected": "ไม่ได้เชื่อมต่อ",
+  "cc.connected": "เชื่อมต่อแล้ว",
+  "cc.wifiSwitch": "เปิดหรือปิด Wi-Fi",
   "cc.off": "ปิด",
   "cc.on": "เปิด",
   "cc.output": "เอาต์พุต",

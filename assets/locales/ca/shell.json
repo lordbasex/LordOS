@@ -36,6 +36,8 @@
   "cc.wallpaper": "Fons de pantalla",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "No connectat",
+  "cc.connected": "Connectat",
+  "cc.wifiSwitch": "Activa o desactiva la Wi-Fi",
   "cc.off": "Desactivat",
   "cc.on": "Activat",
   "cc.output": "Sortida",

@@ -37,6 +37,8 @@
   "cc.wallpaper": "Шпалери",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Не під’єднано",
+  "cc.connected": "Під’єднано",
+  "cc.wifiSwitch": "Увімкнути або вимкнути Wi-Fi",
   "cc.off": "Вимк.",
   "cc.on": "Увімк.",
   "cc.output": "Вихід",

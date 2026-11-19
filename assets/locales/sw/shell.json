@@ -36,6 +36,8 @@
   "cc.wallpaper": "Mandhari",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Haijaunganishwa",
+  "cc.connected": "Imeunganishwa",
+  "cc.wifiSwitch": "Washa au zima Wi-Fi",
   "cc.off": "Imezimwa",
   "cc.on": "Imewashwa",
   "cc.output": "Kitoa sauti",

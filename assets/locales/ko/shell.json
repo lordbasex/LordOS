@@ -35,6 +35,8 @@
   "cc.wallpaper": "배경화면",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "연결 안 됨",
+  "cc.connected": "연결됨",
+  "cc.wifiSwitch": "Wi-Fi 켜기 또는 끄기",
   "cc.off": "끔",
   "cc.on": "켬",
   "cc.output": "출력",

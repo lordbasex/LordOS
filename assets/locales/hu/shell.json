@@ -36,6 +36,8 @@
   "cc.wallpaper": "Háttérkép",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Nincs csatlakoztatva",
+  "cc.connected": "Csatlakozva",
+  "cc.wifiSwitch": "Wi-Fi be- vagy kikapcsolása",
   "cc.off": "Ki",
   "cc.on": "Be",
   "cc.output": "Kimenet",

@@ -37,6 +37,8 @@
   "cc.wallpaper": "Imagine de fundal",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Neconectat",
+  "cc.connected": "Conectat",
+  "cc.wifiSwitch": "Pornește sau oprește Wi-Fi",
   "cc.off": "Dezactivat",
   "cc.on": "Activat",
   "cc.output": "Ieșire",

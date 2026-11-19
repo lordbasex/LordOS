@@ -36,6 +36,8 @@
   "cc.wallpaper": "Taustakuva",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Ei yhdistetty",
+  "cc.connected": "Yhdistetty",
+  "cc.wifiSwitch": "Laita Wi-Fi päälle tai pois",
   "cc.off": "Pois",
   "cc.on": "Päällä",
   "cc.output": "Ulostulo",

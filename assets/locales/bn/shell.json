@@ -36,6 +36,8 @@
   "cc.wallpaper": "ওয়ালপেপার",
   "cc.bluetooth": "ব্লুটুথ",
   "cc.notConnected": "সংযুক্ত নয়",
+  "cc.connected": "সংযুক্ত",
+  "cc.wifiSwitch": "Wi-Fi চালু বা বন্ধ করুন",
   "cc.off": "বন্ধ",
   "cc.on": "চালু",
   "cc.output": "আউটপুট",

@@ -86,6 +86,39 @@ export function wifiBars(dbm) {
   return dbm >= -55 ? 4 : dbm >= -67 ? 3 : dbm >= -78 ? 2 : 1;
 }
 
+// The Control Center's Wi-Fi tile (issue #192), from lord.net.interfaces(): null with no Wi-Fi radio, else the radio it
+// stands for (the connected one, else one that is on, else the first) as { name, on, connected, ssid, bars, canSwitch }.
+// on: the radio is up (the tile is the accent's color, like Bluetooth's); connected: it has an IPv4 address; ssid: the
+// network's name (lord-server reads it from nl80211; null when connected without one, an older lord-server); bars: the
+// signal's bars, 0 when not connected; canSwitch: LordOS may turn it on and off with net-up / net-down, as the switch
+// on its page in Settings → Network does (not one the system's own network service manages).
+const hasIPv4 = (i) => (Array.isArray(i.addresses) ? i.addresses : []).some((a) => a && a.scope === 'global' && a.family === 4);
+export function wifiTile(ifs) {
+  const radios = (Array.isArray(ifs) ? ifs : []).filter((i) => i && i.type === 'wifi' && typeof i.name === 'string' && i.name);
+  if (!radios.length) return null;
+  const r = radios.find((i) => i.up && hasIPv4(i)) || radios.find((i) => i.up) || radios[0];
+  const on = r.up === true;
+  const connected = on && hasIPv4(r);
+  return {
+    name: r.name, on, connected,
+    ssid: connected && typeof r.ssid === 'string' && r.ssid ? r.ssid : null,
+    bars: connected ? wifiBars(r.signal) : 0,
+    canSwitch: r.managed !== 'system',
+  };
+}
+
+// What the tile shows for w = wifiTile(...) while want (true / false: the state asked for, until the administration
+// helper answers; null: nothing asked): { on, busy, ssid, key, bars, dim }. The line under its name is ssid when there
+// is one, else t(key); bars lit unless dim (Settings → Network → Wi-Fi's bars, in the accent on the tile's white icon).
+export function wifiTileView(w, want = null) {
+  const busy = want === true || want === false;
+  const on = busy ? want : !!w?.on;
+  const connected = !busy && !!w?.on && !!w?.connected;
+  const ssid = connected && w.ssid ? w.ssid : null;
+  const key = busy ? (want ? 'shell.cc.on' : 'shell.cc.off') : !w?.on ? 'shell.cc.off' : !connected ? 'shell.cc.notConnected' : ssid ? null : 'shell.cc.connected';
+  return { on, busy, ssid, key, bars: connected ? w.bars : 0, dim: !connected };
+}
+
 // The brightness slider of the Control Center and Quick Settings (issue #114): the first screen whose backlight LordOS
 // can set (lord.display.list().backlight, a laptop's or tablet's own panel), or null, and then there is no slider.
 export function backlightOf(list) {
