@@ -910,8 +910,19 @@ static void flatpak_installation(FilesPlan *p) {
     char path[PATH_MAX + 64];
     char inst[PATH_MAX];
     if (snprintf(path, sizeof path, "%s/.local/share/flatpak", p->home) < (int)sizeof path && realpath(path, inst) &&
-        !strcmp(inst, path) && is_dir(inst))
+        !strcmp(inst, path) && is_dir(inst)) {
         plan_add(p, 1, "%s%s", inst, "");
+        /* its permission overrides and its exports stay read-only, kernel-enforced (ro binds go on after the rw ones):
+         * `flatpak run` only reads them, and nothing in the view may widen an app's permissions or plant an export
+         * (overrides is created first, so it can't be made later) */
+        static const char *const ro[] = { "/overrides", "/exports", NULL };
+        for (int k = 0; ro[k]; k++) {
+            char sub[PATH_MAX + 32], r[PATH_MAX];
+            snprintf(sub, sizeof sub, "%s%s", inst, ro[k]);
+            if (k == 0) mkdir(sub, 0755);
+            if (realpath(sub, r) && !strcmp(r, sub) && is_dir(r)) plan_add(p, 0, "%s%s", r, "");
+        }
+    }
     if (snprintf(path, sizeof path, "%s/.cache", p->home) >= (int)sizeof path) return;
     mkdir(path, 0700);
     strcat(path, "/flatpak");

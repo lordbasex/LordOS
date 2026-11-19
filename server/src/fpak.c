@@ -111,7 +111,8 @@ static const char *const never_talk[] = { "org.freedesktop.Flatpak", "org.freede
  * where Flatpak can hide them; the launcher's view also keeps them, and the shell's startup files, read-only */
 static const char *const hidden[] = { ".config/lordos", ".local/share/lordos", ".cache/lordos", ".local/share/applications",
                                       ".config/autostart", ".config/systemd", ".config/environment.d", ".local/bin",
-                                      ".local/share/flatpak", ".cache/flatpak", NULL };
+                                      ".local/share/flatpak", ".local/share/flatpak/overrides", ".local/share/flatpak/exports",
+                                      ".cache/flatpak", NULL };
 
 int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap) {
     if (!r || !fpak_id_ok(r->id) || !r->arch || !arch_ok(r->arch) || !fpak_branch_ok(r->branch) || !r->home ||
