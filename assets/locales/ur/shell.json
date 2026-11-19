@@ -36,6 +36,8 @@
   "cc.wallpaper": "وال پیپر",
   "cc.bluetooth": "بلوٹوتھ",
   "cc.notConnected": "منسلک نہیں",
+  "cc.connected": "منسلک",
+  "cc.wifiSwitch": "Wi-Fi آن یا آف کریں",
   "cc.off": "بند",
   "cc.on": "آن",
   "cc.output": "آؤٹ پٹ",

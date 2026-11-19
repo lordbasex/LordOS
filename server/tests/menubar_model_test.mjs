@@ -2,7 +2,7 @@
 // panel offers and the month calendar's cells. node server/tests/menubar_model_test.mjs
 import { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, cleanerPanelAction, outputChoices, monthCells, monthWeeks, weekStartFor,
   menuBarEveryDisplay, barDisplays, hasBar, displayIdFor, activeBarId, pinBar, focusDisplayId, panelLeft, inBar, insideDisplay,
-  wifiBars, backlightOf, backlightValue } from '../../sdk/menubarmodel.js';
+  wifiBars, wifiTile, wifiTileView, backlightOf, backlightValue } from '../../sdk/menubarmodel.js';
 import { sharedTicker } from '../../sdk/ticker.js';
 
 let ok = 0;
@@ -169,6 +169,34 @@ eq('Log Out patch', menuBarPatch({ menuBar: { ccSystem: false } }, 'ccLogout', f
 // the Wi-Fi bars, the steps of Settings → Network → Wi-Fi
 eq('wifi bars', [-40, -55, -56, -67, -68, -78, -79, -95].map(wifiBars), [4, 4, 3, 3, 2, 2, 1, 1]);
 eq('no reading: all bars', [undefined, null, NaN, '-50'].map(wifiBars), [4, 4, 4, 4]);
+// the Wi-Fi tile (#192): which radio, on or off, the network's name and the bars
+const v4 = [{ family: 4, scope: 'global', address: '192.168.1.20' }];
+const eth = { name: 'enp3s0', type: 'ethernet', up: true, addresses: v4 };
+eq('no radio: no tile', [wifiTile([]), wifiTile([eth]), wifiTile(null), wifiTile(undefined)], [null, null, null, null]);
+eq('connected', wifiTile([eth, { name: 'wlan0', type: 'wifi', up: true, managed: 'lordos', addresses: v4, signal: -60, ssid: 'Casa' }]),
+  { name: 'wlan0', on: true, connected: true, ssid: 'Casa', bars: 3, canSwitch: true });
+eq('on, not connected', wifiTile([{ name: 'wlan0', type: 'wifi', up: true, addresses: [{ family: 6, scope: 'link' }], signal: -40, ssid: 'Old' }]),
+  { name: 'wlan0', on: true, connected: false, ssid: null, bars: 0, canSwitch: true });
+eq('off', wifiTile([{ name: 'wlan0', type: 'wifi', up: false, addresses: v4, ssid: 'Casa' }]),
+  { name: 'wlan0', on: false, connected: false, ssid: null, bars: 0, canSwitch: true });
+eq('connected without a name (an older lord-server)', wifiTile([{ name: 'wlan0', type: 'wifi', up: true, addresses: v4 }]),
+  { name: 'wlan0', on: true, connected: true, ssid: null, bars: 4, canSwitch: true });
+eq('an empty name is no name', wifiTile([{ name: 'wlan0', type: 'wifi', up: true, addresses: v4, ssid: '' }]).ssid, null);
+eq('the connected radio wins', wifiTile([{ name: 'wlan0', type: 'wifi', up: true, addresses: [] }, { name: 'wlan1', type: 'wifi', up: true, addresses: v4 }]).name, 'wlan1');
+eq('then one that is on', wifiTile([{ name: 'wlan0', type: 'wifi', up: false, addresses: [] }, { name: 'wlan1', type: 'wifi', up: true, addresses: [] }]).name, 'wlan1');
+eq('all off: the first', wifiTile([{ name: 'wlan0', type: 'wifi', up: false }, { name: 'wlan1', type: 'wifi', up: false }]).name, 'wlan0');
+eq('the system manages it: no switch', wifiTile([{ name: 'wlan0', type: 'wifi', up: true, managed: 'system', addresses: v4 }]).canSwitch, false);
+eq('a broken entry is skipped', wifiTile([null, { type: 'wifi' }, { name: 'wlan0', type: 'wifi', up: true, addresses: 'x' }]),
+  { name: 'wlan0', on: true, connected: false, ssid: null, bars: 0, canSwitch: true });
+// what it shows: the network's name, or why there is none; the state asked for while the helper works
+const wOn = { name: 'wlan0', on: true, connected: true, ssid: 'Casa', bars: 3, canSwitch: true };
+eq('view: connected', wifiTileView(wOn), { on: true, busy: false, ssid: 'Casa', key: null, bars: 3, dim: false });
+eq('view: connected, no name', wifiTileView({ ...wOn, ssid: null }), { on: true, busy: false, ssid: null, key: 'shell.cc.connected', bars: 3, dim: false });
+eq('view: on, not connected', wifiTileView({ ...wOn, connected: false, ssid: null, bars: 0 }), { on: true, busy: false, ssid: null, key: 'shell.cc.notConnected', bars: 0, dim: true });
+eq('view: off', wifiTileView({ ...wOn, on: false, connected: false }), { on: false, busy: false, ssid: null, key: 'shell.cc.off', bars: 0, dim: true });
+eq('view: turning off', wifiTileView(wOn, false), { on: false, busy: true, ssid: null, key: 'shell.cc.off', bars: 0, dim: true });
+eq('view: turning on', wifiTileView({ ...wOn, on: false, connected: false }, true), { on: true, busy: true, ssid: null, key: 'shell.cc.on', bars: 0, dim: true });
+eq('view: no tile', wifiTileView(null), { on: false, busy: false, ssid: null, key: 'shell.cc.off', bars: 0, dim: true });
 // the brightness slider: only with a backlight, never at 0
 eq('no displays', backlightOf(null), null);
 eq('no backlight (a desktop, a VM)', backlightOf({ outputs: [], backlight: [] }), null);

@@ -37,6 +37,8 @@
   "cc.wallpaper": "Darbalaukio fonas",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Neprijungta",
+  "cc.connected": "Prijungta",
+  "cc.wifiSwitch": "Įjungti arba išjungti „Wi-Fi“",
   "cc.off": "Išjungta",
   "cc.on": "Įjungta",
   "cc.output": "Išvestis",

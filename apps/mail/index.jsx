@@ -678,6 +678,7 @@ function MailMain() {
           <SideRow icon={{ kind: 'tray' }} label={t('mail.unifiedInboxShort')} count={st.unread} selected={src.kind === 'unified' && !src.filter && !src.label} onClick={() => { setSrc({ kind: 'unified' }); setQ(''); }} />
           <SideRow icon="●" label={t('mail.unread')} selected={src.kind === 'unified' && src.filter === 'unread'} onClick={() => setSrc({ kind: 'unified', filter: 'unread' })} />
           <SideRow icon="⚑" label={t('mail.flagged')} selected={src.kind === 'unified' && src.filter === 'flagged'} onClick={() => setSrc({ kind: 'unified', filter: 'flagged' })} />
+          {/* An account's name is a header over its folders, in their font and size (13 px, #191), set apart by weight */}
           {folders.map((a) => {
             const saved = accounts.find((x) => x.id === a.id);
             const folded = !!saved?.folded;
@@ -691,10 +692,10 @@ function MailMain() {
             const dimC = onHere ? 'rgba(255,255,255,0.85)' : th.textDim;
             return (
               <View key={a.id} style={{ gap: 1 }}>
-                <View onClick={() => toggleAccount(a)} style={{ flexDirection: 'row', alignItems: 'center', height: 22, marginHorizontal: 2, [direction() === 'rtl' ? 'paddingLeft' : 'paddingRight']: 8,
+                <View onClick={() => toggleAccount(a)} style={{ flexDirection: 'row', alignItems: 'center', height: 26, marginHorizontal: 2, [direction() === 'rtl' ? 'paddingLeft' : 'paddingRight']: 8,
                   marginTop: 12, marginBottom: folded ? 0 : 2, gap: 6, borderRadius: 6, backgroundColor: onHere ? th.accent : 'transparent' }}>
                   <Disclosure state={folded ? 'closed' : 'open'} color={dimC} onClick={() => toggleAccount(a)} />
-                  <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: onHere ? '#fff' : th.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{a.name}</Text>
+                  <Text style={{ flex: 1, fontSize: 13, fontWeight: 600, color: onHere ? '#fff' : th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{a.name}</Text>
                   {status === 'sync' || status === 'connecting' ? <Text style={{ fontSize: 10, color: dimC }}>⟳</Text> : null}
                   {bad ? <Text onClick={(e) => { e.stopPropagation?.(); setSheet(st.authFailed[a.id] || status === 'auth' ? { password: a.id } : st.certs.find((c) => c.acct === a.id) ? { cert: st.certs.find((c) => c.acct === a.id) } : 'accounts'); }}
                     style={{ fontSize: 11, color: '#ff9f0a' }}>⚠</Text> : null}
@@ -716,7 +717,7 @@ function MailMain() {
             return (
               <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginHorizontal: 8, marginTop: 16, marginBottom: 4 }}>
                 <Glyph kind="calendar" size={12} color={th.textDim} />
-                <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>{a.name}</Text>
+                <Text style={{ flex: 1, fontSize: 13, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{a.name}</Text>
                 {s2 === 'sync' ? <Text style={{ fontSize: 10, color: th.textDim }}>⟳</Text> : null}
                 {bad ? <Text onClick={() => setSheet(st.certs.find((c) => c.acct === a.id) ? { cert: st.certs.find((c) => c.acct === a.id) } : { password: a.id })} style={{ fontSize: 11, color: '#ff9f0a' }}>⚠</Text> : null}
               </View>

@@ -40,6 +40,8 @@
   "cc.wallpaper": "الخلفية",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "غير متصل",
+  "cc.connected": "متصل",
+  "cc.wifiSwitch": "تشغيل Wi-Fi أو إيقافه",
   "cc.off": "متوقف",
   "cc.on": "يعمل",
   "cc.output": "الإخراج",

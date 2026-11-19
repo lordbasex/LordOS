@@ -35,6 +35,8 @@
   "cc.wallpaper": "Wallpaper",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Tidak terhubung",
+  "cc.connected": "Terhubung",
+  "cc.wifiSwitch": "Nyalakan atau matikan Wi-Fi",
   "cc.off": "Mati",
   "cc.on": "Nyala",
   "cc.output": "Keluaran",

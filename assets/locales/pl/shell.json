@@ -37,6 +37,8 @@
   "cc.wallpaper": "Tapeta",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Nie połączono",
+  "cc.connected": "Połączono",
+  "cc.wifiSwitch": "Włącz lub wyłącz Wi-Fi",
   "cc.off": "Wył.",
   "cc.on": "Wł.",
   "cc.output": "Wyjście",

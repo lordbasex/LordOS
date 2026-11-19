@@ -36,6 +36,8 @@
   "cc.wallpaper": "Ταπετσαρία",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Χωρίς σύνδεση",
+  "cc.connected": "Συνδεδεμένο",
+  "cc.wifiSwitch": "Ενεργοποίηση ή απενεργοποίηση Wi-Fi",
   "cc.off": "Ανενεργό",
   "cc.on": "Ενεργό",
   "cc.output": "Έξοδος",

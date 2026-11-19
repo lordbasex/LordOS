@@ -36,6 +36,8 @@
   "cc.wallpaper": "تصویر زمینه",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "متصل نیست",
+  "cc.connected": "متصل",
+  "cc.wifiSwitch": "روشن یا خاموش کردن Wi-Fi",
   "cc.off": "خاموش",
   "cc.on": "روشن",
   "cc.output": "خروجی",

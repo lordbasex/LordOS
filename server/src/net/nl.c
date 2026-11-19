@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/fib_rules.h>
+#include <linux/genetlink.h>
 #include <linux/if_link.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
@@ -178,6 +179,25 @@ void nl_parse(struct rtattr **tb, int max, const void *attrs, size_t len) {
         int t = a->rta_type & ~(NLA_F_NESTED | NLA_F_NET_BYTEORDER);
         if (t <= max) tb[t] = a;
     }
+}
+
+/* ---- generic netlink ---- */
+
+static void family_cb(const struct nlmsghdr *h, void *ud) {
+    if (h->nlmsg_len < NLMSG_HDRLEN + GENL_HDRLEN) return;
+    struct rtattr *tb[CTRL_ATTR_MAX + 1];
+    nl_parse(tb, CTRL_ATTR_MAX, (char *)NLMSG_DATA(h) + GENL_HDRLEN, h->nlmsg_len - NLMSG_HDRLEN - GENL_HDRLEN);
+    if (tb[CTRL_ATTR_FAMILY_ID]) *(int *)ud = *(uint16_t *)RTA_DATA(tb[CTRL_ATTR_FAMILY_ID]);
+}
+
+int genl_family(int fd, const char *name) {
+    NlMsg m;
+    nlm_init(&m, GENL_ID_CTRL, 0);
+    struct genlmsghdr g = { .cmd = CTRL_CMD_GETFAMILY, .version = 1 };
+    nlm_put(&m, &g, sizeof g);
+    nlm_attr_str(&m, CTRL_ATTR_FAMILY_NAME, name);
+    int id = -1;
+    return nl_dump(fd, &m, family_cb, &id) < 0 ? -1 : id;
 }
 
 /* ---- rtnetlink ---- */

@@ -36,6 +36,8 @@
   "cc.wallpaper": "Divar kağızı",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Qoşulmayıb",
+  "cc.connected": "Qoşulub",
+  "cc.wifiSwitch": "Wi-Fi-ı aç və ya bağla",
   "cc.off": "Sönülü",
   "cc.on": "Aktiv",
   "cc.output": "Çıxış",

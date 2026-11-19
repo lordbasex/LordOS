@@ -35,6 +35,8 @@
   "cc.wallpaper": "墙纸",
   "cc.bluetooth": "蓝牙",
   "cc.notConnected": "未连接",
+  "cc.connected": "已连接",
+  "cc.wifiSwitch": "打开或关闭 Wi-Fi",
   "cc.off": "关",
   "cc.on": "开",
   "cc.output": "输出",

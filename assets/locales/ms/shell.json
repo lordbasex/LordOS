@@ -35,6 +35,8 @@
   "cc.wallpaper": "Kertas Dinding",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Tidak disambungkan",
+  "cc.connected": "Disambungkan",
+  "cc.wifiSwitch": "Hidupkan atau matikan Wi-Fi",
   "cc.off": "Mati",
   "cc.on": "Hidup",
   "cc.output": "Output",

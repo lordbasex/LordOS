@@ -35,6 +35,8 @@
   "cc.wallpaper": "壁紙",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "未接続",
+  "cc.connected": "接続済み",
+  "cc.wifiSwitch": "Wi-Fi をオンまたはオフにする",
   "cc.off": "オフ",
   "cc.on": "オン",
   "cc.output": "出力",

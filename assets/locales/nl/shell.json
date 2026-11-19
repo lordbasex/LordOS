@@ -36,6 +36,8 @@
   "cc.wallpaper": "Achtergrond",
   "cc.bluetooth": "Bluetooth",
   "cc.notConnected": "Niet verbonden",
+  "cc.connected": "Verbonden",
+  "cc.wifiSwitch": "Wifi in- of uitschakelen",
   "cc.off": "Uit",
   "cc.on": "Aan",
   "cc.output": "Uitvoer",
