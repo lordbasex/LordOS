@@ -10,6 +10,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Documentation
+
+- `docs/ROADMAP.md`: a "Release 0.8.9.2 (planned)" section with the clipboard history that scrolls by itself under the
+  pointer (#204) and, probably from the same cause, its arrow keys (#203).
+
 ## [0.8.9.1-beta] - 2026-11-19
 
 ### Changed

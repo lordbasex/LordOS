@@ -937,6 +937,16 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [x] **Raspberry Pi with 0.8.9.1** in the same report (2026-11-19): Lord Flow 113 MB and 6.2 % of one core, as 0.8.9;
   Lord Workspaces, measured on the Pi for the first time, 99 MB and 0.06 %.
 
+## Release 0.8.9.2 (planned)
+
+- [ ] **Clipboard history scrolls by itself under the pointer** ([#204](https://github.com/lordbasex/LordOS/issues/204)).
+  The full panel (❖⇧V, `sdk/clipboard.js`) draws a window of 16 entries around the selected one, and hovering an entry
+  selects it: with the pointer resting near the top or bottom edge, the selection moves, the window slides, another
+  entry comes under the pointer and the list keeps sliding. Make the list scroll as a list, and let hovering select
+  only when the pointer really moves. Probably the same cause as
+  [#203](https://github.com/lordbasex/LordOS/issues/203) (↑ ↓ seem not to work): the entry left under a still pointer
+  takes the selection back after each arrow. Check both on the VM with a long history.
+
 ## Before 1.0
 
 - [ ] **lord-web on the new WPE API (WPEPlatform)** ([#142](https://github.com/lordbasex/LordOS/issues/142), maintainer's
