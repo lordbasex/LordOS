@@ -324,6 +324,22 @@ to the socket; the app saves the windows → tabs → panes arrangement in `term
 out from the theme or Ctrl+Alt+Backspace does close the shells. Instant Replay, images and
 history older than 5000 lines are not kept.
 
+## Memory
+
+- **The history grows as it fills** (0.8.9.1, `server/src/term/vt.c`). The history's ring of lines starts at 1,024
+  lines (or the screen's rows) and doubles up to the profile's limit (`Buffer.max`: 1,000 to 1,000,000 lines, 10,000
+  by default). Before, the whole ring was allocated at once: 24 bytes per line, 24 MB for a 1,000,000-line history
+  holding a few hundred lines. Only the ring of line headers grows; each line's cells are allocated as it is written.
+  Reflow and the alternate screen behave as before (`build/vt-ring-test` in `make test`: 20,000 lines with a clear
+  and a resize, every line in order).
+- **Clearing the history frees it.** `ESC [ 3 J` (which Claude Code sends when it redraws), Clear buffer (❖K) and
+  `ClearScrollback` free the cleared lines' cells instead of keeping them for reuse (0.8.9.1: Claude Code's redraws had left
+  23 MB of cells allocated for 120 lines in use).
+- **Instant Replay** keeps at most 6 MB of frames per tab.
+
+lord-server's memory report in `compositor.log` (`docs/SYSTEM.md`, "Log files") counts the terminals, their lines,
+cells and Instant Replay, so a Terminal's share of the session's memory can be read without tools.
+
 ## tmux -CC
 
 Running `tmux -CC` (or `tmux -CC attach -t session`) in a tab turns it into the "gateway" of

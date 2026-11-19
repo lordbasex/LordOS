@@ -647,6 +647,12 @@ user's ones:
   loses nothing already written, and it ignores SIGTERM for that. The root daemons' lines still go
   to the journal as they were. A child with a log of its own (Linux apps, Xwayland, lord-web, rclone)
   writes its own output as is, after a stamped "starting …" line from lord-server.
+- **The memory report** (0.8.9.1, `mem_report` in `server/src/main.c`). 10 minutes after login, then every 6 hours,
+  lord-server writes a few `memory:` lines to `compositor.log`, right after a `malloc_trim(0)`: the process (RSS,
+  anonymous, file-backed, huge pages), glibc's heap and each of its arenas, the image cache, the per-display scenes,
+  the terminals (lines, cells, Instant Replay), the blur cache, each cached transform raster, the layer, the glyph
+  cache, the nodes and QuickJS's own counters. `grep memory: /var/log/lordos/users/$USER/compositor.log` reads them;
+  how to use them is in `docs/perf/MEMORY-HEAPTRACK.md`. One report is a trim and a few reads of `/proc`.
 - **The previous session.** At login `compositor.log` and `shell.log` become `.prev` (they used to be
   truncated, losing the crash that ended the session). Only this does: `.prev` always means "the
   previous session", never the overflow of the current one (that is `.old`, below).

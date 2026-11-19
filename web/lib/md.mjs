@@ -3,7 +3,7 @@
 //   front matter (--- key: value ---), # headings (with ids), paragraphs, - / 1. lists (nested by
 //   indentation), > blockquotes, ``` fenced code, | tables |, ---, **bold**, *italic*, `code`,
 //   [links](url), ![images](repo/path.png "caption") and block directives on their own line:
-//   [[diagram:<id>]]  [[shot:<n>]]
+//   [[diagram:<id>]]  [[shot:<n>]]  [[figure:<id>]]  [[chart:<id>]]
 // Raw HTML is never passed through; HTML comments (<!-- … -->) are dropped.
 
 export const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

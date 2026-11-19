@@ -1,6 +1,6 @@
 #!/bin/sh
 # session-sample.sh — samples one user's lord-server session: memory and processor time, every few seconds,
-# into a CSV that anyone can analyse (docs/PERFORMANCE.md).
+# into a CSV that anyone can analyse (docs/PERFORMANCE-0.8.9.md, docs/perf/MEMORY-HEAPTRACK.md).
 #
 #   tools/bench/session-sample.sh <user> <minutes> <out.csv> [interval-seconds]
 #

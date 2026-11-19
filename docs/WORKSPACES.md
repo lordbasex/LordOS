@@ -339,8 +339,11 @@ in place of the still pictures).
   blurred bars like the spine and the top band, Intel Core i9-10900, medians of 144 frames): **the drift 9.6–10.0 ms a
   frame**, Reduce motion's fade 9.5–10.3 ms, and a 6 % zoom, for comparison, 52–53 ms (what ruled it out). The drift's
   first frame took 57–62 ms in the bench, which draws the 1920×1080 base scaled once to its larger box; the slideshow
-  decodes each picture at that box's size, so it isn't scaled. Not measured yet on a real session, on the GPU path, at
-  4K (about four times the pixels) or on the Raspberry Pi.
+  decodes each picture at that box's size, so it isn't scaled. **On a real session** (0.8.9, the maintainer's PC, three
+  1920×1080 displays, GPU composition): with the slideshow on, `lord-server` used **19.0 % of one core** over two
+  hours; turned off in the same session, **2.0 %**, and about 68 MB less RSS (`docs/PERFORMANCE-0.8.9.md`, "The
+  slideshow's cost"; the interval used was not recorded). Not measured yet at 4K (about four times the pixels) or on
+  the Raspberry Pi.
 
 ## Keys
 
@@ -467,8 +470,8 @@ What these say:
 
 ## Changed from the proposal
 
-- **Weather widget:** not yet; the shell asks nothing from the internet, and a reviewed path for Open-Meteo waits for
-  the maintainer's OK (docs/ROADMAP.md).
+- **Weather widget:** not in the first drafts, which asked nothing from the internet; it shipped in 0.8.9 after the
+  maintainer approved a reviewed path for Open-Meteo (2026-11-16; "Widgets" above), off until Turn on.
 - **"Seek" is Search and "Control Atlas" is the Control Center**, LordOS's own names.
 - **The group doesn't move as a whole and the divider applies on release:** no `setFrame` loop per pointer move.
 - **The group frame is a border, not a frosted panel,** and Crystal's live blur stays on the spine and on the open

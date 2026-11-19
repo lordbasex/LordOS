@@ -399,7 +399,8 @@ Linux apps. A slow theme makes the whole desktop slow.
   it with reduce motion. `lord.setStyle` takes the engine's own keys (`rotate` in degrees, `scaleX`,
   `scaleY`), not a CSS `transform` string: an unknown key changes nothing and is logged once.
 - **`transform` scale and rotate are cheap**: the subtree is painted once into a cached raster and
-  composited (Lord Flow's minimize effect scales a whole window).
+  composited (Lord Flow's minimize effect scales a whole window). The raster is freed 30 s after its last use
+  (0.8.9.1), so an animation costs its memory only while it runs and shortly after.
 - **Blur costs**: `backdropFilter: blur(r)` reads a margin of 2×r around the surface, and any change
   touching it repaints the whole surface ([LAYERS.md](LAYERS.md#blurred-surfaces-and-partial-repaints)).
   Keep blurred surfaces few and small, and turn blur off with `effects: false`.

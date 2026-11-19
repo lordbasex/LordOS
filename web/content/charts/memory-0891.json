@@ -1,0 +1,52 @@
+{
+  "id": "memory-0891",
+  "note": "lord-server's RSS through the 0.8.9.1 memory work, one fresh session per build ([[chart:memory-0891]]; drawn by web/lib/chartsvg.mjs). Figures from docs/perf/MEMORY-HEAPTRACK.md ('The loop and its results'), data in docs/perf/0.8.9.1/. ws03 is left out on purpose (a snapshot right after Claude Code started).",
+  "title": {
+    "en": "lord-server's memory at rest, change by change (0.8.9.1, in development)",
+    "es": "La memoria de lord-server en reposo, cambio por cambio (0.8.9.1, en desarrollo)",
+    "pt": "A memória do lord-server em repouso, mudança por mudança (0.8.9.1, em desenvolvimento)"
+  },
+  "summary": {
+    "en": "269 → 183 MB: 86 MB less (−32 %).",
+    "es": "269 → 183 MB: 86 MB menos (−32 %).",
+    "pt": "269 → 183 MB: 86 MB a menos (−32 %)."
+  },
+  "unit": "MB",
+  "bars": [
+    { "tone": "hi", "value": 269, "label": {
+      "en": "ws02 · 0.8.9 plus the memory report",
+      "es": "ws02 · la 0.8.9 más el informe de memoria",
+      "pt": "ws02 · a 0.8.9 mais o relatório de memória" } },
+    { "value": 262, "label": {
+      "en": "ws04 · transform rasters freed at rest",
+      "es": "ws04 · las imágenes de transformaciones se liberan en reposo",
+      "pt": "ws04 · as imagens de transformações são liberadas em repouso" } },
+    { "value": 197, "label": {
+      "en": "ws05 · the Terminal's history grows as it fills",
+      "es": "ws05 · el historial de la Terminal crece a medida que se llena",
+      "pt": "ws05 · o histórico do Terminal cresce conforme enche" } },
+    { "value": 205, "label": {
+      "en": "ws06 · more counters in the report",
+      "es": "ws06 · más contadores en el informe",
+      "pt": "ws06 · mais contadores no relatório" } },
+    { "value": 197, "label": {
+      "en": "ws07 · app and font tables cut",
+      "es": "ws07 · tablas de apps y fuentes recortadas",
+      "pt": "ws07 · tabelas de apps e fontes reduzidas" } },
+    { "tone": "hi", "value": 183, "label": {
+      "en": "ws08 · static arrays without huge pages",
+      "es": "ws08 · tablas fijas sin páginas grandes",
+      "pt": "ws08 · tabelas fixas sem páginas grandes" } }
+  ],
+  "refs": [
+    { "value": 185, "label": {
+      "en": "ws02 without the Terminal",
+      "es": "ws02 sin la Terminal",
+      "pt": "ws02 sem o Terminal" } }
+  ],
+  "footnote": {
+    "en": "RSS of lord-server in a fresh session per build, on the maintainer's PC (Intel i9-10900, Radeon RX 580, 3 × 1920×1080, Debian 13, transparent huge pages always): Lord Workspaces, 7 widgets and a Terminal running Claude Code, left at rest. ws03 is not drawn: its 334 MB was read right after Claude Code started. Method and data: docs/perf/MEMORY-HEAPTRACK.md and docs/perf/0.8.9.1/.",
+    "es": "RSS de lord-server en una sesión nueva por compilación, en la PC del mantenedor (Intel i9-10900, Radeon RX 580, 3 × 1920×1080, Debian 13, páginas grandes transparentes en always): Lord Workspaces, 7 widgets y una Terminal con Claude Code, en reposo. ws03 no se dibuja: sus 334 MB se leyeron apenas arrancó Claude Code. Método y datos: docs/perf/MEMORY-HEAPTRACK.md y docs/perf/0.8.9.1/.",
+    "pt": "RSS do lord-server numa sessão nova por compilação, no PC do mantenedor (Intel i9-10900, Radeon RX 580, 3 × 1920×1080, Debian 13, páginas grandes transparentes em always): Lord Workspaces, 7 widgets e um Terminal com o Claude Code, em repouso. A ws03 não aparece: os seus 334 MB foram lidos logo depois que o Claude Code começou. Método e dados: docs/perf/MEMORY-HEAPTRACK.md e docs/perf/0.8.9.1/."
+  }
+}

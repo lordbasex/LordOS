@@ -22,6 +22,7 @@ import { markdown, inline, frontMatter, slugify } from './lib/md.mjs';
 import { diagram } from './lib/diagram.mjs';
 import { paperMarkdown } from './lib/papermd.mjs';
 import { archFigure } from './lib/archsvg.mjs';
+import { chartFigure } from './lib/chartsvg.mjs';
 import { imagerGuide, writeBlock } from './lib/imager-guide.mjs';
 import { embassy } from './lib/embassy.mjs';
 import { readReports, buildModel, renderSections } from '../tools/hwreport/catalog.mjs';
@@ -278,6 +279,8 @@ const featureList = fs.existsSync(featDir)
   : [];
 const figDir = path.join(CONTENT, 'figures');
 const FIGURES = fs.existsSync(figDir) ? Object.fromEntries(fs.readdirSync(figDir).filter((f) => f.endsWith('.json')).map((f) => { const d = readJson(path.join(figDir, f)); return [d.id, d]; })) : {};
+const chartDir = path.join(CONTENT, 'charts');
+const CHARTS = fs.existsSync(chartDir) ? Object.fromEntries(fs.readdirSync(chartDir).filter((f) => f.endsWith('.json')).map((f) => { const d = readJson(path.join(chartDir, f)); return [d.id, d]; })) : {};
 const paperDir = path.join(CONTENT, 'paper');
 const HAS_PAPER = !process.argv.includes('--no-paper') && LANGS.every((l) => fs.existsSync(path.join(paperDir, `paper.${l}.md`)));
 const paperMeta = HAS_PAPER && fs.existsSync(path.join(paperDir, 'meta.json')) ? readJson(path.join(paperDir, 'meta.json')) : {};
@@ -974,6 +977,11 @@ ${shotList.join('\n')}
         if (!f) { console.warn('[web] unknown figure', arg); return ''; }
         return archFigure(f, l);
       }
+      if (kind === 'chart') {      // [[chart:<id>]]: web/content/charts/<id>.json, a bar chart as inline SVG (web/lib/chartsvg.mjs)
+        const c = CHARTS[arg];
+        if (!c) { console.warn('[web] unknown chart', arg); return ''; }
+        return chartFigure(c, l);
+      }
       if (kind === 'shot') {
         if (/^\d+$/.test(arg || '')) {
           const sh = (screenshots || [])[+arg];
@@ -1084,7 +1092,7 @@ ${rels.join('\n')}
     const { data: fm, body } = frontMatter(fs.readFileSync(path.join(paperDir, `paper.${l}.md`), 'utf8'));
     const meta = { ...fm, ...paperMeta };
     if (l === 'en') {         // docs/PAPER.md, the copy on GitHub, always follows the English paper
-      const md = paperMarkdown(body, meta, paperDiagrams.diagrams || [], FIGURES), dst = path.join(REPO, 'docs', 'PAPER.md');
+      const md = paperMarkdown(body, meta, paperDiagrams.diagrams || [], FIGURES, CHARTS), dst = path.join(REPO, 'docs', 'PAPER.md');
       if (!fs.existsSync(dst) || fs.readFileSync(dst, 'utf8') !== md) { fs.writeFileSync(dst, md); log('docs/PAPER.md regenerated from paper.en.md'); }
     }
     let { html: bodyHtml, headings } = renderMd(body, paperDiagrams.diagrams || [], paperDiagrams.screenshots || meta.screenshots || []);
