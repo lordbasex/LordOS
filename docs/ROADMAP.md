@@ -929,8 +929,13 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   check on real hardware (Wi-Fi switch and network name, a paused Google Drive account, the calendar on a 4K Pi).
 - [ ] **Raspberry Pi: the 0.8.9 headless session uses more processor than 0.8.8.9** (6.1 % against 3.4 % at rest, an hour
   each, fresh session per run). Find what runs at rest.
-- [ ] **The 0.8.9 performance report** (`docs/PERFORMANCE-0.8.9.md`): PC and Raspberry Pi, method, the slideshow's cost,
-  the floor and what widgets and a Terminal add.
+- [x] **The 0.8.9 performance report** (`docs/PERFORMANCE-0.8.9.md`, 2026-11-19): PC and Raspberry Pi, method, the
+  slideshow's cost (19.0 % of one core on three 1080p displays, 2.0 % with it off), the floor (177 MB, 0.2 %) and what
+  widgets and a Terminal add, the memory work's runs, the Pi's 0.8.8.9 and 0.8.9 sessions; the CSVs in `docs/perf/`.
+  The memory chart on the site and in the paper (`[[chart:…]]`, `web/lib/chartsvg.mjs`).
+- [ ] **Raspberry Pi with 0.8.9.1** in the same report (runs in progress), and Lord Workspaces on the Pi: the 0.8.9
+  "workspaces" run kept Lord Flow (the theme written before the reboot did not stay), so it counts as a second Lord
+  Flow run.
 
 ## Before 1.0
 

@@ -356,7 +356,9 @@ was checked against this path:
 - **The node stays small:** the rare styles (per-side edges, per-corner radii, scale/rotate,
   `transformOrigin`) live in a separate `StyleExt`, so every walk over the tree touches the same
   memory as before (a node 240 bytes larger made the benchmark's drag about 40 % slower).
-- **Transforms:** a scaled or rotated subtree is painted into its own raster and composited; inside
+- **Transforms:** a scaled or rotated subtree is painted into its own raster and composited (since 0.8.9.1 a raster
+  unused for 30 s is freed by the idle trim, `paint_release_idle`, and a slot holding a small raster gives back a
+  buffer more than four times too big: before, a desktop at rest kept them for the whole session); inside
   a dragged window it goes into the drag layer like anything else. A transformed window is not put in
   the drag layer. The raster is kept while only the transform changes, and painted again when a node
   inside it, or the transformed node's own style (background, border, radius, gradient), changes:

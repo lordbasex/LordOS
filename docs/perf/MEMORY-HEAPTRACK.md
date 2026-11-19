@@ -202,10 +202,8 @@ The heap at rest after ws08, about 105 MB, plus about 69 MB of file-backed pages
 | 15 | Free space inside the heap that glibc has not returned | Fragmentation; `malloc_trim` already runs at rest |
 | ≤ 6 per tab | Terminal Instant Replay | A feature limit (about 1 MB in use in these runs) |
 
-The easy cuts are done. Two items remain from this work:
+The easy cuts are done. One item remains from this work: on the Raspberry Pi, the 0.8.9 headless session uses
+more processor than 0.8.8.9 (6.1 % against 3.4 % of one core).
 
-- The 0.8.9 performance report (`docs/PERFORMANCE-0.8.9.md`).
-- On the Raspberry Pi, the 0.8.9 headless session uses more processor than 0.8.8.9 (6.1 % against 3.4 %).
-
-The data (CSVs, reports) is in `docs/perf/0.8.9.1/`. The report on 0.8.9 itself will be
-`docs/PERFORMANCE-0.8.9.md`.
+The data (CSVs, reports) is in `docs/perf/0.8.9.1/`. The report on 0.8.9 itself, with the slideshow's cost, the
+floor, the Raspberry Pi runs and this loop's CSV statistics, is [`docs/PERFORMANCE-0.8.9.md`](../PERFORMANCE-0.8.9.md).
