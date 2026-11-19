@@ -581,6 +581,9 @@ All figures below were measured by the project and are documented in the files c
 | The login screen closed after sign-in (0.8.5 fix, same kind of VMware VM) | whole system 603 → 548 MB used | `CHANGELOG.md`, 0.8.5 |
 | Whole system, 0.8.5-beta updated from 0.8.4.1, about five minutes after a restart with automatic login (same VMware VM, GPU composition on SVGA3D; Chrome, VS Code, Spotify and llama.cpp installed, not running) | 592 MB used | `results/0.8.5-beta/vmware-fusion` |
 | Boot, the same 0.8.5-beta machine | first frame on the monitor 7.4 s after the kernel started (`systemd-analyze`: 3.3 s kernel + 4.3 s userspace) | `results/0.8.5-beta/vmware-fusion` |
+| A user session (`lord-server`) on real hardware: 3 × 1920×1080 displays, Lord Workspaces, 7 widgets, a Terminal running Claude Code, at rest (in development, 0.8.9.1) | 269 → 183 MB RSS (−32 %) | PC with an RX 580, `docs/perf/MEMORY-HEAPTRACK.md` |
+
+**Memory at rest, in development (0.8.9.1).** Measured one change at a time in fresh sessions on that PC, with heaptrack and a memory report in `compositor.log` (`docs/perf/MEMORY-HEAPTRACK.md`): the cached rasters of animated windows are freed after 30 s at rest (they stayed for the whole session, up to 114 MB); the Terminal's history grows as it fills instead of allocating a million-line table up front (24 MB); and lord-server's static arrays opt out of transparent huge pages (about 16 MB resident for very little data). What is left at rest is mostly the JavaScript of the desktop and the apps (34 MB), one scene per display (24 MB) and the GPU driver (13 MB).
 
 ### 7.2 Drawing
 

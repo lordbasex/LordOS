@@ -65,9 +65,15 @@ static void line_fill(Line *l, int from, int to, Cell b) {
 static Line *bl(Buffer *b, int i) { return &b->ring[(b->head + i) % b->cap]; }
 static Line *L(Term *t, int row) { return bl(t->buf, t->buf->count - t->rows + row); }
 
-static int buf_init(Buffer *b, int cap, int rows) {
+/* The ring starts small and doubles as the history fills, up to the limit: a history of a million lines
+ * allocated its whole table up front (24 MB for a terminal with a few hundred lines, 0.8.9.1). */
+#define RING_START 1024
+static int buf_init(Buffer *b, int max, int rows) {
+    int cap = max < RING_START ? max : RING_START;
+    if (cap < rows) cap = rows;
     b->ring = calloc((size_t)cap, sizeof *b->ring);
     b->cap = cap;
+    b->max = max;
     b->count = rows;
     b->head = 0;
     b->dropped = 0;
@@ -82,7 +88,21 @@ static void buf_free(Buffer *b) {
 }
 
 /* Appends an empty line at the end; if the ring is full the oldest one is dropped. */
+static int buf_grow(Buffer *b) {
+    int cap = b->cap > b->max / 2 ? b->max : b->cap * 2;
+    Line *ring = calloc((size_t)cap, sizeof *ring);
+    if (!ring) return -1;
+    for (int i = 0; i < b->count; i++) ring[i] = *bl(b, i);
+    for (int i = b->count; i < b->cap; i++) free(bl(b, i)->c);     /* lines cleared out of the history */
+    free(b->ring);
+    b->ring = ring;
+    b->cap = cap;
+    b->head = 0;
+    return 0;
+}
+
 static void buf_push(Buffer *b) {
+    if (b->count == b->cap && b->cap < b->max) buf_grow(b);
     if (b->count < b->cap) { line_reset(bl(b, b->count)); b->count++; return; }
     line_reset(&b->ring[b->head]);
     b->head = (b->head + 1) % b->cap;
@@ -1646,13 +1666,16 @@ static void reflow_main(Term *t, int ncols, int nrows, int *ccx, int *ccy) {
     while (out.n - new_cur > nrows) { out.n--; free(out.v[out.n].c); }
     while (out.n < nrows) vec_push(&out);
 
-    int cap = b->cap - t->rows + nrows;
-    int drop = out.n > cap ? out.n - cap : 0;
+    int max = b->max - t->rows + nrows;
+    int drop = out.n > max ? out.n - max : 0;
+    int cap = out.n - drop;
+    if (cap < RING_START) cap = max < RING_START ? max : RING_START;
     for (int i = 0; i < drop; i++) free(out.v[i].c);
     for (int i = 0; i < b->cap; i++) free(b->ring[i].c);
     free(b->ring);
     b->ring = calloc((size_t)cap, sizeof *b->ring);
     b->cap = cap;
+    b->max = max;
     b->head = 0;
     b->count = out.n - drop;
     long long old_dropped = b->dropped;
@@ -1688,7 +1711,7 @@ static void resize_alt(Term *t, int ncols, int nrows) {
     (void)ncols;
     buf_free(b);
     b->ring = ring;
-    b->cap = b->count = nrows;
+    b->cap = b->count = b->max = nrows;
     b->head = 0;
 }
 
@@ -1744,7 +1767,13 @@ void vt_clear_scrollback(Term *t) {
     if (t->buf != &t->main) return;
     Buffer *b = &t->main;
     int extra = b->count - t->rows;
-    for (int i = 0; i < extra; i++) line_reset(bl(b, i));
+    /* the cleared history gives its cells back: a program that clears the scrollback on every redraw
+     * (Claude Code does) left thousands of lines' cells allocated in the ring (0.8.9.1: 23 MB for 120 lines) */
+    for (int i = 0; i < extra; i++) {
+        Line *l = bl(b, i);
+        free(l->c);
+        memset(l, 0, sizeof *l);
+    }
     b->head = (b->head + extra) % b->cap;
     b->count = t->rows;
     b->dropped += extra;

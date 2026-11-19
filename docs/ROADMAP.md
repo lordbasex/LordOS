@@ -900,14 +900,19 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Release 0.8.9.1 (planned)
 
-- **Lord Workspaces: a window brought back from Minimized fills its slot.** Today it keeps the size it had: when the
-  display's layout changed while it was minimized (Two halves to Main and side, for example), it comes back at its old
-  width (923 px in a 1231 px slot in the scene test) and only fits once the layout is picked again. Found while taking the
-  screenshots for the 0.8.9 article (2026-11-18). The tiler keeps the tile it gave each window (`applied` in
-  `themes/workspaces/tiler.js`) and skips a window whose tile looks unchanged; a first fix (forgetting that tile when the
-  window comes back) was not enough in `server/tests/workspaces_scene.mjs`, whose harness also showed no tiler pass
-  after the restore, so the scene's timing needs a look too. Fix it with a scene test that changes the layout while the
-  window is minimized, and check it on VM 127.
+- [x] **Lord Workspaces: a window brought back from Minimized fills its slot.** Found in the scene test while taking the
+  screenshots for the 0.8.9 article (2026-11-18): the window came back at its old width (923 px in a 1231 px slot).
+  The tiler was right; the scene ran more than 60 tiler passes in a second, so the tiler's limit (`MAX_PASSES` in
+  `themes/workspaces/tiler.js`) put the next pass 1 s later and the scene checked before it. `workspaces_scene.mjs` now
+  changes Two halves to Main and side while a window is minimized, waits out the limit and checks that the window fills
+  its new slot (2026-11-19). Still to do: the same check by hand on a real desktop.
+- [x] **Memory at rest** (2026-11-19): 269 → 183 MB for a session with three 1080p displays, 7 widgets and a Terminal
+  running Claude Code (transform rasters freed at rest, the Terminal's history growing as it fills, no huge pages for
+  the static arrays). Method and data: `docs/perf/MEMORY-HEAPTRACK.md`.
+- [ ] **Raspberry Pi: the 0.8.9 headless session uses more processor than 0.8.8.9** (6.1 % against 3.4 % at rest, an hour
+  each, fresh session per run). Find what runs at rest.
+- [ ] **The 0.8.9 performance report** (`docs/PERFORMANCE-0.8.9.md`): PC and Raspberry Pi, method, the slideshow's cost,
+  the floor and what widgets and a Terminal add.
 
 ## Before 1.0
 

@@ -1,5 +1,6 @@
 #include <dirent.h>
 #include <malloc.h>
+#include <sys/mman.h>
 /*
  * lord-server — servidor gráfico de LordOS, escrito desde cero.
  *
@@ -2556,7 +2557,99 @@ static void usage(const char *argv0) {
 static pthread_t loop_thread;
 static void forward_stop(int sig) { pthread_kill(loop_thread, sig); }
 
+/* (0.8.9.1) one memory report: the process (status, huge pages), glibc's heap (mallinfo2: in use against free
+ * but kept), the QuickJS runtime, the image cache, the per-display scenes. Measured right after a malloc_trim. */
+static void mem_report(Server *s) {
+    malloc_trim(0);
+    long rss = 0, anon = 0, file = 0, thp = 0;
+    char line[256];
+    FILE *f = fopen("/proc/self/status", "r");
+    if (f) {
+        while (fgets(line, sizeof line, f)) {
+            sscanf(line, "VmRSS: %ld", &rss); sscanf(line, "RssAnon: %ld", &anon); sscanf(line, "RssFile: %ld", &file);
+        }
+        fclose(f);
+    }
+    if ((f = fopen("/proc/self/smaps_rollup", "r"))) {
+        while (fgets(line, sizeof line, f)) sscanf(line, "AnonHugePages: %ld", &thp);
+        fclose(f);
+    }
+    struct mallinfo2 mi = mallinfo2();
+    int ic = 0, idle = 0;
+    size_t ib = 0;
+    image_cache_stats(&ic, &idle, &ib);
+    long scenes = 0;
+    for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].scene.px) scenes += (long)s->out[i].scene.w * s->out[i].scene.h * 4;
+    fprintf(stderr, "memory: rss=%ldK anon=%ldK file=%ldK thp=%ldK | malloc arena=%zuK inuse=%zuK free=%zuK mmap=%zuK(%zu) "
+            "top=%zuK | images=%d idle=%d %zuK | scenes=%ldK\n", rss, anon, file, thp, mi.arena >> 10, mi.uordblks >> 10,
+            mi.fordblks >> 10, mi.hblkhd >> 10, mi.hblks, mi.keepcost >> 10, ic, idle, ib >> 10, scenes >> 10);
+    int tn = 0, nb = 0, nt = 0;
+    long tl = 0;
+    size_t tc = 0, tr = 0, bb = 0, tb = 0, gn = 0, gb = 0, lb = 0;
+    term_mem_stats(&tn, &tl, &tc, &tr);
+    paint_mem_stats(&nb, &bb, &nt, &tb, &lb);
+    text_mem_stats(&gn, &gb);
+    fprintf(stderr, "memory: terminals=%d lines=%ld cells=%zuK replay=%zuK | blur=%d %zuK | transform=%d %zuK | layer=%zuK | glyphs=%zu %zuK\n",
+            tn, tl, tc >> 10, tr >> 10, nb, bb >> 10, nt, tb >> 10, lb >> 10, gn, gb >> 10);
+    long frames = 0;
+    for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].frame) frames += (long)s->out[i].scene.w * s->out[i].scene.h * 4;
+    fprintf(stderr, "memory: nodes=%d %zuK (Node %zu B) | frames=%ldK\n", node_count(), (size_t)node_count() * sizeof(Node) >> 10,
+            sizeof(Node), frames >> 10);
+    /* glibc's arenas one by one (threads get their own): heap number and its current size */
+    char *mx = NULL;
+    size_t mxn = 0;
+    FILE *ms = open_memstream(&mx, &mxn);
+    if (ms) {
+        malloc_info(0, ms);
+        fclose(ms);
+        char ar[512];
+        size_t ao = 0;
+        int nr = -1;
+        ar[0] = 0;
+        for (char *q = mx; q && *q && ao + 40 < sizeof ar; q = strchr(q + 1, '<')) {
+            long long v;
+            if (sscanf(q, "<heap nr=\"%d\"", &nr) == 1) continue;
+            if (nr >= 0 && sscanf(q, "<system type=\"current\" size=\"%lld\"", &v) == 1) {
+                ao += (size_t)snprintf(ar + ao, sizeof ar - ao, " #%d=%lldK", nr, v >> 10);
+                nr = -1;
+            }
+        }
+        fprintf(stderr, "memory: arenas:%s\n", ar);
+        free(mx);
+    }
+    char td[1024];
+    paint_tf_detail(td, sizeof td);
+    if (td[0]) fprintf(stderr, "memory: transform rasters:%s\n", td);
+    char js[512];
+    js_mem_line(js, sizeof js);
+    fprintf(stderr, "memory: %s\n", js);
+}
+
+/* lord-server's static arrays (.bss, 31 MB) are sized for the worst case and mostly untouched. With
+ * transparent huge pages set to "always", khugepaged turned each 2 MB region with any page in use into a
+ * whole huge page, and about 16 MB of them stayed resident for ~1 MB of data (0.8.9.1, heaptrack and
+ * /proc/<pid>/smaps). Only this range opts out; the heap keeps huge pages. */
+static void bss_no_huge_pages(void) {
+    extern char __bss_start[], _end[];
+    uintptr_t a = (uintptr_t)__bss_start, b = (uintptr_t)_end, pg = (uintptr_t)sysconf(_SC_PAGESIZE);
+    FILE *f = fopen("/proc/self/maps", "r");
+    if (!f || pg == 0 || pg == (uintptr_t)-1) { if (f) fclose(f); return; }
+    char l[512];
+    while (fgets(l, sizeof l, f)) {             /* the anonymous mappings the range covers (there may be a hole) */
+        unsigned long s0, e0, ino;
+        char perm[8];
+        unsigned off, dmaj, dmin;
+        if (sscanf(l, "%lx-%lx %7s %x %x:%x %lu", &s0, &e0, perm, &off, &dmaj, &dmin, &ino) != 7 || ino) continue;
+        uintptr_t x = s0 > a ? s0 : a, y = e0 < b ? e0 : b;
+        x = (x + pg - 1) & ~(pg - 1);
+        y &= ~(pg - 1);
+        if (y > x) madvise((void *)x, y - x, MADV_NOHUGEPAGE);
+    }
+    fclose(f);
+}
+
 int main(int argc, char **argv) {
+    bss_no_huge_pages();
     struct sigaction pipe_sa = { .sa_handler = on_sigpipe };
     sigemptyset(&pipe_sa.sa_mask);
     sigaction(SIGPIPE, &pipe_sa, NULL);
@@ -3105,8 +3198,17 @@ int main(int argc, char **argv) {
         /* glibc keeps what was freed inside the heap for later, so a peak (a big window, an app opened and closed, the
          * theme loading) stays in the RSS for the rest of the session. When a wait ended with nothing to do (the
          * desktop at rest), at most once a minute, the free pages go back to the system: a few ms, never mid-frame. */
+        /* a memory report in compositor.log (docs/perf/MEMORY-HEAPTRACK.md): 10 minutes after the start, when the
+         * session has settled, then every 6 hours; one report is a malloc_trim and a few reads of /proc */
+        static uint64_t mem_next;
+        if (!mem_next) mem_next = loop_wake + 600ull * 1000000000ull;
+        if (loop_wake >= mem_next) {
+            mem_report(&s);
+            mem_next = loop_wake + 6ull * 3600 * 1000000000ull;
+        }
         static uint64_t trimmed_at;
         if (ready == 0 && loop_wake - trimmed_at > 60ull * 1000000000ull) {
+            paint_release_idle();
             malloc_trim(0);
             trimmed_at = loop_wake;
         }

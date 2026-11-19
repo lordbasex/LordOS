@@ -10,8 +10,49 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Changed
+
+- **A desktop session uses about a third less memory (0.8.9.1 memory work).** Measured on a PC with three 1920×1080
+  displays (RX 580, Debian 13, transparent huge pages `always`), Lord Workspaces, 7 widgets and a Terminal running
+  Claude Code at rest: lord-server's RSS went from 269 MB to 183 MB (−86 MB, −32 %). With the Terminal open it now
+  uses less than the same desktop used before without it (185 MB). Each step was one change, measured in a fresh
+  session; the method, the tools and the data are in `docs/perf/MEMORY-HEAPTRACK.md` and `docs/perf/0.8.9.1/`.
+  - **Transform rasters are freed at rest** (`server/src/ui/paint.c`). The cached raster of a scaled or rotated subtree
+    (a window's open or minimize animation, a preview) was freed only after 600 more transform paints, and a desktop at
+    rest makes none, so the rasters of 16 slots stayed for the whole session: 57 MB with widgets, 114 MB with the
+    Terminal. Rasters unused for 30 s are now freed from the once-a-minute idle trim (`paint_release_idle`), and a slot
+    that holds a small raster gives back a buffer more than four times too big (the slots then held 9×9 icons in
+    window-sized buffers).
+  - **The Terminal's history grows as it fills** (`server/src/term/vt.c`). The history ring was allocated for its whole
+    limit at once: 24 bytes per line, 24 MB for a 1,000,000-line history holding 400 lines. It now starts at 1,024 lines
+    and doubles up to the limit (`Buffer.max`); reflow and the alternate screen keep their behaviour (`build/vt-ring-test`, in `make test`). Clearing the
+    history (`ESC [ 3 J`, which Claude Code sends on redraw) now frees the cleared lines' cells instead of keeping them.
+  - **lord-server's static arrays don't use huge pages** (`server/src/main.c`). Its `.bss` is 31 MB of worst-case
+    tables, mostly untouched; with transparent huge pages set to `always`, khugepaged turned each 2 MB region with any
+    page in use into a whole huge page, and about 16 MB stayed resident. lord-server now marks only that range
+    `MADV_NOHUGEPAGE` at start; the heap keeps huge pages (turning them off for the whole process made it larger).
+  - The app list and the font list are cut to what their scan found (`apps.c`, `ui/fonts.c`). They were sized for
+    1,024 apps and 8,192 fonts (18.6 and 5.8 MB). This did not change the RSS (those pages were never touched) and is
+    kept for a smaller address space.
+- **A memory report in `compositor.log`**: 10 minutes after login, then every 6 hours, a few `memory:` lines with the
+  process (RSS, anonymous, file, huge pages), glibc's heap and its arenas, QuickJS, the image cache, the per-display
+  scenes, the terminals (lines, cells, Instant Replay), the blur cache, the transform rasters, the layer, the glyph
+  cache and the nodes. Each report runs after `malloc_trim(0)`.
+
+### Added
+
+- `tools/bench/heaptrack-session.sh install <user> <binary>` runs one user's next session under heaptrack (and only that
+  one; `restore` puts the installed binary back), to see which line of code holds the session's memory.
+  `docs/perf/MEMORY-HEAPTRACK.md` explains the three tools in order (`session-sample.sh`, the memory report, heaptrack),
+  how to read heaptrack's result while the session is still running, and why reserved memory is not resident memory.
+
 ### Fixed
 
+- **Lord Workspaces' scene test: a window brought back from Minimized after the layout changed** (roadmap 0.8.9.1).
+  The scene showed the window coming back at its old width (923 px in a 1231 px slot). The tiler was right: the scene
+  ran more than 60 tiler passes in a second, so the tiler's limit put the next pass 1 s later and the scene checked
+  before it. A new check changes Two halves to Main and side while a window is minimized and brings it back after
+  waiting out the limit; the window fills its new slot.
 - `tools/iso/build-arm64.sh` copies `RCLONE_DEB` into the work folder's `out/` before entering the arm64 chroot.
   The host path meant nothing inside the chroot, so the 0.8.9-beta arm64 ISO stopped with "no lordos-rclone"
   until the package was copied there by hand.

@@ -499,6 +499,21 @@ static int on_interrupt(JSRuntime *r, void *opaque) {
     return w == 2;
 }
 
+/* (memory report) what the session's QuickJS runtime holds, in KB: JS_ComputeMemoryUsage walks every object, a few ms */
+void js_mem_line(char *b, size_t n) {
+    if (!rt) { snprintf(b, n, "js none"); return; }
+    JSMemoryUsage u;
+    JS_ComputeMemoryUsage(rt, &u);
+    snprintf(b, n, "js malloc=%lldK used=%lldK objs=%lld/%lldK funcs=%lld/%lldK(code %lldK pc2line %lldK) strs=%lld/%lldK "
+             "atoms=%lld/%lldK shapes=%lld/%lldK props=%lldK arrays=%lld bin=%lldK",
+             (long long)u.malloc_size >> 10, (long long)u.memory_used_size >> 10, (long long)u.obj_count,
+             (long long)u.obj_size >> 10, (long long)u.js_func_count, (long long)u.js_func_size >> 10,
+             (long long)u.js_func_code_size >> 10, (long long)u.js_func_pc2line_size >> 10, (long long)u.str_count,
+             (long long)u.str_size >> 10, (long long)u.atom_count, (long long)u.atom_size >> 10,
+             (long long)u.shape_count, (long long)u.shape_size >> 10, (long long)u.prop_size >> 10,
+             (long long)u.array_count, (long long)u.binary_object_size >> 10);
+}
+
 /* A new context with the whole `lord` object of a session (or of the login screen). */
 static void session_context(void) {
     rt = JS_NewRuntime();

@@ -302,6 +302,7 @@ typedef struct {
     float ox, oy;               /* raster origin relative to the node (logical px, padding included) */
     int valid;
     unsigned used;
+    uint64_t used_at;           /* CLOCK_MONOTONIC ms of the last use (paint_release_idle) */
     uint64_t sig;               /* the subtree's geometry when it was rasterized (damage_walk) */
     Style st;                   /* the node's style without transform and opacity (tf_norm) */
     StyleExt xst;
@@ -347,6 +348,12 @@ static float tf_step(float sc) {
     static const float steps[] = { 0.125f, 0.25f, 0.5f, 0.75f, 1, 1.5f, 2, 3, 4 };
     for (size_t i = 0; i < sizeof steps / sizeof *steps; i++) if (sc <= steps[i] + 1e-4f) return steps[i];
     return 4;
+}
+
+static uint64_t tf_now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000 + (uint64_t)ts.tv_nsec / 1000000;
 }
 
 static TfLayer *tf_slot(int node, float kr) {
@@ -399,9 +406,12 @@ static int tf_paint(Canvas *c, Node *n, float opacity) {
     TfLayer *e = paint_tf_nocache ? &scratch[depth] : tf_slot(n->id, kr);
     if (paint_tf_nocache) e->valid = 0;
     e->used = ++tf_tick;
+    e->used_at = tf_now_ms();
     float ox = (gx0 - pad) / kr, oy = (gy0 - pad) / kr;
     if (!e->valid || live || cap_last || e->w != w || e->h != h || fabsf(e->ox - ox) > 0.01f || fabsf(e->oy - oy) > 0.01f) {
-        if ((size_t)w * h > e->cap) {
+        /* a slot keeps its buffer for the next raster, but not a window-sized one for a 9x9 icon: the 16
+         * slots held 57 MB of small rasters at rest (0.8.9.1) */
+        if ((size_t)w * h > e->cap || e->cap > 4 * (size_t)w * h + 65536) {
             uint32_t *px = realloc(e->px, (size_t)w * h * 4);
             if (!px) return 0;
             e->px = px;
@@ -2480,4 +2490,36 @@ static Node *hit(Node *n, float x, float y) {
 
 Node *hit_test(Node *root, float x, float y) {
     return root ? hit(root, x, y) : NULL;
+}
+
+/* The desktop at rest: tf_gc counts paints of transformed subtrees, and with nothing animating that count
+ * stands still, so rasters of a window scaled once (the Dock's minimize, a preview, an opening animation)
+ * stayed allocated for the whole session (0.8.9.1: 57 to 114 MB on three 1080p displays). Rasters not used
+ * for 30 s are freed here; one that is needed again is painted again on its next frame. */
+void paint_release_idle(void) {
+    uint64_t now = tf_now_ms();
+    for (int i = 0; i < TF_CACHE; i++)
+        if (tfl[i].px && now - tfl[i].used_at > 30000) {
+            free(tfl[i].px);
+            memset(&tfl[i], 0, sizeof tfl[i]);
+        }
+}
+
+/* (memory report) the transform rasters one by one: node, size, scale, valid */
+void paint_tf_detail(char *b, size_t n) {
+    size_t o = 0;
+    uint64_t now = tf_now_ms();
+    b[0] = 0;
+    for (int i = 0; i < TF_CACHE && o + 64 < n; i++)
+        if (tfl[i].px)
+            o += (size_t)snprintf(b + o, n - o, " #%d %dx%d k%.2f v%d %lus", tfl[i].node, tfl[i].w, tfl[i].h,
+                                  tfl[i].kr, tfl[i].valid, (unsigned long)((now - tfl[i].used_at) / 1000));
+}
+
+/* (memory report) the blur cache and the transform rasters: entries holding pixels and their bytes */
+void paint_mem_stats(int *nb, size_t *blur, int *nt, size_t *tf, size_t *lay) {
+    *lay = (size_t)layer.cap * 5;
+    *nb = *nt = 0; *blur = *tf = 0;
+    for (int i = 0; i < BC_MAX; i++) if (bcache[i].px) { (*nb)++; *blur += bcache[i].cap * sizeof(uint32_t); }
+    for (int i = 0; i < TF_CACHE; i++) if (tfl[i].px) { (*nt)++; *tf += tfl[i].cap * sizeof(uint32_t); }
 }

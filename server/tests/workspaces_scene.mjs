@@ -311,6 +311,31 @@ await flush();
   for (let i = 0; i < 2; i++) await flush();
 }
 
+// (0.8.9.1) the layout changed while a window was minimized: brought back, it fills its slot in the new layout, not
+// the size it had (Two halves to Main and side: it came back at its old width)
+{
+  tiler.setLayout(desk, 'DP-1', 'halves');
+  const a = sdk.wm.open('extra53', { frame: { x: L.x + 100, y: 200, w: 500, h: 400 } });
+  const b = sdk.wm.open('extra54', { frame: { x: L.x + 700, y: 200, w: 500, h: 400 } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('minimized relayout: two halves', [frameOf(a), frameOf(b)], tileRects('halves', plan(L).work, 2, 0.5));
+  // the tiler allows 60 passes a second and waits 1 s past that: this scene goes faster, so it waits here
+  await new Promise((res) => setTimeout(res, 1100));
+  await flush();
+  sdk.wm.minimize(a);
+  for (let i = 0; i < 3; i++) await flush();
+  tiler.setLayout(desk, 'DP-1', 'split');
+  for (let i = 0; i < 3; i++) await flush();
+  const split = tileRects('split', plan(L).work, 3, 2 / 3);   // main and side: three slots, one of them empty
+  check('minimized relayout: the other window in its new slot', frameOf(b), split[1]);
+  sdk.wm.focus(a);
+  for (let i = 0; i < 3; i++) await flush();
+  check('minimized relayout: brought back, it fills its new slot', [!!sdk.wm.get(a).minimized, frameOf(a), frameOf(b)], [false, split[0], split[1]]);
+  for (const id of [a, b]) sdk.wm.close(id, true);
+  tiler.setLayout(desk, 'DP-1', 'free');
+  for (let i = 0; i < 2; i++) await flush();
+}
+
 // re-picking Two halves with two floating windows (moved by hand, or placed by session restore): both tile, side by side
 {
   tiler.setLayout(desk, 'DP-1', 'halves');
