@@ -84,7 +84,9 @@ export function NotificationsSettings() {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
-  const linux = useLauncherApps().filter((a) => a.kind === 'linux');
+  const launcher = useLauncherApps();
+  const linux = launcher.filter((a) => a.kind === 'linux');
+  const fps = launcher.filter((a) => a.kind === 'flatpak');
   const webList = useWebApps();
   const p = notifyPrefs(s);
   const patch = (x) => set({ notifications: { ...p, ...x } });
@@ -100,7 +102,8 @@ export function NotificationsSettings() {
     }
     if (id.startsWith('linux:')) {
       const did = id.slice(6);
-      const la = linux.find((a) => a.desktopId === did || a.desktopId.toLowerCase() === did.toLowerCase());
+      const la = linux.find((a) => a.desktopId === did || a.desktopId.toLowerCase() === did.toLowerCase()) ||
+        fps.find((a) => a.flatpakId.toLowerCase() === did.toLowerCase());    // a Flatpak app's desktop-entry is its id
       return { id, name: la?.name || did, linux: la };
     }
     const app = getApp(id);

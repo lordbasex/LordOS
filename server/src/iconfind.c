@@ -111,8 +111,11 @@ int iconfind_status(const IconRoots *r, const char *name, char *out, size_t n) {
 }
 
 int iconfind_svg_allowed(const char *real, const char *home) {
-    static const char *const sys[] = { "/usr/share/", "/usr/local/share/", "/opt/", "/var/lib/flatpak/exports/share/", NULL };
-    static const char *const own[] = { "/.local/share/icons/", "/.icons/", "/.local/share/flatpak/exports/share/", NULL };
+    /* a Flatpak app's exported icon is a link into its deployment (app/<id>/<arch>/<branch>/<commit>/export/share/) */
+    static const char *const sys[] = { "/usr/share/", "/usr/local/share/", "/opt/", "/var/lib/flatpak/exports/share/",
+                                       "/var/lib/flatpak/app/", NULL };
+    static const char *const own[] = { "/.local/share/icons/", "/.icons/", "/.local/share/flatpak/exports/share/",
+                                       "/.local/share/flatpak/app/", NULL };
     if (!real || real[0] != '/' || !ends_with(real, ".svg") || strstr(real, "/../")) return 0;
     for (int i = 0; sys[i]; i++) if (!strncmp(real, sys[i], strlen(sys[i]))) return 1;
     size_t hl = home ? strlen(home) : 0;

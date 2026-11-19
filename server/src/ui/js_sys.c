@@ -2172,6 +2172,37 @@ static JSValue f_apps_launch_with(JSContext *c, JSValueConst this_val, int argc,
     return JS_NewBool(c, ok);
 }
 
+/* lord.apps.flatpak(language) → [{ id, name, nameC, comment, categories, wmClass, mimeTypes, icon, user }]: the installed
+ * Flatpak apps (apps.c, apps_flatpak_list). */
+static JSValue f_apps_flatpak(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    const char *lang = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    char l[32] = "en";
+    if (lang) {
+        if (strlen(lang) < sizeof l && valid_id_dot(lang)) snprintf(l, sizeof l, "%s", lang);
+        JS_FreeCString(c, lang);
+    }
+    const DesktopApp *list;
+    int n = apps_flatpak_list(l, &list);
+    JSValue arr = JS_NewArray(c);
+    for (int i = 0; i < n; i++) {
+        const DesktopApp *a = &list[i];
+        JSValue o = JS_NewObject(c);
+        JS_SetPropertyStr(c, o, "id", JS_NewString(c, a->id));
+        JS_SetPropertyStr(c, o, "name", JS_NewString(c, a->name));
+        JS_SetPropertyStr(c, o, "nameC", JS_NewString(c, a->name_c));
+        JS_SetPropertyStr(c, o, "comment", JS_NewString(c, a->comment));
+        JS_SetPropertyStr(c, o, "keywords", JS_NewString(c, a->keywords));
+        JS_SetPropertyStr(c, o, "categories", JS_NewString(c, a->categories));
+        JS_SetPropertyStr(c, o, "wmClass", JS_NewString(c, a->wmclass));
+        JS_SetPropertyStr(c, o, "mimeTypes", JS_NewString(c, a->mime));
+        JS_SetPropertyStr(c, o, "icon", JS_NewString(c, a->icon));
+        JS_SetPropertyStr(c, o, "user", JS_NewBool(c, a->user));
+        JS_SetPropertyUint32(c, arr, (uint32_t)i, o);
+    }
+    return arr;
+}
+
 /* lord.apps.launchFlatpak(id) / launchFlatpakWith(id, path): an installed Flatpak app by its id only (docs/FLATPAK.md,
  * E1): the command line is built in C (apps.c, fpak.c), never from an export's Exec line. → true if it started. */
 static JSValue f_apps_launch_flatpak(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -2480,6 +2511,7 @@ static const JSCFunctionListEntry apps_funcs[] = {
     JS_CFUNC_DEF("linux", 1, f_apps_linux),
     JS_CFUNC_DEF("launch", 1, f_apps_launch),
     JS_CFUNC_DEF("launchWith", 2, f_apps_launch_with),
+    JS_CFUNC_DEF("flatpak", 1, f_apps_flatpak),
     JS_CFUNC_DEF("launchFlatpak", 1, f_apps_launch_flatpak),
     JS_CFUNC_DEF("launchFlatpakWith", 2, f_apps_launch_flatpak_with),
     JS_CFUNC_DEF("launchUri", 2, f_apps_launch_uri),

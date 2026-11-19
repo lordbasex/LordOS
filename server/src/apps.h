@@ -50,7 +50,10 @@ int apps_launch_uri(const char *id, const char *uri);
  * the home folder or the user's mounts. 0 started; -1 refused (apps_last_error says why when it can). */
 int apps_launch_flatpak(const char *id);
 int apps_launch_flatpak_with(const char *id, const char *path);
-int apps_flatpak_installed(const char *id);    /* vnc://, rdp://, http(s):// for the app that declares the scheme */
+int apps_flatpak_installed(const char *id);
+/* The installed Flatpak apps (id = the Flatpak id) from their exported .desktop files: name, comment, categories,
+ * MIME types, StartupWMClass and icon only. Returns the count; *out is valid until the next call. */
+int apps_flatpak_list(const char *lang, const DesktopApp **out);    /* vnc://, rdp://, http(s):// for the app that declares the scheme */
 #define APPS_URI_WEB_MAX 3000                                /* an http(s) address at most (the others: 300) */
 /* The app that opens files of a MIME type, as apps_launch_with(id = "") picks it: out gets its desktop
  * id ("firefox-esr.desktop", or the user's "lordos-<app>.desktop"). Order: [Default Applications] of

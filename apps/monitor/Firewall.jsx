@@ -15,7 +15,7 @@ import { useState } from 'react';
 
 // Firewall id of a launcher app: the built-in ones run inside LordOS.
 // Isolated built-in apps (Passwords) have their own scope, like a package.
-const fwId = (a) => (a.kind === 'linux' ? a.id : a.kind === 'package' || a.isolated ? `lpk:${a.id}` : 'lordos');
+const fwId = (a) => (a.kind === 'linux' || a.kind === 'flatpak' ? a.id : a.kind === 'package' || a.isolated ? `lpk:${a.id}` : 'lordos');
 // The desktop shell and the built-in apps share "lordos": these would cut the desktop off itself.
 const DESKTOP_ALWAYS = ['no-files', 'no-usb', 'no-clipboard', 'no-bluetooth'];
 // Linux apps: the clipboard of a Wayland app isn't mediated per app yet, so it isn't offered.

@@ -21,7 +21,7 @@ import { compareNames } from '../../sdk/collate.js';
 const { sortByPrecedence, isDefaultRule } = fwRule;
 
 // Firewall id of a launcher app: the built-in ones run inside LordOS; isolated ones have a scope.
-const fwId = (a) => (a.kind === 'linux' ? a.id : a.kind === 'package' || a.isolated ? `lpk:${a.id}` : 'lordos');
+const fwId = (a) => (a.kind === 'linux' || a.kind === 'flatpak' ? a.id : a.kind === 'package' || a.isolated ? `lpk:${a.id}` : 'lordos');
 
 function useAppIndex() {
   const list = useLauncherApps();

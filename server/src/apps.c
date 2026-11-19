@@ -1032,8 +1032,7 @@ static int launch_flatpak(const char *id, const char *opened) {
     last_error[0] = 0;
 #if !defined(__x86_64__)
     (void)id; (void)opened;
-    snprintf(last_error, sizeof last_error, "apps.flatpakArch");          /* phase 1: x86-64 PCs only */
-    return -1;
+    return -1;                                  /* phase 1: x86-64 PCs only (apps_flatpak_list lists none elsewhere) */
 #else
     char arch[32], branch[FPAK_BRANCH_MAX];
     char *md = malloc(16384);
@@ -1113,6 +1112,68 @@ static int launch_flatpak(const char *id, const char *opened) {
 }
 
 int apps_launch_flatpak(const char *id) { return launch_flatpak(id, NULL); }
+
+/* ---- the installed Flatpak apps, for the launcher, the Dock, Privacy and the Monitor (docs/FLATPAK.md) ----
+ * From the exported .desktop files, whose name must be an installed app's id (fpak_id_ok, flatpak_find): only the
+ * name, comment, categories, MIME types, StartupWMClass and icon are read, never Exec (apps_launch_flatpak builds the
+ * command line). The user's installation first, then the system's. */
+#define FLATPAK_LIST_MAX 128
+static DesktopApp flatpaks[FLATPAK_LIST_MAX];
+
+int apps_flatpak_list(const char *lang, const DesktopApp **out) {
+    int n = 0;
+    *out = flatpaks;
+#if !defined(__x86_64__)
+    (void)lang;
+    return 0;                                   /* phase 1: x86-64 PCs only */
+#endif
+    const char *h = getenv("HOME");
+    char roots[2][PATH_MAX];
+    snprintf(roots[0], sizeof roots[0], "%s/.local/share/flatpak/exports/share", h && h[0] == '/' ? h : "/nonexistent");
+    snprintf(roots[1], sizeof roots[1], "/var/lib/flatpak/exports/share");
+    IconRoots ir;
+    memset(&ir, 0, sizeof ir);
+    for (int k = 0; k < 2; k++)
+        if (snprintf(ir.themes[k], sizeof ir.themes[k], "%.4000s/icons/hicolor", roots[k]) >= (int)sizeof ir.themes[k]) ir.themes[k][0] = 0;
+    snprintf(ir.themes[2], sizeof ir.themes[2], "/usr/share/icons/hicolor");
+    ir.nthemes = ir.npng = 3;
+    Entry *e = malloc(sizeof *e);
+    for (int k = 0; e && k < 2; k++) {
+        char dir[PATH_MAX + 32];
+        snprintf(dir, sizeof dir, "%s/applications", roots[k]);
+        DIR *d = opendir(dir);
+        if (!d) continue;
+        struct dirent *de;
+        while ((de = readdir(d)) && n < FLATPAK_LIST_MAX) {
+            size_t l = strlen(de->d_name);
+            if (l <= 8 || strcmp(de->d_name + l - 8, ".desktop") || l - 8 > FPAK_ID_MAX) continue;
+            char id[FPAK_ID_MAX + 1];
+            memcpy(id, de->d_name, l - 8);
+            id[l - 8] = 0;
+            if (!apps_flatpak_installed(id)) continue;
+            int dup = 0;
+            for (int i = 0; i < n; i++) if (!strcmp(flatpaks[i].id, id)) dup = 1;
+            char file[PATH_MAX * 2];
+            snprintf(file, sizeof file, "%s/%s", dir, de->d_name);
+            if (dup || parse_desktop(file, lang, e) || !e->is_app || e->hidden || e->nodisplay || !e->a.name[0]) continue;
+            DesktopApp *a = &flatpaks[n++];
+            *a = e->a;
+            snprintf(a->id, sizeof a->id, "%s", id);
+            if (snprintf(a->file, sizeof a->file, "%.4000s", file) >= (int)sizeof a->file) a->file[0] = 0;
+            a->bin[0] = 0;
+            a->terminal = 0;
+            a->user = k == 0;
+            if (!a->wmclass[0]) snprintf(a->wmclass, sizeof a->wmclass, "%s", id);   /* a Flatpak window's app_id is its id */
+            a->icon[0] = 0;
+            iconfind_app(&ir, e->icon_name, a->icon, sizeof a->icon);
+        }
+        closedir(d);
+    }
+    free(e);
+    *out = flatpaks;
+    return n;
+}
+
 
 /* "Open with" for a Flatpak app: launchWith's rules for the path (a real path in the home folder or the user's mounts,
  * a regular file or folder); it is granted with --filesystem=<path> and passed after the id. */

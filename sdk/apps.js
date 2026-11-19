@@ -29,6 +29,9 @@ import { launcherItem, webAppOfKey, windowLabel, profileColor, profileHex, profi
 
 const DESKTOP = 'desktop:';
 export const isLinuxApp = (id) => String(id).startsWith(DESKTOP);
+// A Flatpak app (docs/FLATPAK.md): "flatpak:<Flatpak id>", the same identity the firewall, the Monitor and Privacy use.
+const FLATPAK = 'flatpak:';
+export const isFlatpakApp = (id) => String(id).startsWith(FLATPAK);
 
 // Fallback icon: the initial over a color derived from the name (apps without a PNG).
 export function LetterIcon({ size: s = 32, name = '?' }) {
@@ -95,6 +98,14 @@ export function webProfileIcon(entry, profileId, Base = null) {
 const webItems = (list) => list.map((e) => { const it = launcherItem(e); return it && { ...it, Icon: webAppIcon(e) }; }).filter(Boolean);
 
 const linux = createStore([]);
+const flatpak = createStore([]);
+
+// The installed Flatpak apps (lord.apps.flatpak, from their exported .desktop files; never their Exec line).
+function readFlatpak() {
+  if (typeof lord.apps === 'undefined' || typeof lord.apps.flatpak !== 'function') return [];
+  return lord.apps.flatpak(locale.get().lang).map((a) => ({ ...a, id: FLATPAK + a.id, flatpakId: a.id, kind: 'flatpak',
+    Icon: iconFromFile(a.icon, a.name) }));
+}
 
 function readLinux() {
   if (typeof lord.apps === 'undefined' || typeof lord.apps.linux !== 'function') return [];   // not in app mode
@@ -107,6 +118,8 @@ function readLinux() {
 // Re-reads the .desktop files (after installing or removing packages; it's cheap: the server
 // only re-reads if the folders changed).
 export function refreshApps() {
+  const fp = readFlatpak(), fpNow = flatpak.get();
+  if (fp.length !== fpNow.length || fp.some((a, i) => a.id !== fpNow[i].id || a.name !== fpNow[i].name || a.icon !== fpNow[i].icon)) flatpak.set(fp);
   const next = readLinux(), now = linux.get();
   if (next.length === now.length && next.every((a, i) => a.id === now[i].id && a.name === now[i].name && a.icon === now[i].icon &&
     a.terminal === now[i].terminal)) return;
@@ -120,6 +133,7 @@ locale.subscribe(refreshApps);
 // them, marked off: true (the Store's Installed page, which turns them back on).
 export function useLauncherApps({ all = false } = {}) {
   const lin = useStore(linux);
+  const fps = useStore(flatpak);
   useStore(settings, (s) => s.appsOff);
   useEffect(refreshApps, []);    // an app installed outside the Store (a terminal, another app's installer) shows the next time a list opens
   useStore(locale);
@@ -127,7 +141,7 @@ export function useLauncherApps({ all = false } = {}) {
   const web = useStore(webApps);
   useEffect(refreshWebApps, []);
   const own = listApps().map((a) => ({ ...a, kind: a.package ? 'package' : 'lordos', name: appName(a) }));
-  const every = [...own, ...lin, ...webItems(web)].sort((a, b) => compareNames(a.name, b.name));   // "go-link Desk" among the G's (#64)
+  const every = [...own, ...lin, ...fps, ...webItems(web)].sort((a, b) => compareNames(a.name, b.name));   // "go-link Desk" among the G's (#64)
   const off = appsOff();
   if (all) return off.length ? every.map((a) => (a.kind === 'lordos' && off.includes(a.id) ? { ...a, off: true } : a)) : every;
   return launchable(every, off);
@@ -151,6 +165,12 @@ export function launchApp(id) {
   if (web) {
     // a web app: its first profile (the Dock's menu offers the others)
     try { return launchWebApp(web); } catch (e) { notify({ app: 'settings', title: errorText(e) }); return false; }
+  }
+  if (isFlatpakApp(id)) {
+    const ok = typeof lord.apps.launchFlatpak === 'function' && lord.apps.launchFlatpak(String(id).slice(FLATPAK.length));
+    const code = !ok && typeof lord.apps.lastError === 'function' ? lord.apps.lastError() : '';
+    if (code) notify({ app: 'settings', title: errorText(code) });
+    return ok === true;
   }
   if (isLinuxApp(id)) {
     const desktopId = String(id).slice(DESKTOP.length);
@@ -181,6 +201,14 @@ export function launchApp(id) {
     if (lord.apps.launchPackage(id)) return true;
   }
   return wm.open(id) != null;
+}
+
+// The Flatpak app of a Wayland window: its app_id is the Flatpak id (or the export's StartupWMClass).
+export function flatpakAppFor(appId) {
+  if (!appId) return null;
+  const want = String(appId).toLowerCase();
+  if (!flatpak.get().length) refreshApps();
+  return flatpak.get().find((a) => a.flatpakId.toLowerCase() === want || String(a.wmClass || '').toLowerCase() === want) || null;
 }
 
 // Linux app of a Wayland window (by its app_id: the .desktop name or StartupWMClass).
