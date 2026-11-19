@@ -1,6 +1,7 @@
 // settings.js — user settings, stored in ~/.config/lordos/settings.json.
 import { createStore, useStore } from './store.js';
 import { markExistingUser } from './firststartmodel.js';
+import { withWidgetCities } from './weathermodel.js';
 
 const DEFAULTS = {
   mode: 'dark',          // 'dark' | 'light'
@@ -17,7 +18,7 @@ const DEFAULTS = {
   wallpaper: null,       // 0.8.9: null = the theme's default (Lumo Celestial; Lord Workspaces: Cyberpunk City HD's panorama),
                          // migration 5. 0.8.2–0.8.8: 'lumo-celestial' saved for everyone; before: 'aurora', still available
   slideshow: null,       // 0.8.9, Settings → Wallpaper in Lord Workspaces: { on, category, every, perDisplay } (sdk/slideshowmodel.js); new key, no migration
-  weather: { on: false },
+  weather: { on: false },  // { on, unit, city }: city is the default (0.8.9.1: each widget has its own, opts.city; weathermodel.js)
   playerStreams: [],        // 0.8.8.10: the Player's saved streams [{ name, url, user }] (no password: the keyring has it)   // 0.8.8.10: the weather widget asks Open-Meteo only once turned on (sdk/weathermodel.js)
   deskWidgets: [],      // 0.8.8.10: Lord Workspaces' desktop widgets, [{ id, type, x, y }] (sdk/deskwidgets.jsx)
   wallpapers: {},       // 0.8.8.10: a display's own picture, { [connector]: id } (sdk/wallpapers.js wallpaperIdFor)
@@ -59,7 +60,7 @@ const DEFAULTS = {
 // meaning of a setting, it appends [schema, (settings) => newSettings] here. Each runs once per user,
 // in order, when the session loads the file; "schema" records the last one applied. The system-wide
 // migrations (as root) are the lordos package's (packaging/migrations).
-export const SETTINGS_SCHEMA = 7;
+export const SETTINGS_SCHEMA = 8;
 // A Terminal key mapping that sends what a US keyboard's key types anyway (keys.js names keys by their
 // US position): on a US keyboard it does nothing, on any other it types the wrong character. The iTerm2
 // importer made them from keypad entries before 0.8.8.6 ("-" typed "/" on a Latin American keyboard).
@@ -108,6 +109,8 @@ const MIGRATIONS = [
     // like the wallpaper in migration 5: Lord Flow and Lord Classic show it all the same; any other accent stays.
     return s.accent === 'azul' ? { ...s, accent: null } : s;
   }],
+  [8, withWidgetCities],  // 0.8.9.1 (#193): each weather widget keeps its own city (opts.city); the one it showed, the
+                          // shared settings.weather.city, becomes its own, so choosing one on another widget never moves it
 ];
 export function migrateSettings(s) {
   let out = s;

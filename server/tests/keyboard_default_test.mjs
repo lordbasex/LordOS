@@ -68,16 +68,19 @@ eq('a chosen list is kept', s.keyboard.active(), { layout: 'latam', variant: '' 
 s = await session(JSON.stringify({ schema: 4, keyboard: 'br' }), { layouts: 'us', variants: '' });
 eq('a pre-M5 choice other than the default is kept', s.keyboard.active(), { layout: 'br', variant: '' });
 
-eq('migration 4: latam without a list', migrateSettings({ schema: 3, keyboard: 'latam', keyboards: null }), { schema: 7, keyboard: null, keyboards: null });
+eq('migration 4: latam without a list', migrateSettings({ schema: 3, keyboard: 'latam', keyboards: null }), { schema: 8, keyboard: null, keyboards: null });
 eq('migration 4: latam with a list', migrateSettings({ schema: 3, keyboard: 'latam', keyboards: [{ layout: 'latam' }] }).keyboard, 'latam');
 eq('migration 4: runs once', migrateSettings({ schema: 4, keyboard: 'latam', keyboards: null }).keyboard, 'latam');
 
 // migration 5 (0.8.9): the saved Lumo Celestial default becomes the theme's default (null; Lord Workspaces shows its own)
-eq('migration 5: the saved default', migrateSettings({ schema: 4, wallpaper: 'lumo-celestial' }), { schema: 7, wallpaper: null });
+eq('migration 5: the saved default', migrateSettings({ schema: 4, wallpaper: 'lumo-celestial' }), { schema: 8, wallpaper: null });
 eq('migration 5: another picture stays', migrateSettings({ schema: 4, wallpaper: 'crystal-crown' }).wallpaper, 'crystal-crown');
 eq('migration 5: a picture of the user\'s own stays', migrateSettings({ schema: 4, wallpaper: 'image:0123456789abcdef' }).wallpaper, 'image:0123456789abcdef');
-eq('migration 7: the saved default accent', migrateSettings({ schema: 6, accent: 'azul' }), { schema: 7, accent: null });
+eq('migration 7: the saved default accent', migrateSettings({ schema: 6, accent: 'azul' }), { schema: 8, accent: null });
 eq('migration 7: a chosen accent stays', migrateSettings({ schema: 6, accent: 'verde' }).accent, 'verde');
+// migration 8 (0.8.9.1, #193): each weather widget keeps the city it showed (the shared one) as its own
+eq('migration 8: the shared city becomes each widget\'s own', migrateSettings({ schema: 7, weather: { on: true, city: { id: 3002280, name: 'Le Rouret', cc: 'FR' } },
+  deskWidgets: [{ id: 'w', type: 'weather', opts: {} }] }).deskWidgets[0].opts.city, { id: 3002280, name: 'Le Rouret', cc: 'FR' });
 eq('migration 5: runs once (Celestial chosen again later)', migrateSettings({ schema: 5, wallpaper: 'lumo-celestial' }).wallpaper, 'lumo-celestial');
 eq('migration 5: a display\'s own picture stays', migrateSettings({ schema: 4, wallpaper: 'lumo-celestial', wallpapers: { 'DP-1': 'lumo-celestial' } }).wallpapers, { 'DP-1': 'lumo-celestial' });
 s = await session('', { layouts: 'us', variants: '' });

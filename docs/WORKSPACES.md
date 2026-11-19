@@ -133,17 +133,23 @@ displays do. Nothing runs per frame, nothing polls.
   `api.open-meteo.com:443` only. The sandboxed `lord-fetch` speaks TLS on it, sends one fixed GET built from the two
   numbers, and parses the answer strictly into numbers (`server/src/fetch/weather.c`: temperature, feeling, WMO code,
   day or night, six days of code, high and low; anything missing or out of range refuses the whole answer). lord-server
-  checks those numbers again and keeps each zone's forecast 30 minutes (a failure waits 10; at most 8 zones). JS sees
+  checks those numbers again and keeps each zone's forecast 30 minutes (a failure waits 10; at most 16 places, and when the table is full the one asked least recently makes room
+  since 0.8.9.1; widgets on the same place share its forecast and its request, `tests/wxsvc_test.c`). JS sees
   only `lord.weather.request(zone)` and `lord.weather.get(zone)`, in the desktop's own context (never an isolated app).
   The card shows a sky gradient by condition and time of day, the city, the temperature, a drawn icon, high
   and low; m adds the next five days, l the week with range bars and three cities. Tests: `tests/weather_test.c`
   (path and parsing), `tests/weather_model_test.mjs`, and the scene checks that nothing is asked while it's off.
-  **Location** (0.8.8.10): the widget's menu has "Location…", a search over an offline list of cities
+  **City** (0.8.8.10; one per widget since 0.8.9.1, #193): the widget's menu has "Change city…", a search over an offline list of cities
   (`assets/geo/cities.tsv`, GeoNames' cities15000, CC BY 4.0, credited in About; refreshed before each release by
   `tools/geo/fetch-cities.sh`). Searching asks nothing of the network (`lord.weather.cities(query)`, lord-server reads
-  the file: `src/fetch/geocities.c`, `tests/geocities_test.c`). The pick is kept as `settings.weather.city` {id,
-  name, cc}; the widget then asks for `geonames/<id>`, and lord-server takes that city's coordinates from its own
-  list, never from JS. "Automatic" goes back to the time zone's.
+  the file on each search, nothing stays in memory: `src/fetch/geocities.c`, `tests/geocities_test.c`). The pick is
+  kept in that widget's own `opts.city` {id, name, cc} (null: the time zone's), so each weather widget shows its own
+  city; the widget then asks for `geonames/<id>`, and lord-server takes that city's coordinates from its own list,
+  never from JS. "Automatic" goes back to the time zone's. `settings.weather.city` is the default: the last city
+  chosen, which a new widget starts on and the calendar's weather style shows (settings migration 8 gave each
+  existing widget the city it showed; `sdk/weathermodel.js` widgetCity, `withWidgetCities`). The large size's menu
+  also has "Other cities in Clock…" for its row of three cities. The list holds the places of 15,000 people or more
+  (about 34,000); a smaller town is not in it (#193: cities1000 would be about 172,000 places).
 - **VPN** (s, m, l). The VPNs set up in Settings → Network → VPN (`lord.net.vpnList()`), turned on and off with the
   same closed actions Settings uses (`net-vpn-up` / `net-vpn-down`, open to the session's user): no new privilege. A
   widget drives one VPN (`opts.vpn`, chosen from its right-click menu; with a single VPN it is that one), so several
