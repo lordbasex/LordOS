@@ -937,8 +937,11 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [x] **Raspberry Pi with 0.8.9.1** in the same report (2026-11-19): Lord Flow 113 MB and 6.2 % of one core, as 0.8.9;
   Lord Workspaces, measured on the Pi for the first time, 99 MB and 0.06 %.
 
-## Release 0.8.9.2 (planned)
+## Release 0.8.9.2 (released 2026-11-19; the clipboard items move to the next update)
 
+- [x] **A restricted Linux app starts from the desktop again** (released as 0.8.9.2 on 2026-11-19, `CHANGELOG.md`): the
+  launcher's child re-executes itself (`lord-server --launch-view`) to build the view, since lord-server isn't dumpable
+  after dropping from root. Found while testing Flatpak in a session on VM 127.
 - [ ] **Clipboard history scrolls by itself under the pointer** ([#204](https://github.com/lordbasex/LordOS/issues/204)).
   The full panel (❖⇧V, `sdk/clipboard.js`) draws a window of 16 entries around the selected one, and hovering an entry
   selects it: with the pointer resting near the top or bottom edge, the selection moves, the window slides, another

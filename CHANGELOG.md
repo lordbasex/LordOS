@@ -10,6 +10,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9.2-beta] - 2026-11-19
+
 ### Fixed
 
 - **A Linux app restricted in Settings → Privacy didn't start from the desktop.** With no microphone, camera, USB,
@@ -7401,7 +7403,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.1-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.2-beta...HEAD
+[0.8.9.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.1-beta...v0.8.9.2-beta
 [0.8.9.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9-beta...v0.8.9.1-beta
 [0.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.9-beta...v0.8.9-beta
 [0.8.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.8-beta...v0.8.8.9-beta
