@@ -125,9 +125,9 @@ export { notify, dismissNotification, useNotifications, notifications, notifyHis
 export { registerStatusItem, StatusItems, statusItems, setStatusPanelPlacer } from './statusitems.js';
 export { MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, BluetoothGlyph, SignalGlyph } from './quickglyphs.jsx';   // quick settings' glyphs (issue #114)
 export { setBacklight, useBacklight } from './hwkeys.js';   // the Control Center's brightness slider (issue #114)
-export { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, weekStartFor, wifiBars, backlightOf, backlightValue } from './menubarmodel.js';   // what the bar shows (issue #58)
+export { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, monthWeeks, weekStartFor, wifiBars, backlightOf, backlightValue } from './menubarmodel.js';   // what the bar shows (issue #58)
 export { menuBarEveryDisplay, barDisplays, hasBar, displayIdFor, activeBarId, pinBar, focusDisplayId, panelLeft, inBar, insideDisplay } from './menubarmodel.js';   // a bar on every display
-export { SUB_DELAY, SUB_GRACE, selectable, stepIndex, edgeIndex, menuAction, typeAhead, matchIndex, subPlace, aiming, barIndex } from './menunav.js';   // menus from the keyboard
+export { SUB_DELAY, SUB_GRACE, selectable, stepIndex, edgeIndex, menuAction, typeAhead, matchIndex, subPlace, aiming, barIndex, barHover } from './menunav.js';   // menus from the keyboard
 export { sharedTicker, idleStore } from './ticker.js';
 export { companion, statusItem, companionEvent, statusItemEvent } from './companion.js';
 export { clockAlarms, clockTimer, timerStart, timerPause, timerResume, timerReset, timerLeft, stopwatch, swStart, swStop, swLap, swReset, swElapsed, nextAlarm, nextFire } from './alarms.js';

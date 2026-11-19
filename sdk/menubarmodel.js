@@ -7,6 +7,7 @@
 //   menuBarPatch(settings, k, v)  the settings change that turns one of them on or off
 //   outputChoices(soundState)     the outputs a sound panel offers, the default one marked
 //   monthCells(year, month, first) the days of a month calendar, padded to whole weeks
+//   monthWeeks(year, month, first) the same cells as weeks of seven (one row each)
 //
 // A bar on every display (0.8.8.6): Lord Flow draws one full menu bar per display, each with its own clock, status
 // items and panels; only the display with the focused window has the app's menus lit. Lord Classic draws a whole
@@ -109,6 +110,16 @@ export function monthCells(year, month, first = 0) {
   const cells = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
   while (cells.length % 7) cells.push(null);
   return cells;
+}
+
+// The same cells, a week per row. A calendar draws each week as its own row of seven equal (flex: 1) cells: a
+// wrapping row of cells a seventh of a width wide put the seventh day on the next line whenever the width it
+// computed was a little more than the row had (the panel's border, #197).
+export function monthWeeks(year, month, first = 0) {
+  const cells = monthCells(year, month, first);
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
 }
 
 // ---- a bar on every display ----

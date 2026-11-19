@@ -1965,6 +1965,32 @@ static void test_grow_wrap_height(void) {
     CHECK(next->ay >= row->ay + words->h - 0.5f, "the next item (y %g) overlaps the wrapped text (ends at %g)", next->ay, row->ay + words->h);
 }
 
+/* The clock panel's month calendar (#197): a 340 px panel with a 1 px border and 12 px of padding. Its days were a
+ * wrapping row of cells (340 − 24) / 7 wide, which forgot the border: 7 cells were 2 px wider than the 314 px row,
+ * so every week had six days. Now each week is a row of seven flex: 1 cells, which fit any width. */
+static void test_month_rows(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    Node *panel = view(root);
+    sn(panel, "width", 340); sn(panel, "borderWidth", 1);
+    Node *pad = view(panel);
+    sn(pad, "paddingLeft", 12); sn(pad, "paddingRight", 12); sn(pad, "paddingTop", 12); sn(pad, "paddingBottom", 12);
+    Node *old = view(pad);                                   /* the old grid, to show why */
+    ss(old, "flexDirection", "row"); ss(old, "flexWrap", "wrap");
+    Node *oc[7];
+    for (int i = 0; i < 7; i++) { oc[i] = view(old); sn(oc[i], "width", (340.0 - 24) / 7); sn(oc[i], "height", 30); }
+    Node *week = view(pad);
+    ss(week, "flexDirection", "row");
+    Node *c[7];
+    for (int i = 0; i < 7; i++) { c[i] = view(week); sn(c[i], "flexGrow", 1); sn(c[i], "flexShrink", 1); sn(c[i], "flexBasis", 0); sn(c[i], "height", 30); }
+    layout_root(root, 800, 600);
+    CHECK(oc[6]->ay > oc[0]->ay + 0.5f, "the old wrapping row kept its 7th day on the line (the border is in the box now?)");
+    for (int i = 1; i < 7; i++) CHECK(fabsf(c[i]->ay - c[0]->ay) < 0.5f, "day %d of the week on another line (y %g, %g)", i + 1, c[i]->ay, c[0]->ay);
+    CHECK(fabsf(c[0]->w - 314.0f / 7) < 0.5f && fabsf(c[6]->w - 314.0f / 7) < 0.5f, "a day is %g wide, want %g", c[6]->w, 314.0 / 7);
+    CHECK(c[6]->ax + c[6]->w <= panel->ax + 340 - 1 - 12 + 0.5f, "the 7th day (ends at %g) goes past the padding", c[6]->ax + c[6]->w);
+}
+
 /* A wrapping grid of cards with flexBasis (the Store's CardGrid): the lines are broken with the basis
  * when measuring too, not with the content's width. A card whose text measured wider than its basis
  * made the grid measure one card per line and leave a blank band under it (0.8.8.4, #37). */
@@ -3940,6 +3966,7 @@ int main(int argc, char **argv) {
     CHECK(!gc_all.bad && gc_all.frames > 1000 && gc_all.partial > gc_all.frames / 2, "scissor: %d frames, %d partial, %d differ", gc_all.frames, gc_all.partial, gc_all.bad);
     printf("scissor over the damage pipeline and fuzz: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_grow_wrap_height();
+    test_month_rows();
     test_wrap_basis_height();
     test_wrap_in_max_width();
     test_overlay_scrollbar();

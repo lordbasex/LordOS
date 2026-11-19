@@ -110,6 +110,16 @@ which = 'clock'; settings.set({ menuBar: {} }); rerender(); await flush();
 const month = `${monthName(new Date().getMonth())} ${new Date().getFullYear()}`;
 check('clock: notifications title', shown('shell.classic.notifications'), true);
 check('clock: calendar shown', shown(month), true);
+// #197: each week is its own row of seven equal cells; a wrapping row of W / 7 wide cells lost the seventh day to
+// the next line (the panel's border made the row 2 px narrower than seven cells)
+{
+  const day = textNode('15');                       // the <Text>, in its circle, in its cell, in its week
+  const cell = parents.get(parents.get(day)), row = parents.get(cell);
+  const kids = [...parents].filter(([c, p]) => p === row && attached(c)).length;
+  check('clock: a week is a row of seven', kids, 7);
+  check('clock: the week row does not wrap', styles.get(row).flexWrap === undefined || styles.get(row).flexWrap === 'nowrap', true);
+  check('clock: a day cell takes a seventh (flex), not a computed width', styles.get(cell).flexGrow === 1 && styles.get(cell).width === undefined, true);
+}
 settings.set({ menuBar: { calendar: false } });
 await flush();
 check('clock: calendar hidden', shown(month), false);

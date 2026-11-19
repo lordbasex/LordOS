@@ -13,7 +13,7 @@ Você pode ter até nove.
 
 A visão geral mostra as janelas desta área de trabalho e, em cima, todas as áreas de trabalho.
 
-- **Lord Flow:** ⌃↑, ou Visão geral no menu Janela.
+- **Lord Flow:** Visão geral no menu Janela, ou ⌃↑ se as setas com Ctrl estiverem ativadas (veja abaixo).
 - **Lord Classic:** ❖Tab, ou o botão ao lado da busca.
 
 Clique em uma janela para ir até ela e em uma área de trabalho para vê-la. O **+** adiciona uma, e o × de uma área
@@ -23,10 +23,10 @@ de trabalho a fecha: as janelas passam para a seguinte. Arraste uma janela para 
 
 | | Lord Flow | Lord Classic |
 |---|---|---|
-| Anterior ou seguinte | ⌃← ⌃→ · ❖⌃← ❖⌃→ | ❖⌃← ❖⌃→ |
+| Anterior ou seguinte | ❖⌃← ❖⌃→ (também ⌃← ⌃→ se ativadas) | ❖⌃← ❖⌃→ |
 | Nova área de trabalho | Na visão geral | ❖⌃D |
 | Fechar esta área de trabalho | Na visão geral | ❖⌃F4 |
-| Janelas do app | ⌃↓ | |
+| Janelas do app | ⌃↓ (se ativadas) | |
 
 No touchpad, deslize para o lado com três dedos. Quatro dedos para cima abrem a visão geral se os gestos de
 quatro dedos estiverem ativados em [Touchpad e tela sensível ao toque](help:trackpad).
@@ -39,8 +39,9 @@ Menu Janela → **Mover para área de trabalho**. Apps com barra própria têm i
 
 ## Ctrl e as setas
 
-Em muitos apps ⌃← e ⌃→ movem por palavra. Se preferir assim, desative-as em
-[Ajustes → Teclado](settings:keyboard); ❖⌃← e ❖⌃→ continuam trocando de área de trabalho.
+Em muitos apps ⌃← e ⌃→ movem por palavra, então no Lord Flow elas ficam com o app. Para usar ⌃↑ ⌃↓ ⌃← ⌃→
+nas áreas de trabalho, ative **Usar Ctrl + setas para as áreas de trabalho** em
+[Ajustes → Mesa e Dock](settings:dock). ❖⌃← e ❖⌃→ sempre trocam de área de trabalho.
 
 ## Bom saber
 

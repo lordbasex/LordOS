@@ -57,7 +57,7 @@ A parked X11 window goes iconic and to the bottom of X's stack through the path 
 
 ## The Overview
 
-Ctrl+Up in Lord Flow, Super+Tab or the taskbar button in Lord Classic, the Window menu or the desktop's menu in
+Ctrl+Up in Lord Flow (with its Ctrl arrows on, below), Super+Tab or the taskbar button in Lord Classic, the Window menu or the desktop's menu in
 both, and a four-finger swipe up. The windows of the desktop in a grid, drawn smaller by a transform on their
 real frame (lord-server paints a raster of it, so no app redraws; on the GPU path a Linux window's quad is drawn
 at the scaled box, with its hole opened there, so it stays live and can't overflow or reach the Dock), with
@@ -99,16 +99,18 @@ showing. The last desktop can't be closed.
 
 | | Lord Flow | Lord Classic |
 |---|---|---|
-| Overview | ⌃↑ | ❖Tab |
-| App windows | ⌃↓ | |
-| Previous, next desktop | ⌃← ⌃→ · ❖⌃← ❖⌃→ | ❖⌃← ❖⌃→ |
+| Overview | ⌃↑ (option) | ❖Tab |
+| App windows | ⌃↓ (option) | |
+| Previous, next desktop | ❖⌃← ❖⌃→ · ⌃← ⌃→ (option) | ❖⌃← ❖⌃→ |
 | New desktop | Overview | ❖⌃D |
 | Close desktop | Overview | ❖⌃F4 |
 
-⌃ arrows are word movement in apps, in Linux apps and in the Terminal. **Settings → Desktop & Dock → Desktops → Use Ctrl +
-arrow keys for Desktops** (Lord Flow only, `apps/settings/Desktops.jsx`) turns them off (`settings.desktopArrows`): the entries stop applying and the theme asks for the
-`flow` key table instead of `flow-desktops` (`server/src/wl/keygrab.c`), so the keys reach apps. ❖⌃ arrows stay. See
-[SHORTCUTS.md](SHORTCUTS.md).
+⌃ arrows are word movement in apps, in Linux apps and in the Terminal, so in Lord Flow (and Lord Workspaces) they are
+the Desktops keys only when **Settings → Desktop & Dock → Desktops → Use Ctrl + arrow keys for Desktops**
+(`apps/settings/Desktops.jsx`) turns them on (`settings.desktopArrows === true`). Off, the default since 0.8.9.1
+(#201; settings migration 8 turns off the `true` that every user had saved since 0.8.7), the entries don't apply and
+the theme asks for the `flow` key table instead of `flow-desktops` (`server/src/wl/keygrab.c`), so the keys reach
+apps. ❖⌃ arrows always switch desktops. See [SHORTCUTS.md](SHORTCUTS.md).
 
 Left and Right follow the layout: in a right-to-left language the strip is mirrored, and ⌃← goes to the next
 desktop. There is no wrap at the ends: the indicator shows where you are.

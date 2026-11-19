@@ -90,6 +90,27 @@ rerender(); await flush();
 check('setting on again: three bars', textNodes('⌕').length, 3);
 check('and still the same timers', live.size, timers3);
 
+// #190: every item is as tall as the bar, so the top edge of the display is on it (Fitts's law)
+const titleItem = (s, i) => parents.get(parents.get(textNodes(s)[i]));      // <Text> → its pill → the item
+check('a menu title takes the bar\'s whole height', (styles.get(titleItem('shell.menu.window', 1)) || {}).alignSelf, 'stretch');
+check('so does the clock\'s item', (styles.get(parents.get(parents.get(textNodes('⌕')[1]))) || {}).alignSelf, 'stretch');
+// #190: with a menu open, the pointer onto another title opens that one; with none open it opens nothing
+const shownKey = (s) => textNodes(s).length > 0;
+const move = async (id) => { globalThis.__lordEvent('move', id, 10, 10, 0); await flush(); };
+await move(titleItem('shell.menu.window', 1));
+check('hover with no menu open opens nothing', shownKey('shell.window.minimize'), false);
+await move(titleItem('shell.menu.help', 1));
+await click(titleItem('shell.menu.help', 1));
+await move(titleItem('shell.menu.window', 1));
+check('hover onto Window while Help is open opens Window', shownKey('shell.window.minimize'), true);
+await move(titleItem('LordOS', 1));
+check('and onto the app\'s menu, which replaces it', [shownKey('shell.window.minimize'), shownKey('shell.menu.about')], [false, true]);
+await click(titleItem('LordOS', 1));
+await move(titleItem('shell.menu.help', 1));
+check('a click on the open title still closes it', shownKey('shell.menu.about'), false);
+await move(titleItem('shell.menu.window', 1));
+check('and then hovering opens nothing', shownKey('shell.window.minimize'), false);
+
 // unplug the right monitor: its bar goes; plug it back: it comes back
 plug([L, M]);
 rerender(); await flush();

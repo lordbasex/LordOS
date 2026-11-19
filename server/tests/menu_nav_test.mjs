@@ -1,6 +1,6 @@
 // How a menu answers the keyboard and the pointer (sdk/menunav.js): the highlight's moves, the keys, type-ahead,
 // the submenu's side and the safe triangle. node server/tests/menu_nav_test.mjs
-import { selectable, stepIndex, edgeIndex, menuAction, typeAhead, matchIndex, subPlace, aiming, barIndex, TYPE_MS } from '../../sdk/menunav.js';
+import { selectable, stepIndex, edgeIndex, menuAction, typeAhead, matchIndex, subPlace, aiming, barIndex, barHover, TYPE_MS } from '../../sdk/menunav.js';
 
 let ok = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exitCode = 1; } else ok++; };
@@ -105,5 +105,11 @@ eq('next menu', barIndex(5, 1, 1), 2);
 eq('wraps to the first', barIndex(5, 4, 1), 0);
 eq('wraps to the last', barIndex(5, 0, -1), 4);
 eq('no menus', barIndex(0, 0, 1), -1);
+
+// the pointer on a bar's titles (#190): with a menu open, another title opens its menu; otherwise nothing
+eq('hover: another title while one is open', barHover('logo', 'window'), 'window');
+eq('hover: the open one\'s own title', barHover('window', 'window'), null);
+eq('hover: nothing open', barHover(null, 'window'), null);
+eq('hover: no title', barHover('logo', null), null);
 
 console.log(`menu-nav: ${ok} ok`);

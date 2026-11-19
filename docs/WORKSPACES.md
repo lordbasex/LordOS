@@ -341,7 +341,7 @@ in place of the still pictures).
 The theme's table (`index.jsx`) on top of the SDK's base: ❖Space and Ctrl+Space open Search (the theme's entries win
 over the base's), ❖ alone opens it with every app; ❖⌥D collapses or expands the spine; the app switcher (❖Tab by
 default), ❖\` the app's next window, ❖M minimize, ❖H hide, ❖⌥H hide others, ❖, the app's settings, and Lord Flow's
-Desktops keys (⌃↑ the Overview, ⌃← ⌃→ and ❖⌃← ❖⌃→ switch activities, ⌃↓ the app's windows), and its own: ❖1…❖9 show
+Desktops keys (❖⌃← ❖⌃→ switch activities; with Settings' Ctrl arrows on, off by default, also ⌃↑ the Overview, ⌃← ⌃→ and ⌃↓ the app's windows), and its own: ❖1…❖9 show
 activity 1 to 9; ❖Tab and ❖⇧Tab, the next and the previous activity, when Settings → Keyboard puts the app switcher on
 ⌥Tab (the proposal's ❖Tab for activities, by choice); ⌃F2 moves the keyboard to the bars (below). Over a Linux app the
 compositor keeps a fixed list for this theme (`workspaces` and `workspaces-desktops` in `server/src/wl/keygrab.c`: Lord
