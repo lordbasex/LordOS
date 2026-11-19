@@ -349,6 +349,14 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
     && /^(maintainer test: .{20,}|issue #\d+)/.test(e.evidence)), true);
   eq('verified today (#80, #81: issue reports; onedrive, iclouddrive: the maintainer\'s own accounts)', v.map(([k]) => k).sort(), ['filen', 'iclouddrive', 'mega', 'onedrive', 's3', 'sftp', 'webdav']);
   eq('#80 #81 evidence names the issue', [data.verified.mega.evidence.startsWith('issue #80'), data.verified.filen.evidence.startsWith('issue #81')], [true, true]);
+  eq('#195: filen confirmed again on 0.8.9', data.verified.filen.evidence.includes('issue #195'), true);
+  // #195: the package carries the file lord-server reads (0.8.9's left it out: every provider read "not verified")
+  const mkdeb = fs.readFileSync(path.join(root, 'tools/iso/mkdeb.sh'), 'utf8');
+  eq('#195: mkdeb.sh installs assets/cloud', /^cp -r [^\n]*\bassets\/cloud\b[^\n]*"\$L\/assets\/"/m.test(mkdeb), true);
+  // #195: an item without its own verified (lord-server found no providers.json) falls back on the bundled file
+  const filen = { kind: 'filen', label: 'Filen', group: 'server', hint: '', fields: [] };
+  eq('#195: no verified from lord-server: the bundled file decides', M.splitProviders([filen], data).verified.length, 1);
+  eq('#195: lord-server\'s false still wins', M.splitProviders([{ ...filen, verified: false }], data).verified.length, 0);
   const P = (kind, label, group) => ({ kind, label, group, hint: '', fields: [] });
   const list = [P('drive', 'Drive', 'oauth'), P('dropbox', 'Dropbox', 'oauth'), P('webdav', 'WebDAV', 'server'), P('sftp', 'SFTP', 'server'), P('smb', 'SMB', 'server'),
     P('s3', 'S3', 'object'), P('b2', 'Backblaze B2', 'object'), P('crypt', 'Encrypted folder', 'crypt')];

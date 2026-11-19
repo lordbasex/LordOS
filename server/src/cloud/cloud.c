@@ -863,7 +863,8 @@ static const CloudKind *kind_put(const char *kind, const char *type, const char 
 
 void cloud_set_assets(const char *dir) { cpy(cl_assets, sizeof cl_assets, dir); }
 
-/* assets/cloud/providers.json: the kinds tested on LordOS (docs/CLOUD.md 19) */
+/* assets/cloud/providers.json: the kinds tested on LordOS (docs/CLOUD.md 19); installed in /usr/lib/lordos/assets/cloud
+ * since 0.8.9.1 (tools/iso/mkdeb.sh: 0.8.9's package left it out, #195) */
 static JDoc verified_doc(int *ok) {
     JDoc d = { 0 };
     *ok = 0;
@@ -893,7 +894,9 @@ static void emit_kind(JBuf *b, int *first, const CloudKind *k, const JVal *pv, K
     jb_str(b, k->hint ? k->hint : "");
     jb_raw(b, ",\"group\":");
     jb_str(b, k->group);
-    jb_printf(b, ",\"verified\":%s", verified ? "true" : "false");
+    /* #195: no providers.json (an installed system without it, 0.8.9's package) says nothing: JS falls back on its own
+     * copy (sdk/cloudmodel.js, verifiedItem) instead of every provider reading "not verified" */
+    if (verified >= 0) jb_printf(b, ",\"verified\":%s", verified ? "true" : "false");
     if (k->website) { jb_raw(b, ",\"website\":"); jb_str(b, k->website); }
     jb_raw(b, ",\"fields\":[");
     int ff = 1, oauth = !strcmp(k->group, "oauth");
@@ -981,7 +984,7 @@ static char *load_providers(void) {
         const CloudKind *k = kind_put(pre, nm, label, ov && ov->group ? ov->group : cloud_derive_group(nm, opts, no));
         pthread_mutex_unlock(&cl_mu);
         if (!k) continue;
-        emit_kind(&b, &first, k, x, &nk[n++], ver && json_get(ver, k->kind));
+        emit_kind(&b, &first, k, x, &nk[n++], !ver ? -1 : !!json_get(ver, k->kind));
         /* our variants on this backend */
         for (int i = 0; i < cloud_kind_count() && n < KI_MAX; i++) {
             const CloudKind *v = cloud_kind_at(i);
@@ -989,7 +992,7 @@ static char *load_providers(void) {
             pthread_mutex_lock(&cl_mu);
             const CloudKind *vk = kind_put(v->kind, nm, v->label, v->group);
             pthread_mutex_unlock(&cl_mu);
-            if (vk) emit_kind(&b, &first, vk, x, &nk[n++], ver && json_get(ver, vk->kind));
+            if (vk) emit_kind(&b, &first, vk, x, &nk[n++], !ver ? -1 : !!json_get(ver, vk->kind));
         }
     }
     jb_raw(&b, "]");

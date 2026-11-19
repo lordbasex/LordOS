@@ -698,7 +698,10 @@ asks people to check the rest. Decided 2026-11-06 with the maintainer.
 
 ### 19.1 The list
 
-`assets/cloud/providers.json` names the kinds verified on LordOS, each with `since` (the release), `date` and `evidence`:
+`assets/cloud/providers.json` names the kinds verified on LordOS, each with `since` (the release), `date` and `evidence`
+(installed in `/usr/lib/lordos/assets/cloud/` since 0.8.9.1; 0.8.9's package left it out, so lord-server said every
+provider was not verified, overriding the Settings bundle's copy, #195; without the file lord-server now says nothing and
+Settings uses its own copy):
 `"maintainer test: <what>"` or `"issue #N"` (a person's Check This Account report on GitHub). A kind goes in only when it
 was really checked end to end. Today:
 
@@ -708,7 +711,7 @@ was really checked end to end. Today:
 | `sftp` | `cloud_providers_check.sh` against the machine's own OpenSSH `sshd` on 127.0.0.1, a throwaway user and key (`key_pem`), 14/14; SFTP has no links |
 | `s3` | `cloud_providers_check.sh` against `rclone serve s3` (one bucket, access key and secret), 13/13; links not confirmed: the stand-in's links are `http://` and `lord-server` keeps only `https` ones (`cloud_url_ok`), which a real S3 service gives |
 | `mega` | issue #80 (since 0.8.8.7): a person's Check This Account report on 0.8.8.6 (x86_64), rclone v1.75.2, 10 of 10 steps passed, links included |
-| `filen` | issue #81 (since 0.8.8.7): a person's report on 0.8.8.6 (x86_64), rclone v1.75.2, 9 of 10 passed; the link step skipped (`noLinks`: the backend has no public links), which is right for it |
+| `filen` | issue #81 (since 0.8.8.7): a person's report on 0.8.8.6 (x86_64), rclone v1.75.2, 9 of 10 passed; the link step skipped (`noLinks`: the backend has no public links), which is right for it; issue #195: again on 0.8.9 (x86_64), rclone v1.75.2, 9 passed, link skipped (`noLinks`) |
 | `onedrive` | maintainer test (since 0.8.8.7) with the maintainer's own account on their bare-metal machine, rclone v1.75.2: browser sign-in, both ways of using it, files opened, copied up and deleted, pause and resume, across logouts and restarts |
 | `iclouddrive` | maintainer test (since 0.8.8.7) with the maintainer's own account (without the extra end-to-end encryption), rclone v1.75.2: password and device code, files listed, opened, copied up and deleted. Known limit: the code is asked again after each start of rclone (rclone issues 9658 and 9966); see 19.5 |
 
