@@ -2590,6 +2590,32 @@ static void mem_report(Server *s) {
     text_mem_stats(&gn, &gb);
     fprintf(stderr, "memory: terminals=%d lines=%ld cells=%zuK replay=%zuK | blur=%d %zuK | transform=%d %zuK | layer=%zuK | glyphs=%zu %zuK\n",
             tn, tl, tc >> 10, tr >> 10, nb, bb >> 10, nt, tb >> 10, lb >> 10, gn, gb >> 10);
+    long frames = 0;
+    for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].frame) frames += (long)s->out[i].scene.w * s->out[i].scene.h * 4;
+    fprintf(stderr, "memory: nodes=%d %zuK (Node %zu B) | frames=%ldK\n", node_count(), (size_t)node_count() * sizeof(Node) >> 10,
+            sizeof(Node), frames >> 10);
+    /* glibc's arenas one by one (threads get their own): heap number and its current size */
+    char *mx = NULL;
+    size_t mxn = 0;
+    FILE *ms = open_memstream(&mx, &mxn);
+    if (ms) {
+        malloc_info(0, ms);
+        fclose(ms);
+        char ar[512];
+        size_t ao = 0;
+        int nr = -1;
+        ar[0] = 0;
+        for (char *q = mx; q && *q && ao + 40 < sizeof ar; q = strchr(q + 1, '<')) {
+            long long v;
+            if (sscanf(q, "<heap nr=\"%d\"", &nr) == 1) continue;
+            if (nr >= 0 && sscanf(q, "<system type=\"current\" size=\"%lld\"", &v) == 1) {
+                ao += (size_t)snprintf(ar + ao, sizeof ar - ao, " #%d=%lldK", nr, v >> 10);
+                nr = -1;
+            }
+        }
+        fprintf(stderr, "memory: arenas:%s\n", ar);
+        free(mx);
+    }
     char td[1024];
     paint_tf_detail(td, sizeof td);
     if (td[0]) fprintf(stderr, "memory: transform rasters:%s\n", td);
