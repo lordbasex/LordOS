@@ -42,4 +42,28 @@ typedef struct {
  * the id and, for "Open with", the path. Strings go in buf (cap bytes). → argc, or -1 (bad input or no room). */
 int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap);
 
+/* ---- the closed list of `flatpak --user` management commands (docs/FLATPAK.md, Problem 4; AGENTS.md E3) ----
+ * Run by lord-server in lordos-net-flathub.scope (firewall component lordos:flathub). The only argument a caller gives
+ * is a ref, validated here; never a URL, remote name, key, file or option. Flatpak's own TLS and signature checks are
+ * never relaxed (no --no-gpg-verify; --from only with the .flatpakrepo the lordos package ships). */
+enum {
+    FPAK_CMD_REMOTE_ADD,        /* remote-add --if-not-exists --from flathub <shipped .flatpakrepo> */
+    FPAK_CMD_APPSTREAM,         /* update --appstream flathub */
+    FPAK_CMD_INFO,              /* remote-info --show-metadata flathub <ref> */
+    FPAK_CMD_INSTALL,           /* install flathub <ref> */
+    FPAK_CMD_UPDATE,            /* update [<ref>] */
+    FPAK_CMD_UNINSTALL,         /* uninstall <ref> */
+    FPAK_CMD_UNUSED,            /* uninstall --unused */
+    FPAK_CMD_LIST,              /* list --app --columns=application,branch,version,origin */
+    FPAK_CMD_COUNT
+};
+#define FPAK_REPO_FILE "/usr/lib/lordos/assets/flatpak/flathub.flatpakrepo"
+#define FPAK_REF_MAX 160
+/* "app/<id>/<arch>/<branch>": an app's ref (never a runtime's: Flatpak resolves those), the id as fpak_id_ok, the arch
+ * the native one, the branch as fpak_branch_ok. */
+int fpak_ref_ok(const char *ref, const char *arch);
+/* argv for one command of the list (ref NULL or "" where it takes none or is optional). → argc, or -1 (unknown command,
+ * a ref where none is taken or a missing one, a bad ref, no room). */
+int fpak_cmd_argv(int cmd, const char *ref, const char *arch, char **argv, char *buf, size_t cap);
+
 #endif

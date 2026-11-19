@@ -32,6 +32,7 @@ export const COMPONENTS = {
   'lordos:weather': { label: 'monitor.comp.weather', glyph: 'network', hint: 'monitor.comp.weatherHint' },
   'lordos:streams': { label: 'monitor.comp.streams', glyph: 'network', hint: 'monitor.comp.streamsHint' },
   'lordos:machines': { label: 'monitor.comp.machines', icon: 'machines', hint: 'monitor.comp.machinesHint' },
+  'lordos:flathub': { label: 'monitor.comp.flathub', icon: 'store', hint: 'monitor.comp.flathubHint' },   // docs/FLATPAK.md (E3)
   'lordos:vpn': { label: 'monitor.comp.vpn', glyph: 'tunnel', hint: 'monitor.comp.vpnHint', system: true },
   'system:dns': { label: 'monitor.comp.dns', glyph: 'dns', hint: 'monitor.comp.dnsHint', system: true },
   'system:time': { label: 'monitor.comp.time', glyph: 'clock', hint: 'monitor.comp.timeHint', system: true },

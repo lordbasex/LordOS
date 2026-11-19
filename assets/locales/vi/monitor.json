@@ -587,6 +587,8 @@
   "comp.sqlHint": "Cơ sở dữ liệu: kết nối đến các máy chủ MySQL và MariaDB trong mục ưa thích của bạn.",
   "comp.weather": "Thời tiết",
   "comp.weatherHint": "Dự báo của tiện ích thời tiết từ Open-Meteo, khi bạn bật.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "Ứng dụng Flatpak từ Flathub: danh mục, cài đặt và cập nhật.",
   "comp.streams": "Camera và TV",
   "comp.streamsHint": "Tiện ích video và địa chỉ của Trình phát: camera, luồng phát và kênh TV (lord-stream)."
 }

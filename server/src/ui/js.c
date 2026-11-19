@@ -42,6 +42,7 @@
 #include "../fsasync.h"
 #include "js_imager.h"
 #include "js_logs.h"
+#include "js_flatpak.h"
 #include "js_help.h"
 #include "js_voice.h"
 #include "js_hw.h"
@@ -563,6 +564,7 @@ static void session_context(void) {
     js_lan_register(ctx, lord);        /* lord.lan: Files → Network (lan/, docs/FILES.md) */
     js_clean_register(ctx, lord);      /* lord.clean: Cleaner (clean/, docs/CLEANER-ARCHITECTURE.md) */
     js_logs_register(ctx, lord);       /* lord.logs: journal and LordOS logs (Logs app) */
+    js_flatpak_register(ctx, lord);    /* lord.flatpak: the Store's Flathub commands (docs/FLATPAK.md, E3) */
     js_help_register(ctx, lord);       /* lord.help (Help) and lord.time.zoneOffset (Clock, tzif.c) */
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */
     js_voice_register(ctx, lord);      /* lord.voice: reading text aloud through lord-say (tts/speak.c, docs/VOICE.md) */

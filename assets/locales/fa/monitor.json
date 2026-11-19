@@ -602,6 +602,8 @@
   "comp.sqlHint": "پایگاه‌های داده: اتصال به سرورهای MySQL و MariaDB در علاقه‌مندی‌های شما.",
   "comp.weather": "آب‌وهوا",
   "comp.weatherHint": "پیش‌بینی‌های ابزارک آب‌وهوا از Open-Meteo، پس از روشن کردن.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "برنامه‌های Flatpak از Flathub: فهرست، نصب و به‌روزرسانی آن‌ها.",
   "comp.streams": "دوربین‌ها و تلویزیون",
   "comp.streamsHint": "ابزارک ویدیو و نشانی‌های پخش‌کننده: دوربین‌ها، پخش زنده و کانال‌ها (lord-stream)."
 }

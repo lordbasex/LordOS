@@ -617,6 +617,8 @@
   "comp.sqlHint": "Бази даних: з’єднання із серверами MySQL і MariaDB у вашому обраному.",
   "comp.weather": "Погода",
   "comp.weatherHint": "Прогнози віджета погоди від Open-Meteo, коли ви їх увімкнете.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "Застосунки Flatpak із Flathub: каталог, їх встановлення та оновлення.",
   "comp.streams": "Камери й ТБ",
   "comp.streamsHint": "Відеовіджет і адреси Програвача: камери, трансляції й телеканали (lord-stream)."
 }

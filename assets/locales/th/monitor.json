@@ -587,6 +587,8 @@
   "comp.sqlHint": "ฐานข้อมูล: การเชื่อมต่อกับเซิร์ฟเวอร์ MySQL และ MariaDB ในรายการโปรดของคุณ",
   "comp.weather": "สภาพอากาศ",
   "comp.weatherHint": "พยากรณ์ของวิดเจ็ตสภาพอากาศจาก Open-Meteo เมื่อคุณเปิดใช้",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "แอป Flatpak จาก Flathub: แคตตาล็อก การติดตั้ง และการอัปเดต",
   "comp.streams": "กล้องและทีวี",
   "comp.streamsHint": "วิดเจ็ตวิดีโอและที่อยู่ของเครื่องเล่น: กล้อง สตรีม และช่องทีวี (lord-stream)"
 }

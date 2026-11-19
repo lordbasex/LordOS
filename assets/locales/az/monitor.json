@@ -602,6 +602,8 @@
   "comp.sqlHint": "Verilənlər bazaları: seçilmişlərinizdəki MySQL və MariaDB serverlərinə bağlantılar.",
   "comp.weather": "Hava",
   "comp.weatherHint": "Açdıqda hava vidcetinin Open-Meteo proqnozları.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "Flathub-dan Flatpak tətbiqləri: kataloq, quraşdırmalar və yeniləmələr.",
   "comp.streams": "Kameralar və TV",
   "comp.streamsHint": "Video vidceti və Pleyerin ünvanları: kameralar, yayımlar və TV kanalları (lord-stream)."
 }

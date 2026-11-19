@@ -602,6 +602,8 @@
   "comp.sqlHint": "Mga Database: mga koneksyon sa mga MySQL at MariaDB server sa mga paborito mo.",
   "comp.weather": "Panahon",
   "comp.weatherHint": "Ang mga taya ng widget ng panahon mula sa Open-Meteo, kapag in-on mo.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "Mga Flatpak app mula sa Flathub: ang katalogo, ang pag-install at ang mga update nila.",
   "comp.streams": "Mga camera at TV",
   "comp.streamsHint": "Ang video widget at mga address ng Player: camera, stream at TV channel (lord-stream)."
 }

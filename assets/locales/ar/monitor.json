@@ -662,6 +662,8 @@
   "comp.sqlHint": "قواعد البيانات: الاتصالات بخوادم MySQL وMariaDB في مفضلتك.",
   "comp.weather": "الطقس",
   "comp.weatherHint": "توقعات أداة الطقس من Open-Meteo بعد تشغيلها.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "تطبيقات Flatpak من Flathub: الفهرس وتثبيتها وتحديثاتها.",
   "comp.streams": "الكاميرات والتلفزيون",
   "comp.streamsHint": "أداة الفيديو وعناوين المشغّل: كاميرات وبث وقنوات تلفزيون (lord-stream)."
 }

@@ -587,6 +587,8 @@
   "comp.sqlHint": "데이터베이스: 즐겨찾기에 있는 MySQL 및 MariaDB 서버로의 연결.",
   "comp.weather": "날씨",
   "comp.weatherHint": "켜면 날씨 위젯이 Open-Meteo에서 예보를 가져옵니다.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "Flathub의 Flatpak 앱: 카탈로그, 설치 및 업데이트.",
   "comp.streams": "카메라 및 TV",
   "comp.streamsHint": "비디오 위젯과 플레이어의 주소: 카메라, 스트림, TV 채널(lord-stream)."
 }

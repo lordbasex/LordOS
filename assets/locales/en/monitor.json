@@ -602,6 +602,8 @@
   "comp.sqlHint": "Databases: connections to MySQL and MariaDB servers in your favorites.",
   "comp.weather": "Weather",
   "comp.weatherHint": "The weather widget's forecasts from Open-Meteo, once you turn them on.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "Flatpak apps from Flathub: the catalog, their installs and their updates.",
   "comp.streams": "Cameras & TV",
   "comp.streamsHint": "The video widget and the Player's addresses: cameras, streams and TV channels (lord-stream)."
 }

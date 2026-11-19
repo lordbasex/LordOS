@@ -118,6 +118,34 @@ int main(void) {
     r.branch = "stable";
     CHECK(fpak_argv(&r, argv, buf, 64) < 0);                      /* no room: refused, never cut short */
 
+    /* refs and the closed list of management commands (E3) */
+    CHECK(fpak_ref_ok("app/org.gnome.Calculator/x86_64/stable", "x86_64"));
+    CHECK(!fpak_ref_ok("runtime/org.gnome.Platform/x86_64/48", "x86_64"));           /* never a runtime */
+    CHECK(!fpak_ref_ok("app/org.gnome.Calculator/aarch64/stable", "x86_64"));
+    CHECK(!fpak_ref_ok("app/org.gnome.Calculator/x86_64/stable/x", "x86_64"));
+    CHECK(!fpak_ref_ok("app/org.gnome.Calculator/x86_64", "x86_64"));
+    CHECK(!fpak_ref_ok("app/../x86_64/stable", "x86_64"));
+    CHECK(!fpak_ref_ok("app/org.gnome.Calculator/x86_64/--no-gpg-verify", "x86_64"));
+    CHECK(!fpak_ref_ok("app/org.gnome.Calculator/x86_64/", "x86_64"));
+    n = fpak_cmd_argv(FPAK_CMD_INSTALL, "app/org.gnome.Calculator/x86_64/stable", "x86_64", argv, buf, sizeof buf);
+    CHECK(n == 7 && !strcmp(argv[0], "/usr/bin/flatpak") && !strcmp(argv[1], "install") && !strcmp(argv[5], "flathub") &&
+          !strcmp(argv[6], "app/org.gnome.Calculator/x86_64/stable") && has(argv, "--user") && has(argv, "--noninteractive"));
+    CHECK(fpak_cmd_argv(FPAK_CMD_INSTALL, NULL, "x86_64", argv, buf, sizeof buf) < 0);               /* a ref is needed */
+    CHECK(fpak_cmd_argv(FPAK_CMD_INSTALL, "flathub", "x86_64", argv, buf, sizeof buf) < 0);
+    CHECK(fpak_cmd_argv(FPAK_CMD_APPSTREAM, "app/org.gnome.Calculator/x86_64/stable", "x86_64", argv, buf, sizeof buf) < 0);
+    n = fpak_cmd_argv(FPAK_CMD_REMOTE_ADD, NULL, "x86_64", argv, buf, sizeof buf);
+    CHECK(n > 0 && !strcmp(argv[n - 1], FPAK_REPO_FILE) && has(argv, "--from") && !has(argv, "--no-gpg-verify"));
+    n = fpak_cmd_argv(FPAK_CMD_UPDATE, NULL, "x86_64", argv, buf, sizeof buf);
+    CHECK(n > 0 && !strcmp(argv[n - 1], "-y"));
+    n = fpak_cmd_argv(FPAK_CMD_UPDATE, "app/org.gnome.Calculator/x86_64/stable", "x86_64", argv, buf, sizeof buf);
+    CHECK(n > 0 && !strcmp(argv[n - 1], "app/org.gnome.Calculator/x86_64/stable"));
+    CHECK(fpak_cmd_argv(FPAK_CMD_COUNT, NULL, "x86_64", argv, buf, sizeof buf) < 0 && fpak_cmd_argv(-1, NULL, "x86_64", argv, buf, sizeof buf) < 0);
+    for (int c = 0; c < FPAK_CMD_COUNT; c++) {                                       /* never a relaxed check */
+        int m = fpak_cmd_argv(c, c == FPAK_CMD_INFO || c == FPAK_CMD_INSTALL || c == FPAK_CMD_UNINSTALL ? "app/a.b.C/x86_64/stable" : NULL,
+                              "x86_64", argv, buf, sizeof buf);
+        CHECK(m > 0 && !has(argv, "--no-gpg-verify") && !has(argv, "--system") && has(argv, "--user"));
+    }
+
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", root);
     if (system(cmd)) {}

@@ -155,3 +155,49 @@ int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap) {
     argv[argc] = NULL;
     return argc;
 }
+
+int fpak_ref_ok(const char *ref, const char *arch) {
+    if (!ref || !arch || strlen(ref) >= FPAK_REF_MAX || strncmp(ref, "app/", 4)) return 0;
+    char buf[FPAK_REF_MAX], *parts[4] = { 0 };
+    snprintf(buf, sizeof buf, "%s", ref);
+    int n = 0;
+    for (char *p = buf, *tok; n < 4 && (tok = strsep(&p, "/")); ) parts[n++] = tok;
+    if (n != 4 || strchr(ref + 4, '/') == NULL) return 0;
+    /* exactly three slashes */
+    int slashes = 0;
+    for (const char *q = ref; *q; q++) slashes += *q == '/';
+    return slashes == 3 && fpak_id_ok(parts[1]) && !strcmp(parts[2], arch) && fpak_branch_ok(parts[3]);
+}
+
+int fpak_cmd_argv(int cmd, const char *ref, const char *arch, char **argv, char *buf, size_t cap) {
+    int has = ref && ref[0];
+    int needs = cmd == FPAK_CMD_INFO || cmd == FPAK_CMD_INSTALL || cmd == FPAK_CMD_UNINSTALL;
+    int takes = needs || cmd == FPAK_CMD_UPDATE;
+    if (cmd < 0 || cmd >= FPAK_CMD_COUNT || (needs && !has) || (has && !takes) || (has && !fpak_ref_ok(ref, arch))) return -1;
+    static const char *const fixed[FPAK_CMD_COUNT][8] = {
+        [FPAK_CMD_REMOTE_ADD] = { "remote-add", "--user", "--if-not-exists", "--from", "flathub", FPAK_REPO_FILE, NULL },
+        [FPAK_CMD_APPSTREAM]  = { "update", "--user", "--noninteractive", "--appstream", "flathub", NULL },
+        [FPAK_CMD_INFO]       = { "remote-info", "--user", "--show-metadata", "flathub", NULL },
+        [FPAK_CMD_INSTALL]    = { "install", "--user", "--noninteractive", "-y", "flathub", NULL },
+        [FPAK_CMD_UPDATE]     = { "update", "--user", "--noninteractive", "-y", NULL },
+        [FPAK_CMD_UNINSTALL]  = { "uninstall", "--user", "--noninteractive", "-y", NULL },
+        [FPAK_CMD_UNUSED]     = { "uninstall", "--user", "--noninteractive", "-y", "--unused", NULL },
+        [FPAK_CMD_LIST]       = { "list", "--user", "--app", "--columns=application,branch,version,origin", NULL },
+    };
+    int argc = 0;
+    size_t used = 0;
+    const char *list[12];
+    int k = 0;
+    list[k++] = FPAK_FLATPAK;
+    for (int i = 0; fixed[cmd][i]; i++) list[k++] = fixed[cmd][i];
+    if (has) list[k++] = ref;
+    for (int i = 0; i < k; i++) {
+        size_t l = strlen(list[i]) + 1;
+        if (used + l > cap || argc >= FPAK_ARGV_MAX - 1) return -1;
+        memcpy(buf + used, list[i], l);
+        argv[argc++] = buf + used;
+        used += l;
+    }
+    argv[argc] = NULL;
+    return argc;
+}

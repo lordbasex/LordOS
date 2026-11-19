@@ -617,6 +617,8 @@
   "comp.sqlHint": "Baze de date: conexiuni la serverele MySQL și MariaDB din favorite.",
   "comp.weather": "Vremea",
   "comp.weatherHint": "Prognozele widgetului Vremea de la Open-Meteo, după ce le activezi.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "Aplicațiile Flatpak de pe Flathub: catalogul, instalările și actualizările lor.",
   "comp.streams": "Camere și TV",
   "comp.streamsHint": "Widgetul video și adresele Playerului: camere, fluxuri și canale TV (lord-stream)."
 }

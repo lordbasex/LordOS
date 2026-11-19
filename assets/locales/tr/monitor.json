@@ -602,6 +602,8 @@
   "comp.sqlHint": "Veritabanları: sık kullanılanlarınızdaki MySQL ve MariaDB sunucularına bağlantılar.",
   "comp.weather": "Hava Durumu",
   "comp.weatherHint": "Açtığında, hava durumu widget'ının Open-Meteo tahminleri.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "Flathub'dan Flatpak uygulamaları: katalog, kurulumlar ve güncellemeler.",
   "comp.streams": "Kameralar ve TV",
   "comp.streamsHint": "Video widget'ı ve Oynatıcı'nın adresleri: kameralar, yayınlar ve TV kanalları (lord-stream)."
 }

@@ -587,6 +587,8 @@
   "comp.sqlHint": "Pangkalan Data: sambungan ke pelayan MySQL dan MariaDB dalam kegemaran anda.",
   "comp.weather": "Cuaca",
   "comp.weatherHint": "Ramalan widget cuaca daripada Open-Meteo, selepas anda menghidupkannya.",
+  "comp.flathub": "Flathub",
+  "comp.flathubHint": "Aplikasi Flatpak daripada Flathub: katalog, pemasangan dan kemas kininya.",
   "comp.streams": "Kamera dan TV",
   "comp.streamsHint": "Widget video dan alamat Pemain: kamera, strim dan saluran TV (lord-stream)."
 }
