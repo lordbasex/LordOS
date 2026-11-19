@@ -1744,7 +1744,13 @@ void vt_clear_scrollback(Term *t) {
     if (t->buf != &t->main) return;
     Buffer *b = &t->main;
     int extra = b->count - t->rows;
-    for (int i = 0; i < extra; i++) line_reset(bl(b, i));
+    /* the cleared history gives its cells back: a program that clears the scrollback on every redraw
+     * (Claude Code does) left thousands of lines' cells allocated in the ring (0.8.9.1: 23 MB for 120 lines) */
+    for (int i = 0; i < extra; i++) {
+        Line *l = bl(b, i);
+        free(l->c);
+        memset(l, 0, sizeof *l);
+    }
     b->head = (b->head + extra) % b->cap;
     b->count = t->rows;
     b->dropped += extra;

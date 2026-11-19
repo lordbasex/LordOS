@@ -2590,6 +2590,9 @@ static void mem_report(Server *s) {
     text_mem_stats(&gn, &gb);
     fprintf(stderr, "memory: terminals=%d lines=%ld cells=%zuK replay=%zuK | blur=%d %zuK | transform=%d %zuK | layer=%zuK | glyphs=%zu %zuK\n",
             tn, tl, tc >> 10, tr >> 10, nb, bb >> 10, nt, tb >> 10, lb >> 10, gn, gb >> 10);
+    char td[1024];
+    paint_tf_detail(td, sizeof td);
+    if (td[0]) fprintf(stderr, "memory: transform rasters:%s\n", td);
     char js[512];
     js_mem_line(js, sizeof js);
     fprintf(stderr, "memory: %s\n", js);
@@ -3154,6 +3157,7 @@ int main(int argc, char **argv) {
         }
         static uint64_t trimmed_at;
         if (ready == 0 && loop_wake - trimmed_at > 60ull * 1000000000ull) {
+            paint_release_idle();
             malloc_trim(0);
             trimmed_at = loop_wake;
         }
