@@ -1,0 +1,172 @@
+# heaptrack_print --print-leaks of a lord-server session (build mem-ws06, 2026-11-19, PC with 3 x 1080p,
+# Lord Workspaces, 7 widgets, Terminal with Claude Code at rest). Read while the session was still running,
+# so 'leaked' = heap memory alive at that moment. See docs/perf/MEMORY-HEAPTRACK.md.
+reading file "heaptrack-lord-server.raw" - please wait, this might take some time...
+Debuggee command was: lord-server --headless 1280x800 --user <user> --theme /usr/lib/lordos/themes/default/theme.bundle.js --fonts /usr/lib/lordos/assets/fonts --shell /usr/lib/lordos/assets/shell
+finished reading file, now analyzing data:
+
+MEMORY LEAKS
+24.88M leaked over 3 calls from
+out_frames
+  at src/main.c:900
+  in lord-server
+  and 24.88M from 1 other places
+
+20.78M leaked over 11929025 calls from
+js_def_malloc
+  at ../third_party/quickjs/quickjs.c:1633
+  in lord-server
+  and 20.78M from 76474 other places
+
+18.65M leaked over 1 calls from
+apps_list
+  at src/apps.c:343
+  in lord-server
+  and 18.65M from 1 other places
+
+13.02M leaked over 150092 calls from
+0x7fc0fdc4ba7d
+  in /lib/x86_64-linux-gnu/libgallium-25.0.7-2+deb13u1.so
+  and 13.02M from 48657 other places
+
+8.56M leaked over 3 calls from
+load_file
+  at src/ui/image.c:85
+  in lord-server
+  and 8.56M from 1 other places
+
+7.09M leaked over 4542365 calls from
+js_def_realloc
+  at ../third_party/quickjs/quickjs.c:1671
+  in lord-server
+  and 7.09M from 117784 other places
+
+6.28M leaked over 117 calls from
+term_damage::capture_frame
+  at src/term/term.c:800
+  in lord-server
+term_damage
+  at server/src/term/term.c:951
+  and 6.28M from 1 other places
+
+5.80M leaked over 1 calls from
+fonts_list
+  at src/ui/fonts.c:175
+  in lord-server
+  and 5.80M from 1 other places
+
+2.62M leaked over 13 calls from
+canvas_shadow::shadow_mask
+  at src/canvas.c:428
+  in lord-server
+canvas_shadow
+  at server/src/canvas.c:452
+  and 2.62M from 4 other places
+
+1.76M leaked over 1 calls from
+status_load
+  at src/pkg/status.c:99
+  in lord-server
+  and 1.76M from 1 other places
+
+1.49M leaked over 687 calls from
+put_char::line_reserve::line_reserve
+  at src/term/vt.c:35
+  in lord-server
+put_char::line_reserve
+  at server/src/term/vt.c:33
+put_char
+  at server/src/term/vt.c:401
+  and 1.49M from 2 other places
+
+1.49M leaked over 1 calls from
+wave_render
+  at src/ui/wave.c:105
+  in lord-server
+  and 1.49M from 1 other places
+
+1.46M leaked over 12 calls from
+paint_node_body::blur_to_cache
+  at src/ui/paint.c:1555
+  in lord-server
+paint_node_body
+  at server/src/ui/paint.c:176
+  and 1.46M from 2 other places
+
+1.05M leaked over 1 calls from
+pump
+  at src/ui/js_fw.c:221
+  in lord-server
+  and 1.05M from 1 other places
+
+1.05M leaked over 1 calls from
+send_msg
+  at src/sec/pwguard.c:185
+  in lord-server
+  and 1.05M from 1 other places
+
+830.98K leaked over 1 calls from
+load_providers
+  at src/cloud/cloud.c:954
+  in lord-server
+  and 830.98K from 1 other places
+
+495.04K leaked over 1 calls from
+wave_render
+  at src/ui/wave.c:104
+  in lord-server
+  and 495.04K from 1 other places
+
+433.06K leaked over 1197 calls from
+node_new
+  at src/ui/node.c:34
+  in lord-server
+  and 433.06K from 8 other places
+
+376.68K leaked over 1 calls from
+wave_render
+  at src/ui/wave.c:106
+  in lord-server
+  and 376.68K from 1 other places
+
+376.68K leaked over 1 calls from
+wave_render
+  at src/ui/wave.c:107
+  in lord-server
+  and 376.68K from 1 other places
+
+376.68K leaked over 1 calls from
+wave_render
+  at src/ui/wave.c:109
+  in lord-server
+  and 376.68K from 1 other places
+
+376.68K leaked over 1 calls from
+wave_render
+  at src/ui/wave.c:108
+  in lord-server
+  and 376.68K from 1 other places
+
+327.68K leaked over 5 calls from
+dbus_next
+  at src/vault/dbus.c:853
+  in lord-server
+  and 327.68K from 5 other places
+
+285.94K leaked over 2864 calls from
+operator new(unsigned long, std::align_val_t)
+  in /lib/x86_64-linux-gnu/libstdc++.so.6
+  and 285.94K from 2862 other places
+
+265.69K leaked over 19499 calls from
+0x7fc11e4b7613
+  in /lib/x86_64-linux-gnu/libxkbcommon.so.0
+  and 265.69K from 365 other places
+
+
+total runtime: 1841.06s.
+calls to allocation functions: 16841754 (9147/s)
+temporary memory allocations: 4046903 (2198/s)
+peak heap memory consumption: 198.28M
+peak RSS (including heaptrack overhead): 361.72M
+total memory leaked: 122.61M
