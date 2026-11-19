@@ -128,7 +128,8 @@ typedef struct {
     const char *opened;
     unsigned long long opened_dev, opened_ino;
     /* 1: the view without the home restriction (no-mic, no-camera, no-usb, no-bluetooth): the home
-     * folder stays as it is and rw[]/ro[] are unused; everything else (runtime dir with only
+     * folder stays as it is and rw[] is unused; ro[] (paths in the home) are bound over themselves read-only, so
+     * nothing in the app can write them (a mount point can't be renamed or removed either); everything else (runtime dir with only
      * sockets[], private /tmp, /var/tmp, /dev/shm, devpts, /proc, PID and IPC namespaces) is the
      * same. Then sandbox_apply_scope instead of sandbox_apply_files. */
     int keep_home;

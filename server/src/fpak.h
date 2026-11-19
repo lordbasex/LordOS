@@ -29,16 +29,12 @@ int fpak_branch_ok(const char *b);
 int fpak_installed(const char *root, const char *id, char *arch, size_t an, char *branch, size_t bn,
                    char *metadata, size_t mn);
 
-/* Does the app's metadata ([Context] filesystems=) grant the whole home or host (home, host, ~ itself)? Then the
- * launcher keeps the shell's startup files read-only (docs/FLATPAK.md, "What LordOS never grants"). */
-int fpak_meta_grants_home(const char *metadata);
-
 typedef struct {
     const char *id, *arch, *branch;
     uint32_t restricted;            /* FW_R_* of flatpak:<id> */
-    int grants_home;                /* fpak_meta_grants_home */
-    const char *home;               /* the real home folder (for the never-granted paths) */
+    const char *home;               /* the real home folder */
     const char *opened;             /* "Open with": one real path, or NULL */
+    int opened_ro;                  /* grant it read-only (the launcher's grant_ok said no to writing it) */
     int x11;                        /* the X display may be kept (unrestricted only) */
 } FpakRun;
 

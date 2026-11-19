@@ -60,7 +60,6 @@ int main(void) {
     char arch[32], branch[64], md[4096];
     CHECK(fpak_installed(root, "org.gnome.Calculator", arch, sizeof arch, branch, sizeof branch, md, sizeof md) == 0);
     CHECK(!strcmp(arch, "x86_64") && !strcmp(branch, "stable") && strstr(md, "[Context]"));
-    CHECK(fpak_meta_grants_home(md));
     CHECK(fpak_installed(root, "org.gnome.Nothing", arch, sizeof arch, branch, sizeof branch, NULL, 0) < 0);
     /* links that leave the app's folder are refused */
     ln("../../../etc", "app/org.gnome.Calculator/current");
@@ -81,14 +80,6 @@ int main(void) {
     if (symlink("/etc/passwd", p1)) {}
     CHECK(fpak_installed(root, "org.gnome.Calculator", arch, sizeof arch, branch, sizeof branch, NULL, 0) < 0);
 
-    /* [Context] grants */
-    CHECK(fpak_meta_grants_home("[Context]\nfilesystems=host;\n"));
-    CHECK(fpak_meta_grants_home("[Context]\nfilesystems=xdg-music;~;\n"));
-    CHECK(!fpak_meta_grants_home("[Context]\nfilesystems=xdg-download;~/Games:create;host-os;\n"));
-    CHECK(!fpak_meta_grants_home("[Context]\nfilesystems=!home;\n"));
-    CHECK(!fpak_meta_grants_home("[Application]\nfilesystems=home;\n[Context]\nshared=ipc;\n"));
-    CHECK(!fpak_meta_grants_home(NULL));
-
     /* the command line */
     char *argv[FPAK_ARGV_MAX], buf[8192];
     FpakRun r = { .id = "org.gnome.Calculator", .arch = "x86_64", .branch = "stable", .home = root, .x11 = 1 };
@@ -99,11 +90,6 @@ int main(void) {
     CHECK(has(argv, "--no-talk-name=org.freedesktop.secrets") && has(argv, "--talk-name=org.freedesktop.Notifications"));
     CHECK(has(argv, "--nofilesystem=~/.config/lordos") && has(argv, "--nofilesystem=~/.config/autostart"));
     CHECK(!has(argv, "--unshare=network") && !has(argv, "--nosocket=x11"));
-    /* the shell's startup files, read-only, only if the app gets the home and the file exists */
-    put(".bashrc", "x");
-    r.grants_home = 1;
-    n = fpak_argv(&r, argv, buf, sizeof buf);
-    CHECK(has(argv, "--filesystem=~/.bashrc:ro") && !has(argv, "--filesystem=~/.zshrc:ro"));
     /* restrictions */
     r.restricted = FW_R_NO_NETWORK | FW_R_NO_USB | FW_R_NO_BLUETOOTH | FW_R_NO_FILES;
     n = fpak_argv(&r, argv, buf, sizeof buf);
@@ -115,6 +101,10 @@ int main(void) {
     n = fpak_argv(&r, argv, buf, sizeof buf);
     CHECK(n > 2 && !strcmp(argv[n - 1], "/home/a/Documents/x.txt") && !strcmp(argv[n - 2], "org.gnome.Calculator"));
     CHECK(idx(argv, "--filesystem=/home/a/Documents/x.txt") >= 0 && idx(argv, "--filesystem=/home/a/Documents/x.txt") < n - 2);
+    r.opened_ro = 1;                                              /* a path the launcher may only lend read-only */
+    n = fpak_argv(&r, argv, buf, sizeof buf);
+    CHECK(has(argv, "--filesystem=/home/a/Documents/x.txt:ro") && !has(argv, "--filesystem=/home/a/Documents/x.txt"));
+    r.opened_ro = 0;
     r.opened = "/home/a/x:rw";                                    /* a mode suffix would change the grant */
     CHECK(fpak_argv(&r, argv, buf, sizeof buf) < 0);
     r.opened = "relative/x";

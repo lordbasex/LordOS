@@ -913,6 +913,24 @@ static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *
         while (p->cfg.sockets[n]) n++;
         if (n < 7) { p->cfg.sockets[n++] = "bus"; p->cfg.sockets[n] = NULL; }
     }
+    if (!(restricted & FW_R_NO_FILES)) {
+        /* the shell's and the session's startup files, keys and the folders they live in, read-only in the view:
+         * whatever Flatpak grants the app (its metadata, an override file, the whole home), the kernel keeps them
+         * unwritable. Those that don't exist yet aren't covered (nothing to bind over). */
+        static const char *const startup[] = { ".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".bash_aliases",
+                                               ".profile", ".zshrc", ".zprofile", ".zshenv", ".zlogin", ".zlogout",
+                                               ".xprofile", ".xsession", ".xsessionrc", ".xinitrc", ".Xresources",
+                                               ".pam_environment", ".gitconfig", ".ssh", ".gnupg", ".config/fish",
+                                               ".config/environment.d", ".config/autostart", ".config/systemd",
+                                               ".config/lordos", ".local/share/lordos", ".local/share/applications",
+                                               ".local/share/flatpak", ".local/bin", ".bin", NULL };
+        for (int k = 0; startup[k]; k++) {
+            char path[PATH_MAX + 64];
+            struct stat st;
+            if (snprintf(path, sizeof path, "%s/%s", p->home, startup[k]) >= (int)sizeof path || lstat(path, &st)) continue;
+            if (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode)) plan_add(p, 0, "%s%s", path, "");
+        }
+    }
     if (restricted & FW_R_NO_FILES) {
         p->cfg.keep_home = 0;
         char path[PATH_MAX + 128];
@@ -950,25 +968,6 @@ static int launch_flatpak(const char *id, const char *opened) {
         free(md);
         return -1;
     }
-    /* the home may also come from an override file (the user's or the system's, for the app or for all apps): any of
-     * them granting it is enough to keep the shell's startup files read-only */
-    int grants_home = fpak_meta_grants_home(md);
-    const char *hm = getenv("HOME");
-    char ov[PATH_MAX];
-    const char *const ovdirs[] = { "%s/.local/share/flatpak/overrides/%s", "/var/lib/flatpak/overrides/%s%s" };
-    for (int k = 0; k < 2 && !grants_home; k++)
-        for (int g = 0; g < 2 && !grants_home; g++) {
-            const char *name = g ? "global" : id;
-            if (k == 0 ? (!hm || snprintf(ov, sizeof ov, ovdirs[0], hm, name) >= (int)sizeof ov)
-                       : snprintf(ov, sizeof ov, ovdirs[1], name, "") >= (int)sizeof ov)
-                continue;
-            int fd = open(ov, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
-            if (fd < 0) continue;
-            ssize_t r = read(fd, md, 16383);
-            close(fd);
-            md[r > 0 ? r : 0] = 0;
-            grants_home = fpak_meta_grants_home(md);
-        }
     free(md);
     char fwid[FW_APP_MAX], scope[96];
     snprintf(fwid, sizeof fwid, "flatpak:%s", id);
@@ -985,7 +984,7 @@ static int launch_flatpak(const char *id, const char *opened) {
     FilesPlan *plan = flatpak_plan(id, restricted, opened);
     char *argv[FPAK_ARGV_MAX];
     char *buf = malloc(8192);
-    FpakRun r = { .id = id, .arch = arch, .branch = branch, .restricted = restricted, .grants_home = grants_home,
+    FpakRun r = { .id = id, .arch = arch, .branch = branch, .restricted = restricted, .opened_ro = opened && !grant_ok(opened),
                   .home = plan ? plan->home : NULL, .opened = opened, .x11 = 0 };  /* no X: the view's /tmp has no X socket */
     if (!plan || !buf || fpak_argv(&r, argv, buf, 8192) < 0) {
         fprintf(stderr, "apps: %s: the Flatpak app's view or command line can't be built: not launched\n", id);
@@ -1048,7 +1047,10 @@ int apps_launch_flatpak_with(const char *id, const char *path) {
     char real[PATH_MAX];
     struct stat st;
     if (!path || !realpath(path, real) || !fsops_allowed(real) || stat(real, &st) || !(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode))) return -1;
-    if (fsops_protected(real)) return -1;
+    /* never the home folder itself, nor a folder holding a protected one: the grant would reach it whole */
+    const char *h = getenv("HOME");
+    char home[PATH_MAX];
+    if (fsops_protected(real) || fsops_protected_below(real) || (h && realpath(h, home) && !strcmp(real, home))) return -1;
     return launch_flatpak(id, real);
 }
 

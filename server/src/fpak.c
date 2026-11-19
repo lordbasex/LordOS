@@ -100,31 +100,6 @@ out:
     return ok;
 }
 
-int fpak_meta_grants_home(const char *md) {
-    if (!md) return 0;
-    const char *ctx = strstr(md, "[Context]");
-    if (!ctx || (ctx != md && ctx[-1] != '\n')) return 0;
-    for (const char *line = strchr(ctx, '\n'); line && *++line && *line != '[';) {
-        const char *end = strchr(line, '\n');
-        size_t len = end ? (size_t)(end - line) : strlen(line);
-        if (len > 12 && !strncmp(line, "filesystems=", 12)) {
-            const char *p = line + 12, *stop = line + len;
-            while (p < stop) {
-                const char *q = memchr(p, ';', (size_t)(stop - p));
-                size_t tl = q ? (size_t)(q - p) : (size_t)(stop - p);
-                const char *colon = memchr(p, ':', tl);
-                size_t nl = colon ? (size_t)(colon - p) : tl;
-                if (nl && p[0] != '!' && ((nl == 4 && (!strncmp(p, "home", 4) || !strncmp(p, "host", 4))) ||
-                                          (nl == 1 && p[0] == '~') || (nl == 2 && !strncmp(p, "~/", 2))))
-                    return 1;
-                p += tl + 1;
-            }
-        }
-        line = end;
-    }
-    return 0;
-}
-
 /* names lord-server serves on the session bus: an app may talk to them but never own them. --talk-name sets the
  * app's policy to TALK, which replaces an OWN its metadata or an override file asked for (the command line is merged
  * last). The secret service is refused outright: talking to it would reach the person's stored secrets. */
@@ -132,11 +107,11 @@ static const char *const talk_only[] = { "org.freedesktop.Notifications", "org.f
                                          "org.freedesktop.ScreenSaver", "org.kde.StatusNotifierWatcher", NULL };
 static const char *const never_talk[] = { "org.freedesktop.Flatpak", "org.freedesktop.systemd1", "org.freedesktop.secrets",
                                           "org.freedesktop.portal.Flatpak", NULL };
-/* folders the system reads to start or install something, or that hold a security decision (fsops_protected) */
+/* folders the system reads to start or install something, or that hold a security decision (fsops_protected): hidden
+ * where Flatpak can hide them; the launcher's view also keeps them, and the shell's startup files, read-only */
 static const char *const hidden[] = { ".config/lordos", ".local/share/lordos", ".cache/lordos", ".local/share/applications",
                                       ".config/autostart", ".config/systemd", ".config/environment.d", ".local/bin",
                                       ".local/share/flatpak/overrides", ".local/share/flatpak/exports", NULL };
-static const char *const startup[] = { ".bashrc", ".profile", ".bash_profile", ".zshrc", NULL };
 
 int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap) {
     if (!r || !fpak_id_ok(r->id) || !r->arch || !arch_ok(r->arch) || !fpak_branch_ok(r->branch) || !r->home ||
@@ -161,12 +136,6 @@ int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap) {
     for (int i = 0; never_talk[i]; i++) ARG("--no-talk-name=%s", never_talk[i]);
     for (int i = 0; talk_only[i]; i++) ARG("--talk-name=%s", talk_only[i]);
     for (int i = 0; hidden[i]; i++) ARG("--nofilesystem=~/%s", hidden[i]);
-    if (r->grants_home)
-        for (int i = 0; startup[i]; i++) {
-            char p[4200];
-            snprintf(p, sizeof p, "%s/%s", r->home, startup[i]);
-            if (!access(p, F_OK)) ARG("--filesystem=~/%s:ro", startup[i]);
-        }
     /* LordOS's restrictions, also in Flatpak's own terms (the kernel paths stay the boundary) */
     uint32_t x = r->restricted;
     if (x & FW_R_NO_NETWORK) ARG("--unshare=network");
@@ -177,7 +146,7 @@ int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap) {
         ARG("--nosocket=x11");
         ARG("--nosocket=fallback-x11");
     }
-    if (r->opened) ARG("--filesystem=%s", r->opened);
+    if (r->opened) ARG("--filesystem=%s%s", r->opened, r->opened_ro ? ":ro" : "");
     ARG("%s", r->id);
     if (r->opened) ARG("%s", r->opened);
 #undef ARG

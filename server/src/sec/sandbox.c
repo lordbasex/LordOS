@@ -385,7 +385,9 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     int nk = 0;
     for (int pass = 0; pass < 2; pass++) {
         const char *const *list = pass ? cfg->ro : cfg->rw;
-        for (int i = 0; !cfg->keep_home && i < SANDBOX_FILES_MAX && list[i]; i++) {
+        /* a keep_home view binds only ro[]: paths of the real home made read-only (a Flatpak app's shell startup
+         * files, docs/FLATPAK.md); rw[] means nothing there, the home is already the real one */
+        for (int i = 0; (!cfg->keep_home || pass) && i < SANDBOX_FILES_MAX && list[i]; i++) {
             if (!is_under(list[i], cfg->home) || !strcmp(list[i], cfg->home)) continue;   /* outside home: Landlock alone */
             struct stat st;
             int t;
