@@ -269,8 +269,14 @@ With the read-only home (same VM, the app given the whole home by an override, t
 folder that is a link to `~/.config`, and creating a file in the home's root were all refused; its `~/.var/app/<id>`
 and the Documents folder of `user-dirs.dirs` were writable; the home stayed readable.
 
-Outside a LordOS session the app can't be placed in `app-lordos-fp-<id>.scope` (that needs lord-sessiond), so its
-identity in the firewall and the Monitor is still to check in a session on VM 127.
+**In a LordOS session, Checked on 2026-11-19 (VM 127,** LordOS `0.8.9.2~ws72`, flatpak `1.16.6-1~deb13u3`): the real
+launcher run from the session's `server` leaf asked lord-sessiond for the scope, and bubblewrap, `com.voxdsp.Tuxocide`
+and its D-Bus proxy all ran in
+`/system.slice/lordos.service/lordos-session-1000/app-lordos-fp-com.voxdsp.Tuxocide.scope`; the window opened on the
+desktop with LordOS's frame and menu bar. Two writes of `flatpak run` itself needed the read-only home to keep them
+writable: the user's installation `~/.local/share/flatpak` (OSTree locks) and its cache `~/.cache/flatpak` (created on
+first use); `strace` found the second. lord-sessiond places only processes whose executable is in LordOS's bin folder,
+so the test tool was copied there for the run and removed after.
 
 So the launcher needs the view for every Flatpak app (open question 11) **and** `flatpak-session-helper.service`
 masked as well (proposed as E5b, below). The mask also removes `org.freedesktop.Flatpak` (`flatpak-spawn --host`, any

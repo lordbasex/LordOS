@@ -901,6 +901,22 @@ int apps_flatpak_installed(const char *id) {
     return fpak_id_ok(id) && !flatpak_find(id, arch, sizeof arch, branch, sizeof branch, NULL, 0);
 }
 
+/* The user's Flatpak installation and Flatpak's own cache, writable in the view: `flatpak run` opens its OSTree
+ * repository for writing (locks) and keeps its ld.so caches in ~/.cache/flatpak, created on first use ("Read-only file
+ * system" on VM 127 without them). The installation is hidden inside every sandbox; ~/.cache/flatpak is reachable only by
+ * an app given the whole home, as on any Flatpak system. Only real folders. */
+static void flatpak_installation(FilesPlan *p) {
+    char path[PATH_MAX + 64];
+    if (snprintf(path, sizeof path, "%s/.local/share/flatpak", p->home) < (int)sizeof path && is_dir(path))
+        plan_add(p, 1, "%s%s", path, "");
+    if (snprintf(path, sizeof path, "%s/.cache", p->home) >= (int)sizeof path) return;
+    mkdir(path, 0700);
+    strcat(path, "/flatpak");
+    mkdir(path, 0755);
+    struct stat st;
+    if (!lstat(path, &st) && S_ISDIR(st.st_mode)) plan_add(p, 1, "%s%s", path, "");
+}
+
 /* The writable folders of a Flatpak app's read-only home: ~/.var/app/<id> (created) and the person's folders, each a
  * real folder (not a link) directly or deeper in the home and not a protected one; and the opened path when grant_ok
  * allows writing it. A line of user-dirs.dirs it doesn't understand is skipped: fewer writable folders, never more. */
@@ -912,6 +928,7 @@ static void flatpak_writable(FilesPlan *p, const char *id, const char *opened) {
         mkdir(path, 0700);
     }
     if (is_dir(path)) plan_add(p, 1, "%s%s", path, "");
+    flatpak_installation(p);
     snprintf(path, sizeof path, "%s/.config/user-dirs.dirs", p->home);
     int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     FILE *f = fd >= 0 ? fdopen(fd, "re") : NULL;
@@ -981,7 +998,7 @@ static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *
             mkdir(path, 0700);
         }
         if (is_dir(path)) plan_add(p, 1, "%s%s", path, "");
-        plan_add(p, 0, "%s/.local/share/%s", p->home, "flatpak");
+        flatpak_installation(p);
         if (opened) {
             struct stat st;
             if (stat(opened, &st)) { free(p); return NULL; }
