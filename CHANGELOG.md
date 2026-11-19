@@ -66,9 +66,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 
 - `tools/bench/heaptrack-session.sh install <user> <binary>` runs one user's next session under heaptrack (and only that
-  one; `restore` puts the installed binary back), to see which line of code holds the session's memory.
+  one; `restore` puts the installed binary back), to see which line of code holds the session's memory. heaptrack runs
+  as root there (lord-server drops privileges later), so its trace folder must be an absolute path owned by root and not
+  a symlink, or the script refuses it (a folder the user could write to would let them plant a symlink where root writes).
   `docs/perf/MEMORY-HEAPTRACK.md` explains the three tools in order (`session-sample.sh`, the memory report, heaptrack),
   how to read heaptrack's result while the session is still running, and why reserved memory is not resident memory.
+- `tools/bench/session-sample.sh <user> <minutes> <out.csv> [seconds]` samples one user's `lord-server` session (never
+  the login screen's) into a CSV: RSS, anonymous and file-backed memory, processor time in clock ticks and the system's
+  MemAvailable every 10 s, with a header of the version, theme, displays, kernel, processor, the session's pid and start
+  and `clk_tck`. It only reads `/proc`. Every run in `docs/PERFORMANCE-0.8.9.md` was taken with it.
+- **`docs/PERFORMANCE-0.8.9.md`, the performance report of 0.8.9 and 0.8.9.1** (roadmap 0.8.9.1), with every CSV in
+  `docs/perf/0.8.9/` and `docs/perf/0.8.9.1/`. On the maintainer's PC (i9-10900, RX 580, 3 × 1920×1080, Debian 13,
+  THP `always`, Lord Workspaces): the 0.8.9 desktop just after login 177 MB and 0.2 % of one core; Lord Workspaces'
+  wallpaper slideshow **19.0 % of one core** over two hours (559 MB median RSS) and **2.0 %** once turned off in the
+  same session (491 MB); 7 widgets about 1 % of one core; a Terminal running Claude Code about +84 MB before the memory
+  work; turning huge pages off for the whole process 229–249 MB against 177; each build of the memory loop with its
+  CSV's min, median and max (they match the published figures to the MB except ws04: 260.3 against 262). On a
+  Raspberry Pi 5 16 GB, a headless autologin session one hour after a reboot: 0.8.8.9 116 MB and 3.4 % of one core,
+  0.8.9 113 MB and **6.1 %** (two runs; the one meant for Lord Workspaces kept Lord Flow, so it counts as a second
+  Lord Flow run). It also lists what spoiled runs (an old session kept by `systemctl restart lordos`, opening About,
+  the slideshow, the scene being set up, the voice, heaptrack). The Raspberry Pi's 0.8.9.1 runs are still going.
 
 ### Fixed
 
@@ -106,7 +123,44 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   The host path meant nothing inside the chroot, so the 0.8.9-beta arm64 ISO stopped with "no lordos-rclone"
   until the package was copied there by hand.
 
+### Documentation
+
+- `docs/TERMINAL.md`, a new "Memory" section: the history ring starts at 1,024 lines and doubles up to the profile's
+  limit, clearing the history (`ESC [ 3 J`, Clear buffer, `ClearScrollback`) frees the cells, Instant Replay keeps at
+  most 6 MB per tab. `docs/SYSTEM.md`, "Log files": the `memory:` report in `compositor.log` (10 minutes after login,
+  then every 6 hours, after `malloc_trim(0)`). `docs/WINDOWS.md` and `docs/THEMES-GUIDE.md`: a transform's raster is
+  freed 30 s after its last use.
+- `docs/WORKSPACES.md`: the slideshow's cost on a real session (19.0 % against 2.0 % of one core); the weather widget,
+  listed as "not yet" under "Changed from the proposal", shipped in 0.8.9. `docs/SETTINGS.md`: the Ctrl arrows switch
+  shows in Lord Flow and in themes that declare `desktopArrows` (Lord Workspaces), off by default (#201).
+- `docs/RESULTS.md` lists the 0.8.9 and 0.8.9.1 runs; `docs/README.md` indexes `PERFORMANCE-0.8.9.md` and
+  `perf/MEMORY-HEAPTRACK.md` under "Measurements and validation"; `docs/PAPER-VALIDATION.md` has a row for every new
+  number of the paper; the roadmap marks the performance report done and keeps the Raspberry Pi's 0.8.9.1 runs and
+  Lord Workspaces on the Pi open.
+- `docs/HARDWARE-REPORT.md`: report #171, the first one with an NVIDIA card (Gigabyte B760M C, RTX 3060).
+- `docs/VM-SETUP.md`: the helpers' build packages and `libpipewire-0.3-dev` in VM 116's arm64 build chroot, used for the
+  0.8.9-beta images.
+
 ### Website
+
+- **Bar charts** (`[[chart:<id>]]` in a page or the paper, `web/content/charts/<id>.json`, drawn by
+  `web/lib/chartsvg.mjs` without dependencies): horizontal bars from zero, a highlighted tone, a dashed tone for
+  file-backed memory, reference lines and a legend, as inline SVG with `role="img"`, a `<title>` and a `<desc>` that
+  reads every value, in the site's colour tokens (light and dark) and the architecture figures' frame, with a layout
+  for phones (labels above the bars). `docs/PAPER.md` gets each chart as a Markdown table. Two charts:
+  `memory-0891` (lord-server's RSS through the memory loop, 269 → 183 MB, with ws02 without the Terminal at 185 MB as a
+  reference line; ws03's snapshot left out and said so) and `memory-left-0891` (what is left at rest after ws08).
+- **The paper for 0.8.9.1 (in development):** §7.1 has the 0.8.9 rows (the slideshow on and off, the floor), a full
+  memory paragraph (the three tools, the memory report and where it goes, the three changes, the huge-pages finding,
+  reserved against resident, what is left) with both charts, and a paragraph on 0.8.9 on the same PC; §7.4 a table of
+  the Raspberry Pi's headless session in 0.8.8.9 and 0.8.9 (a marked place for 0.8.9.1); §7.5, §8 (the slideshow's
+  measured cost), §10.3 (0.8.9.1 in development) and §11.5 (`session-sample.sh`, `docs/perf/`) point at the new report;
+  en, es and pt.
+- **Features → Own desktop:** the memory chart, a bullet with 0.8.9's slideshow cost and the Raspberry Pi's session,
+  and the numbers' sources now include the maintainer's PC (en, es, pt). **FAQ → How much memory does it need?:** the
+  real-hardware figures (177 MB after login, 269 → 183 MB with widgets and a Terminal in development, about 113 MB on
+  a Pi 5 without a monitor) and a link to the report.
+- Downloads point at the 0.8.9-beta release, and the paper says the voices' number reading shipped in 0.8.9.
 
 - **Home: "The faces of LordOS"**, a new dark band between the hero (its slideshow stays) and the features (en, es,
   pt). An eyebrow ("One system · many faces"), a two-line title ("We didn't copy a desktop. / We built the engine to
