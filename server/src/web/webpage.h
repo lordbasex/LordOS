@@ -29,7 +29,7 @@ int  webpage_title_badge(const char *title);
  * The majors are the current stable releases; RELEASING.md bumps them each release. 0, or -1 for an unknown kind or
  * when out is too short. */
 #define WEBPAGE_CHROME_MAJOR  157
-#define WEBPAGE_EDGE_MAJOR    157
+#define WEBPAGE_EDGE_MAJOR    158
 #define WEBPAGE_FIREFOX_MAJOR 160
 int  webpage_user_agent(int kind, const char *machine, const char *version, char *out, size_t n);
 

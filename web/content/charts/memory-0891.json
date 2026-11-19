@@ -2,9 +2,9 @@
   "id": "memory-0891",
   "note": "lord-server's RSS through the 0.8.9.1 memory work, one fresh session per build ([[chart:memory-0891]]; drawn by web/lib/chartsvg.mjs). Figures from docs/perf/MEMORY-HEAPTRACK.md ('The loop and its results'), data in docs/perf/0.8.9.1/. ws03 is left out on purpose (a snapshot right after Claude Code started).",
   "title": {
-    "en": "lord-server's memory at rest, change by change (0.8.9.1, in development)",
-    "es": "La memoria de lord-server en reposo, cambio por cambio (0.8.9.1, en desarrollo)",
-    "pt": "A memória do lord-server em repouso, mudança por mudança (0.8.9.1, em desenvolvimento)"
+    "en": "lord-server's memory at rest, change by change (0.8.9.1)",
+    "es": "La memoria de lord-server en reposo, cambio por cambio (0.8.9.1)",
+    "pt": "A memória do lord-server em repouso, mudança por mudança (0.8.9.1)"
   },
   "summary": {
     "en": "269 → 183 MB: 86 MB less (−32 %).",

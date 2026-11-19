@@ -356,7 +356,7 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     exactly what desktop Chrome on Linux sends, nothing added. Chrome's reduced user agent says `Linux x86_64` on
     every Linux, an ARM one too, so this string is the same on `aarch64`.
   - `edge`, **Edge on Linux**: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)
-    Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0`, what desktop Edge on Linux sends, without LordOS's token. For the
+    Chrome/158.0.0.0 Safari/537.36 Edg/158.0.0.0`, what desktop Edge on Linux sends, without LordOS's token. For the
     office, mail and team chat sites of Edge's own maker, which expect it.
   - `firefox`, **Firefox on Linux**: `Mozilla/5.0 (X11; Linux <machine>; rv:160.0) Gecko/20100101 Firefox/160.0`.
     Firefox names its processor (`x86_64`, `aarch64`); a machine name that isn't `[A-Za-z0-9_]` becomes `x86_64`.
@@ -397,7 +397,7 @@ How it is built (`server/src/web/webwin.c`, `webengine.c`, `webmain.c`):
     app): LordOS (WebKit), Firefox on Linux and Edge on Linux link and show on the phone as Safari (Linux), Firefox
     (Linux) and Microsoft Edge (Linux). Chrome's string with LordOS's token after `Safari/537.36` (the first
     `chrome`) was refused ("works with Google Chrome 100 or later"), and LordOS alone (`experimental`) as an
-    unsupported browser. Edge's string is Chrome's plus `Edg/157.0.0.0` and works, so the site reads the last
+    unsupported browser. Edge's string is Chrome's plus `Edg/158.0.0.0` and works, so the site reads the last
     token as the browser: `chrome` now sends Chrome's string exactly, nothing added, and `experimental` was removed
     (the UI, both C lists, `lord.webapps.setUserAgent`, the model). A profile that has it is read as `chrome` by
     the registry parser, lord-server and the model alike; its file isn't rewritten for it and still loads (an

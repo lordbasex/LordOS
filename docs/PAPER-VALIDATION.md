@@ -344,7 +344,7 @@ pre-release that never shipped. The paper marks all of it "0.8.9, in development
 | 5.1 | Each app window has its own error boundary; no JSX component is used without being imported or declared (#174) | Test (`jsx_undeclared_test.mjs` in `make test`) | Holds |
 | 3.6 | The lock screen applies the session's display-off and sleep deadlines as the notice arrives (#172) | Test (`greeter_inbox_test.mjs`) | Holds in the tests |
 
-## 0.8.9.1 (in development; the paper's edition of 2026-11-19)
+## 0.8.9.1 (released 2026-11-19; the paper's edition of that day)
 
 | § | Claim | How | State |
 |---|---|---|---|

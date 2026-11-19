@@ -10,7 +10,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9.1-beta] - 2026-11-19
+
 ### Changed
+
+- **Web apps' Browser identity: Edge 158.** The Edge identity now names Edge 158, stable this week
+  (`WEBPAGE_EDGE_MAJOR` in `server/src/web/webpage.h`, `docs/WEBAPPS.md`); Chrome stays at 157 and Firefox at 160.
 
 - **A desktop session uses about a third less memory (0.8.9.1 memory work).** Measured on a PC with three 1920×1080
   displays (RX 580, Debian 13, transparent huge pages `always`), Lord Workspaces, 7 widgets and a Terminal running
@@ -157,6 +162,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Website
 
+- **The release itself:** the paper (meta, the opening, §10.1's table and §10.3) and the site name **0.8.9.1 Beta**
+  (19 November 2026) as the latest release, an update of the 0.8.9 Beta package with no new images; the 0.8.9.1 numbers
+  lose their "in development" label.
 - **Bar charts** (`[[chart:<id>]]` in a page or the paper, `web/content/charts/<id>.json`, drawn by
   `web/lib/chartsvg.mjs` without dependencies): horizontal bars from zero, a highlighted tone, a dashed tone for
   file-backed memory, reference lines and a legend, as inline SVG with `role="img"`, a `<title>` and a `<desc>` that
@@ -164,15 +172,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   for phones (labels above the bars). `docs/PAPER.md` gets each chart as a Markdown table. Two charts:
   `memory-0891` (lord-server's RSS through the memory loop, 269 → 183 MB, with ws02 without the Terminal at 185 MB as a
   reference line; ws03's snapshot left out and said so) and `memory-left-0891` (what is left at rest after ws08).
-- **The paper for 0.8.9.1 (in development):** §7.1 has the 0.8.9 rows (the slideshow on and off, the floor), a full
+- **The paper for 0.8.9.1:** §7.1 has the 0.8.9 rows (the slideshow on and off, the floor), a full
   memory paragraph (the three tools, the memory report and where it goes, the three changes, the huge-pages finding,
   reserved against resident, what is left) with both charts, and a paragraph on 0.8.9 on the same PC; §7.4 a table of
   the Raspberry Pi's headless session in 0.8.8.9 and 0.8.9 (a marked place for 0.8.9.1); §7.5, §8 (the slideshow's
-  measured cost), §10.3 (0.8.9.1 in development) and §11.5 (`session-sample.sh`, `docs/perf/`) point at the new report;
+  measured cost), §10.3 (0.8.9.1) and §11.5 (`session-sample.sh`, `docs/perf/`) point at the new report;
   en, es and pt.
 - **Features → Own desktop:** the memory chart, a bullet with 0.8.9's slideshow cost and the Raspberry Pi's session,
   and the numbers' sources now include the maintainer's PC (en, es, pt). **FAQ → How much memory does it need?:** the
-  real-hardware figures (177 MB after login, 269 → 183 MB with widgets and a Terminal in development, about 113 MB on
+  real-hardware figures (177 MB after login, 269 → 183 MB with widgets and a Terminal in 0.8.9.1, about 113 MB on
   a Pi 5 without a monitor) and a link to the report.
 - Downloads point at the 0.8.9-beta release, and the paper says the voices' number reading shipped in 0.8.9.
 
@@ -7369,7 +7377,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.1-beta...HEAD
+[0.8.9.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9-beta...v0.8.9.1-beta
 [0.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.9-beta...v0.8.9-beta
 [0.8.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.8-beta...v0.8.8.9-beta
 [0.8.8.8-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.7-beta...v0.8.8.8-beta

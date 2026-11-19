@@ -910,7 +910,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   for every app, since 0.8.8.1 they all share the dialog: [#13](https://github.com/lordbasex/LordOS/issues/13),
   [#22](https://github.com/lordbasex/LordOS/issues/22). Done for 0.8.8.3 (`FILES.md`, "The system file dialog").
 
-## Release 0.8.9.1 (planned)
+## Release 0.8.9.1 (released 2026-11-19)
 
 - [x] **Lord Workspaces: a window brought back from Minimized fills its slot.** Found in the scene test while taking the
   screenshots for the 0.8.9 article (2026-11-18): the window came back at its old width (923 px in a 1231 px slot).
