@@ -122,12 +122,14 @@ function Dot({ p }) {
   return <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c || 'transparent', border: c ? 'none' : '1px solid rgba(128,128,128,0.5)' }} />;
 }
 
-// A Cloud account a line of cloud.log is about (#183): "Provider · Name", on screen and in the exported file alike
-// (#194: the file said "Provider (c1a2b3c4d)" somewhere else on the line). An account removed since: its id.
-function accountLabel(id, accounts) {
+// A Cloud account a line of cloud.log is about (#183): "Provider · Name" on screen; withName false gives
+// "Provider (c1a2b3c4d)" for the exported file, which may end up attached to a public report (an account's name is
+// often an email address). Both go in the same place on the line (#194). An account removed since: its id.
+function accountLabel(id, accounts, withName = true) {
   const a = (accounts || []).find((x) => x.id === id);
   if (!a) return id;
-  return `${cloudModel.providerName(a)} · ${a.name}`;
+  const p = cloudModel.providerName(a);
+  return withName ? `${p} · ${a.name}` : `${p} (${id})`;
 }
 
 // ---- entry details ----
@@ -291,7 +293,7 @@ export default function Registros() {
   const exportView = () => {
     const lines = items.map((e) => {
       const when = e.t ? `${formatDate(new Date(e.t / 1000), 'short')} ${clock(e.t / 1000)}` : `#${e.line}`;
-      return exportLine(e, when, tr(`logs.level.${levelOf(e.p)}`), e.acct ? accountLabel(e.acct, accounts) : '');
+      return exportLine(e, when, tr(`logs.level.${levelOf(e.p)}`), e.acct ? accountLabel(e.acct, accounts, false) : '');
     });
     const d = new Date();
     const name = `${tr('logs.exportName')}-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.txt`;
