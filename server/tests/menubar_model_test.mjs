@@ -1,6 +1,6 @@
 // What the bar shows (sdk/menubarmodel.js, issue #58): the choices' defaults, the settings patch, the outputs a sound
 // panel offers and the month calendar's cells. node server/tests/menubar_model_test.mjs
-import { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, cleanerPanelAction, outputChoices, monthCells, weekStartFor,
+import { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, cleanerPanelAction, outputChoices, monthCells, monthWeeks, weekStartFor,
   menuBarEveryDisplay, barDisplays, hasBar, displayIdFor, activeBarId, pinBar, focusDisplayId, panelLeft, inBar, insideDisplay,
   wifiBars, backlightOf, backlightValue } from '../../sdk/menubarmodel.js';
 import { sharedTicker } from '../../sdk/ticker.js';
@@ -55,6 +55,14 @@ eq('30 days', nov.filter(Boolean).length, 30);
 const novMon = monthCells(2026, 10, 1);
 eq('monday first: six blanks', novMon.slice(0, 7), [null, null, null, null, null, null, 1]);
 eq('february 2028 (leap)', monthCells(2028, 1, 1).filter(Boolean).length, 29);
+// a week per row (#197): every row has seven cells, and together they are monthCells
+for (const [y, m, f] of [[2026, 10, 0], [2026, 10, 1], [2028, 1, 1], [2026, 1, 0], [2027, 7, 1]]) {
+  const w = monthWeeks(y, m, f);
+  eq(`weeks of seven ${y}-${m + 1} first ${f}`, w.every((r) => r.length === 7), true);
+  eq(`weeks are the cells ${y}-${m + 1} first ${f}`, w.flat(), monthCells(y, m, f));
+}
+eq('november 2026 from Monday: six weeks', monthWeeks(2026, 10, 1).length, 6);
+eq('february 2026 from Sunday: four weeks', monthWeeks(2026, 1, 0).length, 4);
 eq('week start en', weekStartFor('en-US'), 0);
 eq('week start es', weekStartFor('es'), 1);
 eq('week start unknown', weekStartFor(undefined), 0);

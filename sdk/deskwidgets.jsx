@@ -44,7 +44,7 @@ import { battery, bluetooth } from './hardware.jsx';
 import { fractionOf, toneOf as deviceTone } from './devicesmodel.js';
 import { useDevices, deviceShort, deviceValue, deviceVia } from './devices.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
-import { wifiBars, monthCells, weekStartFor } from './menubarmodel.js';
+import { wifiBars, monthWeeks, weekStartFor } from './menubarmodel.js';
 import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect } from './widgetgrid.js';
 import { useSound, useSpectrumSource } from './sound.js';
 import { sourceOf, appsPlaying, colorsOf, gainOf, PALETTE_ORDER } from './soundwavemodel.js';
@@ -600,9 +600,7 @@ function TodayList({ L, ev, now, max, compact }) {
 function MonthGrid({ L, now, busy, font = 11, heat, fill }) {
   const d0 = new Date(now), y = d0.getFullYear(), m = d0.getMonth();
   const first = weekStartFor(locale.get().lang);
-  const cells = monthCells(y, m, first);
-  const weeks = [];
-  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  const weeks = monthWeeks(y, m, first);
   const wds = [0, 1, 2, 3, 4, 5, 6].map((i) => (i + first) % 7);
   const dot = font * 1.95;
   return (
