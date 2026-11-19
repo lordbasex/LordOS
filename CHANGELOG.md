@@ -36,6 +36,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `/.flatpak-info` check reads. Checked in a LordOS session on VM 127: bubblewrap, the app and its D-Bus proxy in
   `app-lordos-fp-<id>.scope`, the window on the desktop. Tests: `fpak-test` (47), `fw-rules-test`;
   `build/flatpak-view-probe` and `launch-cli --flatpak` for the VM.
+- **Flatpak apps in the desktop** (in development): `lord.apps.flatpak()` lists the installed ones from their exported
+  `.desktop` files (name, comment, categories, MIME types, icon; never `Exec`), so they show in search and the launcher
+  as `flatpak:<id>` and open through the Flatpak launch path; the Monitor names every process of one (bubblewrap, its
+  D-Bus proxy, the app) from its scope, and its firewall lists take `flatpak:<id>`; notification settings name them;
+  a Flatpak window is named and drawn after the app lord-server knows from its client's scope, not the `app_id` it
+  chose (an SDL game says `tuxocide`). Their exported SVG icons, links into the installation, are allowed to lord-media.
+  The launcher's view process shows as `lordos-view`. Checked on VM 127: Tuxocide found and opened from search, its
+  window with its own icon, its five processes under its name in Monitor → Processes.
 
 ## [0.8.9.2-beta] - 2026-11-19
 

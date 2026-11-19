@@ -279,6 +279,12 @@ first use); `strace` found the second. Both are hidden inside the sandbox (`--no
 given the whole home saw them empty, and a file it wrote there never reached the real cache (checked the same day). lord-sessiond places only processes whose executable is in LordOS's bin folder,
 so the test tool was copied there for the run and removed after.
 
+**From the desktop, Checked the same night (VM 127, `0.8.9.3~ws77`):** search (❖Space) found Tuxocide by name with its
+icon and summary (`lord.apps.flatpak`), Enter opened it through `lord.apps.launchFlatpak` in its scope, its window
+showed its own icon (lord-server names the window from the client's scope: the game's own `app_id` isn't its Flatpak
+id), and Monitor → Processes listed `tuxocide`, three `bwrap`, `xdg-dbus-proxy` and `lordos-view` under "Tuxocide". Not
+yet seen: a Flatpak app in Monitor → Network with traffic (the VM's firewall wasn't active).
+
 So the launcher needs the view for every Flatpak app (open question 11) **and** `flatpak-session-helper.service`
 masked as well (proposed as E5b, below). The mask also removes `org.freedesktop.Flatpak` (`flatpak-spawn --host`, any
 command outside the sandbox) instead of only refusing it with `--no-talk-name`. The runtime with its locale and codecs
