@@ -18,6 +18,7 @@
  * Con una señal o --timeout los shells de la Terminal quedan vivos (term/hold.c) y se
  * recuperan en el próximo arranque; las dos primeras formas los cierran.
  */
+#include "apps.h"
 #include "admin.h"
 #include "lordlog.h"
 #include "keylag.h"
@@ -2655,6 +2656,8 @@ int main(int argc, char **argv) {
     sigaction(SIGPIPE, &pipe_sa, NULL);
     /* guardián de una sesión de terminal (ver term/hold.c): no abre pantalla ni input */
     if (argc > 1 && !strcmp(argv[1], "--term-holder")) return hold_main(argc, argv);
+    /* a restricted Linux app's launch, re-executed clean to build its view (apps.c, apps_launch_view_main) */
+    if (argc > 1 && !strcmp(argv[1], "--launch-view")) return apps_launch_view_main();
     /* (0.8.5) a component's network connector (sec/netconn.h): only creates sockets in its scope */
     if (argc > 1 && !strcmp(argv[1], "--net-connector")) return netconn_main(argc, argv);
     if (argc > 1 && !strcmp(argv[1], "--check-code")) return check_code(argc, argv);

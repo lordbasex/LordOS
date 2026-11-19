@@ -37,6 +37,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `app-lordos-fp-<id>.scope`, the window on the desktop. Tests: `fpak-test` (47), `fw-rules-test`;
   `build/flatpak-view-probe` and `launch-cli --flatpak` for the VM.
 
+## [0.8.9.2-beta] - 2026-11-19
+
+### Fixed
+
+- **A Linux app restricted in Settings → Privacy didn't start from the desktop.** With no microphone, camera, USB,
+  Bluetooth or files, opening it from the Dock, the launcher or search did nothing ("not launched" in its log), since
+  the restricted-app view of 0.8.x. lord-server drops from root to the person when the session starts, so it isn't
+  dumpable, and the launcher's child couldn't write its new user namespace's map. The tests run the launcher from a
+  test tool that is dumpable, so they passed. The child now re-executes itself (`lord-server --launch-view`): a fresh
+  process image, dumpable by `execve` and holding none of lord-server's memory, reads the view's plan from a sealed
+  memfd, builds the view, applies Landlock and starts the app (`apps_launch_view_main` in `server/src/apps.c`). Making
+  the child dumpable instead would have let the person's other processes read that copy of lord-server's memory unless
+  Yama stopped them. Checked on a VM from the search: Foot with no microphone (only the display and sound sockets in its
+  runtime folder) and with no files (an empty home).
+
 ### Documentation
 
 - `docs/FLATPAK.md` checked again (2026-11-19) against 0.8.9.1's code and Debian 13's security updates: Debian ships
@@ -7415,7 +7430,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.1-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.2-beta...HEAD
+[0.8.9.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.1-beta...v0.8.9.2-beta
 [0.8.9.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9-beta...v0.8.9.1-beta
 [0.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.9-beta...v0.8.9-beta
 [0.8.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.8-beta...v0.8.8.9-beta

@@ -361,6 +361,12 @@ pre-release that never shipped. The paper marks all of it "0.8.9, in development
 | 5.1 | A paused Cloud account sends nothing to its provider: no mount retries, check listing, quota call, background listing or change polling (#194) | Test (`cloud-test` `t_pause`: `cloud_bring_up_ok` and the `vfs/poll-interval` call) | Not yet with a real Google account or a packet capture |
 | 5.1 | The package installs `assets/cloud/providers.json`, so verified providers read verified (#195) | Test (`cloud_model_test.mjs`: mkdeb.sh installs `assets/cloud`, the fallback) | Not yet in a built .deb |
 
+## 0.8.9.2 (released 2026-11-19)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 5 | A Linux app restricted in Settings → Privacy starts from the desktop: the launcher's child re-executes itself to build the view | VM 127, a LordOS session, Foot opened from search with no microphone (only the display and sound sockets in its runtime folder) and with no files (an empty home); `make test` | Checked once on a VM |
+
 ## What the paper must change for 0.8.5
 
 State in the 0.8.5 edition (`web/content/paper/paper.en.md`, checked 2026-10-26) after each item:
