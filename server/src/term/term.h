@@ -51,7 +51,8 @@ typedef struct {
 /* History + screen in a ring: the screen is the last `rows` lines. */
 typedef struct {
     Line *ring;
-    int cap, count, head;
+    int cap, count, head;       /* cap: lines allocated in the ring, grows up to max */
+    int max;                    /* the history limit plus the screen */
     long long dropped;          /* lines dropped by the history limit */
 } Buffer;
 

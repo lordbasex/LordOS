@@ -409,7 +409,9 @@ static int tf_paint(Canvas *c, Node *n, float opacity) {
     e->used_at = tf_now_ms();
     float ox = (gx0 - pad) / kr, oy = (gy0 - pad) / kr;
     if (!e->valid || live || cap_last || e->w != w || e->h != h || fabsf(e->ox - ox) > 0.01f || fabsf(e->oy - oy) > 0.01f) {
-        if ((size_t)w * h > e->cap) {
+        /* a slot keeps its buffer for the next raster, but not a window-sized one for a 9x9 icon: the 16
+         * slots held 57 MB of small rasters at rest (0.8.9.1) */
+        if ((size_t)w * h > e->cap || e->cap > 4 * (size_t)w * h + 65536) {
             uint32_t *px = realloc(e->px, (size_t)w * h * 4);
             if (!px) return 0;
             e->px = px;
