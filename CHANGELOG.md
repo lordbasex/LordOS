@@ -89,6 +89,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Test Bench closed when F5 ran the checks again.** The fractional-scale check asked for a second
+  `wp_fractional_scale_v1` on the same window, which the protocol forbids: the compositor ended the connection and the
+  bench quit (seen on a desktop with a Lenovo keyboard; any keyboard did it). The checks now keep the one they made, and
+  bind the outputs once instead of adding a copy of each on every run (`server/src/testbench/checks.c`; checked by
+  running the checks three times in a row on LordOS: the old code quit on the second).
+
+- **The keypad typed nothing and moved the cursor instead (reported with a Lenovo USB keyboard).** Every session
+  started with Num Lock off, whatever the firmware had set, so the keypad's digits were Home, End and the arrows. A
+  session on a desktop computer (DMI chassis type, or no DMI, as on a Raspberry Pi) now starts with Num Lock on and its
+  light lit; laptops keep it off, since their keypad is often printed on the letter keys. Changing the layout (adding
+  one in Settings → Keyboard, or switching between them) also built a fresh keyboard state that turned Caps Lock and
+  Num Lock off; it keeps both now (`kb_set`, `kb_set_numlock` in `server/src/keyboard.c`; `test_numlock` in
+  `server/tests/osk_test.c`).
+
 - **A paused Cloud account kept talking to its provider (GitHub #194).** Pause only held uploads back: a failed mount
   was retried every 30 s, the check listing ran every 10 minutes and the quota call every 30, Files' background listing
   went on, and rclone polled Google Drive for changes every minute; the reporter's paused account kept getting Google's

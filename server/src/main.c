@@ -2713,6 +2713,9 @@ int main(int argc, char **argv) {
         char l[128], v[128];
         kb_system_from(KB_SYSTEM_FILE, l, sizeof l, v, sizeof v);
         if (kb_set(l, v)) kb_set("us", "");
+        /* Num Lock on, as the firmware of most desktops leaves it: with it off the keypad moves the cursor and
+         * looks dead. Not on a laptop, whose keypad is often printed on the letter keys (U I O = 4 5 6) */
+        if (!input_portable_computer()) kb_set_numlock(1);
     }
     for (int i = 0; i < OUT_MAX; i++) { s.out[i].kms.fd = -1; s.out[i].gpu = -1; }
     s.cap.kms.fd = -1;

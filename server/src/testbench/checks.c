@@ -105,7 +105,7 @@ static const struct wl_shm_listener shm_l = { shm_format };
 /* ---- outputs ---- */
 typedef struct { char make[48], model[48], name[32]; int w, h, scale, lw, lh, lx, ly, done; uint32_t refresh; } Out;
 static Out outs[8];
-static int nouts;
+static int nouts, outs_bound;
 static void o_geo(void *d, struct wl_output *o, int32_t x, int32_t y, int32_t pw, int32_t ph, int32_t sp, const char *make, const char *model, int32_t tf) {
     (void)o; (void)x; (void)y; (void)pw; (void)ph; (void)sp; (void)tf;
     Out *u = d;
@@ -293,13 +293,15 @@ int checks_run(void) {
     /* outputs, their current mode and the logical layout */
     c = begin("wl_output modes");
     struct zxdg_output_manager_v1 *xom = bind("zxdg_output_manager_v1", &zxdg_output_manager_v1_interface, 3);
-    for (int i = 0; i < nglobals && nouts < 8; i++) {
+    /* bound once: on F5 the same outputs report again (their events keep coming), not a second copy of each */
+    for (int i = 0; i < nglobals && nouts < 8 && !outs_bound; i++) {
         if (strcmp(globals[i].iface, "wl_output")) continue;
         Out *u = &outs[nouts++];
         struct wl_output *o = wl_registry_bind(registry, globals[i].name, &wl_output_interface, globals[i].version < 4 ? globals[i].version : 4);
         wl_output_add_listener(o, &out_l, u);
         if (xom) zxdg_output_v1_add_listener(zxdg_output_manager_v1_get_xdg_output(xom, o), &xo_l, u);
     }
+    outs_bound = 1;
     sync_or();
     sync_or();
     if (!nouts) set(c, CK_FAIL, "%s", "NO OUTPUT");
@@ -320,10 +322,14 @@ int checks_run(void) {
     struct wp_fractional_scale_manager_v1 *fsm = bind("wp_fractional_scale_manager_v1", &wp_fractional_scale_manager_v1_interface, 1);
     if (!fsm) set(c, CK_INFO, "%s", "NOT OFFERED");
     else {
-        struct wp_fractional_scale_v1 *fs = wp_fractional_scale_manager_v1_get_fractional_scale(fsm, surf);
-        wp_fractional_scale_v1_add_listener(fs, &frac_l, NULL);
-        wl_surface_commit(surf);
-        if (tb_wait(&frac_got, 1500) < 0) return died();
+        /* one per surface, kept: a second one is a protocol error that ends the connection (F5 closed the bench) */
+        static struct wp_fractional_scale_v1 *fs;
+        if (!fs) {
+            fs = wp_fractional_scale_manager_v1_get_fractional_scale(fsm, surf);
+            wp_fractional_scale_v1_add_listener(fs, &frac_l, NULL);
+            wl_surface_commit(surf);
+            if (tb_wait(&frac_got, 1500) < 0) return died();
+        }
         if (frac_got) set(c, CK_PASS, "PREFERRED %.3f", frac_val / 120.0);
         else set(c, CK_FAIL, "%s", "NO PREFERRED_SCALE EVENT IN 1.5 S");
     }
