@@ -240,8 +240,24 @@ maintainer's PC): `build/flatpak-view-probe` (`server/tests/flatpak_view_probe.c
 with `sandbox_files_isolate` and `sandbox_apply_scope`, then runs `bwrap --unshare-user --disable-userns --unshare-pid
 --ro-bind / / --proc /proc --dev /dev --tmpfs /tmp`, the namespaces `flatpak run` asks for. It starts, with and without
 the session bus; `/run/user/<uid>/systemd/private` is hidden inside; the runtime folder holds only `bus`, `pipewire-0`,
-`pulse` and the Wayland socket; and the process stays in the cgroup it was started in. A real `flatpak run` in the view
-is still to test on the VM.
+`pulse` and the Wayland socket; and the process stays in the cgroup it was started in.
+
+**`flatpak run` in the view, Checked on 2026-11-19** (the build VM: Debian 13, kernel 6.12.117, flatpak
+`1.16.6-1~deb13u3`, xdg-dbus-proxy `0.1.6-1+deb13u3`, Flathub's `org.freedesktop.Platform//25.08` run with `--command=sh`;
+no LordOS session and no app scope, so it shows the mechanics, not the identity):
+
+| Run | Result |
+|---|---|
+| no view | the process moved itself to `user@1000.service/app.slice/app-flatpak-org.freedesktop.Platform-<n>.scope`: the escape this problem describes, seen |
+| view, no session bus | runs; stays in the cgroup it was started in |
+| view with the session bus | **fails**: `bwrap: Can't find source path /run/user/1000/.flatpak-helper/monitor`. With a bus, `flatpak run` asks `flatpak-session-helper` (D-Bus activated under `user@`, outside the view) for its monitor folder, which the helper creates in the real runtime folder |
+| view with the session bus, `flatpak-session-helper.service` masked | runs; stays in its cgroup; `/etc/resolv.conf` and `/etc/localtime` are right without the helper |
+| no view, helper masked | still moves itself to `user@`: the mask doesn't replace the view |
+
+So the launcher needs the view for every Flatpak app (open question 11) **and** `flatpak-session-helper.service`
+masked as well (proposed as E5b, below). The mask also removes `org.freedesktop.Flatpak` (`flatpak-spawn --host`, any
+command outside the sandbox) instead of only refusing it with `--no-talk-name`. The runtime with its locale and codecs
+extensions took 2.0 GB.
 
 ## Problem 2: the launcher
 
@@ -613,6 +629,9 @@ network exceptions:
   `/dev/null` (harmless while Flatpak isn't installed). This is a packaging change with a
   migration (`packaging/migrations/`), not an admin action. Since 0.8.8 polkitd is on every LordOS image, so this mask
   is what keeps the system helper's polkit actions unreachable.
+- **E5b (proposed 2026-11-19, after the test above). Mask `flatpak-session-helper.service`** (user) too, in the same
+  way as E5: without it `flatpak run` can't start inside the view when the app has the session bus, and it is the
+  service behind `flatpak-spawn --host`.
 - **E6. `lord.fs` deny list**: `~/.local/share/flatpak` (installations, the trusted key ring,
   override files and exports) is added to `fsops_protected()`, since the system reads it to launch
   and install.
