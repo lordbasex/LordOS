@@ -2582,6 +2582,14 @@ static void mem_report(Server *s) {
     fprintf(stderr, "memory: rss=%ldK anon=%ldK file=%ldK thp=%ldK | malloc arena=%zuK inuse=%zuK free=%zuK mmap=%zuK(%zu) "
             "top=%zuK | images=%d idle=%d %zuK | scenes=%ldK\n", rss, anon, file, thp, mi.arena >> 10, mi.uordblks >> 10,
             mi.fordblks >> 10, mi.hblkhd >> 10, mi.hblks, mi.keepcost >> 10, ic, idle, ib >> 10, scenes >> 10);
+    int tn = 0, nb = 0, nt = 0;
+    long tl = 0;
+    size_t tc = 0, tr = 0, bb = 0, tb = 0, gn = 0, gb = 0, lb = 0;
+    term_mem_stats(&tn, &tl, &tc, &tr);
+    paint_mem_stats(&nb, &bb, &nt, &tb, &lb);
+    text_mem_stats(&gn, &gb);
+    fprintf(stderr, "memory: terminals=%d lines=%ld cells=%zuK replay=%zuK | blur=%d %zuK | transform=%d %zuK | layer=%zuK | glyphs=%zu %zuK\n",
+            tn, tl, tc >> 10, tr >> 10, nb, bb >> 10, nt, tb >> 10, lb >> 10, gn, gb >> 10);
     char js[512];
     js_mem_line(js, sizeof js);
     fprintf(stderr, "memory: %s\n", js);
@@ -3142,7 +3150,7 @@ int main(int argc, char **argv) {
         if (loop_wake >= mem_next) {
             mem_report(&s);
             uint64_t up = loop_wake - mem_t0;
-            mem_next = loop_wake + (up < 700ull * 1000000000ull ? 480ull : 1800ull) * 1000000000ull;
+            mem_next = loop_wake + (up < 700ull * 1000000000ull ? 480ull : 300ull) * 1000000000ull;   /* test builds: every 5 min */
         }
         static uint64_t trimmed_at;
         if (ready == 0 && loop_wake - trimmed_at > 60ull * 1000000000ull) {

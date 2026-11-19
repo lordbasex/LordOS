@@ -310,6 +310,7 @@ typedef struct {
 
 void     term_init(const char *fonts_dir, const char *shell_dir);
 Session *term_create(const char *cwd, int scrollback);
+void     term_mem_stats(int *n, long *lines, size_t *cells, size_t *replay);   /* memory report */
 /* Gives a new session the command line of a terminal app (termapp_take's, never JS's): it is typed into the
  * shell once, followed by Enter, at its first prompt or after a short bounded wait. 0, or -1 (no memory). */
 int      term_set_app_line(Session *s, const char *line);

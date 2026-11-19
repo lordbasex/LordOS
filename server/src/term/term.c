@@ -1340,3 +1340,22 @@ void term_wheel(Session *s, int lines, float lx, float ly, int mods) {
     }
     vt_scroll_view(t, lines);
 }
+
+/* (memory report) the open terminals: how many, their lines (history + screen), the cells allocated for them and
+ * the Instant Replay frames */
+void term_mem_stats(int *n, long *lines, size_t *cells, size_t *replay) {
+    *n = 0; *lines = 0; *cells = 0; *replay = 0;
+    for (int i = 0; i < TERM_MAX; i++) {
+        Session *s = &sessions[i];
+        if (!s->used) continue;
+        (*n)++;
+        *replay += s->frame_bytes;
+        Buffer *bs[2] = { &s->t.main, &s->t.alt };
+        for (int k = 0; k < 2; k++) {
+            if (!bs[k]->ring) continue;
+            *lines += bs[k]->count;
+            for (int j = 0; j < bs[k]->cap; j++) *cells += (size_t)bs[k]->ring[j].cap * sizeof(Cell);
+            *cells += (size_t)bs[k]->cap * sizeof(Line);
+        }
+    }
+}

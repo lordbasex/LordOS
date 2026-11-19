@@ -2481,3 +2481,11 @@ static Node *hit(Node *n, float x, float y) {
 Node *hit_test(Node *root, float x, float y) {
     return root ? hit(root, x, y) : NULL;
 }
+
+/* (memory report) the blur cache and the transform rasters: entries holding pixels and their bytes */
+void paint_mem_stats(int *nb, size_t *blur, int *nt, size_t *tf, size_t *lay) {
+    *lay = (size_t)layer.cap * 5;
+    *nb = *nt = 0; *blur = *tf = 0;
+    for (int i = 0; i < BC_MAX; i++) if (bcache[i].px) { (*nb)++; *blur += bcache[i].cap * sizeof(uint32_t); }
+    for (int i = 0; i < TF_CACHE; i++) if (tfl[i].px) { (*nt)++; *tf += tfl[i].cap * sizeof(uint32_t); }
+}

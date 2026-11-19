@@ -656,3 +656,13 @@ void text_draw_ex(Canvas *c, const char *s, float weight, float size, float line
         draw_lines(c, cut, font_for(weight), size, line_h, x, ly, box_w, align, 1, 1, argb);
     }
 }
+
+/* (memory report) the glyph cache: glyphs and the bytes of the table and their bitmaps */
+void text_mem_stats(size_t *n, size_t *bytes) {
+    *n = cache_used;
+    *bytes = cache_cap * sizeof *cache;
+    for (size_t i = 0; i < cache_cap; i++) {
+        if (cache[i].bmp) *bytes += (size_t)cache[i].w * cache[i].h;
+        if (cache[i].argb) *bytes += (size_t)cache[i].w * cache[i].h * 4;
+    }
+}
