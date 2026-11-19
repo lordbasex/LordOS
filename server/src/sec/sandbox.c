@@ -398,7 +398,7 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
                 close(fd);
             } else {
                 if (lstat(list[i], &st) || !(S_ISDIR(st.st_mode) || S_ISREG(st.st_mode))) continue;
-                t = (int)syscall(SYS_open_tree, AT_FDCWD, list[i], OPEN_TREE_CLONE | O_CLOEXEC);
+                t = (int)syscall(SYS_open_tree, AT_FDCWD, list[i], OPEN_TREE_CLONE | O_CLOEXEC | AT_SYMLINK_NOFOLLOW);
             }
             if (t < 0) continue;
             keep[nk].fd = t; keep[nk].dir = S_ISDIR(st.st_mode); keep[nk].path = list[i]; keep[nk].ro = pass; nk++;

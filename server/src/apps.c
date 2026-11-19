@@ -549,7 +549,8 @@ static int own_dir_ok(const char *id) {
 static const char *const sensitive[] = { "/.ssh", "/.gnupg", "/.config/systemd", "/.local/share/systemd",
                                          "/.local/share/dbus-1", "/.config/environment.d", "/.config/user-tmpfiles.d",
                                          "/.local/bin", "/bin", "/.config/autostart", "/.local/share/applications",
-                                         "/.config/lordos", "/.local/share/lordos", NULL };
+                                         "/.config/lordos", "/.local/share/lordos", "/.config/fish", "/.bin",
+                                         "/.local/share/flatpak", "/.config/dbus-1", NULL };
 
 static int path_under(const char *path, const char *dir) {
     size_t n = strlen(dir);
@@ -929,9 +930,14 @@ static void flatpak_writable(FilesPlan *p, const char *id, const char *opened) {
         if (!q || q == rel) continue;
         *q = 0;
         if (strstr(rel, "..") || strchr(rel, '\\') || rel[0] == '/') continue;
+        /* resolved, and only if it is exactly that folder: no link and no "." or empty part anywhere on its way, strictly
+         * below the home (never the home itself: "Documents/." is the home), a folder, and not a protected one */
+        char real[PATH_MAX];
         struct stat st;
-        if (snprintf(path, sizeof path, "%s/%s", p->home, rel) >= (int)sizeof path || lstat(path, &st) || !S_ISDIR(st.st_mode)) continue;
-        if (!fsops_protected(path) && !fsops_protected_below(path) && grant_ok(path)) plan_add(p, 1, "%s%s", path, "");
+        if (snprintf(path, sizeof path, "%s/%s", p->home, rel) >= (int)sizeof path || !realpath(path, real) || strcmp(real, path) ||
+            !path_under(real, p->home) || !strcmp(real, p->home) || lstat(real, &st) || !S_ISDIR(st.st_mode))
+            continue;
+        if (!fsops_protected_resolved(real) && grant_ok(real)) plan_add(p, 1, "%s%s", real, "");
     }
     if (f) fclose(f);
     if (opened) {
