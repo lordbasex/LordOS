@@ -1,5 +1,6 @@
 #include <dirent.h>
 #include <malloc.h>
+#include <sys/mman.h>
 /*
  * lord-server — servidor gráfico de LordOS, escrito desde cero.
  *
@@ -2624,7 +2625,31 @@ static void mem_report(Server *s) {
     fprintf(stderr, "memory: %s\n", js);
 }
 
+/* lord-server's static arrays (.bss, 31 MB) are sized for the worst case and mostly untouched. With
+ * transparent huge pages set to "always", khugepaged turned each 2 MB region with any page in use into a
+ * whole huge page, and about 16 MB of them stayed resident for ~1 MB of data (0.8.9.1, heaptrack and
+ * /proc/<pid>/smaps). Only this range opts out; the heap keeps huge pages. */
+static void bss_no_huge_pages(void) {
+    extern char __bss_start[], _end[];
+    uintptr_t a = (uintptr_t)__bss_start, b = (uintptr_t)_end, pg = (uintptr_t)sysconf(_SC_PAGESIZE);
+    FILE *f = fopen("/proc/self/maps", "r");
+    if (!f || pg == 0 || pg == (uintptr_t)-1) { if (f) fclose(f); return; }
+    char l[512];
+    while (fgets(l, sizeof l, f)) {             /* the anonymous mappings the range covers (there may be a hole) */
+        unsigned long s0, e0, ino;
+        char perm[8];
+        unsigned off, dmaj, dmin;
+        if (sscanf(l, "%lx-%lx %7s %x %x:%x %lu", &s0, &e0, perm, &off, &dmaj, &dmin, &ino) != 7 || ino) continue;
+        uintptr_t x = s0 > a ? s0 : a, y = e0 < b ? e0 : b;
+        x = (x + pg - 1) & ~(pg - 1);
+        y &= ~(pg - 1);
+        if (y > x) madvise((void *)x, y - x, MADV_NOHUGEPAGE);
+    }
+    fclose(f);
+}
+
 int main(int argc, char **argv) {
+    bss_no_huge_pages();
     struct sigaction pipe_sa = { .sa_handler = on_sigpipe };
     sigemptyset(&pipe_sa.sa_mask);
     sigaction(SIGPIPE, &pipe_sa, NULL);
