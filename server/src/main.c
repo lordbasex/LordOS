@@ -2557,7 +2557,7 @@ static void usage(const char *argv0) {
 static pthread_t loop_thread;
 static void forward_stop(int sig) { pthread_kill(loop_thread, sig); }
 
-/* (0.8.9.1 memory work) one report: the process (status, huge pages), glibc's heap (mallinfo2: in use against free
+/* (0.8.9.1) one memory report: the process (status, huge pages), glibc's heap (mallinfo2: in use against free
  * but kept), the QuickJS runtime, the image cache, the per-display scenes. Measured right after a malloc_trim. */
 static void mem_report(Server *s) {
     malloc_trim(0);
@@ -3198,13 +3198,13 @@ int main(int argc, char **argv) {
         /* glibc keeps what was freed inside the heap for later, so a peak (a big window, an app opened and closed, the
          * theme loading) stays in the RSS for the rest of the session. When a wait ended with nothing to do (the
          * desktop at rest), at most once a minute, the free pages go back to the system: a few ms, never mid-frame. */
-        /* (0.8.9.1 memory work) a memory report in compositor.log: 4 and 12 minutes after start, then every 30 */
-        static uint64_t mem_t0, mem_next;
-        if (!mem_t0) { mem_t0 = loop_wake; mem_next = loop_wake + 240ull * 1000000000ull; }
+        /* a memory report in compositor.log (docs/perf/MEMORY-HEAPTRACK.md): 10 minutes after the start, when the
+         * session has settled, then every 6 hours; one report is a malloc_trim and a few reads of /proc */
+        static uint64_t mem_next;
+        if (!mem_next) mem_next = loop_wake + 600ull * 1000000000ull;
         if (loop_wake >= mem_next) {
             mem_report(&s);
-            uint64_t up = loop_wake - mem_t0;
-            mem_next = loop_wake + (up < 700ull * 1000000000ull ? 480ull : 300ull) * 1000000000ull;   /* test builds: every 5 min */
+            mem_next = loop_wake + 6ull * 3600 * 1000000000ull;
         }
         static uint64_t trimmed_at;
         if (ready == 0 && loop_wake - trimmed_at > 60ull * 1000000000ull) {

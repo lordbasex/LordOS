@@ -6,7 +6,7 @@ anyone can repeat the measurement on their own machine. The tools are three:
 1. **`tools/bench/session-sample.sh`**: samples the session's memory and processor time into a CSV. It
    answers *how much*.
 2. **The memory report in `compositor.log`**: counters inside lord-server for each big consumer. It
-   answers *which part of LordOS*. It is in the test builds of branch `perf/mem-0891`.
+   answers *which part of LordOS*. It is in every build since 0.8.9.1.
 3. **heaptrack** (Debian package `heaptrack`): records every allocation with its call stack. It
    answers *which line of code*, including memory that the counters miss.
 
@@ -48,9 +48,10 @@ minutes before sampling.
 
 ## 2. Which part: the memory report
 
-The test builds write a group of `memory:` lines to `/var/log/lordos/users/<user>/compositor.log`. The
-reports come 4 and 12 minutes after login, then every 5
-minutes. Each report runs after `malloc_trim(0)`, so glibc's free-but-kept pages don't count.
+Since 0.8.9.1, lord-server writes a group of `memory:` lines to
+`/var/log/lordos/users/<user>/compositor.log` 10 minutes after login, then every 6 hours. The test builds of
+the loop below wrote them every 5 minutes. Each report runs after `malloc_trim(0)`, so glibc's free-but-kept
+pages don't count.
 
 ```
 memory: rss= anon= file= thp= | malloc arena= inuse= free= mmap=(n) | images= idle= | scenes=
