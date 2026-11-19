@@ -48,7 +48,7 @@ import { wifiBars, monthWeeks, weekStartFor } from './menubarmodel.js';
 import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect } from './widgetgrid.js';
 import { useSound, useSpectrumSource } from './sound.js';
 import { sourceOf, appsPlaying, colorsOf, gainOf, PALETTE_ORDER } from './soundwavemodel.js';
-import { kindOf, unitFor, temp as tempIn, skyOf } from './weathermodel.js';
+import { kindOf, unitFor, temp as tempIn, skyOf, cityOk, widgetCity, placeOf } from './weathermodel.js';
 import { vpnState, rates as vpnRates, targetOf, eventOf } from './vpnmodel.js';
 import { configDirs, accountOf, leftText, alertOf, summarize } from './claudewidgetmodel.js';
 import { admin } from './admin.js';
@@ -116,6 +116,8 @@ export function addDeskWidget(type, size, display) {
   const desk = activeDesktop.get();
   const sz = KIND_SIZES[type].includes(size) ? size : KIND_SIZES[type][0];
   const opts = { ...(NEW_OPTS[type] || {}) };
+  // a new weather widget starts on the last city chosen and keeps it (#193: each widget has its own)
+  if (type === 'weather') opts.city = cityOk(settings.get().weather?.city);
   // a pinned one needs no free block; it still gets one to go back to when it is dragged
   const spot = firstFree(gridFor(d), placed(desk, d), sz) || (opts.pin ? { col: 0, row: 0 } : null);
   if (!spot) return null;
@@ -1218,11 +1220,19 @@ function ClaudeBody({ w, L }) {
 // ---- weather (Open-Meteo through lord-fetch, by the time zone's coordinates: server/src/fetch/wxsvc.h) ----
 // Off until the person turns it on from the widget (settings.weather.on): nothing is asked of the internet before.
 const wxOn = () => !!settings.get().weather?.on;
-// where the forecast is for: the city the person picked from the offline list (settings.weather.city, asked as
-// "geonames/<id>": lord-server takes its coordinates from assets/geo/cities.tsv), else the time zone's
-const wxCity = () => { const c = settings.get().weather?.city; return c && Number.isInteger(c.id) && c.id > 0 ? c : null; };
-const wxHere = () => { const c = wxCity(); return c ? `geonames/${c.id}` : localZone(); };
-const wxHereName = () => wxCity()?.name || cityName(localZone());
+// where the forecast is for: a city the person picked from the offline list (asked as "geonames/<id>": lord-server
+// takes its coordinates from assets/geo/cities.tsv), else the time zone's. Each widget has its own (opts.city, 0.8.9.1,
+// #193); settings.weather.city is the default: the last one chosen, which a new widget starts on and the calendar's
+// weather style shows (weathermodel.js widgetCity). Two widgets on the same city share one forecast: lord-server keeps
+// one per place (wxsvc.c), and a widget asks again only when its 10-minute turn comes.
+const wxCity = (w) => widgetCity(w?.opts, settings.get().weather?.city);
+const wxHere = (w) => placeOf(wxCity(w), localZone());
+const wxHereName = (w) => wxCity(w)?.name || cityName(localZone());
+const wxSetCity = (w, c) => {
+  const city = cityOk(c);
+  settings.set({ weather: { ...(settings.get().weather || {}), city } });
+  if (w) setDeskWidget(w.id, { opts: { city } });
+};
 // the city picker: which widget asked (null: closed)
 const wxPick = createStore(null);
 const wxUnit = () => settings.get().weather?.unit || unitFor(regionCountry(locale.get().region));
@@ -1282,17 +1292,17 @@ function WxGlyph({ code, day = 1, size = 40 }) {
   }
   return <View style={{ width: size, height: size, direction: 'ltr' }}>{parts}</View>;
 }
-// Weather → Location…: a search over the offline list of cities (lord.weather.cities: nothing asked of the network),
-// or back to the time zone's. Centred on the main display, in the person's theme.
+// Weather → Change city…: a search over the offline list of cities (lord.weather.cities: nothing asked of the network),
+// or back to the time zone's, for the widget that asked (w). Centred on the main display, in the person's theme.
 const foldQuery = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 '.-]/g, '').slice(0, 40);
-function CityPicker({ onClose }) {
+function CityPicker({ w, onClose }) {
   const th = useTheme() || {};
   const [q, setQ] = useState('');
   const fq = foldQuery(q).trim();
   let list = [];
   try { list = fq.length >= 2 && lord.weather?.cities ? lord.weather.cities(fq) || [] : []; } catch (e) { list = []; }
-  const cur = wxCity();
-  const pick = (c) => { settings.set({ weather: { ...(settings.get().weather || {}), city: c } }); onClose(); };
+  const cur = wxCity(w);
+  const pick = (c) => { wxSetCity(w, c); onClose(); };
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') onClose(); }), []);
   const d = mainDisplay() || { x: 0, y: 0, w: 1280, h: 800 };
   const W = 420, H = 460;
@@ -1323,20 +1333,19 @@ function WeatherBody({ w }) {
   const on = wxOn();
   useStore(settings, (s) => `${!!s.weather?.on}|${s.weather?.unit || ''}|${s.weather?.city?.id || ''}|${JSON.stringify(s.clock?.cities || [])}`);
   const picking = useStore(wxPick) === w.id;
-  const here = wxHere();
+  const here = wxHere(w);
   const zones = [here, ...(w.size === 'l' ? cities(3) : [])].filter(Boolean);
   const data = useWeather(zones, on);
   const cur = data[here], unit = wxUnit();
   const deg = (c) => `${tempIn(c, unit)}°`;
   const sky = skyOf(cur?.c != null ? kindOf(cur.c) : 'partly', cur ? cur.d : 1);
   const bleed = { position: 'absolute', left: -15, top: -13, right: -15, bottom: -14, background: `linear-gradient(170deg, ${sky[0]}, ${sky[1]})` };
-  const city = wxHereName() || t('shell.widgets.weather.name');
-  const picker = picking ? <CityPicker onClose={() => wxPick.set(null)} /> : null;
+  const city = wxHereName(w) || t('shell.widgets.weather.name');
+  const picker = picking ? <CityPicker w={w} onClose={() => wxPick.set(null)} /> : null;
   if (!on) {
     return (
       <View style={{ flex: 1, gap: 6, justifyContent: 'center' }}>
         <View style={bleed} />
-      {picker}
         {picker}
         <WxGlyph code={2} size={w.size === 's' ? 34 : 40} />
         <Text style={{ fontSize: 13, fontWeight: 650, color: WX_TEXT, textAlign: 'start' }}>{t('shell.widgets.weather.name')}</Text>
@@ -1352,7 +1361,6 @@ function WeatherBody({ w }) {
     return (
       <View style={{ flex: 1, gap: 4 }}>
         <View style={bleed} />
-      {picker}
         {picker}
         <Text style={{ fontSize: 13, fontWeight: 650, color: WX_TEXT, textAlign: 'start' }}>{city}</Text>
         <Text style={{ fontSize: 11.5, color: WX_DIM, textAlign: 'start' }}>{t(cur?.error ? 'shell.widgets.weather.offline' : 'shell.widgets.weather.loading')}</Text>
@@ -1373,13 +1381,12 @@ function WeatherBody({ w }) {
       {today ? <Text style={{ fontSize: 11.5, color: WX_DIM, textAlign: 'start' }}>{t('shell.widgets.weather.hilo', { hi: deg(today[1]), lo: deg(today[2]) })}</Text> : null}
     </View>
   );
-  if (w.size === 's') return <View style={{ flex: 1, justifyContent: 'space-between' }}><View style={bleed} />{head}{foot}</View>;
+  if (w.size === 's') return <View style={{ flex: 1, justifyContent: 'space-between' }}><View style={bleed} />{picker}{head}{foot}</View>;
   const dayName = (i) => (i === 0 ? t('shell.widgets.weather.today') : weekdayName(new Date(Date.now() + i * 86400000).getDay(), true));
   if (w.size === 'm') {
     return (
       <View style={{ flex: 1, flexDirection: 'row', gap: 10 }}>
         <View style={bleed} />
-      {picker}
         {picker}
         <View style={{ width: 120, justifyContent: 'space-between' }}>{head}{foot}</View>
         <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1795,10 +1802,11 @@ const KIND_MENU = {
     ];
   },
   weather: (w) => [
-    { label: t('shell.widgets.weather.location'), onClick: () => wxPick.set(w.id) },
+    { label: t('shell.widgets.weather.changeCity'), onClick: () => wxPick.set(w.id) },
     { label: '°C', checked: wxUnit() === 'c', onClick: () => settings.set({ weather: { ...(settings.get().weather || {}), unit: 'c' } }) },
     { label: '°F', checked: wxUnit() === 'f', onClick: () => settings.set({ weather: { ...(settings.get().weather || {}), unit: 'f' } }) },
-    { label: t('shell.widgets.clock.cities'), onClick: () => wm.open('clock') },
+    // the large one's row of other cities is the Clock's
+    ...(w.size === 'l' ? [{ label: t('shell.widgets.weather.otherCities'), onClick: () => wm.open('clock') }] : []),
     ...(wxOn() ? [{ label: t('shell.widgets.weather.turnOff'), onClick: () => settings.set({ weather: { ...(settings.get().weather || {}), on: false } }) }] : []),
   ],
   clock: (w) => [
