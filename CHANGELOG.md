@@ -72,6 +72,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Test Bench closed when F5 ran the checks again.** The fractional-scale check asked for a second
+  `wp_fractional_scale_v1` on the same window, which the protocol forbids: the compositor ended the connection and the
+  bench quit (seen on a desktop with a Lenovo keyboard; any keyboard did it). The checks now keep the one they made, and
+  bind the outputs once instead of adding a copy of each on every run (`server/src/testbench/checks.c`; checked by
+  running the checks three times in a row on LordOS: the old code quit on the second).
+
 - **The keypad typed nothing and moved the cursor instead (reported with a Lenovo USB keyboard).** Every session
   started with Num Lock off, whatever the firmware had set, so the keypad's digits were Home, End and the arrows. A
   session on a desktop computer (DMI chassis type, or no DMI, as on a Raspberry Pi) now starts with Num Lock on and its
