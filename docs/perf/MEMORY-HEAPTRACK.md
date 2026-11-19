@@ -184,5 +184,27 @@ RSS of the session with 7 widgets and a Terminal running Claude Code at rest, 3 
 
 For comparison, the same desktop **without** the Terminal measured 185 MB on ws02.
 
+**Result: 269 → 183 MB, 86 MB less (−32 %).** With the Terminal and Claude Code open, the session now
+uses less than it used before without them.
+
+## What is left, and why it stays
+
+The heap at rest after ws08, about 105 MB, plus about 69 MB of file-backed pages:
+
+| MB | What | Why it stays (for now) |
+|---:|---|---|
+| 34 | JavaScript of the desktop and every app (QuickJS) | The largest item. Lowering it means loading each app's code only when the app opens: a big change, not for 0.8.9.1 |
+| 24 | One scene per display (3 × 1080p) | Needed to paint |
+| 13 | Mesa, the GPU driver | Not ours |
+| 46 | libLLVM, file-backed | Read from disk; the kernel can drop these clean pages when memory is short |
+| 8 | Wallpapers | Three images in use |
+| 15 | Free space inside the heap that glibc has not returned | Fragmentation; `malloc_trim` already runs at rest |
+| ≤ 6 per tab | Terminal Instant Replay | A feature limit (about 1 MB in use in these runs) |
+
+The easy cuts are done. Two items remain from this work:
+
+- The 0.8.9 performance report (`docs/PERFORMANCE-0.8.9.md`).
+- On the Raspberry Pi, the 0.8.9 headless session uses more processor than 0.8.8.9 (6.1 % against 3.4 %).
+
 The data (CSVs, reports) is in `docs/perf/0.8.9.1/`. The report on 0.8.9 itself will be
 `docs/PERFORMANCE-0.8.9.md`.
