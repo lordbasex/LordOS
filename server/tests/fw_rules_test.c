@@ -61,6 +61,10 @@ static void test_canon(void) {
     CHECK(!fw_app_canon("lordos", o, sizeof o) && !strcmp(o, "lordos"));
     CHECK(!fw_app_canon("desktop:org.chromium.Chromium", o, sizeof o) && !strcmp(o, "desktop:org.chromium.Chromium"));
     CHECK(!fw_app_canon("app-lordos-lpk-sudoku.scope", o, sizeof o) && !strcmp(o, "lpk:sudoku"));
+    /* a Flatpak app's root-owned scope (docs/FLATPAK.md, E2) */
+    CHECK(!fw_app_canon("app-lordos-fp-org.gnome.Calculator.scope", o, sizeof o) && !strcmp(o, "flatpak:org.gnome.Calculator"));
+    CHECK(!fw_app_canon("flatpak:org.gnome.Calculator", o, sizeof o) && !strcmp(o, "flatpak:org.gnome.Calculator"));
+    CHECK(fw_app_canon("app-lordos-fp-.scope", o, sizeof o) || strcmp(o, "flatpak:"));
     CHECK(!fw_app_canon("app-lordos-org.mozilla.firefox.scope", o, sizeof o) && !strcmp(o, "desktop:org.mozilla.firefox"));
     CHECK(!fw_app_canon("/usr/bin/curl", o, sizeof o) && !strcmp(o, "/usr/bin/curl"));
     const char *bad[] = { "", "desktop:", ":x", "a b", "a\"b", "/usr/../bin/sh", "/usr//bin", "/usr/bin/", "rel/path",
@@ -83,6 +87,7 @@ static void test_canon(void) {
     CHECK(!fw_scope_app("lordos-net-mail.scope", o, sizeof o) && !strcmp(o, "lordos:mail"));
     CHECK(!fw_scope_app("app-lordos-firefox.scope", o, sizeof o) && !strcmp(o, "desktop:firefox"));
     CHECK(!fw_scope_app("app-lordos-lpk-notes.scope", o, sizeof o) && !strcmp(o, "lpk:notes"));
+    CHECK(!fw_scope_app("app-lordos-fp-com.voxdsp.Tuxocide.scope", o, sizeof o) && !strcmp(o, "flatpak:com.voxdsp.Tuxocide"));
     CHECK(!fw_scope_app("app-lordos-lordos-vmdisplay.scope", o, sizeof o) && !strcmp(o, "desktop:lordos-vmdisplay"));
     const char *badvm[] = { "app-lordos-lordos-vm-.scope", "app-lordos-lordos-vm-ABC.scope", "app-lordos-lordos-vm-x y.scope",
                             "app-lordos-lordos-vm-0f8e2a6c", "app-lordos-lordos-vm-0f8e2a6c-1b2d-4c3e-9a7b-1122334455667.scope",

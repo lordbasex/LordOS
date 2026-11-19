@@ -130,9 +130,11 @@ int fw_app_canon(const char *in, char *out, size_t n) {
     char buf[FW_APP_MAX];
     const char *pre = NULL, *mid = in;
     size_t mlen = len;
-    /* cgroup scopes (sec/cgroup.h): the .lpk one first, since it's the longest */
+    /* cgroup scopes (sec/cgroup.h): the .lpk and Flatpak ones first, since they're the longest */
     if (ends_with(in, len, ".scope") && !strncmp(in, "app-lordos-lpk-", 15) && len > 15 + 6) {
         pre = "lpk:"; mid = in + 15; mlen = len - 15 - 6;
+    } else if (ends_with(in, len, ".scope") && !strncmp(in, "app-lordos-fp-", 14) && len > 14 + 6) {
+        pre = "flatpak:"; mid = in + 14; mlen = len - 14 - 6;     /* a Flatpak app's scope (docs/FLATPAK.md, E2) */
     } else if (ends_with(in, len, ".scope") && !strncmp(in, "app-lordos-", 11) && len > 11 + 6) {
         pre = "desktop:"; mid = in + 11; mlen = len - 11 - 6;
     }

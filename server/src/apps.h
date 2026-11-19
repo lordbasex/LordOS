@@ -44,7 +44,13 @@ int apps_is_terminal(const char *id);
 /* Same, but opening a file or folder (see apps.c: only apps with MimeType and paths in the
  * home folder or the user's mounts, as a single argument). */
 int apps_launch_with(const char *id, const char *path);
-int apps_launch_uri(const char *id, const char *uri);    /* vnc://, rdp://, http(s):// for the app that declares the scheme */
+int apps_launch_uri(const char *id, const char *uri);
+/* Flatpak apps (docs/FLATPAK.md, E1 and E2): only an installed app's id (fpak_id_ok), started by `flatpak run` with a
+ * command line built in C, in its root-owned app-lordos-fp-<id>.scope and the launcher's view. With: one real path in
+ * the home folder or the user's mounts. 0 started; -1 refused (apps_last_error says why when it can). */
+int apps_launch_flatpak(const char *id);
+int apps_launch_flatpak_with(const char *id, const char *path);
+int apps_flatpak_installed(const char *id);    /* vnc://, rdp://, http(s):// for the app that declares the scheme */
 #define APPS_URI_WEB_MAX 3000                                /* an http(s) address at most (the others: 300) */
 /* The app that opens files of a MIME type, as apps_launch_with(id = "") picks it: out gets its desktop
  * id ("firefox-esr.desktop", or the user's "lordos-<app>.desktop"). Order: [Default Applications] of

@@ -3,3 +3,10 @@
 build/flatpak-view-probe: tests/flatpak_view_probe.c src/sec/sandbox.c src/sec/cgroup.c src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/flatpak_view_probe.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
+
+# Flatpak apps for the launcher: ids, the installation, the `flatpak run` command line (src/fpak.c)
+test: build/fpak-test
+build/fpak-test: tests/fpak_test.c src/fpak.c src/fpak.h src/fw/rules.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/fpak_test.c src/fpak.c
+	./$@ || (rm -f $@; exit 1)

@@ -2172,6 +2172,27 @@ static JSValue f_apps_launch_with(JSContext *c, JSValueConst this_val, int argc,
     return JS_NewBool(c, ok);
 }
 
+/* lord.apps.launchFlatpak(id) / launchFlatpakWith(id, path): an installed Flatpak app by its id only (docs/FLATPAK.md,
+ * E1): the command line is built in C (apps.c, fpak.c), never from an export's Exec line. → true if it started. */
+static JSValue f_apps_launch_flatpak(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    const char *id = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    if (!id) return JS_FALSE;
+    int ok = apps_launch_flatpak(id) == 0;
+    JS_FreeCString(c, id);
+    return JS_NewBool(c, ok);
+}
+static JSValue f_apps_launch_flatpak_with(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    const char *id = argc > 1 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    const char *p = argc > 1 && JS_IsString(argv[1]) ? JS_ToCString(c, argv[1]) : NULL;
+    char path[PATH_MAX];
+    int ok = id && p && !resolve_in_home(p, path) && apps_launch_flatpak_with(id, path) == 0;
+    if (id) JS_FreeCString(c, id);
+    if (p) JS_FreeCString(c, p);
+    return JS_NewBool(c, ok);
+}
+
 /* lord.apps.launchUri(id, uri): a vnc:// or rdp:// address for a Linux app that declares the scheme. */
 static JSValue f_apps_launch_uri(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
@@ -2459,6 +2480,8 @@ static const JSCFunctionListEntry apps_funcs[] = {
     JS_CFUNC_DEF("linux", 1, f_apps_linux),
     JS_CFUNC_DEF("launch", 1, f_apps_launch),
     JS_CFUNC_DEF("launchWith", 2, f_apps_launch_with),
+    JS_CFUNC_DEF("launchFlatpak", 1, f_apps_launch_flatpak),
+    JS_CFUNC_DEF("launchFlatpakWith", 2, f_apps_launch_flatpak_with),
     JS_CFUNC_DEF("launchUri", 2, f_apps_launch_uri),
     JS_CFUNC_DEF("actions", 2, f_apps_actions),
     JS_CFUNC_DEF("launchAction", 2, f_apps_launch_action),

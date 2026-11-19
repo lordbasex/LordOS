@@ -2,6 +2,7 @@
  * tests of the firewall's "no access to your files" (tests/fwlinux/files.sh).
  *
  *   build/launch-cli <desktop id> [file]
+ *   build/launch-cli --flatpak <Flatpak app id> [file]    (docs/FLATPAK.md: the Flatpak launch path)
  *
  * Reads ~/.config/lordos/firewall.json into the same store lord.fw uses (sec/restrict.h) and
  * calls apps_launch / apps_launch_with: the real launcher code, Landlock plan included. Outside
@@ -17,13 +18,16 @@
 #include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* restrict.c's other users (the broker, the permission store) aren't part of this tool */
 void brokersrv_revoke(const char *app, const char *perm) { (void)app; (void)perm; }
 PermState perm_get(const char *app_id, Perm p) { (void)app_id; (void)p; return PERM_ASK; }
 
 int main(int argc, char **argv) {
-    if (argc < 2 || argc > 3) { fprintf(stderr, "usage: launch-cli <desktop id> [file]\n"); return 2; }
+    int fp = argc > 1 && !strcmp(argv[1], "--flatpak");
+    if (fp) { argv++; argc--; }
+    if (argc < 2 || argc > 3) { fprintf(stderr, "usage: launch-cli [--flatpak] <id> [file]\n"); return 2; }
     const char *home = getenv("HOME");
     char path[4096], err[200] = "";
     snprintf(path, sizeof path, "%s/.config/lordos/firewall.json", home ? home : "/nonexistent");
@@ -35,7 +39,9 @@ int main(int argc, char **argv) {
     if (home && realpath(home, real)) fsops_init(real, user ? user : "");   /* the roots "Open with" accepts */
     const DesktopApp *list;
     apps_list("en", &list);
-    int r = argc == 3 ? apps_launch_with(argv[1], argv[2]) : apps_launch(argv[1]);
+    int r = fp ? (argc == 3 ? apps_launch_flatpak_with(argv[1], argv[2]) : apps_launch_flatpak(argv[1]))
+               : argc == 3 ? apps_launch_with(argv[1], argv[2]) : apps_launch(argv[1]);
+    if (r && apps_last_error()[0]) fprintf(stderr, "launch-cli: %s\n", apps_last_error());
     printf("launch-cli: %s → %s\n", argv[1], r ? "not launched" : "launched");
     return r ? 1 : 0;
 }

@@ -254,6 +254,19 @@ no LordOS session and no app scope, so it shows the mechanics, not the identity)
 | view with the session bus, `flatpak-session-helper.service` masked | runs; stays in its cgroup; `/etc/resolv.conf` and `/etc/localtime` are right without the helper |
 | no view, helper masked | still moves itself to `user@`: the mask doesn't replace the view |
 
+**The launch path itself, Checked on 2026-11-19** on the same VM with `build/launch-cli --flatpak <id>` (the real
+`apps_launch_flatpak`: `server/src/apps.c` and `server/src/fpak.c`) and Flathub's `com.voxdsp.Tuxocide`, given the whole
+home with `flatpak override --user --filesystem=home` to stand for an app that declares it:
+
+| Restriction | What the app saw |
+|---|---|
+| none | its processes (bubblewrap, the app, its D-Bus proxy) stayed in the cgroup they were launched in; `~/Documents` readable (the grant); `~/.config/lordos` hidden; `~/.bashrc` readable but not writable (the override's home grant counts as well as the metadata's) |
+| no-files | `~/Documents`, `~/.config/lordos` and `~/.bashrc` absent |
+| no-mic (a device restriction) | no session bus in its runtime folder and no D-Bus proxy |
+
+Outside a LordOS session the app can't be placed in `app-lordos-fp-<id>.scope` (that needs lord-sessiond), so its
+identity in the firewall and the Monitor is still to check in a session on VM 127.
+
 So the launcher needs the view for every Flatpak app (open question 11) **and** `flatpak-session-helper.service`
 masked as well (proposed as E5b, below). The mask also removes `org.freedesktop.Flatpak` (`flatpak-spawn --host`, any
 command outside the sandbox) instead of only refusing it with `--no-talk-name`. The runtime with its locale and codecs

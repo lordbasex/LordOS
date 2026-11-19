@@ -19,6 +19,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   and `flatpak-spawn --host` has no service behind it; `~/.local/share/flatpak` (installations, trusted keys,
   overrides, exports) joins `lord.fs`'s deny list; desktop ids and app scopes starting with `fp-` are reserved for
   Flatpak apps (`app-lordos-fp-<id>.scope`, identity `flatpak:<id>`). Nothing installs Flatpak yet.
+- **The Flatpak launch path** (in development): `lord.apps.launchFlatpak(id)` and `launchFlatpakWith(id, path)` take
+  only an installed app's id (Flatpak's id rules, at most 59 bytes), read the installation without following a link
+  out of the app's folder (`server/src/fpak.c`) and build the `flatpak run` command line in C, never from an export's
+  `Exec` line: no unfiltered session or system bus; no `org.freedesktop.Flatpak`, `systemd1`, `secrets` or the
+  sub-sandbox portal; LordOS's own bus names only to talk to, never to own; LordOS's folders, autostart, `~/.local/bin`
+  and Flatpak's overrides and exports hidden; the shell's startup files read-only when the app gets the home; LordOS's
+  restrictions also as Flatpak options. Every Flatpak app runs in its root-owned scope and in the launcher's view,
+  which hides the user manager's socket, so `flatpak run` can't move it out (checked on a VM: without the view it
+  moves itself under `user@`). `fw_app_canon` reads `app-lordos-fp-<id>.scope` as `flatpak:<id>`, so the firewall,
+  the Monitor, notifications and the PipeWire guard know the app. Tests: `fpak-test` (47), `fw-rules-test`;
+  `build/flatpak-view-probe` and `launch-cli --flatpak` for the VM.
 
 ### Documentation
 

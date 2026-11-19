@@ -42,6 +42,7 @@
 #include "wl/xauth.h"
 #include "wl/xdgact.h"
 #include "term/termapp.h"
+#include "fpak.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -871,6 +872,184 @@ int apps_launch_with(const char *id, const char *path) {
         id = def;
     }
     return launch(id, real, NULL);
+}
+
+/* ---- Flatpak apps (docs/FLATPAK.md; AGENTS.md "Flatpak as an app source", E1 and E2) ----
+ * Only an id: the installation is read here, the command line is built by fpak_argv from fixed tables, never an
+ * export's Exec line. Every Flatpak app runs in its root-owned app-lordos-fp-<id>.scope and in the launcher's view
+ * (never systemd/ in it: otherwise `flatpak run` has the user manager move it out of the scope). Phase 1: x86-64. */
+
+/* /usr/bin/flatpak root's and not writable by anyone else */
+static int flatpak_binary_ok(void) {
+    struct stat st;
+    return !lstat(FPAK_FLATPAK, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && !(st.st_mode & 022) && (st.st_mode & 0111);
+}
+
+/* the user's installation first, then the system's (read only: LordOS never installs there) */
+static int flatpak_find(const char *id, char *arch, size_t an, char *branch, size_t bn, char *md, size_t mn) {
+    const char *h = getenv("HOME");
+    char root[PATH_MAX];
+    if (h && h[0] == '/' && snprintf(root, sizeof root, "%s/.local/share/flatpak", h) < (int)sizeof root &&
+        !fpak_installed(root, id, arch, an, branch, bn, md, mn))
+        return 0;
+    return fpak_installed("/var/lib/flatpak", id, arch, an, branch, bn, md, mn);
+}
+
+int apps_flatpak_installed(const char *id) {
+    char arch[32], branch[FPAK_BRANCH_MAX];
+    return fpak_id_ok(id) && !flatpak_find(id, arch, sizeof arch, branch, sizeof branch, NULL, 0);
+}
+
+/* The view of a Flatpak app. Unrestricted: the home as it is (Flatpak exposes only what its arguments allow) and the
+ * session bus, which the app reaches only through Flatpak's filtering proxy (--nosocket=session-bus). Device-restricted:
+ * no bus, as for Linux apps. No access to files: an empty home with only its ~/.var/app/<id> (rw), the installation
+ * (ro, `flatpak run` reads it) and the opened file. Never systemd/ or any other socket of the session. */
+static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *opened) {
+    FilesPlan *p = view_plan(NULL);
+    if (!p) return NULL;
+    int dev = (restricted & (FW_R_NO_FILES | FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_USB | FW_R_NO_BLUETOOTH)) != 0;
+    if (!dev) {
+        int n = 0;
+        while (p->cfg.sockets[n]) n++;
+        if (n < 7) { p->cfg.sockets[n++] = "bus"; p->cfg.sockets[n] = NULL; }
+    }
+    if (restricted & FW_R_NO_FILES) {
+        p->cfg.keep_home = 0;
+        char path[PATH_MAX + 128];
+        static const char *const dirs[] = { "%s/.var%s", "%s/.var/app%s", "%s/.var/app/%s" };
+        for (int k = 0; k < 3; k++) {
+            if (snprintf(path, sizeof path, dirs[k], p->home, k == 2 ? id : "") >= (int)sizeof path) { free(p); return NULL; }
+            mkdir(path, 0700);
+        }
+        if (is_dir(path)) plan_add(p, 1, "%s%s", path, "");
+        plan_add(p, 0, "%s/.local/share/%s", p->home, "flatpak");
+        if (opened) {
+            struct stat st;
+            if (stat(opened, &st)) { free(p); return NULL; }
+            plan_add(p, grant_ok(opened), "%s%s", opened, "");
+            snprintf(p->opened, sizeof p->opened, "%s", opened);
+            p->cfg.opened = p->opened;
+            p->cfg.opened_dev = (unsigned long long)st.st_dev;
+            p->cfg.opened_ino = (unsigned long long)st.st_ino;
+        }
+    }
+    return p;
+}
+
+static int launch_flatpak(const char *id, const char *opened) {
+    last_error[0] = 0;
+#if !defined(__x86_64__)
+    (void)id; (void)opened;
+    snprintf(last_error, sizeof last_error, "apps.flatpakArch");          /* phase 1: x86-64 PCs only */
+    return -1;
+#else
+    char arch[32], branch[FPAK_BRANCH_MAX];
+    char *md = malloc(16384);
+    if (!md || !fpak_id_ok(id) || flatpak_find(id, arch, sizeof arch, branch, sizeof branch, md, 16384) ||
+        strcmp(arch, "x86_64") || !flatpak_binary_ok()) {
+        free(md);
+        return -1;
+    }
+    /* the home may also come from an override file (the user's or the system's, for the app or for all apps): any of
+     * them granting it is enough to keep the shell's startup files read-only */
+    int grants_home = fpak_meta_grants_home(md);
+    const char *hm = getenv("HOME");
+    char ov[PATH_MAX];
+    const char *const ovdirs[] = { "%s/.local/share/flatpak/overrides/%s", "/var/lib/flatpak/overrides/%s%s" };
+    for (int k = 0; k < 2 && !grants_home; k++)
+        for (int g = 0; g < 2 && !grants_home; g++) {
+            const char *name = g ? "global" : id;
+            if (k == 0 ? (!hm || snprintf(ov, sizeof ov, ovdirs[0], hm, name) >= (int)sizeof ov)
+                       : snprintf(ov, sizeof ov, ovdirs[1], name, "") >= (int)sizeof ov)
+                continue;
+            int fd = open(ov, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+            if (fd < 0) continue;
+            ssize_t r = read(fd, md, 16383);
+            close(fd);
+            md[r > 0 ? r : 0] = 0;
+            grants_home = fpak_meta_grants_home(md);
+        }
+    free(md);
+    char fwid[FW_APP_MAX], scope[96];
+    snprintf(fwid, sizeof fwid, "flatpak:%s", id);
+    snprintf(scope, sizeof scope, "fp-%s", id);
+    static const uint32_t flags[] = { FW_R_NO_NETWORK, FW_R_NO_USB, FW_R_NO_BLUETOOTH, FW_R_NO_FILES, FW_R_NO_MIC, FW_R_NO_CAMERA };
+    uint32_t restricted = 0;
+    for (size_t i = 0; i < sizeof flags / sizeof flags[0]; i++) if (restrict_blocks(fwid, flags[i])) restricted |= flags[i];
+    /* every Flatpak app runs in the view, whose abstract sockets only Landlock's scoping (ABI 6) keeps apart */
+    if (sandbox_landlock_abi() < 6) {
+        fprintf(stderr, "apps: %s: this kernel's Landlock is too old (ABI < 6) for a Flatpak app: not launched\n", id);
+        snprintf(last_error, sizeof last_error, "apps.restrictKernel");
+        return -1;
+    }
+    FilesPlan *plan = flatpak_plan(id, restricted, opened);
+    char *argv[FPAK_ARGV_MAX];
+    char *buf = malloc(8192);
+    FpakRun r = { .id = id, .arch = arch, .branch = branch, .restricted = restricted, .grants_home = grants_home,
+                  .home = plan ? plan->home : NULL, .opened = opened, .x11 = 0 };  /* no X: the view's /tmp has no X socket */
+    if (!plan || !buf || fpak_argv(&r, argv, buf, 8192) < 0) {
+        fprintf(stderr, "apps: %s: the Flatpak app's view or command line can't be built: not launched\n", id);
+        free(plan);
+        free(buf);
+        return -1;
+    }
+    char token[XACT_TOKEN_LEN + 1] = "";
+    const char *tk = xact_issue(xact_now(), XACT_LAUNCH_MS, 1, id);
+    if (tk) snprintf(token, sizeof token, "%s", tk);
+    int logfd = open_log(id, NULL, opened);
+    pid_t pid = fork();
+    if (pid == 0) {
+        setsid();                                   /* its own session: never signals for lord-server's group */
+        if (fork() != 0) _exit(0);
+        sigset_t none;
+        sigemptyset(&none);
+        sigprocmask(SIG_SETMASK, &none, NULL);
+        for (int s = 1; s < 32; s++) signal(s, SIG_DFL);
+        int null = open("/dev/null", O_RDWR);
+        if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); }
+        if (logfd >= 0) { dup2(logfd, 1); dup2(logfd, 2); }
+        syscall(SYS_close_range, 3, ~0u, 0);
+        const char *home = getenv("HOME");
+        if (home && chdir(home)) {}
+        /* its root-owned scope (not app_scope_reserved: "fp-" is reserved for this path alone) */
+        if (app_scope_enter(scope) && getenv("LORDOS_SESSIOND")) {
+            static const char msg[] = "apps: could not place the Flatpak app in its own scope: not launched\n";
+            if (write(2, msg, sizeof msg - 1) < 0) {}
+            _exit(126);
+        }
+        xauth_env_drop();
+        unsetenv("DISPLAY");
+        /* a device-restricted app has no session bus at all: `flatpak run` then starts no proxy */
+        if (restricted & (FW_R_NO_FILES | FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_USB | FW_R_NO_BLUETOOTH)) unsetenv("DBUS_SESSION_BUS_ADDRESS");
+        if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");
+        /* the view, then Landlock's scoping only: its file rules would forbid the mounts bubblewrap makes */
+        if (sandbox_files_isolate(&plan->cfg) || sandbox_apply_scope()) {
+            static const char msg[] = "apps: could not build the Flatpak app's view: not launched\n";
+            if (write(2, msg, sizeof msg - 1) < 0) {}
+            _exit(126);
+        }
+        execve(FPAK_FLATPAK, argv, environ);
+        _exit(127);
+    }
+    if (logfd >= 0) close(logfd);
+    free(plan);
+    free(buf);
+    if (pid < 0) return -1;
+    waitpid(pid, NULL, 0);
+    return 0;
+#endif
+}
+
+int apps_launch_flatpak(const char *id) { return launch_flatpak(id, NULL); }
+
+/* "Open with" for a Flatpak app: launchWith's rules for the path (a real path in the home folder or the user's mounts,
+ * a regular file or folder); it is granted with --filesystem=<path> and passed after the id. */
+int apps_launch_flatpak_with(const char *id, const char *path) {
+    char real[PATH_MAX];
+    struct stat st;
+    if (!path || !realpath(path, real) || !fsops_allowed(real) || stat(real, &st) || !(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode))) return -1;
+    if (fsops_protected(real)) return -1;
+    return launch_flatpak(id, real);
 }
 
 /* A remote desktop or web address for the app that declares that scheme: vnc:// or rdp:// and a strict set of characters.
