@@ -16,6 +16,9 @@ static int pass, failc;
 static double now(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec + t.tv_nsec / 1e9; }
 
 int main(void) {
+    /* run from a Terminal inside a LordOS session, LORDOS_SESSIOND is inherited: the child would then ask the real
+     * lord-sessiond for a cgroup scope, which it refuses for a process outside the session's leaf, and die (126) */
+    unsetenv("LORDOS_SESSIOND");
     char out[4096];
     /* a program that stalls, with and without closing its output */
     char *sl[] = { "/bin/sleep", "60", NULL };

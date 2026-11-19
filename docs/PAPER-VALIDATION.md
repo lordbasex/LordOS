@@ -350,6 +350,9 @@ pre-release that never shipped. The paper marks all of it "0.8.9, in development
 |---|---|---|---|
 | 7.1 | A session at rest with 3 × 1080p, Lord Workspaces, 7 widgets and a Terminal running Claude Code: 269 → 183 MB RSS; transform rasters freed after 30 s at rest, the Terminal's history growing as it fills, no huge pages for lord-server's `.bss` | Measured (the maintainer's PC with an RX 580, a fresh session per build, `tools/bench/session-sample.sh`; `docs/perf/MEMORY-HEAPTRACK.md`, data in `docs/perf/0.8.9.1/`) | Measured once per step |
 | 7.1 | The history ring keeps every line in order across growth, clearing and reflow | Test (`vt-dump` suites in `tests/run_suites.sh`; `build/vt-ring-test` in `make test`: 20,000 lines with a clear and a resize; also run once under AddressSanitizer, 2026-11-19) | Holds in the tests |
+| 2.4 | The Control Center's Wi-Fi tile switches Wi-Fi through the existing closed `net-up`/`net-down` actions and shows the connected network's name, read without root from nl80211 (#192) | Test (`net-test wireless`: `net_ssid_text`; `menubar_model_test.mjs`: `wifiTile`, `wifiTileView`); strace shows the unprivileged `GET_INTERFACE` answered | Not yet on hardware: no connected network was read, the switch not pressed |
+| 5.1 | A paused Cloud account sends nothing to its provider: no mount retries, check listing, quota call, background listing or change polling (#194) | Test (`cloud-test` `t_pause`: `cloud_bring_up_ok` and the `vfs/poll-interval` call) | Not yet with a real Google account or a packet capture |
+| 5.1 | The package installs `assets/cloud/providers.json`, so verified providers read verified (#195) | Test (`cloud_model_test.mjs`: mkdeb.sh installs `assets/cloud`, the fallback) | Not yet in a built .deb |
 
 ## What the paper must change for 0.8.5
 

@@ -4,7 +4,7 @@
 // Default Apps (issue #58, sdk/sysopen.js openCalendarApp).
 import {
   View, Text, ScrollView, Toggle, useStore, notifyHistory, clearNotifyHistory, settings, notifyPrefs, dndActive, useSettings,
-  getApp, appName, formatTime, formatDate, monthName, weekdayName, locale, addListener, t as tr, menuBarPrefs, monthCells, weekStartFor,
+  getApp, appName, formatTime, formatDate, monthName, weekdayName, locale, addListener, t as tr, menuBarPrefs, monthWeeks, weekStartFor,
   openCalendarApp,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -47,9 +47,8 @@ function MonthCalendar({ t }) {
   const [cur, setCur] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const first = weekStartFor(locale.get().lang);      // the week starts on Sunday in English
   const y = cur.getFullYear(), m = cur.getMonth();
-  const cells = monthCells(y, m, first);
+  const weeks = monthWeeks(y, m, first);
   const isToday = (d) => d && y === today.getFullYear() && m === today.getMonth() && d === today.getDate();
-  const cell = (W - 32) / 7;
   return (
     <View style={{ gap: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -65,18 +64,24 @@ function MonthCalendar({ t }) {
       </View>
       <View style={{ flexDirection: 'row' }}>
         {Array.from({ length: 7 }, (_, i) => (
-          <Text key={i} style={{ width: cell, fontSize: 11, color: t.textDim, textAlign: 'center' }}>{weekdayName((i + first) % 7).slice(0, 2)}</Text>
+          <Text key={i} style={{ flex: 1, fontSize: 11, color: t.textDim, textAlign: 'center' }}>{weekdayName((i + first) % 7).slice(0, 2)}</Text>
         ))}
       </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-        {cells.map((d, i) => (
-          <View key={i} onClick={d ? () => openCalendarApp(new Date(y, m, d, 9).getTime()) : undefined}
-            style={{ width: cell, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-            {d ? (
-              <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: isToday(d) ? t.accent : 'transparent' }}>
-                <Text style={{ fontSize: 12, color: isToday(d) ? '#fff' : t.text, fontWeight: isToday(d) ? 600 : 400 }}>{d}</Text>
+      {/* a row per week, seven equal cells (#197: a wrapping row of W / 7 wide cells, which forgot the panel's
+          border, put the seventh day on the next line) */}
+      <View>
+        {weeks.map((wk, r) => (
+          <View key={r} style={{ flexDirection: 'row' }}>
+            {wk.map((d, i) => (
+              <View key={i} onClick={d ? () => openCalendarApp(new Date(y, m, d, 9).getTime()) : undefined}
+                style={{ flex: 1, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+                {d ? (
+                  <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: isToday(d) ? t.accent : 'transparent' }}>
+                    <Text style={{ fontSize: 12, color: isToday(d) ? '#fff' : t.text, fontWeight: isToday(d) ? 600 : 400 }}>{d}</Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
+            ))}
           </View>
         ))}
       </View>

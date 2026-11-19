@@ -6,7 +6,10 @@
 // where a click lights that bar and opens the menu there. sdk/menubarmodel.js decides which bar is lit.
 // From the keyboard: F10, or ⌥ pressed and released alone, opens the lit bar's first menu (sdk/shortcuts.js
 // addMenuBarKeys); ← and → then move between its menus (sdk/menunav.js barIndex), and the same key closes it.
-import { View, Text, useStore, sharedTicker, barDisplays, activeBarId, pinBar, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs, addMenuBarKeys, barIndex, webHelpItems } from '@lordos/sdk';
+// With a menu open, the pointer on another title opens that one (sdk/menunav.js barHover; #190). Every item takes the
+// bar's whole height, so the pointer pushed against the top of the display is on it (Fitts's law; #190: the 22 px
+// items, centered in the 28 px bar, left the top 3 px of the display on the bar itself, where a click did nothing).
+import { View, Text, useStore, sharedTicker, barDisplays, activeBarId, pinBar, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs, addMenuBarKeys, barIndex, barHover, webHelpItems } from '@lordos/sdk';
 import { useState, useRef, useEffect } from 'react';
 import { Menu } from './Menu.jsx';
 
@@ -18,13 +21,17 @@ const clockTicker = sharedTicker(format, 1000);
 // the [x, width] of a bar item (global), for the panel it opens to sit under it
 const itemAt = (ref) => { try { const [x, , w] = lord.getLayout(ref.current.id); return [x, w]; } catch (e) { return null; } };
 
-function BarItem({ t, children, onClick, active, anchorRef }) {
+// The item is as tall as the bar (alignSelf: stretch), its highlight the 22 px pill inside. onEnter: the pointer came
+// onto it (a menu title switches the open menu there).
+function BarItem({ t, children, onClick, active, anchorRef, onEnter }) {
   const [hover, setHover] = useState(false);
   return (
-    <View ref={anchorRef} onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ height: 22, paddingHorizontal: 9, borderRadius: 5, justifyContent: 'center', flexDirection: 'row', alignItems: 'center',
+    <View ref={anchorRef} onClick={onClick} onMouseEnter={() => { setHover(true); onEnter?.(); }} onMouseLeave={() => setHover(false)}
+      style={{ alignSelf: 'stretch', justifyContent: 'center' }}>
+      <View style={{ height: 22, paddingHorizontal: 9, borderRadius: 5, justifyContent: 'center', flexDirection: 'row', alignItems: 'center',
         backgroundColor: active || hover ? t.menuHover : 'transparent' }}>
-      {children}
+        {children}
+      </View>
     </View>
   );
 }
@@ -78,6 +85,8 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
     if (!active && onActivate) onActivate();
     setOpen((o) => (o?.name === name ? null : { name, x: anchorX(ref) }));
   };
+  // the pointer onto a menu title while another menu of this bar is open: that one opens instead (#190)
+  const slide = (name, ref) => setOpen((o) => (barHover(o?.name, name) ? { name, x: anchorX(ref) } : o));
   const dim = !active;
   const close = () => setOpen(null);
   // the menus in the bar's order, for ← and → (keys: opened from the keyboard, its first row highlighted)
@@ -139,20 +148,20 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         position: 'absolute', left: area.x, top: area.y, width: area.w, height, flexDirection: 'row', alignItems: 'center',
         paddingHorizontal: 8, backgroundColor: t.menuBg, backdropFilter: `blur(${t.blur}px)`,
       }}>
-        <BarItem t={t} active={open?.name === 'logo'} anchorRef={refs.logo} onClick={() => toggle('logo', refs.logo)}>
+        <BarItem t={t} active={open?.name === 'logo'} anchorRef={refs.logo} onClick={() => toggle('logo', refs.logo)} onEnter={() => slide('logo', refs.logo)}>
           <LordOSGlyph size={16} color={t.menuText} />
         </BarItem>
-        <BarItem t={t} active={open?.name === 'app'} anchorRef={refs.app} onClick={() => toggle('app', refs.app)}><Label t={t} bold dim={dim}>{app ? (app.builtin ? windowAppName(wm.get(focused)) : appName(app)) : 'LordOS'}</Label></BarItem>
+        <BarItem t={t} active={open?.name === 'app'} anchorRef={refs.app} onClick={() => toggle('app', refs.app)} onEnter={() => slide('app', refs.app)}><Label t={t} bold dim={dim}>{app ? (app.builtin ? windowAppName(wm.get(focused)) : appName(app)) : 'LordOS'}</Label></BarItem>
         {extra.map((m, i) => {
           const key = `app${i}`;
           const ref = { get current() { return appRefs.current[key]; } };
           return (
             <BarItem key={key} t={t} active={open?.name === key} anchorRef={(inst) => { appRefs.current[key] = inst; }}
-              onClick={() => toggle(key, ref)}><Label t={t} dim={dim}>{m.label}</Label></BarItem>
+              onClick={() => toggle(key, ref)} onEnter={() => slide(key, ref)}><Label t={t} dim={dim}>{m.label}</Label></BarItem>
           );
         })}
-        <BarItem t={t} active={open?.name === 'window'} anchorRef={refs.window} onClick={() => toggle('window', refs.window)}><Label t={t} dim={dim}>{tr('shell.menu.window')}</Label></BarItem>
-        <BarItem t={t} active={open?.name === 'help'} anchorRef={refs.help} onClick={() => toggle('help', refs.help)}><Label t={t} dim={dim}>{tr('shell.menu.help')}</Label></BarItem>
+        <BarItem t={t} active={open?.name === 'window'} anchorRef={refs.window} onClick={() => toggle('window', refs.window)} onEnter={() => slide('window', refs.window)}><Label t={t} dim={dim}>{tr('shell.menu.window')}</Label></BarItem>
+        <BarItem t={t} active={open?.name === 'help'} anchorRef={refs.help} onClick={() => toggle('help', refs.help)} onEnter={() => slide('help', refs.help)}><Label t={t} dim={dim}>{tr('shell.menu.help')}</Label></BarItem>
         <View style={{ flex: 1 }} />
         {bar.keyboard ? (
           <BarItem t={t} onClick={() => keyboard.next()}>

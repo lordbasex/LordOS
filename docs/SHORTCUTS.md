@@ -122,7 +122,7 @@ clipboard panel only with no window in front. Isolated apps never receive ❖V, 
 ## Desktops
 
 `flowDesktopKeys` and `classicDesktopKeys` in `sdk/desktops.js` are part of each theme's table; [DESKTOPS.md](DESKTOPS.md)
-has the keys. In Lord Flow ⌃ arrows are word movement in apps, so they are an option, on by default: off, their
+has the keys. In Lord Flow ⌃ arrows are word movement in apps, so they are an option, off by default since 0.8.9.1 (#201; on before): off, their
 entries stop applying and leave Settings → Keyboard's list (`listed`), and `useShortcuts` asks for the `flow` table
 (its `grabs` can change while the theme runs), so the keys reach the apps. ⌃⇧ arrows always stay with the app.
 

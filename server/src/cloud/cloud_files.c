@@ -668,7 +668,7 @@ static int browse_moved(unsigned gen) {
 static int browse_acc(const char *name, const char *rel, char *id, unsigned *gen, int *polls, int *kept) {
     pthread_mutex_lock(&cl_mu);
     Acc *a = cl_find_name(name);
-    int ok = a && cl_running && a->mounted && !a->locked && !cloud_err_offline(a->err);
+    int ok = a && cl_running && a->mounted && !a->locked && !cloud_err_offline(a->err) && !cl_paused(a);   /* #194 */
     if (ok) {
         cl_pf(id, 16, "%s", a->id);
         *gen = a->mount_gen;

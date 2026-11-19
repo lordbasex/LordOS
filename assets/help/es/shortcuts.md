@@ -36,8 +36,8 @@ Una pulsación rápida vuelve a la app anterior.
 |---|---|
 | ❖ solo · F4 | Apps (el lanzador de apps) |
 | ❖Tab · ❖⇧Tab | Cambiar de app |
-| ⌃↑ · ⌃↓ | Vista general · ventanas de la app ([Escritorios](help:desktops)) |
-| ⌃← ⌃→ | Escritorio anterior o siguiente |
+| ❖⌃← ❖⌃→ | Escritorio anterior o siguiente ([Escritorios](help:desktops)) |
+| ⌃↑ · ⌃↓ · ⌃← ⌃→ | Vista general · ventanas de la app · escritorio anterior o siguiente, si las flechas con Ctrl están activadas en [Ajustes → Escritorio y Dock](settings:dock) (vienen apagadas: las apps las usan para moverse por palabras) |
 | ❖\` · ❖⇧\` | Ventana siguiente o anterior de la app |
 | ❖M | Minimizar la ventana |
 | ❖H · ❖⌥H | Ocultar la app · ocultar las demás apps |

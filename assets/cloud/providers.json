@@ -24,7 +24,7 @@
     "filen": {
       "since": "0.8.8.7",
       "date": "2026-11-09",
-      "evidence": "issue #81: a person's Check This Account report, LordOS 0.8.8.6 x86_64 (a laptop, installed), rclone v1.75.2: 9 of 10 steps passed; the link step skipped because the backend has no public links (noLinks), which is right for it"
+      "evidence": "issue #81: a person's Check This Account report, LordOS 0.8.8.6 x86_64 (a laptop, installed), rclone v1.75.2: 9 of 10 steps passed; the link step skipped because the backend has no public links (noLinks), which is right for it; issue #195: again on LordOS 0.8.9 x86_64, rclone v1.75.2: 9 passed, link skipped (noLinks)"
     },
     "onedrive": {
       "since": "0.8.8.7",

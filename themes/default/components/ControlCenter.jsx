@@ -5,12 +5,13 @@
 // A click on a tile's name (and the line under it) opens its page in Settings, as the Wi-Fi tile always did: Dark
 // Mode, Transparency and Accent open Appearance, Sound opens Sound and Wallpaper opens Wallpaper (issue #58).
 // Switch tiles (issue #114): a click anywhere on the tile turns it on or off and the tile shows which (the accent when
-// on, grey when off); its name and the › at its end open its page in Settings. Wi-Fi's icon shows the signal's bars.
+// on, grey when off); its name and the › at its end open its page in Settings. Wi-Fi's (issue #192) is the accent when
+// the radio is on too, but only its round icon turns it on or off; the rest of it opens Settings → Network → Wi-Fi.
 // The panel scrolls when a short screen can't hold it all.
 import {
   View, Text, Image, Slider, useSettings, settings, useCpuUsage, useSystemInfo, memUsedKB, formatBytes, wm, session, addListener, t as tr,
   useSound, defaultSink, sound, NowPlayingTile, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, screenDisplays, menuBarPrefs, SoundOutputList, useSoundOutputs, useBluetooth, setBluetoothPower,
-  panelLeft, inBar, ScrollView, screen, nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiBars, DisclosureGlyph,
+  panelLeft, inBar, ScrollView, screen, nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiTile, wifiTileView, admin, DisclosureGlyph,
   MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, BluetoothGlyph, SignalGlyph,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -134,21 +135,44 @@ function SoundTile({ t, onClose }) {
   );
 }
 
-// The Wi-Fi radio (only when the computer has one): connected or not, with the signal's bars on its icon (the level
-// lord.net.interfaces() reads from /proc/net/wireless, issue #114); a click opens Settings → Network → Wi-Fi.
-function WifiTile({ t, onClose, radios }) {
-  const on = radios.find((i) => i.addresses.some((a) => a.scope === 'global' && a.family === 4));
-  const ip = on?.addresses.find((a) => a.family === 4 && a.scope === 'global')?.address;
+// The Wi-Fi radio (only when the computer has one; issue #192), w from wifiTile(): the accent when it is on and grey when
+// it is off, like Bluetooth's tile. Its round icon turns it on or off with net-up / net-down, the administration
+// helper's actions behind the switch on its page in Settings → Network (no other way in); with no helper, or a radio the
+// system's own network service manages, the icon opens Settings like the rest. The icon lights the signal's bars in the
+// accent, as Settings → Network → Wi-Fi does, and the line under the name is the network's name (or Not connected, or
+// Off). Anywhere else opens Settings → Network → Wi-Fi. onChanged: read the interfaces again once the helper answers.
+function WifiTile({ t, onClose, w, onChanged }) {
+  const [want, setWant] = useState(null);           // the state asked for, while the helper works
+  const [err, setErr] = useState(null);
+  const [hover, setHover] = useState(false);
   const open = () => openSettings(onClose, 'network', 'wifi');
+  const v = wifiTileView(w, want);
+  const toggle = (e) => {
+    e?.stopPropagation?.();
+    if (!w.canSwitch || !admin.available()) { open(); return; }
+    if (want != null) return;
+    const to = !w.on;
+    setWant(to);
+    setErr(null);
+    admin.run(to ? 'net-up' : 'net-down', w.name, undefined, { quiet: true })
+      .then(() => { setWant(null); onChanged(); }, (er) => { setWant(null); setErr(er.message); });
+  };
+  const on = v.on;
+  const fg = on ? '#ffffff' : t.text;
+  const dim = on ? 'rgba(255,255,255,0.8)' : t.textDim;
+  const detail = err || v.ssid || tr(v.key);
   return (
-    <View onClick={open} style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 9, borderRadius: 12,
-      backgroundColor: t.hover, border: `1px solid ${t.separator}` }}>
-      <TileIcon t={t} on={false}>{(c) => <SignalGlyph color={c} size={14} level={on ? wifiBars(on.signal) : 0} off={!on} />}</TileIcon>
-      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-        <Text style={{ fontSize: 12, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{tr('shell.cc.wifi')}</Text>
-        <Text style={{ fontSize: 11, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{on ? `${on.name} · ${ip}` : tr('shell.cc.notConnected')}</Text>
+    <View onClick={open} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 9, borderRadius: 12,
+        backgroundColor: on ? t.accent : t.hover, border: `1px solid ${on ? t.accent : t.separator}`, opacity: hover ? 0.9 : 1 }}>
+      <View onClick={toggle} title={tr('shell.cc.wifiSwitch')}>
+        <TileIcon t={t} on={on}>{(c) => <SignalGlyph color={c} size={14} level={v.bars} off={v.dim} />}</TileIcon>
       </View>
-      <MoreButton color={t.textDim} onClick={open} />
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text style={{ fontSize: 12, fontWeight: 600, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{tr('shell.cc.wifi')}</Text>
+        <Text style={{ fontSize: 11, color: dim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{detail}</Text>
+      </View>
+      <MoreButton color={dim} onClick={open} />
     </View>
   );
 }
@@ -215,7 +239,8 @@ export function ControlCenter({ t, top, onClose, area = null, at = null }) {
   const p = menuBarPrefs(s);
   let ifs = [];
   try { ifs = typeof lord.net !== 'undefined' ? lord.net.interfaces() : []; } catch (e) { ifs = []; }
-  const radios = p.ccWifi ? ifs.filter((i) => i.type === 'wifi') : [];
+  const wifi = p.ccWifi ? wifiTile(ifs) : null;
+  const [, reread] = useState(0);                   // after the Wi-Fi tile turns the radio on or off
   const bt = useBluetooth();
   const btShown = p.ccBluetooth && !!bt?.adapter;
   const bl = useBacklight();
@@ -257,9 +282,9 @@ export function ControlCenter({ t, top, onClose, area = null, at = null }) {
         {p.ccBrightness && bl ? <BrightnessTile t={t} onClose={onClose} bl={bl} /> : null}
         <NowPlayingTile />
         {p.ccNetwork && typeof lord.net !== 'undefined' ? <NetTile t={t} onClose={onClose} ifs={ifs} /> : null}
-        {radios.length || btShown ? (
+        {wifi || btShown ? (
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            {radios.length ? <WifiTile t={t} onClose={onClose} radios={radios} /> : null}
+            {wifi ? <WifiTile t={t} onClose={onClose} w={wifi} onChanged={() => reread((n) => n + 1)} /> : null}
             {btShown ? <BluetoothTile t={t} onClose={onClose} bt={bt} /> : null}
           </View>
         ) : null}

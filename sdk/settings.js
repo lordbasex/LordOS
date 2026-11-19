@@ -1,6 +1,7 @@
 // settings.js — user settings, stored in ~/.config/lordos/settings.json.
 import { createStore, useStore } from './store.js';
 import { markExistingUser } from './firststartmodel.js';
+import { withWidgetCities } from './weathermodel.js';
 
 const DEFAULTS = {
   mode: 'dark',          // 'dark' | 'light'
@@ -17,7 +18,7 @@ const DEFAULTS = {
   wallpaper: null,       // 0.8.9: null = the theme's default (Lumo Celestial; Lord Workspaces: Cyberpunk City HD's panorama),
                          // migration 5. 0.8.2–0.8.8: 'lumo-celestial' saved for everyone; before: 'aurora', still available
   slideshow: null,       // 0.8.9, Settings → Wallpaper in Lord Workspaces: { on, category, every, perDisplay } (sdk/slideshowmodel.js); new key, no migration
-  weather: { on: false },
+  weather: { on: false },  // { on, unit, city }: city is the default (0.8.9.1: each widget has its own, opts.city; weathermodel.js)
   playerStreams: [],        // 0.8.8.10: the Player's saved streams [{ name, url, user }] (no password: the keyring has it)   // 0.8.8.10: the weather widget asks Open-Meteo only once turned on (sdk/weathermodel.js)
   deskWidgets: [],      // 0.8.8.10: Lord Workspaces' desktop widgets, [{ id, type, x, y }] (sdk/deskwidgets.jsx)
   wallpapers: {},       // 0.8.8.10: a display's own picture, { [connector]: id } (sdk/wallpapers.js wallpaperIdFor)
@@ -30,12 +31,14 @@ const DEFAULTS = {
   theme: null,           // id of the chosen theme (folder in themes/)
   desktopCount: 1,            // 0.8.7, how many desktops (sdk/desktops.js)
   desktopNames: null,         // 0.8.8.3, their names by position, '' for the default (sdk/desktops.js)
-  desktopArrows: true,        // 0.8.7, Settings → Keyboard: Lord Flow's ⌃ arrows are the Desktops keys
+  desktopArrows: false,       // 0.8.7, Settings → Desktop & Dock: Lord Flow's ⌃ arrows are the Desktops keys; off by default
+                              // since 0.8.9.1 (#201: apps keep them for moving by word), migration 8
   switcher: null,             // 0.8.7.1, Settings → Keyboard: the app switcher (switchermodel.js)
   sessionRestore: 'always',   // 0.8.7, Settings → Session: 'off' | 'ask' | 'always' (sessionrestore.jsx)
   sessionBrowsers: true,      // browsers reopen their tabs too (the browser-restore admin action)
   remoteDesks: null,          // 0.8.7, the RDP and VNC apps' saved computers (no passwords)
   databases: null,            // 0.8.8.7, Databases: { history, recent, safeMode, servers, importOffered } (apps/databases)
+  logs: null,                 // 0.8.9.1 (#199), Logs: { collapsed } the sidebar groups folded (sdk/logfile.js toggleGroup); new key, no migration
   editor: null,               // 0.8.8.8 (#113), Text Editor: { recent } File → Open Recent (apps/editor/recent.js); new key, no migration
   machinesView: null,         // 0.8.8.7, Machines' library: { view, sort, show } (apps/machines/model.js libView)
   files: null,                // 0.8.7, Files → Settings (apps/files/prefs.js)
@@ -59,7 +62,7 @@ const DEFAULTS = {
 // meaning of a setting, it appends [schema, (settings) => newSettings] here. Each runs once per user,
 // in order, when the session loads the file; "schema" records the last one applied. The system-wide
 // migrations (as root) are the lordos package's (packaging/migrations).
-export const SETTINGS_SCHEMA = 7;
+export const SETTINGS_SCHEMA = 9;
 // A Terminal key mapping that sends what a US keyboard's key types anyway (keys.js names keys by their
 // US position): on a US keyboard it does nothing, on any other it types the wrong character. The iTerm2
 // importer made them from keypad entries before 0.8.8.6 ("-" typed "/" on a Latin American keyboard).
@@ -108,6 +111,13 @@ const MIGRATIONS = [
     // like the wallpaper in migration 5: Lord Flow and Lord Classic show it all the same; any other accent stays.
     return s.accent === 'azul' ? { ...s, accent: null } : s;
   }],
+  [8, (s) => {            // 0.8.9.1 (#201): Lord Flow's ⌃ arrows became off by default, so apps get ⌃← ⌃→ for moving by
+    // word (❖⌃← ❖⌃→ still switch desktops). On was every user's default since 0.8.7 and was saved with the rest of the
+    // settings, so it reads as a choice; nobody can tell it from one. Someone who turned them off keeps that.
+    return s.desktopArrows === true ? { ...s, desktopArrows: false } : s;
+  }],
+  [9, withWidgetCities],  // 0.8.9.1 (#193): each weather widget keeps its own city (opts.city); the one it showed, the
+                          // shared settings.weather.city, becomes its own, so choosing one on another widget never moves it
 ];
 export function migrateSettings(s) {
   let out = s;

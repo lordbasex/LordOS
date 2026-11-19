@@ -11,8 +11,10 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/if_arp.h>
+#include <linux/genetlink.h>
 #include <linux/if_link.h>
 #include <linux/netlink.h>
+#include <linux/nl80211.h>
 #include <linux/rtnetlink.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -280,6 +282,56 @@ int net_wireless_level(const char *text, const char *ifname, int *dbm) {
     return 0;
 }
 
+int net_ssid_text(const unsigned char *raw, size_t len, char *out, size_t n) {
+    if (n) out[0] = 0;
+    if (!raw || !len || len > 32 || len >= n) return 0;
+    for (size_t i = 0; i < len;) {
+        unsigned char c = raw[i];
+        size_t k = c < 0x80 ? 1 : (c & 0xe0) == 0xc0 ? 2 : (c & 0xf0) == 0xe0 ? 3 : (c & 0xf8) == 0xf0 ? 4 : 0;
+        if (!k || i + k > len) return 0;
+        if (k == 1 && (c < 0x20 || c == 0x7f)) return 0;
+        uint32_t cp = k == 1 ? c : k == 2 ? (c & 0x1fu) : k == 3 ? (c & 0x0fu) : (c & 0x07u);
+        for (size_t j = 1; j < k; j++) {
+            if ((raw[i + j] & 0xc0) != 0x80) return 0;
+            cp = (cp << 6) | (raw[i + j] & 0x3fu);
+        }
+        /* overlong forms, surrogates, past U+10FFFF and the C1 controls */
+        if ((k == 2 && cp < 0x80) || (k == 3 && cp < 0x800) || (k == 4 && cp < 0x10000) ||
+            (cp >= 0xd800 && cp <= 0xdfff) || cp > 0x10ffff || (cp >= 0x80 && cp < 0xa0)) return 0;
+        i += k;
+    }
+    memcpy(out, raw, len);
+    out[len] = 0;
+    return 1;
+}
+
+/* The network a Wi-Fi interface is joined to (issue #192: its name under the Control Center's Wi-Fi tile), from
+ * nl80211's GET_INTERFACE, which needs no privilege (like `iw dev`): the kernel adds NL80211_ATTR_SSID while a
+ * station is associated. Read only; one request per Wi-Fi interface on a socket opened once per call. */
+typedef struct { char ssid[33]; } SsidReply;
+
+static void ssid_cb(const struct nlmsghdr *h, void *ud) {
+    if (h->nlmsg_len < NLMSG_HDRLEN + GENL_HDRLEN) return;
+    struct rtattr *tb[NL80211_ATTR_SSID + 1];
+    nl_parse(tb, NL80211_ATTR_SSID, (char *)NLMSG_DATA(h) + GENL_HDRLEN, h->nlmsg_len - NLMSG_HDRLEN - GENL_HDRLEN);
+    struct rtattr *a = tb[NL80211_ATTR_SSID];
+    SsidReply *r = ud;
+    if (a && RTA_PAYLOAD(a) <= 32) net_ssid_text(RTA_DATA(a), RTA_PAYLOAD(a), r->ssid, sizeof r->ssid);
+}
+
+static int wifi_ssid(int gfd, int fam, int ifindex, char *out, size_t n) {
+    if (gfd < 0 || fam < 0) return 0;
+    NlMsg m;
+    nlm_init(&m, (uint16_t)fam, 0);
+    struct genlmsghdr g = { .cmd = NL80211_CMD_GET_INTERFACE, .version = 0 };
+    nlm_put(&m, &g, sizeof g);
+    nlm_attr_u32(&m, NL80211_ATTR_IFINDEX, (uint32_t)ifindex);
+    SsidReply r = { "" };
+    if (nl_dump(gfd, &m, ssid_cb, &r) < 0 || !r.ssid[0]) return 0;
+    snprintf(out, n, "%s", r.ssid);
+    return 1;
+}
+
 char *net_interfaces_json(void) {
     Links l = {0};
     if (dump_links(&l) < 0) { free(l.v); return NULL; }
@@ -287,6 +339,7 @@ char *net_interfaces_json(void) {
     Buf b = {0};
     char *wireless = NULL;                  /* /proc/net/wireless, read once when there is a Wi-Fi interface */
     int wireless_read = 0;
+    int gfd = -1, nl80211 = -1;             /* nl80211, opened once when there is a Wi-Fi interface (-2: not there) */
     buf_printf(&b, "[");
     for (int i = 0; i < l.n; i++) {
         Link *k = &l.v[i];
@@ -321,11 +374,22 @@ char *net_interfaces_json(void) {
         if (!strcmp(type, "wifi")) {
             if (!wireless_read) { wireless = read_file("/proc/net/wireless", 16384, NULL); wireless_read = 1; }
             if (net_wireless_level(wireless, k->name, &dbm)) buf_printf(&b, ",\"signal\":%d", dbm);
+            if (nl80211 == -1) {
+                gfd = nl_open(NETLINK_GENERIC, 0);
+                nl80211 = gfd >= 0 ? genl_family(gfd, NL80211_GENL_NAME) : -2;
+                if (nl80211 < 0) nl80211 = -2;
+            }
+            char ssid[33];
+            if (nl80211 >= 0 && wifi_ssid(gfd, nl80211, k->index, ssid, sizeof ssid)) {
+                buf_printf(&b, ",\"ssid\":");
+                buf_json_str(&b, ssid);
+            }
         }
         buf_printf(&b, "}");
     }
     buf_printf(&b, "]");
     free(wireless);
+    if (gfd >= 0) close(gfd);
     if (fd >= 0) close(fd);
     free(l.v);
     if (b.oom) { buf_free(&b); return NULL; }

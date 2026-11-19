@@ -7,6 +7,7 @@
 //   menuBarPatch(settings, k, v)  the settings change that turns one of them on or off
 //   outputChoices(soundState)     the outputs a sound panel offers, the default one marked
 //   monthCells(year, month, first) the days of a month calendar, padded to whole weeks
+//   monthWeeks(year, month, first) the same cells as weeks of seven (one row each)
 //
 // A bar on every display (0.8.8.6): Lord Flow draws one full menu bar per display, each with its own clock, status
 // items and panels; only the display with the focused window has the app's menus lit. Lord Classic draws a whole
@@ -86,6 +87,39 @@ export function wifiBars(dbm) {
   return dbm >= -55 ? 4 : dbm >= -67 ? 3 : dbm >= -78 ? 2 : 1;
 }
 
+// The Control Center's Wi-Fi tile (issue #192), from lord.net.interfaces(): null with no Wi-Fi radio, else the radio it
+// stands for (the connected one, else one that is on, else the first) as { name, on, connected, ssid, bars, canSwitch }.
+// on: the radio is up (the tile is the accent's color, like Bluetooth's); connected: it has an IPv4 address; ssid: the
+// network's name (lord-server reads it from nl80211; null when connected without one, an older lord-server); bars: the
+// signal's bars, 0 when not connected; canSwitch: LordOS may turn it on and off with net-up / net-down, as the switch
+// on its page in Settings → Network does (not one the system's own network service manages).
+const hasIPv4 = (i) => (Array.isArray(i.addresses) ? i.addresses : []).some((a) => a && a.scope === 'global' && a.family === 4);
+export function wifiTile(ifs) {
+  const radios = (Array.isArray(ifs) ? ifs : []).filter((i) => i && i.type === 'wifi' && typeof i.name === 'string' && i.name);
+  if (!radios.length) return null;
+  const r = radios.find((i) => i.up && hasIPv4(i)) || radios.find((i) => i.up) || radios[0];
+  const on = r.up === true;
+  const connected = on && hasIPv4(r);
+  return {
+    name: r.name, on, connected,
+    ssid: connected && typeof r.ssid === 'string' && r.ssid ? r.ssid : null,
+    bars: connected ? wifiBars(r.signal) : 0,
+    canSwitch: r.managed !== 'system',
+  };
+}
+
+// What the tile shows for w = wifiTile(...) while want (true / false: the state asked for, until the administration
+// helper answers; null: nothing asked): { on, busy, ssid, key, bars, dim }. The line under its name is ssid when there
+// is one, else t(key); bars lit unless dim (Settings → Network → Wi-Fi's bars, in the accent on the tile's white icon).
+export function wifiTileView(w, want = null) {
+  const busy = want === true || want === false;
+  const on = busy ? want : !!w?.on;
+  const connected = !busy && !!w?.on && !!w?.connected;
+  const ssid = connected && w.ssid ? w.ssid : null;
+  const key = busy ? (want ? 'shell.cc.on' : 'shell.cc.off') : !w?.on ? 'shell.cc.off' : !connected ? 'shell.cc.notConnected' : ssid ? null : 'shell.cc.connected';
+  return { on, busy, ssid, key, bars: connected ? w.bars : 0, dim: !connected };
+}
+
 // The brightness slider of the Control Center and Quick Settings (issue #114): the first screen whose backlight LordOS
 // can set (lord.display.list().backlight, a laptop's or tablet's own panel), or null, and then there is no slider.
 export function backlightOf(list) {
@@ -109,6 +143,16 @@ export function monthCells(year, month, first = 0) {
   const cells = [...Array(lead).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)];
   while (cells.length % 7) cells.push(null);
   return cells;
+}
+
+// The same cells, a week per row. A calendar draws each week as its own row of seven equal (flex: 1) cells: a
+// wrapping row of cells a seventh of a width wide put the seventh day on the next line whenever the width it
+// computed was a little more than the row had (the panel's border, #197).
+export function monthWeeks(year, month, first = 0) {
+  const cells = monthCells(year, month, first);
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
 }
 
 // ---- a bar on every display ----

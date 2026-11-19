@@ -839,8 +839,8 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
     (whisper.cpp, local), an AI answers and LordOS reads it aloud (lord-say). Decisions first: which AI answers (local or
     a cloud service, and with which account) and the microphone permission (the broker's device grant).
   - More widgets suggested 2026-11-16: world clocks, countdown and timer (with the Clock app), recent files, LordOS
-    updates, an app launcher of 4 or 8 pinned apps; the Wi‑Fi network's name in the Network widget needs a `lord.net`
-    call for the connected SSID (today only an admin scan reports it).
+    updates, an app launcher of 4 or 8 pinned apps; the Wi‑Fi network's name in the Network widget can now use
+    `lord.net.interfaces()`'s `ssid` (0.8.9.1, #192).
 
 - [ ] **Later, from GitHub suggestions** (maintainer's decisions 2026-11-15, "más adelante"):
   - [x] Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)), in development for 0.8.8.10:
@@ -854,6 +854,18 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
     guest → host", waiting for approval. Host → guest confirmed by the reporter on 0.8.8.8.
   - Mounting non-LordOS partitions automatically at startup ([#122](https://github.com/lordbasex/LordOS/issues/122),
     second step after mounting by hand).
+  - Backup with several jobs ([#200](https://github.com/lordbasex/LordOS/issues/200), maintainer's decision 2026-11-19,
+    "en algún momento"): a named job each with its own source folders, exclusions, destination, schedule (time and day for
+    hourly, daily, weekly) and encryption; folders picked with the file browser; a job may keep the computer from
+    sleeping until it ends; a list of the jobs with their last run and pause, resume and delete. Review first: jobs in
+    parallel (disk and processor), and folders outside the home folder (permissions).
+  - Small towns in the weather's city search ([#193](https://github.com/lordbasex/LordOS/issues/193)): GeoNames'
+    places of 1,000 people or more (172,038 against 34,247; 7 MB on disk against 1.4 MB). The search reads the file on
+    the interface thread, about 80 ms per key in the worst case against 16 ms today, so first make it one pass or index
+    the names, or move it off the interface thread.
+  - From the #190 and #201 fixes: Lord Classic's taskbar has a 4 px band at the screen edge that does nothing; Lord
+    Flow's top-left corner under the logo too; with ⌃ arrows off by default, Lord Flow's Overview has no default key
+    (a ❖ shortcut).
 
 - [ ] **Later: languages of countries that already meet the visits rule (November 2026)** (`LANGUAGES.md`,
   "Languages that already meet the rule"): Norwegian Bokmål (`nb`), Czech (`cs`), Sinhala (`si`), Hebrew (`he`),
@@ -909,6 +921,12 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [x] **Memory at rest** (2026-11-19): 269 → 183 MB for a session with three 1080p displays, 7 widgets and a Terminal
   running Claude Code (transform rasters freed at rest, the Terminal's history growing as it fills, no huge pages for
   the static arrays). Method and data: `docs/perf/MEMORY-HEAPTRACK.md`.
+- [x] **GitHub issues of 2026-11-18 and 19** (2026-11-19, `CHANGELOG.md`): Ctrl+←/→ move by word again (#201); the
+  clock's calendar shows seven days a week (#197); the menu bar answers at the top edge and switches menus on hover
+  (#190); each weather widget has its own city (#193); a paused Cloud account sends nothing to its provider and the Logs
+  time filters work (#194); verified Cloud providers read verified again (#195); the Logs sidebar scrolls and folds
+  (#199); the Control Center's Wi-Fi tile (#192); Mail's account names (#191). Still to do: screenshots on the VM and a
+  check on real hardware (Wi-Fi switch and network name, a paused Google Drive account, the calendar on a 4K Pi).
 - [ ] **Raspberry Pi: the 0.8.9 headless session uses more processor than 0.8.8.9** (6.1 % against 3.4 % at rest, an hour
   each, fresh session per run). Find what runs at rest.
 - [ ] **The 0.8.9 performance report** (`docs/PERFORMANCE-0.8.9.md`): PC and Raspberry Pi, method, the slideshow's cost,

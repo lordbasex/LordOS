@@ -863,7 +863,8 @@ static const CloudKind *kind_put(const char *kind, const char *type, const char 
 
 void cloud_set_assets(const char *dir) { cpy(cl_assets, sizeof cl_assets, dir); }
 
-/* assets/cloud/providers.json: the kinds tested on LordOS (docs/CLOUD.md 19) */
+/* assets/cloud/providers.json: the kinds tested on LordOS (docs/CLOUD.md 19); installed in /usr/lib/lordos/assets/cloud
+ * since 0.8.9.1 (tools/iso/mkdeb.sh: 0.8.9's package left it out, #195) */
 static JDoc verified_doc(int *ok) {
     JDoc d = { 0 };
     *ok = 0;
@@ -893,7 +894,9 @@ static void emit_kind(JBuf *b, int *first, const CloudKind *k, const JVal *pv, K
     jb_str(b, k->hint ? k->hint : "");
     jb_raw(b, ",\"group\":");
     jb_str(b, k->group);
-    jb_printf(b, ",\"verified\":%s", verified ? "true" : "false");
+    /* #195: no providers.json (an installed system without it, 0.8.9's package) says nothing: JS falls back on its own
+     * copy (sdk/cloudmodel.js, verifiedItem) instead of every provider reading "not verified" */
+    if (verified >= 0) jb_printf(b, ",\"verified\":%s", verified ? "true" : "false");
     if (k->website) { jb_raw(b, ",\"website\":"); jb_str(b, k->website); }
     jb_raw(b, ",\"fields\":[");
     int ff = 1, oauth = !strcmp(k->group, "oauth");
@@ -981,7 +984,7 @@ static char *load_providers(void) {
         const CloudKind *k = kind_put(pre, nm, label, ov && ov->group ? ov->group : cloud_derive_group(nm, opts, no));
         pthread_mutex_unlock(&cl_mu);
         if (!k) continue;
-        emit_kind(&b, &first, k, x, &nk[n++], ver && json_get(ver, k->kind));
+        emit_kind(&b, &first, k, x, &nk[n++], !ver ? -1 : !!json_get(ver, k->kind));
         /* our variants on this backend */
         for (int i = 0; i < cloud_kind_count() && n < KI_MAX; i++) {
             const CloudKind *v = cloud_kind_at(i);
@@ -989,7 +992,7 @@ static char *load_providers(void) {
             pthread_mutex_lock(&cl_mu);
             const CloudKind *vk = kind_put(v->kind, nm, v->label, v->group);
             pthread_mutex_unlock(&cl_mu);
-            if (vk) emit_kind(&b, &first, vk, x, &nk[n++], ver && json_get(ver, vk->kind));
+            if (vk) emit_kind(&b, &first, vk, x, &nk[n++], !ver ? -1 : !!json_get(ver, vk->kind));
         }
     }
     jb_raw(&b, "]");
@@ -1287,6 +1290,14 @@ static void about_acc(Acc *a) {
     cl_changed();
 }
 
+/* #194: a paused mount stops asking its provider for changes (rclone polls Google Drive, OneDrive, Dropbox… every
+ * minute, paused or not); resumed, it polls again. Once per change: a call that fails isn't repeated every second. */
+static void poll_paused(Acc *a, int off) {
+    char body[96];
+    a->poll_off = off;
+    if (!cloud_poll_body(a->id, off, body, sizeof body)) rcs(RCM_VFS_POLL, body, NULL, 0, RC_SHORT);
+}
+
 /* The provider refused the saved session (rclone issue 9658: iCloud Drive, with or without Advanced Data Protection, after
  * a restart of rclone: "requestPCS … Missing X-APPLE-WEBAUTH-TOKEN cookie"). rclone reuses the saved cookies and never
  * signs in again on that error; without them it signs in with the password and the trust token, which asks for no code
@@ -1330,7 +1341,7 @@ static int mount_acc(Acc *a) {
     jb_free(&b);
     const char *off = NULL;
     pthread_mutex_lock(&cl_mu);
-    if (st == 200) { a->mounted = 1; a->mount_gen++; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; a->keeper_wait = 1; cloud_fails_clear(&a->kfail); }   /* starting: until its first listing answers (check_acc) */
+    if (st == 200) { a->mounted = 1; a->mount_gen++; a->poll_off = 0; a->err[0] = 0; a->message[0] = 0; a->check_at = 0; a->keeper_wait = 1; cloud_fails_clear(&a->kfail); }   /* starting: until its first listing answers (check_acc) */
     else {
         a->mounted = 0;
         const char *fc = cloud_failure_code(msg);
@@ -1368,6 +1379,8 @@ static void bring_up_config(Acc *a) {
 /* brings an account up in this rclone: secrets from the keyring, config/create, mount */
 static void bring_up(Acc *a) {
     if (a->disabled) return;                    /* turned off: rclone never hears of it */
+    /* #194: paused by the person (Pause, Pause All): nothing goes to its provider, not even a mount, until Resume */
+    if (!cloud_bring_up_ok(a->paused || opt.pause_all, 0, 0)) return;
     a->retry_at = time(NULL) + 30;
     if (!cl_running || a->configured) { if (a->configured && !a->mounted) mount_acc(a); return; }
     char *sec = NULL;
@@ -2846,7 +2859,7 @@ static void do_job(Job *j) {
         break;
     }
     case J_RENAME: job_rename(j); break;
-    case J_ABOUT: { Acc *a; pthread_mutex_lock(&cl_mu); a = cl_find(j->id); pthread_mutex_unlock(&cl_mu); if (a && cl_running && a->configured) about_acc(a); break; }
+    case J_ABOUT: { Acc *a; pthread_mutex_lock(&cl_mu); a = cl_find(j->id); pthread_mutex_unlock(&cl_mu); if (a && cl_running && a->configured && !cl_paused(a)) about_acc(a); break; }
     case J_LINK: job_link(j, 0); break;
     case J_UNLINK: job_link(j, 1); break;
     case J_RESTART:
@@ -2941,21 +2954,25 @@ static void *worker(void *arg) {
                         if (a->pending_secret && t >= a->retry_at) { char *s = strdup(a->pending_secret); a->retry_at = t + 30; if (s) store_secret(a, s); }
                         continue;
                     }
+                    /* #194: paused, nothing reaches the provider by itself: no mount tried again, no quota, no check */
+                    int quiet = cl_paused(a);
                     if (a->mounted) { anymount = 1; poll_acc(a); }
-                    if ((!a->configured || !a->mounted) && t >= a->retry_at && strcmp(a->err, "cloud.addFailed")) bring_up(a);
+                    if (a->mounted && a->polls && quiet != a->poll_off) poll_paused(a, quiet);
+                    if ((!a->configured || !a->mounted) && t >= a->retry_at && strcmp(a->err, "cloud.addFailed") &&
+                        cloud_bring_up_ok(a->paused || opt.pause_all, quiet, a->err[0] != 0)) bring_up(a);
                     if (a->pending_secret && t >= a->retry_at) {
                         char *s = strdup(a->pending_secret);
                         a->retry_at = t + 30;
                         if (s) store_secret(a, s);
                     }
                     if (a->configured && t - a->tok_at >= 300) token_check(a);
-                    if (a->mounted && t - a->about_at >= 1800) about_acc(a);
+                    if (a->mounted && !quiet && t - a->about_at >= 1800) about_acc(a);
                     if (a->rcjob_kind) rcjob_poll(a);
                     /* B14: a new account whose question nobody answered in 5 minutes goes away */
                     if (a->new_acc && a->pending_req && a->pending_since && t - a->pending_since > 300) { add_failed(a, 0, "cloud.signinTimeout", ""); continue; }
                     /* B6: a mount can be up while the provider refuses every listing (a certificate, a password that
                      * changed): the top folder is listed after mounting and every 10 minutes (2 while it fails) */
-                    if (a->mounted && t >= a->check_at && !a->pending_req) check_acc(a);
+                    if (a->mounted && !quiet && t >= a->check_at && !a->pending_req) check_acc(a);
                 }
             }
             if (now >= next_slow) {                 /* every minute */
@@ -3495,10 +3512,18 @@ void cloud_pause(const char *id, int pause) {
      * answering while it was paused is found by one listing, not by a walk that waits on every folder */
     if (!id) {
         opt.pause_all = pause;
-        if (!pause) for (int i = 0; i < ACC_MAX; i++) { cl_acc[i].paused = 0; if (cl_acc[i].used && cl_acc[i].mounted) { cl_acc[i].check_at = 0; cl_acc[i].keeper_wait = 1; } }
+        if (!pause) for (int i = 0; i < ACC_MAX; i++) {
+            cl_acc[i].paused = 0;
+            if (cl_acc[i].used && cl_acc[i].mounted) { cl_acc[i].check_at = 0; cl_acc[i].keeper_wait = 1; }
+            else if (cl_acc[i].used && !cl_acc[i].err[0]) cl_acc[i].retry_at = 0;   /* #194: not mounted while paused: now */
+        }
     } else {
         Acc *a = cl_find(id);
-        if (a) { a->paused = pause; if (!pause && a->mounted) { a->check_at = 0; a->keeper_wait = 1; } }
+        if (a) {
+            a->paused = pause;
+            if (!pause && a->mounted) { a->check_at = 0; a->keeper_wait = 1; }
+            else if (!pause && !a->err[0]) a->retry_at = 0;      /* #194: not mounted while paused: now (an error keeps its wait) */
+        }
     }
     save_accounts();
     pthread_mutex_unlock(&cl_mu);

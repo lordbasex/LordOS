@@ -245,24 +245,6 @@ int wg_import(const char *name, const char *text, char *pub_out, char *err, size
     return 0;
 }
 
-/* ---- generic netlink ---- */
-
-static void family_cb(const struct nlmsghdr *h, void *ud) {
-    struct rtattr *tb[CTRL_ATTR_MAX + 1];
-    nl_parse(tb, CTRL_ATTR_MAX, (char *)NLMSG_DATA(h) + GENL_HDRLEN, h->nlmsg_len - NLMSG_HDRLEN - GENL_HDRLEN);
-    if (tb[CTRL_ATTR_FAMILY_ID]) *(int *)ud = *(uint16_t *)RTA_DATA(tb[CTRL_ATTR_FAMILY_ID]);
-}
-
-static int genl_family(int fd, const char *name) {
-    NlMsg m;
-    nlm_init(&m, GENL_ID_CTRL, 0);
-    struct genlmsghdr g = { .cmd = CTRL_CMD_GETFAMILY, .version = 1 };
-    nlm_put(&m, &g, sizeof g);
-    nlm_attr_str(&m, CTRL_ATTR_FAMILY_NAME, name);
-    int id = -1;
-    return nl_dump(fd, &m, family_cb, &id) < 0 ? -1 : id;
-}
-
 static int resolve_endpoint(const char *ep, struct sockaddr_storage *ss, socklen_t *len) {
     char host[200], port[8];
     const char *colon = strrchr(ep, ':');

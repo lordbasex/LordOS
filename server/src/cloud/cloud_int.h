@@ -76,6 +76,7 @@ typedef struct {
     int srv_port;
     int precision_s;                /* the backend's modtime precision, seconds (fsinfo) */
     int polls;                      /* the backend has change notifications (fsinfo's ChangeNotify): rclone polls them */
+    int poll_off;                   /* #194: this mount's change polling was turned off (paused); a new mount polls again */
     unsigned mount_gen;             /* +1 at each mount: what rclone listed before is gone */
     unsigned listed;                /* +1 when a folder Files shows was listed again in the background (7.3) */
     unsigned tree_gen;              /* the keeper listed the kept folders whole in this mount… */

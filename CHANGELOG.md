@@ -39,6 +39,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   scenes, the terminals (lines, cells, Instant Replay), the blur cache, the transform rasters, the layer, the glyph
   cache and the nodes. Each report runs after `malloc_trim(0)`.
 
+- **Ctrl+←/→ move by word again in apps (GitHub #201).** In Lord Flow and Lord Workspaces, Ctrl+← → ↑ ↓ were taken for
+  desktops (switch, Overview, the app's windows) whenever Settings → Desktop & Dock → Desktops allowed it, and that was
+  on for everyone: the default was saved with the rest of the settings since 0.8.7. The option is now off by default and
+  settings migration 8 turns off the saved default; someone who turned it on after the update keeps it. ❖⌃←/→ always
+  switch desktops in every theme. Help, `docs/DESKTOPS.md` and `docs/SHORTCUTS.md` say so.
+- **Weather widget: each widget has its own city (GitHub #193).** Changing one widget's city changed every weather
+  widget, because the city was one setting. It is now each widget's own (`opts.city`); settings migration 9 gives every
+  existing widget the city it showed, and a new widget starts on the last city chosen. The widget's menu has "Change
+  city…" for that widget (it said "Choose cities in Clock…"); on the small size the picker was never drawn, and the other
+  sizes drew it twice. Widgets on the same city share one forecast and one request; no timer was added. The offline city
+  list is still GeoNames' places of 15,000 people or more, so small towns are not in it yet.
+- **Control Center: the Wi-Fi tile works like Bluetooth's (GitHub #192, Lord Flow and Lord Workspaces).** It is the
+  accent color when Wi-Fi is on; its icon turns Wi-Fi on or off with the same closed `net-up`/`net-down` actions as
+  Settings → Network (no new admin action); the rest of the tile opens Settings → Network → Wi-Fi. The bars use the
+  accent as in Settings, and the tile shows the connected network's name, or Not connected / Off, instead of the
+  interface's. `lord.net.interfaces()` reports `ssid`, which lord-server reads without root from nl80211
+  (`GET_INTERFACE`, as `iw dev` does) and keeps only when it is valid UTF-8 without control characters; isolated apps
+  have no `lord.net`.
+- **Mail: account names in the sidebar use the folders' font and size (GitHub #191),** 13 px in the normal text color and
+  semibold, instead of dim 11 px text. The calendar accounts' headers match.
+- **Logs: the sidebar scrolls and its groups fold (GitHub #199).** With many app logs the last sources could not be
+  reached. The source list scrolls, and Journal, LordOS, Apps, Web apps and Older logs fold with a disclosure triangle,
+  as Mail's accounts; the folded groups are remembered per user (`logs.collapsed`).
+
 ### Added
 
 - `tools/bench/heaptrack-session.sh install <user> <binary>` runs one user's next session under heaptrack (and only that
@@ -48,6 +72,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A paused Cloud account kept talking to its provider (GitHub #194).** Pause only held uploads back: a failed mount
+  was retried every 30 s, the check listing ran every 10 minutes and the quota call every 30, Files' background listing
+  went on, and rclone polled Google Drive for changes every minute; the reporter's paused account kept getting Google's
+  quota errors. While an account is paused none of that runs and the mount's change polling is set to 0 (one more rc
+  method in the allowlist, `vfs/poll-interval`; back to 60 s on Resume). An account the person paused is not mounted
+  until Resume, which mounts it at once; one paused only by the battery keeps its mount but a failed mount is not
+  retried (`cloud_bring_up_ok`). What the person does still reaches the provider (opening a file not on this computer,
+  Measure, Empty Trash).
+- **Logs: the 15 minutes / 1 hour / 24 hours filters did nothing on LordOS's own files (GitHub #194).** The range went
+  only to the journal; `cloud.log` and the other files are now filtered too (`inRange`). The exported text shows each row
+  as the list does, one line with the provider's multi-line error joined (⏎); the account is written as provider and id,
+  never its name (#183's rule: the file may be attached to a public report).
+- **Every Cloud provider read "not verified" on 0.8.9 (GitHub #195).** `tools/iso/mkdeb.sh` never installed
+  `assets/cloud/providers.json`, so lord-server reported `verified: false` for all of them, Filen included, and Check
+  This Account said "Verified on LordOS: no". The package installs it; without the file Settings uses its own copy.
+- **The calendar under the clock showed six days per week (GitHub #197; Lord Flow, Lord Classic, Lord Workspaces).**
+  The days were a wrapping row of cells a seventh of the panel wide, which left out the panel's 1 px border, so seven
+  cells were 2 px too wide and the seventh day went to the next line. Each week is now its own row (`monthWeeks`).
+- **Lord Flow's menu bar didn't answer at the top edge of the display (GitHub #190).** Its items were 22 px pills in a
+  28 px bar, so the top 3 px, where the pointer stops when pushed up, did nothing. They take the bar's whole height now.
+  While a menu is open, moving onto another title opens that menu (`barHover`).
+- **lord-server's forecasts: a full table left new places on "Updating…" for good.** It kept at most 8 places and
+  never dropped one; it holds 16 and the one asked least recently makes room (`build/wxsvc-test`).
+- `rconnect-run-test` failed 7 checks when run from a Terminal inside a LordOS session: it inherited
+  `LORDOS_SESSIOND`, and the real lord-sessiond refused its cgroup scope. The test drops the variable.
 - **Lord Workspaces' scene test: a window brought back from Minimized after the layout changed** (roadmap 0.8.9.1).
   The scene showed the window coming back at its old width (923 px in a 1231 px slot). The tiler was right: the scene
   ran more than 60 tiler passes in a second, so the tiler's limit put the next pass 1 s later and the scene checked

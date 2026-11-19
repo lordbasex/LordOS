@@ -14,6 +14,8 @@
 //   barIndex(count, at, dir)               the menu of a bar after (dir +1) or before (-1) this one, wrapping:
 //                                          'open' on a row without a submenu and 'back' in a top menu move along
 //                                          the bar
+//   barHover(open, name)                   the pointer came onto a bar's menu title: the menu to open now (that
+//                                          one, when another of the bar's menus is open; #190), or null
 //
 // Directions follow the reading order: in Arabic and Hebrew → goes back and ← opens a submenu, because the menus
 // and their submenus are mirrored.
@@ -112,3 +114,8 @@ export function aiming(from, to, box, side) {
 }
 
 export const barIndex = (count, at, dir) => (count > 0 ? (((at + dir) % count) + count) % count : -1);
+
+// A menu bar: while one of its menus is open, moving the pointer onto another title opens that one (no click), as
+// every menu bar does. With none open, or on the open one's own title, nothing changes: a click opens and closes.
+// open: the open menu's name or null; name: the title under the pointer.
+export const barHover = (open, name) => (open && name && open !== name ? name : null);

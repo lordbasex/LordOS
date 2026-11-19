@@ -1,6 +1,6 @@
 // LordOS's own log files in the Logs app (sdk/logfile.js): the stamped lines lord-log writes
 // (server/src/lordlog.c), old unstamped ones, and the sidebar's order. node server/tests/logfile_test.mjs
-import { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder, levelMatch, LEVEL_MAX, cloudAccounts } from '../../sdk/logfile.js';
+import { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder, levelMatch, LEVEL_MAX, cloudAccounts, inRange, rowText, exportLine, SOURCE_GROUPS, toggleGroup } from '../../sdk/logfile.js';
 
 let ok = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exitCode = 1; } else ok++; };
@@ -94,4 +94,33 @@ eq('nothing to do', cloudAccounts(parseLordLog('2026/11/17 10:12:59 ERROR : x', 
 eq('an id with no rclone line', cloudAccounts(parseLordLog(`${stamp(10, 0, 0, 0)} ERROR c0000000a: mount/mount: failed`, 'cloud.log'))[0].acct, 'c0000000a');
 eq('not an account id', cloudAccounts(parseLordLog(`${stamp(10, 0, 0, 0)} ERROR compositor: x: y`, 'cloud.log'))[0].acct, undefined);
 eq('the rows given are not changed', cr[2].acct, undefined);
+
+// #194: rclone's own lines that name the remote belong to that account
+eq('rclone names the remote', cloudAccounts(parseLordLog("2026/11/18 19:27:01 ERROR : cc4ed54b5: mount helper error\n2026/11/18 19:27:02 ERROR : Google drive root 'cc4ed54b5:': x\n2026/11/18 19:27:03 ERROR : notc0000000: y", 'cloud.log')).map((x) => x.acct),
+  ['cc4ed54b5', 'cc4ed54b5', undefined]);
+
+// #194: the time filter for a file's rows
+const tr = parseLordLog([`${stamp(9, 0, 0, 0)} INFO  cloud: old`, 'its next line', `${stamp(10, 0, 0, 0)} INFO  cloud: new`, 'after new'].join('\n'), 'apps/x.log');
+const at10 = new Date(2026, 10, 17, 9, 30, 0).getTime() * 1000;
+eq('in range: newer only, an unstamped line with the one before', inRange(tr, at10).map((x) => x.m), ['new', 'after new']);
+eq('in range: all', inRange(tr, 0).length, 4);
+eq('in range: no time at all is kept', inRange(parseLordLog('a\nb', 'apps/x.log'), at10).length, 2);
+eq('in range: rclone rows', inRange(cr, new Date(2026, 10, 17, 10, 13, 30).getTime() * 1000).map((x) => x.m.slice(0, 12)), ['Mes photos/a', 'a debug line', 'Failed to cr']);
+
+// #194: the list and the export say the same thing, on one line, with the account
+const one = cloudAccounts(cr)[3];
+eq('row text: label first, one line', rowText(one, 'Google Drive · Personal').startsWith('Google Drive · Personal: operations/list: error in ListJSON'), true);
+eq('row text: no line break', rowText(one, 'x').includes('\n'), false);
+eq('row text: breaks shown', rowText({ m: 'a\nb' }, ''), 'a ⏎ b');
+eq('export line: the list\'s text after time, level and process', exportLine(one, 'Wed 19:27:01.643', 'Error', 'Google Drive · Personal'),
+  `Wed 19:27:01.643 Error c1a2b3c4d: ${rowText(one, 'Google Drive · Personal')}`);
+eq('export line: pid', exportLine({ id: 'lord-sessiond', pid: 812, m: 'x' }, 'T', 'Info', ''), 'T Info lord-sessiond[812]: x');
+
+// #199: the sidebar's groups fold and unfold; anything else in the saved list is dropped
+eq('fold', toggleGroup([], 'apps'), ['apps']);
+eq('unfold', toggleGroup(['journal', 'apps'], 'apps'), ['journal']);
+eq('in the sidebar\'s order', toggleGroup(['web'], 'journal'), ['journal', 'web']);
+eq('not a group', toggleGroup(['x', 'web', 'web'], 'nope'), ['web']);
+eq('nothing saved', toggleGroup(null, 'old'), ['old']);
+eq('groups', SOURCE_GROUPS, ['journal', 'session', 'apps', 'web', 'old']);
 console.log(`logfile-test: ${ok} ok`);

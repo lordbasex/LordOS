@@ -6,10 +6,11 @@
 // (Wi-Fi, Bluetooth), Energy (the power mode) and Security (the firewall's mode, Lock Screen, Privacy). Every change
 // shows at once in the preview or on the desktop itself. Nothing here is a second copy of a device's settings: the
 // controls call the SDK (sound, Bluetooth, Night Light, notifications, power profiles, the firewall), and each section's
-// title opens its page in Settings. The Wi-Fi and firewall states are read once when it opens, nothing polls.
+// title opens its page in Settings. The Wi-Fi and firewall states are read once when it opens (and Wi-Fi's again after
+// its switch), nothing polls.
 import {
   View, Text, Image, Slider, Segmented, ScrollView, useSettings, settings, wm, addListener, useSound, defaultSink, sound, useBluetooth, setBluetoothPower,
-  nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiBars, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop, screenDisplays, usePowerProfiles, admin, t as tr,
+  nightActive, setNightManual, notifyPrefs, dndActive, useBacklight, wifiTile, wifiTileView, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop, screenDisplays, usePowerProfiles, admin, t as tr,
   MoonGlyph, SunGlyph, ContrastGlyph, BluetoothGlyph, SignalGlyph, useStore, desktopList, desktopName, activeDesktop, switchDesktop, windows, getApp, firewall, session,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -29,12 +30,14 @@ function Tile({ t, children, style }) {
   return <View style={{ padding: 10, borderRadius: 14, backgroundColor: t.hover, border: `1px solid ${t.separator}`, ...style }}>{children}</View>;
 }
 
-function Switch({ t, on, label, detail, glyph, onToggle, onMore }) {
+// onIcon (Wi-Fi's, issue #192): only the round icon turns it on or off, and onToggle is the rest of the tile.
+function Switch({ t, on, label, detail, glyph, onToggle, onMore, onIcon, iconTitle }) {
   const fg = on ? t.onAccent : t.text;
   return (
     <View onClick={onToggle} style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderRadius: 14,
       backgroundColor: on ? t.accent : t.hover, border: `1px solid ${on ? t.accent : t.separator}` }}>
-      <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? '#ffffff' : t.control }}>
+      <View onClick={onIcon ? (e) => { e?.stopPropagation?.(); onIcon(); } : undefined} title={iconTitle}
+        style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? '#ffffff' : t.control }}>
         {glyph(on ? t.accent : t.text, on ? '#ffffff' : t.control)}
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -248,6 +251,32 @@ function PowerRow({ t, onClose }) {
   );
 }
 
+// The Wi-Fi radio (issue #192), w from wifiTile(): the accent when it is on, like Bluetooth's switch. Its round icon
+// turns it on or off with net-up / net-down, the administration helper's actions behind the switch on its page in
+// Settings → Network (no other way in); with no helper, or a radio the system's own network service manages, the icon
+// opens Settings like the rest. The bars light in the accent (Settings → Network → Wi-Fi's), and the line under the
+// name is the network's name. Anywhere else opens Settings → Network → Wi-Fi. onChanged: read the interfaces again.
+function WifiSwitch({ t, w, onClose, onChanged }) {
+  const [want, setWant] = useState(null);           // the state asked for, while the helper works
+  const [err, setErr] = useState(null);
+  const open = () => openSettings(onClose, 'network', 'wifi');
+  const v = wifiTileView(w, want);
+  const toggle = () => {
+    if (!w.canSwitch || !admin.available()) { open(); return; }
+    if (want != null) return;
+    const to = !w.on;
+    setWant(to);
+    setErr(null);
+    admin.run(to ? 'net-up' : 'net-down', w.name, undefined, { quiet: true })
+      .then(() => { setWant(null); onChanged(); }, (er) => { setWant(null); setErr(er.message); });
+  };
+  return (
+    <Switch t={t} on={v.on} label={tr('shell.cc.wifi')} detail={err || v.ssid || tr(v.key)}
+      glyph={(c) => <SignalGlyph color={c} size={14} level={v.bars} off={v.dim} />}
+      onIcon={toggle} iconTitle={tr('shell.cc.wifiSwitch')} onToggle={open} onMore={open} />
+  );
+}
+
 // anchor: { x, y, bottom } the spine button's box (the panel unfolds from it); area: its display
 export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome, onEdit = () => {} }) {
   const [s, set] = useSettings();
@@ -260,9 +289,9 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome, onEdi
   const soundOn = !!(st.connected && defaultSink(st));
   const dnd = dndActive();
   const night = nightActive();
-  let radios = [];
-  try { radios = typeof lord.net !== 'undefined' ? lord.net.interfaces().filter((i) => i.type === 'wifi') : []; } catch (e) { radios = []; }
-  const wifi = radios.find((i) => i.addresses.some((a) => a.scope === 'global' && a.family === 4));
+  const [, reread] = useState(0);                   // the Wi-Fi switch asks for a new read once it has turned the radio on or off
+  let wifi = null;
+  try { wifi = typeof lord.net !== 'undefined' ? wifiTile(lord.net.interfaces()) : null; } catch (e) { wifi = null; }
   useEffect(() => {
     const n = ref.current?.id;
     if (n) tween(n, { scaleX: [0.94, 1], scaleY: [0.86, 1], opacity: [0, 1] }, { ms: 220, ease: EASE.back });
@@ -332,12 +361,10 @@ export function ControlCenter({ t, anchor, area, rtl, onClose, isOnChrome, onEdi
             onToggle={() => settings.set((x) => ({ ...x, notifications: { ...notifyPrefs(x), dnd: !dnd } }))} onMore={() => openSettings(onClose, 'notifications')} />
         </View>
         {soundOn ? <Tile t={t} style={{ gap: 10 }}><SoundRow t={t} /></Tile> : null}
-        {radios.length || bt?.adapter ? <Head t={t} label={tr('settings.section.network')} onClick={() => openSettings(onClose, 'network')} /> : null}
-        {radios.length || bt?.adapter ? (
+        {wifi || bt?.adapter ? <Head t={t} label={tr('settings.section.network')} onClick={() => openSettings(onClose, 'network')} /> : null}
+        {wifi || bt?.adapter ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            {radios.length ? <Switch t={t} on={false} label={tr('shell.cc.wifi')} detail={wifi ? wifi.name : tr('shell.cc.notConnected')}
-              glyph={(c) => <SignalGlyph color={c} size={14} level={wifi ? wifiBars(wifi.signal) : 0} off={!wifi} />}
-              onToggle={() => openSettings(onClose, 'network', 'wifi')} onMore={() => openSettings(onClose, 'network', 'wifi')} /> : null}
+            {wifi ? <WifiSwitch t={t} w={wifi} onClose={onClose} onChanged={() => reread((n) => n + 1)} /> : null}
             {bt?.adapter ? <Switch t={t} on={!!bt.adapter.powered} label={tr('shell.cc.bluetooth')} glyph={(c) => <BluetoothGlyph color={c} size={14} />}
               onToggle={() => setBluetoothPower(!bt.adapter.powered)} onMore={() => openSettings(onClose, 'bluetooth')} /> : null}
           </View>

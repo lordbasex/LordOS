@@ -45,6 +45,7 @@ typedef enum {
     RCM_STAT,           /* operations/stat of one file about to go up: the conflict rule (7.2) */
     RCM_COPYFILE,       /* operations/copyfile, inside one account only: the cloud's version kept before ours replaces it */
     RCM_FSCACHE_CLEAR,  /* fscache/clear: FTP and SMB keep a dead connection after the server restarts (B18) */
+    RCM_VFS_POLL,       /* vfs/poll-interval: a paused mount stops asking the provider for its changes (#194) */
     RCM_COUNT
 } RcMethod;
 
@@ -258,5 +259,16 @@ int  cloud_off_due(int waiting, int busy);
 const char *cloud_auto_off(const char *type, const char *err, int starting);
 /* a reason read back from accounts.json: one of ours, else "" */
 const char *cloud_off_reason(const char *saved);
+
+/* ---- Pause (#194) ----
+ * A paused account sends nothing to its provider by itself: no listing to check it still answers, no quota, no
+ * background listing of the folders Files shows, no keeper, its mount's change polling off (vfs/poll-interval 0), and
+ * no mount. An account paused by the person (Pause, Pause All: own) is not mounted at all until it is resumed; one
+ * paused only by the battery (any) keeps its first mount, but one that failed (failed: its error) isn't tried again
+ * every 30 seconds. Only what the person does reaches the provider: opening a file not on this computer, Measure, Empty
+ * Trash. 1: bring_up may run. */
+int  cloud_bring_up_ok(int own_pause, int any_pause, int failed);
+/* the mount's change polling, as vfs/poll-interval's body: off for a paused account. 0, -1 doesn't fit */
+int  cloud_poll_body(const char *id, int off, char *out, size_t n);
 
 #endif

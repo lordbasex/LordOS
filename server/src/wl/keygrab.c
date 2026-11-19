@@ -28,8 +28,8 @@ static const Grab flow[] = {
     { KG_META | KG_CTRL, 0, KEY_LEFT, KG_TAKE }, { KG_META | KG_CTRL, 0, KEY_RIGHT, KG_TAKE },
 };
 
-/* Lord Flow with Settings → Keyboard's Desktops arrows on (the default): ⌃ arrows are word movement in
- * a Linux app, so the person chooses. Kept together with `flow` by being a second table. */
+/* Lord Flow with Settings → Desktop & Dock's Desktops arrows on (off by default since 0.8.9.1, #201): ⌃ arrows are
+ * word movement in a Linux app, so the person chooses. Kept together with `flow` by being a second table. */
 static const Grab flow_desktops[] = {
     { KG_META, 0, KEY_TAB, KG_HOLD },
     { KG_META | KG_SHIFT, 0, KEY_TAB, KG_HOLD },

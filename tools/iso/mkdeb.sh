@@ -22,7 +22,8 @@
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
 #   /usr/lib/lordos/themes/<theme>/       theme.json, theme.bundle.js and their resources (greeter: the
 #                                         login screen)
-#   /usr/lib/lordos/assets/               fonts, texts (locales), icons, shell integration
+#   /usr/lib/lordos/assets/               fonts, texts (locales), icons, shell integration, cloud/providers.json (the
+#                                         Cloud providers verified on LordOS: without it every one read "not verified", #195)
 #   /usr/lib/lordos/code-manifest.json    SHA-256 of every bundle LordOS runs as its own code, and
 #   /usr/lib/lordos/code-manifest.sig     its Ed25519 signature (release key; docs/SIGNING.md)
 #   /usr/lib/lordos/lordos-live-prep      live preparation (grub language, folders)
@@ -227,7 +228,7 @@ for d in themes/*/; do
     install -m 644 "$d/theme.json" "$d/theme.bundle.js" "$L/themes/$n/"
     [ -d "$d/assets" ] && cp -r "$d/assets" "$L/themes/$n/"
 done
-cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps assets/geo assets/desktops "$L/assets/"
+cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps assets/geo assets/desktops assets/cloud "$L/assets/"
 # the makers' keys Machines' download catalog pins (assets/machines/systems.json "keys"; docs/VIRTUALIZATION.md 3.9):
 # the admin helper checks each checksum list's signature with them before it trusts a hash
 install -d "$L/assets/machines/keys"

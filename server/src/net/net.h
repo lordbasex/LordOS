@@ -31,6 +31,10 @@ char *net_if_config_json(const char *ifname);
 /* A Wi-Fi interface's level in dBm from the text of /proc/net/wireless: 1 and *dbm, or 0 (no reading). The
  * interfaces' JSON carries it as "signal" (issue #114). */
 int  net_wireless_level(const char *text, const char *ifname, int *dbm);
+/* The SSID nl80211 reports for an associated station (up to 32 raw bytes) as text for the interfaces' JSON ("ssid",
+ * issue #192): 1 and a NUL-terminated copy in out when it is well-formed UTF-8 with no control characters and fits;
+ * 0 otherwise (the field is then left out, never shown garbled). */
+int  net_ssid_text(const unsigned char *raw, size_t len, char *out, size_t n);
 /* Reads a user's .ovpn and embeds the files it names (ca, cert, key, tls-auth...)
  * that are in the same folder. NULL + err if it can't. */
 char *net_ovpn_inline(const char *path, char *err, size_t errn);

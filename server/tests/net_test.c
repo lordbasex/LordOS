@@ -484,6 +484,27 @@ static int test_wireless(void) {
     WL(net_wireless_level("wlan0: zz", "wlan0", &d) == 0);
     WL(net_wireless_level("wlan0:\nwlan5: 0000 1. -60.\n", "wlan0", &d) == 0);    /* never reads the next line */
     WL(net_wireless_level("wlan0: 0000 54. -500.\n", "wlan0", &d) == 0);           /* out of range */
+    /* GitHub #192: the connected network's name ("ssid") from nl80211, raw bytes the access point chose: only
+     * well-formed UTF-8 without control characters reaches the interfaces' JSON */
+    char s[33];
+#define SS(lit, ok) (net_ssid_text((const unsigned char *)(lit), sizeof(lit) - 1, s, sizeof s) == (ok))
+    WL(SS("Casa", 1) && !strcmp(s, "Casa"));
+    WL(SS("Caf\xc3\xa9 \xe2\x98\x95 \xf0\x9f\x93\xb6", 1) && !strcmp(s, "Caf\xc3\xa9 \xe2\x98\x95 \xf0\x9f\x93\xb6"));   /* 2, 3 and 4 bytes */
+    WL(SS("12345678901234567890123456789012", 1) && strlen(s) == 32);   /* the longest an SSID can be */
+    WL(SS("123456789012345678901234567890123", 0) && !s[0]);           /* 33 bytes: not an SSID */
+    WL(SS("", 0));
+    WL(SS("a\nb", 0) && !s[0]);                                      /* a control character */
+    WL(SS("a\x7f", 0));                                               /* DEL */
+    WL(SS("a\xc2\x85", 0));                                           /* a C1 control (NEL) */
+    WL(SS("\xff\xfe", 0));                                            /* not UTF-8 */
+    WL(SS("ab\xc3", 0));                                              /* cut in the middle of a character */
+    WL(SS("\xc0\xaf", 0));                                            /* overlong */
+    WL(SS("\xed\xa0\x80", 0));                                        /* a surrogate */
+    WL(SS("\xf4\x90\x80\x80", 0));                                    /* past U+10FFFF */
+    WL(SS("a\"b\\c", 1) && !strcmp(s, "a\"b\\c"));                    /* quotes are the JSON writer's to escape */
+    WL(net_ssid_text((const unsigned char *)"Casa", 4, s, 4) == 0);  /* no room for the NUL */
+    WL(net_ssid_text(NULL, 4, s, sizeof s) == 0);
+#undef SS
 #undef WL
     printf("wireless: %s\n", bad ? "FAILED" : "ok");
     return bad;
