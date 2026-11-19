@@ -36,8 +36,8 @@ quick press goes back to the previous app.
 |---|---|
 | ❖ alone · F4 | Apps (the app launcher) |
 | ❖Tab · ❖⇧Tab | Switch apps |
-| ⌃↑ · ⌃↓ | Overview · windows of the app ([Desktops](help:desktops)) |
-| ⌃← ⌃→ | Previous or next desktop |
+| ❖⌃← ❖⌃→ | Previous or next desktop ([Desktops](help:desktops)) |
+| ⌃↑ · ⌃↓ · ⌃← ⌃→ | Overview · windows of the app · previous or next desktop, when the Ctrl arrows are on in [Settings → Desktop & Dock](settings:dock) (off by default: apps use them to move by word) |
 | ❖\` · ❖⇧\` | Next or previous window of the app |
 | ❖M | Minimize the window |
 | ❖H · ❖⌥H | Hide the app · hide the other apps |

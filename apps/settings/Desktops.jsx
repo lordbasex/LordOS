@@ -23,7 +23,7 @@ export function DesktopsSection({ tr }) {
         </SettingRow>
         {(themes.current() === 'default' || (themes.current() !== 'classic' && !!themes.info()?.desktopArrows)) && (
           <SettingRow label={tr('settings.dock.desktops.arrows')} hint={tr('settings.dock.desktops.arrowsHint')}>
-            <Toggle small on={s.desktopArrows !== false} onChange={(v) => set({ desktopArrows: v })} />
+            <Toggle small on={s.desktopArrows === true} onChange={(v) => set({ desktopArrows: v })} />
           </SettingRow>
         )}
         <SettingRow label={tr('settings.dock.desktops.swipe')}>

@@ -36,8 +36,8 @@ volta ao app anterior.
 |---|---|
 | ❖ sozinho · F4 | Apps (o lançador de apps) |
 | ❖Tab · ❖⇧Tab | Alternar entre apps |
-| ⌃↑ · ⌃↓ | Visão geral · janelas do app ([Áreas de trabalho](help:desktops)) |
-| ⌃← ⌃→ | Anterior ou seguinte |
+| ❖⌃← ❖⌃→ | Área de trabalho anterior ou seguinte ([Áreas de trabalho](help:desktops)) |
+| ⌃↑ · ⌃↓ · ⌃← ⌃→ | Visão geral · janelas do app · área anterior ou seguinte, se as setas com Ctrl estiverem ativadas em [Ajustes → Mesa e Dock](settings:dock) (vêm desligadas: os apps as usam para mover por palavra) |
 | ❖\` · ❖⇧\` | Janela seguinte ou anterior do app |
 | ❖M | Minimizar a janela |
 | ❖H · ❖⌥H | Ocultar o app · ocultar os outros apps |

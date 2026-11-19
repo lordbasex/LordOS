@@ -71,12 +71,13 @@ export function moveToDesktopItems(id) {
 
 // ---- shortcuts ----
 
-export const ctrlArrowsOn = () => settings.get().desktopArrows !== false;
+export const ctrlArrowsOn = () => settings.get().desktopArrows === true;
 const arrowDir = (e) => (e.code === 105 ? 'left' : 'right');
 const onStep = (e) => stepArrow(arrowDir(e));
 
-// Lord Flow. ⌃ arrows are word movement in a Linux app, so Settings → Keyboard can turn them off
-// (then the 'flow' key table keeps them from nobody); ❖⌃ arrows always work.
+// Lord Flow. ⌃ arrows are word movement in apps, so they are the Desktops keys only when Settings → Desktop & Dock
+// turns them on (off by default since 0.8.9.1, #201; off, the 'flow' key table keeps them from nobody); ❖⌃ arrows
+// always work.
 export const flowDesktopKeys = [
   { id: 'overview', keys: ['Ctrl+ArrowUp'], run: () => toggleOverview(), when: ctrlArrowsOn, listed: ctrlArrowsOn, label: 'shell.shortcuts.overview', group: 'desktops' },
   { id: 'appWindows', keys: ['Ctrl+ArrowDown'], run: () => toggleAppWindows(), when: ctrlArrowsOn, listed: ctrlArrowsOn, label: 'shell.shortcuts.appWindows', group: 'desktops' },

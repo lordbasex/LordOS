@@ -13,7 +13,7 @@ Podés tener hasta nueve.
 
 La vista general muestra las ventanas de este escritorio y, arriba, todos tus escritorios.
 
-- **Lord Flow:** ⌃↑, o Vista general en el menú Ventana.
+- **Lord Flow:** Vista general en el menú Ventana, o ⌃↑ si las flechas con Ctrl están activadas (ver abajo).
 - **Lord Classic:** ❖Tab, o el botón al lado de la búsqueda.
 
 Hacé clic en una ventana para ir a ella y en un escritorio para verlo. Con **+** agregás un escritorio, y con la ×
@@ -23,10 +23,10 @@ de un escritorio lo cerrás: sus ventanas pasan al siguiente. Arrastrá una vent
 
 | | Lord Flow | Lord Classic |
 |---|---|---|
-| Escritorio anterior o siguiente | ⌃← ⌃→ · ❖⌃← ❖⌃→ | ❖⌃← ❖⌃→ |
+| Escritorio anterior o siguiente | ❖⌃← ❖⌃→ (también ⌃← ⌃→ si están activadas) | ❖⌃← ❖⌃→ |
 | Nuevo escritorio | En la vista general | ❖⌃D |
 | Cerrar este escritorio | En la vista general | ❖⌃F4 |
-| Ventanas de la app | ⌃↓ | |
+| Ventanas de la app | ⌃↓ (si están activadas) | |
 
 En un touchpad, deslizá de costado con tres dedos. Cuatro dedos hacia arriba abren la vista general si los
 gestos de cuatro dedos están activados en [Touchpad y pantalla táctil](help:trackpad).
@@ -39,8 +39,9 @@ Menú Ventana → **Mover a escritorio**. Las apps con barra propia lo tienen en
 
 ## Ctrl y las flechas
 
-En muchas apps ⌃← y ⌃→ mueven por palabras. Si las querés para eso, apagalas en
-[Ajustes → Teclado](settings:keyboard); ❖⌃← y ❖⌃→ siguen cambiando de escritorio.
+En muchas apps ⌃← y ⌃→ mueven por palabras, así que en Lord Flow quedan para la app. Si preferís usar
+⌃↑ ⌃↓ ⌃← ⌃→ para los escritorios, activá **Usar Ctrl + flechas para los escritorios** en
+[Ajustes → Escritorio y Dock](settings:dock). ❖⌃← y ❖⌃→ siempre cambian de escritorio.
 
 ## Para tener en cuenta
 
