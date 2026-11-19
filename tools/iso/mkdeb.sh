@@ -84,7 +84,7 @@ for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
          lord-stream:"libavcodec-dev libavformat-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
-         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" \
+         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-appstream:"" \
          lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lordos-guest:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
@@ -186,6 +186,9 @@ fi
 # lord-hidpp (0.8.8.10): the battery of Logitech devices; setgid lordos-hidpp, set by postinst (dpkg-statoverride)
 [ -x server/build/lord-hidpp ] && install -m 755 server/build/lord-hidpp "$L/bin/lord-hidpp"
 [ -x "$L/bin/lord-hidpp" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-hidpp" 2>/dev/null || true; }
+# lord-appstream (Flatpak phase 1, E7): reads Flathub's catalog in its sandbox; only the C library (docs/FLATPAK.md)
+[ -x server/build/lord-appstream ] && install -m 755 server/build/lord-appstream "$L/bin/lord-appstream"
+[ -x "$L/bin/lord-appstream" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-appstream" 2>/dev/null || true; }
 # lord-rdesk (0.8.7): one RDP or VNC connection, sandboxed (docs/FILES.md, "Remote desktop")
 install -m 755 server/build/lord-rdesk "$L/bin/lord-rdesk"
 "$STRIP" --strip-unneeded "$L/bin/lord-rdesk" 2>/dev/null || true

@@ -598,6 +598,12 @@ file name, sizes), which lord-server validates again before the Store reads it. 
 (a new mode of an existing one, or a small new binary) is open question 5; the rule is the same as
 for every decoder. The website's API is never used.
 
+**Built on 2026-11-19 (E7):** the helper is a new small binary, `lord-appstream` (open question 5: not a mode of
+`lord-doc`, so it needs neither Poppler nor libarchive: only the C library), reading the uncompressed `appstream.xml`
+Flatpak keeps next to the `.gz`. Its index line: id, branch, name, summary, icon (`64x64/` or `128x128/<file>.png`),
+categories, license, developer, verified (`flathub::verification::verified`). The Store shows the verified ones by
+default (maintainer's decision); the filter is the shell's, the index carries every app.
+
 ### Updates (Design)
 
 - Store → Updates lists Flatpak updates beside Debian ones (`flatpak --user remote-ls --updates`

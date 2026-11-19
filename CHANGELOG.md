@@ -51,6 +51,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   from the shell is a ref, checked in C (`app/<id>/<native arch>/<branch>`, never a runtime); never a URL, remote,
   key, file or option, and never `--no-gpg-verify`. Its output comes back as printable UTF-8 lines. Checked on VM 127
   in a session: install and uninstall of a Flathub app ran in that scope; a ref ending in an option was refused.
+- **Flathub's catalog, read in a sandbox** (in development, E7): `lord-appstream`, a new helper that links only the C
+  library, reads Flathub's AppStream file (opened by lord-server without following any link but Flatpak's own) and,
+  inside `sandbox_apply_helper` (no network, no file opened by path, no exec, a memory cap), writes a compact index:
+  id, branch, name and summary in the person's language, icon, categories, license, developer and whether Flathub
+  verified the app. lord-server checks every line again before `lord.flatpak.catalog()` hands it to the shell. On
+  Flathub's real catalog (52 MB): 3,366 apps, 2,240 verified, in 0.07 s. `fpakas-test` (2,096 checks, under
+  AddressSanitizer, with random and cut documents).
 
 ## [0.8.9.2-beta] - 2026-11-19
 
