@@ -2556,6 +2556,37 @@ static void usage(const char *argv0) {
 static pthread_t loop_thread;
 static void forward_stop(int sig) { pthread_kill(loop_thread, sig); }
 
+/* (0.8.9.1 memory work) one report: the process (status, huge pages), glibc's heap (mallinfo2: in use against free
+ * but kept), the QuickJS runtime, the image cache, the per-display scenes. Measured right after a malloc_trim. */
+static void mem_report(Server *s) {
+    malloc_trim(0);
+    long rss = 0, anon = 0, file = 0, thp = 0;
+    char line[256];
+    FILE *f = fopen("/proc/self/status", "r");
+    if (f) {
+        while (fgets(line, sizeof line, f)) {
+            sscanf(line, "VmRSS: %ld", &rss); sscanf(line, "RssAnon: %ld", &anon); sscanf(line, "RssFile: %ld", &file);
+        }
+        fclose(f);
+    }
+    if ((f = fopen("/proc/self/smaps_rollup", "r"))) {
+        while (fgets(line, sizeof line, f)) sscanf(line, "AnonHugePages: %ld", &thp);
+        fclose(f);
+    }
+    struct mallinfo2 mi = mallinfo2();
+    int ic = 0, idle = 0;
+    size_t ib = 0;
+    image_cache_stats(&ic, &idle, &ib);
+    long scenes = 0;
+    for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].scene.px) scenes += (long)s->out[i].scene.w * s->out[i].scene.h * 4;
+    fprintf(stderr, "memory: rss=%ldK anon=%ldK file=%ldK thp=%ldK | malloc arena=%zuK inuse=%zuK free=%zuK mmap=%zuK(%zu) "
+            "top=%zuK | images=%d idle=%d %zuK | scenes=%ldK\n", rss, anon, file, thp, mi.arena >> 10, mi.uordblks >> 10,
+            mi.fordblks >> 10, mi.hblkhd >> 10, mi.hblks, mi.keepcost >> 10, ic, idle, ib >> 10, scenes >> 10);
+    char js[512];
+    js_mem_line(js, sizeof js);
+    fprintf(stderr, "memory: %s\n", js);
+}
+
 int main(int argc, char **argv) {
     struct sigaction pipe_sa = { .sa_handler = on_sigpipe };
     sigemptyset(&pipe_sa.sa_mask);
@@ -3105,6 +3136,14 @@ int main(int argc, char **argv) {
         /* glibc keeps what was freed inside the heap for later, so a peak (a big window, an app opened and closed, the
          * theme loading) stays in the RSS for the rest of the session. When a wait ended with nothing to do (the
          * desktop at rest), at most once a minute, the free pages go back to the system: a few ms, never mid-frame. */
+        /* (0.8.9.1 memory work) a memory report in compositor.log: 4 and 12 minutes after start, then every 30 */
+        static uint64_t mem_t0, mem_next;
+        if (!mem_t0) { mem_t0 = loop_wake; mem_next = loop_wake + 240ull * 1000000000ull; }
+        if (loop_wake >= mem_next) {
+            mem_report(&s);
+            uint64_t up = loop_wake - mem_t0;
+            mem_next = loop_wake + (up < 700ull * 1000000000ull ? 480ull : 1800ull) * 1000000000ull;
+        }
         static uint64_t trimmed_at;
         if (ready == 0 && loop_wake - trimmed_at > 60ull * 1000000000ull) {
             malloc_trim(0);
