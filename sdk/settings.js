@@ -38,6 +38,7 @@ const DEFAULTS = {
   sessionBrowsers: true,      // browsers reopen their tabs too (the browser-restore admin action)
   remoteDesks: null,          // 0.8.7, the RDP and VNC apps' saved computers (no passwords)
   databases: null,            // 0.8.8.7, Databases: { history, recent, safeMode, servers, importOffered } (apps/databases)
+  logs: null,                 // 0.8.9.1 (#199), Logs: { collapsed } the sidebar groups folded (sdk/logfile.js toggleGroup); new key, no migration
   editor: null,               // 0.8.8.8 (#113), Text Editor: { recent } File → Open Recent (apps/editor/recent.js); new key, no migration
   machinesView: null,         // 0.8.8.7, Machines' library: { view, sort, show } (apps/machines/model.js libView)
   files: null,                // 0.8.7, Files → Settings (apps/files/prefs.js)
