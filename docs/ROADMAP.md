@@ -1085,7 +1085,12 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   *Can't be done as written:* the mount's traffic as a firewall app (the kernel's client has no cgroup of an app).
   *Not built:* IPv6.
 
-- [ ] **Flatpak and Flathub (future, undecided; not planned for any release)** — a Flathub section in the Store. On
+- [ ] **Flatpak and Flathub — approved 2026-11-19, phase 1 in development** (`FLATPAK.md`; the seven exceptions E1–E7
+  in `AGENTS.md`). Phase 1, x86-64 only: a Flathub switch in the Store (installs `flatpak` without Recommends, masks
+  its root helper and portal), the `verified` catalog through a sandboxed parser, install/update/remove per user, the
+  launcher in its root-owned `app-lordos-fp-<id>.scope` with LordOS's restrictions, firewall, Monitor and Privacy for
+  `flatpak:<id>`, and the VM test plan. Phase 2: LordOS's portals for Flatpak callers, the sub-sandbox service for
+  Chromium/Electron apps, the Raspberry Pi 5. History: a Flathub section in the Store. On
   2026-10-27 the maintainer decided not to implement it for now: the priority is the system's stability, and Flatpak
   would add complexity (bubblewrap, OSTree, portals, seven new exceptions to `AGENTS.md`) and future problems. The
   design review is kept as documentation (`FLATPAK.md`); nothing is built until the maintainer decides whether to

@@ -1,6 +1,13 @@
 # Flatpak and Flathub in LordOS: design review
 
-**Status (2026-10-27, rechecked 2026-11-19 against LordOS 0.8.9.1 and Debian 13's current packages): design review kept for the future; not planned for any release.** On 2026-10-27 the
+**Status (2026-11-19): approved; phase 1 in development** (branch `feat/flatpak`). On 2026-11-19 the maintainer approved
+the seven exceptions E1–E7 below (recorded in `AGENTS.md`, "Flatpak as an app source") and decided: phase 1 on x86-64
+PCs only (the Raspberry Pi 5 in phase 2); Flathub's `verified` subset by default, the rest behind a Store setting; apps
+that need Flatpak's sub-sandboxes (Chromium/Electron through zypak) are marked "not yet supported" and their own spawn
+service waits for phase 2; open question 11 as written there. No compatibility with any Flathub app is claimed until
+the test plan has run. The history of the review follows.
+
+**Earlier status (2026-10-27, rechecked 2026-11-19 against LordOS 0.8.9.1 and Debian 13's current packages): design review kept for the future; not planned for any release.** On 2026-10-27 the
 maintainer decided not to implement Flatpak for now, to keep the system stable and avoid the complexity and
 future problems it would add; this document stays as the reference if that is ever reconsidered (2026-11-15, GitHub #164: it may be looked at for 1.0.0, not before). No Flathub or Flatpak launcher integration has been built. Since 0.8.8.8 lord-server does recognise
 Flatpak clients (security contexts, and the `/.flatpak-info` identity used for the shortcuts permission and for
