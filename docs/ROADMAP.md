@@ -1090,14 +1090,14 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   would add complexity (bubblewrap, OSTree, portals, seven new exceptions to `AGENTS.md`) and future problems. The
   design review is kept as documentation (`FLATPAK.md`); nothing is built until the maintainer decides whether to
   do it at all. On 2026-11-15 (GitHub #164) the maintainer confirmed: no Flatpak support for now; it may be
-  considered for 1.0.0, not before.
-  2026-10-27) and waits for approval. Today LordOS neither uses nor integrates
+  considered for 1.0.0, not before. The review was checked again on 2026-11-19 against 0.8.9.1 and Debian 13's
+  security updates (`FLATPAK.md`, "What changed since 2026-10-27"). Today LordOS neither uses nor integrates
   Flatpak, and its rules keep isolation as LordOS's own code (no bubblewrap/flatpak for `.lpk`). What
   has to be solved so Flatpak apps follow LordOS's security model:
   - **Identity and the firewall:** `flatpak run` moves the app into its own transient
     `app-flatpak-<id>-*.scope` under `user@`, where `lord-netperm` treats it as an escape and applies
     the per-user union, not that app's rules. Flatpak apps must start through LordOS's launcher in
-    LordOS's app scope (or a root-owned `lordos-flatpak-<id>` scope) so Monitor, the firewall and the
+    LordOS's app scope (a root-owned `app-lordos-fp-<id>.scope`, `FLATPAK.md`) so Monitor, the firewall and the
     device restrictions see them as themselves; device-restricted apps have no session bus, which
     `flatpak run` needs today.
   - **The launcher:** their `.desktop` files live in `/var/lib/flatpak/exports/share/applications`

@@ -1,6 +1,6 @@
 # Flatpak and Flathub in LordOS: design review
 
-**Status (2026-10-27): design review kept for the future; not planned for any release.** On 2026-10-27 the
+**Status (2026-10-27, rechecked 2026-11-19 against LordOS 0.8.9.1 and Debian 13's current packages): design review kept for the future; not planned for any release.** On 2026-10-27 the
 maintainer decided not to implement Flatpak for now, to keep the system stable and avoid the complexity and
 future problems it would add; this document stays as the reference if that is ever reconsidered (2026-11-15, GitHub #164: it may be looked at for 1.0.0, not before). No Flathub or Flatpak launcher integration has been built. Since 0.8.8.8 lord-server does recognise
 Flatpak clients (security contexts, and the `/.flatpak-info` identity used for the shortcuts permission and for
@@ -16,6 +16,65 @@ written. Every statement is marked as one of:
   Not run.
 - **Design** — a proposal, not built.
 - **Unverified** — an assumption that the test plan has to confirm on a VM before it can be claimed.
+
+## What changed since 2026-10-27 (recheck of 2026-11-19)
+
+Read again from Debian's security tracker and package metadata, Flatpak's and Flathub's live sources, and LordOS 0.8.9.1's
+code. Nothing was run. The design below still holds; these are the corrections and the new facts, each also written
+into its section:
+
+- **Debian 13's Flatpak is the security-patched `1.16.6-1~deb13u3`** (DSA-6524-1, 2026-09-28; the stable point release
+  still has `~deb13u2`), and **xdg-dbus-proxy `0.1.6-1+deb13u3`** (DSA-6510-1, 2026-09-23, a filter bypass that could
+  reach code on the host; the design relies on the proxy for bus filtering). The test plan requires these versions or
+  newer. Nothing newer has shipped for flatpak, bubblewrap, xdg-dbus-proxy or ostree since 2026-10-27
+  (security-tracker.debian.org).
+- **Two fixes in `deb13u3` bear on the launcher** (Problem 2): exported `.desktop` and D-Bus `.service` files now go
+  through an allowlist of fields (before, `SystemdService=` in an exported service file could start a host unit), and a
+  sandboxed app could signal its parent's process group. LordOS's launcher starts `flatpak run` in its own session
+  (`setsid()`) whatever the version, and never reads `exports/share/dbus-1/services` itself; the user bus does, through
+  `XDG_DATA_DIRS`, which is why E5's masks and the session-bus rules matter.
+- **Upstream moved to 1.18** (1.18.4, 2026-09-28); Debian 13 stays on 1.16.6 with backported fixes. Nothing here may
+  rely on 1.17/1.18 features (conditional permissions such as `--device-if`, `--clear-env`, JSON output).
+- **polkit is now on every LordOS image** (`polkitd` and `pkexec` since 0.8.8, GitHub #4; lord-server is the
+  authentication agent, [PRIVACY.md](PRIVACY.md)). The earlier "LordOS doesn't install polkit" was wrong from then on:
+  `flatpak-system-helper`'s polkit actions would be reachable, so E5's mask is now required, not only explicit.
+- **lord-server already serves more portals** than the Settings portal: FileChooser v2, OpenURI v3, Inhibit and
+  GlobalShortcuts v1, ScreenCast v4 and `org.freedesktop.ScreenSaver` (`server/src/ui/portal.c`); ScreenCast is checked
+  on the VM with a browser ([DESKTOP-PARITY.md](DESKTOP-PARITY.md)). None identifies a Flatpak app yet (a caller under
+  `user@` stays anonymous). The old argument against a ScreenCast frontend ("would break the no-screen-copy claim")
+  no longer applies: LordOS hands screen streams to Linux apps itself, through its own chooser and the PipeWire guard.
+- **bubblewrap already runs under a LordOS exception:** lord-web (0.8.8.8) runs WebKit's bubblewrap and xdg-dbus-proxy
+  inside the root-owned `app-lordos-lordos-web-<app>.scope` under Landlock *scoping* only; with Landlock file rules
+  bubblewrap fails ("Failed to make / slave", [WEBAPPS.md](WEBAPPS.md), checked on kernel 6.12, 2026-11-10). That
+  confirms part of "Why scoping-only Landlock" (Problem 1) and is the precedent E4's wording builds on.
+- **A new conflict with the launcher's view (Problem 1, option B).** The `/.flatpak-info` identity lord-server added in
+  0.8.8.8 (`flatpak_host_ok`, `server/src/wl/kbinhibit.c`) reads `$XDG_RUNTIME_DIR/.flatpak/<instance>/` from
+  lord-server's own runtime folder and checks `child-pid` in lord-server's pid namespace, and the security-context
+  manager is offered only to clients in lord-server's namespaces (`may_secctx`, `server/src/wl/wl.c`). A `flatpak run`
+  inside LordOS's private view (own user, mount and pid namespaces, private runtime folder) would get neither. Phase 1
+  has to either run Flatpak apps without the private view when unrestricted, or teach both checks the view (a new
+  open question, 11).
+- **`flatpak:<id>` already exists as an identity** for the shortcuts permission (`permisos.json`,
+  `server/src/sec/perms.h`), next to `program:<path>`; E2's firewall id shares that namespace. `apps_name_of_program`
+  already reads `flatpak run … <id>` Exec lines, only to show a name (`server/src/apps.c`).
+- **More bus names lord-server owns**, which a Flatpak app must never `--own-name`: also
+  `org.freedesktop.ScreenSaver`, `org.kde.StatusNotifierWatcher` and `org.freedesktop.secrets`.
+- **Two restrictions the table missed:** `no-incoming` and `no-clipboard` (`server/src/fw/rules.h`); `no-clipboard` is
+  enforced today only for `.lpk` apps.
+- **Facts now Checked:** Debian's flatpak build links libseccomp (`libseccomp-dev (>= 2.5.2)` in Build-Depends: open
+  question 10 is answered); the appstream files are `<arch>/active/appstream.xml` and `appstream.xml.gz`, icons under
+  `<arch>/icons`; Flatpak 1.16 tags its Wayland connections with `wp_security_context_v1` (engine `org.flatpak`, app id,
+  instance id; since 1.15.6); since 1.16.1 the transient scope is named by instance id, not pid.
+- **Flathub:** the same signing key (expires 2027-06-14; the summary carries no `xa.gpg-keys`, so no rotation is
+  announced); the summary is 12.86 MB and also carries i386 compatibility refs; `summary.idx` has the `floss`,
+  `verified` and `verified_floss` subsets for x86_64 and aarch64. zypak (v2025.09) is still how Chromium and Electron
+  apps sandbox under Flatpak, so the sub-sandbox limit stands.
+- **Package engine:** since 0.8.8.7 an upgrade installs the Recommends a new version adds; turning Flathub on still
+  installs `flatpak` without Recommends. The engine already parses DEP-11 AppStream (`server/src/pkg/idx.c`), a
+  starting point for E7.
+- **Raspberry Pi 5:** still 16 KB pages; third-party reports show Chromium/Electron apps and jemalloc crashing on 16 KB
+  kernels (**Unverified** for Flathub runtimes). User namespaces are on (`CONFIG_USER_NS=y`) and nothing in LordOS
+  restricts them.
 
 Nothing here has been run on a VM. No compatibility with any Flathub app is claimed.
 
@@ -40,8 +99,9 @@ Nothing here has been run on a VM. No compatibility with any Flathub app is clai
   command-line options win over the app's metadata and over the user's override files.
 - **Permissions:** the Store shows what the app declares (its `[Context]`) and what LordOS changes.
   LordOS's existing restrictions (Settings → Privacy) apply to Flatpak apps through the same
-  kernel paths as to Linux apps. No portal beyond the Settings portal LordOS already serves in
-  0.8.6; a LordOS portal is a later phase with its own review.
+  kernel paths as to Linux apps. lord-server already serves Settings, FileChooser, OpenURI, Inhibit,
+  GlobalShortcuts and ScreenCast to Linux apps, but none of them identifies a Flatpak app yet; doing that
+  (identity by cgroup) is a later phase with its own review (E8).
 - **Installing:** per user (`flatpak --user`), no root and no new admin action. The Flathub remote
   comes from a `.flatpakrepo` file LordOS ships (its GPG key pinned), the catalog is Flathub's
   signed appstream data that `flatpak` itself verifies, and every `flatpak` command lord-server runs
@@ -60,7 +120,7 @@ device-restricted Flatpak app has no D-Bus at all, as Linux apps don't today.
 
 | Package | Version in trixie (sources.debian.org, 2026-10-27) | Notes |
 |---|---|---|
-| `flatpak` | 1.16.6-1~deb13u2 | Depends: `bubblewrap (>= 0.10)`, `fuse3`, `xdg-dbus-proxy`, `adduser` and its libraries (libostree among them). Recommends: `xdg-desktop-portal`, `xdg-desktop-portal-gtk`, `polkitd`, `libpam-systemd`… |
+| `flatpak` | 1.16.6-1~deb13u3 (trixie-security, DSA-6524-1; the point release has ~deb13u2) | Depends: `adduser, bubblewrap (>= 0.10.0~), fuse3, xdg-dbus-proxy (>= 0.1.0)` and its libraries (libostree among them); Build-Depends `libseccomp-dev`. Recommends: `xdg-desktop-portal`, `xdg-desktop-portal-gtk`, `polkitd`, `libpam-systemd`… |
 | `bubblewrap` | 0.12.0-1~deb13u1 | **not setuid**: Debian's README says the setuid mode "is no longer possible"; it needs unprivileged user namespaces (`kernel.unprivileged_userns_clone`, 1 by default) |
 
 The `flatpak` package also installs (file list from packages.debian.org):
@@ -80,8 +140,8 @@ The `flatpak` package also installs (file list from packages.debian.org):
 LordOS's package engine installs Recommends only when asked (`pkg-install … --recommends`,
 [PACKAGES.md](PACKAGES.md)), so turning Flathub on would not pull `xdg-desktop-portal` in. That
 matters: lord-server already owns `org.freedesktop.portal.Desktop` on the session bus for the
-Settings portal (`server/src/ui/portal.c`), and `tests/fwlinux/screen.sh` depends on no screen-cast
-portal being installed.
+Settings portal and its other frontends (`server/src/ui/portal.c`), and `tests/fwlinux/screen.sh` depends on no other
+screen-cast portal being installed (LordOS serves its own ScreenCast).
 
 ## Problem 1: identity and the firewall
 
@@ -136,9 +196,10 @@ pids, and the app runs under `user@` until it is moved back.
 
 **Recommendation: B.** The firewall id is `flatpak:<id>`; `fw_app_canon`, `lord-netperm`'s scope
 scan (`netperm.c`), `sec/appid.c`, the PipeWire guard (`sec/pwguard.c`), the Monitor
-(`ui/js_monitor.c`) and `sec/restrict.c` learn the `app-lordos-fp-` prefix the way they learned
-`app-lordos-lpk-`. The launcher's `valid_id` already refuses desktop ids starting with `lpk-`; it
-would refuse `fp-` too, so no `.desktop` can take a Flatpak app's identity.
+(`ui/js_monitor.c`) learn the `app-lordos-fp-` prefix (identity comes from `fw_app_canon` and `appid.c`; `sec/restrict.c` doesn't parse scope names) the way they learned
+`app-lordos-lpk-`. The launcher's `valid_id` already refuses desktop ids starting with `lpk-`, and `app_scope_reserved`
+(`sec/cgroup.h`) reserves `lpk-`, `lordos-vm*`, `lordos-web*` and the Cloud and remote-desktop names; `fp-` would join
+that list, so no `.desktop` can take a Flatpak app's identity.
 
 The view (Design) for a Flatpak app:
 
@@ -269,7 +330,7 @@ Whatever the app declares, the launcher always adds:
 | `--nosocket=session-bus` | the unfiltered bus reaches the systemd user manager (`systemd-run --user`) and the session helper |
 | `--no-talk-name=org.freedesktop.Flatpak` | `flatpak-spawn --host`: any command, unsandboxed, outside the scope |
 | `--no-talk-name=org.freedesktop.systemd1` | units and transient scopes outside the scope |
-| no `--own-name` of a name lord-server serves (`org.freedesktop.Notifications`, `org.freedesktop.portal.Desktop`) | impersonating LordOS's services |
+| no `--own-name` of a name lord-server serves (`org.freedesktop.Notifications`, `org.freedesktop.portal.Desktop`, `org.freedesktop.ScreenSaver`, `org.kde.StatusNotifierWatcher`, `org.freedesktop.secrets`) | impersonating LordOS's services |
 | `--nofilesystem` (hide) for `~/.config/lordos`, `~/.local/share/lordos`, `~/.cache/lordos`, `~/.local/share/applications`, `~/.config/autostart`, `~/.config/systemd`, `~/.config/environment.d`, `~/.local/bin` | the folders `fsops_protected()` and the launcher's grant rules keep from every app: rules, permissions, launchers, autostart, units |
 | `--filesystem=<file>:ro` for `~/.bashrc`, `~/.profile`, `~/.bash_profile`, `~/.zshrc` (those that exist) | shell startup files run outside any sandbox at the next login |
 
@@ -297,6 +358,8 @@ adds it as well, as defence in depth (the kernel path is the boundary, not bubbl
 | no screen capture | no capture protocol; the ScreenCast portal refuses the app and the PipeWire guard hides every shared screen from it; `/dev/fb*` denied | — |
 | no notifications | `hw/notifyd.c`: the caller's pid is the app's `xdg-dbus-proxy`, which `flatpak run` starts inside the scope, so its cgroup is the app's | — |
 | no access to your files | LordOS's view (home is a tmpfs with only `~/.var/app/<id>`), see Problem 1 | `--nofilesystem=home --nofilesystem=host` |
+| no incoming connections | `lord-netperm` on the scope | — |
+| no clipboard | enforced today only for `.lpk` apps (the broker); for Flatpak and Linux apps it needs the compositor to know the client's app, which the view conflict above affects | — |
 
 **No access to your files is the one restriction whose enforcement changes.** For a Linux app it
 is the view plus Landlock's file rules; for a Flatpak app Landlock's file rules can't be used
@@ -340,9 +403,9 @@ FileChooser, Screenshot, ScreenCast, Camera…). The frontend identifies Flatpak
 `/.flatpak-info` of the caller), keeps the permission store and runs the document portal.
 *Trade-offs:* a large GLib daemon under `user@` (outside any LordOS scope) that decides app
 identity and brokers files; it wants the `org.freedesktop.portal.Desktop` name lord-server holds
-(the Settings portal would move to a backend); its ScreenCast and Camera frontends hand out
-PipeWire streams, which would break the "no Linux app can copy the screen" claim the moment a
-backend exists.
+(the Settings portal would move to a backend). (2026-10-27 this also said its ScreenCast frontend would break the "no
+Linux app can copy the screen" claim; since 0.8.8 LordOS hands screen streams to Linux apps itself, through its own
+chooser and the PipeWire guard, so that argument is gone. The others stand.)
 
 **B. Serve the needed frontend interfaces in lord-server, on the name it already owns.**
 FileChooser (LordOS's own dialog, `fs.openFile`-style), OpenURI, Notification, Inhibit, next to
@@ -353,7 +416,8 @@ lord-server with untrusted callers; FileChooser for a sandboxed app needs a way 
 chosen file after start, which is the document portal's FUSE file system (Debian's
 `xdg-document-portal` is part of the `xdg-desktop-portal` package) or a LordOS equivalent.
 
-**C. No new portals in phase 1.** Apps reach only the Settings portal (dark mode, accent, fonts).
+**C. No new portals in phase 1.** Apps reach the portals lord-server already serves to Linux apps (Settings, and
+FileChooser, OpenURI, Inhibit, GlobalShortcuts and ScreenCast, all anonymous for a Flatpak caller until E8).
 GTK 4 and Qt fall back to their own in-process file dialogs, which show only what the sandbox sees
 (**Unverified** per toolkit).
 
@@ -400,8 +464,8 @@ FileChooser).
   GPGME. LordOS's package engine has its own OpenPGP and RSA code (`pkg/pgp.c`, `pkg/crypto.c`) for
   clear-signed `InRelease` files, but no GVariant or OSTree reader.
 - **Checked.** `flatpak --user` installs into `~/.local/share/flatpak` with no root and no system
-  helper. The system helper (root, polkit) is used only for `--system`; LordOS doesn't install
-  polkit.
+  helper. The system helper (root, polkit) is used only for `--system`. (2026-10-27 this said LordOS doesn't install
+  polkit; since 0.8.8 it does, so the helper must be masked, E5.)
 
 ### Options
 
@@ -459,7 +523,8 @@ neither verified nor free software. Offering `verified_floss` as a setting is op
 
 After `update --appstream flathub`, the signature-checked appstream data sits in
 `~/.local/share/flatpak/appstream/flathub/<arch>/active/` (`appstream.xml`, icons in
-`icons/64x64` and `icons/128x128`; exact file names **Unverified**). lord-server doesn't parse it
+`icons/64x64` and `icons/128x128`; **Checked** 2026-11-19 in `common/flatpak-dir.c`: `<arch>/active/appstream.xml` and
+`appstream.xml.gz`, icons under `<arch>/icons`). lord-server doesn't parse it
 (a 10+ MB XML file from the network): a sandboxed helper does, with `sandbox_apply_helper`, the
 file given as an fd, returning a compact index in a sealed memfd (id, name and summary in the
 user's language, categories, licence, `flathub::verification::verified`, content rating, icon
@@ -482,7 +547,9 @@ for every decoder. The website's API is never used.
 ## Dependency policy
 
 `AGENTS.md` and [ARCHITECTURE.md](ARCHITECTURE.md) forbid "bubblewrap, flatpak, firejail or
-libseccomp for isolation", and `.lpk` isolation must stay LordOS's own code. The argument for
+libseccomp for isolation", and `.lpk` isolation must stay LordOS's own code. Since 0.8.8.8 one exception already lets
+bubblewrap run: lord-web, where WebKit starts it (and xdg-dbus-proxy) inside a root-owned LordOS scope; E4 would be the
+second, worded the same way (a third party's sandbox inside LordOS's, never instead of it). The argument for
 allowing Flatpak as an **app source**:
 
 1. LordOS doesn't link it: no libflatpak, libostree or bubblewrap code in any LordOS binary.
@@ -501,8 +568,8 @@ GPGME/GnuPG, xdg-dbus-proxy, bubblewrap) runs as the user when Flathub is on, an
 code runs outside LordOS's helper sandbox (Problem 4). The wording to approve is E4.
 
 The root parts of the package are not used: LordOS masks `flatpak-system-helper.service` (E5), so
-installing Flathub adds no root service and no polkit actions are reachable (polkitd isn't installed;
-the mask makes that explicit).
+installing Flathub adds no root service and no polkit actions are reachable. polkitd is installed on LordOS since 0.8.8,
+so the mask is what keeps the helper's actions out of reach.
 
 ## Exceptions to approve
 
@@ -532,7 +599,8 @@ network exceptions:
 - **E5. Masking Flatpak's services**: the `lordos` package ships `/etc/systemd/system/
   flatpak-system-helper.service` and `/etc/systemd/user/flatpak-portal.service` as links to
   `/dev/null` (harmless while Flatpak isn't installed). This is a packaging change with a
-  migration (`packaging/migrations/`), not an admin action.
+  migration (`packaging/migrations/`), not an admin action. Since 0.8.8 polkitd is on every LordOS image, so this mask
+  is what keeps the system helper's polkit actions unreachable.
 - **E6. `lord.fs` deny list**: `~/.local/share/flatpak` (installations, the trusted key ring,
   override files and exports) is added to `fsops_protected()`, since the system reads it to launch
   and install.
@@ -591,7 +659,8 @@ library.
 ## Test plan (VM, x86-64 Debian 13 with LordOS)
 
 Each step records the commands, the output and a screenshot (`screendump`) before anything is
-claimed; packages installed for it go into `VM-SETUP.md`.
+claimed; packages installed for it go into `VM-SETUP.md`. The VM runs Debian 13's security-patched versions or newer:
+flatpak `1.16.6-1~deb13u3` and xdg-dbus-proxy `0.1.6-1+deb13u3` (2026-11-19).
 
 1. Install `flatpak` through the Store (no Recommends): which packages, how much disk; check
    `xdg-desktop-portal` was not installed and `screen.sh`'s portal check still passes; the two masked
@@ -652,9 +721,14 @@ claimed; packages installed for it go into `VM-SETUP.md`.
    of installed commits against the appstream data?
 9. **Disk use on low-end machines.** Runtimes are large; should the Store warn below a free-space
    threshold, and should Flathub be offered at all on the Raspberry Pi in phase 1?
-10. **Flatpak's own seccomp filter** (Flatpak installs one in every sandbox; whether Debian's
-    build links libseccomp for it is **Unverified**): it is Flatpak's, inside the app, and LordOS
+10. **Flatpak's own seccomp filter** (Flatpak installs one in every sandbox; Debian's build links libseccomp for it,
+    **Checked** 2026-11-19: `libseccomp-dev (>= 2.5.2)` in Build-Depends): it is Flatpak's, inside the app, and LordOS
     never uses it; confirm the wording of E4 covers it.
+11. **The launcher's view and lord-server's Flatpak checks** (new 2026-11-19). The `/.flatpak-info` identity
+    (`flatpak_host_ok`) and the security-context manager (`may_secctx`) both assume the client shares lord-server's
+    runtime folder and namespaces; inside LordOS's private view neither works. Run unrestricted Flatpak apps without
+    the view (as unrestricted Linux apps run today) and keep the view for restricted ones with the checks taught to
+    follow it, or change how the view handles `$XDG_RUNTIME_DIR/.flatpak`?
 
 ## References
 
@@ -663,11 +737,12 @@ claimed; packages installed for it go into `VM-SETUP.md`.
   `common/flatpak-context.c`, `common/flatpak-exports.c`, `common/flatpak-dir.c`,
   `portal/flatpak-portal.c`, `app/flatpak-builtins-run.c`, `app/flatpak-builtins-remote-add.c`
   (github.com/flatpak/flatpak, tag 1.16.6).
-- Debian: sources.debian.org (flatpak 1.16.6-1~deb13u2, bubblewrap 0.12.0-1~deb13u1),
+- Debian: sources.debian.org (flatpak 1.16.6-1~deb13u3, bubblewrap 0.12.0-1~deb13u1, xdg-dbus-proxy 0.1.6-1+deb13u3),
+  security-tracker.debian.org (DSA-6524-1, DSA-6510-1, DSA-6472-1; rechecked 2026-11-19),
   `debian/control` of flatpak, `debian/README.Debian` of bubblewrap, packages.debian.org file list
   of `flatpak` (trixie, amd64).
 - Flathub: `https://dl.flathub.org/repo/flathub.flatpakrepo`, `summary`, `summary.idx`
-  (fetched 2026-10-27).
+  (fetched 2026-10-27, again 2026-11-19).
 - LordOS: [FIREWALL.md](FIREWALL.md) ("Linux apps", "Escape via `systemd-run --user`", "LordOS
   components in their own scopes", "Blocklists"), [PRIVACY.md](PRIVACY.md) ("What is isolated
   today", "Root-owned app scopes"), [WAYLAND.md](WAYLAND.md) ("The launcher"),

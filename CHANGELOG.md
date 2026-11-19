@@ -12,6 +12,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- `docs/FLATPAK.md` checked again (2026-11-19) against 0.8.9.1's code and Debian 13's security updates: Debian ships
+  flatpak `1.16.6-1~deb13u3` and xdg-dbus-proxy `0.1.6-1+deb13u3` (DSA-6524-1, DSA-6510-1); polkit is on every image
+  since 0.8.8, so masking `flatpak-system-helper` is now required; lord-server already serves FileChooser, OpenURI,
+  Inhibit, GlobalShortcuts and ScreenCast (anonymous for a Flatpak caller); lord-web already runs bubblewrap under an
+  exception; a new open question (11): the 0.8.8.8 Flatpak identity checks don't work inside the launcher's private
+  view. Still not planned for any release. The roadmap entry names the same scope (`app-lordos-fp-<id>`).
 - `docs/ROADMAP.md`: a "Release 0.8.9.2 (planned)" section with the clipboard history that scrolls by itself under the
   pointer (#204) and, probably from the same cause, its arrow keys (#203).
 
