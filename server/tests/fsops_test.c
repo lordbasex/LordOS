@@ -123,6 +123,15 @@ int main(void) {
     CHECK(fsops_protected(a));
     path(a, ".config/lordos/webcam.json");
     CHECK(!fsops_protected(a));
+    /* Flatpak: installations, the trusted keys, override files and exports (docs/FLATPAK.md, E6); an app's own data isn't */
+    path(a, ".local/share/flatpak/repo/flathub.trustedkeys.gpg");
+    CHECK(fsops_protected(a));
+    path(a, ".local/share/flatpak/overrides/global");
+    CHECK(fsops_protected(a));
+    path(a, ".local/share/flatpak-other/x");
+    CHECK(!fsops_protected(a));
+    path(a, ".var/app/org.gnome.Calculator/config/x");
+    CHECK(!fsops_protected(a));
     path(a, "Documentos/x.txt");
     CHECK(!fsops_protected(a));
     path(a, ".config/lordos/global-shortcuts.json");     /* the global shortcuts portal's decisions */

@@ -49,6 +49,9 @@
 #   /usr/lib/lordos/migrate, migrations/  version-to-version system migrations, run by postinst
 #   /etc/kernel/postinst.d/zz-lordos-reboot-required  "restart required" after a kernel update
 #   /etc/logrotate.d/lordos              rotation of /var/log/lordos (server/src/lordlog.h); logrotate is a Recommends
+#   /etc/systemd/system/flatpak-system-helper.service, /etc/systemd/user/flatpak-portal.service
+#                                         links to /dev/null: Flatpak's root helper and sub-sandbox portal masked
+#                                         (docs/FLATPAK.md, E5)
 #   /usr/lib/modules-load.d/lordos-drivetemp.conf    SATA disk temperatures (drivetemp) at boot
 #   /usr/lib/systemd/system/smartmontools.service.d/lordos.conf  Debian's smartd stays off
 #   /usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf  gnome-keyring without the Secret Service
@@ -338,6 +341,12 @@ install -m 644 tools/iso/rootfs/etc/systemd/system/lord-netperm.service "$PKG/us
 # fans by temperature from the first boot (docs/FANS.md): enabled by postinst, also in a chroot
 install -m 644 tools/iso/rootfs/etc/systemd/system/lord-fand.service "$PKG/usr/lib/systemd/system/lord-fand.service"
 install -m 644 tools/iso/rootfs/etc/systemd/system/lordos-autoinstall.service "$PKG/usr/lib/systemd/system/lordos-autoinstall.service"
+# Flatpak's root helper and its sub-sandbox portal stay masked (docs/FLATPAK.md, E5): harmless while Flatpak isn't
+# installed; once the Store's Flathub switch installs it, polkit (on every image since 0.8.8) can't reach the helper's
+# actions and apps can't start sub-sandboxes outside their LordOS scope. New files, so no migration.
+install -d "$PKG/etc/systemd/system" "$PKG/etc/systemd/user"
+ln -sfn /dev/null "$PKG/etc/systemd/system/flatpak-system-helper.service"
+ln -sfn /dev/null "$PKG/etc/systemd/user/flatpak-portal.service"
 find "$L" -type d -exec chmod 755 {} +
 find "$L/themes" "$L/assets" "$L/migrations" "$L/apt" -type f -exec chmod 644 {} +
 

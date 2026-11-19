@@ -102,6 +102,7 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.config/lordos/global-shortcuts.json.tmp", /* and the file it is written to first */
                                            "/.config/lordos/web",           /* Web apps' registry (what lord-web starts, its permissions, the icons): only lord.webapps (docs/WEBAPPS.md) */
                                            "/.local/share/lordos/web",      /* Web apps' data, cookies and caches, per profile: only lord-web */
+                                           "/.local/share/flatpak",         /* Flatpak installations, the trusted keys, overrides and exports: only `flatpak` run by the Store (docs/FLATPAK.md, E6) */
                                            NULL };
 
 void fsops_protect_file(int slot, const char *real) {

@@ -306,13 +306,13 @@ void apps_status_icon(const char *name, char *out, size_t n) {
 /* A desktop id the launcher can run: it must also make a valid app scope name
  * ("app-lordos-<id>.scope", cgroup_scope_name_ok: no '+', at most 62 characters, no "..") and
  * never one that reads as a .lpk package's scope ("lpk-...": that would be lpk:<rest>'s identity,
- * rules and restrictions). */
+ * rules and restrictions) or a Flatpak app's ("fp-...": flatpak:<rest>, docs/FLATPAK.md E2). */
 #define APP_ID_MAX 62
 static int valid_id(const char *id) {
     size_t n = strlen(id);
     if (!n || n >= sizeof apps[0].id || n > APP_ID_MAX) return 0;
     for (const char *p = id; *p; p++) if (!isalnum((unsigned char)*p) && !strchr("._-", *p)) return 0;
-    return id[0] != '.' && id[0] != '-' && !strstr(id, "..") && strncmp(id, "lpk-", 4);
+    return id[0] != '.' && id[0] != '-' && !strstr(id, "..") && strncmp(id, "lpk-", 4) && strncmp(id, "fp-", 3);
 }
 
 static void app_dirs(char dirs[2][PATH_MAX]) {
