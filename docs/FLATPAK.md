@@ -235,8 +235,13 @@ apps pay today.
 that handles file access, and bubblewrap needs both, so `sandbox_apply_files` would make every
 Flatpak app fail to start. A domain with only Landlock's scoping (ABI 6) handles no file access,
 and Landlock's documentation ties the mount restriction to file-system restrictions, so bubblewrap
-should still be able to mount inside it. **Unverified** (the kernel's `security/landlock/fs.c` was
-not read for this review): the first thing to test.
+should still be able to mount inside it. **Checked on 2026-11-19** (kernel 6.12.117, bubblewrap 0.12.0, the
+maintainer's PC): `build/flatpak-view-probe` (`server/tests/flatpak_view_probe.c`) builds the launcher's keep-home view
+with `sandbox_files_isolate` and `sandbox_apply_scope`, then runs `bwrap --unshare-user --disable-userns --unshare-pid
+--ro-bind / / --proc /proc --dev /dev --tmpfs /tmp`, the namespaces `flatpak run` asks for. It starts, with and without
+the session bus; `/run/user/<uid>/systemd/private` is hidden inside; the runtime folder holds only `bus`, `pipewire-0`,
+`pulse` and the Wayland socket; and the process stays in the cgroup it was started in. A real `flatpak run` in the view
+is still to test on the VM.
 
 ## Problem 2: the launcher
 
