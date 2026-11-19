@@ -581,6 +581,9 @@ Todas las cifras de abajo las midió el proyecto y están documentadas en los ar
 | La pantalla de inicio cerrada después de iniciar sesión (corrección de la 0.8.5, el mismo tipo de VM de VMware) | sistema completo 603 → 548 MB usados | `CHANGELOG.md`, 0.8.5 |
 | Sistema completo, 0.8.5-beta actualizado desde 0.8.4.1, unos cinco minutos después de un reinicio con inicio de sesión automático (la misma VM de VMware, composición en la GPU con SVGA3D; Chrome, VS Code, Spotify y llama.cpp instalados, sin correr) | 592 MB usados | `results/0.8.5-beta/vmware-fusion` |
 | Arranque, la misma máquina con 0.8.5-beta | primer cuadro en el monitor 7,4 s después del inicio del kernel (`systemd-analyze`: 3,3 s kernel + 4,3 s espacio de usuario) | `results/0.8.5-beta/vmware-fusion` |
+| Una sesión de usuario (`lord-server`) en hardware real: 3 monitores de 1920×1080, Lord Workspaces, 7 widgets, una Terminal con Claude Code, en reposo (en desarrollo, 0.8.9.1) | 269 → 183 MB de RSS (−32 %) | PC con una RX 580, `docs/perf/MEMORY-HEAPTRACK.md` |
+
+**Memoria en reposo, en desarrollo (0.8.9.1).** Medida de a un cambio por vez en sesiones nuevas en esa PC, con heaptrack y un informe de memoria en `compositor.log` (`docs/perf/MEMORY-HEAPTRACK.md`): las imágenes guardadas de las ventanas animadas se liberan después de 30 s en reposo (quedaban toda la sesión, hasta 114 MB); el historial de la Terminal crece a medida que se llena en vez de reservar de entrada una tabla para un millón de líneas (24 MB); y las tablas fijas de lord-server no usan páginas grandes transparentes (unos 16 MB ocupados para muy pocos datos). Lo que queda en reposo es sobre todo el JavaScript del escritorio y las apps (34 MB), una escena por monitor (24 MB) y el driver de la placa de video (13 MB).
 
 ### 7.2 Dibujo
 

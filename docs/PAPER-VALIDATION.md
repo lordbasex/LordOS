@@ -344,6 +344,13 @@ pre-release that never shipped. The paper marks all of it "0.8.9, in development
 | 5.1 | Each app window has its own error boundary; no JSX component is used without being imported or declared (#174) | Test (`jsx_undeclared_test.mjs` in `make test`) | Holds |
 | 3.6 | The lock screen applies the session's display-off and sleep deadlines as the notice arrives (#172) | Test (`greeter_inbox_test.mjs`) | Holds in the tests |
 
+## 0.8.9.1 (in development; the paper's edition of 2026-11-19)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 7.1 | A session at rest with 3 × 1080p, Lord Workspaces, 7 widgets and a Terminal running Claude Code: 269 → 183 MB RSS; transform rasters freed after 30 s at rest, the Terminal's history growing as it fills, no huge pages for lord-server's `.bss` | Measured (the maintainer's PC with an RX 580, a fresh session per build, `tools/bench/session-sample.sh`; `docs/perf/MEMORY-HEAPTRACK.md`, data in `docs/perf/0.8.9.1/`) | Measured once per step |
+| 7.1 | The history ring keeps every line in order across growth, clearing and reflow | Test (`vt-dump` suites in `tests/run_suites.sh`; `build/vt-ring-test` in `make test`: 20,000 lines with a clear and a resize; also run once under AddressSanitizer, 2026-11-19) | Holds in the tests |
+
 ## What the paper must change for 0.8.5
 
 State in the 0.8.5 edition (`web/content/paper/paper.en.md`, checked 2026-10-26) after each item:
