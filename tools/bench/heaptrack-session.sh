@@ -17,6 +17,8 @@
 # Notes that cost us a test run each (0.8.9.1):
 #  - lord-sessiond starts lord-server with an empty environment: no PATH. The wrapper sets its own, or heaptrack
 #    (a sh script) and `id` are not found and the wrapper silently runs the plain binary.
+#  - heaptrack runs as root (lord-server drops privileges only later), so the out-dir is root's alone: a folder the
+#    user could write to would let them plant a symlink where root writes the trace.
 #  - the helpers lord-server starts re-execute /proc/self/exe, which is lord-server.real: they don't go through
 #    the wrapper, and heaptrack's preload library clears LD_PRELOAD so child programs are not traced.
 set -eu
@@ -27,7 +29,13 @@ install)
     command -v heaptrack >/dev/null || { echo "heaptrack is not installed (apt install heaptrack)" >&2; exit 1; }
     file "$SRC" | grep -q 'not stripped' || echo "warning: $SRC is stripped; heaptrack will show addresses, not lines" >&2
     case "$U" in *[!a-z0-9_-]*|'') echo "bad user name" >&2; exit 1 ;; esac
-    install -d -o "$U" -m 755 "$OUT"
+    # lord-sessiond starts lord-server as root (it drops to the user itself), so heaptrack runs as root and writes
+    # here: the folder must be root's alone, or the user could plant a symlink where the trace is written
+    case "$OUT" in /*) ;; *) echo "out-dir must be an absolute path" >&2; exit 1 ;; esac
+    if [ -L "$OUT" ] || { [ -e "$OUT" ] && [ "$(stat -c %u "$OUT")" != 0 ]; }; then
+        echo "$OUT exists and is not a folder owned by root; pick another out-dir" >&2; exit 1
+    fi
+    install -d -o root -g root -m 755 "$OUT"
     rm -rf "$OUT/used"
     [ -e "$BIN/lord-server.orig" ] || cp -p "$BIN/lord-server" "$BIN/lord-server.orig"
     install -m 755 "$SRC" "$BIN/lord-server.real"
