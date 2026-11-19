@@ -1,0 +1,56 @@
+{
+  "id": "memory-left-0891",
+  "note": "What stays in lord-server's memory at rest after ws08 ([[chart:memory-left-0891]]; drawn by web/lib/chartsvg.mjs). From docs/perf/MEMORY-HEAPTRACK.md ('What is left, and why it stays'): heaptrack, the memory report and /proc/<pid>/smaps.",
+  "title": {
+    "en": "What is left at rest after the 0.8.9.1 work",
+    "es": "Lo que queda en reposo después del trabajo de la 0.8.9.1",
+    "pt": "O que fica em repouso depois do trabalho da 0.8.9.1"
+  },
+  "summary": {
+    "en": "About 105 MB of heap plus about 69 MB of file-backed pages.",
+    "es": "Unos 105 MB de heap más unos 69 MB de páginas respaldadas por archivos.",
+    "pt": "Cerca de 105 MB de heap mais cerca de 69 MB de páginas vindas de arquivos."
+  },
+  "unit": "MB",
+  "bars": [
+    { "tone": "hi", "value": 34, "label": {
+      "en": "JavaScript of the desktop and the apps (QuickJS)",
+      "es": "JavaScript del escritorio y las apps (QuickJS)",
+      "pt": "JavaScript da área de trabalho e dos apps (QuickJS)" } },
+    { "value": 24, "label": {
+      "en": "One scene per display (3 × 1080p)",
+      "es": "Una escena por monitor (3 × 1080p)",
+      "pt": "Uma cena por monitor (3 × 1080p)" } },
+    { "value": 15, "label": {
+      "en": "Free space glibc keeps in the heap",
+      "es": "Espacio libre que glibc guarda en el heap",
+      "pt": "Espaço livre que a glibc guarda no heap" } },
+    { "value": 13, "label": {
+      "en": "Mesa, the GPU driver",
+      "es": "Mesa, el driver de la placa de video",
+      "pt": "Mesa, o driver da placa de vídeo" } },
+    { "value": 8, "label": {
+      "en": "Wallpapers (three pictures)",
+      "es": "Fondos de pantalla (tres imágenes)",
+      "pt": "Papéis de parede (três imagens)" } },
+    { "tone": "file", "value": 46, "label": {
+      "en": "libLLVM, read from disk",
+      "es": "libLLVM, leída del disco",
+      "pt": "libLLVM, lida do disco" } }
+  ],
+  "legend": [
+    { "tone": "base", "label": {
+      "en": "Heap (anonymous memory)",
+      "es": "Heap (memoria anónima)",
+      "pt": "Heap (memória anônima)" } },
+    { "tone": "file", "label": {
+      "en": "File-backed: clean pages the kernel can drop",
+      "es": "Respaldada por archivos: páginas limpias que el kernel puede soltar",
+      "pt": "Vinda de arquivos: páginas limpas que o kernel pode descartar" } }
+  ],
+  "footnote": {
+    "en": "The ws08 session of the 0.8.9.1 memory work (3 × 1080p, Lord Workspaces, 7 widgets, a Terminal running Claude Code), at rest. The Terminal's Instant Replay adds up to 6 MB per tab (about 1 MB in use in these runs). Source: heaptrack, the memory report in compositor.log and /proc/<pid>/smaps; docs/perf/MEMORY-HEAPTRACK.md.",
+    "es": "La sesión de ws08 del trabajo de memoria de la 0.8.9.1 (3 × 1080p, Lord Workspaces, 7 widgets, una Terminal con Claude Code), en reposo. El Instant Replay de la Terminal suma hasta 6 MB por pestaña (alrededor de 1 MB en uso en estas pruebas). Fuente: heaptrack, el informe de memoria en compositor.log y /proc/<pid>/smaps; docs/perf/MEMORY-HEAPTRACK.md.",
+    "pt": "A sessão da ws08 do trabalho de memória da 0.8.9.1 (3 × 1080p, Lord Workspaces, 7 widgets, um Terminal com o Claude Code), em repouso. O Instant Replay do Terminal soma até 6 MB por aba (cerca de 1 MB em uso nestes testes). Fonte: heaptrack, o relatório de memória no compositor.log e /proc/<pid>/smaps; docs/perf/MEMORY-HEAPTRACK.md."
+  }
+}
