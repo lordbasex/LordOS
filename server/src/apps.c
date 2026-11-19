@@ -383,6 +383,10 @@ int apps_list(const char *lang, const DesktopApp **out) {
     free(e);
     if (!list) return 0;
     qsort(list, (size_t)n, sizeof *list, cmp_name);
+    /* the table was sized for MAX_APPS (18.6 MB); kept at that size, the pages the scan touched stayed
+     * resident as 2 MB huge pages (0.8.9.1: ~10 MB for about a hundred apps) */
+    DesktopApp *fit = realloc(list, (size_t)(n ? n : 1) * sizeof *list);
+    if (fit) list = fit;
     free(apps);
     apps = list;
     napps = n;

@@ -172,9 +172,12 @@ static int cmp_entry(const void *a, const void *b) {
 
 const FontEntry *fonts_list(int force, int *count) {
     if (!scanned || force) {
-        if (!entries) entries = calloc(MAX_ENTRIES, sizeof *entries);
-        nentries = 0;
-        if (entries) {
+        /* scanned into a full-size table, then cut to what was found (MAX_ENTRIES is 5.8 MB, and the touched
+         * part stayed resident as huge pages: 0.8.9.1). A rescan builds a new table and frees the old one. */
+        FontEntry *old = entries, *fresh = calloc(MAX_ENTRIES, sizeof *fresh);
+        if (fresh) {                        /* no memory: the old list stays as it was */
+            entries = fresh;
+            nentries = 0;
             if (builtin[0]) scan_dir(builtin, 0);
             scan_dir("/usr/share/fonts", 0);
             scan_dir("/usr/local/share/fonts", 0);
@@ -187,6 +190,9 @@ const FontEntry *fonts_list(int force, int *count) {
                 scan_dir(p, 0);
             }
             qsort(entries, (size_t)nentries, sizeof *entries, cmp_entry);
+            FontEntry *fit = realloc(entries, (size_t)(nentries ? nentries : 1) * sizeof *entries);
+            if (fit) entries = fit;
+            free(old);
         }
         scanned = 1;
     }
