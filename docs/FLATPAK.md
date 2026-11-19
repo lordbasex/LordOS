@@ -4,7 +4,7 @@
 the seven exceptions E1–E7 below (recorded in `AGENTS.md`, "Flatpak as an app source") and decided: phase 1 on x86-64
 PCs only (the Raspberry Pi 5 in phase 2); Flathub's `verified` subset by default, the rest behind a Store setting; apps
 that need Flatpak's sub-sandboxes (Chromium/Electron through zypak) are marked "not yet supported" and their own spawn
-service waits for phase 2; open question 11 as written there. No compatibility with any Flathub app is claimed until
+service waits for phase 2; open question 11 as decided there (every Flatpak app in the view). No compatibility with any Flathub app is claimed until
 the test plan has run. The history of the review follows.
 
 **Earlier status (2026-10-27, rechecked 2026-11-19 against LordOS 0.8.9.1 and Debian 13's current packages): design review kept for the future; not planned for any release.** On 2026-10-27 the
@@ -736,9 +736,13 @@ flatpak `1.16.6-1~deb13u3` and xdg-dbus-proxy `0.1.6-1+deb13u3` (2026-11-19).
     runtime folder and namespaces; inside LordOS's private view neither works. Run unrestricted Flatpak apps without
     the view (as unrestricted Linux apps run today) and keep the view for restricted ones with the checks taught to
     follow it, or change how the view handles `$XDG_RUNTIME_DIR/.flatpak`?
-    **Decided by the maintainer (2026-11-19):** unrestricted Flatpak apps run without the view, as unrestricted Linux
-    apps do today (still in their root-owned scope), and the two checks are taught to follow the view for restricted
-    ones.
+    **Decided by the maintainer (2026-11-19, corrected the same day):** every Flatpak app runs in the view, restricted or
+    not. A first answer ran unrestricted apps without it, but then `flatpak run` reaches the user manager's socket and
+    has it move the app into `app-flatpak-<id>-*.scope` under `user@` (Problem 1, Facts), out of its LordOS scope, its
+    firewall rules and its Monitor row; only the view, which never contains `systemd/`, stops that. Unrestricted apps
+    keep the session bus (reached only through Flatpak's filtering proxy), Wayland and sound in their view. lord-server
+    knows a Flatpak client by its root-owned scope (`app-lordos-fp-<id>.scope`, read from the client's pid) instead of
+    `/.flatpak-info` and the runtime folder, and offers the security-context manager to clients of those scopes.
 
 ## References
 
