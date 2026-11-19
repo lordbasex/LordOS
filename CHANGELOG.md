@@ -44,6 +44,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   chose (an SDL game says `tuxocide`). Their exported SVG icons, links into the installation, are allowed to lord-media.
   The launcher's view process shows as `lordos-view`. Checked on VM 127: Tuxocide found and opened from search, its
   window with its own icon, its five processes under its name in Monitor → Processes.
+- **Flathub's management commands** (in development, E3): `lord.flatpak` runs only a closed list of `flatpak --user`
+  commands (add Flathub from the `.flatpakrepo` the package ships, update the catalog, info, install, update,
+  uninstall, remove unused runtimes, list), one at a time, each in its own child in `lordos-net-flathub.scope`: a new
+  firewall component, "Flathub" in Monitor → Network (named in every language), with its own rules. The only argument
+  from the shell is a ref, checked in C (`app/<id>/<native arch>/<branch>`, never a runtime); never a URL, remote,
+  key, file or option, and never `--no-gpg-verify`. Its output comes back as printable UTF-8 lines. Checked on VM 127
+  in a session: install and uninstall of a Flathub app ran in that scope; a ref ending in an option was refused.
 
 ## [0.8.9.2-beta] - 2026-11-19
 

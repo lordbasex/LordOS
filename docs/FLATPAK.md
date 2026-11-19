@@ -550,7 +550,7 @@ minimal environment, stdin `/dev/null`, output to a log or parsed strictly):
 
 | Command | Arguments from the UI |
 |---|---|
-| `remote-add --if-not-exists --from flathub /usr/share/lordos/flatpak/flathub.flatpakrepo` | none (the file ships in the `lordos` package, root-owned) |
+| `remote-add --if-not-exists --from flathub /usr/lib/lordos/assets/flatpak/flathub.flatpakrepo` | none (the file ships in the `lordos` package, root-owned) |
 | `update --appstream flathub` | none |
 | `remote-info --show-metadata flathub <ref>` | a ref |
 | `install flathub <ref>` | a ref |
@@ -567,6 +567,13 @@ Each command is started like a connector: lord-server forks, the child enters a 
 "Flathub", with its own rules, and blocking it says that no Flatpak update arrives meanwhile (as
 `lordos:store`). Downloads of `extra-data` (proprietary apps that fetch from their vendor during
 install) go through the same scope.
+
+**Built and checked on 2026-11-19** (`server/src/fpak.c` `fpak_cmd_argv`, `server/src/fpakrun.c`, `lord.flatpak` in
+`server/src/ui/js_flatpak.c`; the shipped file is Flathub's own, keys `6E5C…7CAE` and subkey `54A6…7EE8` checked): on
+VM 127, from the session's `server` leaf, remote-add, list, install (`cc.nift.nsm`), info and uninstall exited 0, the
+running `flatpak` was in `lordos-net-flathub.scope`, and a ref ending in `--no-gpg-verify` was refused before anything
+ran. Commands run one at a time. No subset is set on the remote: the maintainer's "verified by default" is a filter of
+the catalog (phase 1 step 4), so the setting can show the rest without changing the remote.
 
 **The pinned key.** The `.flatpakrepo` shipped by LordOS holds Flathub's key above. Because the
 key expires on 2027-06-14 and Flathub can roll it through `xa.gpg-keys`, LordOS also ships a new

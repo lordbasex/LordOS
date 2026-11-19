@@ -13,6 +13,7 @@
 #endif
 #include "js_flatpak.h"
 #include "../fpak.h"
+#include "../fpakrun.h"
 #include "../sec/cgroup.h"
 
 #include <errno.h>
@@ -35,7 +36,7 @@ static const char *const names[FPAK_CMD_COUNT] = {
 
 #define QMAX 16
 #define EMAX 512
-#define LINE_MAX_BYTES 400
+#define LINE_MAX_BYTES FPAK_LINE_MAX
 typedef struct { int id, cmd; char ref[FPAK_REF_MAX]; } Job;
 typedef struct { int id, done, code; char line[LINE_MAX_BYTES + 1]; } Ev;
 
@@ -46,18 +47,6 @@ static int nq, next_id = 1, worker_on, running_id;
 static pid_t running_pid;
 static Ev evs[EMAX];
 static int nev;
-
-static int binary_ok(void) {
-    struct stat st;
-    return !lstat(FPAK_FLATPAK, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && !(st.st_mode & 022) && (st.st_mode & 0111);
-}
-static const char *native_arch(void) {
-#if defined(__x86_64__)
-    return "x86_64";
-#else
-    return NULL;                                /* phase 1: x86-64 PCs only */
-#endif
-}
 
 /* under mu: one more event; when the buffer is full the oldest lines go (never a done) */
 static void push(int id, const char *line, int done, int code) {
@@ -73,99 +62,16 @@ static void push(int id, const char *line, int done, int code) {
     if (line) snprintf(e->line, sizeof e->line, "%s", line);
 }
 
-/* printable UTF-8 only (a control character or a broken sequence becomes nothing), at most LINE_MAX_BYTES */
-static void clean(const char *in, size_t n, char *out) {
-    size_t o = 0;
-    for (size_t i = 0; i < n && o < LINE_MAX_BYTES;) {
-        unsigned char c = (unsigned char)in[i];
-        int len = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : (c >> 3) == 30 ? 4 : 0;
-        if (!len || i + (size_t)len > n) { i++; continue; }
-        int ok = 1;
-        for (int k = 1; k < len; k++) if (((unsigned char)in[i + k] >> 6) != 2) ok = 0;
-        if (!ok || (len == 1 && (c < 0x20 || c == 0x7f) && c != '\t')) { i++; continue; }
-        if (o + (size_t)len > LINE_MAX_BYTES) break;
-        memcpy(out + o, in + i, (size_t)len);
-        o += (size_t)len;
-        i += (size_t)len;
-    }
-    out[o] = 0;
+static void job_line(void *ud, const char *line) {
+    pthread_mutex_lock(&mu);
+    push(*(int *)ud, line, 0, 0);
+    pthread_mutex_unlock(&mu);
 }
-
-static int run(const Job *j) {
-    const char *arch = native_arch();
-    char *argv[FPAK_ARGV_MAX], buf[2048];
-    if (!arch || !binary_ok() || fpak_cmd_argv(j->cmd, j->ref, arch, argv, buf, sizeof buf) < 0) return 127;
-    /* the environment it needs and nothing else: no session bus (no portal, no system helper), no display */
-    static const char *const keep[] = { "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_MESSAGES", "XDG_RUNTIME_DIR", NULL };
-    char envbuf[8][1024], *envp[10];
-    int ne = 0;
-    for (int i = 0; keep[i]; i++) {
-        const char *v = getenv(keep[i]);
-        if (v && strlen(v) < 900) { snprintf(envbuf[ne], sizeof envbuf[ne], "%s=%s", keep[i], v); envp[ne] = envbuf[ne]; ne++; }
-    }
-    snprintf(envbuf[ne], sizeof envbuf[ne], "PATH=/usr/bin:/bin");
-    envp[ne] = envbuf[ne];
-    envp[++ne] = NULL;
-    int p[2];
-    if (pipe2(p, O_CLOEXEC)) return 127;
-    pid_t pid = fork();
-    if (pid < 0) { close(p[0]); close(p[1]); return 127; }
-    if (pid == 0) {
-        setsid();                                       /* its own process group: cancel stops all of it */
-        int null = open("/dev/null", O_RDONLY);
-        if (null >= 0) dup2(null, 0);
-        dup2(p[1], 1);
-        dup2(p[1], 2);
-        syscall(SYS_close_range, 3, ~0u, 0);
-        sigset_t none;
-        sigemptyset(&none);
-        sigprocmask(SIG_SETMASK, &none, NULL);
-        for (int s = 1; s < 32; s++) signal(s, SIG_DFL);
-        const char *home = getenv("HOME");
-        if (home && chdir(home)) {}
-        /* its own firewall component; in a LordOS session a command that can't be placed there never runs */
-        CgroupLimits lim = { 0 };
-        if (cgroup_enter("lordos-net-flathub.scope", &lim) && getenv("LORDOS_SESSIOND")) {
-            static const char msg[] = "flatpak: could not enter lordos-net-flathub.scope: not run\n";
-            if (write(2, msg, sizeof msg - 1) < 0) {}
-            _exit(126);
-        }
-        execve(FPAK_FLATPAK, argv, envp);
-        _exit(127);
-    }
-    close(p[1]);
+static void job_pid(void *ud, pid_t pid) {
+    (void)ud;
     pthread_mutex_lock(&mu);
     running_pid = pid;
     pthread_mutex_unlock(&mu);
-    char acc[4096], line[LINE_MAX_BYTES + 1];
-    size_t have = 0;
-    for (;;) {
-        ssize_t r = read(p[0], acc + have, sizeof acc - have);
-        if (r < 0 && errno == EINTR) continue;
-        if (r <= 0) break;
-        have += (size_t)r;
-        size_t start = 0;
-        for (size_t i = 0; i < have; i++) {
-            if (acc[i] != '\n' && acc[i] != '\r') continue;
-            clean(acc + start, i - start, line);
-            if (line[0]) { pthread_mutex_lock(&mu); push(j->id, line, 0, 0); pthread_mutex_unlock(&mu); }
-            start = i + 1;
-        }
-        if (start == 0 && have == sizeof acc) start = have;     /* a line longer than the buffer: dropped */
-        memmove(acc, acc + start, have - start);
-        have -= start;
-    }
-    if (have) {
-        clean(acc, have, line);
-        if (line[0]) { pthread_mutex_lock(&mu); push(j->id, line, 0, 0); pthread_mutex_unlock(&mu); }
-    }
-    close(p[0]);
-    int st = 0;
-    while (waitpid(pid, &st, 0) < 0 && errno == EINTR) {}
-    pthread_mutex_lock(&mu);
-    running_pid = 0;
-    pthread_mutex_unlock(&mu);
-    return WIFEXITED(st) ? WEXITSTATUS(st) : 128 + (WIFSIGNALED(st) ? WTERMSIG(st) : 0);
 }
 
 static void *worker(void *arg) {
@@ -178,7 +84,7 @@ static void *worker(void *arg) {
         nq--;
         running_id = j.id;
         pthread_mutex_unlock(&mu);
-        int code = run(&j);
+        int code = fpak_run(j.cmd, j.ref, job_line, &j.id, job_pid);
         pthread_mutex_lock(&mu);
         running_id = 0;
         push(j.id, NULL, 1, code);
@@ -189,7 +95,7 @@ static void *worker(void *arg) {
 
 static JSValue f_available(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
-    return JS_NewBool(c, native_arch() && binary_ok());
+    return JS_NewBool(c, fpak_native_arch() && fpak_binary_ok());
 }
 
 static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -199,7 +105,7 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     int cmd = -1;
     for (int i = 0; name && i < FPAK_CMD_COUNT; i++) if (!strcmp(name, names[i])) cmd = i;
     char tmp[2048], *av[FPAK_ARGV_MAX];
-    const char *arch = native_arch();
+    const char *arch = fpak_native_arch();
     /* checked now too, so a bad call is refused at once instead of failing in the worker */
     int ok = cmd >= 0 && arch && (!ref || strlen(ref) < FPAK_REF_MAX) && fpak_cmd_argv(cmd, ref, arch, av, tmp, sizeof tmp) >= 0;
     int id = -1;
