@@ -629,7 +629,7 @@ network exceptions:
   `/dev/null` (harmless while Flatpak isn't installed). This is a packaging change with a
   migration (`packaging/migrations/`), not an admin action. Since 0.8.8 polkitd is on every LordOS image, so this mask
   is what keeps the system helper's polkit actions unreachable.
-- **E5b (proposed 2026-11-19, after the test above). Mask `flatpak-session-helper.service`** (user) too, in the same
+- **E5b (approved by the maintainer on 2026-11-19, after the test above). Mask `flatpak-session-helper.service`** (user) too, in the same
   way as E5: without it `flatpak run` can't start inside the view when the app has the session bus, and it is the
   service behind `flatpak-spawn --host`.
 - **E6. `lord.fs` deny list**: `~/.local/share/flatpak` (installations, the trusted key ring,

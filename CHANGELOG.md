@@ -13,9 +13,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 
 - **Flatpak and Flathub, phase 1 (in development; approved 2026-11-19, `docs/FLATPAK.md`).** The groundwork: the
-  package masks Flatpak's root helper (`flatpak-system-helper.service`) and its sub-sandbox portal
-  (`flatpak-portal.service`) with links to `/dev/null`, so once Flatpak is installed polkit can't reach the helper's
-  actions and no app starts a sandbox outside its LordOS scope; `~/.local/share/flatpak` (installations, trusted keys,
+  package masks Flatpak's root helper (`flatpak-system-helper.service`), its sub-sandbox portal
+  (`flatpak-portal.service`) and its session helper (`flatpak-session-helper.service`) with links to `/dev/null`, so
+  once Flatpak is installed polkit can't reach the helper's actions, no app starts a sandbox outside its LordOS scope
+  and `flatpak-spawn --host` has no service behind it; `~/.local/share/flatpak` (installations, trusted keys,
   overrides, exports) joins `lord.fs`'s deny list; desktop ids and app scopes starting with `fp-` are reserved for
   Flatpak apps (`app-lordos-fp-<id>.scope`, identity `flatpak:<id>`). Nothing installs Flatpak yet.
 

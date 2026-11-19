@@ -49,9 +49,10 @@
 #   /usr/lib/lordos/migrate, migrations/  version-to-version system migrations, run by postinst
 #   /etc/kernel/postinst.d/zz-lordos-reboot-required  "restart required" after a kernel update
 #   /etc/logrotate.d/lordos              rotation of /var/log/lordos (server/src/lordlog.h); logrotate is a Recommends
-#   /etc/systemd/system/flatpak-system-helper.service, /etc/systemd/user/flatpak-portal.service
-#                                         links to /dev/null: Flatpak's root helper and sub-sandbox portal masked
-#                                         (docs/FLATPAK.md, E5)
+#   /etc/systemd/system/flatpak-system-helper.service, /etc/systemd/user/flatpak-portal.service,
+#   /etc/systemd/user/flatpak-session-helper.service
+#                                         links to /dev/null: Flatpak's root helper, sub-sandbox portal and session
+#                                         helper masked (docs/FLATPAK.md, E5 and E5b)
 #   /usr/lib/modules-load.d/lordos-drivetemp.conf    SATA disk temperatures (drivetemp) at boot
 #   /usr/lib/systemd/system/smartmontools.service.d/lordos.conf  Debian's smartd stays off
 #   /usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf  gnome-keyring without the Secret Service
@@ -347,6 +348,9 @@ install -m 644 tools/iso/rootfs/etc/systemd/system/lordos-autoinstall.service "$
 install -d "$PKG/etc/systemd/system" "$PKG/etc/systemd/user"
 ln -sfn /dev/null "$PKG/etc/systemd/system/flatpak-system-helper.service"
 ln -sfn /dev/null "$PKG/etc/systemd/user/flatpak-portal.service"
+# and its session helper (E5b): outside the launcher's view it would hand `flatpak run` a monitor folder the app can't
+# see, and it is the service behind `flatpak-spawn --host`
+ln -sfn /dev/null "$PKG/etc/systemd/user/flatpak-session-helper.service"
 find "$L" -type d -exec chmod 755 {} +
 find "$L/themes" "$L/assets" "$L/migrations" "$L/apt" -type f -exec chmod 644 {} +
 
