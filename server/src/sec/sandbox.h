@@ -133,6 +133,10 @@ typedef struct {
      * sockets[], private /tmp, /var/tmp, /dev/shm, devpts, /proc, PID and IPC namespaces) is the
      * same. Then sandbox_apply_scope instead of sandbox_apply_files. */
     int keep_home;
+    /* with keep_home: the home folder is bound read-only (its top mount; mounts below it are untouched) and only rw[]
+     * (and the opened path) are bound over it writable. A Flatpak app's view (docs/FLATPAK.md): nothing it does can
+     * create, rename or change a file of the home outside those folders, whatever Flatpak grants it. */
+    int home_ro;
 } SandboxFilesCfg;
 
 /* Before sandbox_apply_files: the app's own view of the system, so no unix socket of the session

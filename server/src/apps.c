@@ -900,6 +900,51 @@ int apps_flatpak_installed(const char *id) {
     return fpak_id_ok(id) && !flatpak_find(id, arch, sizeof arch, branch, sizeof branch, NULL, 0);
 }
 
+/* The writable folders of a Flatpak app's read-only home: ~/.var/app/<id> (created) and the person's folders, each a
+ * real folder (not a link) directly or deeper in the home and not a protected one; and the opened path when grant_ok
+ * allows writing it. A line of user-dirs.dirs it doesn't understand is skipped: fewer writable folders, never more. */
+static void flatpak_writable(FilesPlan *p, const char *id, const char *opened) {
+    char path[PATH_MAX + 128];
+    static const char *const dirs[] = { "%s/.var%s", "%s/.var/app%s", "%s/.var/app/%s" };
+    for (int k = 0; k < 3; k++) {
+        if (snprintf(path, sizeof path, dirs[k], p->home, k == 2 ? id : "") >= (int)sizeof path) return;
+        mkdir(path, 0700);
+    }
+    if (is_dir(path)) plan_add(p, 1, "%s%s", path, "");
+    snprintf(path, sizeof path, "%s/.config/user-dirs.dirs", p->home);
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    FILE *f = fd >= 0 ? fdopen(fd, "re") : NULL;
+    if (!f && fd >= 0) close(fd);
+    static const char *const keys[] = { "XDG_DESKTOP_DIR", "XDG_DOCUMENTS_DIR", "XDG_DOWNLOAD_DIR", "XDG_MUSIC_DIR",
+                                        "XDG_PICTURES_DIR", "XDG_VIDEOS_DIR", "XDG_PUBLICSHARE_DIR", "XDG_TEMPLATES_DIR", NULL };
+    char line[PATH_MAX];
+    while (f && fgets(line, sizeof line, f)) {
+        int known = 0;
+        for (int k = 0; keys[k]; k++) {
+            size_t kl = strlen(keys[k]);
+            if (!strncmp(line, keys[k], kl) && line[kl] == '=') { known = (int)kl + 1; break; }
+        }
+        if (!known || strncmp(line + known, "\"$HOME/", 7)) continue;
+        char *rel = line + known + 7, *q = strchr(rel, '"');
+        if (!q || q == rel) continue;
+        *q = 0;
+        if (strstr(rel, "..") || strchr(rel, '\\') || rel[0] == '/') continue;
+        struct stat st;
+        if (snprintf(path, sizeof path, "%s/%s", p->home, rel) >= (int)sizeof path || lstat(path, &st) || !S_ISDIR(st.st_mode)) continue;
+        if (!fsops_protected(path) && !fsops_protected_below(path) && grant_ok(path)) plan_add(p, 1, "%s%s", path, "");
+    }
+    if (f) fclose(f);
+    if (opened) {
+        struct stat st;
+        if (stat(opened, &st)) return;
+        if (grant_ok(opened)) plan_add(p, 1, "%s%s", opened, "");
+        snprintf(p->opened, sizeof p->opened, "%s", opened);
+        p->cfg.opened = p->opened;
+        p->cfg.opened_dev = (unsigned long long)st.st_dev;
+        p->cfg.opened_ino = (unsigned long long)st.st_ino;
+    }
+}
+
 /* The view of a Flatpak app. Unrestricted: the home as it is (Flatpak exposes only what its arguments allow) and the
  * session bus, which the app reaches only through Flatpak's filtering proxy (--nosocket=session-bus). Device-restricted:
  * no bus, as for Linux apps. No access to files: an empty home with only its ~/.var/app/<id> (rw), the installation
@@ -914,22 +959,12 @@ static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *
         if (n < 7) { p->cfg.sockets[n++] = "bus"; p->cfg.sockets[n] = NULL; }
     }
     if (!(restricted & FW_R_NO_FILES)) {
-        /* the shell's and the session's startup files, keys and the folders they live in, read-only in the view:
-         * whatever Flatpak grants the app (its metadata, an override file, the whole home), the kernel keeps them
-         * unwritable. Those that don't exist yet aren't covered (nothing to bind over). */
-        static const char *const startup[] = { ".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".bash_aliases",
-                                               ".profile", ".zshrc", ".zprofile", ".zshenv", ".zlogin", ".zlogout",
-                                               ".xprofile", ".xsession", ".xsessionrc", ".xinitrc", ".Xresources",
-                                               ".pam_environment", ".gitconfig", ".ssh", ".gnupg", ".config/fish",
-                                               ".config/environment.d", ".config/autostart", ".config/systemd",
-                                               ".config/lordos", ".local/share/lordos", ".local/share/applications",
-                                               ".local/share/flatpak", ".local/bin", ".bin", NULL };
-        for (int k = 0; startup[k]; k++) {
-            char path[PATH_MAX + 64];
-            struct stat st;
-            if (snprintf(path, sizeof path, "%s/%s", p->home, startup[k]) >= (int)sizeof path || lstat(path, &st)) continue;
-            if (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode)) plan_add(p, 0, "%s%s", path, "");
-        }
+        /* the real home, read-only: writable only its own ~/.var/app/<id> and the person's folders (Desktop,
+         * Documents, Downloads, Music, Pictures, Videos, Public, Templates of ~/.config/user-dirs.dirs) and the opened
+         * path. Kernel-enforced, whatever Flatpak grants: no startup file, key or autostart entry can be written,
+         * created or renamed into place (decided by the maintainer on 2026-11-19, after a security review). */
+        p->cfg.home_ro = 1;
+        flatpak_writable(p, id, opened);
     }
     if (restricted & FW_R_NO_FILES) {
         p->cfg.keep_home = 0;

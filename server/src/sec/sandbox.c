@@ -387,7 +387,7 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
         const char *const *list = pass ? cfg->ro : cfg->rw;
         /* a keep_home view binds only ro[]: paths of the real home made read-only (a Flatpak app's shell startup
          * files, docs/FLATPAK.md); rw[] means nothing there, the home is already the real one */
-        for (int i = 0; (!cfg->keep_home || pass) && i < SANDBOX_FILES_MAX && list[i]; i++) {
+        for (int i = 0; (!cfg->keep_home || pass || cfg->home_ro) && i < SANDBOX_FILES_MAX && list[i]; i++) {
             if (!is_under(list[i], cfg->home) || !strcmp(list[i], cfg->home)) continue;   /* outside home: Landlock alone */
             struct stat st;
             int t;
@@ -428,6 +428,10 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     if (!stat("/dev/shm", &vt)) bad |= mount("tmpfs", "/dev/shm", "tmpfs", MS_NOSUID | MS_NODEV, "mode=1777");
     bad |= mount("devpts", "/dev/pts", "devpts", MS_NOSUID | MS_NOEXEC, "newinstance,ptmxmode=0666,mode=0620");
     if (!bad) bad |= mount("/dev/pts/ptmx", "/dev/ptmx", NULL, MS_BIND, NULL);
+    /* the real home, read-only, under the writable folders bound next */
+    if (!bad && cfg->keep_home && cfg->home_ro)
+        bad |= mount(cfg->home, cfg->home, NULL, MS_BIND, NULL) ||
+               mount(NULL, cfg->home, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV, NULL);
     for (int i = 0; i < nk && !bad; i++) {
         if (bind_clone(keep[i].fd, keep[i].path, keep[i].dir)) { bad = 1; break; }
         if (keep[i].ro && mount(NULL, keep[i].path, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV, NULL)) { bad = 1; break; }

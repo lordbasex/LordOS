@@ -264,6 +264,11 @@ home with `flatpak override --user --filesystem=home` to stand for an app that d
 | no-files | `~/Documents`, `~/.config/lordos` and `~/.bashrc` absent |
 | no-mic (a device restriction) | no session bus in its runtime folder and no D-Bus proxy |
 
+With the read-only home (same VM, the app given the whole home by an override, tried from inside its namespaces with
+`nsenter`): writing `~/.bashrc`, creating a missing `~/.zshrc`, renaming `~/.config`, writing through a person's
+folder that is a link to `~/.config`, and creating a file in the home's root were all refused; its `~/.var/app/<id>`
+and the Documents folder of `user-dirs.dirs` were writable; the home stayed readable.
+
 Outside a LordOS session the app can't be placed in `app-lordos-fp-<id>.scope` (that needs lord-sessiond), so its
 identity in the firewall and the Monitor is still to check in a session on VM 127.
 
@@ -373,7 +378,7 @@ Whatever the app declares, the launcher always adds:
 | `--no-talk-name=org.freedesktop.systemd1` | units and transient scopes outside the scope |
 | no `--own-name` of a name lord-server serves (`org.freedesktop.Notifications`, `org.freedesktop.portal.Desktop`, `org.freedesktop.ScreenSaver`, `org.kde.StatusNotifierWatcher`, `org.freedesktop.secrets`) | impersonating LordOS's services |
 | `--nofilesystem` (hide) for `~/.config/lordos`, `~/.local/share/lordos`, `~/.cache/lordos`, `~/.local/share/applications`, `~/.config/autostart`, `~/.config/systemd`, `~/.config/environment.d`, `~/.local/bin` | the folders `fsops_protected()` and the launcher's grant rules keep from every app: rules, permissions, launchers, autostart, units |
-| the launcher's view binds the shell's and the session's startup files, `~/.ssh`, `~/.gnupg`, autostart, `~/.local/bin` and LordOS's folders over themselves read-only (those that exist), whatever Flatpak grants (metadata, override files, `~/.bashrc` asked for by name); the app's metadata is never parsed for this. "Open with" never lends the home folder itself or a folder holding a protected one, and lends a sensitive path read-only (`grant_ok`, as for Linux apps) | shell startup files run outside any sandbox at the next login. (2026-11-19: `--filesystem=<file>:ro` chosen from the parsed metadata was replaced after a security review found the parser could be fooled; `--nofilesystem=<file>` doesn't hide a single file inside a granted home, checked) |
+| **the home folder is read-only in the launcher's view** (decided by the maintainer on 2026-11-19 after a security review): writable only `~/.var/app/<id>`, the person's folders from `~/.config/user-dirs.dirs` (real folders, not links, not protected) and an opened path `grant_ok` allows; whatever Flatpak grants (metadata, override files, `~/.bashrc` asked for by name), nothing can write, create or rename a file of the home elsewhere. The metadata is never parsed for this. "Open with" never lends the home folder itself or a folder holding a protected one, and lends a sensitive path read-only | startup files, keys and autostart entries run outside any sandbox at the next login. Protecting them one by one (a first version) could be sidestepped by renaming their folder, by creating a file that didn't exist yet, or through a link; `--nofilesystem=<file>` doesn't hide a single file inside a granted home (checked) |
 
 `org.freedesktop.portal.Flatpak` (sub-sandboxes) can't be refused reliably by an option, so in
 phase 1 LordOS masks `flatpak-portal.service` (see "Exceptions to approve", E5): with no owner and
