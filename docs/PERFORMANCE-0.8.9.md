@@ -16,7 +16,7 @@ this report gives the runs and the comparisons, and doesn't repeat that method.
 | 0.8.9, the desktop just after login (the floor), 10 min | 177 MB, 0.2 % of one core |
 | 0.8.9.1 memory work: 7 widgets and a Terminal running Claude Code at rest | **269 → 183 MB** (−86 MB, −32 %), 2.4 % of one core |
 | Raspberry Pi 5, headless session at rest, 1 h: 0.8.8.9 → 0.8.9 | 116 → 113 MB; **3.4 → 6.1 %** of one core |
-| Raspberry Pi 5 with 0.8.9.1 | in progress (below) |
+| Raspberry Pi 5 with 0.8.9.1, no monitor | Lord Flow 113 MB and 6.2 % of one core (as 0.8.9); Lord Workspaces **99 MB** and **0.06 %** |
 
 The slideshow is the biggest cost found at rest: about 17 points of one core on three 1080p displays. The memory
 work took the session with a Terminal below the same desktop *without* one before the work (183 against 185 MB).
@@ -216,7 +216,27 @@ Three runs of 60 minutes, each after a reboot into the autologin session (`pi-*.
 
 ## Raspberry Pi with 0.8.9.1
 
-<!-- PI-0891: filled when the runs end -->
+Two runs of 60 minutes after a reboot, with `lord-server` 0.8.9.1 (built on the Pi from `main`, stripped) on top of
+the installed 0.8.9 package, so the themes are 0.8.9's (`pi-0.8.9.1-*.csv` in [`perf/0.8.9.1/`](perf/0.8.9.1/); the
+header's `lordos 0.8.9` is the package's version). The theme is now written with the session stopped and checked after
+the reboot (`theme workspaces` in the second file's header and in the session's command line).
+
+| | 0.8.9.1, Lord Flow | 0.8.9.1, Lord Workspaces |
+|---|---:|---:|
+| RSS @1 min | 109.5 MB | 99.2 MB |
+| RSS @20 min | 112.5 MB | 99.4 MB |
+| RSS @60 min | 112.5 MB | 99.4 MB |
+| RSS min / median / max | 102.9 / **112.6** / 112.6 | 99.2 / **99.4** / 107.9 |
+| Anonymous, median | 72.2 MB | 59.5 MB |
+| File-backed, median | 40.4 MB | 39.9 MB |
+| CPU, % of one core | **6.2** (6.0–6.2) | **0.06** (0.05–0.06) |
+
+- **Lord Flow: the same as 0.8.9**, to 0.1 MB and 0.1 points. The memory work freed the cached rasters of
+  animated windows, the Terminal's history and the huge pages of `.bss` on x86-64; a session with no monitor, no
+  window and no Terminal has none of them.
+- **Lord Workspaces: 99 MB and 0.06 % of one core**, 13 MB and 6 points below Lord Flow on the same server. So the
+  processor Lord Flow uses at rest on the Pi comes from its theme (what its JavaScript keeps doing with nothing on
+  screen), not from `lord-server`; it is still on the roadmap.
 
 ## Repeating it
 
@@ -232,7 +252,7 @@ Three runs of 60 minutes, each after a reboot into the autologin session (`pi-*.
 | Folder | Runs |
 |---|---|
 | [`perf/0.8.9/`](perf/0.8.9/) | `pc-0.8.9-workspaces.csv`, `pc-0.8.9-workspaces-slideshow-off-2018.csv`, `pc-0.8.9-floor-base.csv`, `pc-ws01-floor.csv`, `pc-ws01-floor-b.csv`, `pc-ws02-floor.csv`, `pc-ws02-widgets.csv`, `pi-0.8.8.9-flow.csv`, `pi-0.8.9-flow.csv`, `pi-0.8.9-workspaces.csv` (the second Lord Flow run) |
-| [`perf/0.8.9.1/`](perf/0.8.9.1/) | `pc-ws02-widgets-terminal.csv` … `pc-ws08-widgets-terminal.csv`, `pc-ws03-widgets.csv`, `heaptrack-ws06-live.txt` |
+| [`perf/0.8.9.1/`](perf/0.8.9.1/) | `pc-ws02-widgets-terminal.csv` … `pc-ws08-widgets-terminal.csv`, `pc-ws03-widgets.csv`, `heaptrack-ws06-live.txt`, `pi-0.8.9.1-flow.csv`, `pi-0.8.9.1-workspaces.csv` |
 
 The `ws01`–`ws08` builds report themselves as `0.8.9` in the CSV header (the package's version); their build label
 was checked with `strings /proc/<pid>/exe`.

@@ -625,15 +625,16 @@ O Raspberry Pi 5 e o Raspberry Pi 500 (um Pi 5 dentro de um teclado, com a mesma
 | Gerar a imagem SD na placa | 8 min 18 s; 503 MB comprimida |
 | Compilar o kernel do LordOS na placa | cerca de 50 min por variante |
 
-**Uma sessão de desktop em repouso (0.8.8.9 e 0.8.9; `docs/PERFORMANCE-0.8.9.md`).** A sessão de login automático sem monitor, uma hora depois de reiniciar, com uma amostra a cada 10 s:
+**Uma sessão de desktop em repouso (0.8.8.9, 0.8.9 e 0.8.9.1; `docs/PERFORMANCE-0.8.9.md`).** A sessão de login automático sem monitor, uma hora depois de reiniciar, com uma amostra a cada 10 s:
 
 | Versão | RSS do `lord-server` (mediana) | CPU, % de um núcleo |
 |---|---|---|
 | 0.8.8.9, Lord Flow | 116 MB | 3,4 |
 | 0.8.9, Lord Flow (duas execuções) | 113 MB | 6,1 |
-<!-- PI-0891 -->
+| 0.8.9.1, Lord Flow | 113 MB | 6,2 |
+| 0.8.9.1, Lord Workspaces | 99 MB | 0,06 |
 
-A 0.8.9 usa 3 MB a menos de memória e quase o dobro de processador, estável em cada trecho de 10 minutos e sem pintar nada; o que roda em repouso está sendo procurado na 0.8.9.1. Uma execução pensada para o Lord Workspaces ficou no Lord Flow (o tema escrito antes de reiniciar não se manteve), então o Lord Workspaces ainda não foi medido no Pi.
+A 0.8.9 usa 3 MB a menos de memória e quase o dobro de processador, estável em cada trecho de 10 minutos e sem pintar nada. O `lord-server` da 0.8.9.1 (com os temas da 0.8.9) não muda nenhuma das duas coisas no Pi: o trabalho de memória liberou caches de janelas e do histórico do Terminal, e esta sessão não tem monitor, nem janelas, nem Terminal. O Lord Workspaces, medido no Pi pela primeira vez (o tema agora é definido com a sessão parada, e a amostragem o confere depois de reiniciar), fica em 99 MB e 0,06 % de um núcleo, então o processador a mais em repouso é do tema Lord Flow, não do servidor; encontrá-lo continua no roteiro.
 
 **O kernel do LordOS.** O kernel do próprio Raspberry Pi não inclui o Landlock. Sem ele, o teste hostil do ajudante de documentos falha em 5 das suas 25 verificações de sistema de arquivos e o teste do sandbox não consegue rodar. O LordOS compila o kernel do Raspberry Pi a partir do código-fonte e da configuração padrão dele, mudando só três opções (Landlock ligado, a lista de LSMs, o sufixo de versão), e o fixa para que um kernel mais novo do repositório não o substitua. A imagem também ativa o cgroup de memória, que o Raspberry Pi desliga no boot.
 

@@ -85,7 +85,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Raspberry Pi 5 16 GB, a headless autologin session one hour after a reboot: 0.8.8.9 116 MB and 3.4 % of one core,
   0.8.9 113 MB and **6.1 %** (two runs; the one meant for Lord Workspaces kept Lord Flow, so it counts as a second
   Lord Flow run). It also lists what spoiled runs (an old session kept by `systemctl restart lordos`, opening About,
-  the slideshow, the scene being set up, the voice, heaptrack). The Raspberry Pi's 0.8.9.1 runs are still going.
+  the slideshow, the scene being set up, the voice, heaptrack). With 0.8.9.1's `lord-server` the Pi's Lord Flow session is unchanged (113 MB, 6.2 %), and Lord Workspaces, measured on the Pi for the first time, uses **99 MB and 0.06 %** of one core: the extra processor at rest is Lord Flow's theme, not the server.
 
 ### Fixed
 
@@ -135,8 +135,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   shows in Lord Flow and in themes that declare `desktopArrows` (Lord Workspaces), off by default (#201).
 - `docs/RESULTS.md` lists the 0.8.9 and 0.8.9.1 runs; `docs/README.md` indexes `PERFORMANCE-0.8.9.md` and
   `perf/MEMORY-HEAPTRACK.md` under "Measurements and validation"; `docs/PAPER-VALIDATION.md` has a row for every new
-  number of the paper; the roadmap marks the performance report done and keeps the Raspberry Pi's 0.8.9.1 runs and
-  Lord Workspaces on the Pi open.
+  number of the paper; the roadmap marks the performance report and the Raspberry Pi's 0.8.9.1 runs done and keeps Lord
+  Flow's processor at rest on the Pi open.
 - `docs/HARDWARE-REPORT.md`: report #171, the first one with an NVIDIA card (Gigabyte B760M C, RTX 3060).
 - `docs/VM-SETUP.md`: the helpers' build packages and `libpipewire-0.3-dev` in VM 116's arm64 build chroot, used for the
   0.8.9-beta images.

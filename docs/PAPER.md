@@ -822,15 +822,16 @@ The Raspberry Pi 5 and the Raspberry Pi 500 (a Pi 5 in a keyboard, with the same
 | Building the SD image on the board | 8 min 18 s; 503 MB compressed |
 | Building the LordOS kernel on the board | about 50 min per flavour |
 
-**A desktop session at rest (0.8.8.9 and 0.8.9; `docs/PERFORMANCE-0.8.9.md`).** The autologin session without a monitor, one hour after a reboot, sampled every 10 s:
+**A desktop session at rest (0.8.8.9, 0.8.9 and 0.8.9.1; `docs/PERFORMANCE-0.8.9.md`).** The autologin session without a monitor, one hour after a reboot, sampled every 10 s:
 
 | Version | `lord-server` RSS (median) | CPU, % of one core |
 |---|---|---|
 | 0.8.8.9, Lord Flow | 116 MB | 3.4 |
 | 0.8.9, Lord Flow (two runs) | 113 MB | 6.1 |
-<!-- PI-0891 -->
+| 0.8.9.1, Lord Flow | 113 MB | 6.2 |
+| 0.8.9.1, Lord Workspaces | 99 MB | 0.06 |
 
-0.8.9 uses 3 MB less memory and almost twice the processor, steadily in every 10 minutes and with nothing painted; what runs at rest is being looked for in 0.8.9.1. A run meant for Lord Workspaces kept Lord Flow (the theme written before the reboot did not stay), so Lord Workspaces has not been measured on the Pi yet.
+0.8.9 uses 3 MB less memory and almost twice the processor, steadily in every 10 minutes and with nothing painted. 0.8.9.1's `lord-server` (on the 0.8.9 themes) changes neither on the Pi: the memory work freed caches of windows and of the Terminal's history, and this session has no monitor, no window and no Terminal. Lord Workspaces, measured on the Pi for the first time (the theme is now set with the session stopped, and the sampler checks it after the reboot), settles at 99 MB and 0.06 % of one core, so the extra processor at rest belongs to Lord Flow's theme, not to the server; finding it stays on the roadmap.
 
 **The LordOS kernel.** The Raspberry Pi's own kernel doesn't build Landlock. Without it, the document-helper hostile test fails 5 of its 25 filesystem checks and the sandbox test can't run. LordOS builds the Raspberry Pi kernel from its own source and default configuration, changing only three options (Landlock on, the LSM list, the version suffix), and pins it so a newer archive kernel can't replace it. The image also enables the memory cgroup, which Raspberry Pi turns off at boot.
 
