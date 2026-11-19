@@ -11,6 +11,7 @@
 //   inRange(rows, since)     → the time filter for a file's rows (since in µs, 0 all); unstamped lines go with the line before
 //   rowText(row, label)      → a row's message as one line, after its account's label: the list and the export alike
 //   exportLine(row, when, level, label) → a row of the exported file
+//   toggleGroup(collapsed, g) → the sidebar groups folded after a click on g's triangle (SOURCE_GROUPS, #199)
 //
 // A line written by LordOS is "2026-11-11T12:43:56.123-03:00 INFO  xwayland: message" (local time with its
 // offset, ERROR|WARN|INFO|DEBUG, the subsystem). rclone's own (cloud.log) is "2026/11/17 10:12:59 ERROR : message"
@@ -144,6 +145,15 @@ export function rowText(e, label) {
 }
 export function exportLine(e, when, level, label) {
   return `${when} ${level} ${(e && e.id) || '-'}${e && e.pid >= 0 ? `[${e.pid}]` : ''}: ${rowText(e, label)}`;
+}
+
+// #199: the sidebar's groups, each one folded with its disclosure triangle like Mail's folders; which are folded is the
+// user's (settings.json "logs": { collapsed }). Anything not a group is dropped, so a stale or edited file can't grow it.
+export const SOURCE_GROUPS = ['journal', 'session', 'apps', 'web', 'old'];
+export function toggleGroup(collapsed, g) {
+  const cur = (Array.isArray(collapsed) ? collapsed : []).filter((x) => SOURCE_GROUPS.includes(x));
+  const next = cur.includes(g) ? cur.filter((x) => x !== g) : SOURCE_GROUPS.includes(g) ? [...cur, g] : cur;
+  return SOURCE_GROUPS.filter((x) => next.includes(x));
 }
 
 export function fileGroup(name) {

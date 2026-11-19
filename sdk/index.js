@@ -78,7 +78,7 @@ import { startCleanerStatus } from './cleanerstatus.jsx';
 import { startCloud } from './cloudstatus.jsx';
 export { errorText, statusText, codeError, parseCode } from './errors.js';
 export { logs } from './logs.js';
-export { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder, levelMatch, LEVEL_MAX, cloudAccounts, inRange, rowText, exportLine } from './logfile.js';
+export { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder, levelMatch, LEVEL_MAX, cloudAccounts, inRange, rowText, exportLine, SOURCE_GROUPS, toggleGroup } from './logfile.js';
 export { LordOSLogo, LordOSGlyph, LordOSWordmark } from './logo.js';
 export { Lumo, lumoSource } from './mascot.js';
 export { DesktopWidgets, registerWidgetType, setWidgets, desktopWidgets } from './widgets.js';

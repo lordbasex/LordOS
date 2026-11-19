@@ -11,11 +11,12 @@
 // Cloud's log (cloud.log) shows which account each line is about where lord-server knows it (#183, cloudAccounts).
 // Filters by level (that level only), time (the journal and the files, #194), process or unit, and text; live with
 // inotify (no polling); exports the filtered view to Documents, each row as the list shows it (rowText, #194). The list
-// draws only the visible rows.
+// draws only the visible rows. The sidebar scrolls, and each group folds with its triangle like Mail's folders; which
+// ones are folded is kept in the user's settings ("logs": { collapsed }, #199).
 import {
-  View, Text, TextInput, Segmented, SidebarItem, SectionTitle, useTheme, useLocale,
+  View, Text, TextInput, Segmented, SidebarItem, ScrollView, Disclosure, useTheme, useLocale, useSettings, settings, direction,
   logs, fs, formatDate, formatNumber, addListener, parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder,
-  levelMatch, LEVEL_MAX, cloudAccounts, inRange, rowText, exportLine, useCloud, cloudModel,
+  levelMatch, LEVEL_MAX, cloudAccounts, inRange, rowText, exportLine, toggleGroup, useCloud, cloudModel,
   Toolbar, ToolbarButton, ToolbarSpacer, SearchField, EmptyState, Hairline, spacing, typeScale, useAppWindow,
   useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
@@ -185,6 +186,9 @@ export default function Registros() {
   const [state, setState] = useState({ loading: false, error: '', ms: 0 });
   const [notice, setNotice] = useState('');
   const accounts = useCloud().accounts || [];
+  const [prefs] = useSettings();
+  const collapsed = Array.isArray(prefs.logs?.collapsed) ? prefs.logs.collapsed : [];
+  const toggle = (g) => settings.set({ logs: { ...(settings.get().logs || {}), collapsed: toggleGroup(collapsed, g) } });
   const sources = useMemo(() => { try { return logs.sources(); } catch (e) { return { user: 0, system: false }; } }, []);
   const files = useMemo(() => { try { return sortFiles(logs.files()); } catch (e) { return []; } }, [src.kind]);
   const logDir = useMemo(() => { try { return (logs.dir() || {}).dir || ''; } catch (e) { return ''; } }, []);
@@ -325,25 +329,43 @@ export default function Registros() {
   const narrow = width < 640;
   const caption = { fontSize: typeScale.caption, fontWeight: 600, color: t.textDim, whiteSpace: 'nowrap', textAlign: 'start' };
 
+  // a group's header: its triangle and name; a click on either folds it (#199). Folded with its selected source inside,
+  // the header stands in for the selected row, as Mail's account headers do.
+  const group = (g, title, rows, selectedIn) => {
+    const folded = collapsed.includes(g);
+    const here = folded && selectedIn;
+    const dim = here ? 'rgba(255,255,255,0.85)' : t.textDim;
+    return [
+      <View key={`h-${g}`} onClick={() => toggle(g)} style={{ flexDirection: 'row', alignItems: 'center', height: 22, gap: 6, marginTop: spacing.s,
+        marginBottom: folded ? 0 : 2, [direction() === 'rtl' ? 'paddingLeft' : 'paddingRight']: 8, borderRadius: 6, backgroundColor: here ? t.accent : 'transparent' }}>
+        <Disclosure state={folded ? 'closed' : 'open'} color={dim} onToggle={() => toggle(g)} style={{ [direction() === 'rtl' ? 'marginLeft' : 'marginRight']: -6 }} />
+        <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: here ? '#fff' : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{title}</Text>
+      </View>,
+      ...(folded ? [] : rows),
+    ];
+  };
+  const fileRow = (f) => side('lordos', isPrevious(f.name) ? tr('logs.previous', { name: fileLabel(f.name) })
+    : isOlder(f.name) ? tr('logs.older', { name: fileLabel(f.name) }) : fileLabel(f.name), '≡', { file: f.name });
+  const fileOn = (list) => src.kind === 'lordos' && list.some((f) => f.name === src.file);
+  const session = files.filter((f) => fileGroup(f.name) === 'session');
+
   const sourceList = (
-    <View style={{ width: 210, ...(bar.narrow ? { flex: 1 } : null), backgroundColor: t.sidebarBg, paddingHorizontal: 10, paddingTop: spacing.xs, gap: 2 }}>
-      <SectionTitle>{tr('logs.section.journal')}</SectionTitle>
-      {side('user', tr('logs.src.user'), '☺')}
-      {side('system', tr('logs.src.system'), '▣')}
-      {side('kernel', tr('logs.src.kernel'), '◐')}
-      <SectionTitle>{tr('logs.section.lordos')}</SectionTitle>
-      {!files.length && <Text style={{ fontSize: typeScale.caption, color: t.textDim, paddingHorizontal: 10, textAlign: 'start' }}>{tr('logs.noFiles')}</Text>}
-      {['session', 'apps', 'web', 'old'].map((g) => {
-        const list = files.filter((f) => fileGroup(f.name) === g);
-        if (!list.length) return null;
-        return [
-          g !== 'session' && <SectionTitle key={`t-${g}`}>{tr(`logs.section.${g}`)}</SectionTitle>,
-          ...list.map((f) => side('lordos', isPrevious(f.name) ? tr('logs.previous', { name: fileLabel(f.name) })
-            : isOlder(f.name) ? tr('logs.older', { name: fileLabel(f.name) }) : fileLabel(f.name), '≡', { file: f.name })),
-        ];
-      })}
-      <View style={{ flex: 1 }} />
-      <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, paddingHorizontal: spacing.s, paddingBottom: spacing.m, textAlign: 'start' }}>
+    <View style={{ width: 210, ...(bar.narrow ? { flex: 1 } : null), backgroundColor: t.sidebarBg }}>
+      {/* #199: many apps' logs made the last groups unreachable: the list scrolls, the hint stays at the bottom */}
+      <ScrollView style={{ flex: 1, minHeight: 0 }} contentStyle={{ paddingHorizontal: 10, paddingTop: spacing.xs, paddingBottom: spacing.s, gap: 2 }}>
+        {group('journal', tr('logs.section.journal'), [
+          side('user', tr('logs.src.user'), '☺'),
+          side('system', tr('logs.src.system'), '▣'),
+          side('kernel', tr('logs.src.kernel'), '◐'),
+        ], src.kind !== 'lordos')}
+        {group('session', tr('logs.section.lordos'), files.length ? session.map(fileRow)
+          : [<Text key="none" style={{ fontSize: typeScale.caption, color: t.textDim, paddingHorizontal: 10, textAlign: 'start' }}>{tr('logs.noFiles')}</Text>], fileOn(session))}
+        {['apps', 'web', 'old'].map((g) => {
+          const list = files.filter((f) => fileGroup(f.name) === g);
+          return list.length ? group(g, tr(`logs.section.${g}`), list.map(fileRow), fileOn(list)) : null;
+        })}
+      </ScrollView>
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.4, paddingHorizontal: spacing.m, paddingTop: spacing.s, paddingBottom: spacing.m, textAlign: 'start' }}>
         {src.kind === 'user' ? tr('logs.hint.user') : src.kind === 'lordos' ? tr('logs.hint.lordos', { dir: logDir.replace(fs.home(), '~') }) : sources.system ? tr('logs.hint.systemDirect') : tr('logs.hint.systemAdmin')}
       </Text>
       <Hairline edge="end" />

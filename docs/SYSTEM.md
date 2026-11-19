@@ -589,6 +589,10 @@ LordOS's log viewer.
     (`cloudAccounts`), and so do rclone's lines that name the account's remote (`c1a2b3c4d:`, since 0.8.9.1,
     #194). The list and the export show a row the same way (`rowText`, #194): the account's "provider ·
     name" before the message and a multi-line message on one line (` ⏎ ` for each break).
+  - The sidebar scrolls (#199: with many apps' logs the last groups couldn't be reached) and each group
+    (Journal, LordOS, Apps, Web apps, Older logs) folds with a disclosure triangle, like Mail's folders;
+    the folded ones are kept in `settings.json` (`logs.collapsed`, `toggleGroup`). A folded group with the
+    selected source inside shows its header selected.
 - **Filters:** level (all, or only info, only warnings, only errors: until 0.8.8.10 each level showed the
   more urgent ones too, so a log of errors looked the same under every choice, #183), time range (15 min, 1 hour,
   24 h, everything; the journal is asked for that range, a LordOS file filtered by `inRange` since 0.8.9.1, #194:

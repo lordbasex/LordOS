@@ -1,6 +1,6 @@
 // LordOS's own log files in the Logs app (sdk/logfile.js): the stamped lines lord-log writes
 // (server/src/lordlog.c), old unstamped ones, and the sidebar's order. node server/tests/logfile_test.mjs
-import { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder, levelMatch, LEVEL_MAX, cloudAccounts, inRange, rowText, exportLine } from '../../sdk/logfile.js';
+import { parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder, levelMatch, LEVEL_MAX, cloudAccounts, inRange, rowText, exportLine, SOURCE_GROUPS, toggleGroup } from '../../sdk/logfile.js';
 
 let ok = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exitCode = 1; } else ok++; };
@@ -116,4 +116,11 @@ eq('export line: the list\'s text after time, level and process', exportLine(one
   `Wed 19:27:01.643 Error c1a2b3c4d: ${rowText(one, 'Google Drive · Personal')}`);
 eq('export line: pid', exportLine({ id: 'lord-sessiond', pid: 812, m: 'x' }, 'T', 'Info', ''), 'T Info lord-sessiond[812]: x');
 
+// #199: the sidebar's groups fold and unfold; anything else in the saved list is dropped
+eq('fold', toggleGroup([], 'apps'), ['apps']);
+eq('unfold', toggleGroup(['journal', 'apps'], 'apps'), ['journal']);
+eq('in the sidebar\'s order', toggleGroup(['web'], 'journal'), ['journal', 'web']);
+eq('not a group', toggleGroup(['x', 'web', 'web'], 'nope'), ['web']);
+eq('nothing saved', toggleGroup(null, 'old'), ['old']);
+eq('groups', SOURCE_GROUPS, ['journal', 'session', 'apps', 'web', 'old']);
 console.log(`logfile-test: ${ok} ok`);
