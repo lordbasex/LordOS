@@ -94,6 +94,9 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     case 'map': {
       // X11 (Xwayland): the WM_CLASS class, or its instance when only that names a .desktop
       if (d.x11 && d.appAlt && !linuxAppFor(d.appId) && linuxAppFor(d.appAlt)) d = { ...d, appId: d.appAlt };
+      // a Flatpak app's window: lord-server tells the app from the client's root-owned scope; its own app_id may be
+      // anything ("tuxocide" for an SDL game), so the Flatpak id names and draws it (docs/FLATPAK.md)
+      if (d.flatpak && !linuxAppFor(d.appId)) d = { ...d, appId: d.flatpak };
       const c = d.csd ? { w: 0, h: 0 } : windowChrome();
       const area = openingArea(launcherKeyFor(d.appId));   // its assigned display, or under the pointer (docs/DISPLAYS.md)
       // a browser's own notification popup (no app id, title or parent): floating in the top corner, never

@@ -2783,8 +2783,13 @@ static void emit_map(Surf *s, int w, int h) {
              t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false");
     } else {
         int fixed = s->min_w > 0 && s->min_w == s->max_w && s->min_h > 0 && s->min_h == s->max_h;
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s}",
-             t, a, w, h, s->csd ? "true" : "false", s->owner || s->dlg ? "true" : "false", fixed ? "true" : "false",
+        /* a Flatpak app's window: the app lord-server knows from the client's root-owned scope (or its security context),
+         * never from the app_id it chose ("tuxocide" for an SDL game); the shell names and draws it from that */
+        const char *who = client_identity(s->client);
+        char fp[KBI_ID_MAX + 8] = "";
+        if (!strncmp(who, "flatpak:", 8)) json_str(fp, sizeof fp, who + 8);
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"flatpak\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s}",
+             t, a, fp, w, h, s->csd ? "true" : "false", s->owner || s->dlg ? "true" : "false", fixed ? "true" : "false",
              s->owner ? s->owner->id : 0, s->modal ? "true" : "false");
     }
 }
