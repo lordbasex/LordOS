@@ -129,28 +129,39 @@ sudo tools/bench/heaptrack-session.sh restore
 |---:|---|---|
 | 24.9 | `main.c:900` `out_frames` | One scene per display, 3 × 1080p: needed |
 | 28 | `quickjs.c` | The theme and the apps' JavaScript |
-| **18.6** | **`apps.c:343` `apps_list`** | **The app table, sized for 1,024 apps** |
+| 18.6 | `apps.c:343` `apps_list` | The app table, sized for 1,024 apps (reserved, almost not resident) |
 | 13.0 | `libgallium` | Mesa, the GPU driver |
 | 8.6 | `image.c:85` | The wallpapers |
 | 6.3 | `term.c:800` | Instant Replay frames of the Terminal (limit 6 MB per tab) |
-| **5.8** | **`fonts.c:175` `fonts_list`** | **The font table, sized for 8,192 fonts** |
+| 5.8 | `fonts.c:175` `fonts_list` | The font table, sized for 8,192 fonts (reserved, almost not resident) |
 | ~10 | sound wave, shadows, firewall, PipeWire guard, packages, cloud | 0.8–3.4 MB each |
 
-### Reserved is not resident, except with huge pages
+### Reserved is not resident: check before you cut
 
 heaptrack counts bytes **requested**. The RSS counts pages **touched**. A large `calloc` is served by
-`mmap`, and its untouched pages normally cost nothing.
+`mmap`, and its untouched pages cost nothing.
 
-With THP set to `always`, though, touching one byte brings in a whole **2 MB** page. So check what is
-really resident in `/proc/<pid>/smaps`: each mapping's `Rss` and `AnonHugePages`.
-
-Ours had two anonymous mappings: 10.3 MB resident (8 MB of huge pages) and 6.3 MB (6 MB). That is how the
-app table (~100 apps filled, 18.6 MB reserved) and the font table really cost about 16 MB:
+The app table and the font table (18.6 + 5.8 MB in the list above) looked like the next thing to cut.
+We cut them in ws07, and the RSS did not move: they were `mmap`'d and almost untouched. **Check
+`/proc/<pid>/smaps` before cutting anything heaptrack shows.** It gives each mapping's `Rss` and its
+`AnonHugePages` (transparent huge pages):
 
 ```sh
-awk '/^[0-9a-f]+-/{n=$6} /^Rss:/{r=$2} /^AnonHugePages:/{if(r>4096)print r, $2, n}' \
+sudo awk '/^[0-9a-f]+-/{h=$1" "$6} /^Rss:/{r=$2} /^AnonHugePages:/{if(r>4096)print r, $2, h}' \
     /proc/<pid>/smaps | sort -rn | head
 ```
+
+Ours had two unnamed anonymous mappings: 10.5 MB resident (8 MB of huge pages) and 6.2 MB (6 MB). They
+were not the tables. Their addresses come right after the binary's own mappings, and the binary's
+`_end` (`nm build/lord-server | grep ' _end$'`, plus the load address) falls at their end. So they are
+lord-server's **static arrays** (`.bss`).
+
+`size build/lord-server` reports 31 MB of them, sized for the worst case and mostly untouched. With THP
+set to `always`, khugepaged turns a 2 MB region that has any page in use into a whole huge page. So about
+16 MB stayed resident for very little data. `nm -S --size-sort build/lord-server` lists the biggest ones.
+
+ws08 marks only that range `MADV_NOHUGEPAGE` at startup. A whole-process opt-out (`PR_SET_THP_DISABLE`,
+ws01) had made things worse: 249 MB against 177 MB, because the heap does benefit from huge pages.
 
 ## The loop and its results
 
@@ -166,7 +177,8 @@ RSS of the session with 7 widgets and a Terminal running Claude Code at rest, 3 
 | ws04 | Free transform rasters unused for 30 s; clearing the scrollback frees its cells | 262 MB |
 | ws05 | The history table grows on demand; raster slots give back oversized buffers | **197 MB** |
 | ws06 | Counters for nodes, frames, arenas, plus heaptrack | 205 MB |
-| ws07 | App and font tables cut to what the scan found | *in progress* |
+| ws07 | App and font tables cut to what the scan found | 197 MB (no change: see above) |
+| ws08 | The static arrays (`.bss`) opt out of huge pages | *in progress* |
 
 \* ws03 was read right after Claude Code started.
 
