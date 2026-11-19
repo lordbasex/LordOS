@@ -23,7 +23,7 @@ static void t_methods(void) {
     static const char *const allowed[] = { "core/version", "config/providers", "config/create", "config/update", "config/delete",
         "config/get", "mount/mount", "mount/unmount", "mount/listmounts", "operations/about", "operations/publiclink",
         "operations/fsinfo", "core/stats", "core/transferred", "core/bwlimit", "vfs/stats", "vfs/queue", "vfs/queue-set-expiry",
-        "vfs/refresh", "vfs/forget", "core/quit", "operations/cleanup", "operations/size", "job/status", "job/stop", "operations/list", "operations/stat", "operations/copyfile", "fscache/clear", NULL };
+        "vfs/refresh", "vfs/forget", "core/quit", "operations/cleanup", "operations/size", "job/status", "job/stop", "operations/list", "operations/stat", "operations/copyfile", "fscache/clear", "vfs/poll-interval", NULL };
     static const char *const never[] = { "core/command", "config/dump", "config/show", "config/password", "config/setpath",
         "config/unlock", "options/set", "options/get", "rc/noop", "rc/list", "rc/error", "operations/delete",
         "operations/deletefile", "operations/purge", "operations/copyurl", "operations/uploadfile", "operations/movefile",
@@ -905,8 +905,24 @@ static void t_onoff(void) {
     CHECK(!strcmp(cloud_off_reason("rm -rf"), "") && !strcmp(cloud_off_reason(NULL), "") && !strcmp(cloud_off_reason(""), ""));
 }
 
+/* #194: a paused account sends nothing to its provider by itself */
+static void t_pause(void) {
+    /* paused by the person (Pause, Pause All): never mounted nor tried again, failed or not */
+    CHECK(!cloud_bring_up_ok(1, 1, 0) && !cloud_bring_up_ok(1, 1, 1) && !cloud_bring_up_ok(1, 0, 0));
+    /* paused by the battery only: its first mount, but a failed one isn't tried again every 30 s */
+    CHECK(cloud_bring_up_ok(0, 1, 0) && !cloud_bring_up_ok(0, 1, 1));
+    /* not paused: as before */
+    CHECK(cloud_bring_up_ok(0, 0, 0) && cloud_bring_up_ok(0, 0, 1));
+    char b[96];
+    CHECK(!cloud_poll_body("cc4ed54b5", 1, b, sizeof b) && !strcmp(b, "{\"fs\":\"cc4ed54b5:\",\"interval\":\"0s\"}"));
+    CHECK(!cloud_poll_body("cc4ed54b5", 0, b, sizeof b) && !strcmp(b, "{\"fs\":\"cc4ed54b5:\",\"interval\":\"60s\"}"));
+    CHECK(cloud_poll_body("c\",\"x", 1, b, sizeof b) == -1 && cloud_poll_body("", 1, b, sizeof b) == -1 && cloud_poll_body(NULL, 1, b, sizeof b) == -1);
+    CHECK(cloud_poll_body("cc4ed54b5", 1, b, 10) == -1);
+}
+
 int main(void) {
     t_onoff();
+    t_pause();
     t_browse();
     t_methods();
     t_http();

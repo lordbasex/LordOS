@@ -9,12 +9,13 @@
 //   - System and Kernel: the system journal. If the user is in systemd-journal or adm it is read
 //     directly; otherwise an administrator asks for it via the helper's closed logs-system action.
 // Cloud's log (cloud.log) shows which account each line is about where lord-server knows it (#183, cloudAccounts).
-// Filters by level (that level only), time, process or unit, and text; live with inotify (no polling); exports the
-// filtered view to Documents. The list draws only the visible rows.
+// Filters by level (that level only), time (the journal and the files, #194), process or unit, and text; live with
+// inotify (no polling); exports the filtered view to Documents, each row as the list shows it (rowText, #194). The list
+// draws only the visible rows.
 import {
   View, Text, TextInput, Segmented, SidebarItem, SectionTitle, useTheme, useLocale,
   logs, fs, formatDate, formatNumber, addListener, parseLordLog, sortFiles, fileGroup, fileLabel, isPrevious, isOlder,
-  levelMatch, LEVEL_MAX, cloudAccounts, useCloud, cloudModel,
+  levelMatch, LEVEL_MAX, cloudAccounts, inRange, rowText, exportLine, useCloud, cloudModel,
   Toolbar, ToolbarButton, ToolbarSpacer, SearchField, EmptyState, Hairline, spacing, typeScale, useAppWindow,
   useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
@@ -120,13 +121,12 @@ function Dot({ p }) {
   return <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c || 'transparent', border: c ? 'none' : '1px solid rgba(128,128,128,0.5)' }} />;
 }
 
-// A Cloud account a line of cloud.log is about (#183): "Provider · Name" on screen; withName false gives
-// "Provider (c1a2b3c4d)" for the exported file, which may end up attached to a report. An account removed since: its id.
-function accountLabel(id, accounts, withName = true) {
+// A Cloud account a line of cloud.log is about (#183): "Provider · Name", on screen and in the exported file alike
+// (#194: the file said "Provider (c1a2b3c4d)" somewhere else on the line). An account removed since: its id.
+function accountLabel(id, accounts) {
   const a = (accounts || []).find((x) => x.id === id);
   if (!a) return id;
-  const p = cloudModel.providerName(a);
-  return withName ? `${p} · ${a.name}` : `${p} (${id})`;
+  return `${cloudModel.providerName(a)} · ${a.name}`;
 }
 
 // ---- entry details ----
@@ -218,10 +218,11 @@ export default function Registros() {
     return logs.system(q).then(only);         // administrators, through the helper
   };
 
-  // one of LordOS's files, parsed and filtered; cloud.log's rows get their account (#183)
+  // one of LordOS's files, parsed and filtered; cloud.log's rows get their account (#183); the time range too (#194)
   const readFile = () => {
     let rows = parseLordLog(src.file ? logs.tail(src.file, 512 * 1024) || '' : '', src.file || '');
     if (/^cloud\.log(\.prev|\.old)?$/.test(src.file || '')) rows = cloudAccounts(rows);
+    rows = inRange(rows, RANGES[range] ? Date.now() * 1000 - RANGES[range] : 0);
     const s = search.toLowerCase();
     return rows.filter((r) => levelMatch(r.p, level) && (!s || r.m.toLowerCase().includes(s)) && (!proc || r.id === proc));
   };
@@ -286,8 +287,7 @@ export default function Registros() {
   const exportView = () => {
     const lines = items.map((e) => {
       const when = e.t ? `${formatDate(new Date(e.t / 1000), 'short')} ${clock(e.t / 1000)}` : `#${e.line}`;
-      const acct = e.acct ? ` [${accountLabel(e.acct, accounts, false)}]` : '';
-      return `${when} ${tr(`logs.level.${levelOf(e.p)}`)} ${e.id || '-'}${e.pid >= 0 ? `[${e.pid}]` : ''}${acct}: ${e.m}`;
+      return exportLine(e, when, tr(`logs.level.${levelOf(e.p)}`), e.acct ? accountLabel(e.acct, accounts) : '');
     });
     const d = new Date();
     const name = `${tr('logs.exportName')}-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.txt`;
@@ -313,7 +313,7 @@ export default function Registros() {
         <Text style={{ width: COL_TIME, fontSize: typeScale.caption, color: on ? '#fff' : t.textDim, fontFamily: 'monospace', whiteSpace: 'nowrap', direction: 'ltr', textAlign: 'start' }}>{e.t ? clock(e.t / 1000) : `#${e.line}`}</Text>
         <Text style={{ width: colProc, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{e.id || '—'}</Text>
         <Text style={{ flex: 1, fontSize: typeScale.callout, color: fg, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
-          {e.acct ? `${accountLabel(e.acct, accounts)}: ` : ''}{e.m.replace(/\n/g, ' ⏎ ')}</Text>
+          {rowText(e, e.acct ? accountLabel(e.acct, accounts) : '')}</Text>
       </View>
     );
   };

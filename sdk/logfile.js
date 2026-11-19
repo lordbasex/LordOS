@@ -8,6 +8,9 @@
 //   isOlder(name)            → true for "<name>.log.old" (the older part the 16 MB cap moved aside)
 //   levelMatch(p, level)     → the level filter: 'all', or exactly 'error' (0..3), 'warning' (4), 'info' (5, 6)
 //   cloudAccounts(rows)      → cloud.log's rows with the account each one is about (acct), rclone's copies folded
+//   inRange(rows, since)     → the time filter for a file's rows (since in µs, 0 all); unstamped lines go with the line before
+//   rowText(row, label)      → a row's message as one line, after its account's label: the list and the export alike
+//   exportLine(row, when, level, label) → a row of the exported file
 //
 // A line written by LordOS is "2026-11-11T12:43:56.123-03:00 INFO  xwayland: message" (local time with its
 // offset, ERROR|WARN|INFO|DEBUG, the subsystem). rclone's own (cloud.log) is "2026/11/17 10:12:59 ERROR : message"
@@ -114,7 +117,33 @@ export function cloudAccounts(rows) {
       if (tail.length >= 20 && err.includes(tail.slice(0, 80))) r.acct = a.acct;
     }
   }
+  // #194: rclone names the remote (the account's id) in some of its own lines ("c1a2b3c4d: …", "'c1a2b3c4d:'"): those
+  // lines are about that account even with no failed call of lord-server's around them
+  for (const r of out) {
+    if (r.id !== 'rclone' || r.acct) continue;
+    const m = /(?:^|[\s'"(\[])(c[0-9a-f]{8}):/.exec(r.m);
+    if (m) r.acct = m[1];
+  }
   return drop.size ? out.filter((_, i) => !drop.has(i)) : out;
+}
+
+// #194: the time filter (15 minutes, an hour, a day) for LordOS's files; it only asked the journal before, so a file
+// showed everything under each choice. A row without a time of its own (the rest of a message, a Linux app's line) takes
+// the time of the row before it; rows before any time are kept, nothing says how old they are.
+export function inRange(rows, since) {
+  if (!since) return rows || [];
+  let last = 0;
+  return (rows || []).filter((r) => { if (r.t) last = r.t; const t = r.t || last; return !t || t >= since; });
+}
+
+// #194: the list and the exported file show a row the same way: its account (cloud.log) before the message, and a
+// message of several lines (a provider's JSON details) on one line, each line break shown as ⏎; until 0.8.9.1 the
+// file had the account in another place and form, and the details on lines of their own with no account.
+export function rowText(e, label) {
+  return `${label ? `${label}: ` : ''}${String((e && e.m) || '').replace(/\r?\n/g, ' ⏎ ')}`;
+}
+export function exportLine(e, when, level, label) {
+  return `${when} ${level} ${(e && e.id) || '-'}${e && e.pid >= 0 ? `[${e.pid}]` : ''}: ${rowText(e, label)}`;
 }
 
 export function fileGroup(name) {

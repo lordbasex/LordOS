@@ -586,10 +586,13 @@ LordOS's log viewer.
     which, as "provider · name": lord-server writes a line of its own after each rc call about an account
     that failed (`ERROR c1a2b3c4d: operations/list: …`, the id only), rclone's copy of it is folded into it
     and rclone's lines of the same second that end with the same error take the account too
-    (`cloudAccounts`). The export writes the provider and the id, never the name.
+    (`cloudAccounts`), and so do rclone's lines that name the account's remote (`c1a2b3c4d:`, since 0.8.9.1,
+    #194). The list and the export show a row the same way (`rowText`, #194): the account's "provider ·
+    name" before the message and a multi-line message on one line (` ⏎ ` for each break).
 - **Filters:** level (all, or only info, only warnings, only errors: until 0.8.8.10 each level showed the
   more urgent ones too, so a log of errors looked the same under every choice, #183), time range (15 min, 1 hour,
-  24 h, everything), process or unit (`[A-Za-z0-9@._:-]`, the same check as the C side), and free-text
+  24 h, everything; the journal is asked for that range, a LordOS file filtered by `inRange` since 0.8.9.1, #194:
+  until then a file showed everything under each choice; an unstamped line goes with the line before it), process or unit (`[A-Za-z0-9@._:-]`, the same check as the C side), and free-text
   search in the message.
 - **Live:** follows new entries as they arrive (see below) and keeps the view pinned to the bottom
   until the user scrolls up.

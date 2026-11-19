@@ -42,6 +42,7 @@ static const char *const methods[RCM_COUNT] = {
     [RCM_STAT] = "operations/stat",
     [RCM_COPYFILE] = "operations/copyfile",
     [RCM_FSCACHE_CLEAR] = "fscache/clear",
+    [RCM_VFS_POLL] = "vfs/poll-interval",
 };
 
 const char *rc_method_path(int m) { return m >= 0 && m < RCM_COUNT ? methods[m] : NULL; }
@@ -917,4 +918,13 @@ const char *cloud_auto_off(const char *type, const char *err, int starting) {
 
 const char *cloud_off_reason(const char *saved) {
     return saved && !strcmp(saved, CLOUD_OFF_SIGNIN) ? CLOUD_OFF_SIGNIN : "";
+}
+
+int cloud_bring_up_ok(int own_pause, int any_pause, int failed) { return !own_pause && !(any_pause && failed); }
+
+int cloud_poll_body(const char *id, int off, char *out, size_t n) {
+    if (!id || !id[0] || strlen(id) > 15) return -1;
+    for (const char *s = id; *s; s++) if (!isalnum((unsigned char)*s)) return -1;
+    int r = snprintf(out, n, "{\"fs\":\"%s:\",\"interval\":\"%ds\"}", id, off ? 0 : CLOUD_POLL_S);
+    return r < 0 || (size_t)r >= n ? -1 : 0;
 }
