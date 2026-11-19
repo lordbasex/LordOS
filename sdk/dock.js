@@ -28,7 +28,7 @@ import { useWindows, wm, windowMenuTitle, windowAccent, appIdOf, getApp, windows
 import { pickWindow } from './desktopmodel.js';
 import { desktopSuffix } from './desktops.js';
 import { screen, onScreenChange, displayFor } from '@lordos/runtime';
-import { useLauncherApps, launchApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, windowIcon } from './apps.js';
+import { useLauncherApps, launchApp, windowLinuxApp, shortAppName, windowAppName, LetterIcon, windowIcon } from './apps.js';
 import { t, locale } from './i18n.js';
 import { webAppOfWindow, webAppEntry, webRunning, launchWebApp, webBadges } from './webapps.js';
 import { profileMenu, webDockId, webPrefs, dockBadge, badgeTotal, badgeLabel, parseWindowAppId } from './webappsmodel.js';
@@ -164,7 +164,7 @@ export function launcherIdOf(w) {
   if (web) return `web:${web.entry.id}`;            // every profile's windows under the app
   const appId = w.args?.appId || '';
   if (w.args?.pkg && appId && (getApp(appId)?.package || getApp(appId)?.isolated)) return appId;   // isolated app (.lpk or built-in): grouped under its own entry
-  const a = linuxAppFor(appId);
+  const a = windowLinuxApp(appId);
   return a ? a.id : `linux:${appId || w.id}`;
 }
 // The Dock entry a window belongs to (a typed id, or "linux:…" for a window with no .desktop).

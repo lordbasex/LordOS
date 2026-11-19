@@ -14,7 +14,7 @@ import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfa
 import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName, direction } from './i18n.js';
-import { linuxAppFor } from './apps.js';
+import { linuxAppFor, windowLinuxApp } from './apps.js';
 import { shortcutsWho } from './kbinhibitmodel.js';
 import { webOwnerOf } from './webapps.js';
 import { osk } from './osk.js';
@@ -25,7 +25,7 @@ import { dockIdOfWindow } from './dock.js';
 import { promptForServer } from './privacy.js';
 
 // the launcher entry a new window belongs to (as sdk/dock.js launcherIdOf), for its assigned display
-const launcherKeyFor = (appId) => (!appId ? null : getApp(appId)?.package || getApp(appId)?.isolated ? appId : linuxAppFor(appId)?.id || null);
+const launcherKeyFor = (appId) => (!appId ? null : getApp(appId)?.package || getApp(appId)?.isolated ? appId : windowLinuxApp(appId)?.id || null);
 
 const idOf = (sid) => `linux#${sid}`;
 export const surfaceOf = (wid) => (String(wid).startsWith('linux#') ? Number(String(wid).slice(6)) || 0 : 0);

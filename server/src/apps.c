@@ -53,6 +53,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/prctl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
@@ -1337,6 +1338,7 @@ static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const cha
 
 int apps_launch_view_main(void) {
     static const char fail[] = "apps: the app's view could not be built: not launched\n";
+    prctl(PR_SET_NAME, "lordos-view");          /* not "exe" (/proc/self/exe) in the Monitor; the app it execs gets its own */
     char *buf = malloc(LV_MAX + 2);
     size_t got = 0;
     for (ssize_t r; buf && got < LV_MAX && (r = read(LV_FD, buf + got, LV_MAX - got)) != 0;) {

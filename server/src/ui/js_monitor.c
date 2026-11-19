@@ -173,7 +173,9 @@ static int scope_of(int pid, char *kind, char *id, size_t n) {
             if (l > 17 && !strncmp(leaf, "app-lordos-", 11) && !strcmp(leaf + l - 6, ".scope") && l - 17 < sizeof buf) {
                 const char *b = leaf + 11;
                 size_t bl = l - 17;
-                if (bl > 4 && !strncmp(b, "lpk-", 4)) { k = 'l'; b += 4; bl -= 4; } else k = 'd';
+                if (bl > 4 && !strncmp(b, "lpk-", 4)) { k = 'l'; b += 4; bl -= 4; }
+                else if (bl > 3 && !strncmp(b, "fp-", 3)) { k = 'f'; b += 3; bl -= 3; }    /* a Flatpak app (docs/FLATPAK.md) */
+                else k = 'd';
                 memcpy(buf, b, bl);
                 buf[bl] = 0;
             }
@@ -202,6 +204,8 @@ static JSValue annotate(JSContext *c, JSValue obj, const char *lang) {
     if (!JS_IsObject(obj)) return obj;
     const DesktopApp *apps = NULL;
     int napps = apps_list(lang, &apps);
+    const DesktopApp *fps = NULL;
+    int nfps = -1;                                  /* the Flatpak apps, read when a process in such a scope is seen */
     JSValue list = JS_GetPropertyStr(c, obj, "list");
     uint32_t len = 0;
     JSValue lv = JS_GetPropertyStr(c, list, "length");
@@ -229,6 +233,20 @@ static JSValue annotate(JSContext *c, JSValue obj, const char *lang) {
                     char id[200];
                     snprintf(id, sizeof id, "lpk:%s", sid);
                     JS_SetPropertyStr(c, e, "app", JS_NewString(c, id));
+                    JS_FreeValue(c, e);
+                    continue;
+                }
+                if (sk == 'f') {                        /* every process of a Flatpak app: bubblewrap, its proxy, the app */
+                    if (nfps < 0) nfps = apps_flatpak_list(lang, &fps);
+                    char id[200];
+                    snprintf(id, sizeof id, "flatpak:%s", sid);
+                    JS_SetPropertyStr(c, e, "app", JS_NewString(c, id));
+                    for (int k = 0; k < nfps; k++)
+                        if (!strcmp(fps[k].id, sid)) {
+                            JS_SetPropertyStr(c, e, "appName", JS_NewString(c, fps[k].name));
+                            JS_SetPropertyStr(c, e, "appIcon", JS_NewString(c, fps[k].icon));
+                            break;
+                        }
                     JS_FreeValue(c, e);
                     continue;
                 }

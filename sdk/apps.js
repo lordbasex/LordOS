@@ -203,6 +203,9 @@ export function launchApp(id) {
   return wm.open(id) != null;
 }
 
+// The app of a Linux window: its .desktop's, else the Flatpak app with that id.
+export const windowLinuxApp = (appId) => linuxAppFor(appId) || flatpakAppFor(appId);
+
 // The Flatpak app of a Wayland window: its app_id is the Flatpak id (or the export's StartupWMClass).
 export function flatpakAppFor(appId) {
   if (!appId) return null;
@@ -260,7 +263,7 @@ export function windowAppName(w) {
   const appId = w.args?.appId || '';
   const pkg = appId ? registryApp(appId) : null;
   if (pkg && (pkg.package || pkg.isolated)) return pkg.isolated ? appName(pkg) : pkg.name;
-  return shortAppName(linuxAppFor(appId)) || prettyAppId(appId) || appName(registryApp('linux'));
+  return shortAppName(windowLinuxApp(appId)) || prettyAppId(appId) || appName(registryApp('linux'));
 }
 
 // Icon of a window: its app's; for a Linux window, its .desktop's if one is found.
@@ -272,7 +275,7 @@ export function windowIcon(w, getApp) {
     // an isolated .lpk app (lord-server --app) arrives as a Wayland window with app_id = its id
     const pkg = appId ? registryApp(appId) : null;
     if (pkg && (pkg.package || pkg.isolated) && pkg.Icon) return pkg.Icon;
-    const a = linuxAppFor(appId);
+    const a = windowLinuxApp(appId);
     return a ? a.Icon : ({ size }) => h(LetterIcon, { size, name: appId || w?.title || 'Linux' });
   }
   return getApp(w?.id)?.Icon || (({ size }) => h(LetterIcon, { size, name: w?.id }));
