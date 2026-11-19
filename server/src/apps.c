@@ -903,18 +903,23 @@ int apps_flatpak_installed(const char *id) {
 
 /* The user's Flatpak installation and Flatpak's own cache, writable in the view: `flatpak run` opens its OSTree
  * repository for writing (locks) and keeps its ld.so caches in ~/.cache/flatpak, created on first use ("Read-only file
- * system" on VM 127 without them). The installation is hidden inside every sandbox; ~/.cache/flatpak is reachable only by
- * an app given the whole home, as on any Flatpak system. Only real folders. */
+ * system" on VM 127 without them). It is `flatpak run`'s alone: inside the sandbox both are hidden by fpak_argv's
+ * --nofilesystem (a tmpfs over them; checked: an app given the whole home sees them empty). Only real folders, no link
+ * on the way. */
 static void flatpak_installation(FilesPlan *p) {
     char path[PATH_MAX + 64];
-    if (snprintf(path, sizeof path, "%s/.local/share/flatpak", p->home) < (int)sizeof path && is_dir(path))
-        plan_add(p, 1, "%s%s", path, "");
+    char inst[PATH_MAX];
+    if (snprintf(path, sizeof path, "%s/.local/share/flatpak", p->home) < (int)sizeof path && realpath(path, inst) &&
+        !strcmp(inst, path) && is_dir(inst))
+        plan_add(p, 1, "%s%s", inst, "");
     if (snprintf(path, sizeof path, "%s/.cache", p->home) >= (int)sizeof path) return;
     mkdir(path, 0700);
     strcat(path, "/flatpak");
     mkdir(path, 0755);
+    /* only that very folder: ~/.cache or it a link would put the grant somewhere else */
+    char real[PATH_MAX];
     struct stat st;
-    if (!lstat(path, &st) && S_ISDIR(st.st_mode)) plan_add(p, 1, "%s%s", path, "");
+    if (realpath(path, real) && !strcmp(real, path) && !lstat(real, &st) && S_ISDIR(st.st_mode)) plan_add(p, 1, "%s%s", real, "");
 }
 
 /* The writable folders of a Flatpak app's read-only home: ~/.var/app/<id> (created) and the person's folders, each a
@@ -1075,7 +1080,6 @@ static int launch_flatpak(const char *id, const char *opened) {
             _exit(126);
         }
         xauth_env_drop();
-        unsetenv("DISPLAY");
         /* a device-restricted app has no session bus at all: `flatpak run` then starts no proxy */
         if (restricted & (FW_R_NO_FILES | FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_USB | FW_R_NO_BLUETOOTH)) unsetenv("DBUS_SESSION_BUS_ADDRESS");
         if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");

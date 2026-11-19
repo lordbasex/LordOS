@@ -275,7 +275,8 @@ and its D-Bus proxy all ran in
 `/system.slice/lordos.service/lordos-session-1000/app-lordos-fp-com.voxdsp.Tuxocide.scope`; the window opened on the
 desktop with LordOS's frame and menu bar. Two writes of `flatpak run` itself needed the read-only home to keep them
 writable: the user's installation `~/.local/share/flatpak` (OSTree locks) and its cache `~/.cache/flatpak` (created on
-first use); `strace` found the second. lord-sessiond places only processes whose executable is in LordOS's bin folder,
+first use); `strace` found the second. Both are hidden inside the sandbox (`--nofilesystem`, a tmpfs over them): an app
+given the whole home saw them empty, and a file it wrote there never reached the real cache (checked the same day). lord-sessiond places only processes whose executable is in LordOS's bin folder,
 so the test tool was copied there for the run and removed after.
 
 So the launcher needs the view for every Flatpak app (open question 11) **and** `flatpak-session-helper.service`
