@@ -39,6 +39,8 @@ void input_remove(Input *in, int idx);
 void input_dispatch(Input *in, int idx, InputHandler cb, void *ud);
 /* Is a keyboard someone can type on attached? (the on-screen keyboard's Automatic mode, osk.h) */
 int  input_has_keyboard(const Input *in);
+/* A laptop or another portable computer (DMI chassis type); 0 without DMI (a Raspberry Pi). */
+int  input_portable_computer(void);
 /* Lights Caps Lock, Num Lock and Scroll Lock (bits LED_*) on every keyboard that has them, writing only to the ones
  * whose lights differ. We hold the devices with EVIOCGRAB, so the kernel's console no longer lights them. */
 void input_set_leds(Input *in, int mask);

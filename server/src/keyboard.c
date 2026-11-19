@@ -40,6 +40,21 @@ static void setup_compose(void) {
     if (compose_table) compose = xkb_compose_state_new(compose_table, XKB_COMPOSE_STATE_NO_FLAGS);
 }
 
+/* Turns one lock modifier (XKB_MOD_NAME_CAPS, XKB_MOD_NAME_NUM) on or off, keeping the rest of the state. */
+static void kb_set_lock(const char *name, int on) {
+    if (!state || !keymap) return;
+    xkb_mod_index_t i = xkb_keymap_mod_get_index(keymap, name);
+    if (i == XKB_MOD_INVALID || i >= 32) return;
+    xkb_mod_mask_t dep = (xkb_mod_mask_t)xkb_state_serialize_mods(state, XKB_STATE_MODS_DEPRESSED);
+    xkb_mod_mask_t lat = (xkb_mod_mask_t)xkb_state_serialize_mods(state, XKB_STATE_MODS_LATCHED);
+    xkb_mod_mask_t lock = (xkb_mod_mask_t)xkb_state_serialize_mods(state, XKB_STATE_MODS_LOCKED);
+    lock = on ? lock | 1u << i : lock & ~(1u << i);
+    xkb_layout_index_t g = xkb_state_serialize_layout(state, XKB_STATE_LAYOUT_LOCKED);
+    xkb_state_update_mask(state, dep, lat, lock, 0, 0, g);
+}
+
+void kb_set_numlock(int on) { kb_set_lock(XKB_MOD_NAME_NUM, on); }
+
 /* layouts: "latam" or "us,latam" (up to 4); variants in the same order ("", "abnt2"…). */
 int kb_set(const char *layouts, const char *variants) {
     if (!valid(layouts) || !valid(variants) || !layouts[0]) return -1;
@@ -47,10 +62,15 @@ int kb_set(const char *layouts, const char *variants) {
     struct xkb_rule_names names = { "evdev", "pc105", layouts, variants, "" };
     struct xkb_keymap *km = xkb_keymap_new_from_names(ctx, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
     if (!km) return -1;
+    /* the locks stay as they were: changing the layout must not turn Caps Lock or Num Lock off */
+    int caps = state && xkb_state_mod_name_is_active(state, XKB_MOD_NAME_CAPS, XKB_STATE_MODS_LOCKED) > 0;
+    int num = state && xkb_state_mod_name_is_active(state, XKB_MOD_NAME_NUM, XKB_STATE_MODS_LOCKED) > 0;
     if (state) xkb_state_unref(state);
     if (keymap) xkb_keymap_unref(keymap);
     keymap = km;
     state = xkb_state_new(keymap);
+    kb_set_lock(XKB_MOD_NAME_CAPS, caps);
+    kb_set_lock(XKB_MOD_NAME_NUM, num);
     snprintf(cur_layouts, sizeof cur_layouts, "%s", layouts);
     snprintf(cur_variants, sizeof cur_variants, "%s", variants);
     setup_compose();

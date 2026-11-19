@@ -158,7 +158,7 @@ void input_set_leds(Input *in, int mask) {
 }
 
 /* Read once: the kind of computer doesn't change while it runs. No DMI (a Raspberry Pi): 0. */
-static int portable_computer(void) {
+int input_portable_computer(void) {
     static int known = -1;
     if (known < 0) {
         int type = 0;
@@ -172,7 +172,7 @@ static int portable_computer(void) {
 int input_has_keyboard(const Input *in) {
     for (int i = 0; i < in->count; i++) {
         const InputDevice *d = &in->dev[i];
-        if (d->keyboard && osk_keyboard_counts(d->bus, portable_computer(), d->typed)) return 1;
+        if (d->keyboard && osk_keyboard_counts(d->bus, input_portable_computer(), d->typed)) return 1;
     }
     return 0;
 }

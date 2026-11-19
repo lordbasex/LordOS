@@ -72,6 +72,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **The keypad typed nothing and moved the cursor instead (reported with a Lenovo USB keyboard).** Every session
+  started with Num Lock off, whatever the firmware had set, so the keypad's digits were Home, End and the arrows. A
+  session on a desktop computer (DMI chassis type, or no DMI, as on a Raspberry Pi) now starts with Num Lock on and its
+  light lit; laptops keep it off, since their keypad is often printed on the letter keys. Changing the layout (adding
+  one in Settings → Keyboard, or switching between them) also built a fresh keyboard state that turned Caps Lock and
+  Num Lock off; it keeps both now (`kb_set`, `kb_set_numlock` in `server/src/keyboard.c`; `test_numlock` in
+  `server/tests/osk_test.c`).
+
 - **A paused Cloud account kept talking to its provider (GitHub #194).** Pause only held uploads back: a failed mount
   was retried every 30 s, the check listing ran every 10 minutes and the quota call every 30, Files' background listing
   went on, and rclone polled Google Drive for changes every minute; the reporter's paused account kept getting Google's

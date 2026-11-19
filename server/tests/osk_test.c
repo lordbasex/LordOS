@@ -206,6 +206,34 @@ static void test_locked(void) {
     CHECK(kb_leds() == 0);
 }
 
+/* The keypad types digits with Num Lock on, and a new layout keeps Caps Lock and Num Lock as they were. */
+static void test_numlock(void) {
+    if (kb_set("latam", "")) { printf("  num lock skipped: needs xkb-data\n"); return; }
+    KeyInfo k;
+    kb_key(KEY_KP1, 1, &k);
+    CHECK(!strcmp(k.key, "End") && !k.chr[0]);         /* off: the keypad moves the cursor */
+    kb_key(KEY_KP1, 0, &k);
+    kb_set_numlock(1);
+    CHECK(kb_leds() == 1 << LED_NUML);
+    kb_key(KEY_KP1, 1, &k);
+    CHECK(!strcmp(k.chr, "1"));
+    kb_key(KEY_KP1, 0, &k);
+    kb_key(KEY_CAPSLOCK, 1, &k);
+    kb_key(KEY_CAPSLOCK, 0, &k);
+    CHECK(!kb_set("us,latam", ""));                     /* the user changes layouts: the locks stay */
+    CHECK(kb_leds() == (1 << LED_CAPSL | 1 << LED_NUML));
+    kb_key(KEY_A, 1, &k);
+    CHECK(k.caps && !strcmp(k.chr, "A"));
+    kb_key(KEY_A, 0, &k);
+    kb_key(KEY_KP5, 1, &k);
+    CHECK(!strcmp(k.chr, "5"));
+    kb_key(KEY_KP5, 0, &k);
+    kb_set_numlock(0);
+    kb_key(KEY_CAPSLOCK, 1, &k);
+    kb_key(KEY_CAPSLOCK, 0, &k);
+    CHECK(kb_leds() == 0);
+}
+
 /* The computer's layout (#55): /etc/default/keyboard as Debian writes it; "us" without a usable one. */
 static void sysfile(const char *path, const char *text) {
     FILE *f = fopen(path, "w");
@@ -243,6 +271,7 @@ int main(void) {
     test_labels();
     test_leds();
     test_locked();
+    test_numlock();
     if (fails) { printf("%d failed\n", fails); return 1; }
     printf("osk-test: ok\n");
     return 0;
