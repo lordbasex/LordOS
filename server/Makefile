@@ -445,9 +445,9 @@ build/keygrab-test: tests/keygrab_test.c src/wl/keygrab.c src/wl/keygrab.h src/i
 	./$@
 # keyboard-shortcuts-inhibit: who is asked, what holds, which keys the app gets and ❖Esc (src/wl/kbinhibit.c)
 test: build/kbinhibit-test
-build/kbinhibit-test: tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/kbinhibit.h src/wl/keygrab.c src/wl/keygrab.h src/wl/dndgate.c src/wl/dndgate.h
+build/kbinhibit-test: tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/kbinhibit.h src/wl/keygrab.c src/wl/keygrab.h src/wl/dndgate.c src/wl/dndgate.h src/sec/appid.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/keygrab.c src/wl/dndgate.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/kbinhibit_test.c src/wl/kbinhibit.c src/wl/keygrab.c src/wl/dndgate.c src/sec/appid.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
 # the global shortcuts portal's rules without a bus (src/ui/gshort.c): triggers, the kept combinations, a session's states, the store
 test: build/gshort-test

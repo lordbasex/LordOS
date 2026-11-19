@@ -246,6 +246,34 @@ int main(void) {
         CHECK(identity_of(open("/proc/self", O_PATH | O_DIRECTORY | O_CLOEXEC), k) && !strcmp(k, want));
     }
     CHECK(!kbi_identity(-1, k, sizeof k) && !k[0]);
+    /* a Flatpak app the launcher started: its root-owned scope names it (docs/FLATPAK.md, open question 11); a scope
+     * of the same name under user@ names no one, nor does a desktop app's scope here */
+    {
+        char d[] = "/tmp/kbi-scope.XXXXXX", f[64], line[256];
+        if (mkdtemp(d)) {
+            snprintf(f, sizeof f, "%s/cgroup", d);
+            const char *cases[][2] = {
+                { "0::/system.slice/lordos.service/lordos-session-%u/app-lordos-fp-org.gnome.Calculator.scope\n", "flatpak:org.gnome.Calculator" },
+                { "0::/user.slice/user-%u.slice/user@%u.service/app.slice/app-lordos-fp-org.gnome.Calculator.scope\n", "" },
+                { "0::/system.slice/lordos.service/lordos-session-%u/app-lordos-org.gnome.Calculator.scope\n", "" },
+            };
+            for (int i = 0; i < 3; i++) {
+                FILE *w = fopen(f, "w");
+                if (!w) break;
+                snprintf(line, sizeof line, cases[i][0], (unsigned)getuid(), (unsigned)getuid());
+                fputs(line, w);
+                fclose(w);
+                int dfd = open(d, O_PATH | O_DIRECTORY);
+                char who[KBI_ID_MAX];
+                int ok = kbi_identity(dfd, who, sizeof who);
+                if (cases[i][1][0]) CHECK(ok && !strcmp(who, cases[i][1]));
+                else CHECK(!ok || strncmp(who, "flatpak:", 8));
+                close(dfd);
+            }
+            unlink(f);
+            rmdir(d);
+        }
+    }
     fd = open("/proc/self", O_PATH | O_DIRECTORY | O_CLOEXEC);
     CHECK(!kbi_identity(fd, k, 10));                                 /* too small a buffer */
     if (fd >= 0) close(fd);

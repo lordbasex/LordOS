@@ -31,7 +31,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   LordOS's restrictions also as Flatpak options. Every Flatpak app runs in its root-owned scope and in the launcher's view,
   which hides the user manager's socket, so `flatpak run` can't move it out (checked on a VM: without the view it
   moves itself under `user@`). `fw_app_canon` reads `app-lordos-fp-<id>.scope` as `flatpak:<id>`, so the firewall,
-  the Monitor, notifications and the PipeWire guard know the app. Tests: `fpak-test` (47), `fw-rules-test`;
+  the Monitor, notifications and the PipeWire guard know the app, and lord-server's keyboard-shortcuts permission
+  names its windows `flatpak:<id>` from that scope too (`kbi_identity`), since the view hides the runtime folder the
+  `/.flatpak-info` check reads. Checked in a LordOS session on VM 127: bubblewrap, the app and its D-Bus proxy in
+  `app-lordos-fp-<id>.scope`, the window on the desktop. Tests: `fpak-test` (47), `fw-rules-test`;
   `build/flatpak-view-probe` and `launch-cli --flatpak` for the VM.
 
 ### Documentation

@@ -3,6 +3,7 @@
 #include "kbinhibit.h"
 #include "dndgate.h"
 #include "keygrab.h"
+#include "../sec/appid.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -224,10 +225,31 @@ int kbi_peer_proc(int sock, int pid) {
     return procfd;
 }
 
+/* A Flatpak app LordOS's launcher started: its root-owned app-lordos-fp-<id>.scope says who it is, whatever its root or
+ * namespaces hold (the launcher's view hides the runtime folder flatpak_host_ok reads; docs/FLATPAK.md, open question
+ * 11). Only that kind of scope counts here: a desktop or .lpk scope goes on to the checks below. 1, or 0. */
+static int scope_identity(int procfd, char *out, size_t n) {
+    int fd = openat(procfd, "cgroup", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return 0;
+    char buf[1024];
+    ssize_t r = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (r <= 0) return 0;
+    buf[r] = 0;
+    char *line = strstr(buf, "0::");
+    if (!line || (line != buf && line[-1] != '\n')) return 0;
+    char *nl = strchr(line, '\n');
+    if (nl) *nl = 0;
+    char app[KBI_ID_MAX];
+    if (appid_of_cgroup(line + 3, app, sizeof app) || strncmp(app, FLATPAK, sizeof FLATPAK - 1)) return 0;
+    return snprintf(out, n, "%s", app) < (int)n;
+}
+
 int kbi_identity(int procfd, char *out, size_t n) {
     if (!out || n < KBI_ID_MAX) return 0;
     out[0] = 0;
     if (procfd < 0) return 0;
+    if (scope_identity(procfd, out, n)) return 1;
     int root = openat(procfd, "root", O_PATH | O_DIRECTORY | O_CLOEXEC);
     if (root < 0) return 0;
     int flatpak = dndg_root_sandboxed(root);
