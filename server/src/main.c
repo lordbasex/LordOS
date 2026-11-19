@@ -2578,6 +2578,9 @@ int main(int argc, char **argv) {
         }
         return app_main(argv[2], host, fonts);
     }
+    /* (0.8.9.1, memory) no transparent huge pages for the session: with THP "always" the heap faults in 2 MB pages and
+     * khugepaged refills what malloc_trim gave back, so a desktop at rest kept ~90-230 MB of half-used huge pages */
+    prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0);
     const char *card = NULL;               /* sin --card: la que tiene pantalla (drmcard.h) */
     const char *theme = "../themes/default/theme.bundle.js";
     const char *fonts = "../assets/fonts";
