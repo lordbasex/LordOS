@@ -30,12 +30,14 @@ typedef struct {
     WxData d;
     long long at;               /* when d came */
     long long tried;            /* the last attempt */
+    unsigned long long asked;   /* when wxs_request last asked (a count): the least recent gives its slot to a new zone */
     char err[24];
 } Zone;
 
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
 static Zone Z[WXS_ZONES];
 static int nz, busy, inited;
+static unsigned long long asks;   /* wxs_request's count, for Zone.asked */
 static char fetch_bin[PATH_MAX];
 
 static long long now_s(void) { return (long long)time(NULL); }
@@ -190,7 +192,7 @@ static void *worker(void *arg) {
         char err[24] = "";
         int ok = !fetch_one(&h, lat, lon, &d, err, sizeof err);
         pthread_mutex_lock(&mu);
-        Zone *y = find(zone);          /* still the same slot: zones are never removed */
+        Zone *y = find(zone);          /* by name: its slot may have gone to another zone meanwhile */
         if (y) {
             if (ok) { y->d = d; y->have = 1; y->at = now_s(); y->err[0] = 0; }
             else snprintf(y->err, sizeof y->err, "%s", err);
@@ -207,14 +209,19 @@ int wxs_request(const char *zone) {
     Zone *z = find(zone);
     if (!z) {
         double lat, lon;
-        if (nz >= WXS_ZONES || coords(zone, &lat, &lon)) { pthread_mutex_unlock(&mu); return -1; }
-        z = &Z[nz++];
+        if (coords(zone, &lat, &lon)) { pthread_mutex_unlock(&mu); return -1; }
+        /* full: the zone asked least recently that isn't waiting for its fetch gives up its slot (each weather widget
+         * has its own city since 0.8.9.1, #193: one person trying cities must not fill the table for good) */
+        if (nz < WXS_ZONES) z = &Z[nz++];
+        else for (int i = 0; i < nz; i++) if (!Z[i].want && (!z || Z[i].asked < z->asked)) z = &Z[i];
+        if (!z) { pthread_mutex_unlock(&mu); return -1; }
         memset(z, 0, sizeof *z);
         snprintf(z->zone, sizeof z->zone, "%s", zone);
         z->lat = lat;
         z->lon = lon;
     }
     long long now = now_s();
+    z->asked = ++asks;
     int fresh = z->have && now - z->at < WXS_FRESH, waiting = z->tried && now - z->tried < (z->err[0] ? WXS_RETRY : 60);
     if (!fresh && !waiting && !z->want) {
         z->want = 1;

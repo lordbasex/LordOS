@@ -33,3 +33,11 @@ build/geocities-test: tests/geocities_test.c src/fetch/geocities.c src/fetch/geo
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/geocities_test.c src/fetch/geocities.c src/sec/json.c -lm
 	./$@ || (rm -f $@; exit 1)
+
+# the weather widget's table of places (fetch/wxsvc.c): shared by widgets on one city, the least recent one makes room
+# (0.8.9.1, #193); no network, no lord-fetch
+test: build/wxsvc-test
+build/wxsvc-test: tests/wxsvc_test.c src/fetch/wxsvc.c src/fetch/wxsvc.h src/fetch/geocities.c src/fetch/weather.c src/hw/night.c src/doc/wire.c src/sec/json.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/wxsvc_test.c src/fetch/wxsvc.c src/fetch/geocities.c src/fetch/weather.c src/hw/night.c src/doc/wire.c src/sec/json.c -lm -lpthread
+	./$@ || (rm -f $@; exit 1)

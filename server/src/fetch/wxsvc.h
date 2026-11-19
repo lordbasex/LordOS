@@ -4,14 +4,15 @@
  * zone1970.tab here, never from JS. A worker thread connects to api.open-meteo.com:443 through the
  * weather connector (sec/netconn.h, NC_WEATHER: its own scope and firewall row, "lordos:weather"), hands
  * the socket to lord-fetch (FQ_WEATHER) and reads its answer back strictly (fetch/weather.h). Each zone's
- * forecast is kept 30 minutes; a failure waits 10 before the next try. At most WXS_ZONES zones.
+ * forecast is kept 30 minutes; a failure waits 10 before the next try. At most WXS_ZONES zones: when full,
+ * the one asked least recently gives its place to a new one (0.8.9.1, #193).
  * Thread-safe; nothing blocks the caller. */
 #ifndef LORD_FETCH_WXSVC_H
 #define LORD_FETCH_WXSVC_H
 
 #include "weather.h"
 
-#define WXS_ZONES 8
+#define WXS_ZONES 16
 #define WXS_FRESH 1800          /* seconds a forecast is kept */
 #define WXS_RETRY 600           /* seconds after a failure */
 
