@@ -729,6 +729,9 @@ flatpak `1.16.6-1~deb13u3` and xdg-dbus-proxy `0.1.6-1+deb13u3` (2026-11-19).
     runtime folder and namespaces; inside LordOS's private view neither works. Run unrestricted Flatpak apps without
     the view (as unrestricted Linux apps run today) and keep the view for restricted ones with the checks taught to
     follow it, or change how the view handles `$XDG_RUNTIME_DIR/.flatpak`?
+    **Decided by the maintainer (2026-11-19):** unrestricted Flatpak apps run without the view, as unrestricted Linux
+    apps do today (still in their root-owned scope), and the two checks are taught to follow the view for restricted
+    ones.
 
 ## References
 
