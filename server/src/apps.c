@@ -51,6 +51,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
@@ -980,6 +981,90 @@ int apps_default_for(const char *mime, char *out, size_t n) {
 /* action: the name of one of the entry's desktop actions (apps_launch_action), whose Exec line
  * replaces the main one; never together with a file. Everything else (the id, the listing filters,
  * the scope, the restrictions) is the same as a plain launch. */
+/* ---- the view, built in a clean process (lord-server --launch-view) ----
+ * lord-server drops from root to the user when a session starts, so it isn't dumpable: its /proc/self files stay
+ * root's, and a child of it can't write its new user namespace's uid_map. Every restricted app failed to start from
+ * the desktop ("not launched"; found on VM 127, 2026-11-19), while the tests, which run the launcher from build/launch-cli,
+ * passed. Making the child dumpable would let the user's other processes read the copy of lord-server's memory it holds
+ * until exec (unless Yama stops them). Instead the child execs /proc/self/exe --launch-view: a fresh process image,
+ * dumpable by execve and holding nothing of lord-server's, builds the view and execs the app. The plan goes on fd 3,
+ * a sealed memfd of "key\0value\0" pairs, written here and read back by apps_launch_view_main. */
+#define LV_FD 3
+#define LV_MAX (1 << 20)
+
+static int lv_put(int fd, const char *k, const char *v) {
+    if (!v) return 0;
+    size_t kl = strlen(k) + 1, vl = strlen(v) + 1;
+    return write(fd, k, kl) == (ssize_t)kl && write(fd, v, vl) == (ssize_t)vl ? 0 : -1;
+}
+
+/* In the launcher's child, after its scope and environment: never returns on success. */
+static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const char *prog, char *const argv[]) {
+    int fd = memfd_create("lordos-launch-view", MFD_ALLOW_SEALING);
+    if (fd < 0) return;
+    char num[32];
+    int bad = lv_put(fd, "home", cfg->home) || lv_put(fd, "runtime", cfg->runtime_dir) || lv_put(fd, "cwd", cfg->cwd) ||
+              lv_put(fd, "opened", cfg->opened) || lv_put(fd, "prog", prog);
+    for (int i = 0; !bad && i < SANDBOX_FILES_MAX && cfg->rw[i]; i++) bad = lv_put(fd, "rw", cfg->rw[i]);
+    for (int i = 0; !bad && i < SANDBOX_FILES_MAX && cfg->ro[i]; i++) bad = lv_put(fd, "ro", cfg->ro[i]);
+    for (int i = 0; !bad && i < 8 && cfg->sockets[i]; i++) bad = lv_put(fd, "sock", cfg->sockets[i]);
+    snprintf(num, sizeof num, "%llu", cfg->opened_dev);
+    bad = bad || lv_put(fd, "odev", num);
+    snprintf(num, sizeof num, "%llu", cfg->opened_ino);
+    bad = bad || lv_put(fd, "oino", num) || lv_put(fd, "keephome", cfg->keep_home ? "1" : "0") ||
+          lv_put(fd, "rules", file_rules ? "files" : "scope");
+    for (int i = 0; !bad && argv[i]; i++) bad = lv_put(fd, "arg", argv[i]);
+    if (bad || fcntl(fd, F_ADD_SEALS, F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL) || lseek(fd, 0, SEEK_SET)) { close(fd); return; }
+    if (fd != LV_FD) { if (dup2(fd, LV_FD) < 0) { close(fd); return; } close(fd); }
+    static char *const self[] = { "lord-server", "--launch-view", NULL };
+    execve("/proc/self/exe", self, environ);
+}
+
+int apps_launch_view_main(void) {
+    static const char fail[] = "apps: the app's view could not be built: not launched\n";
+    char *buf = malloc(LV_MAX + 2);
+    size_t got = 0;
+    for (ssize_t r; buf && got < LV_MAX && (r = read(LV_FD, buf + got, LV_MAX - got)) != 0;) {
+        if (r < 0) { if (errno == EINTR) continue; break; }
+        got += (size_t)r;
+    }
+    close(LV_FD);
+    if (!buf || !got || got >= LV_MAX || buf[got - 1]) { if (write(2, fail, sizeof fail - 1) < 0) {} return 126; }
+    buf[got] = 0;
+    SandboxFilesCfg cfg;
+    memset(&cfg, 0, sizeof cfg);
+    const char *prog = NULL, *rules = NULL;
+    char *args[MAX_ARGS + 1];
+    int na = 0, nrw = 0, nro = 0, ns = 0, bad = 0;
+    for (char *p = buf; p < buf + got && !bad;) {
+        char *k = p, *v = p + strlen(p) + 1;
+        if (v >= buf + got) { bad = 1; break; }
+        p = v + strlen(v) + 1;
+        if (!strcmp(k, "home")) cfg.home = v;
+        else if (!strcmp(k, "runtime")) cfg.runtime_dir = v;
+        else if (!strcmp(k, "cwd")) cfg.cwd = v;
+        else if (!strcmp(k, "opened")) cfg.opened = v;
+        else if (!strcmp(k, "prog")) prog = v;
+        else if (!strcmp(k, "rules")) rules = v;
+        else if (!strcmp(k, "keephome")) cfg.keep_home = !strcmp(v, "1");
+        else if (!strcmp(k, "odev")) cfg.opened_dev = strtoull(v, NULL, 10);
+        else if (!strcmp(k, "oino")) cfg.opened_ino = strtoull(v, NULL, 10);
+        else if (!strcmp(k, "rw")) { if (nrw < SANDBOX_FILES_MAX) cfg.rw[nrw++] = v; else bad = 1; }
+        else if (!strcmp(k, "ro")) { if (nro < SANDBOX_FILES_MAX) cfg.ro[nro++] = v; else bad = 1; }
+        else if (!strcmp(k, "sock")) { if (ns < 7) cfg.sockets[ns++] = v; else bad = 1; }
+        else if (!strcmp(k, "arg")) { if (na < MAX_ARGS) args[na++] = v; else bad = 1; }
+        else bad = 1;
+    }
+    args[na] = NULL;
+    if (bad || !prog || prog[0] != '/' || !na || !rules || !cfg.home || cfg.home[0] != '/' ||
+        sandbox_files_isolate(&cfg) || (!strcmp(rules, "files") ? sandbox_apply_files(&cfg) : sandbox_apply_scope())) {
+        if (write(2, fail, sizeof fail - 1) < 0) {}
+        return 126;
+    }
+    execve(prog, args, environ);
+    return 127;
+}
+
 static int launch(const char *id, const char *file, const char *action) {
     last_error[0] = 0;
     if (file && action) return -1;
@@ -1063,9 +1148,10 @@ static int launch(const char *id, const char *file, const char *action) {
          * X socket either, nor its own runtime folder the X cookie (wl/xauth.h) */
         if (plan) xauth_env_drop();
         if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");
-        if (plan && (sandbox_files_isolate(&plan->cfg) ||
-                     (plan->cfg.keep_home ? sandbox_apply_scope() : sandbox_apply_files(&plan->cfg)))) {
-            static const char msg[] = "apps: could not apply the no-files restriction: not launched\n";
+        if (plan) {
+            /* the view and Landlock in a clean process image (apps_launch_view_main): never returns on success */
+            apps_view_exec(&plan->cfg, !plan->cfg.keep_home, prog, argv);
+            static const char msg[] = "apps: could not start the restricted app's view: not launched\n";
             if (write(2, msg, sizeof msg - 1) < 0) {}
             _exit(126);
         }

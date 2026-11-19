@@ -44,7 +44,10 @@ int apps_is_terminal(const char *id);
 /* Same, but opening a file or folder (see apps.c: only apps with MimeType and paths in the
  * home folder or the user's mounts, as a single argument). */
 int apps_launch_with(const char *id, const char *path);
-int apps_launch_uri(const char *id, const char *uri);    /* vnc://, rdp://, http(s):// for the app that declares the scheme */
+int apps_launch_uri(const char *id, const char *uri);
+/* lord-server --launch-view: the launcher's child re-executed (apps.c): reads the restricted app's view from fd 3,
+ * builds it, applies Landlock and execs the app. Only the launcher starts it; returns only on failure (126/127). */
+int apps_launch_view_main(void);    /* vnc://, rdp://, http(s):// for the app that declares the scheme */
 #define APPS_URI_WEB_MAX 3000                                /* an http(s) address at most (the others: 300) */
 /* The app that opens files of a MIME type, as apps_launch_with(id = "") picks it: out gets its desktop
  * id ("firefox-esr.desktop", or the user's "lordos-<app>.desktop"). Order: [Default Applications] of

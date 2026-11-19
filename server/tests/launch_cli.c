@@ -17,12 +17,15 @@
 #include <stdio.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* restrict.c's other users (the broker, the permission store) aren't part of this tool */
 void brokersrv_revoke(const char *app, const char *perm) { (void)app; (void)perm; }
 PermState perm_get(const char *app_id, Perm p) { (void)app_id; (void)p; return PERM_ASK; }
 
 int main(int argc, char **argv) {
+    /* the launcher re-executes /proc/self/exe --launch-view to build a restricted app's view: here that is this tool */
+    if (argc > 1 && !strcmp(argv[1], "--launch-view")) return apps_launch_view_main();
     if (argc < 2 || argc > 3) { fprintf(stderr, "usage: launch-cli <desktop id> [file]\n"); return 2; }
     const char *home = getenv("HOME");
     char path[4096], err[200] = "";
