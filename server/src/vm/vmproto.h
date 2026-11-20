@@ -43,14 +43,19 @@
  *                   new one replaces the old. The serial log goes on as before.
  *     VM_AGENT      the guest agent (6.17; machine.json "agent"): a = VAG_SHUTDOWN (guest-shutdown), VAG_TIMESYNC
  *                   (guest-set-time from this computer's clock), VAG_INSTALL (copies lordos-guest, the clipboard helper,
- *                   into the guest through qemu-guest-agent and enables it), VAG_TRANSFER (the transfer folder, 6.7.1:
- *                   a Linux guest mounts it again; a Windows guest gets WinFsp: one descriptor, its installer, which
- *                   lord-server opened in the machines' image store, text = its SHA-256 (64 hex), checked again here and
- *                   in the guest with its signature, installed by msiexec as SYSTEM from a private folder) → VM_REPLY
+ *                   into a Linux guest through qemu-guest-agent and enables it; into a Windows guest, the LordOS guest
+ *                   tools, lordos-guest-win.exe, into %ProgramFiles%\LordOS, started at every sign-in), VAG_TRANSFER (the
+ *                   transfer folder, 6.7.1: a Linux guest mounts it again; a Windows guest gets WinFsp: one descriptor, its
+ *                   installer, which lord-server opened in the machines' image store, text = its SHA-256 (64 hex), checked
+ *                   again here and in the guest with its signature, installed by msiexec as SYSTEM from a private folder)
+ *                   → VM_REPLY
  *     VM_CLIP       the host's clipboard for the guest: one descriptor, a memfd of a bytes (at most VM_CLIP_MAX); b =
  *                   VCF_TEXT: UTF-8 text; VCF_CLIPX: text, HTML and/or a PNG in AGK_CLIPX's layout (vmagent.h), checked
  *                   and sanitized again here. Sent on only when machine.json's clipboard allows to-guest and
  *                   lordos-guest said hello (as text only to a helper without "clipx")
+ *     VM_DISPLAY_SIZE a, b = the machine window's size (320..8192 × 200..8192), sent by lord-server with each VD_RESIZE.
+ *                   lord-vm remembers it and passes it to a guest helper that sets its own display's size (AGK_DISPLAY,
+ *                   the LordOS guest tools for Windows; again after each hello); others follow QEMU's ui_info → VM_REPLY
  *     VM_FILE       a file dropped on the machine's window, for the guest: one descriptor, a regular file lord-server
  *                   opened read-only for the person (never a path); text = its name (lord-vm makes it safe for the
  *                   guest's file systems, ag_drop_name). lord-vm copies it through qemu-guest-agent, in pieces, one file
@@ -78,7 +83,7 @@
  *                   text = the machine's id. Sent once QEMU runs, so it can follow the first VM_STATEs
  *                   (starting, paused); lord-server asks for the display once it has both.
  *     VM_DISPLAY_FD seq of the VM_DISPLAY; the descriptor; a = console width, b = height if known (else 0)
- *     VM_AGENT_STATE a = VAS_* (off, waiting, connected), b = VAC_* (what works now), text = "version\tsystem" as
+ *     VM_AGENT_STATE a = VAS_* (off, waiting, connected), b = VAC_* and LAG_CAP_WINDOWS (what works now), text = "version\tsystem" as
  *                   the guest reported them (untrusted, shown as text only). Sent on each change and after VM_STATUS
  *     VM_CLIP_DATA  the guest's clipboard (machine.json allows from-guest): a sealed memfd of a bytes; b = VCF_TEXT
  *                   (UTF-8) or VCF_CLIPX (AGK_CLIPX's layout, every part already checked: UTF-8 text, sanitized HTML,
@@ -167,8 +172,8 @@
 
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
-    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE,
-    VM_REQ_LAST = VM_FILE,
+    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
+    VM_REQ_LAST = VM_DISPLAY_SIZE,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS,
 };
@@ -180,10 +185,11 @@ enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
 /* VM_AGENT a, VM_AGENT_STATE a and b */
 enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL, VAG_TRANSFER };
 enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
-/* VAC_TRANSFER: the guest has the transfer folder (6.7.1) mounted (Linux: /mnt/LordOS; Windows: VirtioFsSvc runs);
+/* 256: LAG_CAP_WINDOWS (vmagent.h), the guest's helper does apps mode.
+ * VAC_TRANSFER: the guest has the transfer folder (6.7.1) mounted (Linux: /mnt/LordOS; Windows: VirtioFsSvc runs);
  * VAC_XFER_SETUP: a Windows guest that can have it once WinFsp is installed (VAG_TRANSFER) */
-enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_TRANSFER = 128,
-       VAC_XFER_SETUP = 256 };
+enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
+       VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024 };
 #define VM_CLIP_MAX (11u << 20)
 /* VM_CLIP and VM_CLIP_DATA b: what the memfd holds */
 enum { VCF_TEXT = 0, VCF_CLIPX = 1 };
@@ -354,7 +360,8 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_TRANSFER)) &&
                       (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX))) &&
                       (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1))) &&
-                      (m->type != VM_FILE || m->text[0]);
+                      (m->type != VM_FILE || m->text[0]) &&
+                      (m->type != VM_DISPLAY_SIZE || (m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM));
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
@@ -362,7 +369,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_DISPLAY_FD: return m->a >= 0 && m->b >= 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VM_NOTICE: return m->a > VMN_NONE && m->a < VMN_COUNT;
     case VM_CONSOLE_FD: return 1;
-    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 512;
+    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 2048;
     case VM_CLIP_DATA: return m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX);
     case VM_FILE_PROGRESS: return m->a >= 0 && m->a <= 100;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;

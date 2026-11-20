@@ -333,6 +333,75 @@ static void test_schema(void) {
         CHECK(vm_transfer_path(NULL, xp, sizeof xp) < 0);
         /* a person's share can't be the transfer folder: it's inside the library */
     }
+    /* schema 6's boot order: a list of 1 to 3 different devices (disk, cd, network), and boot_menu; neither in the file is
+     * auto (the system disk, then the CD/DVD), which is how every older file reads and what a new machine writes */
+    {
+        struct { const char *add; int schema, want, n, o0, o1, o2, menu; } bo[] = {
+            { "\"boot_order\":[\"network\",\"disk\"]", 6, VM_OK, 2, VM_BOOT_NET, VM_BOOT_DISK, -1, 0 },
+            { "\"boot_order\":[\"cd\",\"disk\",\"network\"],\"boot_menu\":true", 6, VM_OK, 3, VM_BOOT_CD, VM_BOOT_DISK, VM_BOOT_NET, 1 },
+            { "\"boot_order\":[\"disk\"]", 6, VM_OK, 1, VM_BOOT_DISK, -1, -1, 0 },
+            { "\"boot_menu\":false", 6, VM_OK, 0, -1, -1, -1, 0 },
+            { "\"boot_order\":[]", 6, VM_E_RANGE, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":[\"disk\",\"disk\"]", 6, VM_E_RANGE, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":[\"disk\",\"cd\",\"network\",\"disk\"]", 6, VM_E_RANGE, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":[\"floppy\"]", 6, VM_E_RANGE, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":[1]", 6, VM_E_RANGE, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":\"auto\"", 6, VM_E_FIELD, 0, 0, 0, 0, 0 },
+            { "\"boot_menu\":\"on\"", 6, VM_E_FIELD, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":[\"network\"]", 5, VM_E_FIELD, 0, 0, 0, 0, 0 },
+            { "\"boot_menu\":true", 5, VM_E_FIELD, 0, 0, 0, 0, 0 },
+        };
+        for (size_t i = 0; i < sizeof bo / sizeof bo[0]; i++) {
+            char t[4096];
+            const char *at = strstr(GOOD, "\"schema\":1");
+            snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, bo[i].schema, (int)(strlen(at) - 10 - 1), at + 10, bo[i].add);
+            int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+            if (r != bo[i].want) fprintf(stderr, "  boot %s: got %d (%s)\n", bo[i].add, r, err);
+            CHECK(r == bo[i].want);
+            if (r != VM_OK) continue;
+            const int want[3] = { bo[i].o0, bo[i].o1, bo[i].o2 };
+            CHECK(m.n_boot == bo[i].n && m.boot_menu == bo[i].menu);
+            for (int k = 0; k < m.n_boot; k++) CHECK(m.boot_order[k] == want[k]);
+            char *jj = vm_machine_json(&m);
+            CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+            CHECK(jj && !strstr(jj, "boot_order") == !m.n_boot && !strstr(jj, "boot_menu") == !m.boot_menu);
+            free(jj);
+        }
+        /* an old file and a new machine: auto, written as nothing */
+        CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && m.n_boot == 0 && m.boot_menu == 0);
+        char *jj = vm_machine_json(&m);
+        CHECK(jj && !strstr(jj, "boot_"));
+        free(jj);
+        /* the command line's text */
+        int o[VM_BOOT_DEVS];
+        CHECK(vm_boot_parse("auto", o) == 0);
+        CHECK(vm_boot_parse("network,disk", o) == 2 && o[0] == VM_BOOT_NET && o[1] == VM_BOOT_DISK);
+        CHECK(vm_boot_parse("disk,cd,network", o) == 3 && o[0] == VM_BOOT_DISK && o[1] == VM_BOOT_CD && o[2] == VM_BOOT_NET);
+        const char *bad[] = { "", ",", "disk,", ",disk", "disk,disk", "disk,cd,network,disk", "Disk", "auto,disk", "dis", "disks", "network disk", NULL };
+        for (int k = 0; bad[k]; k++) CHECK(vm_boot_parse(bad[k], o) == -1);
+        CHECK(vm_boot_parse(NULL, o) == -1);
+        char sp[32];
+        vm_boot_spec(&m, sp, sizeof sp); CHECK(!strcmp(sp, "auto"));
+        m.n_boot = vm_boot_parse("cd,network", m.boot_order);
+        vm_boot_spec(&m, sp, sizeof sp); CHECK(!strcmp(sp, "cd,network"));
+        /* QEMU's bootindex: auto is the disk then the CD (after an installer's kernel at 0: 1 and 2); a chosen order numbers
+         * the listed devices and leaves the others out */
+        int ix[VM_BOOT_DEVS];
+        m.n_boot = 0;
+        vm_boot_indexes(&m, 0, ix); CHECK(ix[VM_BOOT_DISK] == 0 && ix[VM_BOOT_CD] == 1 && ix[VM_BOOT_NET] == -1);
+        vm_boot_indexes(&m, 1, ix); CHECK(ix[VM_BOOT_DISK] == 1 && ix[VM_BOOT_CD] == 2 && ix[VM_BOOT_NET] == -1);
+        m.n_boot = vm_boot_parse("network,disk", m.boot_order);
+        vm_boot_indexes(&m, 0, ix); CHECK(ix[VM_BOOT_NET] == 0 && ix[VM_BOOT_DISK] == 1 && ix[VM_BOOT_CD] == -1);
+        m.n_boot = vm_boot_parse("cd,network,disk", m.boot_order);
+        vm_boot_indexes(&m, 1, ix); CHECK(ix[VM_BOOT_CD] == 1 && ix[VM_BOOT_NET] == 2 && ix[VM_BOOT_DISK] == 3);
+        /* checked after a change too (lord-vm --set) */
+        m.schema = 6; m.n_boot = 2; m.boot_order[0] = VM_BOOT_CD; m.boot_order[1] = VM_BOOT_CD;
+        CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+        m.boot_order[1] = 7;
+        CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+        m.n_boot = 0; m.boot_menu = 2;
+        CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+    }
     /* which folders may be shared (vm_share_allowed): a real folder in home (not home), under /media/<user> or /mnt, nothing
      * hidden, never the library or what holds it */
     {
@@ -472,7 +541,8 @@ static void test_messages(void) {
     q = vm_msg(VM_AGENT, 7, VAG_TRANSFER + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_FILES | VAC_TRANSFER, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
-    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, 512, 0, 0, "1\tx"); CHECK(!vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_DISPLAY | (int)LAG_CAP_WINDOWS | VAC_TRANSFER | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, 2048, 0, 0, "1\tx"); CHECK(!vm_msg_valid(&q, 0));
     q.a = 101; CHECK(!vm_msg_valid(&q, 0));
     q.a = -1; CHECK(!vm_msg_valid(&q, 0));
     char longtext[400];
@@ -1017,7 +1087,137 @@ static void test_network(void) {
     }
 }
 
+/* the resolution a machine starts with (Configure → Display) */
+static void test_resolution(void) {
+    int w = 0, h = 0;
+    CHECK(!vm_resolution_parse("1920x1080", &w, &h) && w == 1920 && h == 1080);
+    CHECK(!vm_resolution_parse("640x480", &w, &h));
+    CHECK(vm_resolution_parse("1921x1080", &w, &h));          /* odd */
+    CHECK(vm_resolution_parse("639x480", &w, &h));
+    CHECK(vm_resolution_parse("7682x4320", &w, &h));
+    CHECK(vm_resolution_parse("1920X1080", &w, &h));
+    CHECK(vm_resolution_parse("1920x1080 ", &w, &h));
+    CHECK(vm_resolution_parse("x1080", &w, &h));
+    CHECK(vm_resolution_parse("123456x480", &w, &h));
+    CHECK(vm_resolution_parse("", &w, &h));
+}
+
+/* the Windows guest tools (vmagent.h): AGK_DISPLAY and apps mode, every frame parsed to its last byte */
+typedef struct { uint8_t b[4096]; size_t n; } TB;
+static void tb8(TB *t, uint8_t v) { t->b[t->n++] = v; }
+static void tb16(TB *t, uint16_t v) { tb8(t, (uint8_t)v); tb8(t, (uint8_t)(v >> 8)); }
+static void tb32(TB *t, uint32_t v) { tb16(t, (uint16_t)v); tb16(t, (uint16_t)(v >> 16)); }
+static void tbs(TB *t, const char *s) { tb16(t, (uint16_t)strlen(s)); memcpy(t->b + t->n, s, strlen(s)); t->n += strlen(s); }
+static void tbwin(TB *t, uint32_t id, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t flags, uint32_t owner, const char *title, const char *app) {
+    tb32(t, id); tb32(t, (uint32_t)x); tb32(t, (uint32_t)y); tb32(t, (uint32_t)w); tb32(t, (uint32_t)h); tb32(t, flags);
+    if (flags & LAGW_OWNED) tb32(t, owner);
+    tb32(t, 4242); tbs(t, title); tbs(t, app);
+}
+static void test_lag(void) {
+    uint8_t d[8];
+    uint32_t w = 0, h = 0;
+    ag_display_write(d, 1784, 830);
+    CHECK(!ag_display_parse(d, 8, &w, &h) && w == 1784 && h == 830);
+    CHECK(ag_display_parse(d, 7, &w, &h) == -1 && ag_display_parse(NULL, 8, &w, &h) == -1);
+    ag_display_write(d, 319, 600); CHECK(ag_display_parse(d, 8, NULL, NULL) == -1);
+    ag_display_write(d, 800, 199); CHECK(ag_display_parse(d, 8, NULL, NULL) == -1);
+    ag_display_write(d, 8193, 600); CHECK(ag_display_parse(d, 8, NULL, NULL) == -1);
+    ag_display_write(d, 0xffffffffu, 600); CHECK(ag_display_parse(d, 8, NULL, NULL) == -1);
+    ag_display_write(d, 8192, 8192); CHECK(!ag_display_parse(d, 8, NULL, NULL));
+
+    int on = -1;
+    uint8_t one = 1, two = 2;
+    CHECK(!lag_apps_parse(&one, 1, &on) && on == 1 && lag_apps_parse(&two, 1, &on) == -1 && lag_apps_parse(&one, 0, &on) == -1);
+
+    /* LAG_WINDOWS */
+    TB t = { .n = 0 };
+    tb32(&t, 7); tb16(&t, 2);
+    tbwin(&t, 0x10, 0, 0, 800, 600, LAGW_FOCUSED, 0, "Notepad \xe2\x80\x94 a.txt", "notepad.exe");
+    tbwin(&t, 0x20, -8, -8, 300, 200, LAGW_OWNED | LAGW_TOPMOST, 0x10, "", "notepad.exe");
+    LagWin ws[LAG_WIN_MAX];
+    uint32_t serial = 0;
+    CHECK(lag_windows_parse(t.b, t.n, &serial, ws, LAG_WIN_MAX) == 2 && serial == 7);
+    CHECK(ws[0].id == 0x10 && ws[0].w == 800 && ws[0].flags == LAGW_FOCUSED && ws[0].pid == 4242 && ws[0].title_n == 17 && ws[0].app_n == 11);
+    CHECK(ws[1].owner == 0x10 && ws[1].x == -8 && !ws[1].title_n);
+    CHECK(lag_windows_parse(t.b, t.n, NULL, ws, 1) == 1);                                       /* fewer kept, still checked */
+    CHECK(lag_windows_parse(t.b, t.n - 1, NULL, ws, LAG_WIN_MAX) == -1);                       /* short */
+    t.b[t.n++] = 0;
+    CHECK(lag_windows_parse(t.b, t.n, NULL, ws, LAG_WIN_MAX) == -1);                           /* a byte too many */
+    TB e = { .n = 0 }; tb32(&e, 1); tb16(&e, 0);
+    CHECK(lag_windows_parse(e.b, e.n, NULL, ws, LAG_WIN_MAX) == 0);                             /* no windows */
+    struct { uint32_t id; int32_t x, y, w, h; uint32_t f, o; const char *ti, *ap; } bad[] = {
+        { 0, 0, 0, 10, 10, 0, 0, "a", "b" },                        /* id 0 */
+        { 1, 0, 0, 0, 10, 0, 0, "a", "b" },                         /* empty */
+        { 1, 0, 0, 10, LAG_DIM_MAX + 1, 0, 0, "a", "b" },
+        { 1, -LAG_DIM_MAX - 1, 0, 10, 10, 0, 0, "a", "b" },
+        { 1, 0, 0, 10, 10, 16, 0, "a", "b" },                       /* unknown flag */
+        { 1, 0, 0, 10, 10, LAGW_OWNED, 0, "a", "b" },               /* owner 0 */
+        { 1, 0, 0, 10, 10, LAGW_OWNED, 1, "a", "b" },               /* owns itself */
+        { 1, 0, 0, 10, 10, 0, 0, "a\xff", "b" },                    /* not UTF-8 */
+        { 1, 0, 0, 10, 10, 0, 0, "a", "..\\x.exe" },                /* a path */
+        { 1, 0, 0, 10, 10, 0, 0, "a", "C:x.exe" },
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+        TB b = { .n = 0 };
+        tb32(&b, 1); tb16(&b, 1);
+        tbwin(&b, bad[i].id, bad[i].x, bad[i].y, bad[i].w, bad[i].h, bad[i].f, bad[i].o, bad[i].ti, bad[i].ap);
+        CHECK(lag_windows_parse(b.b, b.n, NULL, ws, LAG_WIN_MAX) == -1);
+    }
+    TB dup = { .n = 0 }; tb32(&dup, 1); tb16(&dup, 2);
+    tbwin(&dup, 5, 0, 0, 10, 10, 0, 0, "a", "b"); tbwin(&dup, 5, 0, 0, 10, 10, 0, 0, "a", "b");
+    CHECK(lag_windows_parse(dup.b, dup.n, NULL, ws, LAG_WIN_MAX) == -1);                     /* one window twice */
+    TB many = { .n = 0 }; tb32(&many, 1); tb16(&many, LAG_WIN_MAX + 1);
+    CHECK(lag_windows_parse(many.b, many.n, NULL, ws, LAG_WIN_MAX) == -1);
+    TB *bt = (TB *)malloc(sizeof(TB)); bt->n = 0; tb32(bt, 1); tb16(bt, 1);
+    tb32(bt, 9); tb32(bt, 0); tb32(bt, 0); tb32(bt, 10); tb32(bt, 10); tb32(bt, 0); tb32(bt, 1);
+    tb16(bt, LAG_TITLE_MAX + 1); memset(bt->b + bt->n, 'a', LAG_TITLE_MAX + 1); bt->n += LAG_TITLE_MAX + 1; tbs(bt, "x");
+    CHECK(lag_windows_parse(bt->b, bt->n, NULL, ws, LAG_WIN_MAX) == -1);                     /* title too long */
+    free(bt);
+    TB lie = { .n = 0 }; tb32(&lie, 1); tb16(&lie, 1);
+    tb32(&lie, 9); tb32(&lie, 0); tb32(&lie, 0); tb32(&lie, 10); tb32(&lie, 10); tb32(&lie, 0); tb32(&lie, 1); tb16(&lie, 400); tbs(&lie, "x");
+    CHECK(lag_windows_parse(lie.b, lie.n, NULL, ws, LAG_WIN_MAX) == -1);                     /* a length past the end */
+
+    /* LAG_WINICON */
+    TB ic = { .n = 0 }; tb32(&ic, 0x10); tb16(&ic, 2); tb16(&ic, 2); for (int i = 0; i < 16; i++) tb8(&ic, (uint8_t)i);
+    uint32_t iid = 0; uint16_t iw = 0, ih = 0; const uint8_t *px = NULL;
+    CHECK(!lag_winicon_parse(ic.b, ic.n, &iid, &iw, &ih, &px) && iid == 0x10 && iw == 2 && ih == 2 && px == ic.b + 8);
+    CHECK(lag_winicon_parse(ic.b, ic.n - 1, &iid, &iw, &ih, &px) == -1);
+    ic.b[4] = LAG_ICON_MAX + 1; CHECK(lag_winicon_parse(ic.b, ic.n, &iid, &iw, &ih, &px) == -1);
+    ic.b[4] = 0; CHECK(lag_winicon_parse(ic.b, ic.n, &iid, &iw, &ih, &px) == -1);
+
+    /* LAG_WINACT */
+    LagAct a;
+    TB ac = { .n = 0 }; tb32(&ac, 0x10); tb8(&ac, LAGA_CLOSE);
+    CHECK(!lag_winact_parse(ac.b, ac.n, &a) && a.id == 0x10 && a.action == LAGA_CLOSE);
+    tb8(&ac, 0); CHECK(lag_winact_parse(ac.b, ac.n, &a) == -1);
+    ac.n = 4; tb8(&ac, 6); CHECK(lag_winact_parse(ac.b, ac.n, &a) == -1);
+    ac.n = 4; tb8(&ac, 0); CHECK(lag_winact_parse(ac.b, ac.n, &a) == -1);
+    TB mv = { .n = 0 }; tb32(&mv, 0x10); tb8(&mv, LAGA_MOVE); tb32(&mv, (uint32_t)-5); tb32(&mv, 10); tb32(&mv, 640); tb32(&mv, 480);
+    CHECK(!lag_winact_parse(mv.b, mv.n, &a) && a.x == -5 && a.w == 640 && a.h == 480);
+    CHECK(lag_winact_parse(mv.b, 5, &a) == -1 && lag_winact_parse(mv.b, mv.n - 1, &a) == -1);
+    mv.n = 17; tb32(&mv, 0); CHECK(lag_winact_parse(mv.b, mv.n, &a) == -1);                  /* height 0 */
+    TB z = { .n = 0 }; tb32(&z, 0); tb8(&z, LAGA_FOCUS); CHECK(lag_winact_parse(z.b, z.n, &a) == -1);
+
+    /* LAG_APPLIST, LAG_LAUNCH */
+    TB al = { .n = 0 }; tb16(&al, 2);
+    tbs(&al, "Notepad"); tbs(&al, "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Notepad.lnk");
+    tbs(&al, "Paint"); tbs(&al, "C:\\Users\\a\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Paint.lnk");
+    LagApp ap[4];
+    CHECK(lag_applist_parse(al.b, al.n, ap, 4) == 2 && ap[1].name_n == 5 && !memcmp(ap[1].name, "Paint", 5));
+    CHECK(lag_applist_parse(al.b, al.n - 1, ap, 4) == -1);
+    TB ae = { .n = 0 }; tb16(&ae, 1); tbs(&ae, ""); tbs(&ae, "x"); CHECK(lag_applist_parse(ae.b, ae.n, ap, 4) == -1);    /* no name */
+    TB am = { .n = 0 }; tb16(&am, LAG_APPS_MAX + 1); CHECK(lag_applist_parse(am.b, am.n, ap, 4) == -1);
+    const uint8_t *tok = NULL; uint16_t tn = 0;
+    TB la = { .n = 0 }; tbs(&la, "C:\\x.lnk");
+    CHECK(!lag_launch_parse(la.b, la.n, &tok, &tn) && tn == 8 && !memcmp(tok, "C:\\x.lnk", 8));
+    CHECK(lag_launch_parse(la.b, la.n - 1, &tok, &tn) == -1);
+    TB l0 = { .n = 0 }; tbs(&l0, ""); CHECK(lag_launch_parse(l0.b, l0.n, &tok, &tn) == -1);
+    TB lb = { .n = 0 }; tbs(&lb, "\xc3"); CHECK(lag_launch_parse(lb.b, lb.n, &tok, &tn) == -1);
+}
+
 int main(void) {
+    test_resolution();
+    test_lag();
     test_clipx();
     test_log_clean();
     test_images();

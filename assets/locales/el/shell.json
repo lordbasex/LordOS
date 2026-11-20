@@ -468,6 +468,8 @@
   "ws.spine.activities": "Δραστηριότητες",
   "ws.spine.apps": "Εφαρμογές",
   "ws.spine.files": "Αρχεία",
+  "ws.spine.store": "Κατάστημα",
+  "ws.spine.monitor": "Παρακολούθηση",
   "ws.spine.control": "Χειριστήρια",
   "ws.spine.collapse": "Σύμπτυξη στήλης",
   "ws.spine.expand": "Ανάπτυξη στήλης",

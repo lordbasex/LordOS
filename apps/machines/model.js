@@ -339,18 +339,22 @@ export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math
 // lord-vm's capability bits (vmproto.h VAC_*) → the popover's list: what works now, and what doesn't and why
 // transfer: the guest has the transfer folder (6.7.1) mounted; transferSetup: a Windows guest that gets it once WinFsp is
 // installed (Set Up the Transfer Folder)
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, transfer: 128, transferSetup: 256 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024 };
+// a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
+// (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
+export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
 export function agentLines(agent, cfg) {
   const caps = agent?.caps || 0, on = agent?.state === 'connected';
   const clip = cfg?.clipboard || 'off';
+  const win = guestWindows(agent);
   return [
     ['shell', 'works'],                                       // the serial console needs no agent
     ['logs', on && caps & AGENT_CAPS.journal ? 'works' : 'needsAgent'],
     ['shutdown', on && caps & AGENT_CAPS.shutdown ? 'works' : 'acpi'],
     ['time', on && caps & AGENT_CAPS.time ? 'works' : 'needsAgent'],
     ['awake', on && caps & AGENT_CAPS.awake ? 'works' : 'needsAgent'],
-    ['clipboard', clip === 'off' ? 'off' : caps & AGENT_CAPS.clipboard ? 'works' : 'needsHelper'],
-    ['resolution', 'works'],
+    ['clipboard', clip === 'off' ? 'off' : caps & AGENT_CAPS.clipboard ? 'works' : win ? 'needsTools' : 'needsHelper'],
+    ['resolution', !win || caps & AGENT_CAPS.display ? 'works' : 'needsTools'],
     ['folders', cfg?.shares?.length || (cfg?.transfer && caps & AGENT_CAPS.transfer) ? 'works' : 'none'], ['apps', 'later'],
   ];
 }
@@ -639,4 +643,26 @@ export function netSummary(m) {
   const n = NET_MODES.includes(m?.network) ? m.network : 'shared';
   return { mode: n, card: n === 'bridged' ? m.bridge || '' : '', ports: usesPorts(n) ? (m.ports || []).length : 0,
     lan: usesPorts(n) && n !== 'hostonly' && (m.ports || []).some((r) => r.open === 'lan') };
+}
+
+// Where a machine starts from (Configure → Boot; machine.json's boot_order): "auto" (the system disk, then the CD/DVD
+// drive) or the devices the firmware tries, in order, as lord-vm takes them ("network,disk").
+export const BOOT_DEVS = ['disk', 'cd', 'network'];
+// the order as the list Configure moves rows in: the chosen ones first, then the others (auto: the disk, the CD/DVD, the network)
+export function bootList(order) {
+  const got = typeof order === 'string' && order !== 'auto' ? order.split(',').filter((d, i, a) => BOOT_DEVS.includes(d) && a.indexOf(d) === i) : [];
+  return [...got, ...BOOT_DEVS.filter((d) => !got.includes(d))];
+}
+// a row moved up (by -1) or down (by +1); out of range leaves the list as it was
+export function bootMove(list, i, by) {
+  const j = i + by;
+  if (i < 0 || j < 0 || i >= list.length || j >= list.length) return list;
+  const out = list.slice();
+  [out[i], out[j]] = [out[j], out[i]];
+  return out;
+}
+// the summary's words: null for auto, else the first device's key
+export function bootSummary(order) {
+  if (typeof order !== 'string' || order === 'auto' || !order) return null;
+  return `machines.cfg.bootFirst.${bootList(order)[0]}`;
 }

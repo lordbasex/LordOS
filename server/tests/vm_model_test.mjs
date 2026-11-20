@@ -188,6 +188,9 @@ eq('storage bar no total', storageBar({}), []);
 eq('agent off lines', agentLines(null, {}).find((l) => l[0] === 'clipboard')[1], 'off');
 eq('agent connected', agentLines({ state: 'connected', caps: 1 | 2 | 16 | 32 }, { clipboard: 'both' }).filter((l) => l[1] === 'works').map((l) => l[0]), ['shell', 'logs', 'shutdown', 'time', 'clipboard', 'resolution']);
 eq('agent helper missing', agentLines({ state: 'connected', caps: 1 }, { clipboard: 'to-guest' }).find((l) => l[0] === 'clipboard')[1], 'needsHelper');
+eq('windows guest without the tools', agentLines({ state: 'connected', caps: 1 | 4 | 8, system: 'Windows 11 Pro' }, { clipboard: 'both' }).filter((l) => ['clipboard', 'resolution'].includes(l[0])).map((l) => l[1]), ['needsTools', 'needsTools']);
+eq('windows guest with the tools', agentLines({ state: 'connected', caps: 1 | 4 | 8 | 32 | 128 | 256, system: 'Windows 11 Pro' }, { clipboard: 'both' }).filter((l) => ['clipboard', 'resolution'].includes(l[0])).map((l) => l[1]), ['works', 'works']);
+eq('linux guest resolution', agentLines({ state: 'connected', caps: 1, system: 'Ubuntu 26.04' }, {}).find((l) => l[0] === 'resolution')[1], 'works');
 eq('agent tone', [agentTone(null, false), agentTone({ state: 'waiting' }, true), agentTone({ state: 'connected' }, true)], ['off', 'pause', 'run']);
 eq('clip ways', [clipTo('both'), clipTo('from-guest'), clipFrom('from-guest'), clipFrom('off')], [true, false, true, false]);
 
@@ -327,7 +330,7 @@ eq('guest folder', [M.guestFolder('/home/ana/Descargas/x (2).txt'), M.guestFolde
 eq('follow stuck', [M.followStuck([1920, 1080], [1784, 830], 0, 5000), M.followStuck([1920, 1080], [1784, 830], 0, 3000), M.followStuck([1920, 1080], [1918, 1080], 0, 9000), M.followStuck(null, [1, 1], 0, 9000)], [true, false, false, false]);
 eq('copy line through the transfer folder', M.copyLine([{ id: 2, name: 'iso', state: 'copying', pct: 40, size: 10, via: 'transfer' }]).fast, true);
 // the transfer folder (6.7.1): what the window says of it, how a drop goes, WinFsp in the catalog
-const T = 128, S = 256;
+const T = 512, S = 1024;
 const runT = (caps, extra = {}) => ({ state: 'running', agent: { state: 'connected', caps, ...extra } });
 eq('transfer: off', M.transferState({ transfer: false }, runT(T)), 'off');
 eq('transfer: no row', M.transferState(null, runT(T)), 'off');
@@ -348,6 +351,14 @@ eq('auto setup', [M.autoTransferSetup({ transferSetup: true }, 'setup'), M.autoT
   eq('winfsp pinned', w && { id: w.id, name: w.name, size: w.size, sha: w.sha.length }, { id: 'winfsp', name: 'winfsp-2.1.25156.msi', size: 2191360, sha: 64 });
   eq('winfsp arm64: none yet', M.winfspFor(cat, 'arm64'), null);
 }
+
+// the boot order (Configure → Boot)
+eq('boot list auto', M.bootList('auto'), ['disk', 'cd', 'network']);
+eq('boot list chosen', M.bootList('network,disk'), ['network', 'disk', 'cd']);
+eq('boot list junk', [M.bootList(undefined), M.bootList('floppy,cd,cd')], [['disk', 'cd', 'network'], ['cd', 'disk', 'network']]);
+eq('boot move', [M.bootMove(['disk', 'cd', 'network'], 2, -1), M.bootMove(['disk', 'cd', 'network'], 0, 1), M.bootMove(['disk', 'cd', 'network'], 0, -1), M.bootMove(['disk', 'cd', 'network'], 2, 1)],
+  [['disk', 'network', 'cd'], ['cd', 'disk', 'network'], ['disk', 'cd', 'network'], ['disk', 'cd', 'network']]);
+eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSummary('network,disk'), M.bootSummary('cd')], [null, null, 'machines.cfg.bootFirst.network', 'machines.cfg.bootFirst.cd']);
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

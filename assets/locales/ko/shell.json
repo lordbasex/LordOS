@@ -461,6 +461,8 @@
   "ws.spine.activities": "활동",
   "ws.spine.apps": "앱",
   "ws.spine.files": "파일",
+  "ws.spine.store": "스토어",
+  "ws.spine.monitor": "모니터",
   "ws.spine.control": "제어",
   "ws.spine.collapse": "막대 접기",
   "ws.spine.expand": "막대 펼치기",

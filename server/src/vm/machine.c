@@ -193,6 +193,22 @@ int vm_base_valid(const char *s) {
 static const char *const PROTOS[] = { "tcp", "udp", NULL };
 static const char *const OPENS[] = { "this-computer", "lan", NULL };
 
+int vm_resolution_ok(int w, int h) {
+    return w >= 640 && h >= 480 && w <= 7680 && h <= 4320 && !(w & 1) && !(h & 1);
+}
+
+int vm_resolution_parse(const char *s, int *w, int *h) {
+    int a = 0, b = 0, k = 0;
+    const char *p = s;
+    for (; *p >= '0' && *p <= '9' && k < 5; p++, k++) a = a * 10 + (*p - '0');
+    if (!k || *p != 'x') return -1;
+    p++; k = 0;
+    for (; *p >= '0' && *p <= '9' && k < 5; p++, k++) b = b * 10 + (*p - '0');
+    if (!k || *p || !vm_resolution_ok(a, b)) return -1;
+    *w = a; *h = b;
+    return 0;
+}
+
 int vm_ifname_valid(const char *s) {
     size_t n = s ? strlen(s) : 0;
     if (n < 1 || n > VM_IFNAME_MAX || !strcmp(s, ".") || !strcmp(s, "..")) return 0;
@@ -326,12 +342,19 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if ((m->secure_boot || m->tpm || m->hyperv) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "secure boot, TPM and Hyper-V are for amd64 machines for now");
     if (m->secure_boot && m->firmware != VM_FW_UEFI) return fail(err, n, VM_E_RANGE, "secure boot needs UEFI");
     if (m->graphics != VM_GFX_2D && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "graphics");
+    if ((m->res_w || m->res_h) && !vm_resolution_ok(m->res_w, m->res_h)) return fail(err, n, VM_E_RANGE, "resolution must be 640x480 to 7680x4320, even numbers");
     if (m->schema < 5 && m->graphics) return fail(err, n, VM_E_FIELD, "graphics needs schema 5");
     if (m->graphics == VM_GFX_3D && m->devices == VM_DEV_WINDOWS) return fail(err, n, VM_E_RANGE, "3D graphics are for Linux machines (the windows devices stay 2D)");
     if (m->graphics == VM_GFX_3D && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "3D graphics are for amd64 machines for now");
     if ((m->sound | m->microphone) & ~1) return fail(err, n, VM_E_RANGE, "sound and microphone are true or false");
     if (m->volume < 0 || m->volume > 100) return fail(err, n, VM_E_RANGE, "volume must be 0 to 100");
     if (m->schema < 6 && (!m->sound || m->volume != 100 || m->microphone)) return fail(err, n, VM_E_FIELD, "sound, volume and microphone need schema 6");
+    if (m->n_boot < 0 || m->n_boot > VM_BOOT_DEVS || (m->boot_menu & ~1)) return fail(err, n, VM_E_RANGE, "boot_order: at most %d devices; boot_menu is true or false", VM_BOOT_DEVS);
+    for (int i = 0; i < m->n_boot; i++) {
+        if (m->boot_order[i] < 0 || m->boot_order[i] >= VM_BOOT_DEVS) return fail(err, n, VM_E_RANGE, "boot_order: disk, cd or network");
+        for (int k = 0; k < i; k++) if (m->boot_order[i] == m->boot_order[k]) return fail(err, n, VM_E_RANGE, "boot_order: the same device twice");
+    }
+    if (m->schema < 6 && (m->n_boot || m->boot_menu)) return fail(err, n, VM_E_FIELD, "boot_order and boot_menu need schema 6");
     if (m->transfer & ~1) return fail(err, n, VM_E_RANGE, "transfer is true or false");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
     for (int i = 0; m->transfer && i < m->n_shares; i++)
@@ -373,7 +396,8 @@ static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
-    "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "transfer", NULL,
+    "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
+    "boot_order", "boot_menu", "transfer", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -412,6 +436,39 @@ const char *const VM_NET_NAMES[] = { "shared", "isolated", "bridged", "hostonly"
 static const char *const CLIPS[] = { "off", "to-guest", "from-guest", "both", NULL };
 static const char *const DEVS[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_DEV_NAMES[] = { "virtio", "compat", "windows", NULL };
+const char *const VM_BOOT_NAMES[] = { "disk", "cd", "network", NULL };
+
+int vm_boot_parse(const char *s, int order[VM_BOOT_DEVS]) {
+    if (!s) return -1;
+    if (!strcmp(s, "auto")) return 0;
+    int n = 0;
+    for (const char *p = s;;) {
+        const char *e = strchr(p, ',');
+        size_t len = e ? (size_t)(e - p) : strlen(p);
+        int d = -1;
+        for (int i = 0; VM_BOOT_NAMES[i]; i++) if (strlen(VM_BOOT_NAMES[i]) == len && !strncmp(p, VM_BOOT_NAMES[i], len)) d = i;
+        if (d < 0 || n >= VM_BOOT_DEVS) return -1;
+        for (int k = 0; k < n; k++) if (order[k] == d) return -1;
+        order[n++] = d;
+        if (!e) break;
+        p = e + 1;
+    }
+    return n;
+}
+
+void vm_boot_spec(const VmMachine *m, char *out, size_t n) {
+    if (!n) return;
+    snprintf(out, n, "%s", m->n_boot ? "" : "auto");
+    for (int i = 0; i < m->n_boot && m->boot_order[i] >= 0 && m->boot_order[i] < VM_BOOT_DEVS; i++)
+        snprintf(out + strlen(out), n - strlen(out), "%s%s", i ? "," : "", VM_BOOT_NAMES[m->boot_order[i]]);
+}
+
+void vm_boot_indexes(const VmMachine *m, int first, int idx[VM_BOOT_DEVS]) {
+    for (int i = 0; i < VM_BOOT_DEVS; i++) idx[i] = -1;
+    if (!m->n_boot) { idx[VM_BOOT_DISK] = first; idx[VM_BOOT_CD] = first + 1; return; }
+    for (int i = 0; i < m->n_boot && i < VM_BOOT_DEVS; i++)
+        if (m->boot_order[i] >= 0 && m->boot_order[i] < VM_BOOT_DEVS) idx[m->boot_order[i]] = first + i;
+}
 static const char *const RTCS[] = { "utc", "local", NULL };
 static const char *const SMB_KEYS[] = { "manufacturer", "product", "version", "serial", "sku", "family", NULL };
 
@@ -486,6 +543,19 @@ static int parse4(const JVal *o, VmMachine *m, char *err, size_t n) {
 static int parse6(const JVal *o, VmMachine *m, char *err, size_t n) {
     int r;
     if ((r = get_str(o, "bridge", m->bridge, sizeof m->bridge, 0, err, n))) return r;
+    const JVal *bo = json_get(o, "boot_order"), *bm = json_get(o, "boot_menu");
+    if (bo) {
+        if (bo->type != J_ARR) return fail(err, n, VM_E_FIELD, "boot_order must be a list");
+        if (!bo->len || bo->len > VM_BOOT_DEVS) return fail(err, n, VM_E_RANGE, "boot_order: 1 to %d devices", VM_BOOT_DEVS);
+        for (const JVal *e = bo->kid; e; e = e->next) {
+            int d = -1;
+            if (e->type == J_STR) for (int i = 0; VM_BOOT_NAMES[i]; i++) if (!strcmp(e->str, VM_BOOT_NAMES[i])) d = i;
+            if (d < 0) return fail(err, n, VM_E_RANGE, "boot_order: disk, cd or network");
+            m->boot_order[m->n_boot++] = d;
+        }
+    }
+    if (bm && bm->type != J_BOOL) return fail(err, n, VM_E_FIELD, "boot_menu must be true or false");
+    m->boot_menu = bm ? json_bool(o, "boot_menu", 0) : 0;
     const JVal *x = json_get(o, "ports");
     if (!x) return VM_OK;
     if (x->type != J_ARR) return fail(err, n, VM_E_FIELD, "ports must be a list");
@@ -553,6 +623,12 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         if (json_get(o, "graphics") && (r = get_enum(o, "graphics", GFX, &m->graphics, err, n))) goto out;
     }
     if ((r = parse6(o, m, err, n))) goto out;
+    {
+        /* schema 6: the display the guest starts with ("WxH"); missing: it follows the window */
+        const JVal *rv = json_get(o, "resolution");
+        m->res_w = m->res_h = 0;
+        if (rv && (rv->type != J_STR || vm_resolution_parse(rv->str, &m->res_w, &m->res_h))) { r = fail(err, n, VM_E_FIELD, "resolution must be \"WxH\""); goto out; }
+    }
     {
         /* schema 6's keys: missing means sound on at full volume, microphone off */
         const JVal *so = json_get(o, "sound"), *mi = json_get(o, "microphone");
@@ -636,6 +712,7 @@ char *vm_machine_json(const VmMachine *m) {
         if (m->hyperv) jb_raw(&b, ",\n  \"hyperv\": true");
         if (m->drivers[0]) { jb_raw(&b, ",\n  \"drivers\": "); jb_str(&b, m->drivers); }
         if (m->graphics == VM_GFX_3D) jb_raw(&b, ",\n  \"graphics\": \"3d\"");
+        if (m->res_w && m->res_h) { char rs[48]; snprintf(rs, sizeof rs, ",\n  \"resolution\": \"%dx%d\"", m->res_w, m->res_h); jb_raw(&b, rs); }
     }
     if (m->schema >= 6) {
         if (m->bridge[0]) { jb_raw(&b, ",\n  \"bridge\": "); jb_str(&b, m->bridge); }
@@ -646,6 +723,12 @@ char *vm_machine_json(const VmMachine *m) {
             jb_raw(&b, "]");
         }
     }
+    if (m->schema >= 6 && m->n_boot) {
+        jb_raw(&b, ",\n  \"boot_order\": [");
+        for (int i = 0; i < m->n_boot; i++) jb_printf(&b, "%s\"%s\"", i ? ", " : "", VM_BOOT_NAMES[m->boot_order[i]]);
+        jb_raw(&b, "]");
+    }
+    if (m->schema >= 6 && m->boot_menu) jb_raw(&b, ",\n  \"boot_menu\": true");
     if (m->schema >= 6) jb_printf(&b, ",\n  \"sound\": %s,\n  \"volume\": %d,\n  \"microphone\": %s", m->sound ? "true" : "false", m->volume, m->microphone ? "true" : "false");
     if (m->schema >= 7) jb_printf(&b, ",\n  \"transfer\": %s", m->transfer ? "true" : "false");
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);

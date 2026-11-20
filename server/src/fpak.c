@@ -170,6 +170,9 @@ static int build_argv(const FpakRun *r, const FpakSpawn *sp, char **argv, int ma
     ARG("run");
     ARG("--arch=%s", r->arch);
     ARG("--branch=%s", r->branch);
+    /* no document portal: LordOS's view of the app has no /run/user/<uid>/doc, and when something on the desktop started
+     * xdg-document-portal, flatpak asked bubblewrap for it and the app never started (2026-11-20) */
+    ARG("--no-documents-portal");
     if (sp) {
         /* what the app asked for its new instance (flatpak-portal's mapping); everything after this can only take away */
         uint32_t f = sp->flags, sf = sp->sandbox_flags;

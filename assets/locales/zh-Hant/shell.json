@@ -461,6 +461,8 @@
   "ws.spine.activities": "活動",
   "ws.spine.apps": "App",
   "ws.spine.files": "檔案",
+  "ws.spine.store": "商店",
+  "ws.spine.monitor": "監視器",
   "ws.spine.control": "控制",
   "ws.spine.collapse": "收合側欄",
   "ws.spine.expand": "展開側欄",

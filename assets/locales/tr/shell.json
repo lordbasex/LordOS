@@ -468,6 +468,8 @@
   "ws.spine.activities": "Etkinlikler",
   "ws.spine.apps": "Uygulamalar",
   "ws.spine.files": "Dosyalar",
+  "ws.spine.store": "Mağaza",
+  "ws.spine.monitor": "Monitör",
   "ws.spine.control": "Denetimler",
   "ws.spine.collapse": "Şeridi daralt",
   "ws.spine.expand": "Şeridi genişlet",

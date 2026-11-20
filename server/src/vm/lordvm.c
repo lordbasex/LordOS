@@ -939,6 +939,18 @@ static struct {
     pid_t fx_cpid;
     char fx_stage[40];
     long long fx_t0;
+    /* LordOS guest tools for Windows (VAG_INSTALL on a Windows guest, tools/guest-win): the program, read at the start,
+     * and the install's steps (see wi_begin) */
+    uint8_t *wtools;
+    size_t wtools_n, wi_off;
+    int wi_step, wi_client, wi_auto;
+    uint32_t wi_seq;
+    long wi_handle, wi_pid;
+    long long wi_poll_at, wi_deadline;
+    char wi_tmp[256];
+    /* the guest's display (AGK_DISPLAY): the size the window wants last, sent to a helper with "display" */
+    int lag_display, lag_windows;
+    uint32_t disp_w, disp_h;
 } S;
 
 /* what the guest said of the transfer folder */
@@ -1638,6 +1650,8 @@ static void build_qemu_args(void) {
         if (any) { arg("-smbios"); arg(t1); }
     }
     if (m->rtc == VM_RTC_LOCAL) { arg("-rtc"); arg("base=localtime"); }
+    /* the firmware's boot menu: SeaBIOS and OVMF wait 5 s at each start for Esc (fw_cfg's etc/boot-menu-wait) */
+    if (m->boot_menu) { arg("-boot"); arg("menu=on,splash-time=5000"); }
     if (uefi) {
         arg("-blockdev"); argj(blockdev_file("fw-code-file", m->firmware_code, 1));
         arg("-blockdev"); argj(blockdev_fmt("raw", "fw-code", "fw-code-file", 1));
@@ -1669,36 +1683,43 @@ static void build_qemu_args(void) {
      * network cards at 0x18 (q35 keeps 0x1f for its own controllers). Serials are letters, digits and "-_." only. */
     char ser[VM_SERIAL_MAX + 16];
     snprintf(ser, sizeof ser, "%s%s", m->disk_serial[0] ? ",serial=" : "", m->disk_serial);
-    /* an unattended install's first start: QEMU gives the installer's kernel (-kernel) boot index 0 */
-    const char *bi_sys = S.unattended ? "1" : "0", *bi_cd = S.unattended ? "2" : "1";
+    /* where the firmware starts from (machine.json's boot_order, vm_boot_indexes): each device's ",bootindex=N", or
+     * nothing for one not listed. An unattended install's first start: QEMU gives the installer's kernel (-kernel)
+     * boot index 0, the rest follow it */
+    int bidx[VM_BOOT_DEVS];
+    vm_boot_indexes(m, S.unattended ? 1 : 0, bidx);
+    char bi_sys[24] = "", bi_cd[24] = "", bi_net[24] = "";
+    if (bidx[VM_BOOT_DISK] >= 0) snprintf(bi_sys, sizeof bi_sys, ",bootindex=%d", bidx[VM_BOOT_DISK]);
+    if (bidx[VM_BOOT_CD] >= 0) snprintf(bi_cd, sizeof bi_cd, ",bootindex=%d", bidx[VM_BOOT_CD]);
+    if (bidx[VM_BOOT_NET] >= 0) snprintf(bi_net, sizeof bi_net, ",bootindex=%d", bidx[VM_BOOT_NET]);
     if (m->devices == VM_DEV_COMPAT) {
         /* devices every system has a driver for (6.22): SATA (AHCI) disks and CD/DVD; q35 has its AHCI built in (ide.0
          * to ide.5), arm64's virt gets one in the system disk's slot */
         const char *bus = arm ? "ahci" : "ide";
         if (arm) { arg("-device"); arg("ich9-ahci,id=ahci,addr=0x1"); }
-        arg("-device"); argf("ide-hd,id=sysdisk,drive=sys,bus=%s.0,bootindex=%s%s", bus, bi_sys, ser);
+        arg("-device"); argf("ide-hd,id=sysdisk,drive=sys,bus=%s.0%s%s", bus, bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
             arg("-device"); argf("ide-hd,id=datadisk%d,drive=data%d,bus=%s.%d%s%s", i + 1, i + 1, bus, i + 1, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
         }
         if (m->iso[0]) {
             arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
             arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
-            arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,drive=cd,bootindex=%s", bus, bi_cd);
+            arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,drive=cd%s", bus, bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
-        } else { arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,bootindex=%s", bus, bi_cd); S.cd_node[0] = 0; }
+        } else { arg("-device"); argf("ide-cd,id=cd0,bus=%s.5%s", bus, bi_cd); S.cd_node[0] = 0; }
     } else if (m->devices == VM_DEV_WINDOWS) {
         /* Windows (4.3): virtio disks (Setup loads viostor from the drivers), the CD/DVD drives on q35's own SATA (ide.4
          * the drivers' disc, ide.5 the installer's), which Setup reads with the drivers it has */
-        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=%s,addr=0x1%s", bi_sys, ser);
+        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys%s,addr=0x1%s", bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
             arg("-device"); argf("virtio-blk-pci,id=datadisk%d,drive=data%d,addr=0x%x%s%s", i + 1, i + 1, 0x10 + i, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
         }
         if (m->iso[0]) {
             arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
             arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
-            arg("-device"); argf("ide-cd,id=cd0,bus=ide.5,drive=cd,bootindex=%s", bi_cd);
+            arg("-device"); argf("ide-cd,id=cd0,bus=ide.5,drive=cd%s", bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
-        } else { arg("-device"); argf("ide-cd,id=cd0,bus=ide.5,bootindex=%s", bi_cd); S.cd_node[0] = 0; }
+        } else { arg("-device"); argf("ide-cd,id=cd0,bus=ide.5%s", bi_cd); S.cd_node[0] = 0; }
         /* xHCI for the USB tablet and the seed disk, before either */
         arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5");
         if (m->drivers[0]) {
@@ -1707,7 +1728,7 @@ static void build_qemu_args(void) {
             arg("-device"); arg("ide-cd,id=cd1,bus=ide.4,drive=drv");
         }
     } else {
-        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=%s,addr=0x1%s", bi_sys, ser);
+        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys%s,addr=0x1%s", bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
             arg("-device"); argf("virtio-blk-pci,id=datadisk%d,drive=data%d,addr=0x%x%s%s", i + 1, i + 1, 0x10 + i, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
         }
@@ -1717,9 +1738,9 @@ static void build_qemu_args(void) {
         if (m->iso[0]) {
             arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
             arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
-            arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0,drive=cd,bootindex=%s", bi_cd);
+            arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0,drive=cd%s", bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
-        } else { arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0,bootindex=%s", bi_cd); S.cd_node[0] = 0; }
+        } else { arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0%s", bi_cd); S.cd_node[0] = 0; }
     }
     if (S.win_seed) {
         /* Windows' seed disk (vmunattend.h): a removable USB stick, where Setup looks for Autounattend.xml and $WinPEDriver$ */
@@ -1747,7 +1768,7 @@ static void build_qemu_args(void) {
     if (m->network == VM_NET_BRIDGED) {
         /* the macvtap's device, opened by lord-vm (6.5): the card straight on it; no vhost (QEMU opens no device) */
         arg("-netdev"); arg("tap,id=nic0,fd=6,vhost=off");
-        arg("-device"); argf("%s,netdev=nic0,mac=%s,addr=0x2", NICDEV[m->nic_model], m->mac);
+        arg("-device"); argf("%s,netdev=nic0,mac=%s,addr=0x2%s", NICDEV[m->nic_model], m->mac, bi_net);
     }
     if (m->network == VM_NET_SHARED || m->network == VM_NET_HOSTONLY) {
         /* The card sits on a hub, and passt on another port of it: when passt ends, a new one is put on a new port
@@ -1756,7 +1777,7 @@ static void build_qemu_args(void) {
         arg("-netdev"); arg("hubport,id=nic0,hubid=0");
         arg("-netdev"); arg("stream,id=pst0,addr.type=fd,addr.str=6");
         arg("-netdev"); arg("hubport,id=hp0,hubid=0,netdev=pst0");
-        arg("-device"); argf("%s,netdev=nic0,mac=%s,addr=0x2", NICDEV[m->nic_model], m->mac);
+        arg("-device"); argf("%s,netdev=nic0,mac=%s,addr=0x2%s", NICDEV[m->nic_model], m->mac, bi_net);
     }
     /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces; not connected */
     for (int i = 0; i < m->n_extra_macs; i++) { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
@@ -1764,7 +1785,14 @@ static void build_qemu_args(void) {
     /* amd64 with -nodefaults needs a display device or its kernel never starts (3.3); arm64's virt has no keyboard */
     /* 3D (decide_graphics): the same slot with virgl, and the D-Bus display shares its pictures as dmabufs (gl=on) made on
      * the render node QEMU's sandbox may open */
-    if (!arm) { arg("-device"); arg(S.gl ? "virtio-vga-gl,id=video0,addr=0x4" : "virtio-vga,id=video0,addr=0x4"); }
+    if (!arm) {
+        /* a chosen resolution is the EDID's preferred mode: what every driver starts with (some, the windows guests'
+         * among them, never take another size from the window while they run) */
+        static char vga[96];
+        snprintf(vga, sizeof vga, "%s,id=video0,addr=0x4", S.gl ? "virtio-vga-gl" : "virtio-vga");
+        if (m->res_w && m->res_h) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",xres=%d,yres=%d", m->res_w, m->res_h);
+        arg("-device"); arg(vga);
+    }
     char dbus_disp[96];
     if (S.gl) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=%s,audiodev=snd0", S.render);
     else snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,audiodev=snd0");
@@ -2689,8 +2717,11 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * (journalctl through guest-exec every 5 s, into log/journal.log), shuts the guest down when ACPI didn't, and pings it
  * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
+/* what org.lordos.agent's helper brings (kept when qemu-guest-agent comes and goes) */
+#define VAC_LAG (VAC_CLIPBOARD | VAC_DISPLAY | (int)LAG_CAP_WINDOWS)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
-       AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW, AQ_XEXEC, AQ_XSTATUS };
+       AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
+       AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS };
 
 /* A Clone's first start (6.3): one fixed script, run as root by qemu-guest-agent, with the new hostname as its only
  * argument (checked: one DNS label). The machine-id is made again by systemd from the clone's new SMBIOS UUID (the old
@@ -2814,6 +2845,7 @@ static void windows_install_done(void) {
     }
     S.win_seed = 0;
     vlog("unattended: Windows is installed (its guest agent answered): the seed disk is wiped and removed, the discs leave at the next start");
+    S.wi_auto = 1;                      /* the LordOS guest tools go in once the guest agent said what it can do */
 }
 
 static void ag_set(int state) {
@@ -2833,9 +2865,11 @@ static int qga_do(const char *cmd, const char *args, int kind) {
 }
 
 static void fx_fail_all(const char *why);
+static void wi_lost(const char *why);
 static void qga_sync(void) {
     char a[64];
     fx_fail_all("the guest agent started again");
+    wi_lost("the guest agent started again");
     S.agq_n = 0;                        /* nothing sent before is waited for any more */
     S.xfer_pid = 0; S.xfer_poll_at = 0;
     snprintf(a, sizeof a, "{\"id\":%ld}", ++S.sync_id);
@@ -2854,11 +2888,12 @@ static void ag_timesync(void) {
 
 static void ag_lost(const char *why) {
     fx_fail_all("qemu-guest-agent stopped answering in the guest");
+    wi_lost("qemu-guest-agent stopped answering in the guest");
     if (S.qga_up) vlog("agent: %s", why);
     S.qga_up = 0; S.agq_n = 0; S.jpid = 0; S.inhibit_done = 0;
     S.xfer_pid = 0; S.xfer_poll_at = 0; S.xfer_guest = XG_UNKNOWN;
     if (S.id_state == 2) { S.id_state = 1; S.id_poll_at = 0; }      /* tried again when the agent is back */
-    S.ag_caps &= VAC_CLIPBOARD;
+    S.ag_caps &= VAC_LAG;
     ag_set(VAS_WAITING);
 }
 
@@ -2882,7 +2917,9 @@ static void journal_append(const uint8_t *data, size_t n) {
 }
 
 static void ag_install_step(void);
+static int wi_begin(int client, uint32_t seq, const char **why);
 static void fx_on_reply(int kind, const JVal *root, const JVal *r, int ok);
+static void wi_on_reply(int kind, const JVal *root, const JVal *r, int ok);
 static void fx_fail_all(const char *why);
 
 static void on_qga_reply(const JVal *root, int ok) {
@@ -2895,6 +2932,7 @@ static void on_qga_reply(const JVal *root, int ok) {
     switch (kind) {
     case AQ_FXEXEC: case AQ_FXSTATUS: case AQ_FXOPEN: case AQ_FXWRITE: case AQ_FXCLOSE: fx_on_reply(kind, root, r, ok); break;
     case AQ_XEXEC: case AQ_XSTATUS: xfer_reply(kind, root, r, ok); break;
+    case AQ_WIEXEC: case AQ_WISTATUS: case AQ_WIOPEN: case AQ_WIWRITE: case AQ_WICLOSE: wi_on_reply(kind, root, r, ok); break;
     case AQ_DEVRAW: {
         /* --dev-qmp: a qemu-guest-agent command for the tests; a pid, or what a guest-exec printed */
         char t[VM_TEXT_MAX], o[140];
@@ -2902,6 +2940,21 @@ static void on_qga_reply(const JVal *root, int ok) {
         else if (json_get(r, "pid")) snprintf(t, sizeof t, "pid %ld", (long)json_num(r, "pid", 0));
         else if (json_get(r, "exited")) { ag_exec_text(json_str(r, "out-data"), o, sizeof o); snprintf(t, sizeof t, "exited %d exitcode %d: %s", json_bool(r, "exited", 0), (int)json_num(r, "exitcode", -1), o); }
         else snprintf(t, sizeof t, "return");
+        /* the whole output in the log too (the reply holds 200 bytes), printable ASCII, in lines */
+        for (int k = 0; ok && k < 2; k++) {
+            const char *b = json_str(r, k ? "err-data" : "out-data");
+            size_t bl = b ? strnlen(b, 1 << 20) : 0;
+            uint8_t *o2 = bl ? malloc(bl) : NULL;
+            long on = o2 ? ag_b64_decode(b, bl, o2, bl) : -1;
+            for (long i = 0; i < on; i += 900) {
+                char ln[901];
+                long m = on - i < 900 ? on - i : 900;
+                for (long j = 0; j < m; j++) ln[j] = o2[i + j] >= 0x20 && o2[i + j] < 0x7f ? (char)o2[i + j] : o2[i + j] == '\n' ? '|' : ' ';
+                ln[m] = 0;
+                vlog("dev-%s: %s", k ? "err" : "out", ln);
+            }
+            free(o2);
+        }
         reply(S.dev_client, S.dev_seq, ok ? VME_OK : VME_QMP, t);
         break;
     }
@@ -2917,7 +2970,7 @@ static void on_qga_reply(const JVal *root, int ok) {
     case AQ_INFO: {
         const char *v = ok ? json_str(r, "version") : NULL;
         snprintf(S.ag_version, sizeof S.ag_version, "%.40s", v ? v : "");
-        int caps = S.ag_caps & (VAC_CLIPBOARD | VAC_TRANSFER | VAC_XFER_SETUP);
+        int caps = S.ag_caps & (VAC_LAG | VAC_TRANSFER | VAC_XFER_SETUP);
         const JVal *cmds = json_get(r, "supported_commands");
         for (const JVal *e = cmds && cmds->type == J_ARR ? cmds->kid : NULL; e; e = e->next) {
             const char *n = json_str(e, "name");
@@ -2952,6 +3005,11 @@ static void on_qga_reply(const JVal *root, int ok) {
                    "\"--why=The machine is kept awake while it runs\",\"--mode=block\",\"sleep\",\"infinity\"]}", AQ_INHIBIT);
         }
         id_begin();
+        if (S.wi_auto && S.ag_windows) {
+            const char *why = NULL;
+            S.wi_auto = 0;
+            if (wi_begin(-1, 0, &why)) vlog("agent: the LordOS guest tools for Windows weren't installed: %s", why);
+        }
         xfer_begin();
         /* a machine that resumed from a saved state has a clipboard helper that said hello to the lord-vm before: it
          * is asked to say it again (once; its answer gets the plain hello) */
@@ -3619,6 +3677,215 @@ static void fx_tick(long long now) {
     if (qga_do("guest-exec-status", a, AQ_FXSTATUS)) S.fx_poll_at = now + 200;
 }
 
+/* ---- LordOS guest tools for Windows (VAG_INSTALL on a Windows guest; docs/VIRTUALIZATION.md 7.1) ----
+ * Through qemu-guest-agent, which runs as SYSTEM: SYSTEM never writes by a path the person controls.
+ *   1. FX_PREP_PS: a private folder in %SystemRoot%\Temp (SYSTEM and Administrators only, checked), as for a drop;
+ *   2. lordos-guest-win.exe written into it in 32 KB pieces;
+ *   3. WI_INSTALL_PS: its SHA-256 checked against what lord-vm sent; %ProgramFiles%\LordOS made (or checked: not a
+ *      reparse point) with its own protected ACL (SYSTEM and Administrators full control, Users read and run, owned
+ *      by Administrators); a running copy stopped; the program copied in (it takes the folder's ACL); HKLM's Run key
+ *      starts it at every sign-in, as the person; and for the person signed in now, a one-shot scheduled task (their
+ *      Interactive logon, no password stored, no time limit) starts it at once, then goes. The private folder goes
+ *      whatever happens. Nothing of the person's is touched, and the program runs as them only. */
+enum { WI_NONE = 0, WI_PREP, WI_OPEN, WI_WRITE, WI_CLOSE, WI_INSTALL };
+/* %s: the private folder (base64 of UTF-8), then the program's SHA-256 (64 hex digits, upper case) */
+static const char WI_INSTALL_PS[] =
+    "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';trap{[Console]::Error.Write($_.Exception.Message);exit 1};"
+    "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
+    "try{"
+    "$f=Join-Path $t 'lordos-guest-win.exe';"
+    "if((Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash -ne '%s'){throw 'the copy in the guest is not the one sent'};"
+    "$d=Join-Path $env:ProgramFiles 'LordOS';"
+    "if(Test-Path -LiteralPath $d){if((Get-Item -LiteralPath $d -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'a reparse point in Program Files'}}"
+    "else{[IO.Directory]::CreateDirectory($d)|Out-Null};"
+    "$a=New-Object Security.AccessControl.DirectorySecurity;$a.SetAccessRuleProtection($true,$false);"
+    "foreach($x in 'S-1-5-18','S-1-5-32-544'){$a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($x)),'FullControl','ContainerInherit,ObjectInherit','None','Allow')))};"
+    "$a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')),'ReadAndExecute','ContainerInherit,ObjectInherit','None','Allow')));"
+    "$a.SetOwner((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')));"
+    "[IO.Directory]::SetAccessControl($d,$a);"
+    "$e=Join-Path $d 'lordos-guest-win.exe';"
+    "Get-Process -Name 'lordos-guest-win' -ErrorAction SilentlyContinue|Stop-Process -Force -ErrorAction SilentlyContinue;Start-Sleep -Milliseconds 500;"
+    "if(Test-Path -LiteralPath $e){if((Get-Item -LiteralPath $e -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'a reparse point in Program Files'};Remove-Item -LiteralPath $e -Force};"
+    "[IO.File]::Copy($f,$e);"
+    "Set-ItemProperty -LiteralPath 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'LordOS guest tools' -Value ('\"'+$e+'\"');"
+    /* the port: vioserial lets only SYSTEM and Administrators open it; the person signed in at the machine (Interactive
+     * users) may read and write it too. Found by what \\.\\Global\\org.lordos.agent points to, set as the device's
+     * own security (kept across restarts), applied by restarting that one port */
+    "Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;using System.Text;public static class LordPort{"
+    "[DllImport(\"kernel32.dll\",CharSet=CharSet.Unicode)]static extern uint QueryDosDeviceW(string n,StringBuilder t,int m);"
+    "[DllImport(\"setupapi.dll\",CharSet=CharSet.Unicode)]static extern IntPtr SetupDiCreateDeviceInfoList(IntPtr g,IntPtr w);"
+    "[StructLayout(LayoutKind.Sequential)]struct DI{public int cb;public Guid g;public int inst;public IntPtr r;}"
+    "[DllImport(\"setupapi.dll\",CharSet=CharSet.Unicode,SetLastError=true)]static extern bool SetupDiOpenDeviceInfoW(IntPtr s,string id,IntPtr w,int f,ref DI d);"
+    "[DllImport(\"setupapi.dll\",CharSet=CharSet.Unicode,SetLastError=true)]static extern bool SetupDiSetDeviceRegistryPropertyW(IntPtr s,ref DI d,int p,byte[] b,int n);"
+    "[DllImport(\"setupapi.dll\")]static extern bool SetupDiDestroyDeviceInfoList(IntPtr s);"
+    "public static string Target(string n){var b=new StringBuilder(512);return QueryDosDeviceW(n,b,512)>0?b.ToString():\"\";}"
+    "public static int Sddl(string id,string sd){IntPtr s=SetupDiCreateDeviceInfoList(IntPtr.Zero,IntPtr.Zero);var d=new DI();d.cb=Marshal.SizeOf(d);int e=0;"
+    "if(!SetupDiOpenDeviceInfoW(s,id,IntPtr.Zero,0,ref d))e=Marshal.GetLastWin32Error();"
+    "else{byte[] b=Encoding.Unicode.GetBytes(sd+\"\\0\");if(!SetupDiSetDeviceRegistryPropertyW(s,ref d,0x18,b,b.Length))e=Marshal.GetLastWin32Error();}"
+    "SetupDiDestroyDeviceInfoList(s);return e;}}';"
+    "$pt=[LordPort]::Target('org.lordos.agent');if(-not $pt){throw 'the machine has no org.lordos.agent port'};"
+    "$pd=Get-PnpDevice -PresentOnly|?{$_.InstanceId -match '\\\\VIOSERIALPORT\\\\'}|?{(Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName DEVPKEY_Device_PDOName).Data -eq $pt}|Select-Object -First 1;"
+    "if(-not $pd){throw 'org.lordos.agent''s device not found'};"
+    "$sd='D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;IU)';"
+    "if((Get-PnpDeviceProperty -InstanceId $pd.InstanceId -KeyName DEVPKEY_Device_SecuritySDS).Data -ne 'D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GWGR;;;IU)'){"
+    "$r=[LordPort]::Sddl($pd.InstanceId,$sd);if($r){throw ('the port''s security could not be set ('+$r+')')};"
+    "pnputil.exe /restart-device $pd.InstanceId|Out-Null};"
+    "$u=(Get-CimInstance Win32_ComputerSystem).UserName;$s='installed';"
+    "if($u){$tn='LordOS-tools-'+[guid]::NewGuid().ToString('N');"
+    "try{$act=New-ScheduledTaskAction -Execute $e;"
+    "$pr=New-ScheduledTaskPrincipal -UserId $u -LogonType Interactive -RunLevel Limited;"
+    "$st=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero);"
+    "Register-ScheduledTask -TaskName $tn -Action $act -Principal $pr -Settings $st|Out-Null;Start-ScheduledTask -TaskName $tn;"
+    "for($i=0;$i -lt 20 -and -not (Get-Process -Name 'lordos-guest-win' -ErrorAction SilentlyContinue);$i++){Start-Sleep -Milliseconds 250};"
+    "if(Get-Process -Name 'lordos-guest-win' -ErrorAction SilentlyContinue){$s='installed and started'}"
+    "}finally{Unregister-ScheduledTask -TaskName $tn -Confirm:$false -ErrorAction SilentlyContinue}};"
+    "[Console]::Out.Write($s)"
+    "}finally{Remove-Item -LiteralPath $t -Recurse -Force -ErrorAction SilentlyContinue}";
+
+static void wi_end(int code, const char *why) {
+    vlog("agent: LordOS guest tools for Windows: %s", why);
+    if (S.wi_client >= 0) reply(S.wi_client, S.wi_seq, code, why);
+    if (code != VME_OK && S.qga_up) {
+        if (S.wi_handle > 0) { char a[48]; snprintf(a, sizeof a, "{\"handle\":%ld}", S.wi_handle); qga_do("guest-file-close", a, AQ_IGNORE); }
+        if (S.wi_tmp[0] && S.wi_step < WI_INSTALL) {
+            char b[400], ps[sizeof FX_DROP_PS + 400];
+            if (ag_b64_encode((const uint8_t *)S.wi_tmp, strlen(S.wi_tmp), b, sizeof b) > 0) { snprintf(ps, sizeof ps, FX_DROP_PS, b); fx_exec_ps(ps, AQ_IGNORE); }
+        }
+    }
+    S.wi_step = WI_NONE;
+    S.wi_handle = S.wi_pid = 0;
+    S.wi_poll_at = 0;
+    S.wi_tmp[0] = 0;
+    S.wi_off = 0;
+}
+
+/* starts the install (client -1: after an unattended install, nobody to answer). 0 started */
+static int wi_begin(int client, uint32_t seq, const char **why) {
+    if (S.dev_qmp) {
+        /* development: a new build dropped into the machine's folder (lord-vm's Landlock keeps it there) is taken */
+        char p[PATH_MAX + 32];
+        snprintf(p, sizeof p, "%s/dev-wintools.exe", S.dir);
+        int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        struct stat st;
+        uint8_t *b;
+        if (fd >= 0 && !fstat(fd, &st) && st.st_size > 0 && st.st_size < (8 << 20) && (b = malloc((size_t)st.st_size))) {
+            if (pread(fd, b, (size_t)st.st_size, 0) == st.st_size) { free(S.wtools); S.wtools = b; S.wtools_n = (size_t)st.st_size; vlog("dev: %s", p); }
+            else free(b);
+        }
+        if (fd >= 0) close(fd);
+    }
+    if (!S.wtools) { *why = "the LordOS guest tools for Windows aren't on this computer"; return -1; }
+    if (S.wi_step || S.helper_handle) { *why = "busy"; return -1; }
+    if (!(S.ag_caps & VAC_FILES) || !(S.ag_caps & VAC_EXEC)) { *why = "the guest agent can't write files or run commands"; return -1; }
+    S.wi_client = client; S.wi_seq = seq;
+    S.wi_step = WI_PREP;
+    S.wi_deadline = now_ms() + 120000;
+    if (fx_exec_ps(FX_PREP_PS, AQ_WIEXEC)) { S.wi_step = WI_NONE; *why = "the guest agent is busy"; return -1; }
+    vlog("agent: installing the LordOS guest tools for Windows (%zu bytes)", S.wtools_n);
+    return 0;
+}
+
+static void wi_write_next(void) {
+    if (S.wi_off < S.wtools_n) {
+        size_t n = S.wtools_n - S.wi_off < 32768 ? S.wtools_n - S.wi_off : 32768;
+        static char b64[32768 / 3 * 4 + 64], args[32768 / 3 * 4 + 128];
+        if (ag_b64_encode(S.wtools + S.wi_off, n, b64, sizeof b64) < 0) { wi_end(VME_INTERNAL, "internal error"); return; }
+        snprintf(args, sizeof args, "{\"handle\":%ld,\"buf-b64\":\"%s\"}", S.wi_handle, b64);
+        S.wi_off += n;
+        if (qga_do("guest-file-write", args, AQ_WIWRITE)) wi_end(VME_BUSY, "the guest agent is busy");
+        return;
+    }
+    char a[48];
+    snprintf(a, sizeof a, "{\"handle\":%ld}", S.wi_handle);
+    S.wi_handle = 0;
+    S.wi_step = WI_CLOSE;
+    if (qga_do("guest-file-close", a, AQ_WICLOSE)) wi_end(VME_BUSY, "the guest agent is busy");
+}
+
+static void wi_on_reply(int kind, const JVal *root, const JVal *r, int ok) {
+    if (!S.wi_step) return;
+    if (!ok) { char why[VM_TEXT_MAX]; snprintf(why, sizeof why, "qemu-guest-agent: %.160s", qmp_error_desc(root)); wi_end(VME_QMP, why); return; }
+    switch (kind) {
+    case AQ_WIEXEC: S.wi_pid = (long)json_num(r, "pid", 0); S.wi_poll_at = now_ms() + 300; break;
+    case AQ_WISTATUS: {
+        if (!json_bool(r, "exited", 0)) {
+            if (now_ms() > S.wi_deadline) { wi_end(VME_QMP, "the guest's script took too long"); break; }
+            S.wi_poll_at = now_ms() + 300;
+            break;
+        }
+        int code = (int)json_num(r, "exitcode", -1);
+        char said[1024], txt[1024];
+        ag_exec_text(json_str(r, code == 0 ? "out-data" : "err-data"), said, sizeof said);
+        if (code != 0) {
+            char why[VM_TEXT_MAX];
+            snprintf(why, sizeof why, "the guest's script failed (%d)%s%.150s", code, said[0] ? ": " : "", said);
+            if (S.wi_step == WI_INSTALL) S.wi_tmp[0] = 0;           /* the script removed it */
+            wi_end(VME_QMP, why);
+            break;
+        }
+        if (S.wi_step == WI_PREP) {
+            win_text(said, txt, sizeof txt);
+            if (!ag_drop_staging_ok(txt, 1)) { wi_end(VME_QMP, "the guest didn't make a private folder"); break; }
+            snprintf(S.wi_tmp, sizeof S.wi_tmp, "%.200s", txt);       /* ag_drop_staging_ok: at most 200 */
+            JBuf b;
+            jb_init(&b);
+            char p[sizeof S.wi_tmp + 32];
+            snprintf(p, sizeof p, "%s\\lordos-guest-win.exe", S.wi_tmp);
+            jb_raw(&b, "{\"path\":");
+            jb_str(&b, p);
+            jb_raw(&b, ",\"mode\":\"wb\"}");
+            S.wi_step = WI_OPEN;
+            if (b.oom || qga_do("guest-file-open", b.p, AQ_WIOPEN)) wi_end(VME_BUSY, "the guest agent is busy");
+            jb_free(&b);
+        } else if (S.wi_step == WI_INSTALL) {
+            S.wi_tmp[0] = 0;
+            snprintf(txt, sizeof txt, "%.100s", said[0] ? said : "installed");
+            wi_end(VME_OK, txt);
+        }
+        break;
+    }
+    case AQ_WIOPEN:
+        S.wi_handle = (long)(r && r->type == J_NUM ? r->num : 0);
+        if (S.wi_handle <= 0) { wi_end(VME_QMP, "the guest agent didn't open the file"); break; }
+        S.wi_step = WI_WRITE;
+        S.wi_off = 0;
+        wi_write_next();
+        break;
+    case AQ_WIWRITE: wi_write_next(); break;
+    case AQ_WICLOSE: {
+        uint8_t d[32];
+        char hex[65], b[400];
+        sha256(S.wtools, S.wtools_n, d);
+        for (int i = 0; i < 32; i++) snprintf(hex + i * 2, 3, "%02X", d[i]);
+        if (ag_b64_encode((const uint8_t *)S.wi_tmp, strlen(S.wi_tmp), b, sizeof b) < 0) { wi_end(VME_INTERNAL, "internal error"); break; }
+        char *ps = malloc(sizeof WI_INSTALL_PS + sizeof b + sizeof hex);
+        if (!ps) { wi_end(VME_INTERNAL, "out of memory"); break; }
+        snprintf(ps, sizeof WI_INSTALL_PS + sizeof b + sizeof hex, WI_INSTALL_PS, b, hex);
+        S.wi_step = WI_INSTALL;
+        if (fx_exec_ps(ps, AQ_WIEXEC)) wi_end(VME_BUSY, "the guest agent is busy");
+        free(ps);
+        break;
+    }
+    default: break;
+    }
+}
+
+static void wi_lost(const char *why) {
+    if (!S.wi_step) return;
+    int up = S.qga_up;
+    S.qga_up = 0;
+    wi_end(VME_WRONG_STATE, why);
+    S.qga_up = up;
+}
+
+static void wi_tick(long long now) {
+    if (!S.wi_poll_at || now < S.wi_poll_at) return;
+    S.wi_poll_at = 0;
+    char a[48];
+    snprintf(a, sizeof a, "{\"pid\":%ld}", S.wi_pid);
+    if (qga_do("guest-exec-status", a, AQ_WISTATUS)) S.wi_poll_at = now + 300;
+}
+
 static void drain_qga(void) {
     if (qmp_fill(&S.qga) < 0) { close(S.qga_fd); S.qga_fd = -1; ag_set(VAS_OFF); return; }
     JDoc d;
@@ -3687,6 +3954,32 @@ static int clip_clean(const uint8_t *in, size_t n, uint8_t **out, size_t *on, ch
     return 0;
 }
 
+/* apps mode from the guest (vmagent.h, LAG_*): checked here to the last byte; the windows themselves are lord-server's
+ * (a later stage). Until then each list is only logged (in full with --dev-qmp, for lordvm-dev) */
+static void lag_apps_frame(const AgFrame *f) {
+    static LagWin ws[LAG_WIN_MAX];
+    static LagApp as[LAG_APPS_MAX];
+    if (f->kind == LAG_WINDOWS) {
+        uint32_t serial = 0;
+        int n = lag_windows_parse(f->data, f->len, &serial, ws, LAG_WIN_MAX);
+        if (n < 0) { vlog("agent: a window list that doesn't parse: dropped"); return; }
+        vlog("agent: windows #%u: %d", serial, n);
+        for (int i = 0; S.dev_qmp && i < n; i++)
+            vlog("agent:   %08x %d,%d %dx%d flags %u owner %08x pid %u [%.*s] %.*s", ws[i].id, ws[i].x, ws[i].y, ws[i].w, ws[i].h, ws[i].flags, ws[i].owner,
+                 ws[i].pid, (int)(ws[i].app_n < 60 ? ws[i].app_n : 60), (const char *)ws[i].app, (int)(ws[i].title_n < 200 ? ws[i].title_n : 200), (const char *)ws[i].title);
+    } else if (f->kind == LAG_WINICON) {
+        uint32_t id; uint16_t w, h; const uint8_t *px;
+        if (lag_winicon_parse(f->data, f->len, &id, &w, &h, &px)) { vlog("agent: a window icon that doesn't parse: dropped"); return; }
+        if (S.dev_qmp) vlog("agent: icon %08x %ux%u", id, w, h);
+    } else {
+        int n = lag_applist_parse(f->data, f->len, as, LAG_APPS_MAX);
+        if (n < 0) { vlog("agent: a program list that doesn't parse: dropped"); return; }
+        vlog("agent: the guest lists %d programs", n);
+        for (int i = 0; S.dev_qmp && i < n; i++)
+            vlog("agent:   [%.*s] %.*s", (int)(as[i].name_n < 100 ? as[i].name_n : 100), (const char *)as[i].name, (int)(as[i].token_n < 300 ? as[i].token_n : 300), (const char *)as[i].token);
+    }
+}
+
 static void drain_lag(void) {
     if (!S.lag_buf) { S.lag_buf = malloc(AG_FRAME_MAX + AG_HEAD); S.lag_n = 0; if (!S.lag_buf) return; }
     ssize_t r = read(S.lag_fd, S.lag_buf + S.lag_n, AG_FRAME_MAX + AG_HEAD - S.lag_n);
@@ -3707,11 +4000,15 @@ static void drain_lag(void) {
                 char *sp = strchr(S.lag_version, ' ');
                 if (sp) *sp = 0;
                 S.lag_clipx = strstr(t + 13, " clipx") != NULL;
-                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "");
+                S.lag_display = strstr(t + 13, " display") != NULL;
+                S.lag_windows = strstr(t + 13, " windows") != NULL;
+                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s%s%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "",
+                                       S.lag_display ? " (sets the display's size)" : "", S.lag_windows ? " (apps mode)" : "");
                 S.lag_hello = 1;
-                S.ag_caps |= VAC_CLIPBOARD;
+                S.ag_caps = (S.ag_caps & ~(VAC_DISPLAY | (int)LAG_CAP_WINDOWS)) | VAC_CLIPBOARD | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0);
                 static const char me[] = "lord-vm 2 clipboard clipx";
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
+                if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
                 ag_broadcast();
             }
         } else if (f.kind == AGK_CLIP && S.lag_hello && clip_allows(0) && f.len && ag_utf8_ok(f.data, f.len)) {
@@ -3736,6 +4033,12 @@ static void drain_lag(void) {
                 if (fd >= 0) close(fd);
             }
             free(clean);
+        } else if (f.kind == AGK_DISPLAY && S.lag_hello && S.lag_display) {
+            uint32_t w, h;
+            if (ag_display_parse(f.data, f.len, &w, &h)) vlog("agent: the guest's display size: malformed");
+            else vlog("agent: the guest's display is %ux%u%s", w, h, w == S.disp_w && h == S.disp_h ? "" : " (not the size asked for)");
+        } else if ((f.kind == LAG_WINDOWS || f.kind == LAG_WINICON || f.kind == LAG_APPLIST) && S.lag_hello && S.lag_windows) {
+            lag_apps_frame(&f);
         }
         /* other kinds: skipped, so either side can grow */
         memmove(S.lag_buf, S.lag_buf + k, S.lag_n - (size_t)k);
@@ -3776,7 +4079,8 @@ static void ag_tick(long long now) {
 static void console_out(const char *b, size_t n);
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
-    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && !(m->type == VM_AGENT && m->a == VAG_TRANSFER)) { close(fd); fd = -1; }
+    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && (m->type != VM_QMP || !S.dev_qmp) &&
+        !(m->type == VM_AGENT && m->a == VAG_TRANSFER)) { close(fd); fd = -1; }
     int alive = S.qemu > 0 && !S.qemu_done && S.qmp_up;
     switch (m->type) {
     case VM_STATUS: {
@@ -3911,7 +4215,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         }
         if (m->a == VAG_SHUTDOWN) { qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1); reply(ci, m->seq, VME_OK, ""); return; }
         if (m->a == VAG_TIMESYNC) { ag_timesync(); reply(ci, m->seq, VME_OK, ""); return; }
-        if (S.ag_windows) { reply(ci, m->seq, VME_WRONG_STATE, "lordos-guest is for Linux guests"); return; }
+        if (S.ag_windows) { const char *why = NULL; if (wi_begin(ci, m->seq, &why)) reply(ci, m->seq, VME_WRONG_STATE, why); return; }
         if (!S.helper || S.helper_handle || !(S.ag_caps & VAC_FILES) || !(S.ag_caps & VAC_EXEC)) { reply(ci, m->seq, VME_WRONG_STATE, S.helper ? "the guest agent can't write files or run commands" : "lordos-guest isn't available for this machine's architecture"); return; }
         S.install_client = ci; S.install_seq = m->seq;
         S.helper_handle = -1;
@@ -3985,21 +4289,59 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         vlog("keep running without lord-server: %s", S.keep_running ? "yes" : "no");
         reply(ci, m->seq, VME_OK, "");
         return;
-    case VM_QMP:
+    case VM_DISPLAY_SIZE:
+        /* the window's size (lord-server sends it with VD_RESIZE): a guest that sets its own size gets it through its
+         * helper; others follow QEMU's ui_info (lord-vmdisplay) */
+        S.disp_w = (uint32_t)m->a; S.disp_h = (uint32_t)m->b;
+        if (S.lag_hello && S.lag_display) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
+        reply(ci, m->seq, VME_OK, "");
+        return;
+    case VM_QMP: {
         if (!S.dev_qmp) { reply(ci, m->seq, VME_DENIED, "lord-vm wasn't started with --dev-qmp"); return; }
-        if (!S.qmp_up) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
-        if (strstr(m->text, "\"execute\":\"guest-")) {
-            /* to qemu-guest-agent instead (the tests check what reached the guest) */
-            if (!S.qga_up || S.agq_n >= 32 || qmp_raw(&S.qga, m->text)) { reply(ci, m->seq, VME_WRONG_STATE, "the guest agent isn't answering"); return; }
-            S.agq[(S.agq_head + S.agq_n) % 32] = AQ_DEVRAW; S.agq_n++;
-            S.dev_client = ci; S.dev_seq = m->seq;
-            vlog("dev-qmp to the guest agent from client %d: %s", ci, m->text);
+        if (!strncmp(m->text, "lag-", 4)) {
+            /* development: apps mode's requests to the guest, as lord-server will send them (lordvm-dev apps, winact, launch) */
+            uint8_t b[600];
+            unsigned id, act;
+            int on, x, y, w, h, k;
+            if (sscanf(m->text, "lag-apps %d", &on) == 1) { b[0] = on ? 1 : 0; lag_send(LAG_APPS, b, 1); }
+            else if ((k = sscanf(m->text, "lag-winact %x %u %d %d %d %d", &id, &act, &x, &y, &w, &h)) >= 2) {
+                b[0] = (uint8_t)id; b[1] = (uint8_t)(id >> 8); b[2] = (uint8_t)(id >> 16); b[3] = (uint8_t)(id >> 24); b[4] = (uint8_t)act;
+                int n = 5;
+                if (k == 6) { int32_t v[4] = { x, y, w, h }; for (int i = 0; i < 4; i++) for (int j = 0; j < 4; j++) b[n++] = (uint8_t)((uint32_t)v[i] >> (8 * j)); }
+                lag_send(LAG_WINACT, b, (uint32_t)n);
+            } else if (!strncmp(m->text, "lag-launch ", 11)) {
+                size_t l = strlen(m->text + 11);
+                b[0] = (uint8_t)l; b[1] = (uint8_t)(l >> 8);
+                memcpy(b + 2, m->text + 11, l);
+                lag_send(LAG_LAUNCH, b, (uint32_t)l + 2);
+            } else { reply(ci, m->seq, VME_BAD_REQUEST, "lag-apps 0|1, lag-winact ID N [X Y W H], lag-launch TOKEN"); return; }
+            reply(ci, m->seq, S.lag_windows ? VME_OK : VME_WRONG_STATE, S.lag_windows ? "sent" : "sent, but the guest's helper didn't say \"windows\"");
             return;
         }
-        if (S.pq_n >= MAX_PENDING || qmp_raw(&S.qmp, m->text)) { reply(ci, m->seq, VME_BAD_REQUEST, "can't send"); return; }
+        if (!S.qmp_up) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        /* a command longer than the message's text comes in a descriptor (lordvm-dev qmpf) */
+        static char big[1 << 20];
+        const char *cmd = m->text;
+        if (fd >= 0) {
+            ssize_t bn = pread(fd, big, sizeof big - 1, 0);
+            close(fd);
+            if (bn <= 0) { reply(ci, m->seq, VME_BAD_REQUEST, "unreadable"); return; }
+            big[bn] = 0;
+            cmd = big;
+        }
+        if (strstr(cmd, "\"execute\":\"guest-")) {
+            /* to qemu-guest-agent instead (the tests check what reached the guest) */
+            if (!S.qga_up || S.agq_n >= 32 || qmp_raw(&S.qga, cmd)) { reply(ci, m->seq, VME_WRONG_STATE, "the guest agent isn't answering"); return; }
+            S.agq[(S.agq_head + S.agq_n) % 32] = AQ_DEVRAW; S.agq_n++;
+            S.dev_client = ci; S.dev_seq = m->seq;
+            vlog("dev-qmp to the guest agent from client %d: %.120s", ci, cmd);
+            return;
+        }
+        if (S.pq_n >= MAX_PENDING || qmp_raw(&S.qmp, cmd)) { reply(ci, m->seq, VME_BAD_REQUEST, "can't send"); return; }
         pq_push(P_RAW, ci, m->seq, -1);
-        vlog("dev-qmp from client %d: %s", ci, m->text);
+        vlog("dev-qmp from client %d: %.120s", ci, cmd);
         return;
+    }
     }
     reply(ci, m->seq, VME_BAD_REQUEST, "unknown request");
 }
@@ -4031,7 +4373,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { S.lag_hello = 0; S.lag_clipx = 0; S.ag_caps &= ~VAC_CLIPBOARD; S.lag_n = 0; ag_broadcast(); }
+            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_display = S.lag_windows = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -4345,6 +4687,7 @@ static void loop(void) {
         if (S.id_poll_at && (next < 0 || S.id_poll_at < next)) next = S.id_poll_at;
         if (S.xfer_poll_at && (next < 0 || S.xfer_poll_at < next)) next = S.xfer_poll_at;
         if (S.fx_poll_at && (next < 0 || S.fx_poll_at < next)) next = S.fx_poll_at;
+        if (S.wi_poll_at && (next < 0 || S.wi_poll_at < next)) next = S.wi_poll_at;
         if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
@@ -4362,6 +4705,7 @@ static void loop(void) {
         if (S.id_poll_at && now >= S.id_poll_at) { char a[48]; S.id_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.id_pid); qga_do("guest-exec-status", a, AQ_IDSTATUS); }
         if (S.xfer_poll_at && now >= S.xfer_poll_at) { char a[48]; S.xfer_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.xfer_pid); if (qga_do("guest-exec-status", a, AQ_XSTATUS)) S.xfer_poll_at = now + 300; }
         fx_tick(now);
+        wi_tick(now);
         host_stop_tick(now);
         if (S.shut_deadline && now >= S.shut_deadline) {
             S.shut_deadline = 0;
@@ -4808,6 +5152,17 @@ static int cmd_start(const char *dir, int argc, char **argv) {
             if (pread(hfd, S.helper, S.helper_n, 0) != (ssize_t)S.helper_n) { free(S.helper); S.helper = NULL; S.helper_n = 0; }
         }
         if (hfd >= 0) close(hfd);
+        /* and the LordOS guest tools for a Windows guest (x86-64) */
+        if (S.m.arch == VM_ARCH_AMD64) {
+            int wfd = open("/usr/lib/lordos/guest/windows/lordos-guest-win.exe", O_RDONLY | O_CLOEXEC);
+            const char *alt = getenv("LORDVM_WINTOOLS");    /* development: a build that isn't installed */
+            if (wfd < 0 && alt && S.dev_qmp) wfd = open(alt, O_RDONLY | O_CLOEXEC);
+            if (wfd >= 0 && !fstat(wfd, &hs) && hs.st_size > 0 && hs.st_size < (8 << 20) && (S.wtools = malloc((size_t)hs.st_size))) {
+                S.wtools_n = (size_t)hs.st_size;
+                if (pread(wfd, S.wtools, S.wtools_n, 0) != (ssize_t)S.wtools_n) { free(S.wtools); S.wtools = NULL; S.wtools_n = 0; }
+            }
+            if (wfd >= 0) close(wfd);
+        }
     }
     S.state = VS_STOPPED;
     set_state(VS_STARTING, VR_NONE, 0, "");
@@ -4992,7 +5347,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, xfer = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -5002,10 +5357,16 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     VmPort port[VM_PORTS];
     int nport = 0, ports_set = 0;
     const char *bridge = NULL;
+    /* where the machine starts from: --boot-order auto|disk,cd,network (in any order, any of them), --boot-menu on|off.
+     * Allowed while suspended: bootindex and the boot menu are fw_cfg data the saved stream doesn't carry (a state saved
+     * with the disk first loaded with the network first and the menu on, and the guest went on as it was) */
+    int boot[VM_BOOT_DEVS], nboot = -1, bmenu = -1;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
         i++;
+        if (!strcmp(a, "--boot-order")) { nboot = vm_boot_parse(v, boot); if (nboot < 0) { fprintf(stderr, "lord-vm: --boot-order auto, or disk, cd and network in the order wanted (\"network,disk\")\n"); return 2; } continue; }
+        if (!strcmp(a, "--boot-menu")) { bmenu = parse_enum(v, "off", "on"); if (bmenu < 0) { fprintf(stderr, "lord-vm: --boot-menu on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--port")) {
             if (nport >= VM_PORTS) { fprintf(stderr, "lord-vm: at most %d forwarded ports\n", VM_PORTS); return 2; }
             if (vm_port_parse(v, &port[nport])) { fprintf(stderr, "lord-vm: --port tcp|udp:HOST:GUEST[:this-computer|lan], this computer's port %d to 65535\n", VM_PORT_HOST_MIN); return 2; }
@@ -5034,6 +5395,12 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         }
         if (!strcmp(a, "--devices")) { devs = parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat\n"); return 2; } continue; }
         if (!strcmp(a, "--graphics")) { gfx = parse_enum(v, "2d", "3d"); if (gfx < 0) { fprintf(stderr, "lord-vm: --graphics 2d|3d\n"); return 2; } continue; }
+        if (!strcmp(a, "--resolution")) {
+            if (!strcmp(v, "follow")) { resw = reshh = 0; res_set = 1; continue; }
+            if (vm_resolution_parse(v, &resw, &reshh)) { fprintf(stderr, "lord-vm: --resolution follow|WxH (640x480 to 7680x4320, even)\n"); return 2; }
+            res_set = 1;
+            continue;
+        }
         if (!strcmp(a, "--nic-model")) {
             for (int k = 0; VM_NIC_MODELS[k]; k++) if (!strcmp(v, VM_NIC_MODELS[k])) nicm = k;
             if (nicm < 0) { fprintf(stderr, "lord-vm: --nic-model virtio|e1000e|e1000|e1000-82545em|e1000-82544gc|vmxnet3|rtl8139|pcnet\n"); return 2; }
@@ -5067,7 +5434,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
         /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
     if (vcpus && vcpus != m.vcpus) {
@@ -5090,10 +5457,15 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (m.agent || m.clipboard) m.schema = VM_SCHEMA;
     if (gfx >= 0) m.graphics = gfx;
     if (m.graphics) m.schema = VM_SCHEMA;
+    if (res_set) { m.res_w = resw; m.res_h = reshh; if (resw) m.schema = VM_SCHEMA; }
     if (sound >= 0) m.sound = sound;
     if (vol >= 0) m.volume = vol;
     if (mic >= 0) m.microphone = mic;
     if (sound >= 0 || vol >= 0 || mic >= 0) m.schema = VM_SCHEMA;
+    if (xfer >= 0) { m.transfer = xfer; m.schema = VM_SCHEMA; }
+    if (nboot >= 0) { m.n_boot = nboot; memcpy(m.boot_order, boot, sizeof boot[0] * (size_t)nboot); }
+    if (bmenu >= 0) m.boot_menu = bmenu;
+    if (m.n_boot || m.boot_menu) m.schema = VM_SCHEMA;
     if (xfer >= 0) { m.transfer = xfer; m.schema = VM_SCHEMA; }
     if (shares_set) {
         const struct passwd *pw = getpwuid(getuid());
@@ -5147,9 +5519,11 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
-    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\",\"transfer\":%s}\n", m.vcpus, m.memory_mb, m.disk_gb,
-           VM_NET_NAMES[m.network], m.n_ports, m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices], VM_NIC_MODELS[m.nic_model],
-           m.graphics == VM_GFX_3D ? "3d" : "2d", m.transfer ? "true" : "false");
+    char bspec[32];
+    vm_boot_spec(&m, bspec, sizeof bspec);
+    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\",\"boot_order\":\"%s\",\"boot_menu\":%s,\"transfer\":%s}\n",
+           m.vcpus, m.memory_mb, m.disk_gb, VM_NET_NAMES[m.network], m.n_ports, m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices],
+           VM_NIC_MODELS[m.nic_model], m.graphics == VM_GFX_3D ? "3d" : "2d", bspec, m.boot_menu ? "true" : "false", m.transfer ? "true" : "false");
     rc = 0;
 out:
     close(lock);
@@ -6645,6 +7019,7 @@ static int usage(void) {
             "                         [--network shared|isolated|bridged|hostonly] [--bridge CARD]   (bridged: a wired card's name)\n"
             "                         [--port tcp|udp:HOST:GUEST[:this-computer|lan] ...] [--ports none]   (forwarded ports, replacing the list)\n"
             "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both] [--graphics 2d|3d]   (also on --create)\n"
+            "                         [--boot-order auto|disk,cd,network (any order, any of them)] [--boot-menu on|off]\n"
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
             "                         [--sound on|off] [--volume 0..100] [--microphone on|off]   (with the machine off; Machines changes them live)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"

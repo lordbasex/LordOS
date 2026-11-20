@@ -468,6 +468,8 @@
   "ws.spine.activities": "কার্যক্রম",
   "ws.spine.apps": "অ্যাপ",
   "ws.spine.files": "ফাইল",
+  "ws.spine.store": "স্টোর",
+  "ws.spine.monitor": "মনিটর",
   "ws.spine.control": "নিয়ন্ত্রণ",
   "ws.spine.collapse": "বার গুটিয়ে নিন",
   "ws.spine.expand": "বার প্রসারিত করুন",
