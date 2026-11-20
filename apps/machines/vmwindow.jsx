@@ -5,10 +5,10 @@
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
   View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
-  inhibitShortcuts, useNarrow, t as tr,
+  inhibitShortcuts, useNarrow, useFilesDrop, FilesDropHint, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand, dropBlocker, copyLine, guestFolder, followStuck } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal } from './ui.jsx';
 import { openLogs, openSnapshots } from './library.jsx';
@@ -21,7 +21,7 @@ const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.install}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn'].every((k) => a[k] === b[k])
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'filesSeq'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent);
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
@@ -106,6 +106,8 @@ function Tools({ ctl, floating, compact }) {
     '-',
     { label: tr('machines.tb.follow'), checked: follow, onClick: () => ctl.setFollow(true) },
     { label: tr('machines.tb.sizesNote'), disabled: true },
+    // the guest kept its size after Follow asked for another (its display driver doesn't follow): said, not hidden
+    follow && ctl.stuck && st?.w ? { label: tr('machines.tb.followStuck', { w: st.w, h: st.h }), disabled: true } : null,
   ];
   const g = st?.agent;
   const clip = cfg?.clipboard || 'off';
@@ -315,7 +317,12 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   useEffect(() => { if (!rec) return undefined; const t2 = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t2); }, [rec]);
   const box = useRef(null);
   const root = useRef(null);
-  const sized = useRef({ last: null, want: null, at: 0, rate: false, thumb: 0 });
+  const sized = useRef({ last: null, want: null, at: 0, rate: false, thumb: 0, asked: null, askedAt: 0 });
+  const [stuck, setStuck] = useState(false);
+  // files dropped on the window, on their way into the guest (lord.vm.files): the ones still copying
+  const [copies, setCopies] = useState([]);
+  const filesSeen = useRef(-1);
+  const onFiles = useRef(null);
   const buttons = useRef(new Set());
   const wheel = useRef(0);
   const sidRef = useRef(sid);
@@ -339,7 +346,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     }
     const id = active ? lord.vm.attach(dir) : lord.vm.start(dir, opts || {});
     if (!id) { setErr(active ? tr('machines.win.cantAttach') : vmRefusal(tr('machines.win.cantStart'))); return; }
-    sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0 };
+    sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0, asked: null, askedAt: 0 };
     setErr(''); setSt(null); setSid(id);
   };
   // a window opened to go back to a snapshot (with memory, the machine off) starts from it
@@ -364,8 +371,12 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         const want = guestSize(lord.getLayout(box.current.id), z.last);
         if (!want) z.want = null;
         else if (!z.want || z.want[0] !== want[0] || z.want[1] !== want[1]) { z.want = want; z.at = now(); }
-        else if (now() - z.at > 400) { lord.vm.resize(sid, want[0], want[1]); z.last = want; z.want = null; }
+        else if (now() - z.at > 400) { lord.vm.resize(sid, want[0], want[1]); z.last = want; z.want = null; z.asked = want; z.askedAt = now(); }
       }
+      // asked for a size the guest didn't take (Follow the window): the resolution menu says so
+      const stuckNow = q.display === 'up' && followRef.current && followStuck(z.asked, [q.w, q.h], z.askedAt, now());
+      setStuck((x) => (x === stuckNow ? x : stuckNow));
+      if (q.filesSeq !== filesSeen.current || (q.ended && filesSeen.current !== -2)) { filesSeen.current = q.ended ? -2 : q.filesSeq; onFiles.current?.(lord.vm.files(sid)); }
       // the card picture in the library, every few seconds while it runs
       if (q.display === 'up' && q.state === 'running' && now() - z.thumb > THUMB_MS) { z.thumb = now(); lord.vm.snapshot(sid); }
       if (q.ended) {
@@ -537,6 +548,29 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     const text = lord.vm.clipboardTake(sid);
     if (text) { clipSent.current = text; clipboard.set(text, { origin: 'machines' }); }
   }, [st?.clipIn]);
+  // Files dragged from Files onto the picture (6.x): copied into the guest's Downloads by its agent, one at a time in
+  // lord-vm; a line under the picture while they go, a notice when they're there. Only into the guest: nothing comes
+  // out by dragging (a shared folder does that)
+  const blocker = dropBlocker(st, !!cfg.agent);
+  const sendFiles = (files) => {
+    const s = sidRef.current;
+    const why = dropBlocker(stRef.current, !!cfg.agent);
+    if (why || !s) { notify({ app: 'machines', label: tr('machines.title'), title: tr(`machines.drop.no.${why || 'off'}`), body: '', sound: false }); return; }
+    const refused = files.filter((f) => !lord.vm.sendFile(s, f)).map((f) => f.split('/').pop());
+    if (refused.length) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.drop.refused', { name: refused.join(', ') }), body: '', sound: false });
+  };
+  const drop = useFilesDrop({ onDrop: ({ files }) => sendFiles(files) });
+  onFiles.current = (list) => {
+    if (!Array.isArray(list)) return;
+    setCopies(list.filter((f) => f.state === 'copying'));
+    const done = list.filter((f) => f.state === 'done'), failed = list.filter((f) => f.state === 'failed');
+    if (done.length) {
+      notify({ app: 'machines', label: tr('machines.title'), title: done.length === 1 ? tr('machines.drop.done', { machine: name }) : tr('machines.drop.doneN', { machine: name, count: done.length }),
+        body: done.length === 1 ? done[0].message : guestFolder(done[done.length - 1].message), sound: false });
+    }
+    for (const f of failed) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.drop.failed', { machine: name, name: f.name }), body: f.message, sound: false });
+  };
+  const line = copyLine(copies);
   const ctl = {
     sid, cfg,
     shell, toggleShell: () => { setShell(!shell); setShellKeys(!shell); },
@@ -545,6 +579,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     setFull: (on) => wm.setFullscreen(winId, on),
     setFollow: (on) => { setFollow(on); sized.current.last = null; },
     fixed: (w, h) => { setFollow(false); if (sid) lord.vm.resize(sid, w, h); },
+    stuck,
     logs: () => openLogs(m0),
     configure: (section) => setCfgSheet({ section }),
     begin: () => begin(),
@@ -614,7 +649,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   else if (st.state === 'stopping') card = <Card title={tr('machines.state.stopping')} text={tr('machines.win.shuttingDownHint')} />;
 
   return (
-    <View ref={root} style={{ flex: 1, backgroundColor: '#000' }}>
+    <View ref={root} {...drop.props} style={{ flex: 1, backgroundColor: '#000' }}>
       <View ref={box} onMouseDown={(e) => { setShellKeys(false); down(e); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
         {st?.media && st.display === 'up' ? <MediaView media={st.media} style={{ flex: 1 }} /> : null}
       </View>
@@ -651,6 +686,17 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
           </View>
         </View>
       ) : null}
+      {line ? (
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
+          <View style={{ maxWidth: 560, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
+            <Text style={{ fontSize: 13, color: '#f2f2f5', textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              {tr('machines.drop.copying', { name: line.name, pct: line.pct }) + (line.waiting ? ` · ${tr('machines.drop.waiting', { count: line.waiting })}` : '')}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+      <FilesDropHint over={drop.over} title={drop.over && (blocker ? tr(`machines.drop.no.${blocker}`) : drop.over.files.length ? tr('machines.drop.title') : tr('machines.drop.none'))}
+        note={drop.over && !blocker && drop.over.files.length ? `${drop.over.skipped ? `${tr('machines.drop.skipped', { count: drop.over.skipped })} · ` : ''}${tr('machines.drop.oneWay')}` : ''} />
       {pickCd ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPickCd(false)}
         onPick={(x) => { setPickCd(false); cdTo(Array.isArray(x) ? x[0] : x); }} /> : null}
       {full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}

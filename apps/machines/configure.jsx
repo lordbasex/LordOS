@@ -101,7 +101,7 @@ export function Configure({ dir, section: section0, onClose }) {
       m.shares.length === 1 ? tr('machines.cfg.shareSum1') : tr('machines.cfg.shareSum', { n: m.shares.length })].filter(Boolean).join(', ')
       : tr(`machines.cfg.clipSum.${m.clipboard || 'off'}`),
     agent: m.agent ? (m.agentState === 'connected' ? tr('machines.agent.connected') : tr('machines.cfg.agentOn')) : tr('machines.cfg.agentOffSum'),
-    boot: m.firmware === 'uefi' ? 'UEFI' : 'BIOS',
+    boot: [m.firmware === 'uefi' ? 'UEFI' : 'BIOS', m.tpm ? tr('machines.cfg.tpm') : null, m.firmware === 'uefi' && m.secureBoot ? tr('machines.cfg.secureBoot') : null].filter(Boolean).join(', '),
     security: tr('machines.cfg.sum.security'),
   };
   const offNote = running ? tr('machines.cfg.needsOff') : null;
@@ -259,9 +259,12 @@ export function Configure({ dir, section: section0, onClose }) {
   else if (sec === 'boot') pane = <>
     <Group>
       <Row label={tr('machines.cfg.firmware')} value={m.firmware === 'uefi' ? 'UEFI' : 'BIOS'} />
+      {/* TPM 2.0 (swtpm) and Secure Boot: machine.json's tpm and secure_boot, set when the machine is made */}
+      <Row label={tr('machines.cfg.tpm')} value={tr(m.tpm ? 'machines.cfg.on' : 'machines.cfg.off')} note={tr('machines.cfg.setAtCreate')} />
+      {m.firmware === 'uefi' ? <Row label={tr('machines.cfg.secureBoot')} value={tr(m.secureBoot ? 'machines.cfg.on' : 'machines.cfg.off')} note={tr('machines.cfg.setAtCreate')} /> : null}
       <Row label={tr('machines.cfg.bootOrder')} value={m.iso ? tr('machines.cfg.bootDiskThenCd') : tr('machines.cfg.bootDisk')} last note={tr('machines.cfg.bootNote')} />
     </Group>
-    <Later text={tr('machines.cfg.laterTpm')} />
+    <Later text={tr('machines.cfg.laterBoot')} />
   </>;
   else if (sec === 'security') pane = <Group>
     {['sandbox', 'files', 'network', 'limits', 'display', 'secrets'].map((k, i, a) => (

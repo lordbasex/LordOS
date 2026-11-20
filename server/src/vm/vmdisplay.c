@@ -298,7 +298,11 @@ static void au_rec(int fd) {
 }
 
 /* a new picture size: ask lord-server for a picture of it; the old one isn't written again */
+static const char *me = "";             /* the machine's id, for the notes in the session's log */
 static void new_size(uint32_t w, uint32_t h) {
+    /* the guest's own size (what follows a VD_RESIZE when its display driver does): a note when it changes, so a
+     * request that isn't followed can be told from one that never went out */
+    if (w != D.w || h != D.h) fprintf(stderr, "lord-vmdisplay %s: the guest's picture is %ux%u\n", me, w, h);
     D.w = w;
     D.h = h;
     damage(0, 0, (int)w, (int)h);
@@ -560,6 +564,13 @@ static void call_noreply(const char *iface, const char *method, const char *sig,
     sd_bus_message_unref(m);
 }
 
+static int on_ui_info(sd_bus_message *m, void *u, sd_bus_error *e) {
+    (void)u; (void)e;
+    const sd_bus_error *err = sd_bus_message_get_error(m);
+    if (err) fprintf(stderr, "lord-vmdisplay %s: QEMU refused the new size: %s\n", me, err->message ? err->message : err->name ? err->name : "?");
+    return 0;
+}
+
 static void key(int code, int down) {
     uint32_t q = vm_evdev_to_qnum(code);
     if (!q || code < 0 || code >= 768) return;
@@ -615,7 +626,10 @@ static void send_input(long long now) {
     if (D.resize_pending && now - D.resize_ms >= RESIZE_GAP_MS) {
         D.resize_pending = 0;
         D.resize_ms = now;
-        call_noreply("org.qemu.Display1.Console", "SetUIInfo", "qqiiuu", (uint16_t)0, (uint16_t)0, 0, 0, (uint32_t)D.rw, (uint32_t)D.rh);
+        /* with an answer: QEMU says so when the display device can't be asked (a refusal used to go unseen) */
+        fprintf(stderr, "lord-vmdisplay %s: the guest is asked for %dx%d\n", me, D.rw, D.rh);
+        sd_bus_call_method_async(bus, NULL, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "SetUIInfo", on_ui_info, NULL, "qqiiuu",
+                                 (uint16_t)0, (uint16_t)0, 0, 0, (uint32_t)D.rw, (uint32_t)D.rh);
     }
     if (D.ptr_pending) { D.ptr_pending = 0; say(vd_msg(VD_POINTER, D.ptr_x, D.ptr_y, D.ptr_on, 0, 0, 0), -1); }
 }
@@ -735,6 +749,7 @@ int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
     if (argc == 2 && !strcmp(argv[1], "--selftest")) return selftest();
     if (argc != 2 || !uuid_ok(argv[1])) { fprintf(stderr, "usage: lord-vmdisplay <machine id>   (fd 3: lord-server, fd 4: QEMU's D-Bus display)\n"); return 2; }
+    me = argv[1];
     if (!is_socket(CH, SOCK_SEQPACKET) || !is_socket(DBUS_FD, SOCK_STREAM)) { fprintf(stderr, "lord-vmdisplay: fd 3 must be a SOCK_SEQPACKET and fd 4 a stream socket\n"); return 2; }
     fcntl(CH, F_SETFD, FD_CLOEXEC);
     fcntl(DBUS_FD, F_SETFD, FD_CLOEXEC);

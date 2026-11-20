@@ -14,6 +14,7 @@
  *   rate HZ             copy rate                        release           let go of everything
  *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON
  *   noack 0|1           stop acknowledging frames (tests the 250 ms fallback)
+ *   file PATH           copy a file into the guest through its agent (VM_FILE, as a drop on the window does)
  *   wait-frames N [S]   wait until N more frames arrived (at most S seconds, default 30)
  *   quit
  * stdout: one JSON line per event or answer. Binaries are looked for next to this one, or in $LORDVM_BIN. */
@@ -136,7 +137,9 @@ static void from_vm(void) {
             vm_state = m.a;
             out("{\"ev\":\"state\",\"state\":\"%s\",\"reason\":%d,\"code\":%d,\"qemu_pid\":%d,\"detail\":\"%s\"}", STATES[m.a], m.b, m.c, m.d, m.text);
             if ((m.a == VS_RUNNING || m.a == VS_PAUSED) && !display_asked && machine_id[0]) { display_asked = 1; ask(VM_DISPLAY, 0, NULL); }
-        } else if (m.type == VM_REPLY) out("{\"ev\":\"reply\",\"seq\":%u,\"code\":%d,\"text\":\"%s\"}", m.seq, m.a, m.text);
+        } else if (m.type == VM_FILE_PROGRESS) out("{\"ev\":\"file\",\"seq\":%u,\"pct\":%d,\"name\":\"%s\"}", m.seq, m.a, m.text);
+        else if (m.type == VM_AGENT_STATE) out("{\"ev\":\"agent\",\"state\":%d,\"caps\":%d}", m.a, m.b);
+        else if (m.type == VM_REPLY) out("{\"ev\":\"reply\",\"seq\":%u,\"code\":%d,\"text\":\"%s\"}", m.seq, m.a, m.text);
         else if (m.type == VM_DISPLAY_FD) {
             if (fd < 0) { out("{\"ev\":\"error\",\"what\":\"VM_DISPLAY_FD without a descriptor\"}"); continue; }
             out("{\"ev\":\"display_fd\"}");
@@ -261,7 +264,14 @@ static int handle(char *line) {
     else if (!strcmp(line, "reset")) ask(VM_RESET, 0, NULL);
     else if (!strncmp(line, "shutdown", 8)) ask(VM_SHUTDOWN, atoi(line + 8), NULL);
     else if (!strcmp(line, "poweroff")) ask(VM_POWEROFF, 0, NULL);
-    else if (!strncmp(line, "qmp ", 4)) { snprintf(a1, sizeof a1, "%s", line + 4); ask(VM_QMP, 0, a1); }
+    else if (!strncmp(line, "file ", 5)) {
+        int fd = open(line + 5, O_RDONLY | O_CLOEXEC);
+        const char *slash = strrchr(line + 5, '/');
+        VmMsg m = vm_msg(VM_FILE, ++seq, 0, 0, 0, 0, slash ? slash + 1 : line + 5);
+        if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"file\"}");
+        else out("{\"ok\":true,\"cmd\":\"file\",\"seq\":%u}", seq);
+        if (fd >= 0) close(fd);
+    } else if (!strncmp(line, "qmp ", 4)) { snprintf(a1, sizeof a1, "%s", line + 4); ask(VM_QMP, 0, a1); }
     else if (sscanf(line, "wait-frames %d %d", &x, &y) >= 1) {
         if (sscanf(line, "wait-frames %d %d", &x, &y) < 2) y = 30;
         frames_target = frames + x;

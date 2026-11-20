@@ -790,6 +790,10 @@ enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P
        P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
+/* a file dropped on the machine's window, for the guest (VM_FILE) */
+#define FX_QUEUE 8
+typedef struct { int fd, client; uint32_t seq; char name[AG_NAME_MAX + 1]; } FxReq;
+
 static struct {
     char dir[PATH_MAX], disks[PATH_MAX + 16], rundir[PATH_MAX], sock_path[PATH_MAX];
     VmMachine m;
@@ -824,7 +828,8 @@ static struct {
     long long shut_deadline, kill_deadline;
     Pending pq[MAX_PENDING];
     int pq_head, pq_n;
-    int dev_qmp, paused_start, keep_running;
+    int dev_qmp, paused_start, keep_running, dev_client;
+    uint32_t dev_seq;
     int notify_fd;
     int display_n;
     int cred_fd[MAX_CREDS];
@@ -889,6 +894,14 @@ static struct {
     int id_state;                           /* 0 none, 1 pending, 2 running in the guest, 3 done */
     long id_pid;
     long long id_poll_at;
+    /* files dropped on the window (VM_FILE): the one being copied and the ones waiting (see fx_next) */
+    FxReq fx, fxq[FX_QUEUE];
+    int fxq_n, fx_step, fx_last;
+    long fx_handle, fx_pid;
+    long long fx_poll_at, fx_deadline, fx_told_at;
+    off_t fx_off, fx_size;
+    size_t fx_chunk;
+    char fx_tmp[64], fx_dest[1024];
 } S;
 
 static void awake_update(void);
@@ -2421,7 +2434,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
-       AQ_IDEXEC, AQ_IDSTATUS };
+       AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW };
 
 /* A Clone's first start (6.3): one fixed script, run as root by qemu-guest-agent, with the new hostname as its only
  * argument (checked: one DNS label). The machine-id is made again by systemd from the clone's new SMBIOS UUID (the old
@@ -2507,8 +2520,10 @@ static int qga_do(const char *cmd, const char *args, int kind) {
     return 0;
 }
 
+static void fx_fail_all(const char *why);
 static void qga_sync(void) {
     char a[64];
+    fx_fail_all("the guest agent started again");
     S.agq_n = 0;                        /* nothing sent before is waited for any more */
     snprintf(a, sizeof a, "{\"id\":%ld}", ++S.sync_id);
     qga_do("guest-sync", a, AQ_SYNC);
@@ -2525,6 +2540,7 @@ static void ag_timesync(void) {
 }
 
 static void ag_lost(const char *why) {
+    fx_fail_all("qemu-guest-agent stopped answering in the guest");
     if (S.qga_up) vlog("agent: %s", why);
     S.qga_up = 0; S.agq_n = 0; S.jpid = 0; S.inhibit_done = 0;
     if (S.id_state == 2) { S.id_state = 1; S.id_poll_at = 0; }      /* tried again when the agent is back */
@@ -2552,14 +2568,28 @@ static void journal_append(const uint8_t *data, size_t n) {
 }
 
 static void ag_install_step(void);
+static void fx_on_reply(int kind, const JVal *root, const JVal *r, int ok);
+static void fx_fail_all(const char *why);
 
 static void on_qga_reply(const JVal *root, int ok) {
     if (!S.agq_n) return;
     int kind = S.agq[S.agq_head];
     S.agq_head = (S.agq_head + 1) % 32;
     S.agq_n--;
+    if (S.qga_up) S.ping_at = now_ms();     /* any answer says it's there (a long copy keeps the queue from emptying) */
     const JVal *r = json_get(root, "return");
     switch (kind) {
+    case AQ_FXEXEC: case AQ_FXSTATUS: case AQ_FXOPEN: case AQ_FXWRITE: case AQ_FXCLOSE: fx_on_reply(kind, root, r, ok); break;
+    case AQ_DEVRAW: {
+        /* --dev-qmp: a qemu-guest-agent command for the tests; a pid, or what a guest-exec printed */
+        char t[VM_TEXT_MAX], o[140];
+        if (!ok) snprintf(t, sizeof t, "error: %.180s", qmp_error_desc(root));
+        else if (json_get(r, "pid")) snprintf(t, sizeof t, "pid %ld", (long)json_num(r, "pid", 0));
+        else if (json_get(r, "exited")) { ag_exec_text(json_str(r, "out-data"), o, sizeof o); snprintf(t, sizeof t, "exited %d exitcode %d: %s", json_bool(r, "exited", 0), (int)json_num(r, "exitcode", -1), o); }
+        else snprintf(t, sizeof t, "return");
+        reply(S.dev_client, S.dev_seq, ok ? VME_OK : VME_QMP, t);
+        break;
+    }
     case AQ_SYNC:
         if (ok && r && r->type == J_NUM && (long)r->num == S.sync_id) {
             S.qga_up = 1;
@@ -2704,6 +2734,291 @@ static void ag_install_step(void) {
     jb_raw(&b, "]}");
     if (!b.oom) qga_do("guest-exec", b.p, AQ_INSTALL);
     jb_free(&b);
+}
+
+/* ---- files dropped on the machine's window (VM_FILE) ----
+ * One file at a time, through qemu-guest-agent (which runs as root, or SYSTEM on Windows), into the Downloads folder of
+ * the person signed in to the guest. lord-vm reads only the descriptor lord-server opened; the guest chooses no path on
+ * this computer, and its answers (a folder, a path) only ever go back as text.
+ *   Linux:   a private folder (mktemp -d in /var/tmp, 0700), the file written into it, then one fixed script hands the
+ *            folder to the person (the first one with a seat, else the first account from 1000 up) and their own group
+ *            (named: uutils' chown, Ubuntu 26.04's, leaves the group as it was for "user:") and moves the file,
+ *            as that person (runuser), into their Downloads (xdg-user-dir) under a free name; the folder goes.
+ *            The file is never written by root into a folder the person owns.
+ *   Windows: a PowerShell script finds the signed-in person's Downloads (else the public one) and reserves a free name
+ *            there (CreateNew); the file is written into it. The name reaches both scripts as an argument or as base64,
+ *            never as script text. */
+enum { FX_NONE = 0, FX_PREP, FX_OPEN, FX_WRITE, FX_CLOSE, FX_PLACE };
+#define FX_CHUNK (48 * 1024)
+
+static const char FX_PREP_SH[] = "umask 077; d=$(mktemp -d /var/tmp/lordos-drop.XXXXXXXX) && printf '%s' \"$d\"";
+/* as the person: $1 the file, $2 its name */
+static const char FX_MOVE_SH[] =
+    "f=\"$1\"; n=\"$2\"; t=$(xdg-user-dir DOWNLOAD 2>/dev/null); "
+    "if [ -z \"$t\" ] || [ \"$t\" = \"$HOME\" ]; then t=\"$HOME/Downloads\"; fi; "
+    "mkdir -p -- \"$t\" || exit 5; "
+    "case \"$n\" in ?*.*) b=\"${n%.*}\"; e=\".${n##*.}\";; *) b=\"$n\"; e=\"\";; esac; "
+    "p=\"$t/$n\"; i=2; "
+    "while [ -e \"$p\" ] || [ -L \"$p\" ]; do p=\"$t/$b ($i)$e\"; i=$((i+1)); [ \"$i\" -lt 1000 ] || exit 6; done; "
+    "mv -n -T -- \"$f\" \"$p\" && [ ! -e \"$f\" ] || exit 7; "
+    "chmod 644 -- \"$p\" 2>/dev/null; printf '%s' \"$p\"";
+/* as root: $1 the private folder, $2 the name, $3 FX_MOVE_SH */
+static const char FX_PLACE_SH[] =
+    "d=\"$1\"; n=\"$2\"; "
+    "u=$(loginctl list-sessions --no-legend 2>/dev/null | awk '$2>=1000 && $2<60000 && $4 ~ /^seat/ {print $3; exit}'); "
+    "[ -n \"$u\" ] || u=$(loginctl list-sessions --no-legend 2>/dev/null | awk '$2>=1000 && $2<60000 {print $3; exit}'); "
+    "[ -n \"$u\" ] || u=$(getent passwd | awk -F: '$3>=1000 && $3<60000 && $7 !~ /(nologin|false)$/ {print $1; exit}'); "
+    "if [ -z \"$u\" ]; then rm -rf -- \"$d\"; echo 'no account of a person in the guest' >&2; exit 3; fi; "
+    "g=$(id -gn \"$u\") && chown -R -- \"$u:$g\" \"$d\" || { rm -rf -- \"$d\"; exit 4; }; "
+    "p=$(runuser -u \"$u\" -- /bin/sh -c \"$3\" lordos-drop \"$d/file\" \"$n\"); r=$?; rm -rf -- \"$d\"; "
+    "[ \"$r\" -eq 0 ] || exit \"$r\"; printf '%s' \"$p\"";
+/* %s: the name, base64 of its UTF-8. Prints base64 of the reserved path's UTF-8 (no console code page in the way) */
+static const char FX_PREP_PS[] =
+    "$ErrorActionPreference='Stop';"
+    "$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
+    "$d=$null;"
+    "try{$u=(Get-CimInstance Win32_ComputerSystem).UserName;"
+    "if($u){$s=(New-Object Security.Principal.NTAccount($u)).Translate([Security.Principal.SecurityIdentifier]).Value;"
+    "$h=(Get-CimInstance Win32_UserProfile -Filter (\"SID='\"+$s+\"'\")).LocalPath;"
+    "if($h){$d=Join-Path $h 'Downloads'}}}catch{$d=$null};"
+    "if(-not $d -or -not (Test-Path -LiteralPath $d -PathType Container)){$d=Join-Path $env:PUBLIC 'Downloads';"
+    "if(-not (Test-Path -LiteralPath $d)){New-Item -ItemType Directory -Path $d|Out-Null}};"
+    "$b=[IO.Path]::GetFileNameWithoutExtension($n);$e=[IO.Path]::GetExtension($n);$p=Join-Path $d $n;$i=2;"
+    "while(Test-Path -LiteralPath $p){if($i -gt 999){throw 'no free name'};$p=Join-Path $d ($b+' ('+$i+')'+$e);$i++};"
+    "([IO.File]::Open($p,'CreateNew','Write')).Close();"
+    "[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($p)))";
+static const char FX_DROP_PS[] =
+    "Remove-Item -LiteralPath ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'))) -Force -ErrorAction SilentlyContinue";
+
+static void fx_next(void);
+
+/* guest-exec of a PowerShell script (pure ASCII): -EncodedCommand, base64 of its UTF-16LE */
+static int fx_exec_ps(const char *script, int kind) {
+    size_t n = strlen(script);
+    uint8_t *w = malloc(n * 2);
+    char *b = malloc(n * 2 / 3 * 4 + 16);
+    int r = -1;
+    if (w && b) {
+        for (size_t i = 0; i < n; i++) { w[i * 2] = (uint8_t)script[i]; w[i * 2 + 1] = 0; }
+        if (ag_b64_encode(w, n * 2, b, n * 2 / 3 * 4 + 16) > 0) {
+            JBuf j;
+            jb_init(&j);
+            jb_raw(&j, "{\"path\":\"powershell.exe\",\"arg\":[\"-NoProfile\",\"-NonInteractive\",\"-ExecutionPolicy\",\"Bypass\",\"-EncodedCommand\",");
+            jb_str(&j, b);
+            jb_raw(&j, "],\"capture-output\":true}");
+            if (!j.oom) r = qga_do("guest-exec", j.p, kind);
+            jb_free(&j);
+        }
+    }
+    free(w); free(b);
+    return r;
+}
+static int fx_exec_sh(const char *script, const char *a1, const char *a2, const char *a3, int kind) {
+    JBuf j;
+    jb_init(&j);
+    jb_raw(&j, "{\"path\":\"/bin/sh\",\"arg\":[\"-c\",");
+    jb_str(&j, script);
+    jb_raw(&j, ",\"lordos-drop\"");
+    const char *a[3] = { a1, a2, a3 };
+    for (int i = 0; i < 3 && a[i]; i++) { jb_raw(&j, ","); jb_str(&j, a[i]); }
+    jb_raw(&j, "],\"capture-output\":true}");
+    int r = j.oom ? -1 : qga_do("guest-exec", j.p, kind);
+    jb_free(&j);
+    return r;
+}
+
+static void fx_progress(int force) {
+    long long now = now_ms();
+    if (!force && now - S.fx_told_at < 250) return;
+    S.fx_told_at = now;
+    int pct = S.fx_size > 0 ? (int)(S.fx_off * 100 / S.fx_size) : 0;
+    if (pct > 99 && S.fx_step != FX_NONE) pct = 99;
+    VmMsg m = vm_msg(VM_FILE_PROGRESS, S.fx.seq, pct, 0, 0, 0, S.fx.name);
+    send_to(S.fx.client, &m, -1);
+}
+
+static void fx_reset(void) {
+    if (S.fx.fd >= 0) close(S.fx.fd);
+    memset(&S.fx, 0, sizeof S.fx);
+    S.fx.fd = -1;
+    S.fx_step = FX_NONE;
+    S.fx_handle = S.fx_pid = 0;
+    S.fx_poll_at = S.fx_deadline = 0;
+    S.fx_off = S.fx_size = 0;
+    S.fx_tmp[0] = S.fx_dest[0] = 0;
+}
+
+/* the copy failed: what the guest has of it goes (when the agent still answers), the next file starts */
+static void fx_fail(int code, const char *why) {
+    vlog("files: %s wasn't copied: %s", S.fx.name, why);
+    reply(S.fx.client, S.fx.seq, code, why);
+    if (S.qga_up) {
+        if (S.fx_handle > 0) { char a[48]; snprintf(a, sizeof a, "{\"handle\":%ld}", S.fx_handle); qga_do("guest-file-close", a, AQ_IGNORE); }
+        if (S.fx_tmp[0]) fx_exec_sh("rm -rf -- \"$1\"", S.fx_tmp, NULL, NULL, AQ_IGNORE);
+        else if (S.fx_dest[0] && S.ag_windows) {
+            char b[1500], ps[sizeof FX_DROP_PS + 1500];
+            if (ag_b64_encode((const uint8_t *)S.fx_dest, strlen(S.fx_dest), b, sizeof b) > 0) { snprintf(ps, sizeof ps, FX_DROP_PS, b); fx_exec_ps(ps, AQ_IGNORE); }
+        }
+    }
+    fx_reset();
+    fx_next();
+}
+
+static void fx_done(const char *where) {
+    S.fx_step = FX_NONE;
+    S.fx_off = S.fx_size;
+    VmMsg m = vm_msg(VM_FILE_PROGRESS, S.fx.seq, 100, 0, 0, 0, S.fx.name);
+    send_to(S.fx.client, &m, -1);
+    vlog("files: %s copied into the guest (%lld bytes): %s", S.fx.name, (long long)S.fx_size, where);
+    reply(S.fx.client, S.fx.seq, VME_OK, where);
+    fx_reset();
+    fx_next();
+}
+
+/* every file that waits, and the one being copied, refused (the agent went, the machine stops) */
+static void fx_fail_all(const char *why) {
+    if (S.fx_step) { int up = S.qga_up; S.qga_up = 0; fx_fail(VME_WRONG_STATE, why); S.qga_up = up; }
+    for (int i = 0; i < S.fxq_n; i++) { reply(S.fxq[i].client, S.fxq[i].seq, VME_WRONG_STATE, why); if (S.fxq[i].fd >= 0) close(S.fxq[i].fd); }
+    S.fxq_n = 0;
+}
+
+static void fx_write_next(void) {
+    static uint8_t buf[FX_CHUNK];
+    static char b64[FX_CHUNK / 3 * 4 + 8], args[FX_CHUNK / 3 * 4 + 96];
+    ssize_t n = pread(S.fx.fd, buf, sizeof buf, S.fx_off);
+    if (n < 0) { fx_fail(VME_INTERNAL, "the file couldn't be read"); return; }
+    if (n == 0) {
+        char a[48];
+        snprintf(a, sizeof a, "{\"handle\":%ld}", S.fx_handle);
+        S.fx_step = FX_CLOSE;
+        if (qga_do("guest-file-close", a, AQ_FXCLOSE)) fx_fail(VME_BUSY, "the guest agent is busy");
+        return;
+    }
+    if (ag_b64_encode(buf, (size_t)n, b64, sizeof b64) < 0) { fx_fail(VME_INTERNAL, "internal error"); return; }
+    snprintf(args, sizeof args, "{\"handle\":%ld,\"buf-b64\":\"%s\"}", S.fx_handle, b64);
+    S.fx_chunk = (size_t)n;
+    if (qga_do("guest-file-write", args, AQ_FXWRITE)) fx_fail(VME_BUSY, "the guest agent is busy");
+}
+
+static void fx_open(const char *path) {
+    JBuf j;
+    jb_init(&j);
+    jb_raw(&j, "{\"path\":");
+    jb_str(&j, path);
+    jb_raw(&j, ",\"mode\":\"w\"}");
+    S.fx_step = FX_OPEN;
+    if (j.oom || qga_do("guest-file-open", j.p, AQ_FXOPEN)) fx_fail(VME_BUSY, "the guest agent is busy");
+    jb_free(&j);
+}
+
+/* the next file that waits, when nothing is being copied */
+static void fx_next(void) {
+    if (S.fx_step || !S.fxq_n) return;
+    S.fx = S.fxq[0];
+    memmove(S.fxq, S.fxq + 1, (size_t)(S.fxq_n - 1) * sizeof *S.fxq);
+    S.fxq_n--;
+    struct stat st;
+    S.fx_size = !fstat(S.fx.fd, &st) ? st.st_size : 0;
+    S.fx_off = 0;
+    S.fx_step = FX_PREP;
+    S.fx_deadline = now_ms() + 120000;
+    if (!S.qga_up) { fx_fail(VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
+    vlog("files: copying %s (%lld bytes) into the guest", S.fx.name, (long long)S.fx_size);
+    fx_progress(1);
+    int r;
+    if (S.ag_windows) {
+        char b[AG_NAME_MAX / 3 * 4 + 16], ps[sizeof FX_PREP_PS + sizeof b];
+        if (ag_b64_encode((const uint8_t *)S.fx.name, strlen(S.fx.name), b, sizeof b) < 0) { fx_fail(VME_INTERNAL, "internal error"); return; }
+        snprintf(ps, sizeof ps, FX_PREP_PS, b);
+        r = fx_exec_ps(ps, AQ_FXEXEC);
+    } else r = fx_exec_sh(FX_PREP_SH, NULL, NULL, NULL, AQ_FXEXEC);
+    if (r) fx_fail(VME_BUSY, "the guest agent is busy");
+}
+
+/* guest-exec-status of the step's script has exited: what it printed (out-data, base64) */
+static void fx_exec_done(const JVal *r) {
+    int code = (int)json_num(r, "exitcode", -1);
+    char said[sizeof S.fx_dest];
+    ag_exec_text(json_str(r, code == 0 ? "out-data" : "err-data"), said, sizeof said);
+    if (code != 0) {
+        char why[VM_TEXT_MAX];
+        snprintf(why, sizeof why, "the guest's script failed (%d)%s%.150s", code, said[0] ? ": " : "", said);
+        fx_fail(VME_QMP, why);
+        return;
+    }
+    if (S.fx_step == FX_PREP && !S.ag_windows) {
+        /* only the folder that script makes: /var/tmp/lordos-drop.XXXXXXXX */
+        static const char pre[] = "/var/tmp/lordos-drop.";
+        size_t l = strlen(said), pl = sizeof pre - 1;
+        int good = l == pl + 8 && !strncmp(said, pre, pl);
+        for (size_t i = pl; good && i < l; i++) good = isalnum((unsigned char)said[i]);
+        if (!good) { fx_fail(VME_QMP, "the guest didn't make a private folder"); return; }
+        snprintf(S.fx_tmp, sizeof S.fx_tmp, "%s", said);
+        char p[sizeof S.fx_tmp + 8];
+        snprintf(p, sizeof p, "%s/file", S.fx_tmp);
+        fx_open(p);
+    } else if (S.fx_step == FX_PREP) {
+        /* the path PowerShell reserved, base64 of UTF-8 */
+        uint8_t path[sizeof S.fx_dest];
+        long n = ag_b64_decode(said, strlen(said), path, sizeof path - 1);
+        if (n <= 3 || !ag_utf8_ok(path, (size_t)n)) { fx_fail(VME_QMP, "the guest didn't name a folder"); return; }
+        for (long i = 0; i < n; i++) if (path[i] < 0x20) { fx_fail(VME_QMP, "the guest didn't name a folder"); return; }
+        path[n] = 0;
+        snprintf(S.fx_dest, sizeof S.fx_dest, "%s", (const char *)path);
+        fx_open(S.fx_dest);
+    } else if (S.fx_step == FX_PLACE) {
+        S.fx_tmp[0] = 0;                                  /* the script removed it */
+        fx_done(said[0] ? said : S.fx.name);
+    }
+}
+
+static void fx_on_reply(int kind, const JVal *root, const JVal *r, int ok) {
+    if (!S.fx_step) return;
+    if (!ok) { char why[VM_TEXT_MAX]; snprintf(why, sizeof why, "qemu-guest-agent: %.160s", qmp_error_desc(root)); fx_fail(VME_QMP, why); return; }
+    switch (kind) {
+    case AQ_FXEXEC:
+        S.fx_pid = (long)json_num(r, "pid", 0);
+        S.fx_poll_at = now_ms() + 150;
+        break;
+    case AQ_FXSTATUS:
+        if (!json_bool(r, "exited", 0)) {
+            if (now_ms() > S.fx_deadline) { fx_fail(VME_QMP, "the guest's script took too long"); break; }
+            S.fx_poll_at = now_ms() + 200;
+            break;
+        }
+        fx_exec_done(r);
+        break;
+    case AQ_FXOPEN:
+        S.fx_handle = (long)(r && r->type == J_NUM ? r->num : 0);
+        if (S.fx_handle <= 0) { fx_fail(VME_QMP, "the guest agent didn't open the file"); break; }
+        S.fx_step = FX_WRITE;
+        fx_write_next();
+        break;
+    case AQ_FXWRITE: {
+        long count = (long)json_num(r, "count", -1);
+        if (count != (long)S.fx_chunk) { fx_fail(VME_QMP, "the guest agent wrote less than it was given (is its disk full?)"); break; }
+        S.fx_off += (off_t)S.fx_chunk;
+        if (S.fx_off > S.fx_size) S.fx_size = S.fx_off;
+        fx_progress(0);
+        fx_write_next();
+        break;
+    }
+    case AQ_FXCLOSE:
+        S.fx_handle = 0;
+        if (S.ag_windows) { fx_done(S.fx_dest); break; }
+        S.fx_step = FX_PLACE;
+        S.fx_deadline = now_ms() + 120000;
+        if (fx_exec_sh(FX_PLACE_SH, S.fx_tmp, S.fx.name, FX_MOVE_SH, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
+        break;
+    }
+}
+
+static void fx_tick(long long now) {
+    if (!S.fx_poll_at || now < S.fx_poll_at) return;
+    S.fx_poll_at = 0;
+    char a[48];
+    snprintf(a, sizeof a, "{\"pid\":%ld}", S.fx_pid);
+    if (qga_do("guest-exec-status", a, AQ_FXSTATUS)) S.fx_poll_at = now + 200;
 }
 
 static void drain_qga(void) {
@@ -2863,7 +3178,7 @@ static void ag_tick(long long now) {
 static void console_out(const char *b, size_t n);
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
-    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP) { close(fd); fd = -1; }
+    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE) { close(fd); fd = -1; }
     int alive = S.qemu > 0 && !S.qemu_done && S.qmp_up;
     switch (m->type) {
     case VM_STATUS: {
@@ -3004,6 +3319,27 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         reply(ci, m->seq, VME_OK, what);
         return;
     }
+    case VM_FILE: {
+        struct stat st;
+        char nm[AG_NAME_MAX + 1];
+        const char *no = fd < 0 ? "no file" : fstat(fd, &st) || !S_ISREG(st.st_mode) || (fcntl(fd, F_GETFL) & O_ACCMODE) != O_RDONLY ? "not a file opened for reading"
+                       : ag_drop_name(m->text, nm, sizeof nm) ? "the file's name can't be used" : NULL;
+        int code = VME_BAD_REQUEST;
+        if (!no) {
+            code = VME_WRONG_STATE;
+            if (!S.m.agent) { code = VME_DENIED; no = "the guest agent is off for this machine"; }
+            else if (!alive || S.state != VS_RUNNING) no = S.state == VS_PAUSED ? "the machine is paused" : "not running";
+            else if (!S.qga_up) no = "qemu-guest-agent isn't answering in the guest";
+            else if (!(S.ag_caps & VAC_FILES) || !(S.ag_caps & VAC_EXEC)) no = "the guest agent can't write files or run commands";
+            else if (S.fxq_n >= FX_QUEUE) { code = VME_BUSY; no = "too many files are waiting"; }
+        }
+        if (no) { if (fd >= 0) close(fd); reply(ci, m->seq, code, no); return; }
+        FxReq *q = &S.fxq[S.fxq_n++];
+        q->fd = fd; q->client = ci; q->seq = m->seq;
+        memcpy(q->name, nm, sizeof q->name);
+        fx_next();
+        return;
+    }
     case VM_KEEP:
         S.keep_running = m->a ? 1 : 0;
         vlog("keep running without lord-server: %s", S.keep_running ? "yes" : "no");
@@ -3012,6 +3348,14 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
     case VM_QMP:
         if (!S.dev_qmp) { reply(ci, m->seq, VME_DENIED, "lord-vm wasn't started with --dev-qmp"); return; }
         if (!S.qmp_up) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        if (strstr(m->text, "\"execute\":\"guest-")) {
+            /* to qemu-guest-agent instead (the tests check what reached the guest) */
+            if (!S.qga_up || S.agq_n >= 32 || qmp_raw(&S.qga, m->text)) { reply(ci, m->seq, VME_WRONG_STATE, "the guest agent isn't answering"); return; }
+            S.agq[(S.agq_head + S.agq_n) % 32] = AQ_DEVRAW; S.agq_n++;
+            S.dev_client = ci; S.dev_seq = m->seq;
+            vlog("dev-qmp to the guest agent from client %d: %s", ci, m->text);
+            return;
+        }
         if (S.pq_n >= MAX_PENDING || qmp_raw(&S.qmp, m->text)) { reply(ci, m->seq, VME_BAD_REQUEST, "can't send"); return; }
         pq_push(P_RAW, ci, m->seq, -1);
         vlog("dev-qmp from client %d: %s", ci, m->text);
@@ -3358,6 +3702,7 @@ static void loop(void) {
         if (S.net_retry_at && (next < 0 || S.net_retry_at < next)) next = S.net_retry_at;
         if (S.host_stopping && (next < 0 || now + 500 < next)) next = now + 500;
         if (S.id_poll_at && (next < 0 || S.id_poll_at < next)) next = S.id_poll_at;
+        if (S.fx_poll_at && (next < 0 || S.fx_poll_at < next)) next = S.fx_poll_at;
         if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
@@ -3373,6 +3718,7 @@ static void loop(void) {
         }
         if (S.net_retry_at && now >= S.net_retry_at) net_restart();
         if (S.id_poll_at && now >= S.id_poll_at) { char a[48]; S.id_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.id_pid); qga_do("guest-exec-status", a, AQ_IDSTATUS); }
+        fx_tick(now);
         host_stop_tick(now);
         if (S.shut_deadline && now >= S.shut_deadline) {
             S.shut_deadline = 0;
@@ -3679,7 +4025,7 @@ static int connect_machine(const VmMachine *m);
 static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
-    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = -1;
+    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = -1;
     S.keeper_fd = S.passt_pidfd = S.tpm_q = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
