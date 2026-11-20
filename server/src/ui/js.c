@@ -89,7 +89,7 @@ static void dump_exception(JSContext *c) {
     JS_FreeValue(c, e);
 }
 
-/* ---- the main-thread stall detector (docs/PERFORMANCE.md, "Main-thread pauses") ----
+/* ---- the main-thread stall detector (docs/MAIN-THREAD.md) ----
  * Everything the desktop draws waits for the main thread, the pointer too: a JavaScript task that runs for 200 ms
  * stops the pointer for 200 ms. Every entry from C into JavaScript (an event, a timer tick, a frame, a reply, the
  * promise jobs after it) is timed with two clock reads; one that ran longer than STALL_MS is logged with what it

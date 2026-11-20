@@ -1,6 +1,6 @@
 #!/bin/sh
-# perf_headless.sh — how long the main thread is busy for everyday actions (docs/PERFORMANCE.md, "Main-thread
-# pauses"): a headless lord-server on the CPU path runs a theme with tests/perf/driver.js after it, which opens apps,
+# perf_headless.sh — how long the main thread is busy for everyday actions (docs/MAIN-THREAD.md):
+# a headless lord-server on the CPU path runs a theme with tests/perf/driver.js after it, which opens apps,
 # clicks their sidebars and changes settings, one step every 1.5 s, and logs per step the main thread's JavaScript,
 # layout and paint time and its longest single run, and the JS heap per scenario. Not part of `make test` (minutes).
 #   tests/perf_headless.sh [theme] [plan,...]      e.g. tests/perf_headless.sh default store,settings
@@ -20,7 +20,8 @@ rm -rf "$ROOT/themes/zperf"
 mkdir -p "$ROOT/themes/zperf"
 cp -r "$ROOT/themes/$THEME" "$T"
 PLANJS=$(printf '%s' "$PLAN" | sed "s/[^a-zA-Z,]//g; s/,/','/g")
-{ printf "globalThis.PERF_PLAN = ['%s'];\n" "$PLANJS"; cat tests/perf/pre.js "$ROOT/themes/$THEME/theme.bundle.js" tests/perf/driver.js; } >"$T/theme.bundle.js"
+# PERF_BUNDLE: another build of the theme (an older checkout's, to compare)
+{ printf "globalThis.PERF_PLAN = ['%s'];\n" "$PLANJS"; cat tests/perf/pre.js "${PERF_BUNDLE:-$ROOT/themes/$THEME/theme.bundle.js}" tests/perf/driver.js; } >"$T/theme.bundle.js"
 node tests/perf/manifest.mjs "$ROOT" "themes/zperf/$THEME/theme.bundle.js" || exit 1
 mkdir -p "$D/home/.config/lordos"
 chmod 700 "$D"

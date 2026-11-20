@@ -51,7 +51,8 @@ async function buildTheme(name) {
     bundle: true,
     format: 'iife',
     target: 'es2020',
-    minify: true,
+    // LORD_NOMINIFY=1: readable names in stacks and in server/tests/perf's render counts (a diagnosis build)
+    minify: !process.env.LORD_NOMINIFY,
     jsx: 'automatic',
     alias: {
       '@lordos/runtime': path.join(root, 'runtime', 'index.js'),

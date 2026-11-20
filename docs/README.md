@@ -127,6 +127,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [PAPER-VALIDATION.md](PAPER-VALIDATION.md) | Each claim of the paper, how it is checked and its state |
 | [RESULTS.md](RESULTS.md) | Versioned results: measurements per version and machine, with the commands that produced them |
 | [PERFORMANCE-0.8.9.md](PERFORMANCE-0.8.9.md) | Performance of 0.8.9 and 0.8.9.1 on the maintainer's PC and a Raspberry Pi 5: memory and processor at rest, the slideshow's cost, the floor, widgets and a Terminal, the memory work's runs (data in `perf/`) |
+| [MAIN-THREAD.md](MAIN-THREAD.md) | The main thread's pauses (0.8.9.5): the stall detector and its log lines, `tools/stall-where.mjs`, `server/tests/perf_headless.sh`, the rules that keep the desktop answering (store subscriptions, memoized apps, pending controls) and what was measured |
 | [perf/MEMORY-HEAPTRACK.md](perf/MEMORY-HEAPTRACK.md) | Measuring a session's memory down to the line of code: session-sample.sh, the memory report, heaptrack; the 0.8.9.1 results |
 
 ## Images and assets

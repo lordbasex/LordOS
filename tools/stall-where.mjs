@@ -1,4 +1,4 @@
-// stall-where.mjs — the stall detector's lines (lord-server: stall: …, docs/PERFORMANCE.md) with the minified
+// stall-where.mjs — the stall detector's lines (lord-server: stall: …, docs/MAIN-THREAD.md) with the minified
 // places of their JavaScript stacks turned into source files and lines, through the theme's source map.
 //
 //   LORD_SOURCEMAP=1 node tools/build-theme.mjs default     # the map, from the same sources as the running bundle

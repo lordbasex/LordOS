@@ -189,7 +189,7 @@ const host = {
 
   finalizeInitialChildren: () => false,
   // React 19: no prepareUpdate; commitUpdate receives the type and the old and new props
-  commitUpdate(inst, _type, prev, next) { applyProps(inst, prev, next); inst.props = next; ops.updated++; ops.last = inst; },
+  commitUpdate(inst, _type, prev, next) { applyProps(inst, prev, next); inst.props = next; ops.updated++; ops.total++; ops.last = inst; },
   commitTextUpdate(inst, _old, text) { lord.setText(inst.id, text); ops.updated++; },
   resetTextContent() {},
   shouldSetTextContent: () => false,

@@ -104,6 +104,15 @@
       step('wait', () => {});
       step('wait', () => {});
       end();
+      begin('Files: scroll the big folder');
+      for (let i = 0; i < 6; i++) step(`scroll ${i}`, () => {
+        const f = frameOf('files');
+        const it = f && labels({ x: f.x + 260, y: f.y + 120, w: f.w - 300, h: f.h - 200 })[0];
+        if (!it) return false;
+        for (let k = 0; k < 8; k++) globalThis.__lordEvent('wheel', it.id, it.x, it.y, -3);
+        return true;
+      });
+      end();
       begin('Files: sidebar');
       step('list', () => {
         const items = sidebar('files', 200);
@@ -118,20 +127,76 @@
       for (let i = 0; i < 4; i++) step('wait', () => {});
       end();
     },
+    // the maintainer's case: several apps open, then a setting changes and windows are focused in turn
+    mixed() {
+      // (not Monitor: its charts redraw four times a second and would be in every step; idleMonitor measures it)
+      begin('Three apps open: open them');
+      step('close the others', closeAll);
+      for (const a of ['store', 'settings', 'files']) step(`open ${a}`, () => sdk.wm.open(a));
+      step('wait', () => {});
+      step('wait', () => {});
+      end();
+      begin('Three apps open: settings.set (6 times)');
+      for (let i = 0; i < 6; i++) step(`windowSnap ${i % 2 ? 'on' : 'off'}`, () => sdk.settings.set({ windowSnap: i % 2 === 1 }));
+      end();
+      begin('Three apps open: focus each (2 rounds)');
+      for (let r = 0; r < 2; r++) for (const a of ['store', 'settings', 'files']) step(`focus ${a}`, () => sdk.wm.focus(a));
+      end();
+      begin('Three apps open: idle');
+      for (let i = 0; i < 4; i++) step('idle', () => {});
+      end();
+    },
+    // the native calls apps make while rendering, each timed alone (ms; the first call may fill a cache)
+    natives() {
+      begin('native calls');
+      const calls = [
+        ['pkg.upgrades', () => lord.pkg.upgrades()], ['pkg.upgrades again', () => lord.pkg.upgrades()],
+        ['pkg.info bash', () => lord.pkg.info('bash', { lang: 'en' })], ['pkg.lastUpdate', () => lord.pkg.lastUpdate()],
+        ['pkg.categoryCounts', () => lord.pkg.categories && lord.pkg.categories()],
+        ['pkg.apps Graphics', () => lord.pkg.apps({ category: 'Graphics', limit: 2000, lang: 'en' })],
+        ['pkg.search editor', () => lord.pkg.search('editor', { limit: 60, lang: 'en' })],
+        ['pkg.plan vim', () => lord.pkg.plan({ install: ['vim'] })],
+        ['fs.list /usr/bin', () => lord.fs.list('/usr/bin')], ['fs.list /usr/share/doc', () => lord.fs.list('/usr/share/doc')],
+        ['fonts.list', () => lord.fonts && lord.fonts.list()], ['apps.list', () => lord.apps && lord.apps.list && lord.apps.list()],
+        ['system.info', () => lord.system.info()], ['monitor.sample', () => lord.monitor && lord.monitor.sample()],
+      ];
+      for (const [name, fn] of calls) step(name, () => {
+        const t0 = lord.now();
+        let n = '';
+        try { const r = fn(); n = Array.isArray(r) ? ` (${r.length})` : ''; } catch (e) { n = ` (${e.message})`; }
+        log({ native: name + n, ms: +(lord.now() - t0).toFixed(1) });
+      });
+      end();
+    },
     launcher() {
       begin('Launcher F4 (4 times)');
       for (let i = 0; i < 4; i++) step(`F4 ${i}`, () => key('F4', 62));
       end();
     },
   };
-  for (const p of (globalThis.PERF_PLAN || ['idle', 'settingsSet', 'launcher', 'store', 'settings', 'files', 'monitor'])) plans[p]?.();
+  // idleX: app X alone, then 20 idle steps (30 s): what it does in the background, and whether its heap grows
+  const idleApp = (app) => {
+    begin(`${app} alone: open`);
+    step('close the others', closeAll);
+    step('open', () => sdk.wm.open(app));
+    step('wait', () => {});
+    step('wait', () => {});
+    end();
+    begin(`${app} alone: idle 30 s`);
+    for (let i = 0; i < 20; i++) step('idle', () => {});
+    end();
+  };
+  for (const p of (globalThis.PERF_PLAN || ['idle', 'settingsSet', 'launcher', 'store', 'settings', 'files', 'monitor'])) {
+    if (/^idle[A-Za-z]+$/.test(p) && !plans[p]) idleApp(p.slice(4).toLowerCase());
+    else plans[p]?.();
+  }
   steps.push({ begin: 'after all' });
   steps.push({ name: 'settle', fn: () => {}, scenario: 'after all' });
   steps.push({ end: 'after all' });
 
   let cursor = -1;
   const heap = () => { const s = lord.stats(2); return { usedKB: s.jsUsedKB, objects: s.jsObjects, nodes: s.nodes }; };
-  let last = lord.stats(1);
+  let last = lord.stats(1), lastOps = 0;
   function next() {
     cursor++;
     if (cursor >= steps.length) { log({ done: true, stalls: lord.stats().stalls, worst: lord.stats().stallWorstMs }); lord.quit?.(); return; }
@@ -142,9 +207,11 @@
     try { ok = s.fn() !== false; } catch (e) { log({ error: String(e && e.message || e), step: s.name }); }
     setTimeout(() => {
       const now = lord.stats(1);
-      log({ scenario: s.scenario, step: s.name, ok, js: +(now.busyJsMs - last.busyJsMs).toFixed(1), layout: +(now.busyLayoutMs - last.busyLayoutMs).toFixed(1),
+      const ops = globalThis.__lordReactOps ? globalThis.__lordReactOps() : 0;
+      log({ scenario: s.scenario, step: s.name, ok, updates: ops - lastOps, js: +(now.busyJsMs - last.busyJsMs).toFixed(1), layout: +(now.busyLayoutMs - last.busyLayoutMs).toFixed(1),
         paint: +(now.busyPaintMs - last.busyPaintMs).toFixed(1), max: +now.maxRunMs.toFixed(1), nodes: now.nodes });
       last = now;
+      lastOps = ops;
       next();
     }, STEP);
   }

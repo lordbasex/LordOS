@@ -10,6 +10,7 @@ for (const o of lines) {
   if (o.step && cur) cur.steps.push(o);
   if (o.done) console.log(`stalls past the limit: ${o.stalls}, worst ${o.worst?.toFixed?.(1)} ms`);
   if (o.error) console.log('error:', o.step, o.error);
+  if (o.native) console.log(`native ${o.native}: ${o.ms} ms`);
 }
 const f = (n) => (n == null ? '-' : n.toFixed(1));
 for (const r of rows) {
@@ -20,5 +21,5 @@ for (const r of rows) {
   const dh = r.heap1 && r.heap0 ? r.heap1.usedKB - r.heap0.usedKB : null;
   console.log(`${r.name}: ${r.steps.length} steps; per step js ${f(sum('js') / n)} layout ${f(sum('layout') / n)} paint ${f(sum('paint') / n)} ms; ` +
     `longest run ${f(max)} ms${worst ? ` (${worst.step})` : ''}; heap ${r.heap0?.usedKB} → ${r.heap1?.usedKB} KB (${dh >= 0 ? '+' : ''}${dh}), objects ${r.heap0?.objects} → ${r.heap1?.objects}, nodes ${r.heap1?.nodes}`);
-  if (process.env.PERF_STEPS) for (const s of r.steps) console.log(`    ${s.step}: js ${s.js} layout ${s.layout} paint ${s.paint} max ${s.max}${s.ok === false ? ' (not found)' : ''}`);
+  if (process.env.PERF_STEPS) for (const s of r.steps) console.log(`    ${s.step}: updates ${s.updates} js ${s.js} layout ${s.layout} paint ${s.paint} max ${s.max}${s.ok === false ? ' (not found)' : ''}`);
 }

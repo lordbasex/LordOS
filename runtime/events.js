@@ -18,13 +18,14 @@ export const register = (inst) => instances.set(inst.id, inst);
 // What React did in the run in progress (index.js counts it) and the node the last pointer event was for. When a run
 // took too long, lord-server asks __lordStallWho(what) whose it was: the window (WindowShell's lordWin prop) of that
 // node, or of the last node React touched, and how many nodes React made and changed.
-export const ops = { created: 0, updated: 0, last: null };
+export const ops = { created: 0, updated: 0, last: null, total: 0 };   // total: changes since the start (tests)
 let lastEventId = 0;
 const resetOps = () => { ops.created = 0; ops.updated = 0; ops.last = null; };
 function windowOf(inst) {
   for (let n = inst; n; n = n.parent) if (n.props && n.props.lordWin) return String(n.props.lordWin);
   return null;
 }
+globalThis.__lordReactOps = () => ops.total;
 globalThis.__lordStallWho = (what) => {
   const at = what === '__lordEvent' || what === '__lordGesture' ? instances.get(lastEventId) : ops.last;
   const win = (at && windowOf(at)) || (ops.last && windowOf(ops.last));
