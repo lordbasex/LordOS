@@ -193,6 +193,8 @@ ALL += build/lord-netperm
 ifeq ($(BPF),1)
 NP_GEN := build/gen/np_bpf.h
 NP_CPP := -DNP_HAVE_BPF
+else
+$(warning clang not found: lord-netperm builds without BPF and the firewall enforces nothing; tools/iso/mkdeb.sh refuses to package it)
 endif
 build/bpf2c: src/netperm/bpf2c.c
 	@mkdir -p build
