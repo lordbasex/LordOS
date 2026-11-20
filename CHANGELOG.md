@@ -10,6 +10,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9.3-beta] - 2026-11-20
+
 ### Security
 
 - **The per-app firewall enforced no rule in 0.8.8.6 to 0.8.9.2.** `lord-netperm` compiles its cgroup BPF programs with
@@ -7417,7 +7419,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.2-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.3-beta...HEAD
+[0.8.9.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.2-beta...v0.8.9.3-beta
 [0.8.9.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.1-beta...v0.8.9.2-beta
 [0.8.9.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9-beta...v0.8.9.1-beta
 [0.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.9-beta...v0.8.9-beta

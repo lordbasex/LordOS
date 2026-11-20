@@ -361,6 +361,13 @@ pre-release that never shipped. The paper marks all of it "0.8.9, in development
 | 5.1 | A paused Cloud account sends nothing to its provider: no mount retries, check listing, quota call, background listing or change polling (#194) | Test (`cloud-test` `t_pause`: `cloud_bring_up_ok` and the `vfs/poll-interval` call) | Not yet with a real Google account or a packet capture |
 | 5.1 | The package installs `assets/cloud/providers.json`, so verified providers read verified (#195) | Test (`cloud_model_test.mjs`: mkdeb.sh installs `assets/cloud`, the fallback) | Not yet in a built .deb |
 
+## 0.8.9.3 (released 2026-11-20)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 6.6 | The 0.8.8.6 to 0.8.9.2 packages had no BPF programs in `lord-netperm`, and 0.8.9.3 has them | every `lordos_*.deb` still in the APT repository unpacked on 2026-11-20: 0.8.1 to 0.8.8.5 have them, 0.8.8.6, 0.8.8.7, 0.8.8.8, 0.8.8.9 and 0.8.9 carry `fw.bpfNotBuilt` (the build without BPF); this machine's 0.8.9 logged `BPF not available (fw.bpfNotBuilt)`. Rebuilt with clang: `npverify-test` 46/46 through the kernel verifier, and on VM 127 `11 BPF programs attached`, then "no internet", per-domain rules and the camera, USB and Bluetooth restrictions denied (docs/FLATPAK.md, "Results") | Verified |
+| 6.6 | `tools/iso/mkdeb.sh` refuses a `lord-netperm` without BPF | the check greps the binary for `fw.bpfNotBuilt` before packaging, with no way to skip it | Verified (code) |
+
 ## 0.8.9.2 (released 2026-11-19)
 
 | § | Claim | How | State |
