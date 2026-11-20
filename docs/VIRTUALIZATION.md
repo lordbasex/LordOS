@@ -1703,7 +1703,13 @@ person's own shares are.
 - **Where:** `vm_transfer_path` (machine.c). At each start `lord-vm` makes `<library>/Transfer` (0700) and the machine's folder
   in it (0777: virtiofsd can't take the guest's uids, so this lets a guest person with another uid than this account's write
   there; nothing outside the 0700 parent reaches it), then checks both are real folders of this account and opens the folder
-  without following a link at any step (`open_share`). `lord.vm.transferFolder(dir)` makes it the same way for Open Transfer
+  without following a link at any step (`open_share`).
+- **Tied to its machine** (`vm_transfer_claim`, security review 2026-11-20): the folder's name is readable, but an owner record
+  beside it, `<library>/Transfer/.<name>.machine` (outside what the guest sees), holds the machine's id. A folder of that name
+  owned by another machine (one deleted, renamed or made again with the same name), or owned by none and not empty, or not a
+  real folder, is moved aside to `<name> (old YYYY-MM-DD)` (then ` 2`, ` 3`…) with its record, never deleted, and the machine
+  gets a new one. Removing a machine (to the Trash) moves its own folder aside the same way (`lord.vm.transferAside`), so a new
+  machine of that name never starts with another's files. `lord.vm.transferFolder(dir)` makes it the same way for Open Transfer
   Folder before the first start. It is inside the library, which a person's share may never be (`vm_share_allowed`): this one
   fixed path is the exception, and it holds no machine folder (the library lists only `<name>.lordvm` directly in it), so the
   guest can't reach a `machine.json`. lord-server refuses a start when the folder is one `fsops_protected` covers, as for a
@@ -1725,13 +1731,25 @@ person's own shares are.
   machines tested), visible in the signed-in person's session too.
 - **Drops (6.21) go through it** when the guest has it mounted: `lord-vm` copies the file lord-server opened into the transfer
   folder itself, in a child process so its loop never waits (a reflink, `FICLONE`, where the file system can; else
-  `copy_file_range`, which on one file system never passes through user space; else read and write), under a name it makes
-  (`.lordos-drop-<16 hex>`, `O_EXCL | O_NOFOLLOW`, through the folder's descriptor: the guest can write that folder, so nothing
-  there is followed or trusted). Not a hard link: the guest could then write the person's original. Then, on Linux, root only
-  checks that `/mnt/LordOS` is mounted and, as the person, a fixed script copies the file into a hidden temporary file in their
-  Downloads, moves it to a free name and removes the transfer copy; on Windows the person's own scheduled task (the drops'
-  mechanism, 6.21) finds the transfer drive by that name and copies from it. Any failure tries the agent's way once more and
-  looks at the guest's folder again; `lord-vm` removes its file from the transfer folder whatever happens. The window's hint says
+  `copy_file_range`, which on one file system never passes through user space; else read and write), into a folder it makes
+  for that drop (`.lordos-drop-<16 hex>`, 0700, holding `file`, made `O_EXCL | O_NOFOLLOW` through the folder's descriptors:
+  the guest can write the transfer folder, so nothing there is followed or trusted), then hashes the person's file (SHA-256).
+  Not a hard link: the guest could then write the person's original. The person's copy in the guest is written to a hidden
+  file in their Downloads and gets its name only when its size and SHA-256 are the ones `lord-vm` measured; otherwise it's
+  deleted and the agent's way follows. On Linux root only checks that `/mnt/LordOS` is mounted and, as the person, a fixed
+  script checks the drop's folder and file aren't links, copies and hashes in one pass (`tee | sha256sum`), and names it. On
+  Windows SYSTEM finds the transfer drive itself and never by a name a guest could plant: only a global drive (no person can
+  make one) labelled `LordOS` whose drop folder, not a reparse point, holds `token`, a random value `lord-vm` wrote there and
+  gives SYSTEM in its script; the person's own scheduled task (the drops' mechanism, 6.21) gets that exact path, checks it and
+  its folder aren't reparse points, and copies and hashes it (`IncrementalHash`). Any failure tries the agent's way once more
+  and looks at the guest's folder again; `lord-vm` removes the drop's folder whatever happens.
+- **Who in the guest sees a drop while it passes:** on Linux the drop's folder is 0700 and the guest's kernel checks it: only
+  root and the account with this computer's uid (1000 on most systems: usually the person) can enter it (checked 2026-11-20:
+  another account gets "Permission denied" for the folder and the file; it can still rename the folder away, which only
+  sends the drop the agent's way). On Windows the VirtIO-FS drive gives Everyone full control (its ACL is
+  `O:WDG:WDD:P(A;;FA;;;WD)`, checked 2026-11-20): every account of the guest can read a dropped file during the seconds it
+  passes through the transfer folder, and change it (which the hash check catches). Machines used by several people should
+  drop files through the agent: turn the transfer folder off in Configure. The window's hint says
   which way the files will go, the progress line says "through the transfer folder".
 - **Out of the guest:** what the guest saves in its LordOS folder or drive is in the transfer folder here at once (Open Transfer
   Folder: the folder menu, the Actions menu, the library's menu). Dragging out of the guest's window still needs a helper inside
@@ -1743,14 +1761,18 @@ person's own shares are.
 
 | | Agent's way (before) | Transfer folder |
 |---|---|---|
-| Ubuntu 26.04 guest, drop into Downloads | about 26–30 MB/s (an 8.7 GB ISO took minutes) | 4.8 s, about 440 MB/s (host copy 0.7 s, the person's copy in the guest the rest); SHA-256 checked in the guest |
-| Windows 11 guest, drop into Downloads | about 26–30 MB/s | 24.5 s, about 88 MB/s (host copy 3.3 s; about 11 s is the fixed cost of the scheduled task and PowerShell, the same on the agent's way); SHA-256 checked in the guest |
+| Ubuntu 26.04 guest, drop into Downloads | about 26–30 MB/s (an 8.7 GB ISO took minutes) | 17.6 s, about 120 MB/s with the hash check (host copy and SHA-256 8.5 s, the person's copy and hash in the guest 9.2 s); 4.8 s before the check was added |
+| Windows 11 guest, drop into Downloads | about 26–30 MB/s (78–80 s for this file, measured the same day) | 25.6 s, about 84 MB/s with the hash check (host 8.5 s; the person's task about 17 s, of which about 9 s is the fixed cost of the scheduled task and PowerShell, the same on the agent's way) |
 | Ubuntu guest → this computer (`cp` into ~/LordOS) | not possible | 2.4 s, about 880 MB/s, the file whole on the host when the copy returns |
 | Windows guest → this computer (`copy` to Z:) | not possible | 2.5 s, about 860 MB/s |
 | WinFsp set up in a Windows guest | — | 8 s (installer copied, checked, installed, service started) |
 
 Also checked: a machine suspended with the transfer folder resumes with it (suspend.json `"transfer": true`) and mounts it again;
-with the guest's mount gone, a drop falls back to the agent's way and the guest's folder is mounted again.
+with the guest's mount gone, a drop falls back to the agent's way and the guest's folder is mounted again; a copy whose size or
+hash differs is deleted and named nothing (the Linux script run against a wrong hash and a wrong size, the Windows script as
+SYSTEM); a folder of the same name left by an earlier machine moved aside at the start. The hash costs time: this computer's
+SHA-256 (portable C, no SHA extensions on this CPU) runs at about 280 MB/s; running it while the guest copies (a second step
+that names the guest's copy) would bring a 2 GB drop to about 10 s on Linux: not done yet.
 
 ### 6.8 Clipboard and drag
 

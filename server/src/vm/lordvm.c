@@ -938,9 +938,10 @@ static struct {
     char fx_tmp[256];                      /* the private folder in the guest the file is written into */
     /* a drop through the transfer folder (6.7.1): fx_via 1; the host's copy into it (a child of lord-vm: its pid, the pipe
      * it reports on), the file's name there (.lordos-drop-<random>), whether the agent's way was tried after it failed */
-    int fx_via, fx_cpipe, fx_retried;
+    int fx_via, fx_cpipe, fx_retried, fx_stagefd, fx_dig_n;
     pid_t fx_cpid;
-    char fx_stage[40];
+    char fx_stage[40], fx_token[33], fx_sha[65];
+    uint8_t fx_dig[32];
     long long fx_t0;
     /* LordOS guest tools for Windows (VAG_INSTALL on a Windows guest, tools/guest-win): the program, read at the start,
      * and the install's steps (see wi_begin) */
@@ -1398,22 +1399,16 @@ static int spawn_swtpm(char *err, size_t errlen) {
  * real folders owned by this account, no link on the way (open_share), and never the library, a machine's folder or a
  * folder holding them other than as <library>/Transfer/<name>. lord-vm keeps a descriptor of it for the drops. */
 static int xfer_prepare(const char *lib, char *err, size_t errlen) {
-    char top[PATH_MAX + 16], want[PATH_MAX];
-    snprintf(top, sizeof top, "%s/" VM_XFER_DIR, lib);
+    char want[PATH_MAX], moved[NAME_MAX + 1];
     const char *base = strrchr(S.dir, '/');
     char real[PATH_MAX + 256];
     snprintf(real, sizeof real, "%s%.255s", lib, base ? base : "/");
-    if (vm_transfer_path(real, want, sizeof want)) { snprintf(err, errlen, "the machine's folder name can't give one"); return -1; }
-    struct stat st;
-    if (mkdir(top, 0700) && errno != EEXIST) { snprintf(err, errlen, "can't make %.120s: %s", top, strerror(errno)); return -1; }
-    if (lstat(top, &st) || !S_ISDIR(st.st_mode) || st.st_uid != getuid()) { snprintf(err, errlen, "%.120s isn't a folder of this account", top); return -1; }
-    if (!mkdir(want, 0700)) {
-        int d = open(want, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-        if (d >= 0) { if (fchmod(d, 0777)) {} close(d); }
-        vlog("transfer: made %s", want);
-    } else if (errno != EEXIST) { snprintf(err, errlen, "can't make %.120s: %s", want, strerror(errno)); return -1; }
+    /* made when it isn't there, and this machine's: a folder of another machine of the same name moves aside */
+    if (vm_transfer_claim(real, S.m.id, want, sizeof want, moved, sizeof moved)) { snprintf(err, errlen, "can't make or claim it in %.120s/" VM_XFER_DIR ": %s", lib, strerror(errno)); return -1; }
+    if (moved[0]) vlog("transfer: the folder of that name was another machine's: it's now %s", moved);
     int fd = open_share(want, err, errlen);
     if (fd < 0) return -1;
+    struct stat st;
     if (fstat(fd, &st) || !S_ISDIR(st.st_mode) || st.st_uid != getuid()) { close(fd); snprintf(err, errlen, "%.120s isn't a folder of this account", want); return -1; }
     snprintf(S.xfer_path, sizeof S.xfer_path, "%s", want);
     if (S.xfer_dfd >= 0) close(S.xfer_dfd);
@@ -2783,6 +2778,7 @@ static const char XFER_CHECK_PS[] =
 
 static int fx_exec_ps(const char *script, int kind);
 static int fx_exec_sh(const char *script, const char *a1, const char *a2, const char *a3, int kind);
+static int fx_exec_sh5(const char *script, const char *const a[5], int kind);
 static void ag_broadcast(void);
 static void xfer_set(int g) {
     S.xfer_guest = g;
@@ -3170,26 +3166,30 @@ static const char FX_PLACE_SH[] =
     "[ \"$r\" -eq 0 ] || exit \"$r\"; printf '%s' \"$p\"";
 /* as the person, through the transfer folder: $1 the file there (/mnt/LordOS/.lordos-drop-...), $2 its name */
 static const char FX_XMOVE_SH[] =
-    "f=\"$1\"; n=\"$2\"; t=$(xdg-user-dir DOWNLOAD 2>/dev/null); "
+    "d=\"$1\"; f=\"$1/file\"; n=\"$2\"; z=\"$3\"; h=\"$4\"; t=$(xdg-user-dir DOWNLOAD 2>/dev/null); "
     "if [ -z \"$t\" ] || [ \"$t\" = \"$HOME\" ]; then t=\"$HOME/Downloads\"; fi; "
     "mkdir -p -- \"$t\" || exit 5; "
     "[ -e \"$HOME/LordOS\" ] || [ -L \"$HOME/LordOS\" ] || ln -s /mnt/LordOS \"$HOME/LordOS\" 2>/dev/null; "
+    /* lord-vm's folder and file as it made them: a real folder and a regular file, no link */
+    "[ -d \"$d\" ] && [ ! -L \"$d\" ] && [ -f \"$f\" ] && [ ! -L \"$f\" ] || { echo 'the file in the transfer folder is not there' >&2; exit 9; }; "
     "w=$(mktemp -p \"$t\" .lordos-drop.XXXXXXXX) || exit 5; "
-    "cp -- \"$f\" \"$w\" || { rm -f -- \"$w\"; exit 8; }; "
+    /* copied and hashed in one pass; given its name only when size and SHA-256 are the ones lord-vm measured */
+    "g=$(tee -- \"$w\" < \"$f\" | sha256sum) || { rm -f -- \"$w\"; exit 9; }; g=${g%% *}; "
+    "[ \"$g\" = \"$h\" ] && [ \"$(stat -c %s -- \"$w\")\" = \"$z\" ] || { rm -f -- \"$w\"; echo 'the copy differs from the file dropped' >&2; exit 9; }; "
     "case \"$n\" in ?*.*) b=\"${n%.*}\"; e=\".${n##*.}\";; *) b=\"$n\"; e=\"\";; esac; "
     "p=\"$t/$n\"; i=2; "
     "while [ -e \"$p\" ] || [ -L \"$p\" ]; do p=\"$t/$b ($i)$e\"; i=$((i+1)); [ \"$i\" -lt 1000 ] || { rm -f -- \"$w\"; exit 6; }; done; "
     "mv -n -T -- \"$w\" \"$p\" && [ ! -e \"$w\" ] || { rm -f -- \"$w\"; exit 7; }; "
-    "rm -f -- \"$f\"; chmod 644 -- \"$p\" 2>/dev/null; printf '%s' \"$p\"";
-/* as root, through the transfer folder: $1 lord-vm's name for the file there, $2 its name, $3 FX_XMOVE_SH. Exit 9: the
- * folder isn't mounted (the agent's way follows) */
+    "chmod 644 -- \"$p\" 2>/dev/null; printf '%s' \"$p\"";
+/* as root, through the transfer folder: $1 lord-vm's folder for the file there (.lordos-drop-<hex>), $2 its name, $3
+ * FX_XMOVE_SH, $4 its size, $5 its SHA-256. Exit 9: not mounted, or the copy isn't the file (the agent's way follows) */
 static const char FX_XPLACE_SH[] =
     "s=\"$1\"; n=\"$2\"; mountpoint -q /mnt/LordOS || { echo 'the transfer folder is not mounted' >&2; exit 9; }; "
     "u=$(loginctl list-sessions --no-legend 2>/dev/null | awk '$2>=1000 && $2<60000 && $4 ~ /^seat/ {print $3; exit}'); "
     "[ -n \"$u\" ] || u=$(loginctl list-sessions --no-legend 2>/dev/null | awk '$2>=1000 && $2<60000 {print $3; exit}'); "
     "[ -n \"$u\" ] || u=$(getent passwd | awk -F: '$3>=1000 && $3<60000 && $7 !~ /(nologin|false)$/ {print $1; exit}'); "
     "if [ -z \"$u\" ]; then echo 'no account of a person in the guest' >&2; exit 3; fi; "
-    "runuser -u \"$u\" -- /bin/sh -c \"$3\" lordos-drop \"/mnt/LordOS/$s\" \"$n\"";
+    "runuser -u \"$u\" -- /bin/sh -c \"$3\" lordos-drop \"/mnt/LordOS/$s\" \"$n\" \"$4\" \"$5\"";
 /* Windows, as SYSTEM: WinFsp for the transfer folder (VAG_TRANSFER). %s: the private folder (base64 of UTF-8), then the
  * installer's SHA-256 (hex). Checks the hash and Authenticode signature of the file the agent wrote there, installs it
  * quietly (msiexec), sets the VirtIO-FS service to start by itself and starts it. The folder goes whatever happens */
@@ -3220,45 +3220,62 @@ static const char FX_PREP_PS[] =
     "$g=Get-Acl -LiteralPath $d;if($g.GetOwner([Security.Principal.SecurityIdentifier]).Value -notin $k){throw 'not ours'};"
     "foreach($r in $g.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])){if($r.IdentityReference.Value -notin $k){throw 'not private'}};"
     "[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($d)))";
-/* Windows, as the person (the scheduled task's script). %s: the private folder, the name, and lord-vm's name for the file
- * in the transfer folder ("" the agent's way: the file is in the private folder), each base64 of its UTF-8.
- * Writes "ok:" + base64 of the path the copy got, or "err:" + why, into the result file */
+/* Windows, as the person (the scheduled task's script). %s: the private folder, the name (each base64 of its UTF-8), then
+ * for the transfer folder's way the file's size and SHA-256 ("" and "" the agent's way: the file is in the private
+ * folder). The transfer folder's file is the one SYSTEM found by lord-vm's token (the private folder's "src"), checked
+ * not to be a reparse point, copied and hashed into a hidden file in Downloads that gets its name only when size and
+ * hash are lord-vm's. Writes "ok:" + base64 of the path the copy got, or "err:" + why, into the result file */
 static const char FX_COPY_PS[] =
     "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
     "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
-    "$sn=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
-    "$r=Join-Path $t 'out';$p=$null;$o=$null;"
+    "$z='%s';$h='%s';"
+    "$r=Join-Path $t 'out';$p=$null;$o=$null;$w=$null;$hs=$null;"
     "function Say($x){$y=[IO.File]::Open($r,'Open','Write');$b=[Text.Encoding]::UTF8.GetBytes($x);$y.SetLength(0);$y.Write($b,0,$b.Length);$y.Close()};"
     "try{"
-    /* the transfer folder's drive, found by the file lord-vm put there */
-    "$src=Join-Path $t 'file';if($sn){$src=$null;foreach($v in [IO.DriveInfo]::GetDrives()){try{$c=Join-Path $v.RootDirectory.FullName $sn;"
-    "if([IO.File]::Exists($c)){$src=$c;break}}catch{}};if(-not $src){throw 'the transfer folder is not there'}};"
+    "$src=Join-Path $t 'file';"
+    "if($h){$src=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String([IO.File]::ReadAllText((Join-Path $t 'src'))));"
+    "foreach($x in @([IO.Path]::GetDirectoryName($src),$src)){if((Get-Item -LiteralPath $x -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'a reparse point in the transfer folder'}};"
+    "$hs=[Security.Cryptography.IncrementalHash]::CreateHash([Security.Cryptography.HashAlgorithmName]::SHA256)};"
     "try{$d=(New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path}catch{$d=$null};"
     "if(-not $d){$d=Join-Path $env:USERPROFILE 'Downloads'};"
     "if(-not (Test-Path -LiteralPath $d -PathType Container)){New-Item -ItemType Directory -Path $d|Out-Null};"
+    "$w=Join-Path $d ('.lordos-drop-'+[guid]::NewGuid().ToString('N')+'.part');$o=[IO.File]::Open($w,'CreateNew','Write');"
+    "$s=[IO.File]::Open($src,'Open','Read','Read');"
+    "try{if($hs){$buf=New-Object byte[] 4194304;while(($k=$s.Read($buf,0,$buf.Length)) -gt 0){$o.Write($buf,0,$k);$hs.AppendData($buf,0,$k)}}else{$s.CopyTo($o,4194304)}}finally{$s.Close();$o.Close();$o=$null};"
+    "if($hs){$g=[BitConverter]::ToString($hs.GetHashAndReset()).Replace('-','').ToLowerInvariant();"
+    "if($g -ne $h -or (Get-Item -LiteralPath $w -Force).Length -ne [long]$z){throw 'the copy differs from the file dropped'}};"
     "$b=[IO.Path]::GetFileNameWithoutExtension($n);$e=[IO.Path]::GetExtension($n);$q=Join-Path $d $n;$i=2;"
-    "while(-not $o){try{$o=[IO.File]::Open($q,'CreateNew','Write');$p=$q}catch{if(-not (Test-Path -LiteralPath $q)){throw};if($i -gt 999){throw 'no free name'};$q=Join-Path $d ($b+' ('+$i+')'+$e);$i++}};"
-    "$s=[IO.File]::OpenRead($src);try{$s.CopyTo($o,4194304)}finally{$s.Close();$o.Close()};"
-    "if($sn){Remove-Item -LiteralPath $src -Force -ErrorAction SilentlyContinue};"
+    "while(-not $p){if(-not (Test-Path -LiteralPath $q)){try{[IO.File]::Move($w,$q);$p=$q;$w=$null;continue}catch{if(-not (Test-Path -LiteralPath $q)){throw}}};"
+    "if($i -gt 999){throw 'no free name'};$q=Join-Path $d ($b+' ('+$i+')'+$e);$i++};"
     "Say('ok:'+[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($p)))"
-    "}catch{if($o){$o.Close()};if($p){Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue};Say('err:'+$_.Exception.Message)}";
+    "}catch{if($o){$o.Close()};if($w){Remove-Item -LiteralPath $w -Force -ErrorAction SilentlyContinue};Say('err:'+$_.Exception.Message+' (at '+$_.InvocationInfo.OffsetInLine+')')}";
 /* Windows, the last step, as SYSTEM. %s: the private folder (base64 of UTF-8), then FX_COPY_PS (base64 of UTF-16LE),
- * which goes into the private folder as copy.ps1 for the task (a task's arguments are too short for it inline).
+ * which goes into the private folder as copy.ps1 for the task (a task's arguments are too short for it inline), then
+ * for the transfer folder's way lord-vm's folder there (base64) and the token lord-vm wrote in it ("" and "" the agent's
+ * way). SYSTEM finds the transfer drive itself: only a global drive (no person can make one) labelled LordOS whose
+ * folder of that name, not a reparse point, holds that token; the person's task gets that exact path, never a search.
  * Prints the base64 path the person's copy got; the task and the private folder go whatever happens */
 static const char FX_PLACE_PS[] =
     "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';trap{[Console]::Error.Write($_.Exception.Message);exit 1};"
-    "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));$tn=$null;"
+    "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));$tn=$null;$cps='%s';"
+    "$sg=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));$tk='%s';"
     "try{"
     "$u=(Get-CimInstance Win32_ComputerSystem).UserName;if(-not $u){throw 'no one is signed in to the machine'};"
     "$w=(New-Object Security.Principal.NTAccount($u)).Translate([Security.Principal.SecurityIdentifier]);"
     "$f=Join-Path $t 'file';$r=Join-Path $t 'out';$c=Join-Path $t 'copy.ps1';[IO.File]::WriteAllBytes($r,[byte[]]@());"
-    "[IO.File]::WriteAllText($c,[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('%s')));"
+    "[IO.File]::WriteAllText($c,[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($cps)));"
     "function Grant($p,$x,$dir){if($dir){$a=[IO.Directory]::GetAccessControl($p,'Access')}else{$a=[IO.File]::GetAccessControl($p,'Access')};"
     "$a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($w,$x,'Allow')));"
     "if($dir){[IO.Directory]::SetAccessControl($p,$a)}else{[IO.File]::SetAccessControl($p,$a)}};"
     /* the result file needs Read too: .NET's open for writing was refused with Write alone (2026-11-20). Only that file:
      * the person can't add, rename or replace anything in the folder */
     "Grant $t 'Traverse' 1;if(Test-Path -LiteralPath $f){Grant $f 'Read' 0};Grant $c 'Read' 0;Grant $r 'Read, Write' 0;"
+    "if($sg){$src=$null;foreach($v in [IO.DriveInfo]::GetDrives()){try{if($v.DriveType -ne 'Fixed' -or -not $v.IsReady -or $v.VolumeLabel -ne 'LordOS'){continue};"
+    "$dd=Join-Path $v.RootDirectory.FullName $sg;$tf=Join-Path $dd 'token';"
+    "if(((Get-Item -LiteralPath $dd -Force).Attributes -bor (Get-Item -LiteralPath $tf -Force).Attributes) -band [IO.FileAttributes]::ReparsePoint){continue};"
+    "if([IO.File]::ReadAllText($tf).Trim() -ceq $tk){$src=Join-Path $dd 'file';break}}catch{}};"
+    "if(-not $src){throw 'the transfer folder is not there'};"
+    "$sf=Join-Path $t 'src';[IO.File]::WriteAllText($sf,[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($src)));Grant $sf 'Read' 0};"
     "$tn='LordOS-drop-'+[guid]::NewGuid().ToString('N');"
     "$act=New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File \"'+$c+'\"');"
     "$pr=New-ScheduledTaskPrincipal -UserId $u -LogonType Interactive -RunLevel Limited;"
@@ -3307,13 +3324,16 @@ static int fx_exec_ps(const char *script, int kind) {
     return r;
 }
 static int fx_exec_sh(const char *script, const char *a1, const char *a2, const char *a3, int kind) {
+    const char *a[5] = { a1, a2, a3, NULL, NULL };
+    return fx_exec_sh5(script, a, kind);
+}
+static int fx_exec_sh5(const char *script, const char *const a[5], int kind) {
     JBuf j;
     jb_init(&j);
     jb_raw(&j, "{\"path\":\"/bin/sh\",\"arg\":[\"-c\",");
     jb_str(&j, script);
     jb_raw(&j, ",\"lordos-drop\"");
-    const char *a[3] = { a1, a2, a3 };
-    for (int i = 0; i < 3 && a[i]; i++) { jb_raw(&j, ","); jb_str(&j, a[i]); }
+    for (int i = 0; i < 5 && a[i]; i++) { jb_raw(&j, ","); jb_str(&j, a[i]); }
     jb_raw(&j, "],\"capture-output\":true}");
     int r = j.oom ? -1 : qga_do("guest-exec", j.p, kind);
     jb_free(&j);
@@ -3336,8 +3356,11 @@ static void fx_unstage(void) {
     S.fx_cpid = 0;
     if (S.fx_cpipe >= 0) close(S.fx_cpipe);
     S.fx_cpipe = -1;
-    if (S.fx_stage[0] && S.xfer_dfd >= 0 && unlinkat(S.xfer_dfd, S.fx_stage, 0) && errno != ENOENT) vlog("files: can't remove %s from the transfer folder: %s", S.fx_stage, strerror(errno));
-    S.fx_stage[0] = 0;
+    /* only through the folder's descriptor, without following a link the guest may have put there */
+    if (S.fx_stagefd >= 0) { unlinkat(S.fx_stagefd, "file", 0); unlinkat(S.fx_stagefd, "token", 0); close(S.fx_stagefd); S.fx_stagefd = -1; }
+    if (S.fx_stage[0] && S.xfer_dfd >= 0 && unlinkat(S.xfer_dfd, S.fx_stage, AT_REMOVEDIR) && errno != ENOENT) vlog("files: can't remove %s from the transfer folder: %s", S.fx_stage, strerror(errno));
+    S.fx_stage[0] = S.fx_token[0] = S.fx_sha[0] = 0;
+    S.fx_dig_n = 0;
 }
 
 static void fx_reset(void) {
@@ -3455,15 +3478,16 @@ static int xfer_ready(void) { return S.xfer_on && S.xfer_dfd >= 0 && S.vfs[VM_SH
 
 /* lord-vm's copy into the transfer folder, in a child (lord-vm's loop never waits on a file): a reflink (FICLONE) where
  * the file system can, else copy_file_range (the kernel copies; on one file system without reflink it still never
- * passes through here), else read and write. It reports on the pipe: bytes so far, -1 done, -2 - errno failed */
+ * passes through here), else read and write; then the SHA-256 of the person's file (the guest's copy must match it).
+ * It reports on the pipe: bytes so far (the copy is the first half, the hash the second), -5 and the 32 bytes of the
+ * hash, -1 done, -2 - errno failed */
 static void fx_copy_child(int src, int dst, int out, off_t size) {
     int64_t v;
-    if (size > 0 && !ioctl(dst, FICLONE, src)) { v = size; write_all(out, &v, sizeof v); v = -1; write_all(out, &v, sizeof v); _exit(0); }
-    static char buf[1 << 20];
+    static uint8_t buf[1 << 20];
     off_t in = 0;
-    int plain = 0;
     long long told = 0;
-    for (;;) {
+    if (size > 0 && !ioctl(dst, FICLONE, src)) in = size;
+    for (int plain = 0; in < size || !size;) {
         ssize_t n;
         if (!plain) {
             n = copy_file_range(src, &in, dst, NULL, 64 << 20, 0);
@@ -3475,21 +3499,43 @@ static void fx_copy_child(int src, int dst, int out, off_t size) {
         if (n < 0) { if (errno == EINTR) continue; v = -2 - errno; write_all(out, &v, sizeof v); _exit(1); }
         if (n == 0) break;
         long long now = now_ms();
-        if (now - told >= 100) { told = now; v = in; write_all(out, &v, sizeof v); }
+        if (now - told >= 100) { told = now; v = in / 2; write_all(out, &v, sizeof v); }
     }
-    v = in; write_all(out, &v, sizeof v);
-    v = -1; write_all(out, &v, sizeof v);
+    off_t copied = in;
+    Sha256 h;
+    sha256_init(&h);
+    for (off_t off = 0;;) {
+        ssize_t n = pread(src, buf, sizeof buf, off);
+        if (n < 0) { if (errno == EINTR) continue; v = -2 - errno; write_all(out, &v, sizeof v); _exit(1); }
+        if (!n) break;
+        sha256_update(&h, buf, (size_t)n);
+        off += n;
+        long long now = now_ms();
+        if (now - told >= 100) { told = now; v = copied / 2 + off / 2; write_all(out, &v, sizeof v); }
+    }
+    struct { int64_t tag; uint8_t d[32]; int64_t end; } msg = { -5, { 0 }, -1 };
+    sha256_final(&h, msg.d);
+    write_all(out, &msg, sizeof msg);                    /* one write: one read on the other side */
     _exit(0);
 }
 
-/* 0 when the copy into the transfer folder started (FX_XCOPY) */
+/* 0 when the copy into the transfer folder started (FX_XCOPY): a folder of lord-vm's own there, .lordos-drop-<16 hex>
+ * (0700: in a Linux guest only the account with this computer's uid and root can enter it), holding "file" and, for
+ * a Windows guest, "token" (a random value SYSTEM finds the drive by); all made without following a link */
 static int fx_xcopy_start(void) {
-    uint64_t rnd;
-    if (getrandom(&rnd, sizeof rnd, 0) != sizeof rnd) return -1;
-    snprintf(S.fx_stage, sizeof S.fx_stage, ".lordos-drop-%016llx", (unsigned long long)rnd);
-    int dst = openat(S.xfer_dfd, S.fx_stage, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0644);
-    if (dst < 0) { vlog("files: can't make a file in the transfer folder: %s", strerror(errno)); S.fx_stage[0] = 0; return -1; }
-    if (fchmod(dst, 0644)) {}
+    uint64_t rnd[3];
+    if (getrandom(rnd, sizeof rnd, 0) != sizeof rnd) return -1;
+    snprintf(S.fx_stage, sizeof S.fx_stage, ".lordos-drop-%016llx", (unsigned long long)rnd[0]);
+    snprintf(S.fx_token, sizeof S.fx_token, "%016llx%016llx", (unsigned long long)rnd[1], (unsigned long long)rnd[2]);
+    if (mkdirat(S.xfer_dfd, S.fx_stage, 0700)) { vlog("files: can't make a folder in the transfer folder: %s", strerror(errno)); S.fx_stage[0] = 0; return -1; }
+    S.fx_stagefd = openat(S.xfer_dfd, S.fx_stage, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    int dst = S.fx_stagefd >= 0 ? openat(S.fx_stagefd, "file", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600) : -1;
+    if (dst < 0) { vlog("files: can't make a file in the transfer folder: %s", strerror(errno)); fx_unstage(); return -1; }
+    if (S.ag_windows) {
+        int tf = openat(S.fx_stagefd, "token", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+        if (tf < 0 || write_all(tf, S.fx_token, strlen(S.fx_token))) { if (tf >= 0) close(tf); close(dst); fx_unstage(); return -1; }
+        close(tf);
+    }
     int pp[2];
     if (pipe2(pp, O_CLOEXEC)) { close(dst); fx_unstage(); return -1; }
     pid_t pid = fork();
@@ -3505,6 +3551,7 @@ static int fx_xcopy_start(void) {
     S.fx_cpipe = pp[0];
     S.fx_cpid = pid;
     S.fx_step = FX_XCOPY;
+    S.fx_dig_n = 0;
     return 0;
 }
 
@@ -3516,11 +3563,14 @@ static void fx_xcopy_read(void) {
     if (n < 0 && (errno == EAGAIN || errno == EINTR)) return;
     if (n <= 0) { fx_fail(VME_INTERNAL, "the copy into the transfer folder stopped"); return; }
     for (size_t i = 0; i < (size_t)n / sizeof *v; i++) {
+        if (S.fx_dig_n) { memcpy(S.fx_dig + (32 - 8 * S.fx_dig_n), &v[i], 8); S.fx_dig_n--; continue; }
         if (v[i] >= 0) { S.fx_off = (off_t)v[i]; fx_progress(0); continue; }
+        if (v[i] == -5) { S.fx_dig_n = 4; continue; }
         if (v[i] == -1) {
             close(S.fx_cpipe); S.fx_cpipe = -1; S.fx_cpid = 0;           /* reaped by reap() */
+            for (int k = 0; k < 32; k++) snprintf(S.fx_sha + k * 2, 3, "%02x", S.fx_dig[k]);
             long long ms = now_ms() - S.fx_t0;
-            vlog("files: %s is in the transfer folder (%lld bytes in %lld ms)", S.fx.name, (long long)S.fx_size, ms);
+            vlog("files: %s is in the transfer folder (%lld bytes in %lld ms, SHA-256 %.16s…)", S.fx.name, (long long)S.fx_size, ms, S.fx_sha);
             if (S.ag_windows) fx_begin_agent();                         /* the private folder for the person's task */
             else fx_place();
             return;
@@ -3656,19 +3706,23 @@ static void fx_place(void) {
         snprintf(ps, sizeof ps, XFER_WINFSP_PS, bt, S.fx.sha);
         if (fx_exec_ps(ps, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
     } else if (S.ag_windows) {
-        char bn[AG_NAME_MAX / 3 * 4 + 16], bs[80] = "", copy[sizeof FX_COPY_PS + 2 * sizeof bt + 80];
+        char bn[AG_NAME_MAX / 3 * 4 + 16], bs[80] = "", sz[24] = "", copy[sizeof FX_COPY_PS + 2 * sizeof bt + 160];
         if (ag_b64_encode((const uint8_t *)S.fx.name, strlen(S.fx.name), bn, sizeof bn) < 0 ||
             (S.fx_via && ag_b64_encode((const uint8_t *)S.fx_stage, strlen(S.fx_stage), bs, sizeof bs) < 0)) { fx_fail(VME_INTERNAL, "internal error"); return; }
-        snprintf(copy, sizeof copy, FX_COPY_PS, bt, bn, bs);
+        if (S.fx_via) snprintf(sz, sizeof sz, "%lld", (long long)S.fx_size);
+        snprintf(copy, sizeof copy, FX_COPY_PS, bt, bn, sz, S.fx_via ? S.fx_sha : "");
         char *enc = ps_encode(copy);
-        size_t pn = sizeof FX_PLACE_PS + sizeof bt + (enc ? strlen(enc) : 0);
+        size_t pn = sizeof FX_PLACE_PS + sizeof bt + sizeof bs + sizeof S.fx_token + (enc ? strlen(enc) : 0);
         char *ps = enc ? malloc(pn) : NULL;
-        if (ps) snprintf(ps, pn, FX_PLACE_PS, bt, enc);
+        if (ps) snprintf(ps, pn, FX_PLACE_PS, bt, enc, bs, S.fx_via ? S.fx_token : "");
         if (!ps) fx_fail(VME_INTERNAL, "internal error");
         else if (fx_exec_ps(ps, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
         free(ps); free(enc);
     } else if (S.fx_via) {
-        if (fx_exec_sh(FX_XPLACE_SH, S.fx_stage, S.fx.name, FX_XMOVE_SH, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
+        char sz[24];
+        snprintf(sz, sizeof sz, "%lld", (long long)S.fx_size);
+        const char *a[5] = { S.fx_stage, S.fx.name, FX_XMOVE_SH, sz, S.fx_sha };
+        if (fx_exec_sh5(FX_XPLACE_SH, a, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
     } else if (fx_exec_sh(FX_PLACE_SH, S.fx_tmp, S.fx.name, FX_MOVE_SH, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
 }
 
@@ -5081,7 +5135,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = -1;
-    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = -1;
+    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {

@@ -333,6 +333,60 @@ static void test_schema(void) {
         CHECK(vm_transfer_path(NULL, xp, sizeof xp) < 0);
         /* a person's share can't be the transfer folder: it's inside the library */
     }
+    /* the transfer folder is tied to its machine (vm_transfer_claim): an owner record beside it with the machine's id; a
+     * folder of that name that's another machine's, or nobody's and not empty, moves aside, never deleted; the Trash moves
+     * a machine's own folder aside (vm_transfer_aside) */
+    {
+        char lib[] = "/tmp/vm-xfer.XXXXXX";
+        if (mkdtemp(lib)) {
+            const char *A = "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b", *B = "1f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2c";
+            char dir[PATH_MAX], xp[PATH_MAX], xp2[PATH_MAX], mv[NAME_MAX + 1], p2[PATH_MAX + 64], own[PATH_MAX + 128];
+            snprintf(dir, sizeof dir, "%s/Ubuntu.lordvm", lib);
+            struct stat st;
+            CHECK(vm_transfer_claim(dir, A, xp, sizeof xp, mv, sizeof mv) == 0 && !mv[0] && !lstat(xp, &st) && S_ISDIR(st.st_mode) && (st.st_mode & 0777) == 0777);
+            snprintf(own, sizeof own, "%s/Transfer/.Ubuntu.machine", lib);
+            CHECK(!lstat(own, &st) && S_ISREG(st.st_mode));
+            snprintf(p2, sizeof p2, "%s/Transfer", lib);
+            CHECK(!lstat(p2, &st) && (st.st_mode & 0777) == 0700);
+            snprintf(p2, sizeof p2, "%s/a.txt", xp);
+            FILE *f = fopen(p2, "w"); if (f) { fputs("A's\n", f); fclose(f); }
+            /* the same machine again: the same folder, its files there */
+            CHECK(vm_transfer_claim(dir, A, xp2, sizeof xp2, mv, sizeof mv) == 0 && !mv[0] && !strcmp(xp, xp2) && !access(p2, F_OK));
+            /* another machine of the same name: A's folder moves aside with its files, B gets an empty one */
+            CHECK(vm_transfer_claim(dir, B, xp2, sizeof xp2, mv, sizeof mv) == 0 && !strncmp(mv, "Ubuntu (old ", 12) && access(p2, F_OK));
+            char aside[PATH_MAX + 64];
+            snprintf(aside, sizeof aside, "%s/Transfer/%s/a.txt", lib, mv);
+            CHECK(!access(aside, F_OK));
+            snprintf(aside, sizeof aside, "%s/Transfer/.%s.machine", lib, mv);
+            CHECK(!access(aside, F_OK));                       /* its owner record went with it */
+            /* once more for A: B's (empty) folder moves aside too, under another name */
+            char mv2[NAME_MAX + 1];
+            CHECK(vm_transfer_claim(dir, A, xp2, sizeof xp2, mv2, sizeof mv2) == 0 && mv2[0] && strcmp(mv, mv2));
+            /* a folder nobody claimed: taken when empty, moved aside when not */
+            snprintf(dir, sizeof dir, "%s/Debian.lordvm", lib);
+            snprintf(p2, sizeof p2, "%s/Transfer/Debian", lib); mkdir(p2, 0700);
+            CHECK(vm_transfer_claim(dir, B, xp, sizeof xp, mv, sizeof mv) == 0 && !mv[0]);
+            snprintf(dir, sizeof dir, "%s/Fedora.lordvm", lib);
+            snprintf(p2, sizeof p2, "%s/Transfer/Fedora", lib); mkdir(p2, 0700);
+            snprintf(own, sizeof own, "%s/x", p2); f = fopen(own, "w"); if (f) fclose(f);
+            CHECK(vm_transfer_claim(dir, B, xp, sizeof xp, mv, sizeof mv) == 0 && !strncmp(mv, "Fedora (old ", 12));
+            /* a link where the folder should be: moved aside, never followed */
+            snprintf(dir, sizeof dir, "%s/Arch.lordvm", lib);
+            snprintf(p2, sizeof p2, "%s/Transfer/Arch", lib);
+            CHECK(!symlink("/etc", p2));
+            CHECK(vm_transfer_claim(dir, A, xp, sizeof xp, mv, sizeof mv) == 0 && mv[0] && !lstat(xp, &st) && S_ISDIR(st.st_mode));
+            /* the Trash: only the machine's own folder moves */
+            snprintf(dir, sizeof dir, "%s/Ubuntu.lordvm", lib);
+            CHECK(vm_transfer_aside(dir, B, mv, sizeof mv) == 1);              /* A's now: B's id doesn't move it */
+            CHECK(vm_transfer_aside(dir, A, mv, sizeof mv) == 0 && mv[0]);
+            CHECK(vm_transfer_path(dir, xp, sizeof xp) == 0 && lstat(xp, &st));
+            CHECK(vm_transfer_aside(dir, A, mv, sizeof mv) == 1);              /* nothing left to move */
+            CHECK(vm_transfer_claim(dir, "not-an-id", xp, sizeof xp, mv, sizeof mv) < 0);
+            char cmd[PATH_MAX + 16];
+            snprintf(cmd, sizeof cmd, "rm -rf '%s'", lib);
+            if (system(cmd)) {}
+        }
+    }
     /* schema 6's boot order: a list of 1 to 3 different devices (disk, cd, network), and boot_menu; neither in the file is
      * auto (the system disk, then the CD/DVD), which is how every older file reads and what a new machine writes */
     {

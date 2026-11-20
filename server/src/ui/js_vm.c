@@ -2068,22 +2068,31 @@ static JSValue f_files(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     return a;
 }
 
-/* transferFolder(dir) → the machine's transfer folder (6.7.1), made as lord-vm makes it when it isn't there yet
- * (<library>/Transfer 0700, the machine's folder in it 0777), or null; for Open Transfer Folder before the first start */
+/* transferFolder(dir) → the machine's transfer folder (6.7.1), made and claimed for it as lord-vm does at its start
+ * (vm_transfer_claim: a folder of that name that's another machine's moves aside), or null; for Open Transfer Folder
+ * before the first start. transferAside(dir) → bool: before the machine goes to the Trash, its own transfer folder moves
+ * aside to "<name> (old YYYY-MM-DD)" (kept, never deleted), so a new machine of that name doesn't get its files */
+static int machine_id_of(const char *dir, char id[37]) {
+    VmMachine m;
+    char err[256];
+    if (vm_machine_load(dir, &m, err, sizeof err) != VM_OK) return -1;
+    memcpy(id, m.id, 37);
+    return 0;
+}
 static JSValue f_transfer_folder(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
-    char dir[PATH_MAX], xp[PATH_MAX], top[PATH_MAX];
-    if (argc < 1 || machine_dir(c, argv[0], dir, sizeof dir) || vm_transfer_path(dir, xp, sizeof xp)) return JS_NULL;
-    snprintf(top, sizeof top, "%s", xp);
-    char *sl = strrchr(top, '/');
-    if (!sl) return JS_NULL;
-    *sl = 0;
+    char dir[PATH_MAX], xp[PATH_MAX], id[37], moved[NAME_MAX + 1];
+    if (argc < 1 || machine_dir(c, argv[0], dir, sizeof dir) || machine_id_of(dir, id)) return JS_NULL;
+    if (vm_transfer_claim(dir, id, xp, sizeof xp, moved, sizeof moved)) return JS_NULL;
     struct stat st;
-    if (mkdir(top, 0700) && errno != EEXIST) return JS_NULL;
-    if (lstat(top, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) return JS_NULL;
-    if (!mkdir(xp, 0700)) { int d = open(xp, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC); if (d >= 0) { if (fchmod(d, 0777)) {} close(d); } }
     if (lstat(xp, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) return JS_NULL;
     return JS_NewString(c, xp);
+}
+static JSValue f_transfer_aside(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX], id[37], moved[NAME_MAX + 1];
+    if (argc < 1 || machine_dir(c, argv[0], dir, sizeof dir) || machine_id_of(dir, id)) return JS_FALSE;
+    return JS_NewBool(c, vm_transfer_aside(dir, id, moved, sizeof moved) >= 0);
 }
 
 /* cdrom(id, path | null) → bool: a disc into the running machine's drive (the file is opened here, for the person, and
@@ -3355,7 +3364,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
-    JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
+    JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
     JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("sendFile", 2, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),

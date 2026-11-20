@@ -189,6 +189,15 @@ int vm_share_allowed(const char *path, const char *home, const char *user, const
  * is the folder that holds `dir`. 0, or -1 when the machine's folder name can't give one (not <name>.lordvm, hidden, too
  * long) */
 int vm_transfer_path(const char *dir, char *out, size_t n);
+/* the transfer folder of the machine `id` in `dir`, made when it isn't there (<library>/Transfer 0700, the folder 0777)
+ * and tied to the machine: its owner record, <library>/Transfer/.<name>.machine, holds the machine's id. A folder there
+ * that another machine owns (a deleted, renamed or remade machine of the same name), or that nobody owns and isn't
+ * empty, is moved aside to "<name> (old YYYY-MM-DD)" (its new name in moved), never deleted. 0 and the path in out,
+ * else -1 */
+int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char *moved, size_t mn);
+/* the machine goes (to the Trash): its transfer folder, when it's this machine's, moves aside as above. 0 moved, 1 there
+ * was none of this machine's, -1 it couldn't be moved */
+int vm_transfer_aside(const char *dir, const char *id, char *moved, size_t mn);
 
 /* a network interface's name as Linux allows it: 1 to 15 of [A-Za-z0-9_.-], not "." or ".." */
 int vm_ifname_valid(const char *s);

@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/random.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
@@ -183,6 +184,103 @@ int vm_transfer_path(const char *dir, char *out, size_t n) {
     int w = snprintf(out, n, "%.*s/" VM_XFER_DIR "/%.*s", (int)(b - dir), dir, (int)(bl - 7), b + 1);
     if (w < 0 || (size_t)w >= n || !path_valid(out)) return -1;
     return 0;
+}
+
+/* the owner record beside a transfer folder: <library>/Transfer/.<name>.machine (outside the folder the guest sees) */
+static int xfer_owner_of(const char *xp, char *out, size_t n) {
+    const char *b = strrchr(xp, '/');
+    if (!b) return -1;
+    int w = snprintf(out, n, "%.*s/.%s.machine", (int)(b - xp), xp, b + 1);
+    return w < 0 || (size_t)w >= n || strlen(b + 1) + 9 > NAME_MAX ? -1 : 0;
+}
+static int xfer_owner_read(const char *op, char id[37]) {
+    int fd = open(op, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    struct stat st;
+    char buf[64];
+    ssize_t r = !fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_uid == geteuid() ? read(fd, buf, sizeof buf - 1) : -1;
+    close(fd);
+    if (r < 36) return -1;
+    memcpy(id, buf, 36);
+    id[36] = 0;
+    return vm_uuid_valid(id) && (r == 36 || buf[36] == '\n') ? 0 : -1;
+}
+static int xfer_owner_write(const char *op, const char *id) {
+    char tmp[PATH_MAX + 8];
+    if (snprintf(tmp, sizeof tmp, "%s.tmp", op) >= (int)sizeof tmp) return -1;
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (fd < 0) return -1;
+    char line[40];
+    int l = snprintf(line, sizeof line, "%s\n", id);
+    int ok = write(fd, line, (size_t)l) == l && !fsync(fd);
+    close(fd);
+    if (!ok || rename(tmp, op)) { unlink(tmp); return -1; }
+    return 0;
+}
+static int dir_empty(const char *p) {
+    DIR *d = opendir(p);
+    if (!d) return 0;
+    int empty = 1;
+    for (struct dirent *e; empty && (e = readdir(d));) if (strcmp(e->d_name, ".") && strcmp(e->d_name, "..")) empty = 0;
+    closedir(d);
+    return empty;
+}
+/* xp (and its owner record) to "<name> (old YYYY-MM-DD)", " 2", " 3"… beside it; the new name in moved */
+static int xfer_aside(const char *xp, char *moved, size_t mn) {
+    char day[16], to[PATH_MAX], op[PATH_MAX], top2[PATH_MAX];
+    time_t t = time(NULL);
+    struct tm tm;
+    localtime_r(&t, &tm);
+    strftime(day, sizeof day, "%Y-%m-%d", &tm);
+    for (int i = 1; i < 100; i++) {
+        int w = i == 1 ? snprintf(to, sizeof to, "%s (old %s)", xp, day) : snprintf(to, sizeof to, "%s (old %s) %d", xp, day, i);
+        const char *b = strrchr(to, '/');
+        if (w < 0 || (size_t)w >= sizeof to || !b || strlen(b + 1) + 9 > NAME_MAX) return -1;
+        struct stat st;
+        if (!lstat(to, &st) || errno != ENOENT) continue;
+        if (rename(xp, to)) return -1;
+        if (!xfer_owner_of(xp, op, sizeof op) && !xfer_owner_of(to, top2, sizeof top2)) rename(op, top2);
+        if (moved && mn) snprintf(moved, mn, "%s", b + 1);
+        return 0;
+    }
+    return -1;
+}
+
+int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char *moved, size_t mn) {
+    if (moved && mn) moved[0] = 0;
+    if (!vm_uuid_valid(id) || vm_transfer_path(dir, out, n)) return -1;
+    char top[PATH_MAX], op[PATH_MAX], who[37];
+    snprintf(top, sizeof top, "%s", out);
+    char *sl = strrchr(top, '/');
+    if (!sl) return -1;
+    *sl = 0;
+    struct stat st;
+    if (mkdir(top, 0700) && errno != EEXIST) return -1;
+    if (lstat(top, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) return -1;
+    if (xfer_owner_of(out, op, sizeof op)) return -1;
+    if (!lstat(out, &st)) {
+        int mine = S_ISDIR(st.st_mode) && st.st_uid == geteuid();
+        int owner = !xfer_owner_read(op, who);
+        if (mine && owner && !strcmp(who, id)) return 0;
+        /* a folder nobody claimed yet and empty: this machine's */
+        if (mine && !owner && dir_empty(out)) return xfer_owner_write(op, id);
+        /* another machine's (a machine of the same name, deleted or renamed, or made again): kept, beside it */
+        if (xfer_aside(out, moved, mn)) return -1;
+    } else if (errno != ENOENT) return -1;
+    if (mkdir(out, 0700)) return -1;
+    int d = open(out, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (d >= 0) { if (fchmod(d, 0777)) {} close(d); }
+    return xfer_owner_write(op, id);
+}
+
+int vm_transfer_aside(const char *dir, const char *id, char *moved, size_t mn) {
+    char xp[PATH_MAX], op[PATH_MAX], who[37];
+    if (moved && mn) moved[0] = 0;
+    if (!vm_uuid_valid(id) || vm_transfer_path(dir, xp, sizeof xp) || xfer_owner_of(xp, op, sizeof op)) return -1;
+    struct stat st;
+    if (lstat(xp, &st) || !S_ISDIR(st.st_mode)) return 1;
+    if (xfer_owner_read(op, who) || strcmp(who, id)) return 1;          /* not this machine's */
+    return xfer_aside(xp, moved, mn);
 }
 
 int vm_base_valid(const char *s) {

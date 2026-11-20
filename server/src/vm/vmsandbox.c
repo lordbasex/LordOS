@@ -283,7 +283,8 @@ int vm_jail_self(const char *machine_dir, const char *runtime_dir, const char *x
     if (runtime_dir && runtime_dir[0]) rule(rs, runtime_dir, LANDLOCK_ACCESS_FS_REMOVE_FILE, h);
     /* without it the drops go the agent's way (lord-vm can't make the file there) */
     if (xfer_dir && xfer_dir[0]) rule(rs, xfer_dir, LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_MAKE_REG |
-                                      LANDLOCK_ACCESS_FS_REMOVE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE, h);
+                                      LANDLOCK_ACCESS_FS_REMOVE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE | LANDLOCK_ACCESS_FS_MAKE_DIR |
+                                      LANDLOCK_ACCESS_FS_REMOVE_DIR | LANDLOCK_ACCESS_FS_READ_DIR, h);
     rule(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, h);
     int r = ok && !prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) && !syscall(SYS_landlock_restrict_self, rs, 0U);
     close(rs);

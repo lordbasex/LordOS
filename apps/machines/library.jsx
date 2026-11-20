@@ -412,6 +412,8 @@ export function Library() {
   const missing = missingFor(host, [host.arch]);
   const remove = (m) => {
     setDel(null);
+    // its transfer folder stays, moved aside ("<name> (old date)"), so a new machine of that name starts with its own (6.7.1)
+    if (m.transfer && has()) lord.vm.transferAside(m.dir);
     try { fs.trash(m.dir); setError(''); } catch (e) { setError(tr('machines.deleteFailed', { name: m.name })); }
     refresh();
   };

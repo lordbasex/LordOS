@@ -65,8 +65,9 @@
  *                   one-shot scheduled task that runs as that person (refused when nobody is signed in).
  *                   When the guest has the transfer folder mounted (VAC_TRANSFER, 6.7.1), the file is first copied by
  *                   lord-vm into that folder on this computer (a reflink when the file system can; in a child process)
- *                   under a fixed hidden name, and the person's own copy in the guest reads it from there; if that way
- *                   fails, the agent's way is tried once.
+ *                   in a 0700 folder of its own, with the file's SHA-256, and the person's own copy in the guest reads it
+ *                   from there and is named only when its size and hash match; if that way fails, the agent's way is
+ *                   tried once.
  *                   VM_FILE_PROGRESS on the way; → VM_REPLY with the file's path in the guest (the guest's words, text only) or why not
  *     VM_SNAPSHOT   a = VSN_TAKE, VSN_REVERT or VSN_DELETE; text = "TAG\tNAME" (take) or "TAG". qcow2 internal
  *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
