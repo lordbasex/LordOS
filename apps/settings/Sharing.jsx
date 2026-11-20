@@ -223,7 +223,7 @@ function SshSection({ isAdmin, ips, user, hostname }) {
     <>
       <Section title={tr('settings.sharing.ssh')} footer={tr('settings.sharing.sshSecurity')}>
         <SettingRow label={tr('settings.sharing.sshToggle')} hint={hint}>
-          <Toggle small on={st.enabled} onChange={turn} />
+          <Toggle small pending on={st.enabled} onChange={turn} />
         </SettingRow>
         {st.enabled && (
           <View style={{ paddingVertical: spacing.m, gap: 6 }}>
@@ -402,7 +402,7 @@ export function SharingSettings() {
     <Stack>
       <Section title={tr('settings.sharing.remote')}>
         <SettingRow label={tr('settings.sharing.remoteToggle')} hint={busy ? tr('settings.sharing.working') : tr('settings.sharing.remoteHint')}>
-          <Toggle small on={st.enabled} onChange={(on) => !busy && isAdmin && act(on ? 'remote-enable' : 'remote-disable')} />
+          <Toggle small pending on={st.enabled} onChange={(on) => !busy && isAdmin && act(on ? 'remote-enable' : 'remote-disable')} />
         </SettingRow>
         {st.enabled && (
           <View style={{ paddingVertical: spacing.m, gap: 6 }}>

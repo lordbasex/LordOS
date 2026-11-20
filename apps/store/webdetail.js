@@ -113,7 +113,7 @@ export function WebAppDetail({ id }) {
         h(Text, { style: { fontSize: typeScale.largeTitle, fontWeight: 600, color: th.text, textAlign: 'start' } }, d.name),
         h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.35, textAlign: 'start' } }, a ? t(a.description) : host),
         h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.s, marginTop: spacing.s } },
-          !d.installed ? h(Button, { primary: true, label: busy ? t('store.working') : t('store.install'), disabled: busy || !a || g.s.step === 'engine', onClick: () => a && !busy && g.start() }) : null,
+          !d.installed ? h(Button, { primary: true, busy, label: busy ? t('store.working') : t('store.install'), disabled: !busy && (!a || g.s.step === 'engine'), onClick: () => a && !busy && g.start() }) : null,
           d.installed ? h(Button, { primary: true, label: t('store.open'), onClick: () => open(id) }) : null,
           d.installed ? h(Button, { label: t('store.remove'), onClick: () => setRemoving(!removing) }) : null,
           h(Tag, { label: t('store.kind.web') }),

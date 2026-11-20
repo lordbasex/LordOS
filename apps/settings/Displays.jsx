@@ -337,7 +337,7 @@ export function DisplaysSettings() {
         <DisplayHeader cur={cur} sizeLine={sizeLine} several={several} n={act.length > 1 && !d.mirror ? nums[cur.id] : 0} t={t} tr={tr} />
         {several ? (
           <SettingRow label={tr('prefs.display.useAsMain')} hint={cur.main ? tr('prefs.display.mainHint') : ''} disabled={!cur.active || d.mirror}>
-            <Toggle small on={!!cur.main} onChange={(on) => { if (on && !cur.main) setMainDisplay(cur.id); }} />
+            <Toggle small pending on={!!cur.main} onChange={(on) => (on && !cur.main ? setMainDisplay(cur.id) : undefined)} />
           </SettingRow>
         ) : null}
         <Brightness list={d.backlight || []} />
@@ -377,7 +377,7 @@ export function DisplaysSettings() {
         </SettingRow>
         {d.accelerometer && cur.builtin ? (
           <SettingRow label={tr('prefs.display.autoRotate')} hint={tr('prefs.display.autoRotateHint')}>
-            <Toggle small on={!!d.autoRotate} onChange={(on) => setAutoRotateDisplays(on)} />
+            <Toggle small pending on={!!d.autoRotate} onChange={(on) => setAutoRotateDisplays(on)} />
           </SettingRow>
         ) : null}
       </Section>
@@ -386,7 +386,7 @@ export function DisplaysSettings() {
       {several ? (
         <Section title={tr('prefs.display.multiple')} footer={tr('prefs.display.multipleHint')}>
           <SettingRow label={tr('prefs.display.mirrorDisplays')} disabled={act.length < 2 && !d.mirror}>
-            <Toggle small on={!!d.mirror} onChange={(on) => setDisplayMirror(on)} />
+            <Toggle small pending on={!!d.mirror} onChange={(on) => setDisplayMirror(on)} />
           </SettingRow>
           {/* the same switch as Settings → Desktop & Dock → Menu Bar, or Taskbar in Lord Classic (on by default since 0.8.8.6) */}
           <SettingRow label={tr(themes.current() === 'classic' ? 'settings.dock.menubar.everyDisplayTaskbar' : 'prefs.display.menuBarAll')} disabled={d.mirror}>

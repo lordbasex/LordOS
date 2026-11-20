@@ -99,7 +99,7 @@ export function BluetoothSettings() {
     <Stack>
       <PageHeader icon={<BtIcon />} title={tr('prefs.bt.title')}
         subtitle={a.powered ? tr('prefs.bt.visibleAs', { name: a.name || a.address }) : tr('prefs.bt.offHint')}>
-        <Toggle small on={a.powered} onChange={togglePower} />
+        <Toggle small pending on={a.powered} onChange={togglePower} />
       </PageHeader>
       {err === 'blocked' ? (
         <GroupBox>

@@ -94,7 +94,7 @@ export function DateTimeSettings() {
       <GroupBox footer={isAdmin ? '' : tr('prefs.time.needAdmin')}>
         <SettingRow label={tr('prefs.time.auto')} hint={!td ? '' : !td.canNTP ? tr('prefs.time.noNtp') : ntp ? tr(td.synced ? 'prefs.time.synced' : 'prefs.time.syncing') : tr('prefs.time.manual')}
           disabled={!isAdmin || (td && !td.canNTP)}>
-          <Toggle small on={ntp} onChange={setNtp} />
+          <Toggle small pending on={ntp} onChange={setNtp} />
         </SettingRow>
         <SettingRow label={tr('prefs.time.dateTime')} hint={clock}>
           <Button small label={tr('prefs.time.change')} disabled={ntp || !isAdmin} onClick={() => setEditing(!editing)} />
