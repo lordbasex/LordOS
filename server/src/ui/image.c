@@ -388,6 +388,13 @@ void image_cache_stats(int *count, int *idle, size_t *bytes) {
 
 void image_size(const Image *img, int *w, int *h) { *w = img->w; *h = img->h; }
 
+/* the decoded pixels (premultiplied ARGB, w × h) once they're there; NULL while pending or failed (js_guestwin.c) */
+const uint32_t *image_ready_px(const Image *img, int *w, int *h) {
+    if (!img || img->state != IMG_READY || !img->px || img->w <= 0 || img->h <= 0) return NULL;
+    *w = img->w; *h = img->h;
+    return img->px;
+}
+
 /* A node's own image (`pixels` prop: an app's canvas, e.g. drawn from WASM).
  * It does not go into the path cache; it is reused if the size doesn't change. rgba = w*h*4 bytes. */
 Image *image_pixels(Image *img, int w, int h, const uint8_t *rgba) {

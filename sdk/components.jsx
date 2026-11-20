@@ -3,7 +3,7 @@
 import { View, Text, addListener, displayFor, onCommit, onScreenChange, capsLock } from '@lordos/runtime';
 import { Component, createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useTheme } from './theme.js';
-import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop } from './windows.js';
+import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop, appContentNodes } from './windows.js';
 import { onDesktop } from './desktopmodel.js';
 import { useStore } from './store.js';
 import { textDirection, direction, t as tr } from './i18n.js';
@@ -1192,6 +1192,11 @@ export function AppHost({ id, focused }) {
   const [overlayHost, setOverlayHost] = useState(null);
   // the window's content is the area Tab goes round while it is focused (sdk/focus.js)
   const area = useFocusArea(id, focused, focusRingColor(useTheme()));
+  useEffect(() => {                       // the content's node, for apps mode inside a Machines guest (sdk/guestwin.js)
+    const n = area.current;
+    if (n && n.id) appContentNodes.set(id, n.id);
+    return () => { if (appContentNodes.get(id) === n?.id) appContentNodes.delete(id); };
+  });
   useEffect(() => {                       // developer timing: open → first commit of this window
     const t0 = openedAt.get(id);
     if (t0 != null && app && !app.isolated) { openedAt.delete(id); console.log(`timing: ${app.id} window committed ${(lord.now() - t0).toFixed(1)} ms after wm.open`); }

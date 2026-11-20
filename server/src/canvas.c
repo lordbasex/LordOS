@@ -860,6 +860,16 @@ void canvas_blit_scaled(Canvas *c, const uint32_t *src, int stride, int sw_px, i
     int x0 = clampi((int)floorf(dx), c->clip.x0, c->clip.x1), x1 = clampi((int)ceilf(dx + dw), c->clip.x0, c->clip.x1);
     int y0 = clampi((int)floorf(dy), c->clip.y0, c->clip.y1), y1 = clampi((int)ceilf(dy + dh), c->clip.y0, c->clip.y1);
     if (x0 >= x1 || y0 >= y1) return;
+    /* one source pixel per pixel, whole pixels, opaque: rows copied (a part of a Machines guest's picture, mview.c) */
+    if (opaque && opacity >= 1 && dw == sw && dh == sh && dx == floorf(dx) && dy == floorf(dy) && sx == floorf(sx) && sy == floorf(sy) &&
+        sx >= 0 && sy >= 0 && sx + sw <= sw_px && sy + sh <= sh_px) {
+        for (int j = y0; j < y1; j++) {
+            const uint32_t *sr = src + (size_t)((int)sy + j - (int)dy) * stride + (int)sx + (x0 - (int)dx);
+            uint32_t *row = c->px + (size_t)j * c->stride + x0;
+            for (int i = 0; i < x1 - x0; i++) row[i] = sr[i] | 0xff000000u;
+        }
+        return;
+    }
     uint32_t k_op = (uint32_t)(opacity * 256 + 0.5f);
     float ux = sw / dw, uy = sh / dh;
     for (int j = y0; j < y1; j++) {

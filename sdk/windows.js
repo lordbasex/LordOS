@@ -64,6 +64,9 @@ export function setWindowMemory(fn) { memory = fn; }
 const areaOfWindow = (w) => workAreaOf(displayFor(w));
 // Window id → the node of its frame inside WindowShell (the Desktops animation, sdk/desktops.js).
 export const fxNodes = new Map();
+// window id → the node of the app's content inside the theme's frame (AppHost): its area on screen, without the title
+// bar (apps mode's guest side, sdk/guestwin.js)
+export const appContentNodes = new Map();
 // Window id → the corner radius its frame is drawn with (WindowShell's borderRadius; 0 when square):
 // a window capture leaves the corners outside it transparent (apps/screenshots, issue #70).
 export const frameRadii = new Map();

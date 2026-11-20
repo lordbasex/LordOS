@@ -12,6 +12,7 @@
 
 #define MEDIA_MAX_SRC 48
 #define MEDIA_APP_MAX 48
+#define MEDIA_CROP_NODES 64       /* LAG_WIN_MAX: a machine's windows in apps mode */
 
 typedef struct MAudio MAudio;
 
@@ -49,6 +50,7 @@ typedef struct {
     /* drawing */
     MediaView view;
     int node, box_w, box_h, sent_w, sent_h;
+    int crop_nodes[MEDIA_CROP_NODES];   /* nodes that show a part of it (Node.crop): each one damaged for its part */
     uint32_t *cache;            /* scaled/rotated (when copying isn't enough) */
     int cache_w, cache_h;
     unsigned cache_seq, cache_gen;
@@ -93,6 +95,11 @@ MediaSrc *media_src_get(int id);
 MediaSrc *media_src_at(int i);          /* iterate: 0..MEDIA_MAX_SRC-1 (NULL if free) */
 void media_src_close(MediaSrc *s);
 void media_src_damage(MediaSrc *s);
+/* A new frame changed (x, y, w, h) of the picture: the node that shows all of it is damaged whole (as
+ * media_src_damage), each node showing a part only where its part changed. Returns how many nodes were damaged. */
+int  media_src_damage_rect(MediaSrc *s, int x, int y, int w, int h);
+/* how many nodes show a part of it now */
+int  media_src_crop_count(MediaSrc *s);
 int  media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
 /* the same with lord-stream (0.8.8.10: network players and M3U lists, src/media/stream; streamurl.h) */
 int  media_spawn_stream(int kind, const char *params, const int *fds, int nfds, pid_t *pid);

@@ -113,6 +113,9 @@ function applyProps(inst, prev, next) {
   if (prev.session !== next.session) lord.setProp(inst.id, 'session', next.session ?? 0);
   if (prev.surface !== next.surface) lord.setProp(inst.id, 'surface', next.surface ?? 0);
   if (prev.media !== next.media) lord.setProp(inst.id, 'media', next.media ?? 0);
+  // <MediaView crop={[x, y, w, h]}>: only that part of the picture (Machines' apps mode); compared by value
+  const pc = prev.crop, nc = next.crop;
+  if (pc !== nc && !(Array.isArray(pc) && Array.isArray(nc) && pc.length === 4 && nc.length === 4 && pc.every((v, i) => v === nc[i]))) lord.setProp(inst.id, 'crop', Array.isArray(nc) ? nc : null);
   if (next.wave && JSON.stringify(prev.wave) !== JSON.stringify(next.wave)) lord.setProp(inst.id, 'wave', next.wave);
   // protected: the node (and what's inside) comes out black in screenshots, recordings and remote desktop
   if (!!prev.protected !== !!next.protected) lord.setProp(inst.id, 'protected', !!next.protected);

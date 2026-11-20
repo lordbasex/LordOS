@@ -1465,7 +1465,7 @@ Quick actions stay on the bar itself, icons with tooltips, in this order: **agen
 | **Window** | The guest's desktop in a window; the guest's resolution follows the window | Guest agent or virtio-gpu resize |
 | **Full Screen** | Takes one display, its own desktop | Nothing |
 | **All Displays** | One head per display | virtio-gpu multi-head |
-| **Apps** (seamless) | Guest apps as LordOS windows, no guest desktop | See 7.2 |
+| **Apps** (seamless) | Guest apps as LordOS windows, no guest desktop (built, 7.2) | LordOS or Windows in the guest, with the LordOS tools |
 | **Picture in Picture** | Small floating view, input optional; live control off by default | Our `setPip` |
 | **Thumbnail** | Paused at last frame, one click to resume | Suspend |
 
@@ -1865,7 +1865,7 @@ How it knows: backing-file chains are read from qcow2 headers; shared extents fr
 The first icon on the bar shows its state: gray (not installed), amber (machine starting or agent reconnecting), green (connected), red (version too old or failing). Clicking it opens a popover:
 
 - **Connected:** the system and architecture as the agent reports them, agent version, connection time.
-- **A list of what works now, and what doesn't and why:** Shell, Logs, File copy, Clipboard, Resolution, Folders, Apps. Each line comes from the agent's reported capabilities, so it's the truth for that guest, not a table in the app.
+- **A list of what works now, and what doesn't and why:** Shell, Logs, File copy, Clipboard, Resolution, Folders, Apps (works when the helper lists its windows, 7.2). Each line comes from the agent's reported capabilities, so it's the truth for that guest, not a table in the app.
 - **Not connected:** the next step, which depends on the state. If the guest is still booting, says wait. If the agent isn't installed: an **Install Agent** button attaches a small verified disc, shows the one command to run, and removes the disc once connected.
 
 **Protocol.** A virtio-serial port named `org.lordos.agent`, chosen over vsock because it works in every guest without extra drivers. Length-prefixed frames with a channel number, a `hello` carrying version and capabilities, skipped unknown kinds so that either side can grow, and a hard frame limit. `lord-vm`, not `lord-server`, parses it, inside the sandbox. A newer host updates an older agent itself only with the person's consent, from the signed disc.
@@ -2078,7 +2078,7 @@ From another computer, a running machine is offered by LordOS's own remote deskt
 | Time, shutdown, IP, freeze | `qemu-guest-agent` | qemu-ga from virtio-win |
 | Resolution, clipboard | QEMU's display (resolution); `lordos-guest` (clipboard) | `lordos-guest-win`, the LordOS guest tools (7.1.2) |
 | Folders | Kernel | virtiofs driver + WinFsp |
-| Apps mode | `lordos-guest` | `lordos-guest-win`: the guest side is built, the host side is a later stage (7.2) |
+| Apps mode | `lordos-guest` on a LordOS guest (7.2) | `lordos-guest-win` (7.1.2, 7.2) |
 | Install | From guest's repo | Mounted ISO, one run, silent |
 
 Tool updates: Linux through guest's own updates, plus `lordos-guest` in our repository; virtio-win at the pinned version, offered by the app, with a snapshot first.
@@ -2167,11 +2167,13 @@ virtio-win 0.1.271, viogpudo 100.100.104.27100), driven by `lordvm-dev` (`agent 
 
 ### 7.2 Apps mode (seamless)
 
-**Linux guests:** apps speak Wayland to a small compositor proxy in the guest (`lordos-guest`), which forwards surfaces over vsock to the host, as `waypipe` does. On the host each surface is a native LordOS Wayland client, so it's a real window with its own Dock entry. Zero-copy with virtio-gpu cross-domain is the target; a first version copies. Guest X11 apps need the guest's Xwayland. Host keeps no X11.
+**Built (in development, 2026-11-20).** Each window of the guest is its own LordOS window: its title (with the machine's name, so a guest's window is always told apart), its app's icon in the Dock, the taskbar and the switcher (one Dock icon per app of each machine, `vm:<machine>:<app>`), and the guest's own desktop hidden. The machine's window shrinks to a small controller (the machine's name, an **Applications** menu, **Leave Apps Mode**; Esc there leaves too). The toolbar's Apps button and **Actions → Apps Mode** turn it on; the choice is kept per machine (`app.json` `appsMode`) and the window opens in it next time. It's offered only when the agent is connected and the guest's helper says `windows` in its hello (`LAG_CAP_WINDOWS`, 256, in `VM_AGENT_STATE`); otherwise the button says why: the agent is off, or the guest needs LordOS or Windows inside, with the LordOS tools.
 
-**virtio-win guests:** `lordos-guest-win` (7.1.2) sends the guest's window list, icons and program list and takes window actions and launches (`LAG_*` in `vmagent.h`); the host crops each window out of the machine's picture. The host side (a LordOS window per guest window) is being built separately; until it lands Apps mode stays off there.
+**How.** The guest's helper lists its windows (`LAG_WINDOWS`: id, place in the guest's pixels, focused, minimized, on top, owner, pid, title, app; at most 64), their icons (`LAG_WINICON`, at most 64 × 64 RGBA) and its apps (`LAG_APPLIST`, name and an opaque token), all in `server/src/vm/vmagent.h`. lord-vm parses each with strict parsers (exact lengths, counts, sane rectangles, UTF-8 without control characters), writes it again and hands it to lord-server as a sealed memfd (`VM_WINDATA`), which parses it again. The host sends `LAG_APPS` (on/off: the guest hides its own desktop), `LAG_WINACT` (focus, close, minimize, restore, move to x, y, w, h) and `LAG_LAUNCH` with a token the guest listed (lord-server names the app by its place in the list and the list's generation; lord-vm sends the token from its own copy). The guest's screen is asked to be as large as this display (`lord.vm.resize`), so no window is cut. Each LordOS window shows its part of the machine's one picture: `<MediaView crop={[x, y, w, h]}>` (`Node.crop`, `media/mview.c`), drawn straight from the shared picture (2D) or the picture read back from the 3D dmabuf, copied as rows at 1:1; a new frame damages each window only where its part changed (`media_src_damage_rect`), and a frame that touches no shown part counts as read at once. The pointer goes to the guest at the window's place (`cropPoint`), the keyboard while the window is in front. Moving or resizing the LordOS window moves the guest's (`move`), minimizing, focusing and closing do the same in the guest; a window the guest moves or resizes itself is followed. A menu or tooltip (owned and on top) is a small frameless window over the others.
 
-Each forwarded window carries a thin marker in the frame with the machine's name, so that a person can always tell a guest's window from a host's, and it can't request protected-window status or the host's secure input.
+**LordOS guests.** `lordos-guest` asks the guest's own lord-server through a local endpoint for its user only (`server/src/ui/js_guestwin.c`, `$XDG_RUNTIME_DIR/lordos-guestwin.sock`, same uid, only inside a Machines guest), which lists the windows of its window manager, applies the listed actions and launches only its launcher's apps; in apps mode it hides its Dock, bar and wallpaper. **Windows guests:** `lordos-guest-win` (7.1.2): it lists the top-level windows (Win32), hides the taskbar in apps mode, and launches only a Start menu shortcut it listed. **Other Linux systems** (GNOME, KDE on Wayland) don't list their windows: apps mode isn't offered there, and the button says it needs LordOS or Windows in the machine.
+
+**Not yet.** Guest apps in the launcher before the machine runs (6.12); a window's own shape (a round or see-through window shows the guest's black around it); more than one display.
 
 ## 8. Privacy and security model
 

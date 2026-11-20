@@ -98,9 +98,40 @@ static inline uint32_t bilinear(const uint32_t *px, int w, int h, float u, float
     return out;
 }
 
+/* A node showing a part of the picture (Node.crop: Machines' apps mode, one window of the guest): that part stretched
+ * over the box, straight from the picture (no cache: several such nodes share one source). Remembered in crop_nodes so
+ * a new frame damages each node only where its part changed (media_src_damage_rect). */
+static void paint_crop(Canvas *c, MediaSrc *s, int node, const float *r, float x, float y, float w, float h, float op) {
+    int free_at = -1, known = 0;
+    for (int i = 0; i < MEDIA_CROP_NODES && !known; i++) {
+        if (s->crop_nodes[i] == node) known = 1;
+        else if (free_at < 0 && (!s->crop_nodes[i] || !node_get(s->crop_nodes[i]) || node_get(s->crop_nodes[i])->term != s->id)) free_at = i;
+    }
+    if (!known && free_at >= 0) s->crop_nodes[free_at] = node;
+    if (s->node == node) s->node = 0;
+    int sw, sh;
+    const uint32_t *px = pixels_of(s, &sw, &sh);
+    if (!px) return;
+    s->painted_seq = s->frame_seq;
+    /* the part, kept inside the picture (the guest's window may reach past its screen's edge) */
+    float cx0 = fmaxf(r[0], 0), cy0 = fmaxf(r[1], 0), cx1 = fminf(r[0] + r[2], (float)sw), cy1 = fminf(r[1] + r[3], (float)sh);
+    Rect old = canvas_push_clip(c, x, y, w, h);
+    float kx = w / r[2], ky = h / r[3];
+    if (cx1 > cx0 && cy1 > cy0) {
+        float dx = x + (cx0 - r[0]) * kx, dy = y + (cy0 - r[1]) * ky, dw = (cx1 - cx0) * kx, dh = (cy1 - cy0) * ky;
+        if (fabsf(kx - 1) < 0.001f && fabsf(ky - 1) < 0.001f) { dx = roundf(dx); dy = roundf(dy); }
+        canvas_blit_scaled(c, px, sw, sw, sh, cx0, cy0, cx1 - cx0, cy1 - cy0, dx, dy, dw, dh, op, s->opaque || s->xrgb);
+        if (s->xrgb) force_alpha(c, (int)floorf(dx), (int)floorf(dy), (int)ceilf(dw), (int)ceilf(dh));
+    }
+    if (s->shown_scale != kx) { s->shown_scale = kx; if (s->cur_mode == 1) media_cursor_touch(); }
+    canvas_set_clip(c, old);
+}
+
 void media_paint(Canvas *c, int handle, int node, float x, float y, float w, float h, float radius, float op) {
     MediaSrc *s = media_src_get(handle);
     if (!s || w < 1 || h < 1) return;
+    Node *nd = node_get(node);
+    if (nd && nd->crop) { paint_crop(c, s, node, nd->crop, x, y, w, h, op); return; }
     s->node = node;
     int bw = (int)lroundf(w), bh = (int)lroundf(h);
     s->box_w = bw;

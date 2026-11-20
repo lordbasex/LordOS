@@ -341,12 +341,50 @@ MediaSrc *media_src_get(int id) {
     return NULL;
 }
 
+/* a node in crop_nodes still shows a part of this source? */
+static Node *crop_node(MediaSrc *s, int i) {
+    Node *n = s->crop_nodes[i] ? node_get(s->crop_nodes[i]) : NULL;
+    if (n && n->type == NODE_MEDIA && n->term == s->id && n->crop) return n;
+    s->crop_nodes[i] = 0;
+    return NULL;
+}
+
+int media_src_crop_count(MediaSrc *s) {
+    int k = 0;
+    for (int i = 0; i < MEDIA_CROP_NODES; i++) if (crop_node(s, i)) k++;
+    return k;
+}
+
+int media_src_damage_rect(MediaSrc *s, int x, int y, int w, int h) {
+    int k = 0;
+    Node *n = s->node ? node_get(s->node) : NULL;
+    if (n && n->type == NODE_MEDIA && n->term == s->id && !n->crop && n->prev_box.x1 > n->prev_box.x0) {
+        damage_add((Box){ floorf(n->ax), floorf(n->ay), ceilf(n->ax + n->w), ceilf(n->ay + n->h) });
+        k++;
+    } else s->node = 0;
+    for (int i = 0; i < MEDIA_CROP_NODES; i++) {
+        Node *c = crop_node(s, i);
+        if (!c || c->prev_box.x1 <= c->prev_box.x0 || c->w <= 0 || c->h <= 0) continue;
+        const float *r = c->crop;
+        /* the changed area inside this node's part, in the node's coordinates (the part is stretched over the box) */
+        float x0 = fmaxf((float)x, r[0]), y0 = fmaxf((float)y, r[1]), x1 = fminf((float)(x + w), r[0] + r[2]), y1 = fminf((float)(y + h), r[1] + r[3]);
+        if (x1 <= x0 || y1 <= y0) continue;
+        float sx = c->w / r[2], sy = c->h / r[3];
+        damage_add((Box){ floorf(c->ax + (x0 - r[0]) * sx) - 1, floorf(c->ay + (y0 - r[1]) * sy) - 1,
+                          ceilf(c->ax + (x1 - r[0]) * sx) + 1, ceilf(c->ay + (y1 - r[1]) * sy) + 1 });
+        k++;
+    }
+    ui.dirty = 1;
+    return k;
+}
+
 void media_src_damage(MediaSrc *s) {
     Node *n = s->node ? node_get(s->node) : NULL;
     /* only the node's box (not the shadow margin): that way a new frame falls inside it (media_cover_node) */
     if (n && n->type == NODE_MEDIA && n->term == s->id && n->prev_box.x1 > n->prev_box.x0)
         damage_add((Box){ floorf(n->ax), floorf(n->ay), ceilf(n->ax + n->w), ceilf(n->ay + n->h) });
     else s->node = 0;
+    if (s->w > 0 && s->h > 0) for (int i = 0; i < MEDIA_CROP_NODES; i++) if (s->crop_nodes[i] && crop_node(s, i)) { media_src_damage_rect(s, 0, 0, s->w, s->h); break; }
     ui.dirty = 1;
 }
 

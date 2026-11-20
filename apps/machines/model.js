@@ -355,7 +355,7 @@ export function agentLines(agent, cfg) {
     ['awake', on && caps & AGENT_CAPS.awake ? 'works' : 'needsAgent'],
     ['clipboard', clip === 'off' ? 'off' : caps & AGENT_CAPS.clipboard ? 'works' : win ? 'needsTools' : 'needsHelper'],
     ['resolution', !win || caps & AGENT_CAPS.display ? 'works' : 'needsTools'],
-    ['folders', cfg?.shares?.length || (cfg?.transfer && caps & AGENT_CAPS.transfer) ? 'works' : 'none'], ['apps', 'later'],
+    ['folders', cfg?.shares?.length || (cfg?.transfer && caps & AGENT_CAPS.transfer) ? 'works' : 'none'], ['apps', appsBlocker(agent, cfg) || 'works'],
   ];
 }
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
@@ -643,6 +643,74 @@ export function netSummary(m) {
   const n = NET_MODES.includes(m?.network) ? m.network : 'shared';
   return { mode: n, card: n === 'bridged' ? m.bridge || '' : '', ports: usesPorts(n) ? (m.ports || []).length : 0,
     lan: usesPorts(n) && n !== 'hostonly' && (m.ports || []).some((r) => r.open === 'lan') };
+}
+
+// ---- apps mode (docs/VIRTUALIZATION.md 7.2): each window of the guest as its own LordOS window ----
+
+// Why apps mode can't be turned on now, or null: 'needsAgent' (the machine's agent is off or not connected), 'needsTools'
+// (the guest's helper doesn't list its windows: it needs LordOS or Windows in the machine, with the LordOS tools)
+export function appsBlocker(agent, cfg) {
+  if (!cfg?.agent || agent?.state !== 'connected') return 'needsAgent';
+  return agent.caps & AGENT_CAPS.windows ? null : 'needsTools';
+}
+
+// The size the guest is asked for in apps mode: the display's, so its windows are never cut by a smaller screen (even,
+// 320 × 200 to 8192 × 8192, as guestSize)
+export const appsGuestSize = (d) => [Math.max(320, Math.min(8192, Math.round(d?.w || 0) & ~1)), Math.max(200, Math.min(8192, Math.round(d?.h || 0) & ~1))];
+
+// Guest pixels → this computer's coordinates: the guest's screen (gw × gh) laid over the display d ({ x, y, w, h }), one
+// scale for both axes (the smaller, so all of it fits); and back
+export function guestScale(gw, gh, d) {
+  if (!(gw > 0) || !(gh > 0) || !(d?.w > 0) || !(d?.h > 0)) return 1;
+  return Math.min(d.w / gw, d.h / gh);
+}
+export const toHostRect = (r, k, d) => ({ x: Math.round(d.x + r.x * k), y: Math.round(d.y + r.y * k), w: Math.max(1, Math.round(r.w * k)), h: Math.max(1, Math.round(r.h * k)) });
+export const toGuestRect = (r, k, d) => ({ x: Math.round((r.x - d.x) / k), y: Math.round((r.y - d.y) / k), w: Math.max(1, Math.round(r.w / k)), h: Math.max(1, Math.round(r.h / k)) });
+
+// the part of the guest's picture a window shows (<MediaView crop>)
+export const cropOf = (w) => [w.x, w.y, w.w, w.h];
+
+// A point over a guest's window (layout box [x, y, w, h] of its picture, crop [x, y, w, h]) → the guest's absolute
+// pointer position, inside its screen (gw × gh); null outside the box
+export function cropPoint(px, py, box, crop, gw, gh) {
+  if (!box || !crop || box[2] <= 0 || box[3] <= 0) return null;
+  const lx = px - box[0], ly = py - box[1];
+  if (lx < 0 || ly < 0 || lx >= box[2] || ly >= box[3]) return null;
+  const x = Math.floor(crop[0] + lx * crop[2] / box[2]), y = Math.floor(crop[1] + ly * crop[3] / box[3]);
+  return [Math.max(0, Math.min(gw - 1, x)), Math.max(0, Math.min(gh - 1, y))];
+}
+
+// Two rectangles the same within a few pixels (rounding between the two sides)
+export const nearRect = (a, b, tol = 2) => !!a && !!b && Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol && Math.abs(a.w - b.w) <= tol && Math.abs(a.h - b.h) <= tol;
+
+// A guest window drawn as a small frameless window on top (a menu, a tooltip: owned and topmost), not a framed one
+export const isPopup = (w) => !!w && w.owner > 0 && w.topmost;
+
+// The LordOS window's instance name for a guest window (wm.open('machines', { instance }))
+export const guestInstance = (mid, id) => `ga-${String(mid || '').replace(/[^A-Za-z0-9-]/g, '')}-${Number(id) >>> 0}`;
+
+// What changes between the guest's list and the LordOS windows open for it: open (new and not minimized, a sane size),
+// close (gone from the list), minimize / restore (the guest's state changed), follow (the guest moved or resized it:
+// the LordOS window follows, unless it's the place this side asked for). have: Map gid → { rect, minimized, asked }.
+export function planWindows(list, have) {
+  const open = [], close = [], follow = [], minimize = [], restore = [];
+  const ids = new Set();
+  for (const w of list || []) {
+    ids.add(w.id);
+    const h = have.get(w.id);
+    if (!h) { if (!w.minimized && w.w >= 8 && w.h >= 8) open.push(w); continue; }
+    if (w.minimized && !h.minimized) minimize.push(w);
+    else if (!w.minimized && h.minimized) restore.push(w);
+    if (!w.minimized && !nearRect(w, h.rect) && !(h.asked && nearRect(w, h.asked))) follow.push(w);
+  }
+  for (const gid of have.keys()) if (!ids.has(gid)) close.push(gid);
+  return { open, close, follow, minimize, restore };
+}
+
+// The guest's apps for the Applications menu: by name, no repeats of a token
+export function guestAppItems(apps) {
+  const seen = new Set();
+  return (apps || []).filter((a) => a && a.token && a.name && !seen.has(a.token) && seen.add(a.token)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // Where a machine starts from (Configure → Boot; machine.json's boot_order): "auto" (the system disk, then the CD/DVD

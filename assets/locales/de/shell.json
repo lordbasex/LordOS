@@ -833,5 +833,6 @@
   "widgets.claude.d": "{d} T {h} h",
   "widgets.claude.h": "{h} h {m} min",
   "widgets.claude.m": "{m} min",
-  "widgets.claude.near": "Nahe am Limit"
+  "widgets.claude.near": "Nahe am Limit",
+  "guestWindowName": "{app} ({machine})"
 }
