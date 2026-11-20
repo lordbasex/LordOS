@@ -309,6 +309,22 @@ eq('mute toggle', [muteToggle({}), muteToggle({ sound: false, volume: 40 }), mut
   [{ sound: false }, { sound: true }, { sound: true, volume: 50 }, { sound: true, volume: 50 }]);
 eq('mic live', [micLive({ mic: 'live' }), micLive({ mic: 'wait' }), micLive(undefined)], [true, false, false]);
 eq('mic ask', [micAsk({ mic: 'wait' }, false), micAsk({ mic: 'wait' }, true), micAsk({ mic: 'off' }, false), micAsk(null, false)], [true, false, false, false]);
+// files dropped on the window (the guest agent copies them in)
+const ag = (caps, state = 'connected') => ({ state, caps });
+eq('drop: off', M.dropBlocker({ state: 'stopped' }, true), 'off');
+eq('drop: no state', M.dropBlocker(null, true), 'off');
+eq('drop: paused', M.dropBlocker({ state: 'paused', agent: ag(12) }, true), 'paused');
+eq('drop: agent off in Configure', M.dropBlocker({ state: 'running', agent: ag(12) }, false), 'agentOff');
+eq('drop: agent waiting', M.dropBlocker({ state: 'running', agent: ag(0, 'waiting') }, true), 'agentWaiting');
+eq('drop: no agent yet', M.dropBlocker({ state: 'running' }, true), 'agentWaiting');
+eq('drop: no file writes', M.dropBlocker({ state: 'running', agent: ag(4) }, true), 'agentCant');
+eq('drop: no exec', M.dropBlocker({ state: 'running', agent: ag(8) }, true), 'agentCant');
+eq('drop: ok', M.dropBlocker({ state: 'running', agent: ag(1 | 4 | 8) }, true), null);
+eq('copy line none', M.copyLine([{ id: 1, state: 'done', pct: 100, size: 5 }]), null);
+eq('copy line by size', M.copyLine([{ id: 7, name: 'b', state: 'copying', pct: 0, size: 300 }, { id: 3, name: 'a', state: 'copying', pct: 50, size: 100 }]), { name: 'a', pct: 12, waiting: 1 });
+eq('copy line empty files', M.copyLine([{ id: 1, name: 'z', state: 'copying', pct: 100, size: 0 }]), { name: 'z', pct: 99, waiting: 0 });
+eq('guest folder', [M.guestFolder('/home/ana/Descargas/x (2).txt'), M.guestFolder('C:\\Users\\Ana\\Downloads\\x.txt'), M.guestFolder('x.txt'), M.guestFolder('/x')], ['/home/ana/Descargas', 'C:\\Users\\Ana\\Downloads', '', '/']);
+eq('follow stuck', [M.followStuck([1920, 1080], [1784, 830], 0, 5000), M.followStuck([1920, 1080], [1784, 830], 0, 3000), M.followStuck([1920, 1080], [1918, 1080], 0, 9000), M.followStuck(null, [1, 1], 0, 9000)], [true, false, false, false]);
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

@@ -48,6 +48,13 @@
  *                   VCF_TEXT: UTF-8 text; VCF_CLIPX: text, HTML and/or a PNG in AGK_CLIPX's layout (vmagent.h), checked
  *                   and sanitized again here. Sent on only when machine.json's clipboard allows to-guest and
  *                   lordos-guest said hello (as text only to a helper without "clipx")
+ *     VM_FILE       a file dropped on the machine's window, for the guest: one descriptor, a regular file lord-server
+ *                   opened read-only for the person (never a path); text = its name (lord-vm makes it safe for the
+ *                   guest's file systems, ag_drop_name). lord-vm copies it through qemu-guest-agent, in pieces, one file
+ *                   at a time (at most 8 wait), into the Downloads folder of the guest's signed-in person: on Linux
+ *                   through a private temporary folder, then moved and owned by that person (runuser); on Windows
+ *                   through a private SYSTEM-only folder in %SystemRoot%\Temp, then given to that person and moved
+ *                   into their Downloads (never opened there). VM_FILE_PROGRESS on the way; → VM_REPLY with the file's path in the guest (the guest's words, text only) or why not
  *     VM_SNAPSHOT   a = VSN_TAKE, VSN_REVERT or VSN_DELETE; text = "TAG\tNAME" (take) or "TAG". qcow2 internal
  *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
  *                   memory (QMP snapshot-save, snapshot-load, snapshot-delete jobs), under operation.json; the entry
@@ -68,6 +75,8 @@
  *     VM_CLIP_DATA  the guest's clipboard (machine.json allows from-guest): a sealed memfd of a bytes; b = VCF_TEXT
  *                   (UTF-8) or VCF_CLIPX (AGK_CLIPX's layout, every part already checked: UTF-8 text, sanitized HTML,
  *                   a PNG whose header is sane; lord-server still re-encodes the picture before it's used)
+ *     VM_FILE_PROGRESS seq of the VM_FILE; a = percent copied (0..100); text = the file's name as the guest gets it.
+ *                   Sent to the client that asked, at most every 250 ms
  *     VM_JOB        progress of a long request: a = VJ_* (suspend, resume, snapshot), b = VJS_* (running, done,
  *                   failed), c = percent (0..100, -1 unknown), text = detail
  *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (VMN_NET_LOST: passt ended while
@@ -149,10 +158,10 @@
 
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
-    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND,
-    VM_REQ_LAST = VM_SOUND,
+    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE,
+    VM_REQ_LAST = VM_FILE,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
-    VM_AGENT_STATE, VM_CLIP_DATA,
+    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS,
 };
 /* VM_NOTICE a */
 enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VMN_COUNT };
@@ -332,7 +341,8 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
                       (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_INSTALL)) &&
                       (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX))) &&
-                      (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1)));
+                      (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1))) &&
+                      (m->type != VM_FILE || m->text[0]);
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
@@ -342,6 +352,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_CONSOLE_FD: return 1;
     case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 128;
     case VM_CLIP_DATA: return m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX);
+    case VM_FILE_PROGRESS: return m->a >= 0 && m->a <= 100;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }

@@ -58,4 +58,19 @@ int ag_utf8_ok(const uint8_t *p, size_t n);
 long ag_b64_encode(const uint8_t *in, size_t n, char *out, size_t cap);
 long ag_b64_decode(const char *in, size_t n, uint8_t *out, size_t cap);
 
+/* A file dropped on the machine's window (VM_FILE): its name as the guest gets it, safe on Linux and Windows file
+ * systems. The last part of `in` (after any '/'); valid UTF-8 or refused; control characters and \ : * ? " < > |
+ * become '_'; leading spaces and trailing spaces and dots go; "." and ".." are refused; a DOS device name (CON, PRN,
+ * AUX, NUL, COM1-9, LPT1-9, with any extension) gets a '_' in front; at most AG_NAME_MAX bytes, cut on a character
+ * boundary with its extension (up to 16 bytes) kept. 0 ok (out NUL-terminated), -1 nothing usable. */
+#define AG_NAME_MAX 180
+int ag_drop_name(const char *in, char *out, size_t cap);
+/* qemu-guest-agent's guest-exec output (out-data) as text for the log or the person: base64-decoded, every byte that
+ * isn't printable ASCII or part of valid UTF-8 replaced by '?', line ends as spaces, trimmed; at most cap - 1 bytes. */
+void ag_exec_text(const char *b64, char *out, size_t cap);
+/* the private folder a drop is written into, as the guest's script named it: Linux /var/tmp/lordos-drop.XXXXXXXX
+ * (8 letters or digits); Windows <drive>:\...\Temp\lordos-drop-<32 lowercase hex> (printable ASCII, no "..", no '/').
+ * 1 it is one, 0 not */
+int ag_drop_staging_ok(const char *p, int windows);
+
 #endif

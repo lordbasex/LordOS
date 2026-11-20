@@ -417,6 +417,12 @@ static void test_messages(void) {
     q = vm_msg(VM_NOTICE, 0, VMN_NET_LOST, 11, 0, 0, "passt"); CHECK(vm_msg_valid(&q, 0) && !vm_msg_valid(&q, 1));
     q.a = VMN_COUNT; CHECK(!vm_msg_valid(&q, 0));
     q.a = VMN_NONE; CHECK(!vm_msg_valid(&q, 0));
+    /* a dropped file (VM_FILE) is a request with a name; its progress comes only from lord-vm, 0..100 */
+    q = vm_msg(VM_FILE, 6, 0, 0, 0, 0, "a.txt"); CHECK(vm_msg_valid(&q, 1) && !vm_msg_valid(&q, 0));
+    q = vm_msg(VM_FILE, 6, 0, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    q = vm_msg(VM_FILE_PROGRESS, 6, 42, 0, 0, 0, "a.txt"); CHECK(vm_msg_valid(&q, 0) && !vm_msg_valid(&q, 1));
+    q.a = 101; CHECK(!vm_msg_valid(&q, 0));
+    q.a = -1; CHECK(!vm_msg_valid(&q, 0));
     char longtext[400];
     memset(longtext, 'a', sizeof longtext - 1); longtext[sizeof longtext - 1] = 0;
     q = vm_msg(VM_QMP, 0, 0, 0, 0, 0, longtext);
@@ -689,6 +695,53 @@ static void test_agent(void) {
     CHECK(ag_b64_decode("a$==", 4, d, sizeof d) == -1 && ag_b64_decode("aGVsbG8=", 8, d, 2) == -1 && ag_b64_encode(d, 7, e, 8) == -1);
 }
 
+/* a dropped file's name as the guest gets it (VM_FILE), and what a guest-exec printed */
+static const char *dn(const char *in) { static char o[AG_NAME_MAX + 1]; return ag_drop_name(in, o, sizeof o) ? "(refused)" : o; }
+static void test_drop_names(void) {
+    CHECK(!strcmp(dn("notes.txt"), "notes.txt"));
+    CHECK(!strcmp(dn("/home/a/b/Informe final.pdf"), "Informe final.pdf"));
+    CHECK(!strcmp(dn("Prueba \xc3\xb1" "and\xc3\xba: copia?.bin"), "Prueba \xc3\xb1" "and\xc3\xba_ copia_.bin"));
+    CHECK(!strcmp(dn("a\\b|c<d>e\"f*g"), "a_b_c_d_e_f_g"));
+    CHECK(!strcmp(dn("tab\there\x7f"), "tab_here_"));
+    CHECK(!strcmp(dn("  lead and trail. . "), "lead and trail"));
+    CHECK(!strcmp(dn(".bashrc"), ".bashrc"));
+    CHECK(!strcmp(dn("CON"), "_CON") && !strcmp(dn("nul.txt"), "_nul.txt") && !strcmp(dn("Com7.log"), "_Com7.log") && !strcmp(dn("LPT1 .x"), "_LPT1 .x"));
+    CHECK(!strcmp(dn("console.txt"), "console.txt") && !strcmp(dn("com10"), "com10") && !strcmp(dn("lpt0"), "lpt0"));
+    CHECK(!strcmp(dn("."), "(refused)") && !strcmp(dn(".."), "(refused)") && !strcmp(dn("   "), "(refused)") && !strcmp(dn(""), "(refused)") && !strcmp(dn("dir/"), "(refused)"));
+    CHECK(!strcmp(dn("bad \xc3"), "(refused)") && !strcmp(dn("\xc0\x80"), "(refused)"));
+    /* too long: cut on a character, the extension kept */
+    char lng[400];
+    size_t k = 0;
+    for (int i = 0; i < 120; i++) { lng[k++] = '\xc3'; lng[k++] = '\xa9'; }       /* 240 bytes of é */
+    memcpy(lng + k, ".tar.gz", 8);
+    const char *o = dn(lng);
+    CHECK(strlen(o) <= AG_NAME_MAX && strlen(o) > 100 && ag_utf8_ok((const uint8_t *)o, strlen(o)) && !strcmp(o + strlen(o) - 3, ".gz"));
+    char small[8];
+    CHECK(!ag_drop_name("abcdefghij.k", small, sizeof small) && strlen(small) == 7 && !strcmp(small + 5, ".k"));
+    CHECK(ag_drop_name("abc", small, 1) == -1);
+    char t[64];
+    char e[64];
+    ag_b64_encode((const uint8_t *)"  /home/a/Downloads/x (2).txt\n", 31, e, sizeof e);
+    ag_exec_text(e, t, sizeof t); CHECK(!strcmp(t, "/home/a/Downloads/x (2).txt"));
+    ag_b64_encode((const uint8_t *)"a\x01" "b\xff" "c", 5, e, sizeof e);
+    ag_exec_text(e, t, sizeof t); CHECK(!strcmp(t, "a b?c"));
+    ag_b64_encode((const uint8_t *)"\xc3\xa9\xc3\xa9\xc3\xa9", 6, e, sizeof e);
+    ag_exec_text(e, t, 4); CHECK(!strcmp(t, "\xc3\xa9"));                           /* cut on a character */
+    ag_exec_text(NULL, t, sizeof t); CHECK(!t[0]);
+    /* the private folders a drop is written into: only the ones the fixed scripts make */
+    CHECK(ag_drop_staging_ok("/var/tmp/lordos-drop.Ab3dE9xZ", 0) && !ag_drop_staging_ok("/var/tmp/lordos-drop.Ab3d", 0));
+    CHECK(!ag_drop_staging_ok("/home/a/lordos-drop.Ab3dE9xZ", 0) && !ag_drop_staging_ok("/var/tmp/lordos-drop.Ab3dE9x/", 0) && !ag_drop_staging_ok(NULL, 0));
+    CHECK(ag_drop_staging_ok("C:\\Windows\\Temp\\lordos-drop-0123456789abcdef0123456789abcdef", 1));
+    CHECK(ag_drop_staging_ok("D:\\WINDOWS\\TEMP\\lordos-drop-0123456789abcdef0123456789abcdef", 1));
+    CHECK(!ag_drop_staging_ok("C:\\Users\\a\\Temp\\..\\lordos-drop-0123456789abcdef0123456789abcdef", 1));
+    CHECK(!ag_drop_staging_ok("C:\\Windows\\Temp\\lordos-drop-0123456789ABCDEF0123456789abcdef", 1));
+    CHECK(!ag_drop_staging_ok("C:\\Windows\\Temp\\lordos-drop-0123456789abcdef0123456789abcde", 1));
+    CHECK(!ag_drop_staging_ok("C:/Windows/Temp/lordos-drop-0123456789abcdef0123456789abcdef", 1));
+    CHECK(!ag_drop_staging_ok("\\\\srv\\Temp\\lordos-drop-0123456789abcdef0123456789abcdef", 1));
+    CHECK(!ag_drop_staging_ok("/var/tmp/lordos-drop.Ab3dE9xZ", 1) && !ag_drop_staging_ok("C:\\Windows\\Temp\\lordos-drop-0123456789abcdef0123456789abcdef", 0));
+    ag_exec_text("!!", t, sizeof t); CHECK(!t[0]);
+}
+
 /* the guest's clipboard beyond text (6.8): AGK_CLIPX, PNG headers, HTML made harmless, Clone hostnames (6.3) */
 static int san(const char *in, char *out, size_t cap) { return (int)ag_html_sanitize(in, strlen(in), out, cap); }
 static void test_clipx(void) {
@@ -920,6 +973,7 @@ int main(void) {
     test_network();
     test_ops();
     test_agent();
+    test_drop_names();
     test_host();
     test_messages();
     test_qmp();

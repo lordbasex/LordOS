@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
 int ag_frame_next(const uint8_t *b, size_t n, AgFrame *f) {
     if (n < AG_HEAD) return 0;
@@ -354,4 +355,103 @@ long ag_html_sanitize(const char *s, size_t n, char *out, size_t cap) {
     if (o.over) return -1;
     out[o.n] = 0;
     return (long)o.n;
+}
+
+/* ---- files dropped on the machine's window ---- */
+
+static int dos_device(const char *s, size_t n) {
+    static const char *const DEV[] = { "con", "prn", "aux", "nul", NULL };
+    size_t b = 0;
+    while (b < n && s[b] != '.') b++;
+    while (b > 0 && s[b - 1] == ' ') b--;                    /* "CON .txt" is CON too */
+    char l[5];
+    if (b != 3 && b != 4) return 0;
+    for (size_t i = 0; i < b; i++) l[i] = lower(s[i]);
+    l[b] = 0;
+    if (b == 3) return in_list(DEV, l);
+    return (!memcmp(l, "com", 3) || !memcmp(l, "lpt", 3)) && l[3] >= '1' && l[3] <= '9';
+}
+
+/* the start of the UTF-8 character that holds byte i (or i itself) */
+static size_t char_start(const char *s, size_t i) {
+    while (i > 0 && ((unsigned char)s[i] & 0xc0) == 0x80) i--;
+    return i;
+}
+
+int ag_drop_name(const char *in, char *out, size_t cap) {
+    if (!in || !out || cap < 2) return -1;
+    const char *s = strrchr(in, '/');
+    s = s ? s + 1 : in;
+    size_t n = strlen(s);
+    if (!n || n > 4096 || !ag_utf8_ok((const uint8_t *)s, n)) return -1;
+    char t[4097];
+    size_t k = 0;
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)s[i];
+        t[k++] = c < 0x20 || c == 0x7f || strchr("\\:*?\"<>|", c) ? '_' : (char)c;
+    }
+    size_t a = 0;
+    while (a < k && t[a] == ' ') a++;
+    while (k > a && (t[k - 1] == ' ' || t[k - 1] == '.')) k--;
+    if (k == a) return -1;                                  /* nothing, ".", "..", "  " */
+    const char *u = t + a;
+    size_t un = k - a;
+    int dev = dos_device(u, un);
+    size_t lim = AG_NAME_MAX < cap - 1 ? AG_NAME_MAX : cap - 1;
+    if (dev) lim--;
+    size_t o = 0;
+    if (dev) out[o++] = '_';
+    if (un <= lim) { memcpy(out + o, u, un); o += un; }
+    else {
+        /* too long: the start, cut on a character, then the extension when it's short */
+        const char *dot = NULL;
+        for (size_t i = un; i > 1; i--) if (u[i - 1] == '.') { dot = u + i - 1; break; }
+        size_t en = dot && (size_t)(u + un - dot) <= 16 ? (size_t)(u + un - dot) : 0;
+        size_t head = char_start(u, lim - en);
+        while (head > 0 && u[head - 1] == ' ') head--;
+        if (!head) return -1;
+        memcpy(out + o, u, head); o += head;
+        memcpy(out + o, u + un - en, en); o += en;
+    }
+    out[o] = 0;
+    return 0;
+}
+
+void ag_exec_text(const char *b64, char *out, size_t cap) {
+    if (!cap) return;
+    out[0] = 0;
+    if (!b64) return;
+    uint8_t buf[2048];
+    size_t bl = strnlen(b64, 2700);
+    long n = ag_b64_decode(b64, bl, buf, sizeof buf);
+    if (n <= 0) return;
+    for (long i = 0; i < n; i++) if (buf[i] < 0x20 || buf[i] == 0x7f) buf[i] = ' ';
+    if (!ag_utf8_ok(buf, (size_t)n)) for (long i = 0; i < n; i++) if (buf[i] >= 0x80) buf[i] = '?';
+    long s = 0, e = n;
+    while (s < e && buf[s] == ' ') s++;
+    while (e > s && buf[e - 1] == ' ') e--;
+    size_t l = (size_t)(e - s);
+    if (l > cap - 1) l = char_start((const char *)buf + s, cap - 1);
+    memcpy(out, buf + s, l);
+    out[l] = 0;
+}
+
+int ag_drop_staging_ok(const char *p, int windows) {
+    if (!p) return 0;
+    size_t l = strlen(p);
+    if (!windows) {
+        static const char pre[] = "/var/tmp/lordos-drop.";
+        size_t pl = sizeof pre - 1;
+        if (l != pl + 8 || strncmp(p, pre, pl)) return 0;
+        for (size_t i = pl; i < l; i++) if (!((p[i] >= 'a' && p[i] <= 'z') || (p[i] >= 'A' && p[i] <= 'Z') || (p[i] >= '0' && p[i] <= '9'))) return 0;
+        return 1;
+    }
+    static const char tail[] = "\\Temp\\lordos-drop-";
+    size_t tl = sizeof tail - 1;
+    if (l < 3 + tl + 32 || l > 200 || !((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) || p[1] != ':' || p[2] != '\\') return 0;
+    for (size_t i = 0; i < l; i++) if (p[i] < 0x20 || p[i] > 0x7e || p[i] == '/' || (p[i] == '.' && p[i + 1] == '.')) return 0;
+    const char *t = p + l - 32 - tl;
+    if (strncasecmp(t, tail, tl)) return 0;
+    for (size_t i = l - 32; i < l; i++) if (!((p[i] >= '0' && p[i] <= '9') || (p[i] >= 'a' && p[i] <= 'f'))) return 0;
+    return 1;
 }

@@ -354,6 +354,42 @@ export function agentLines(agent, cfg) {
 }
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
 export const agentTone = (a, configured) => (!configured ? 'off' : a?.state === 'connected' ? 'run' : 'pause');
+
+// ---- files dropped on the window: copied into the guest's Downloads by its agent (lord.vm.sendFile) ----
+// Why a drop can't be taken now (the hint says it before the files are let go of), or null: 'off' (not running),
+// 'paused', 'agentOff' (Configure), 'agentWaiting' (not connected yet), 'agentCant' (it can't write files or run the
+// script that puts them in place). Files only go in: nothing is dragged out of a guest without a helper inside it.
+export function dropBlocker(st, agentOn) {
+  if (!st || (st.state !== 'running' && st.state !== 'paused')) return 'off';
+  if (st.state === 'paused') return 'paused';
+  if (!agentOn) return 'agentOff';
+  const g = st.agent;
+  if (!g || g.state !== 'connected') return 'agentWaiting';
+  return g.caps & AGENT_CAPS.files && g.caps & AGENT_CAPS.exec ? null : 'agentCant';
+}
+// the line under the picture while files go in (lord.vm.files): the first one still copying, the whole percentage by
+// size, how many wait after it; null when none is copying
+export function copyLine(list) {
+  const going = (list || []).filter((f) => f && f.state === 'copying').sort((a, b) => a.id - b.id);
+  if (!going.length) return null;
+  const total = going.reduce((a, f) => a + Math.max(0, f.size || 0), 0);
+  const pct = total > 0 ? Math.floor(going.reduce((a, f) => a + Math.max(0, f.size || 0) * Math.min(100, Math.max(0, f.pct || 0)), 0) / total)
+    : Math.floor(going.reduce((a, f) => a + Math.min(100, Math.max(0, f.pct || 0)), 0) / going.length);
+  return { name: going[0].name, pct: Math.min(99, pct), waiting: going.length - 1 };
+}
+// the folder of a path in the guest, Linux's or Windows' ('' for a bare name)
+export function guestFolder(p) {
+  const s = String(p || '');
+  const i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'));
+  return i > 0 ? s.slice(0, i) : i === 0 ? s.slice(0, 1) : '';
+}
+// Follow the window, not followed: the guest still shows another size 4 s after it was asked for one (a display
+// driver that takes sizes only when the system starts). asked = [w, h] (null: nothing asked), got = the picture's size
+export function followStuck(asked, got, askedAt, now) {
+  if (!asked || !got || !(got[0] > 0)) return false;
+  if (Math.abs(asked[0] - got[0]) <= 8 && Math.abs(asked[1] - got[1]) <= 8) return false;
+  return now - askedAt > 4000;
+}
 // a shared folder's mount tag from its name (6.7): letters, digits, '-' and '_', at most 32, not one already used
 export function shareTag(name, used = []) {
   const base = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 28) || 'share';

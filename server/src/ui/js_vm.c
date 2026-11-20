@@ -6,7 +6,7 @@
  *
  *   host() → { arch, cpus, ramMb, kvmDevice, kvm, vcpusRecommended, memMaxMb, missing: { amd64, arm64 }, ready,
  *             cards: [{ name, kind: 'wired'|'wifi', up }] }   (cards: what a bridged machine may join, 6.5)
- *   list() → [{ dir, folder, name, id, arch, accel, vcpus, memoryMb, diskGb, firmware, network, iso, state, reason,
+ *   list() → [{ dir, folder, name, id, arch, accel, vcpus, memoryMb, diskGb, firmware, tpm, secureBoot, network, iso, state, reason,
  *              code, detail, since, error }]   the machines in ~/Machines (<name>.lordvm)
  *   create({ name, arch, vcpus, memoryMb, diskGb, import | iso }) → job id (0: refused);  job(id) → { done, ok, out, dir }
  *   start(dir) → session id · attach(dir) → session id (a machine already running, through its runtime socket)
@@ -16,7 +16,8 @@
  *   key(id, evdev, down) · motion(id, x, y) · button(id, b, down) · wheel(id, dy, dx) · release(id)
  *   resize(id, w, h) · rate(id, hz) · close(id)
  *   log(dir) → the end of the machine's lord-vm.log (what failed)
- *   cdrom(id, path | null) → a disc into (or out of) a running machine's drive; poll's cd / cdMessage say how it went */
+ *   cdrom(id, path | null) → a disc into (or out of) a running machine's drive; poll's cd / cdMessage say how it went
+ *   sendFile(id, path) → request id: a dropped file into the guest's Downloads (guest agent); files(id) → how they went */
 #include "js_vm.h"
 #include "../media/media_int.h"
 #include "../media/aring.h"
@@ -304,6 +305,8 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_int(c, o, "memoryMb", m.memory_mb);
             set_int(c, o, "diskGb", m.disk_gb);
             set_str(c, o, "firmware", m.firmware == VM_FW_UEFI ? "uefi" : "bios");
+            JS_SetPropertyStr(c, o, "tpm", JS_NewBool(c, m.tpm));
+            JS_SetPropertyStr(c, o, "secureBoot", JS_NewBool(c, m.secure_boot));
             set_str(c, o, "network", VM_NET_NAMES[m.network]);
             set_str(c, o, "bridge", m.bridge);
             {
@@ -1123,6 +1126,10 @@ typedef struct {
     int mic_wait;                       /* the guest records and the machine allows it, LordOS's permission not (yet) */
     int spk_vol, spk_play;              /* what the speakers' stream was last given */
     char name[VM_NAME_MAX + 1];
+    /* files dropped on the window, on their way into the guest (VM_FILE): 1 copying, 2 done, 3 failed; msg is the
+     * guest's path (done) or why not, for the app to show; files() hands finished ones over once */
+    struct { uint32_t seq; int state, pct; long long size; char name[VM_TEXT_MAX], msg[VM_TEXT_MAX]; } fx[16];
+    int fx_changes;
 } Sess;
 static Sess sess[MAX_SESS];
 
@@ -1531,6 +1538,18 @@ static void drop_display(Sess *s, int close_helper) {
 
 static void drop_creds(Sess *s) { if (s->creds[0]) { unlink(s->creds); s->creds[0] = 0; } }
 
+/* the end of a VM_FILE: 1 if this reply was one */
+static int fx_reply(Sess *s, const VmMsg *m) {
+    for (int i = 0; i < 16; i++) if (s->fx[i].state == 1 && s->fx[i].seq == m->seq) {
+        s->fx[i].state = m->a == VME_OK ? 2 : 3;
+        if (m->a == VME_OK) s->fx[i].pct = 100;
+        snprintf(s->fx[i].msg, sizeof s->fx[i].msg, "%s", m->text);
+        s->fx_changes++;
+        return 1;
+    }
+    return 0;
+}
+
 static void from_vm(Sess *s) {
     for (int k = 0; k < VD_POLL_MAX && s->vm >= 0; k++) {
         VmMsg m;
@@ -1605,7 +1624,11 @@ static void from_vm(Sess *s) {
             s->notice_seq++;
             snprintf(s->notice_text, sizeof s->notice_text, "%s", m.text);
             break;
+        case VM_FILE_PROGRESS:
+            for (int i = 0; i < 16; i++) if (s->fx[i].state == 1 && s->fx[i].seq == m.seq) { s->fx[i].pct = m.a; s->fx_changes++; }
+            break;
         case VM_REPLY:
+            if (fx_reply(s, &m)) break;
             if (s->ag_seq && m.seq == s->ag_seq) { s->ag_result = m.a == VME_OK ? 2 : 3; snprintf(s->ag_msg, sizeof s->ag_msg, "%s", m.text); s->ag_seq = 0; }
             if (s->cd_seq && m.seq == s->cd_seq) { s->cd_state = m.a == VME_OK ? 2 : 3; snprintf(s->cd_msg, sizeof s->cd_msg, "%s", m.text); s->cd_seq = 0; }
             if (m.a != VME_OK) {
@@ -1855,7 +1878,75 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_SetPropertyStr(c, so, "micBytes", JS_NewFloat64(c, sm && sm->mic ? (double)maudio_bytes(sm->mic) : 0));
         JS_SetPropertyStr(c, o, "sound", so);
     }
+    set_int(c, o, "filesSeq", s->fx_changes);
     return o;
+}
+
+/* sendFile(session, path) → request id (0: refused): a file dropped on the machine's window, copied into the guest's
+ * Downloads by lord-vm through the guest agent. The file is opened here, for the person, read-only, and only a regular
+ * file; lord-vm gets the descriptor and the name, never a path. files(session) → [{ id, name, size, pct, state:
+ * 'copying'|'done'|'failed', message }]: the guest's path or why not; finished ones are listed once (poll's filesSeq
+ * counts changes) */
+static JSValue f_send_file(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    const char *p = s ? JS_ToCString(c, argv[1]) : NULL;
+    int slot = -1, fd = -1;
+    uint32_t q = 0;
+    if (s) for (int i = 0; i < 16; i++) if (!s->fx[i].state) { slot = i; break; }
+    if (p && p[0] == '/' && slot >= 0 && s->vm >= 0) fd = open(p, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NONBLOCK);
+    struct stat st;
+    if (fd >= 0 && !fstat(fd, &st) && S_ISREG(st.st_mode)) {
+        /* the name, at most VM_TEXT_MAX - 1 bytes: a long one keeps its start (on a character) and its extension;
+         * lord-vm makes it safe for the guest */
+        const char *base = strrchr(p, '/') + 1;
+        char name[VM_TEXT_MAX];
+        size_t bl = strlen(base);
+        if (bl < sizeof name) memcpy(name, base, bl + 1);
+        else {
+            const char *dot = strrchr(base, '.');
+            size_t el = dot && strlen(dot) <= 16 ? strlen(dot) : 0, hl = sizeof name - 1 - el;
+            while (hl > 0 && ((unsigned char)base[hl] & 0xc0) == 0x80) hl--;
+            memcpy(name, base, hl);
+            memcpy(name + hl, base + bl - el, el);
+            name[hl + el] = 0;
+        }
+        if (bl && name[0]) {
+            VmMsg m = vm_msg(VM_FILE, ++s->seq, 0, 0, 0, 0, name);
+            if (!vm_send(s->vm, &m, fd)) {
+                q = m.seq;
+                s->fx[slot].seq = q; s->fx[slot].state = 1; s->fx[slot].pct = 0; s->fx[slot].size = (long long)st.st_size;
+                snprintf(s->fx[slot].name, sizeof s->fx[slot].name, "%s", name);
+                s->fx[slot].msg[0] = 0;
+                s->fx_changes++;
+            }
+        }
+    }
+    if (fd >= 0) close(fd);
+    if (p) JS_FreeCString(c, p);
+    return JS_NewUint32(c, q);
+}
+static JSValue f_files(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    JSValue a = JS_NewArray(c);
+    if (!s) return a;
+    uint32_t k = 0;
+    for (int i = 0; i < 16; i++) {
+        if (!s->fx[i].state) continue;
+        /* lord-vm is gone: what it had is lost */
+        if (s->fx[i].state == 1 && s->vm < 0) { s->fx[i].state = 3; snprintf(s->fx[i].msg, sizeof s->fx[i].msg, "the machine stopped"); }
+        JSValue o = JS_NewObject(c);
+        set_int(c, o, "id", (int)s->fx[i].seq);
+        set_str(c, o, "name", s->fx[i].name);
+        JS_SetPropertyStr(c, o, "size", JS_NewInt64(c, s->fx[i].size));
+        set_int(c, o, "pct", s->fx[i].pct);
+        set_str(c, o, "state", s->fx[i].state == 1 ? "copying" : s->fx[i].state == 2 ? "done" : "failed");
+        set_str(c, o, "message", s->fx[i].msg);
+        JS_SetPropertyUint32(c, a, k++, o);
+        if (s->fx[i].state != 1) s->fx[i].state = 0;
+    }
+    return a;
 }
 
 /* cdrom(id, path | null) → bool: a disc into the running machine's drive (the file is opened here, for the person, and
@@ -2977,7 +3068,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
     JS_CFUNC_DEF("agent", 2, f_agent), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
-    JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
+    JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("sendFile", 2, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
