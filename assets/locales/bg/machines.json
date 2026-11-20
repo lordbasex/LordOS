@@ -835,5 +835,15 @@
   "un.err.tooLong": "Твърде дълго.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Готово",
-  "as.stepOf": "Стъпка {n} от {total}"
+  "as.stepOf": "Стъпка {n} от {total}",
+  "storage.refresh": "Опресняване",
+  "storage.available": "Свободно",
+  "storage.note": "Копията на машина споделят хранилището си, докато някое от тях не се промени, затова споделеното се брои веднъж.",
+  "storage.sharesWith": "Споделя данни на диска с {names}",
+  "storage.freesShort": "освобождава {size}",
+  "storage.takes": "Заема",
+  "storage.freesIf": "Освобождава при изтриване",
+  "storage.sharedTile": "Споделено",
+  "storage.sharesTitle": "Споделя хранилище с",
+  "storage.madeOf": "От какво се състои"
 }

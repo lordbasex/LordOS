@@ -835,5 +835,15 @@
   "un.err.tooLong": "Çok uzun.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Bitti",
-  "as.stepOf": "Adım {n}/{total}"
+  "as.stepOf": "Adım {n}/{total}",
+  "storage.refresh": "Yenile",
+  "storage.available": "Kullanılabilir",
+  "storage.note": "Bir makinenin kopyaları biri değişene kadar depolamayı paylaşır; bu yüzden paylaşılan kısım bir kez sayılır.",
+  "storage.sharesWith": "Disk verisini {names} ile paylaşıyor",
+  "storage.freesShort": "{size} boşaltır",
+  "storage.takes": "Kapladığı",
+  "storage.freesIf": "Silinirse boşalır",
+  "storage.sharedTile": "Paylaşılan",
+  "storage.sharesTitle": "Depolamayı paylaştığı",
+  "storage.madeOf": "Nelerden oluşuyor"
 }

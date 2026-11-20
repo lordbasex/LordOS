@@ -6,10 +6,14 @@
 // (the mock's "Downloads" in the bar; 3.9, "The Linux download cards"), shared by every account: each with its size and
 // the machines of this account whose CD drive has it; Remove (vm-image-remove, an administrator's action) asks first and
 // is refused while a running machine has it in its drive.
+// The look (2026-11-20, the maintainer): hypervisaur's "See where your space goes" (kit.jsx): the volume on a card with
+// its bar, each machine a row with its system's mark, who it shares disk data with and a small bar of its size, and for
+// the one chosen three tiles (takes up, frees if deleted, shared) and what it's made of.
 import { View, Text, ScrollView, ConfirmDialog, useAppWindow, wm, fs, admin, useNarrow, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
-import { storageRows, storageBar, stateView } from './model.js';
+import { storageRows, storageBar, stateView, systemOf } from './model.js';
 import { usePal, has, bytes, Btn, Sheet, OsMark } from './ui.jsx';
+import { Sym, Round, Pill } from './kit.jsx';
 import { readMeta } from './meta.js';
 import CATALOG from '../../assets/machines/systems.json';
 import { downloadedImages, IMAGES_DIR } from './catalog.js';
@@ -96,93 +100,185 @@ export function Storage() {
     try { fs.trash(x.dir); setSel(null); setMsg({ ok: true, text: tr('machines.storage.trashed', { name: x.name }) }); } catch (e) { setMsg({ ok: false, text: tr('machines.deleteFailed', { name: x.name }) }); }
     load();
   };
+  // who a machine shares disk data with: the machines on the same frozen disk, or the copy it came from and its copies
+  const machinesOf = rows.filter((r) => r.machine).map((r) => r.machine);
+  const partners = (x) => {
+    if (!x) return [];
+    if (x.base) return machinesOf.filter((y) => y.base === x.base && y.dir !== x.dir);
+    if (!(x.shared > 0)) return [];
+    return machinesOf.filter((y) => y.dir !== x.dir && (y.id === x.meta?.cloneOf || y.meta?.cloneOf === x.id));
+  };
+  const osId = (x) => x?.meta?.os || systemOf(x?.meta?.osName, x?.name).id;
+  const maxSize = Math.max(1, ...rows.map((r) => r.size || 0));
+  const card = { borderRadius: 14, backgroundColor: p.dark ? 'rgba(255,255,255,0.05)' : '#ffffff', border: `1px solid ${p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` };
+  const sectionTitle = (text) => <Text style={{ fontSize: 12, fontWeight: 700, color: p.dim, textAlign: 'start', paddingHorizontal: 4, paddingTop: 6, paddingBottom: 6 }}>{text}</Text>;
+  const miniBar = (frac, lit) => (
+    <View style={{ height: 4, borderRadius: 2, marginTop: 5, backgroundColor: lit ? 'rgba(255,255,255,0.3)' : p.track }}>
+      <View style={{ width: `${Math.max(2, Math.round(frac * 1000) / 10)}%`, height: 4, borderRadius: 2, backgroundColor: lit ? '#ffffff' : p.accent }} />
+    </View>
+  );
+  const pick = (key) => { setSel(key); setEst(null); setMsg(null); };
+  const tile = (label, value, color) => (
+    <View style={{ flex: 1, minWidth: 0, padding: 10, gap: 2, borderRadius: 10, backgroundColor: p.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
+      <Text style={{ fontSize: 11, color: p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{label}</Text>
+      <Text style={{ fontSize: 16, fontWeight: 700, color: color || p.text, textAlign: 'start', whiteSpace: 'nowrap' }}>{value}</Text>
+    </View>
+  );
+  const part = (label, v, total) => (
+    <View key={label} style={{ gap: 4 }}>
+      <View style={{ flexDirection: 'row' }}>
+        <Text style={{ flex: 1, fontSize: 13, color: p.text, textAlign: 'start' }}>{label}</Text>
+        <Text style={{ fontSize: 13, color: p.dim }}>{bytes(v)}</Text>
+      </View>
+      <View style={{ height: 4, borderRadius: 2, backgroundColor: p.track }}>
+        <View style={{ width: `${total > 0 ? Math.min(100, Math.max(v > 0 ? 1 : 0, Math.round((v / total) * 1000) / 10)) : 0}%`, height: 4, borderRadius: 2, backgroundColor: p.accent }} />
+      </View>
+    </View>
+  );
+  const msgLine = msg ? <Text style={{ fontSize: 12, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null;
+  const shareNames = (list) => list.map((y) => y.name).join(', ');
+  const mates = partners(m);
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingVertical: 16, gap: 10, borderBottomWidth: 1, borderColor: p.line }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ flex: 1, fontSize: 15, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.storage.title')}</Text>
-          <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.storage.freeOf', { free: bytes(st.free || 0), total: bytes(st.total || 0) })}</Text>
+      <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14, gap: 10, borderBottomWidth: 1, borderColor: p.line }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Sym name="storage" size={20} color={p.text} />
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.storage.disk')}</Text>
+          <Text style={{ fontSize: 13, color: p.dim }}>{tr('machines.storage.freeOf', { free: bytes(st.free || 0), total: bytes(st.total || 0) })}</Text>
+          <Round title={tr('machines.storage.refresh')} onClick={load}><Sym name="refresh" size={16} color={p.text} /></Round>
         </View>
-        <View style={{ flexDirection: 'row', height: 16, borderRadius: 4, overflow: 'hidden', backgroundColor: p.track }}>
-          {bar.map((b) => <View key={b.key} style={{ width: `${Math.round(b.frac * 1000) / 10}%`, height: 16, backgroundColor: colors[b.key] }} />)}
+        <View style={{ flexDirection: 'row', height: 14, borderRadius: 7, overflow: 'hidden', backgroundColor: p.track }}>
+          {bar.map((b) => <View key={b.key} style={{ width: `${Math.round(b.frac * 1000) / 10}%`, height: 14, backgroundColor: b.key === 'machines' ? p.accent : colors[b.key] }} />)}
         </View>
-        <View style={{ flexDirection: 'row', gap: 18, flexWrap: 'wrap' }}>
+        <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
           {bar.map((b) => (
             <View key={b.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: colors[b.key] }} />
-              <Text style={{ fontSize: 12, color: p.text }}>{`${tr(`machines.storage.cat.${b.key}`)} ${bytes(b.bytes)}`}</Text>
+              <View style={{ width: 9, height: 9, borderRadius: 3, backgroundColor: b.key === 'machines' ? p.accent : colors[b.key] }} />
+              <Text style={{ fontSize: 12, color: p.text }}>{tr(`machines.storage.cat.${b.key}`)}</Text>
+              <Text style={{ fontSize: 12, color: p.dim }}>{bytes(b.bytes)}</Text>
             </View>
           ))}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 9, height: 9, borderRadius: 3, border: `1px solid ${p.dim}` }} />
+            <Text style={{ fontSize: 12, color: p.text }}>{tr('machines.storage.available')}</Text>
+            <Text style={{ fontSize: 12, color: p.dim }}>{bytes(st.free || 0)}</Text>
+          </View>
         </View>
+        <Text style={{ fontSize: 11, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.note')}</Text>
       </View>
       <View style={{ flex: 1, minHeight: 0, flexDirection: narrow ? 'column' : 'row' }}>
-        <View style={{ flex: 1, minWidth: 0, minHeight: 0, paddingHorizontal: narrow ? 12 : 20, paddingVertical: 12 }}>
-          <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
-            <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.machine')}</Text>
-            <Text style={{ width: 90, fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'end' }}>{tr('machines.storage.size')}</Text>
-            <Text style={{ width: 110, fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'end' }}>{tr('machines.storage.frees')}</Text>
-          </View>
-          <ScrollView style={{ flex: 1 }}>
+        <ScrollView style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+          <View style={{ paddingHorizontal: narrow ? 12 : 16, paddingVertical: 10, gap: 4 }}>
+            {sectionTitle(tr('machines.storage.cat.machines'))}
             {rows.map((r) => {
               const lit = sel === r.key;
+              const x = r.machine;
+              const mates = partners(x);
+              const sub = r.base ? (r.names.join(', ') || tr('machines.storage.baseUnused'))
+                : mates.length ? tr('machines.storage.sharesWith', { names: shareNames(mates) }) : (x?.meta?.osName || '');
               return (
-                <View key={r.key} onClick={() => { setSel(r.key); setEst(null); setMsg(null); }} style={{ height: 34, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderRadius: 6, backgroundColor: lit ? '#0a84ff' : 'transparent' }}>
-                  <Text style={{ flex: 1, paddingLeft: r.level * 18, fontSize: 13, color: lit ? '#fff' : r.base ? p.dim : p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                    {r.base ? tr('machines.storage.base', { n: r.users }) : r.name}</Text>
-                  <Text style={{ width: 90, fontSize: 13, color: lit ? '#fff' : p.text, textAlign: 'end' }}>{bytes(r.size)}</Text>
-                  <Text style={{ width: 110, fontSize: 13, fontWeight: 600, color: lit ? '#fff' : p.text, textAlign: 'end' }}>{r.base ? (r.users ? '—' : bytes(r.size)) : bytes(r.frees)}</Text>
+                <View key={r.key} onClick={() => pick(r.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 8,
+                  marginLeft: r.level * 22, borderRadius: 10, backgroundColor: lit ? p.accent : 'transparent' }}>
+                  {r.level ? <Text style={{ fontSize: 13, color: lit ? '#fff' : p.dim }}>↳</Text> : null}
+                  {r.base ? <View style={{ width: 30, height: 30, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+                    <Sym name="disks" size={18} color={lit ? '#ffffff' : p.text} /></View> : <OsMark id={osId(x)} size={30} />}
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ fontSize: 13, fontWeight: 600, color: lit ? '#fff' : p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                      {r.base ? tr('machines.storage.base', { n: r.users }) : r.name}</Text>
+                    {sub ? <Text style={{ fontSize: 11, color: lit ? 'rgba(255,255,255,0.82)' : p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{sub}</Text> : null}
+                    {miniBar((r.size || 0) / maxSize, lit)}
+                  </View>
+                  <View style={{ width: 100, alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 13, fontWeight: 700, color: lit ? '#fff' : p.text, textAlign: 'end' }}>{bytes(r.size)}</Text>
+                    <Text style={{ fontSize: 11, color: lit ? 'rgba(255,255,255,0.82)' : p.dim, textAlign: 'end' }}>
+                      {r.base ? (r.users ? '—' : tr('machines.storage.freesShort', { size: bytes(r.size) })) : tr('machines.storage.freesShort', { size: bytes(r.frees) })}</Text>
+                  </View>
                 </View>
               );
             })}
             {!rows.length ? <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start', padding: 10 }}>{tr('machines.empty')}</Text> : null}
             {imgs.length ? <>
-              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 10, paddingTop: 16, paddingBottom: 6 }}>
-                <Text style={{ flex: 1, fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.downloads')}</Text>
-              </View>
+              <View style={{ height: 10 }} />
+              {sectionTitle(tr('machines.storage.downloads'))}
               {imgs.map((x) => {
                 const key = `img:${x.sha}`;
                 const lit = sel === key;
                 return (
-                  <View key={key} onClick={() => { setSel(key); setEst(null); setMsg(null); }} style={{ height: 34, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderRadius: 6, backgroundColor: lit ? '#0a84ff' : 'transparent' }}>
+                  <View key={key} onClick={() => pick(key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10,
+                    backgroundColor: lit ? p.accent : 'transparent', borderTopWidth: 0 }}>
+                    <Sym name="download" size={18} color={lit ? '#ffffff' : p.dim} />
                     <Text style={{ flex: 1, fontSize: 13, color: lit ? '#fff' : p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                       {x.partial ? tr('machines.storage.dlPartialRow', { name: imgName(x) }) : imgName(x)}</Text>
-                    <Text style={{ width: 90, fontSize: 13, color: lit ? '#fff' : p.text, textAlign: 'end' }}>{bytes(x.size)}</Text>
-                    <Text style={{ width: 110, fontSize: 13, fontWeight: 600, color: lit ? '#fff' : p.text, textAlign: 'end' }}>{x.users.length ? '—' : bytes(x.size)}</Text>
+                    <Text style={{ fontSize: 13, color: lit ? '#fff' : p.dim, textAlign: 'end' }}>{bytes(x.size)}</Text>
+                    <Round size={26} title={tr('machines.storage.dlRemoveOk')} onClick={(e) => { e?.stopPropagation?.(); if (!removing && !x.running.length) setRm(x); }}>
+                      <Sym name="trash" size={14} color={lit ? '#ffffff' : p.dim} /></Round>
                   </View>
                 );
               })}
+              <Text style={{ fontSize: 11, lineHeight: 1.45, color: p.dim, textAlign: 'start', paddingHorizontal: 4, paddingTop: 6 }}>{tr('machines.storage.dlShared')}</Text>
             </> : null}
-          </ScrollView>
-        </View>
-        <View style={{ width: narrow ? undefined : 300, padding: 16, gap: 10, backgroundColor: p.raised }}>
+          </View>
+        </ScrollView>
+        <View style={{ width: narrow ? undefined : 340, padding: 18, gap: 12, borderLeftWidth: narrow ? 0 : 1, borderTopWidth: narrow ? 1 : 0, borderColor: p.line,
+          backgroundColor: p.dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.015)' }}>
           {cur && m ? <>
-            <Text style={{ fontSize: 14, fontWeight: 600, color: p.text, textAlign: 'start' }}>{m.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <OsMark id={osId(m)} size={40} />
+              <Text style={{ flex: 1, fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{m.name}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {tile(tr('machines.storage.takes'), bytes(cur.size))}
+              {tile(tr('machines.storage.freesIf'), bytes(m.frees), p.accent)}
+              {tile(tr('machines.storage.sharedTile'), bytes(m.base ? cur.baseBytes : m.shared || 0))}
+            </View>
             <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
               {m.base ? tr('machines.storage.aboutLinked', { size: bytes(cur.baseBytes), n: cur.baseUsers, frees: bytes(m.frees) })
                 : m.shared > 0 ? tr('machines.storage.aboutShared', { size: bytes(m.shared), frees: bytes(m.frees) }) : tr('machines.storage.aboutOwn', { frees: bytes(m.frees) })}</Text>
-            {[['disks', m.disks], ['state', m.savedBytes], ['snapshots', m.snapshots], ['other', m.other]].map(([k, v]) => (
-              <View key={k} style={{ flexDirection: 'row' }}>
-                <Text style={{ flex: 1, fontSize: 12, color: p.text, textAlign: 'start' }}>{tr(`machines.storage.split.${k}`)}</Text>
-                <Text style={{ fontSize: 12, fontWeight: 600, color: p.text }}>{(k === 'snapshots' && v > 0 ? `${tr('machines.storage.about')} ` : '') + bytes(v)}</Text>
-              </View>
-            ))}
+            {mates.length ? <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 12, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.storage.sharesTitle')}</Text>
+              {mates.map((y) => (
+                <View key={y.dir} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <OsMark id={osId(y)} size={20} />
+                  <Text style={{ flex: 1, fontSize: 13, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{y.name}</Text>
+                </View>
+              ))}
+            </View> : null}
+            <View style={{ ...card, padding: 12, gap: 10 }}>
+              <Text style={{ fontSize: 12, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.storage.madeOf')}</Text>
+              {[['disks', m.disks], ['state', m.savedBytes], ['snapshots', m.snapshots], ['other', m.other]].filter(([k, v]) => k === 'disks' || v > 0)
+                .map(([k, v]) => part((k === 'snapshots' ? `${tr(`machines.storage.split.${k}`)} (${tr('machines.storage.about')})` : tr(`machines.storage.split.${k}`)), v, m.total || cur.size))}
+            </View>
             <View style={{ flex: 1 }} />
-            {msg ? <Text style={{ fontSize: 12, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}
-            {m.snapshotCount ? <Btn label={tr('machines.storage.snapshots', { n: m.snapshotCount })} onClick={() => openSnapshots(m)} /> : null}
-            <Btn label={busy ? tr('machines.storage.compacting') : tr('machines.storage.reclaim')} disabled={!!busy || !!est?.job || on}
-              onClick={() => { setMsg(null); const j = lord.vm.compact(m.dir, true); if (j) setEst({ job: j }); else setMsg({ ok: false, text: tr('machines.cfg.refused') }); }} />
-            <Btn danger label={tr('machines.storage.trash', { size: bytes(m.frees) })} disabled={on || !!busy} onClick={() => setDel(m)} />
+            {msgLine}
             {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.whenOff')}</Text> : null}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {m.snapshotCount ? <Pill icon="snapshot" label={tr('machines.storage.snapshots', { n: m.snapshotCount })} onClick={() => openSnapshots(m)} /> : null}
+              <Pill label={busy ? tr('machines.storage.compacting') : tr('machines.storage.reclaim')} disabled={!!busy || !!est?.job || on}
+                onClick={() => { setMsg(null); const j = lord.vm.compact(m.dir, true); if (j) setEst({ job: j }); else setMsg({ ok: false, text: tr('machines.cfg.refused') }); }} />
+              <Pill danger icon="trash" label={tr('machines.storage.trash', { size: bytes(m.frees) })} disabled={on || !!busy} onClick={() => setDel(m)} />
+            </View>
           </> : cur && cur.base ? <>
-            <Text style={{ fontSize: 14, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.storage.base', { n: cur.users })}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Sym name="disks" size={32} color={p.text} />
+              <Text style={{ flex: 1, fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.storage.base', { n: cur.users })}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {tile(tr('machines.storage.takes'), bytes(cur.size))}
+              {tile(tr('machines.storage.freesIf'), cur.users || cur.trash ? '—' : bytes(cur.size), p.accent)}
+            </View>
             <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{cur.users || cur.trash ? tr('machines.storage.baseUsed', { names: cur.names.join(', ') || '—', trash: cur.trash }) : tr('machines.storage.baseUnused')}</Text>
             <View style={{ flex: 1 }} />
-            {!cur.users && !cur.trash ? <Btn danger label={tr('machines.storage.removeBase', { size: bytes(cur.size) })}
-              onClick={() => { setMsg(lord.vm.removeBase(cur.path) ? null : { ok: false, text: tr('machines.cfg.refused') }); setSel(null); load(); }} /> : null}
+            {msgLine}
+            {!cur.users && !cur.trash ? <View style={{ flexDirection: 'row' }}><Pill danger icon="trash" label={tr('machines.storage.removeBase', { size: bytes(cur.size) })}
+              onClick={() => { setMsg(lord.vm.removeBase(cur.path) ? null : { ok: false, text: tr('machines.cfg.refused') }); setSel(null); load(); }} /></View> : null}
           </> : img ? <>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <OsMark id={img.id} size={32} />
-              <Text style={{ flex: 1, fontSize: 14, fontWeight: 600, color: p.text, textAlign: 'start' }}>{imgName(img)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <OsMark id={img.id} size={40} />
+              <Text style={{ flex: 1, fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{imgName(img)}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {tile(tr('machines.storage.takes'), bytes(img.size))}
+              {tile(tr('machines.storage.freesIf'), bytes(img.size), p.accent)}
             </View>
             {img.file ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{img.file}</Text> : null}
             <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
@@ -190,13 +286,17 @@ export function Storage() {
                 : img.users.length ? tr('machines.storage.dlUsed', { names: img.users.join(', ') }) : tr('machines.storage.dlUnused')}</Text>
             <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.dlShared')}</Text>
             <View style={{ flex: 1 }} />
-            {msg ? <Text style={{ fontSize: 12, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}
-            <Btn danger label={removing ? tr('machines.storage.dlRemoving') : tr('machines.storage.dlRemove', { size: bytes(img.size) })} disabled={removing || img.running.length > 0} onClick={() => setRm(img)} />
+            {msgLine}
             {img.running.length ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.dlRunning', { names: img.running.join(', ') })}</Text> : null}
+            <View style={{ flexDirection: 'row' }}>
+              <Pill danger icon="trash" label={removing ? tr('machines.storage.dlRemoving') : tr('machines.storage.dlRemove', { size: bytes(img.size) })} disabled={removing || img.running.length > 0} onClick={() => setRm(img)} />
+            </View>
           </> : <>
-            <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.storage.pick')}</Text>
-            <View style={{ flex: 1 }} />
-            {msg ? <Text style={{ fontSize: 12, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+              <Sym name="storage" size={40} color={p.dim} />
+              <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.dim, textAlign: 'center', maxWidth: 260 }}>{tr('machines.storage.pick')}</Text>
+            </View>
+            {msgLine}
           </>}
         </View>
       </View>

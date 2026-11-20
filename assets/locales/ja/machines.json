@@ -835,5 +835,15 @@
   "un.err.tooLong": "長すぎます",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "完了",
-  "as.stepOf": "ステップ {n}/{total}"
+  "as.stepOf": "ステップ {n}/{total}",
+  "storage.refresh": "更新",
+  "storage.available": "空き",
+  "storage.note": "マシンのコピーはどちらかが変わるまでストレージを共有するため、共有分は一度だけ数えられます。",
+  "storage.sharesWith": "{names} とディスクのデータを共有",
+  "storage.freesShort": "{size} 解放",
+  "storage.takes": "使用量",
+  "storage.freesIf": "削除で解放",
+  "storage.sharedTile": "共有",
+  "storage.sharesTitle": "ストレージを共有",
+  "storage.madeOf": "内訳"
 }

@@ -835,5 +835,15 @@
   "un.err.tooLong": "Πολύ μεγάλο.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Τέλος",
-  "as.stepOf": "Βήμα {n} από {total}"
+  "as.stepOf": "Βήμα {n} από {total}",
+  "storage.refresh": "Ανανέωση",
+  "storage.available": "Διαθέσιμο",
+  "storage.note": "Τα αντίγραφα μιας μηχανής μοιράζονται τον χώρο τους μέχρι να αλλάξει κάποιο, οπότε ό,τι μοιράζονται μετριέται μία φορά.",
+  "storage.sharesWith": "Μοιράζεται δεδομένα δίσκου με {names}",
+  "storage.freesShort": "ελευθερώνει {size}",
+  "storage.takes": "Καταλαμβάνει",
+  "storage.freesIf": "Ελευθερώνει αν διαγραφεί",
+  "storage.sharedTile": "Κοινόχρηστο",
+  "storage.sharesTitle": "Μοιράζεται χώρο με",
+  "storage.madeOf": "Από τι αποτελείται"
 }

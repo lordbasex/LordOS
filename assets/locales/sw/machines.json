@@ -835,5 +835,15 @@
   "un.err.tooLong": "Ni refu mno.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Imekamilika",
-  "as.stepOf": "Hatua {n} kati ya {total}"
+  "as.stepOf": "Hatua {n} kati ya {total}",
+  "storage.refresh": "Onyesha upya",
+  "storage.available": "Inapatikana",
+  "storage.note": "Nakala za mashine hushiriki hifadhi hadi mojawapo ibadilike, kwa hivyo kinachoshirikiwa huhesabiwa mara moja.",
+  "storage.sharesWith": "Inashiriki data ya diski na {names}",
+  "storage.freesShort": "inaachilia {size}",
+  "storage.takes": "Inachukua",
+  "storage.freesIf": "Huachiliwa ikifutwa",
+  "storage.sharedTile": "Inashirikiwa",
+  "storage.sharesTitle": "Inashiriki hifadhi na",
+  "storage.madeOf": "Imeundwa na nini"
 }

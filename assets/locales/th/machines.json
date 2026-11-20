@@ -835,5 +835,15 @@
   "un.err.tooLong": "ยาวเกินไป",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "เสร็จสิ้น",
-  "as.stepOf": "ขั้นตอนที่ {n} จาก {total}"
+  "as.stepOf": "ขั้นตอนที่ {n} จาก {total}",
+  "storage.refresh": "รีเฟรช",
+  "storage.available": "ว่าง",
+  "storage.note": "สำเนาของเครื่องใช้พื้นที่ร่วมกันจนกว่าเครื่องใดเครื่องหนึ่งจะเปลี่ยน ส่วนที่ใช้ร่วมกันจึงนับครั้งเดียว",
+  "storage.sharesWith": "ใช้ข้อมูลดิสก์ร่วมกับ {names}",
+  "storage.freesShort": "คืน {size}",
+  "storage.takes": "ใช้พื้นที่",
+  "storage.freesIf": "คืนเมื่อลบ",
+  "storage.sharedTile": "ใช้ร่วมกัน",
+  "storage.sharesTitle": "ใช้พื้นที่ร่วมกับ",
+  "storage.madeOf": "ประกอบด้วย"
 }

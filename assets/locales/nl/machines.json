@@ -835,5 +835,15 @@
   "un.err.tooLong": "Te lang.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Gereed",
-  "as.stepOf": "Stap {n} van {total}"
+  "as.stepOf": "Stap {n} van {total}",
+  "storage.refresh": "Vernieuwen",
+  "storage.available": "Beschikbaar",
+  "storage.note": "Kopieën van een machine delen hun opslag totdat een van beide verandert, dus wat ze delen telt één keer.",
+  "storage.sharesWith": "Deelt schijfgegevens met {names}",
+  "storage.freesShort": "maakt {size} vrij",
+  "storage.takes": "Neemt in",
+  "storage.freesIf": "Vrij bij verwijderen",
+  "storage.sharedTile": "Gedeeld",
+  "storage.sharesTitle": "Deelt opslag met",
+  "storage.madeOf": "Waaruit het bestaat"
 }

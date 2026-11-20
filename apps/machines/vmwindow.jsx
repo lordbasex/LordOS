@@ -10,10 +10,10 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
-import { usePal, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal } from './ui.jsx';
+import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal } from './ui.jsx';
 import { openLogs, openSnapshots } from './library.jsx';
 import { Configure } from './configure.jsx';
-import { Sheet } from './kit.jsx';
+import { Sheet, Pill } from './kit.jsx';
 
 const BAR = 48;
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
@@ -32,17 +32,12 @@ function AgentButton({ ctl }) {
   // off while the machine is: nothing to wait for
   const tone = ctl.a.start ? 'off' : agentTone(g, cfg.agent);
   const label = !cfg.agent ? tr('machines.agent.off') : g?.state === 'connected' ? tr('machines.agent.connected') : ctl.a.start ? tr('machines.agent.idle') : tr('machines.agent.waiting');
-  const light = () => (
-    <View style={{ width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${TONE[tone]}` }}>
-      <StateDot tone={tone} size={8} />
-    </View>
-  );
   return (
     <View ref={ref}>
-      <IconBtn icon={light} label={label} on={open} onClick={() => setOpen(!open)} />
+      <IconBtn sym="agent" badge={TONE[tone]} label={label} on={open} onClick={() => setOpen(!open)} />
       {open ? (
         <Overlay anchor={ref}>
-          <View style={{ position: 'absolute', top: 32, left: 0, width: 300 }}>
+          <View style={{ position: 'absolute', top: 30, left: -12, width: 340 }}>
             <AgentPop ctl={ctl} onClose={() => setOpen(false)} />
           </View>
         </Overlay>
@@ -62,26 +57,40 @@ function AgentPop({ ctl, onClose }) {
   }, []);
   const on = g?.state === 'connected';
   const lines = agentLines(g, cfg);
+  const tone = ctl.a.start ? 'off' : agentTone(g, cfg.agent);
+  const bg = p.dark ? '#34343c' : '#fbfbfd';
+  const edge = p.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)';
+  // the hypervisaur look (kit.jsx): a rounded popover with a nub toward the button, a light and the state in bold,
+  // the system on a line of its own, then what works in this machine
   return (
-    <View ref={ref} style={{ padding: 12, gap: 6, borderRadius: 10, backgroundColor: p.dark ? '#2b2b31' : '#fff', border: `1px solid ${p.line}`, boxShadow: '0 12px 34px rgba(0,0,0,0.5)' }}>
-      <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.off') : on ? tr('machines.agent.connected') : tr('machines.agent.waiting')}</Text>
-      {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{[g.system, tr('machines.agent.version', { v: g.version })].filter(Boolean).join(', ')}</Text>
-        : <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.offHint') : ctl.st?.state === 'running' ? tr('machines.agent.installHint') : tr('machines.agent.bootHint')}</Text>}
-      <View style={{ height: 4 }} />
-      {lines.map(([k, st]) => (
-        <View key={k} style={{ flexDirection: 'row', gap: 8 }}>
-          <Text style={{ width: 86, fontSize: 12, fontWeight: 600, color: st === 'works' ? '#7be3a4' : p.text, textAlign: 'start' }}>{tr(`machines.agent.st.${st}`)}</Text>
-          <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.agent.cap.${k}`)}</Text>
+    <View ref={ref}>
+      <Image src={`svg:48:${hexOf(bg)}:asset:machines/symbols/nub-symbolic.svg`} style={{ marginLeft: 22, width: 22, height: 22, marginTop: -11, marginBottom: -1 }} />
+      <View style={{ padding: 16, gap: 8, borderRadius: 16, backgroundColor: bg, border: `1px solid ${edge}`, boxShadow: '0 18px 44px rgba(0,0,0,0.45)' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <StateDot tone={tone} size={10} />
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.off') : on ? tr('machines.agent.connected') : tr('machines.agent.waiting')}</Text>
         </View>
-      ))}
-      {on ? (
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
-          <Btn label={g.install === 1 ? tr('machines.agent.installing') : tr('machines.agent.installHelper')} disabled={g.install === 1} onClick={() => lord.vm.agent(ctl.sid, 'install')} style={{ height: 28 }} />
-          <Btn label={tr('machines.agent.timesync')} onClick={() => lord.vm.agent(ctl.sid, 'timesync')} style={{ height: 28 }} />
+        {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{[g.system, tr('machines.agent.version', { v: g.version })].filter(Boolean).join(' · ')}</Text>
+          : <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.offHint') : ctl.st?.state === 'running' ? tr('machines.agent.installHint') : tr('machines.agent.bootHint')}</Text>}
+        <View style={{ marginTop: 4, borderRadius: 12, backgroundColor: p.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.035)', paddingVertical: 4 }}>
+          {lines.map(([k, st], i) => (
+            <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 6,
+              borderTopWidth: i ? 1 : 0, borderColor: p.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: st === 'works' ? TONE.run : 'transparent', border: st === 'works' ? 'none' : `1.5px solid ${p.dim}` }} />
+              <Text style={{ flex: 1, fontSize: 12, color: st === 'works' ? p.text : p.dim, textAlign: 'start' }}>{tr(`machines.agent.cap.${k}`)}</Text>
+              <Text style={{ fontSize: 11, fontWeight: 600, color: st === 'works' ? TONE.run : p.dim, textAlign: 'end' }}>{tr(`machines.agent.st.${st}`)}</Text>
+            </View>
+          ))}
         </View>
-      ) : null}
-      {g?.install === 2 ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.installed')}</Text> : null}
-      {g?.install === 3 ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{g.message}</Text> : null}
+        {on ? (
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+            <Pill label={g.install === 1 ? tr('machines.agent.installing') : tr('machines.agent.installHelper')} disabled={g.install === 1} onClick={() => lord.vm.agent(ctl.sid, 'install')} />
+            <Pill label={tr('machines.agent.timesync')} onClick={() => lord.vm.agent(ctl.sid, 'timesync')} />
+          </View>
+        ) : null}
+        {g?.install === 2 ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.installed')}</Text> : null}
+        {g?.install === 3 ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{g.message}</Text> : null}
+      </View>
     </View>
   );
 }

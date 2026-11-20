@@ -835,5 +835,15 @@
   "un.err.tooLong": "Túl hosszú.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Kész",
-  "as.stepOf": "{n}. lépés / {total}"
+  "as.stepOf": "{n}. lépés / {total}",
+  "storage.refresh": "Frissítés",
+  "storage.available": "Szabad",
+  "storage.note": "Egy gép másolatai addig osztoznak a tárhelyen, amíg valamelyikük meg nem változik, ezért a közös rész csak egyszer számít.",
+  "storage.sharesWith": "Lemezadatokon osztozik: {names}",
+  "storage.freesShort": "{size} szabadul fel",
+  "storage.takes": "Foglal",
+  "storage.freesIf": "Törléskor felszabadul",
+  "storage.sharedTile": "Közös",
+  "storage.sharesTitle": "Tárhelyen osztozik",
+  "storage.madeOf": "Miből áll"
 }

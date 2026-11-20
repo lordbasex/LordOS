@@ -835,5 +835,15 @@
   "un.err.tooLong": "För långt.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Klar",
-  "as.stepOf": "Steg {n} av {total}"
+  "as.stepOf": "Steg {n} av {total}",
+  "storage.refresh": "Uppdatera",
+  "storage.available": "Ledigt",
+  "storage.note": "Kopior av en maskin delar lagring tills någon av dem ändras, så det de delar räknas en gång.",
+  "storage.sharesWith": "Delar diskdata med {names}",
+  "storage.freesShort": "frigör {size}",
+  "storage.takes": "Tar upp",
+  "storage.freesIf": "Frigörs vid radering",
+  "storage.sharedTile": "Delat",
+  "storage.sharesTitle": "Delar lagring med",
+  "storage.madeOf": "Vad den består av"
 }

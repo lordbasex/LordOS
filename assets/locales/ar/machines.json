@@ -835,5 +835,15 @@
   "un.err.tooLong": "طويل جدًا.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "تم",
-  "as.stepOf": "الخطوة {n} من {total}"
+  "as.stepOf": "الخطوة {n} من {total}",
+  "storage.refresh": "تحديث",
+  "storage.available": "متاح",
+  "storage.note": "تتشارك نسخ الجهاز مساحة التخزين إلى أن تتغير إحداها، لذا يُحسب المشترك مرة واحدة.",
+  "storage.sharesWith": "يتشارك بيانات القرص مع {names}",
+  "storage.freesShort": "يحرّر {size}",
+  "storage.takes": "يشغل",
+  "storage.freesIf": "يحرّر عند الحذف",
+  "storage.sharedTile": "مشترك",
+  "storage.sharesTitle": "يتشارك التخزين مع",
+  "storage.madeOf": "مما يتكوّن"
 }

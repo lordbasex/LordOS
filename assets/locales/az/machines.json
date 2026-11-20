@@ -835,5 +835,15 @@
   "un.err.tooLong": "Çox uzundur.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Hazır",
-  "as.stepOf": "Addım {n}/{total}"
+  "as.stepOf": "Addım {n}/{total}",
+  "storage.refresh": "Yenilə",
+  "storage.available": "Boş",
+  "storage.note": "Maşının nüsxələri onlardan biri dəyişənə qədər yaddaşı bölüşür, buna görə bölüşdükləri bir dəfə sayılır.",
+  "storage.sharesWith": "Disk məlumatını {names} ilə bölüşür",
+  "storage.freesShort": "{size} boşaldır",
+  "storage.takes": "Tutur",
+  "storage.freesIf": "Silinsə boşaldır",
+  "storage.sharedTile": "Bölüşülən",
+  "storage.sharesTitle": "Yaddaşı bölüşür",
+  "storage.madeOf": "Nədən ibarətdir"
 }

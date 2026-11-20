@@ -835,5 +835,15 @@
   "un.err.tooLong": "অনেক লম্বা",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "সম্পন্ন",
-  "as.stepOf": "ধাপ {n} / {total}"
+  "as.stepOf": "ধাপ {n} / {total}",
+  "storage.refresh": "রিফ্রেশ",
+  "storage.available": "খালি",
+  "storage.note": "কোনো মেশিনের কপিগুলো যতক্ষণ না কোনোটি বদলায় ততক্ষণ স্টোরেজ ভাগ করে, তাই ভাগ করা অংশ একবারই গোনা হয়।",
+  "storage.sharesWith": "{names}-এর সাথে ডিস্কের ডেটা ভাগ করে",
+  "storage.freesShort": "{size} খালি করে",
+  "storage.takes": "জায়গা নেয়",
+  "storage.freesIf": "মুছলে খালি হয়",
+  "storage.sharedTile": "ভাগ করা",
+  "storage.sharesTitle": "স্টোরেজ ভাগ করে",
+  "storage.madeOf": "কী দিয়ে তৈরি"
 }

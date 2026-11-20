@@ -835,5 +835,15 @@
   "un.err.tooLong": "Задовго.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Готово",
-  "as.stepOf": "Крок {n} з {total}"
+  "as.stepOf": "Крок {n} з {total}",
+  "storage.refresh": "Оновити",
+  "storage.available": "Вільно",
+  "storage.note": "Копії машини ділять сховище, доки одна з них не зміниться, тож спільне враховується один раз.",
+  "storage.sharesWith": "Ділить дані диска з {names}",
+  "storage.freesShort": "звільнить {size}",
+  "storage.takes": "Займає",
+  "storage.freesIf": "Звільнить видалення",
+  "storage.sharedTile": "Спільне",
+  "storage.sharesTitle": "Ділить сховище з",
+  "storage.madeOf": "З чого складається"
 }

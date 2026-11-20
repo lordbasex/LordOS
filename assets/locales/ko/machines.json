@@ -835,5 +835,15 @@
   "un.err.tooLong": "너무 깁니다",
   "req.row.tpm": "TPM 2.0(Windows 11)",
   "cfg.done": "완료",
-  "as.stepOf": "{total}단계 중 {n}단계"
+  "as.stepOf": "{total}단계 중 {n}단계",
+  "storage.refresh": "새로 고침",
+  "storage.available": "사용 가능",
+  "storage.note": "머신의 복사본은 어느 한쪽이 바뀔 때까지 저장 공간을 공유하므로 공유하는 부분은 한 번만 계산됩니다.",
+  "storage.sharesWith": "{names}와(과) 디스크 데이터 공유",
+  "storage.freesShort": "{size} 확보",
+  "storage.takes": "차지하는 공간",
+  "storage.freesIf": "삭제 시 확보",
+  "storage.sharedTile": "공유됨",
+  "storage.sharesTitle": "저장 공간 공유",
+  "storage.madeOf": "구성"
 }

@@ -5,15 +5,22 @@
 import { View, Text, TextInput, Toggle, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { usePal, Btn, Sheet } from './ui.jsx';
+import { Sym } from './kit.jsx';
 import { cloneMethod, cloneHostname, hostnameValid } from './model.js';
 import { writeMeta } from './meta.js';
 
-function Kind({ on, title, text, foot, onClick }) {
+function Kind({ on, icon, title, text, foot, onClick }) {
   const p = usePal();
   return (
-    <View onClick={onClick} style={{ flex: 1, minHeight: 150, padding: 14, gap: 6, borderRadius: 12, backgroundColor: on ? (p.dark ? '#1d3049' : '#e6f1ff') : p.card,
-      border: `2px solid ${on ? '#0a84ff' : p.line}` }}>
-      <Text style={{ fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
+    <View onClick={onClick} style={{ flex: 1, minHeight: 150, padding: 14, gap: 6, borderRadius: 14,
+      backgroundColor: p.dark ? 'rgba(255,255,255,0.05)' : '#ffffff', border: `2px solid ${on ? p.accent : p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Sym name={icon} size={22} color={on ? p.accent : p.dim} />
+        <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
+        <View style={{ width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', border: `2px solid ${on ? p.accent : p.dim}` }}>
+          {on ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.accent }} /> : null}
+        </View>
+      </View>
       <Text style={{ fontSize: 13, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{text}</Text>
       <View style={{ flex: 1 }} />
       <Text style={{ fontSize: 12, fontWeight: 700, color: p.text, textAlign: 'start' }}>{foot}</Text>
@@ -64,9 +71,9 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
     ]}>
       {!fromSnapshot ? (
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <Kind on={kind === 'clone'} onClick={() => setKind('clone')} title={tr('machines.clone.clone')} text={tr('machines.clone.cloneText')}
+          <Kind icon="copy" on={kind === 'clone'} onClick={() => setKind('clone')} title={tr('machines.clone.clone')} text={tr('machines.clone.cloneText')}
             foot={tr(info.reflink || cloneMethod(info, 'clone') === 'linked' ? 'machines.clone.changesOnly' : 'machines.clone.fullCopy')} />
-          <Kind on={kind === 'duplicate'} onClick={() => setKind('duplicate')} title={tr('machines.clone.duplicate')} text={tr('machines.clone.duplicateText')}
+          <Kind icon="disks" on={kind === 'duplicate'} onClick={() => setKind('duplicate')} title={tr('machines.clone.duplicate')} text={tr('machines.clone.duplicateText')}
             foot={tr(info.reflink ? 'machines.clone.alsoShares' : 'machines.clone.fullCopy')} />
         </View>
       ) : null}
@@ -91,7 +98,8 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
           </Text>
         </View>
       ) : null}
-      <View style={{ paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: blocked ? p.warnBg : p.card }}>
+      <View style={{ paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, backgroundColor: blocked ? p.warnBg : p.dark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+        border: `1px solid ${p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
         <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>
           {blocked || tr(`machines.clone.how.${how}`, { fs: info.fs || '', name: m.name })}
         </Text>

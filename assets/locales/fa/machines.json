@@ -835,5 +835,15 @@
   "un.err.tooLong": "بیش از حد طولانی است.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "تمام",
-  "as.stepOf": "مرحلهٔ {n} از {total}"
+  "as.stepOf": "مرحلهٔ {n} از {total}",
+  "storage.refresh": "تازه‌سازی",
+  "storage.available": "در دسترس",
+  "storage.note": "نسخه‌های یک ماشین تا وقتی یکی تغییر کند فضای ذخیره را به اشتراک می‌گذارند، پس بخش مشترک یک بار شمرده می‌شود.",
+  "storage.sharesWith": "داده‌های دیسک را با {names} به اشتراک می‌گذارد",
+  "storage.freesShort": "{size} آزاد می‌کند",
+  "storage.takes": "اشغال می‌کند",
+  "storage.freesIf": "با حذف آزاد می‌شود",
+  "storage.sharedTile": "مشترک",
+  "storage.sharesTitle": "فضا را به اشتراک می‌گذارد با",
+  "storage.madeOf": "از چه ساخته شده"
 }

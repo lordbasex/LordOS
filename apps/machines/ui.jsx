@@ -97,17 +97,19 @@ export function Bar({ frac, color, height = 6 }) {
   );
 }
 
-// A button in the mocks' style: filled (accent), plain (gray) or a text link
+// A button in the mocks' style: filled (accent), plain (gray) or a text link; a pill, as hypervisaur's (kit.jsx)
 export function Btn({ label, onClick, primary, disabled, big, link, danger, style }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
-  const bg = link ? 'transparent' : primary ? p.accent : p.btn;
+  const bg = link ? 'transparent' : primary ? (danger ? '#e5483f' : p.accent) : p.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
+  const h = big ? 44 : 32;
   return (
     <View onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ height: big ? 44 : 32, paddingHorizontal: big ? 18 : 12, borderRadius: big ? 12 : 8, alignItems: 'center', justifyContent: 'center',
-        backgroundColor: bg, opacity: disabled ? 0.45 : hover && !link ? 0.88 : 1, ...style }}>
+      style={{ height: h, paddingHorizontal: big ? 22 : 16, borderRadius: h / 2, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: bg, opacity: disabled ? 0.45 : hover && !link ? 0.86 : 1,
+        border: link || primary ? 'none' : `1px solid ${p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, ...style }}>
       <Text style={{ fontSize: big ? 14 : 13, fontWeight: primary || big ? 700 : 600, whiteSpace: 'nowrap',
-        color: link ? '#6cb6ff' : primary ? '#fff' : danger ? '#ff453a' : p.text }}>{label}</Text>
+        color: link ? p.accent : primary ? '#fff' : danger ? '#ff453a' : p.text }}>{label}</Text>
     </View>
   );
 }
@@ -115,7 +117,7 @@ export function Btn({ label, onClick, primary, disabled, big, link, danger, styl
 // A toolbar button with a glyph (or a drawn icon) and its name as the tooltip (the mock "Session": agent, shell, logs,
 // screenshot, record, pause, power)
 // sym: a glyph of assets/machines/symbols (kit.jsx's Sym), tinted like the text
-export function IconBtn({ glyph, icon, sym, label, onClick, disabled, on, danger, color, size = 14 }) {
+export function IconBtn({ glyph, icon, sym, label, onClick, disabled, on, danger, color, size = 14, badge }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   const fg = on || danger ? '#fff' : color || p.text;
@@ -126,6 +128,8 @@ export function IconBtn({ glyph, icon, sym, label, onClick, disabled, on, danger
         backgroundColor: danger ? '#8f1f2c' : on ? p.accent : hover && !disabled ? p.hover : 'transparent' }}>
       {sym ? <Image src={`svg:40:${hex}:asset:machines/symbols/${sym}-symbolic.svg`} style={{ width: 18, height: 18 }} />
         : icon ? icon(fg) : <Text style={{ fontSize: size, fontWeight: 700, color: fg }}>{glyph}</Text>}
+      {badge ? <View style={{ position: 'absolute', right: 7, bottom: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: badge,
+        border: `1.5px solid ${p.dark ? '#2b2b31' : '#f2f2f4'}` }} /> : null}
     </View>
   );
 }
@@ -223,9 +227,9 @@ export function PopMenu({ x, y, items, onClose, width = 220 }) {
     return () => { a(); b(); };
   }, []);
   return (
-    <View ref={ref} style={{ position: 'absolute', left: x, top: y, width, padding: 5, borderRadius: 10, backgroundColor: p.dark ? '#2b2b31' : '#ffffff',
-      border: `1px solid ${p.line}`, boxShadow: '0 12px 34px rgba(0,0,0,0.5)' }}>
-      {items.filter(Boolean).map((it, i) => (it === '-' ? <View key={`s${i}`} style={{ height: 1, marginVertical: 4, marginHorizontal: 6, backgroundColor: p.line }} />
+    <View ref={ref} style={{ position: 'absolute', left: x, top: y, width, padding: 6, borderRadius: 12, backgroundColor: p.dark ? '#34343c' : '#fbfbfd',
+      border: `1px solid ${p.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)'}`, boxShadow: '0 18px 44px rgba(0,0,0,0.45)' }}>
+      {items.filter(Boolean).map((it, i) => (it === '-' ? <View key={`s${i}`} style={{ height: 1, marginVertical: 5, marginHorizontal: 10, backgroundColor: p.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }} />
         : <MenuItem key={`${i}${it.label}`} it={it} onClose={onClose} />))}
     </View>
   );
@@ -236,7 +240,7 @@ function MenuItem({ it, onClose }) {
   const lit = hover && !it.disabled;
   return (
     <View onClick={() => { if (it.disabled) return; onClose(); it.onClick?.(); }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ minHeight: 28, paddingHorizontal: 8, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: lit ? p.accent : 'transparent', opacity: it.disabled ? 0.4 : 1 }}>
+      style={{ minHeight: 30, paddingHorizontal: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: lit ? p.accent : 'transparent', opacity: it.disabled ? 0.4 : 1 }}>
       <Text style={{ width: 12, fontSize: 11, color: lit ? '#fff' : p.text }}>{it.checked ? '✓' : ''}</Text>
       <Text style={{ flex: 1, fontSize: 13, whiteSpace: 'nowrap', color: lit ? '#fff' : it.destructive ? '#ff453a' : p.text }}>{it.label}</Text>
       {it.hint ? <Text style={{ fontSize: 11, color: lit ? '#e6f1ff' : p.dim }}>{it.hint}</Text> : null}
@@ -273,15 +277,18 @@ export function MenuBtn({ label, items, primary, disabled }) {
 export const overlayRoot = { current: null };
 
 // A dialog over the window (the mocks' Clone and the snapshot sheets): title, body, actions on the right. Esc cancels.
+// An alert in hypervisaur's look (kit.jsx): the window dimmed behind, a rounded card with a hairline edge.
 export function Sheet({ title, children, actions, width = 560, onCancel }) {
   const p = usePal();
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') onCancel?.(); }), [onCancel]);
   return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' }}>
-      <View style={{ width, padding: 22, gap: 14, borderRadius: 18, backgroundColor: p.dark ? '#1f1f23' : '#ffffff', boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
-        <Text style={{ fontSize: 18, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 24,
+      backgroundColor: p.dark ? 'rgba(0,0,0,0.5)' : 'rgba(30,30,40,0.28)' }}>
+      <View style={{ width, maxWidth: '100%', padding: 22, gap: 14, borderRadius: 16, backgroundColor: p.dark ? '#26262f' : '#f6f6f8',
+        border: `1px solid ${p.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`, boxShadow: '0 24px 64px rgba(0,0,0,0.55)' }}>
+        <Text style={{ fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
         {children}
-        {actions?.length ? <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>{actions}</View> : null}
+        {actions?.length ? <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 4 }}>{actions}</View> : null}
       </View>
     </View>
   );

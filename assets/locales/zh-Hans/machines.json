@@ -835,5 +835,15 @@
   "un.err.tooLong": "太长了",
   "req.row.tpm": "TPM 2.0（Windows 11）",
   "cfg.done": "完成",
-  "as.stepOf": "第 {n} 步，共 {total} 步"
+  "as.stepOf": "第 {n} 步，共 {total} 步",
+  "storage.refresh": "刷新",
+  "storage.available": "可用",
+  "storage.note": "机器的副本在任一方改变之前共享存储，所以共享的部分只计算一次。",
+  "storage.sharesWith": "与 {names} 共享磁盘数据",
+  "storage.freesShort": "释放 {size}",
+  "storage.takes": "占用",
+  "storage.freesIf": "删除后释放",
+  "storage.sharedTile": "共享",
+  "storage.sharesTitle": "共享存储的机器",
+  "storage.madeOf": "组成"
 }

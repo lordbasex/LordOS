@@ -835,5 +835,15 @@
   "un.err.tooLong": "Liian pitkä.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Valmis",
-  "as.stepOf": "Vaihe {n}/{total}"
+  "as.stepOf": "Vaihe {n}/{total}",
+  "storage.refresh": "Päivitä",
+  "storage.available": "Vapaana",
+  "storage.note": "Koneen kopiot jakavat tallennustilan, kunnes jokin niistä muuttuu, joten jaettu lasketaan vain kerran.",
+  "storage.sharesWith": "Jakaa levyn tietoja: {names}",
+  "storage.freesShort": "vapauttaa {size}",
+  "storage.takes": "Vie tilaa",
+  "storage.freesIf": "Vapautuu poistettaessa",
+  "storage.sharedTile": "Jaettu",
+  "storage.sharesTitle": "Jakaa tallennustilan",
+  "storage.madeOf": "Mistä se koostuu"
 }

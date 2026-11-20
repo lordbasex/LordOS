@@ -835,5 +835,15 @@
   "un.err.tooLong": "बहुत लंबा है",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "हो गया",
-  "as.stepOf": "चरण {n} / {total}"
+  "as.stepOf": "चरण {n} / {total}",
+  "storage.refresh": "रीफ़्रेश",
+  "storage.available": "उपलब्ध",
+  "storage.note": "किसी मशीन की कॉपियाँ तब तक स्टोरेज साझा करती हैं जब तक उनमें से कोई बदल न जाए, इसलिए साझा हिस्सा एक बार गिना जाता है।",
+  "storage.sharesWith": "{names} के साथ डिस्क डेटा साझा करती है",
+  "storage.freesShort": "{size} खाली करती है",
+  "storage.takes": "घेरती है",
+  "storage.freesIf": "हटाने पर खाली",
+  "storage.sharedTile": "साझा",
+  "storage.sharesTitle": "स्टोरेज साझा करती है",
+  "storage.madeOf": "किससे बनी है"
 }

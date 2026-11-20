@@ -835,5 +835,15 @@
   "un.err.tooLong": "Quá dài.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Xong",
-  "as.stepOf": "Bước {n}/{total}"
+  "as.stepOf": "Bước {n}/{total}",
+  "storage.refresh": "Làm mới",
+  "storage.available": "Còn trống",
+  "storage.note": "Các bản sao của một máy dùng chung dung lượng cho đến khi một bản thay đổi, nên phần dùng chung chỉ tính một lần.",
+  "storage.sharesWith": "Dùng chung dữ liệu đĩa với {names}",
+  "storage.freesShort": "giải phóng {size}",
+  "storage.takes": "Chiếm",
+  "storage.freesIf": "Giải phóng nếu xóa",
+  "storage.sharedTile": "Dùng chung",
+  "storage.sharesTitle": "Dùng chung dung lượng với",
+  "storage.madeOf": "Gồm những gì"
 }

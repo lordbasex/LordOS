@@ -71,7 +71,7 @@ export function Pill({ label, onClick, primary, disabled, danger, icon }) {
     <View onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ height: 36, paddingHorizontal: 20, borderRadius: 18, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center',
         backgroundColor: bg, opacity: disabled ? 0.45 : hover ? 0.88 : 1, border: primary ? 'none' : `1px solid ${p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
-      {icon ? <Sym name={icon} size={16} color={primary ? '#ffffff' : p.text} /> : null}
+      {icon ? <Sym name={icon} size={16} color={primary ? '#ffffff' : danger ? '#ff453a' : p.text} /> : null}
       <Text style={{ fontSize: 13, fontWeight: 600, color: primary ? '#fff' : danger ? '#ff453a' : p.text, whiteSpace: 'nowrap' }}>{label}</Text>
     </View>
   );

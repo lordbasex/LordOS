@@ -835,5 +835,15 @@
   "un.err.tooLong": "بہت لمبا ہے",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "ہو گیا",
-  "as.stepOf": "مرحلہ {n} از {total}"
+  "as.stepOf": "مرحلہ {n} از {total}",
+  "storage.refresh": "تازہ کریں",
+  "storage.available": "دستیاب",
+  "storage.note": "کسی مشین کی نقلیں اسٹوریج بانٹتی ہیں جب تک ان میں سے کوئی بدل نہ جائے، اس لیے مشترک حصہ ایک بار گنا جاتا ہے۔",
+  "storage.sharesWith": "{names} کے ساتھ ڈسک ڈیٹا بانٹتی ہے",
+  "storage.freesShort": "{size} خالی کرتی ہے",
+  "storage.takes": "جگہ لیتی ہے",
+  "storage.freesIf": "حذف پر خالی",
+  "storage.sharedTile": "مشترک",
+  "storage.sharesTitle": "اسٹوریج بانٹتی ہے",
+  "storage.madeOf": "کس چیز سے بنی ہے"
 }

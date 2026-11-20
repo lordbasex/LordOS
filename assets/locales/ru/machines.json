@@ -835,5 +835,15 @@
   "un.err.tooLong": "Слишком длинно.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Готово",
-  "as.stepOf": "Шаг {n} из {total}"
+  "as.stepOf": "Шаг {n} из {total}",
+  "storage.refresh": "Обновить",
+  "storage.available": "Свободно",
+  "storage.note": "Копии машины делят хранилище, пока одна из них не изменится, поэтому общее учитывается один раз.",
+  "storage.sharesWith": "Делит данные диска с {names}",
+  "storage.freesShort": "освободит {size}",
+  "storage.takes": "Занимает",
+  "storage.freesIf": "Освободит удаление",
+  "storage.sharedTile": "Общее",
+  "storage.sharesTitle": "Делит хранилище с",
+  "storage.madeOf": "Из чего состоит"
 }

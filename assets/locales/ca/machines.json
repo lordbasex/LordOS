@@ -835,5 +835,15 @@
   "un.err.tooLong": "Massa llarg.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Fet",
-  "as.stepOf": "Pas {n} de {total}"
+  "as.stepOf": "Pas {n} de {total}",
+  "storage.refresh": "Actualitza",
+  "storage.available": "Disponible",
+  "storage.note": "Les còpies d'una màquina comparteixen l'emmagatzematge fins que alguna canvia, així que el que comparteixen es compta una sola vegada.",
+  "storage.sharesWith": "Comparteix dades de disc amb {names}",
+  "storage.freesShort": "allibera {size}",
+  "storage.takes": "Ocupa",
+  "storage.freesIf": "Allibera si s'esborra",
+  "storage.sharedTile": "Compartit",
+  "storage.sharesTitle": "Comparteix emmagatzematge amb",
+  "storage.madeOf": "De què està feta"
 }

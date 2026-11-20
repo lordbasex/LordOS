@@ -6,6 +6,7 @@
 import { View, Text, TextInput, ScrollView, Segmented, useAppWindow, wm, fs, clipboard, revealPath, useNarrow, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { usePal, Btn, has } from './ui.jsx';
+import { Sym, ToolPill, ToolGlyph } from './kit.jsx';
 import { readLog, reportText } from './diag.js';
 
 const levelOf = (l) => (/(fail|error|refus|crash|killed|panic|cannot|can't|err\b|\[err)/i.test(l) ? 'error' : /(warn|note:|lost|retry)/i.test(l) ? 'warn' : 'info');
@@ -98,17 +99,24 @@ export function Logs({ dir, name }) {
   if (m?.agent) sources.push(['journal', tr('machines.logs.journal')]);
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <View style={{ minHeight: 52, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: narrow ? 8 : 0, borderBottomWidth: 1, borderColor: p.line }}>
-        <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{tr('machines.logs.title', { name })}</Text>
+      <View style={{ minHeight: 56, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: narrow ? 8 : 0, borderBottomWidth: 1, borderColor: p.line }}>
+        <Sym name="logs" size={20} color={p.text} />
+        <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{tr('machines.logs.title', { name })}</Text>
         <Segmented small value={which} onChange={(x) => { setWhich(x); setPaused(false); }} options={sources} />
         {which !== 'overview' ? <>
-          <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.logs.filter')}</Text>
-          <View style={{ width: narrow ? 110 : 160 }}><TextInput value={filter} onChange={setFilter} /></View>
-          <Btn label={tr(`machines.logs.level.${level}`)} onClick={() => setLevel(LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length])} style={{ height: 28 }} />
-          <Btn label={paused ? tr('machines.logs.follow') : tr('machines.logs.pause')} onClick={() => setPaused(!paused)} style={{ height: 28 }} />
-          <Btn label={tr('machines.logs.copy')} onClick={() => clipboard.set(lines.join('\n'))} style={{ height: 28 }} />
-          <Btn label={tr('machines.logs.save')} onClick={save} style={{ height: 28 }} />
-          <Btn label={tr('machines.logs.clear')} onClick={() => { cleared.current = { which, count: text.split('\n').filter((l) => l.trim()).length }; setText(text); }} style={{ height: 28 }} />
+          <Btn label={tr(`machines.logs.level.${level}`)} onClick={() => setLevel(LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length])} style={{ height: 30 }} />
+          <ToolPill>
+            <ToolGlyph icon={paused ? 'play' : 'pause'} title={paused ? tr('machines.logs.follow') : tr('machines.logs.pause')} on={paused} onClick={() => setPaused(!paused)} />
+            <ToolGlyph icon="copy" title={tr('machines.logs.copy')} onClick={() => clipboard.set(lines.join('\n'))} />
+            <ToolGlyph icon="download" title={tr('machines.logs.save')} onClick={save} />
+            <ToolGlyph icon="trash" title={tr('machines.logs.clear')} onClick={() => { cleared.current = { which, count: text.split('\n').filter((l) => l.trim()).length }; setText(text); }} />
+          </ToolPill>
+          <View style={{ width: narrow ? 140 : 200, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 10, height: 32, borderRadius: 16,
+            backgroundColor: p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', border: `1px solid ${p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}` }}>
+            <Sym name="search" size={14} color={p.dim} />
+            <View style={{ flex: 1, minWidth: 0 }}><TextInput value={filter} onChange={setFilter} placeholder={tr('machines.logs.filter')}
+              style={{ backgroundColor: 'transparent', borderWidth: 0, border: 'none', paddingHorizontal: 2, height: 28 }} /></View>
+          </View>
         </> : null}
       </View>
       {which === 'overview' ? <Overview dir={dir} m={m} text={text} /> : (

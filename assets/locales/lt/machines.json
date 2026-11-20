@@ -835,5 +835,15 @@
   "un.err.tooLong": "Per ilgas.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Atlikta",
-  "as.stepOf": "{n} žingsnis iš {total}"
+  "as.stepOf": "{n} žingsnis iš {total}",
+  "storage.refresh": "Atnaujinti",
+  "storage.available": "Laisva",
+  "storage.note": "Mašinos kopijos dalijasi saugykla, kol kuri nors pasikeičia, todėl bendra dalis skaičiuojama vieną kartą.",
+  "storage.sharesWith": "Dalijasi disko duomenimis su {names}",
+  "storage.freesShort": "atlaisvina {size}",
+  "storage.takes": "Užima",
+  "storage.freesIf": "Atlaisvinama ištrynus",
+  "storage.sharedTile": "Bendra",
+  "storage.sharesTitle": "Dalijasi saugykla su",
+  "storage.madeOf": "Iš ko sudaryta"
 }

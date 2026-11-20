@@ -43,6 +43,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   in `assets/machines/logos/README.md`. Ubuntu keeps Machines' own mark (Canonical asks for written permission), and so
   does Windows (Microsoft's logo isn't used, nor anything made to look like it).
 - `lord-vm --sha256 FILE` and `lord.vm.hash(path)`: an ISO's SHA-256 with progress, to check the one you downloaded.
+- **Machines looks like a native virtualization app** (the look of hypervisaur's screenshots, reimplemented: no code or
+  images of it are used; `apps/machines/kit.jsx`). The assistant, Configure, Requirements and the Raspberry Pi page open
+  as sheets over the window, which stays behind, dimmed. Configure has a glyph beside each section, a header with its
+  summary, grouped cards, sliders and Cancel/Done pills. The machine's toolbar is in pill groups of glyphs, and every
+  glyph (38 of LordOS's own, `assets/machines/symbols`) follows the accent chosen in Settings → Appearance.
+  - **Storage** ("where your space goes"): the volume on a card with its bar and an Available slice, each machine with
+    its system's mark, who it shares disk data with and a small bar of its size, and for the selected one three tiles
+    (takes up, frees if deleted, shared), the machines it shares storage with, and what it's made of. Downloaded
+    systems have a remove button on their row.
+  - **The agent's popover**: a light and the state in bold, the guest's system, then each thing the agent brings with a
+    green dot when it works; the agent button carries the light as a badge.
+  - **Logs**: pause, copy, save and clear as glyphs on one pill and a rounded filter field. **Snapshots** and **Clone**:
+    cards and pills in the same look; menus and alerts are rounded, with a hairline edge.
 
 ### Fixed
 

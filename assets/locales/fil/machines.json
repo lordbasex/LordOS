@@ -835,5 +835,15 @@
   "un.err.tooLong": "Masyadong mahaba.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Tapos na",
-  "as.stepOf": "Hakbang {n} ng {total}"
+  "as.stepOf": "Hakbang {n} ng {total}",
+  "storage.refresh": "I-refresh",
+  "storage.available": "Bakante",
+  "storage.note": "Nagsasalo ang mga kopya ng isang makina sa storage hanggang may magbago sa isa, kaya isang beses lang binibilang ang pinagsasaluhan.",
+  "storage.sharesWith": "Nagsasalo ng data ng disk sa {names}",
+  "storage.freesShort": "nagpapalaya ng {size}",
+  "storage.takes": "Sinasakop",
+  "storage.freesIf": "Lalaya kapag binura",
+  "storage.sharedTile": "Pinagsasaluhan",
+  "storage.sharesTitle": "Nagsasalo ng storage sa",
+  "storage.madeOf": "Saan ito binubuo"
 }

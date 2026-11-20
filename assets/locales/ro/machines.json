@@ -835,5 +835,15 @@
   "un.err.tooLong": "Prea lung.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Gata",
-  "as.stepOf": "Pasul {n} din {total}"
+  "as.stepOf": "Pasul {n} din {total}",
+  "storage.refresh": "Reîmprospătează",
+  "storage.available": "Disponibil",
+  "storage.note": "Copiile unei mașini își împart spațiul până când una dintre ele se schimbă, așa că ce împart se numără o singură dată.",
+  "storage.sharesWith": "Împarte date de disc cu {names}",
+  "storage.freesShort": "eliberează {size}",
+  "storage.takes": "Ocupă",
+  "storage.freesIf": "Eliberat la ștergere",
+  "storage.sharedTile": "Partajat",
+  "storage.sharesTitle": "Împarte spațiul cu",
+  "storage.madeOf": "Din ce e făcută"
 }

@@ -835,5 +835,15 @@
   "un.err.tooLong": "Terlalu panjang.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Selesai",
-  "as.stepOf": "Langkah {n} daripada {total}"
+  "as.stepOf": "Langkah {n} daripada {total}",
+  "storage.refresh": "Muat semula",
+  "storage.available": "Tersedia",
+  "storage.note": "Salinan sesebuah mesin berkongsi storan sehingga salah satunya berubah, jadi yang dikongsi dikira sekali sahaja.",
+  "storage.sharesWith": "Berkongsi data cakera dengan {names}",
+  "storage.freesShort": "membebaskan {size}",
+  "storage.takes": "Menggunakan",
+  "storage.freesIf": "Bebas jika dipadam",
+  "storage.sharedTile": "Dikongsi",
+  "storage.sharesTitle": "Berkongsi storan dengan",
+  "storage.madeOf": "Terdiri daripada"
 }

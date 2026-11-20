@@ -835,5 +835,15 @@
   "un.err.tooLong": "Trop long.",
   "req.row.tpm": "TPM 2.0 (Windows 11)",
   "cfg.done": "Terminé",
-  "as.stepOf": "Étape {n} sur {total}"
+  "as.stepOf": "Étape {n} sur {total}",
+  "storage.refresh": "Actualiser",
+  "storage.available": "Disponible",
+  "storage.note": "Les copies d'une machine partagent leur stockage jusqu'à ce que l'une d'elles change : ce qu'elles partagent n'est compté qu'une fois.",
+  "storage.sharesWith": "Partage des données de disque avec {names}",
+  "storage.freesShort": "libère {size}",
+  "storage.takes": "Occupe",
+  "storage.freesIf": "Libéré si supprimée",
+  "storage.sharedTile": "Partagé",
+  "storage.sharesTitle": "Partage le stockage avec",
+  "storage.madeOf": "De quoi elle est faite"
 }
