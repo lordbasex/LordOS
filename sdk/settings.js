@@ -1,4 +1,5 @@
 // settings.js — user settings, stored in ~/.config/lordos/settings.json.
+import { useRef, useSyncExternalStore } from 'react';
 import { createStore, useStore } from './store.js';
 import { markExistingUser } from './firststartmodel.js';
 import { withWidgetCities } from './weathermodel.js';
@@ -155,6 +156,45 @@ export function saveSettingsNow(durable = false) {
   return lord.settings.save(JSON.stringify(settings.get(), null, 2), durable);
 }
 
+// [settings, set]: the component renders again on every change to any setting.
 export function useSettings() {
   return [useStore(settings), settings.set];
+}
+
+// [settings, set] for a component that renders often and reads few settings (a theme's root, which holds the whole
+// desktop): it renders again only when a setting it read changed. The object it gets records the keys read from it
+// (while rendering, or later in a handler or an effect); spreading or listing it ({ ...s }, Object.keys,
+// JSON.stringify) counts as reading every key. Values are read live: a handler sees the current setting. Whatever the
+// component shows must come from this object: a helper that reads settings.get() itself is not followed (pass it
+// the object instead). Before 0.8.9.5 a theme's root rendered again, synchronously, on any change to any setting:
+// the session's saved windows, the Store's sidebar width, a switch in Settings.
+export function useTrackedSettings() {
+  const ref = useRef(null);
+  if (!ref.current) ref.current = { keys: new Set(), all: false, state: null, view: null };
+  const r = ref.current;
+  const view = useSyncExternalStore(settings.subscribe, () => settingsView(r));
+  return [view, settings.set];
+}
+function settingsView(r) {
+  const s = settings.get();
+  if (r.state === s && r.view) return r.view;
+  const old = r.state;
+  r.state = s;
+  if (!r.view || r.all || !old) r.view = trackingView(r);
+  else for (const k of r.keys) if (!Object.is(old[k], s[k])) { r.view = trackingView(r); break; }
+  return r.view;
+}
+function trackingView(r) {
+  return new Proxy({}, {
+    get(_, k) { if (typeof k === 'string') r.keys.add(k); return settings.get()[k]; },
+    has(_, k) { if (typeof k === 'string') r.keys.add(k); return k in settings.get(); },
+    ownKeys() { r.all = true; return Reflect.ownKeys(settings.get()); },
+    getOwnPropertyDescriptor(_, k) {
+      if (typeof k === 'string') r.keys.add(k);
+      const d = Reflect.getOwnPropertyDescriptor(settings.get(), k);
+      return d ? { ...d, configurable: true } : undefined;
+    },
+    set() { return false; },
+    deleteProperty() { return false; },
+  });
 }

@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} düyün",
     "other": "{ms} ms · {count} düyün"
   },
+  "pauses": "50 ms-dən uzun fasilələr",
+  "pausesValue": "{count} (ən uzunu: {ms} ms)",
   "server": "Ekran serveri",
   "systemApp": "Sistem tətbiqi",
   "systemReport": "Sistem hesabatı…",

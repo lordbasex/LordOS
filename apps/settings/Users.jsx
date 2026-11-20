@@ -86,7 +86,7 @@ export function UsersSettings() {
         // the whole computer's: no login screen at the next boots, a login prompt on tty1 and startlordos there (as startx)
         <Section title={tr('settings.users.loginTitle')} footer={tr('settings.users.textModeHint')}>
           <SettingRow label={tr('settings.users.textMode')}>
-            <Toggle small on={!!data.textMode} onChange={(on) => run('boot-text', on ? 'on' : 'off', tr('settings.users.saved'))} />
+            <Toggle small pending on={!!data.textMode} onChange={(on) => run('boot-text', on ? 'on' : 'off', tr('settings.users.saved'))} />
           </SettingRow>
         </Section>
       )}
@@ -204,10 +204,10 @@ function UserDetail({ user, isAdmin, run, autologin, admins }) {
       {isAdmin && (
         <Section>
           <SettingRow label={tr('settings.users.admin')} hint={lastAdmin ? tr('settings.users.lastAdmin') : tr('settings.users.makeAdminHint')}>
-            <Toggle small on={user.admin} onChange={(on) => !(lastAdmin && !on) && run('user-admin', `${user.name}\n${on ? 1 : 0}`, tr('settings.users.saved'))} />
+            <Toggle small pending on={user.admin} onChange={(on) => !(lastAdmin && !on) && run('user-admin', `${user.name}\n${on ? 1 : 0}`, tr('settings.users.saved'))} />
           </SettingRow>
           <SettingRow label={tr('settings.users.autologin')} hint={tr('settings.users.autologinHint')}>
-            <Toggle small on={autologin === user.name} onChange={(on) => run('user-autologin', on ? user.name : '', tr('settings.users.saved'))} />
+            <Toggle small pending on={autologin === user.name} onChange={(on) => run('user-autologin', on ? user.name : '', tr('settings.users.saved'))} />
           </SettingRow>
         </Section>
       )}

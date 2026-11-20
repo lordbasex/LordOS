@@ -155,7 +155,7 @@ function Details({ name, onBack, onRemoved, extras = [], withRemove = [] }) {
   const desc = (info.appDescription || info.description || '').trim();
   const busy = !!job;
   const primary = !info.installed
-    ? h(Button, { primary: true, label: t('store.install'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doInstall() })
+    ? h(Button, { primary: true, label: t('store.install'), disabled: !isAdmin, busy, pending: true, onClick: () => isAdmin && !job && doInstall() })
     : desk ? h(Button, { primary: true, label: t('store.open'), onClick: () => launchApp(desk.id) }) : null;
   return h(View, { style: { gap: spacing.xl } },
     onBack ? h(Button, { plain: true, small: true, label: `‹ ${t('store.back')}`, onClick: onBack, style: { alignSelf: 'flex-start', [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -6 } }) : null,
@@ -168,8 +168,8 @@ function Details({ name, onBack, onRemoved, extras = [], withRemove = [] }) {
         h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.35, textAlign: 'start' } }, app?.summary || info.summary),
         h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.s, marginTop: spacing.s } },
           primary,
-          (info.upgradable || missing.length > 0) && h(Button, { label: t('store.upgrade'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doInstall() }),
-          info.installed && !info.essential && h(Button, { label: t('store.remove'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doRemove() }),
+          (info.upgradable || missing.length > 0) && h(Button, { label: t('store.upgrade'), disabled: !isAdmin, busy, pending: true, onClick: () => isAdmin && !job && doInstall() }),
+          info.installed && !info.essential && h(Button, { label: t('store.remove'), disabled: !isAdmin, busy, pending: true, onClick: () => isAdmin && !job && doRemove() }),
           info.installed ? h(Text, { style: { fontSize: typeScale.caption, fontWeight: 500, color: '#30d158', marginLeft: spacing.xs } }, t('store.installedBadge')) : null))),
     !isAdmin && h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.debian.needAdmin')),
     h(Facts, { items: [
@@ -334,7 +334,7 @@ function LordOSCard({ up }) {
         h(Text, { style: { fontSize: typeScale.title, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('store.system.available', { version: up.version })),
         h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, textAlign: 'start' } },
           t('store.system.availableDetail', { installed: up.installed, size: formatBytes(up.size || 0) }))),
-      h(Button, { primary: true, label: t('store.system.update'), disabled: !isAdmin || !!job,
+      h(Button, { primary: true, label: t('store.system.update'), disabled: !isAdmin, busy: !!job, pending: true,
         onClick: () => isAdmin && !job && setPlan(lord.pkg.plan({ install: ['lordos'] })) })),
     !isAdmin && h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.debian.needAdmin')),
     plan && h(View, { style: { gap: spacing.s } },

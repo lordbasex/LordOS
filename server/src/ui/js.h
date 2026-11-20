@@ -15,7 +15,12 @@ void   js_shutdown(void);
 double js_tick(double now);        /* runs expired timers; ms until the next one or -1 */
 int    js_wants_frame(void);       /* there are pending requestAnimationFrame callbacks */
 void   js_frame(double now);
-void   js_mem_line(char *buf, size_t n);   /* (memory report) the session runtime's QuickJS usage, one line */
+void   js_mem_line(char *buf, size_t n);
+/* The stall detector (js.c): a main-thread task of `kind` ("layout", "paint") that took ms; logged past the limit */
+void   js_stall_note(const char *kind, const char *what, double ms);
+int    js_stall_count(void);
+void   js_stall_begin(void);           /* a call into JS made outside js.c (js_wm_end): timed as one run */
+void   js_stall_end(const char *what);   /* (memory report) the session runtime's QuickJS usage, one line */
 void   js_pointer(const char *type, int target, float x, float y, int button);
 /* Touchpad and remote desktop (tp/tp_route.c) → __lordGesture(kind, phase, id, x, y, a, b, c, d):
  * "scroll" (dx, dy, source), "pinch" (scale, rotation, dx, dy), "swipe" (dx, dy, fingers, system). */

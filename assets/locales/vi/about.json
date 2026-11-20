@@ -32,6 +32,8 @@
   "renderValue": {
     "other": "{ms} ms · {count} nút"
   },
+  "pauses": "Khoảng dừng trên 50 ms",
+  "pausesValue": "{count} (lâu nhất: {ms} ms)",
   "server": "Máy chủ hiển thị",
   "systemApp": "Ứng dụng hệ thống",
   "systemReport": "Báo cáo hệ thống…",

@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} node",
     "other": "{ms} ms · {count} nodes"
   },
+  "pauses": "Pauses de més de 50 ms",
+  "pausesValue": "{count} (la més llarga: {ms} ms)",
   "server": "Servidor de pantalla",
   "systemApp": "App del sistema",
   "systemReport": "Informe del sistema…",

@@ -98,6 +98,8 @@ export default function About() {
         <InfoRow k={tr('about.display')} v={`${screen.width} × ${screen.height}`} />
         <InfoRow k={tr('about.ram')} v={`${formatNumber(st.rssKB / 1024, 1)} MB (JS ${formatNumber(st.jsKB / 1024, 1)} MB)`} />
         <InfoRow k={tr('about.render')} v={tr('about.renderValue', { ms: formatNumber(st.layoutMs + st.paintMs, 1), count: st.nodes })} />
+        {/* main-thread pauses this session: the stall detector's count (lord-server's log has each one) */}
+        {st.stalls != null ? <InfoRow k={tr('about.pauses')} v={tr('about.pausesValue', { count: formatNumber(st.stalls, 0), ms: formatNumber(st.stallWorstMs || 0, 0) })} /> : null}
       </View>
       <View style={{ marginTop: 12 }}>
         <Button small label={tr('about.systemReport')} onClick={() => wm.open('sysinfo')} />

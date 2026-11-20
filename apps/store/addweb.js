@@ -63,6 +63,6 @@ export function AddFromAddress() {
       h(View, { style: { flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' } },
         h(Button, { label: s.step === 'installed' ? t('store.close') : t('store.cancel'), onClick: () => send({ type: 'reset' }) }),
         s.step === 'installed' ? h(Button, { primary: true, label: t('store.open'), onClick: () => { open(s.app); send({ type: 'reset' }); } })
-          : h(Button, { primary: true, label: s.step === 'installing' ? t('store.working') : t('store.install'), disabled: busy || !M.nameOk(s.name), onClick: install }))) : null);
+          : h(Button, { primary: true, busy: s.step === 'installing', label: s.step === 'installing' ? t('store.working') : t('store.install'), disabled: busy || !M.nameOk(s.name), onClick: install }))) : null);
 }
 

@@ -173,7 +173,7 @@ function OnSwitch({ a }) {
   // waiting to turn off shows as off: switching it on again cancels the wait
   return (
     <View aria-label={tr('cloud.off.switch', { name: a.name })} onClick={(e) => e.stopPropagation?.()}>
-      <Toggle small on={!M.isOff(a) && !a.offWaiting} onChange={(v) => switchAccount(a, v)} />
+      <Toggle small pending on={!M.isOff(a) && !a.offWaiting} onChange={(v) => switchAccount(a, v)} />
     </View>
   );
 }
@@ -392,8 +392,8 @@ function Overview({ st }) {
         <SettingRow label={tr('cloud.downloadLimit')}>
           <PopUp width={130} value={Math.round((o.bwDown || 0) / MIB)} onChange={(v) => cloud.setOptions({ bwDown: v * MIB })} options={LIMITS.map((v) => [v, limitLabel(v, tr)])} />
         </SettingRow>
-        <SettingRow label={tr('cloud.pauseOnBattery')}><Toggle small on={o.pauseOnBattery !== false} onChange={(v) => cloud.setOptions({ pauseOnBattery: v })} /></SettingRow>
-        <SettingRow label={tr('cloud.pauseOnMetered')}><Toggle small on={o.pauseOnMetered !== false} onChange={(v) => cloud.setOptions({ pauseOnMetered: v })} /></SettingRow>
+        <SettingRow label={tr('cloud.pauseOnBattery')}><Toggle small pending on={o.pauseOnBattery !== false} onChange={(v) => cloud.setOptions({ pauseOnBattery: v })} /></SettingRow>
+        <SettingRow label={tr('cloud.pauseOnMetered')}><Toggle small pending on={o.pauseOnMetered !== false} onChange={(v) => cloud.setOptions({ pauseOnMetered: v })} /></SettingRow>
       </Section>
       <Section title={tr('cloud.about.title')} footer={tr('cloud.about.hint')}>
         <SettingRow label={svc.version ? tr('cloud.about.version', { version: svc.version }) : 'rclone'} hint={tr('cloud.about.license')}>
@@ -669,11 +669,11 @@ function Options({ a, accounts }) {
       {/* this account's own pause; paused by Pause All (or the battery, a metered network) is said apart, with the way out,
           so the switch doesn't look on while the account itself isn't paused */}
       {row(tr('cloud.opt.pause'), a.state === 'paused' && !a.paused ? tr('cloud.opt.pausedOther') : tr('cloud.opt.pauseHint'),
-        <Toggle small on={!!a.paused} onChange={(v) => (v ? cloud.pause(a.id) : cloud.resume(a.id))} />, !own)}
+        <Toggle small pending on={!!a.paused} onChange={(v) => (v ? cloud.pause(a.id) : cloud.resume(a.id))} />, !own)}
       {a.state === 'paused' && !a.paused && pauseAll
         ? row(tr('cloud.opt.pausedAll'), '', <Button small label={tr('cloud.resumeAll')} onClick={() => cloud.resume(null)} />) : null}
       {/* an account's own options only where lord-server has them (not in 0.8.8.5: docs/CLOUD.md 17.1) */}
-      {own ? row(tr('cloud.opt.unmetered'), '', <Toggle small on={!!ao.unmeteredOnly} onChange={(v) => cloud.setAccountOptions(a.id, { unmeteredOnly: v })} />) : null}
+      {own ? row(tr('cloud.opt.unmetered'), '', <Toggle small pending on={!!ao.unmeteredOnly} onChange={(v) => cloud.setAccountOptions(a.id, { unmeteredOnly: v })} />) : null}
       {own ? row(tr('cloud.opt.uploadLimit'), tr('cloud.opt.thisAccount'),
         <PopUp width={110} value={Math.round((ao.bwUp || 0) / MIB)} onChange={(v) => cloud.setAccountOptions(a.id, { bwUp: v * MIB })} options={LIMITS.map((v) => [v, limitLabel(v, tr)])} />, true) : null}
     </View>

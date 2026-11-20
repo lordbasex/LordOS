@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} nœud",
     "other": "{ms} ms · {count} nœuds"
   },
+  "pauses": "Pauses de plus de 50 ms",
+  "pausesValue": "{count} (la plus longue : {ms} ms)",
   "server": "Serveur d’affichage",
   "systemApp": "App système",
   "systemReport": "Rapport système…",

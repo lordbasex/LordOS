@@ -90,11 +90,236 @@ static void dump_exception(JSContext *c) {
     JS_FreeValue(c, e);
 }
 
+/* ---- the main-thread stall detector (docs/MAIN-THREAD.md) ----
+ * Everything the desktop draws waits for the main thread, the pointer too: a JavaScript task that runs for 200 ms
+ * stops the pointer for 200 ms. Every entry from C into JavaScript (an event, a timer tick, a frame, a reply, the
+ * promise jobs after it) is timed with two clock reads; one that ran longer than STALL_MS is logged with what it
+ * was, whose window it was for (__lordStallWho, runtime/events.js) and where the JavaScript was when it passed
+ * STALL_MS (a stack sample taken from QuickJS's interrupt handler, every 10000 bytecode steps). Native lord.<ns>.*
+ * calls are timed too (js_prof_wrap) and logged by name past SLOW_CALL_MS; layout and paint report through
+ * js_stall_note (main.c). At most STALL_LINES lines per STALL_WINDOW_MS; the rest are counted. The counts are in
+ * lord.stats() (stalls, stallWorstMs, slowCalls). LORD_STALL_MS overrides the threshold (tests). */
+#define STALL_MS 50
+#define SLOW_CALL_MS 20
+#define STALL_LINES 30
+#define STALL_WINDOW_MS 10000
+
+static struct {
+    double limit;                        /* STALL_MS, or LORD_STALL_MS */
+    int count, slow_calls, lines, dropped;
+    double busy_js, busy_layout, busy_paint, max_run;   /* totals for lord.stats(true) (the perf driver) */
+    double worst, window_at;
+    int depth;                           /* nesting of timed entries: only the outermost one is timed */
+    double t0;
+    int sampled;
+    char sample[384];                    /* where the JS was when it passed the limit */
+} stall;
+
+static double stall_limit(void) {
+    if (stall.limit <= 0) {
+        const char *e = getenv("LORD_STALL_MS");
+        double v = e ? atof(e) : 0;
+        stall.limit = v > 0 ? v : STALL_MS;
+    }
+    return stall.limit;
+}
+
+/* one line, rate-limited; kind: "js" "call" "layout" "paint" */
+static void stall_line(const char *kind, const char *what, const char *who, const char *where, double ms) {
+    double now = now_ms();
+    if (now - stall.window_at > STALL_WINDOW_MS) {
+        if (stall.dropped) fprintf(stderr, "lord-server: stall: %d more not logged\n", stall.dropped);
+        stall.window_at = now;
+        stall.lines = stall.dropped = 0;
+    }
+    if (stall.lines >= STALL_LINES) { stall.dropped++; return; }
+    stall.lines++;
+    fprintf(stderr, "lord-server: stall: %.1f ms %s %s%s%s%s%s\n", ms, kind, what ? what : "?",
+            who && who[0] ? " [" : "", who && who[0] ? who : "", who && who[0] ? "]" : "",
+            where && where[0] ? where : "");
+}
+
+void js_stall_note(const char *kind, const char *what, double ms) {
+    if (kind[0] == 'l') stall.busy_layout += ms;
+    else stall.busy_paint += ms;
+    if (ms <= stall_limit()) return;
+    stall.count++;
+    if (ms > stall.worst) stall.worst = ms;
+    stall_line(kind, what, NULL, NULL, ms);
+}
+
+/* QuickJS's interrupt handler: the first time a timed entry passes the limit, the JS stack (its innermost frames,
+ * file names cut to their base name) */
+static void stall_sample(void) {
+    if (!stall.depth || stall.sampled || !ctx || JS_HasException(ctx)) return;
+    if (now_ms() - stall.t0 <= stall_limit()) return;
+    stall.sampled = 1;
+    static const char probe[] = "new Error().stack";
+    JSValue st = JS_Eval(ctx, probe, sizeof probe - 1, "<stall>", JS_EVAL_TYPE_GLOBAL);
+    const char *s = JS_IsString(st) ? JS_ToCString(ctx, st) : NULL;
+    size_t o = 0;
+    int frames = 0;
+    stall.sample[0] = 0;
+    for (const char *p = s; p && *p && frames < 5; ) {
+        const char *nl = strchr(p, '\n');
+        size_t n = nl ? (size_t)(nl - p) : strlen(p);
+        char line[256];
+        snprintf(line, sizeof line, "%.*s", (int)(n < 255 ? n : 255), p);
+        p = nl ? nl + 1 : p + n;
+        char *a = strstr(line, "at ");
+        if (!a || strstr(line, "<stall>")) continue;
+        a += 3;
+        char *paren = strchr(a, '(');                  /* "name (/path/file.js:1:234)" → "name (file.js:1:234)" */
+        if (paren) {
+            char *slash = strrchr(paren, '/');
+            if (slash) memmove(paren + 1, slash + 1, strlen(slash + 1) + 1);
+        }
+        o += (size_t)snprintf(stall.sample + o, o < sizeof stall.sample ? sizeof stall.sample - o : 0, "%s%s", frames ? " < " : " at ", a);
+        if (o >= sizeof stall.sample) { o = sizeof stall.sample - 1; break; }
+        frames++;
+    }
+    if (s) JS_FreeCString(ctx, s);
+    if (JS_IsException(st)) JS_FreeValue(ctx, JS_GetException(ctx));
+    else JS_FreeValue(ctx, st);
+}
+
+/* A call from C (call_global_atom) and the promise jobs right after it (drain_jobs) are one run: React's
+ * synchronous render after a click is a job. The call leaves the run open with its name; drain_jobs closes it, or
+ * the next run does (a call with no jobs after it). */
+static struct { int open; double t_end; JSAtom name; JSValue detail; } run;
+
+static void js_run_finish(void);
+
+static void js_run_begin(void) {
+    if (stall.depth == 0 && run.open) js_run_finish();
+    if (stall.depth++ == 0) { stall.t0 = now_ms(); stall.sampled = 0; stall.sample[0] = 0; }
+}
+
+/* the outermost call returned: the run stays open for its jobs (name and first argument kept) */
+static void js_run_called(JSAtom name, int argc, JSValueConst *argv) {
+    if (--stall.depth > 0) return;
+    run.open = 1;
+    run.t_end = now_ms();
+    run.name = JS_DupAtom(ctx, name);
+    run.detail = argc > 0 && JS_IsString(argv[0]) ? JS_DupValue(ctx, argv[0]) : JS_UNDEFINED;
+}
+
+/* where: what the JS was doing when it passed the limit (the sample); who: __lordStallWho(what) */
+static void stall_report(const char *what, const char *detail, double ms) {
+    stall.count++;
+    if (ms > stall.worst) stall.worst = ms;
+    char who[160] = "", name[128];
+    snprintf(name, sizeof name, "%s%s%s", what, detail ? " " : "", detail ? detail : "");
+    /* whose it was: runtime/events.js knows the window under the last event and the timers that just ran */
+    stall.depth++;                        /* this call is not a run of its own */
+    JSValue g = JS_GetGlobalObject(ctx), f = JS_GetPropertyStr(ctx, g, "__lordStallWho");
+    if (JS_IsFunction(ctx, f)) {
+        JSValue arg = JS_NewString(ctx, what), r = JS_Call(ctx, f, g, 1, &arg);
+        const char *s = JS_IsString(r) ? JS_ToCString(ctx, r) : NULL;
+        if (s) { snprintf(who, sizeof who, "%s", s); JS_FreeCString(ctx, s); }
+        if (JS_IsException(r)) JS_FreeValue(ctx, JS_GetException(ctx));
+        JS_FreeValue(ctx, r);
+        JS_FreeValue(ctx, arg);
+    }
+    JS_FreeValue(ctx, f);
+    JS_FreeValue(ctx, g);
+    stall.depth--;
+    stall_line("js", name, who, stall.sample, ms);
+}
+
+static void js_run_finish(void) {
+    if (!run.open) return;
+    run.open = 0;
+    double ms = run.t_end - stall.t0;
+    stall.busy_js += ms;
+    if (ms > stall.max_run) stall.max_run = ms;
+    if (ms > stall_limit()) {
+        const char *n = JS_AtomToCString(ctx, run.name);
+        const char *d = JS_IsString(run.detail) ? JS_ToCString(ctx, run.detail) : NULL;
+        stall_report(n ? n : "?", d, ms);
+        if (d) JS_FreeCString(ctx, d);
+        if (n) JS_FreeCString(ctx, n);
+    }
+    JS_FreeAtom(ctx, run.name);
+    JS_FreeValue(ctx, run.detail);
+    run.detail = JS_UNDEFINED;
+}
+
+/* a run that isn't a call_global_atom (js_wm_end, jobs with no call before them) */
+static void js_run_end(const char *what, const char *detail) {
+    if (--stall.depth > 0) return;
+    double ms = now_ms() - stall.t0;
+    stall.busy_js += ms;
+    if (ms > stall.max_run) stall.max_run = ms;
+    if (ms > stall_limit()) stall_report(what, detail, ms);
+}
+
+void js_stall_begin(void) { js_run_begin(); }
+void js_stall_end(const char *what) { js_run_end(what, NULL); }
+
+/* lord.<ns>.<fn>(): the native call, timed; data[0] the real function, data[1] its name ("pkg.apps") */
+static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *data) {
+    (void)magic;
+    double t0 = now_ms();
+    JSValue r = JS_Call(c, data[0], this_val, argc, argv);
+    double ms = now_ms() - t0;
+    if (ms > SLOW_CALL_MS) {
+        stall.slow_calls++;
+        const char *n = JS_ToCString(c, data[1]);
+        stall_line("call", n ? n : "?", NULL, NULL, ms);
+        if (n) JS_FreeCString(c, n);
+    }
+    return r;
+}
+
+/* Every function of every lord.<ns> object (and one level below: lord.settings.x, lord.fs.trash.y) is replaced by a
+ * timed one with the same length. Done once the native API is complete, before any JavaScript runs. */
+static void prof_wrap_obj(JSContext *c, JSValueConst obj, const char *prefix, int level) {
+    JSPropertyEnum *props = NULL;
+    uint32_t n = 0;
+    if (JS_GetOwnPropertyNames(c, &props, &n, obj, JS_GPN_STRING_MASK)) return;
+    for (uint32_t i = 0; i < n; i++) {
+        JSPropertyDescriptor d;
+        int has = JS_GetOwnProperty(c, &d, obj, props[i].atom);
+        if (has <= 0) continue;
+        int data_prop = !(d.flags & JS_PROP_GETSET);
+        const char *key = JS_AtomToCString(c, props[i].atom);
+        char name[96];
+        snprintf(name, sizeof name, "%s%s%s", prefix, prefix[0] ? "." : "", key ? key : "?");
+        if (data_prop && JS_IsFunction(c, d.value) && level > 0) {
+            int len = 0;
+            JSValue l = JS_GetPropertyStr(c, d.value, "length");
+            JS_ToInt32(c, &len, l);
+            JS_FreeValue(c, l);
+            JSValue data[2] = { d.value, JS_NewString(c, name) };
+            JSValue w = JS_NewCFunctionData(c, prof_call, len, 0, 2, data);
+            JS_FreeValue(c, data[1]);
+            JS_DefinePropertyValue(c, obj, props[i].atom, w, d.flags & (JS_PROP_WRITABLE | JS_PROP_ENUMERABLE | JS_PROP_CONFIGURABLE));
+        } else if (data_prop && JS_IsObject(d.value) && !JS_IsFunction(c, d.value) && !JS_IsArray(c, d.value) && level < 2) {
+            prof_wrap_obj(c, d.value, name, level + 1);
+        }
+        if (key) JS_FreeCString(c, key);
+        JS_FreeValue(c, d.value);
+        JS_FreeValue(c, d.getter);
+        JS_FreeValue(c, d.setter);
+    }
+    for (uint32_t i = 0; i < n; i++) JS_FreeAtom(c, props[i].atom);
+    js_free(c, props);
+}
+
+int js_stall_count(void) { return stall.count; }
+
 static void drain_jobs(void) {
     JSContext *c;
     int r;
+    if (!JS_IsJobPending(rt)) { if (stall.depth == 0) js_run_finish(); return; }
+    int cont = stall.depth == 0 && run.open;          /* the jobs of the call that just returned: the same run */
+    if (cont) stall.depth++;
+    else js_run_begin();
     while ((r = JS_ExecutePendingJob(rt, &c)) != 0)
         if (r < 0) dump_exception(c);
+    if (cont) { stall.depth--; run.t_end = now_ms(); js_run_finish(); }
+    else js_run_end("jobs", NULL);
 }
 
 static Node *arg_node(JSContext *c, JSValueConst v) {
@@ -416,7 +641,7 @@ static JSValue f_log(JSContext *c, JSValueConst this_val, int argc, JSValueConst
 
 /* Metrics for the theme (e.g. the "About" window). */
 static JSValue f_stats(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
-    (void)this_val; (void)argc; (void)argv;
+    (void)this_val;
     long pages = 0, rss = 0;
     FILE *f = fopen("/proc/self/statm", "r");
     if (f) { if (fscanf(f, "%ld %ld", &pages, &rss) != 2) rss = 0; fclose(f); }
@@ -426,6 +651,26 @@ static JSValue f_stats(JSContext *c, JSValueConst this_val, int argc, JSValueCon
     JS_SetPropertyStr(c, o, "nodes", JS_NewInt32(c, node_count()));
     JS_SetPropertyStr(c, o, "layoutMs", JS_NewFloat64(c, ui.layout_ms));
     JS_SetPropertyStr(c, o, "paintMs", JS_NewFloat64(c, ui.paint_ms));
+    JS_SetPropertyStr(c, o, "stalls", JS_NewInt32(c, stall.count));             /* main-thread pauses past STALL_MS */
+    JS_SetPropertyStr(c, o, "stallWorstMs", JS_NewFloat64(c, stall.worst));
+    JS_SetPropertyStr(c, o, "slowCalls", JS_NewInt32(c, stall.slow_calls));
+    int32_t more = 0;
+    if (argc > 0) JS_ToInt32(c, &more, argv[0]);
+    if (more >= 1) {                    /* lord.stats(1): the main thread's busy totals and longest run since the last such call */
+        JS_SetPropertyStr(c, o, "busyJsMs", JS_NewFloat64(c, stall.busy_js));
+        JS_SetPropertyStr(c, o, "busyLayoutMs", JS_NewFloat64(c, stall.busy_layout));
+        JS_SetPropertyStr(c, o, "busyPaintMs", JS_NewFloat64(c, stall.busy_paint));
+        JS_SetPropertyStr(c, o, "maxRunMs", JS_NewFloat64(c, stall.max_run));
+        stall.max_run = 0;
+    }
+    if (more >= 2) {                    /* lord.stats(2): the heap after a full collection (takes a while) */
+        JS_RunGC(rt);
+        JSMemoryUsage u;
+        JS_ComputeMemoryUsage(rt, &u);
+        JS_SetPropertyStr(c, o, "jsUsedKB", JS_NewInt64(c, (int64_t)(u.memory_used_size >> 10)));
+        JS_SetPropertyStr(c, o, "jsObjects", JS_NewInt64(c, (int64_t)u.obj_count));
+        JS_SetPropertyStr(c, o, "jsMallocKB", JS_NewInt64(c, (int64_t)(u.malloc_size >> 10)));
+    }
     return o;
 }
 
@@ -459,8 +704,10 @@ static int eval(const char *src, size_t len, const char *name) {
 static JSValue call_global_atom(JSAtom name, int argc, JSValueConst *argv) {
     JSValue g = JS_GetGlobalObject(ctx), f = JS_GetProperty(ctx, g, name), r = JS_UNDEFINED;
     if (JS_IsFunction(ctx, f)) {
+        js_run_begin();
         r = JS_Call(ctx, f, g, argc, argv);
         if (JS_IsException(r)) { dump_exception(ctx); r = JS_UNDEFINED; }
+        js_run_called(name, argc, argv);
     }
     JS_FreeValue(ctx, f);
     JS_FreeValue(ctx, g);
@@ -510,6 +757,7 @@ static char *load_code(const char *path, size_t *len, int *refused) {
 static int on_interrupt(JSRuntime *r, void *opaque) {
     (void)r;
     (void)opaque;
+    stall_sample();
     int w = wdog_js_poll();
     if (w == 1 && ctx && !JS_HasException(ctx)) {
         /* inside the interpreter QuickJS adds an error's stack only while it unwinds: an Error made by a
@@ -596,6 +844,7 @@ static void session_context(void) {
     js_help_register(ctx, lord);       /* lord.help (Help) and lord.time.zoneOffset (Clock, tzif.c) */
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */
     js_voice_register(ctx, lord);      /* lord.voice: reading text aloud through lord-say (tts/speak.c, docs/VOICE.md) */
+    prof_wrap_obj(ctx, lord, "", 0);   /* every lord.<ns>.* call timed (the stall detector) */
     JS_SetPropertyStr(ctx, g, "lord", lord);
     JS_FreeValue(ctx, g);
 }
@@ -773,6 +1022,8 @@ int js_app_recovery(void) {
 void js_shutdown(void) {
     media_shutdown();                   /* the lord-media helpers belong to this context */
     if (ctx) js_wasm_shutdown(ctx);
+    if (ctx && run.open) { run.open = 0; JS_FreeAtom(ctx, run.name); JS_FreeValue(ctx, run.detail); run.detail = JS_UNDEFINED; }
+    stall.depth = 0;
     if (ctx && hot_rt == rt) for (int i = 0; i < HOT_N; i++) JS_FreeAtom(ctx, hot_atom[i]);
     hot_rt = NULL;
     if (ctx) JS_FreeContext(ctx);

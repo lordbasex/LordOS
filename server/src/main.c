@@ -1446,6 +1446,7 @@ static Box paint_ui(Server *s) {
         }
     }
     ui.layout_ms = t1 - t0;
+    js_stall_note("layout", "tree", ui.layout_ms);
     s->layout_total += ui.layout_ms;
     s->renders++;
     return d;
@@ -1586,6 +1587,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     view_reset();
     if (r.x1 <= r.x0 || r.y1 <= r.y0) return (Rect){ 0, 0, 0, 0 };
     double ms = now_ms() - t0;
+    js_stall_note("paint", "display", ms);
     ui.paint_ms += ms;
     s->paint_total += ms;
     ui.damage_px += px;
@@ -2973,7 +2975,10 @@ int main(int argc, char **argv) {
         double zd = media_reap_timeout();
         if (zd >= 0 && (delay < 0 || zd < delay)) delay = zd;
         /* sin monitor y sin nadie mirando no se dibuja (al conectarse alguien llega un cuadro entero) */
-        int unseen = s.headless && !mirror_watchers() && !media_needs_cpu();   /* recording the screen: yes */
+        /* LORD_HEADLESS_DRAW=1 (tests/perf_headless.sh): headless and nobody watching, it still lays out and paints */
+        static int headless_draw = -1;
+        if (headless_draw < 0) headless_draw = getenv("LORD_HEADLESS_DRAW") != NULL;
+        int unseen = s.headless && !headless_draw && !mirror_watchers() && !media_needs_cpu();   /* recording the screen: yes */
         if (!s.headless && display_is_off()) unseen = 1;     /* screen off after idle (DPMS): nothing to draw */
         js_sys_unseen = unseen;                     /* the desk widgets' data feeds rest too (lord.system.seen) */
         /* the minimized windows and those on a hidden desktop: their frame callbacks once a second (wl/framegate.h) */

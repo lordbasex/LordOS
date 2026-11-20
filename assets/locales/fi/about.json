@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} solmu",
     "other": "{ms} ms · {count} solmua"
   },
+  "pauses": "Yli 50 ms:n tauot",
+  "pausesValue": "{count} (pisin: {ms} ms)",
   "server": "Näyttöpalvelin",
   "systemApp": "Järjestelmäsovellus",
   "systemReport": "Järjestelmäraportti…",

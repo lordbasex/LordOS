@@ -123,7 +123,7 @@ function TurnOn() {
     step === 'idle' && s.msg && !s.msg.ok ? h(Line, { th, color: '#ff453a' }, s.msg.text) : null,
     h(View, { style: { flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' } },
       step === 'plan' ? h(Button, { label: t('store.cancel'), onClick: () => setStep('idle') }) : null,
-      step === 'idle' ? h(Button, { primary: true, label: t('flathub.setup.turnOn'), onClick: start }) : null,
+      step === 'idle' ? h(Button, { primary: true, label: t('flathub.setup.turnOn'), pending: true, onClick: start }) : null,
       step === 'plan' && sizes ? h(Button, { primary: true, label: t('flathub.setup.install'), disabled: !isAdmin || !!deb.job, onClick: confirm }) : null));
 }
 
@@ -144,7 +144,7 @@ function InstalledList({ onOpen }) {
           h(Text, { onClick: () => onOpen(x.id), style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' } }, a.name),
           h(Text, { style: { fontSize: typeScale.caption, color: th.textDim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' } },
             x.version ? t('store.version', { version: x.version }) : x.id)),
-        h(Button, { small: true, label: t('flathub.remove'), disabled: busy, onClick: () => !busy && F.uninstall({ ...x, name: a.name }) }),
+        h(Button, { small: true, label: t('flathub.remove'), busy, pending: true, onClick: () => !busy && F.uninstall({ ...x, name: a.name }) }),
         h(Button, { small: true, label: t('store.open'), onClick: () => openApp(x.id) }));
     })));
 }
@@ -170,8 +170,8 @@ export function FlathubPage({ query, onOpen, category = null }) {
       h(Toggle, { on: fh.prefs.showAll, onChange: (v) => F.setPrefs({ showAll: v }) }),
       h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } },
         fh.prefs.showAll ? t('flathub.showAllOn') : t('flathub.showAllOff', { count: hidden })),
-      h(Button, { small: true, label: t('flathub.refresh'), disabled: working, onClick: () => F.loadCatalog({ fetch: true }) }),
-      h(Button, { small: true, label: t('flathub.turnOff'), onClick: F.turnOff })),
+      h(Button, { small: true, label: t('flathub.refresh'), busy: working, onClick: () => F.loadCatalog({ fetch: true }) }),
+      h(Button, { small: true, label: t('flathub.turnOff'), pending: true, onClick: F.turnOff })),
     h(JobProgress),
     h(InstalledList, { onOpen }),
     s.loaded ? h(Header, { th }, query ? t('flathub.results', { count: list.length }) : t('flathub.catalogTitle', { count: list.length })) : null,

@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} گره",
     "other": "{ms} ms · {count} گره"
   },
+  "pauses": "مکث‌های بیش از ۵۰ ms",
+  "pausesValue": "{count} (طولانی‌ترین: {ms} ms)",
   "server": "سرور نمایش",
   "systemApp": "برنامهٔ سیستمی",
   "systemReport": "گزارش سیستم…",

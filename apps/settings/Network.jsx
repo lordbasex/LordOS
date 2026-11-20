@@ -121,7 +121,7 @@ function InterfacePage({ name, net }) {
         <SettingRow minHeight={52} icon={<Badge glyph={i.type === 'wifi' ? '◠' : '⇅'} color={i.up ? '#0a84ff' : tint.off} size={32} />}
           label={name} labelStyle={{ fontWeight: 600 }} hint={`${typeLabel(i.type, tr)} · ${statusOf(i, tr)}`}>
           <StatusDot color={dotColor(i)} />
-          {!sys && isAdmin && <Toggle small on={i.up} onChange={(on) => run(setMsg, on ? 'net-up' : 'net-down', name)} />}
+          {!sys && isAdmin && <Toggle small pending on={i.up} onChange={(on) => run(setMsg, on ? 'net-up' : 'net-down', name)} />}
         </SettingRow>
       </Section>
       <Message msg={msg} />
@@ -661,7 +661,7 @@ function VpnPage({ net }) {
                 <ToolbarButton small title={tr('network.vpn.delete')} icon={<TrashGlyph color={tint.error} />}
                   onClick={() => run(setMsg, 'net-vpn-delete', v.name).then(() => setTick((x) => x + 1))} />
               )}
-              <Toggle small on={busy} onChange={(x) => (x ? up(v) : down(v))} />
+              <Toggle small pending on={busy} onChange={(x) => (x ? up(v) : down(v))} />
             </SettingRow>
           );
         })}

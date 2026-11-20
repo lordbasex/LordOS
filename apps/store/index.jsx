@@ -198,7 +198,7 @@ function InstallFile({ path, onDone }) {
       {!msg?.ok && <debian.Refused />}
       <View style={{ flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' }}>
         <Button label={tr('store.close')} onClick={() => onDone?.(true)} />
-        {(m || isDeb) && !msg?.ok && <Button primary label={busy ? tr('store.working') : tr('store.install')} onClick={() => !busy && install()} />}
+        {(m || isDeb) && !msg?.ok && <Button primary busy={busy} label={busy ? tr('store.working') : tr('store.install')} onClick={() => !busy && install()} />}
       </View>
     </View>
   );

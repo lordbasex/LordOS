@@ -92,7 +92,7 @@ export function CoolingSettings() {
       {controllable && (
         <GroupBox title={tr('cooling.profile')} footer={err || (isAdmin ? tr(`cooling.profileHint.${s.profile}`) : tr('cooling.needAdmin'))}>
           <SettingRow label={tr('cooling.systemControl')} hint={tr('cooling.systemControlHint')} disabled={!isAdmin}>
-            <Toggle small on={s.profile === 'auto'} onChange={(on) => isAdmin && run(fanControl.setProfile(on ? 'auto' : 'balanced'))} />
+            <Toggle small pending on={s.profile === 'auto'} onChange={(on) => isAdmin && run(fanControl.setProfile(on ? 'auto' : 'balanced'))} />
           </SettingRow>
           {s.profile !== 'auto' && (
             <SettingRow label={tr('cooling.curveProfile')} stack disabled={!isAdmin}>

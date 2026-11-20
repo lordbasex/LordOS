@@ -166,10 +166,10 @@ function AppDetails({ entry }) {
       </Section>
       <Section footer={tr('webapps.settings.backgroundFooter')}>
         <SettingRow label={tr('webapps.settings.background')}>
-          <Toggle on={!!entry.background} onChange={(on) => call('setBackground', entry.id, on)} />
+          <Toggle pending on={!!entry.background} onChange={(on) => call('setBackground', entry.id, on)} />
         </SettingRow>
         <SettingRow label={tr('webapps.settings.tray')} hint={tr('webapps.settings.trayHint')}>
-          <Toggle on={!!entry.tray} onChange={(on) => call('setTray', entry.id, on)} />
+          <Toggle pending on={!!entry.tray} onChange={(on) => call('setTray', entry.id, on)} />
         </SettingRow>
       </Section>
       <Section footer={tr(M.COLOR_SCHEMES_AVAILABLE.length < M.COLOR_SCHEMES.length ? 'webapps.appearance.later' : 'webapps.appearance.footer')}>

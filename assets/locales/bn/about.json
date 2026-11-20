@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count}টি নোড",
     "other": "{ms} ms · {count}টি নোড"
   },
+  "pauses": "৫০ ms-এর বেশি বিরতি",
+  "pausesValue": "{count} (দীর্ঘতম: {ms} ms)",
   "server": "ডিসপ্লে সার্ভার",
   "systemApp": "সিস্টেম অ্যাপ",
   "systemReport": "সিস্টেম রিপোর্ট…",

@@ -13,6 +13,33 @@ const instances = new Map();          // native id → reconciler instance
 const listeners = { pointermove: new Set(), pointerdown: new Set(), pointerup: new Set(), keydown: new Set(), keyup: new Set(), swipe: new Set(), pinch: new Set() };
 
 export const register = (inst) => instances.set(inst.id, inst);
+
+// ---- for lord-server's stall detector (server/src/ui/js.c) ----
+// What React did in the run in progress (index.js counts it) and the node the last pointer event was for. When a run
+// took too long, lord-server asks __lordStallWho(what) whose it was: the window (WindowShell's lordWin prop) of that
+// node, or of the last node React touched, and how many nodes React made and changed.
+export const ops = { created: 0, updated: 0, last: null, total: 0 };   // total: changes since the start (tests)
+let lastEventId = 0;
+const resetOps = () => { ops.created = 0; ops.updated = 0; ops.last = null; };
+function windowOf(inst) {
+  for (let n = inst; n; n = n.parent) if (n.props && n.props.lordWin) return String(n.props.lordWin);
+  return null;
+}
+globalThis.__lordReactOps = () => ops.total;
+globalThis.__lordStallWho = (what) => {
+  const at = what === '__lordEvent' || what === '__lordGesture' ? instances.get(lastEventId) : ops.last;
+  const win = (at && windowOf(at)) || (ops.last && windowOf(ops.last));
+  const out = `${win ? `window ${win}` : 'shell'}; react made ${ops.created}, changed ${ops.updated}`;
+  return out;
+};
+// a timer tick is a run of its own: the counts start again (the prelude's __lordTick, wrapped once)
+export function wrapTick() {
+  const tick = globalThis.__lordTick;
+  if (typeof tick !== 'function' || tick.__lordWrapped) return;
+  const wrapped = (now) => { resetOps(); return tick(now); };
+  wrapped.__lordWrapped = true;
+  globalThis.__lordTick = wrapped;
+}
 export const unregister = (inst) => instances.delete(inst.id);
 
 // React priority for the event in progress (queried by resolveUpdatePriority): clicks and
@@ -76,6 +103,8 @@ function run(p, fn) {
 }
 
 globalThis.__lordEvent = (type, id, x, y, button) => {
+  resetOps();
+  lastEventId = id;
   // A mouse's back and forward buttons (3 and 4, issue #159) go to the Linux app under the pointer, not to the
   // desktop's own handlers: most onMouseDown handlers (title bars, buttons, sliders) don't look at ev.button.
   if ((type === 'down' || type === 'up') && button > 2) return;
@@ -128,6 +157,7 @@ globalThis.__lordEvent = (type, id, x, y, button) => {
 // With libxkbcommon (server/src/keyboard.c) the server already sends the translated key; if no
 // XKB layout is loaded only the code and value arrive and keymap.js is used as a fallback.
 globalThis.__lordKey = (code, value, key, chr, base, flags) => {
+  resetOps();
   const ev = key === undefined ? translate(code, value) : nativeKey(code, value, key, chr, base, flags);
   ev.defaultPrevented = false;
   ev.preventDefault = () => { ev.defaultPrevented = true; };

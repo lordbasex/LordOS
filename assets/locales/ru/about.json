@@ -36,6 +36,8 @@
     "few": "{ms} мс · {count} узла",
     "many": "{ms} мс · {count} узлов"
   },
+  "pauses": "Паузы дольше 50 мс",
+  "pausesValue": "{count} (самая долгая: {ms} мс)",
   "server": "Дисплейный сервер",
   "systemApp": "Системное приложение",
   "systemReport": "Отчёт о системе…",

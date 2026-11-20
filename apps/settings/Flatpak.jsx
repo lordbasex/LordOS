@@ -92,7 +92,7 @@ export function FlatpakSettings() {
         <ValueRow label={tr('flathub.settings.state')} value={tr(has ? 'flathub.settings.installed' : 'flathub.settings.notInstalled')} />
         {has ? (
           <SettingRow label={tr('flathub.settings.showInStore')} hint={tr('flathub.settings.showInStoreHint')}>
-            <Toggle small on={prefs.on} onChange={(on) => F.setPrefs({ on })} />
+            <Toggle small pending on={prefs.on} onChange={(on) => F.setPrefs({ on })} />
           </SettingRow>
         ) : null}
         {has ? <ValueRow label={tr('flathub.settings.apps')} value={String(s.installed.length)} /> : null}

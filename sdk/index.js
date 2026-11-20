@@ -10,7 +10,7 @@ export { View, Text, Image, Terminal, Surface, MediaView, screen, addListener, u
 export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox } from '@lordos/runtime';
 export { createStore, useStore } from './store.js';
 export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch } from './thememeta.js';   // theme.json's sketch and options (0.8.9)
-export { settings, useSettings } from './settings.js';
+export { settings, useSettings, useTrackedSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
 export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage } from './localename.js';   // glibc region names (installer, Settings)
@@ -147,7 +147,7 @@ export * as fs from './fs.js';
 export { useDirectory } from './fs.js';
 export { ThemeProvider, useTheme, DEFAULT_TOKENS, solidOver } from './theme.js';
 export {
-  Button, Toggle, Segmented, SidebarItem, SectionTitle, ScrollView, TextInput, TextArea, FormFields, hasTextFocus, takeTextFocus, releaseTextFocus, textFocusOwner, Stepper, Slider,
+  Button, Toggle, Spinner, usePending, afterPaint, useAppFocused, Segmented, SidebarItem, SectionTitle, ScrollView, TextInput, TextArea, FormFields, hasTextFocus, takeTextFocus, releaseTextFocus, textFocusOwner, Stepper, Slider,
   AppHost, useAppWindow, useKeyboard, focusToken, restoreFocus, pasteIntoFocused, FloatingWindows, useWindowState, useFilesDrop, FilesDropHint,
 } from './components.jsx';
 export { sortDrop, dropCount } from './filedrop.js';

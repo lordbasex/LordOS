@@ -197,7 +197,7 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
   const { dir } = useLocale();
   const drag = useStore(dockDrag);
   const poof = useStore(dockPoof);
-  const reduce = !!useStore(settings).reduceMotion;
+  const reduce = !!useStore(settings, (s) => s.reduceMotion);
   // The magnifier computes positions with the mouse coordinate: in Arabic/Hebrew the bottom row reverses
   // the list (the visual result users expect); on the side the order is top to bottom in all of them.
   const flip = !vert && dir === 'rtl';

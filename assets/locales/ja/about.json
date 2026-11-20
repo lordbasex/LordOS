@@ -32,6 +32,8 @@
   "renderValue": {
     "other": "{ms} ms · {count} ノード"
   },
+  "pauses": "50 ms を超える停止",
+  "pausesValue": "{count} 回(最長 {ms} ms)",
   "server": "ディスプレイサーバ",
   "systemApp": "システムアプリ",
   "systemReport": "システムレポート…",

@@ -28,3 +28,4 @@ HANDOFF.md
 themes/*/theme.vm-e2e.bundle.js
 themes/*/code-manifest.vm-e2e.json
 third_party/audiocpp/
+themes/*/theme.bundle.js.map
