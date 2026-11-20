@@ -12,6 +12,9 @@ downloads from its maker's own server (docs/VIRTUALIZATION.md 4.3). Downloaded f
 
 Not shown, on purpose:
 
-- **Ubuntu**: Canonical's policy asks for written permission to use its logo; the card keeps Machines' own mark.
-- **Windows**: Microsoft's logo is Microsoft's trademark and isn't used, nor anything made to look like it; the card
-  keeps Machines' own mark.
+- **Ubuntu**: Canonical's trademark policy asks for written permission to use its logo; the card shows Machines' own
+  mark (`../marks/ubuntu.svg`, an orange tile with a "U", nothing like Canonical's Circle of Friends).
+- **Windows**: Microsoft's guidelines allow no use of its logos, icons or designs, nor of anything confusingly similar
+  (four panes included); the card shows Machines' own mark (`../marks/windows.svg`, a generic app window on a blue
+  tile). Both marks were drawn for LordOS on 2026-11-20, under LordOS's own license. Naming Windows 11 and Ubuntu in
+  text, to say what a card downloads, is the use both companies allow.

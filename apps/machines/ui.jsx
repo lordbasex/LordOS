@@ -55,9 +55,17 @@ const MARKS = {
 };
 // The systems' own logos, unmodified, where their makers allow it to name the system (assets/machines/logos/README.md);
 // on a light tile so each keeps its own colors. Ubuntu (written permission) and Windows (Microsoft's mark) keep ours.
+// Machines' own marks for systems whose makers don't let their logos be shown (Canonical asks for written permission;
+// Microsoft allows no use of its logos or of designs like them): drawn for LordOS, nothing like either logo
+const DRAWN = { ubuntu: 'ubuntu', windows: 'windows' };
 const LOGOS = { debian: 'asset:machines/logos/debian.svg', fedora: 'asset:machines/logos/fedora.svg', kali: 'asset:machines/logos/kali.svg' };
 
 export function OsMark({ id, size = 40 }) {
+  // Machines' own drawn marks (assets/machines/marks): a whole tile, colors included
+  if (DRAWN[id]) {
+    const px = Math.max(32, Math.min(256, Math.ceil(size * 2)));
+    return <Image src={`svg:${px}:-:asset:machines/marks/${DRAWN[id]}.svg`} style={{ width: size, height: size }} />;
+  }
   if (LOGOS[id]) {
     return (
       <View style={{ width: size, height: size, borderRadius: size * 0.22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', border: '1px solid rgba(0,0,0,0.08)' }}>

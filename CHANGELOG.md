@@ -40,8 +40,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   its https URL, SHA-256 and size; the helper takes only the id, architecture, name and hash from the app and checks them
   against the catalog.
 - **The systems' own logos** on the Debian, Fedora and Kali cards, unmodified, with their licenses and trademark notices
-  in `assets/machines/logos/README.md`. Ubuntu keeps Machines' own mark (Canonical asks for written permission), and so
-  does Windows (Microsoft's logo isn't used, nor anything made to look like it).
+  in `assets/machines/logos/README.md`. Ubuntu (Canonical asks for written permission) and Windows (Microsoft allows no
+  use of its logos or of designs like them, four panes included) get Machines' own drawn marks instead
+  (`assets/machines/marks`): an orange tile with a "U" and a generic app window on a blue tile.
 - `lord-vm --sha256 FILE` and `lord.vm.hash(path)`: an ISO's SHA-256 with progress, to check the one you downloaded.
 - **The Store is arranged by where apps come from** (`apps/store/index.jsx`). The sidebar has **Where apps come from**
   (Linux apps from Debian, Flathub, Web apps, LordOS apps, and Wine and Android said as coming soon) and **Picked by
@@ -65,8 +66,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
-- **A Windows 11 machine, or one on compatible devices, starts in its window** (`server/src/vm/lordvm.c`): in that case
-  the window's sound output wasn't declared, and QEMU refused the sound card with "audiodev 'snd0' not found".
+- **Machines on compatible devices start in their window** (`server/src/vm/lordvm.c`; the device sets of imported machines
+  and of the new card in `docs/VIRTUALIZATION.md` 4.3): the window's sound output wasn't declared for them, and QEMU refused the sound card with "audiodev 'snd0' not found".
 - **The desktop no longer stalls while the Store installs a Flathub app** (`sdk/flathub.js`, `apps/store/flathubpages.js`):
   every line flatpak printed changed the Store's state, which redrew the 60 cards of the Flathub page and filtered and
   sorted the 2 242 apps of the catalog again, several times a second. Progress now reaches the page at most every
