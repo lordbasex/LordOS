@@ -76,11 +76,13 @@ static char *test_path(const char *env, const char *def) {
 #define QEMU_IMG test_path("LORDVM_TEST_QEMU_IMG", "/usr/bin/qemu-img")
 #define PASST    test_path("LORDVM_TEST_PASST", "/usr/bin/passt")
 #define VIRTIOFSD test_path("LORDVM_TEST_VIRTIOFSD", "/usr/libexec/virtiofsd")
+#define SWTPM    test_path("LORDVM_TEST_SWTPM", "/usr/bin/swtpm")
 #define QEMU_BIN_OF(a) test_path((a) ? "LORDVM_TEST_QEMU_AMD64" : "LORDVM_TEST_QEMU_ARM64", QEMU_BIN[a])
 #else
 #define QEMU_IMG "/usr/bin/qemu-img"
 #define PASST    "/usr/bin/passt"
 #define VIRTIOFSD "/usr/libexec/virtiofsd"
+#define SWTPM    "/usr/bin/swtpm"
 #define QEMU_BIN_OF(a) QEMU_BIN[a]
 #endif
 static const char *const QEMU_BIN[2] = { "/usr/bin/qemu-system-aarch64", "/usr/bin/qemu-system-x86_64" };
@@ -93,6 +95,8 @@ static const char *const FW_ARM64[][2] = {
 static const char *const FW_AMD64[][2] = {
     { "/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd" },
 };
+/* secure boot (Windows 11, 4.3): the code built with it and the variables with Microsoft's keys enrolled (Debian's ovmf) */
+static const char *const FW_AMD64_SB[2] = { "/usr/share/OVMF/OVMF_CODE_4M.secboot.fd", "/usr/share/OVMF/OVMF_VARS_4M.ms.fd" };
 
 #define LOG_CAP      (4 << 20)
 #define SERIAL_CAP   (1 << 20)
@@ -360,6 +364,12 @@ static int machine_type_for(int arch, char *out, size_t n) {
     return -1;
 }
 
+static int firmware_for(int arch, const char **code, const char **vars);
+static int firmware_sb(const char **code, const char **vars) {
+    if (!file_exists(FW_AMD64_SB[0]) || !file_exists(FW_AMD64_SB[1])) return -1;
+    *code = FW_AMD64_SB[0]; *vars = FW_AMD64_SB[1];
+    return 0;
+}
 static int firmware_for(int arch, const char **code, const char **vars) {
 #ifdef LORDVM_TEST_PATHS
     const char *tc = test_path("LORDVM_TEST_FW_CODE", ""), *tv = test_path("LORDVM_TEST_FW_VARS", "");
@@ -529,6 +539,29 @@ static void snaps_sweep(const char *dir, const VmMachine *m) {
     }
 }
 
+/* The TPM's state (4.3) isn't a disk qemu-img can snapshot: each snapshot keeps a copy of swtpm's one state file,
+ * disks/tpm/snap-<tag>.permall (a tag is letters, digits and '-'). TPMS_TAKE copies the state there, TPMS_REVERT copies it
+ * back, TPMS_DROP removes it. Machines without a TPM have nothing to do. */
+enum { TPMS_TAKE, TPMS_REVERT, TPMS_DROP };
+static int copy_sparse(const char *from, const char *to);
+static int tpm_snap(const char *dir, const VmMachine *m, int op, const char *tag) {
+    if (!m->tpm || !vm_snap_tag_valid(tag)) return 0;
+    char cur[PATH_MAX + 64], snap[PATH_MAX + 128];
+    snprintf(cur, sizeof cur, "%s/disks/tpm/tpm2-00.permall", dir);
+    snprintf(snap, sizeof snap, "%s/disks/tpm/snap-%s.permall", dir, tag);
+    if (op == TPMS_DROP) { unlink(snap); return 0; }
+    const char *from = op == TPMS_TAKE ? cur : snap, *to = op == TPMS_TAKE ? snap : cur;
+    if (!file_exists(from)) { if (op == TPMS_REVERT) unlink(cur); return 0; }   /* no state then: none now */
+    /* a whole new file, then renamed over: never half a state */
+    char tmp[PATH_MAX + 160];
+    snprintf(tmp, sizeof tmp, "%s.new", to);
+    unlink(tmp);
+    if (copy_sparse(from, tmp)) { unlink(tmp); return -1; }
+    chmod(tmp, 0600);
+    if (rename(tmp, to)) { unlink(tmp); return -1; }
+    return 0;
+}
+
 static int snap_take_off(const char *dir, const VmMachine *m, const char *tag, const char *name, char *err, size_t errlen) {
     VmSnap list[VM_SNAPS_MAX];
     int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
@@ -544,6 +577,13 @@ static int snap_take_off(const char *dir, const VmMachine *m, const char *tag, c
             vm_op_end(dir);
             return -1;
         }
+    }
+    if (tpm_snap(dir, m, TPMS_TAKE, tag)) {
+        char e2[256];
+        for (int k = 0; k < nd; k++) qimg_snap(dir, disks[k], "-d", tag, e2, sizeof e2);
+        vm_op_end(dir);
+        snprintf(err, errlen, "can't keep the TPM's state");
+        return -1;
     }
     VmSnap sn;
     memset(&sn, 0, sizeof sn);
@@ -566,6 +606,7 @@ static int snap_delete_off(const char *dir, const VmMachine *m, const char *tag,
     char disks[VM_NDISKS][PATH_MAX + 64], e2[256];
     int nd = disk_files(dir, m, disks);
     for (int k = 0; k < nd; k++) if (qimg_snap(dir, disks[k], "-d", tag, e2, sizeof e2)) vlog("snapshots: deleting %s on %s: %s", tag, disks[k], e2);
+    tpm_snap(dir, m, TPMS_DROP, tag);
     snap_picture_rm(dir, tag);
     vm_op_end(dir);
     return 0;
@@ -581,6 +622,7 @@ static int snap_revert_off(const char *dir, const VmMachine *m, const char *tag,
     int nd = disk_files(dir, m, disks);
     if (vm_op_begin(dir, "snapshot-revert", tag, NULL, NULL)) { snprintf(err, errlen, "can't write operation.json"); return -1; }
     for (int i = 0; i < nd; i++) if (qimg_snap(dir, disks[i], "-a", tag, err, errlen)) return -1;     /* operation.json stays: the next open goes on */
+    if (tpm_snap(dir, m, TPMS_REVERT, tag)) { snprintf(err, errlen, "can't put the TPM's state back"); return -1; }
     discard_state(dir);
     vm_op_end(dir);
     return 0;
@@ -591,7 +633,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     vm_host_probe(&h);
     int arch = h.arch >= 0 ? h.arch : VM_ARCH_AMD64;
     const char *name = NULL, *import = NULL, *iso = NULL, *unatt = NULL;
-    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1;
+    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1, sb = 0, tpm = 0, hv = 0, rtc = -1;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
@@ -610,6 +652,10 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--unattended")) unatt = v;
         else if (!strcmp(a, "--agent")) { agent = parse_enum(v, "off", "on"); if (agent < 0) { fprintf(stderr, "lord-vm: --agent on|off\n"); return 2; } }
         else if (!strcmp(a, "--clipboard")) { clip = parse_clip(v); if (clip < 0) { fprintf(stderr, "lord-vm: --clipboard off|to-guest|from-guest|both\n"); return 2; } }
+        else if (!strcmp(a, "--secure-boot")) { sb = parse_enum(v, "off", "on"); if (sb < 0) { fprintf(stderr, "lord-vm: --secure-boot on|off\n"); return 2; } }
+        else if (!strcmp(a, "--tpm")) { tpm = parse_enum(v, "off", "on"); if (tpm < 0) { fprintf(stderr, "lord-vm: --tpm on|off\n"); return 2; } }
+        else if (!strcmp(a, "--hyperv")) { hv = parse_enum(v, "off", "on"); if (hv < 0) { fprintf(stderr, "lord-vm: --hyperv on|off\n"); return 2; } }
+        else if (!strcmp(a, "--rtc")) { rtc = parse_enum(v, "utc", "local"); if (rtc < 0) { fprintf(stderr, "lord-vm: --rtc utc|local\n"); return 2; } }
         else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
     }
     /* an unattended install (vmunattend.h): the spec lord-server wrote (0600, the password only as a hash), read and
@@ -642,10 +688,16 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     if (disp >= 0) m.display = disp;
     if (net >= 0) m.network = net;
     const char *code = NULL, *vars = NULL;
+    /* Windows 11 (4.3): secure boot (UEFI only), a TPM 2.0, Hyper-V enlightenments, the clock in local time */
+    m.secure_boot = sb; m.tpm = tpm; m.hyperv = hv;
+    if (rtc >= 0) m.rtc = rtc;
+    if (sb && fw == VM_FW_BIOS) { fprintf(stderr, "lord-vm: secure boot needs UEFI\n"); return 2; }
+    if (sb) fw = VM_FW_UEFI;
+    if (tpm && !file_exists(SWTPM)) { fprintf(stderr, "lord-vm: %s isn't installed (swtpm, for the TPM)\n", SWTPM); return 1; }
     if (fw < 0) fw = firmware_for(arch, &code, &vars) ? VM_FW_BIOS : VM_FW_UEFI;
     m.firmware = fw;
     if (fw == VM_FW_UEFI) {
-        if (firmware_for(arch, &code, &vars)) { fprintf(stderr, "lord-vm: no UEFI firmware for %s is installed (%s)\n", vm_arch_name(arch), arch == VM_ARCH_ARM64 ? "qemu-efi-aarch64" : "ovmf"); return 1; }
+        if (sb ? (arch != VM_ARCH_AMD64 || firmware_sb(&code, &vars)) : firmware_for(arch, &code, &vars)) { fprintf(stderr, "lord-vm: no UEFI firmware for %s is installed (%s)\n", vm_arch_name(arch), arch == VM_ARCH_ARM64 ? "qemu-efi-aarch64" : "ovmf"); return 1; }
         snprintf(m.firmware_code, sizeof m.firmware_code, "%s", code);
         if (sha256_file(code, m.firmware_sha256)) { fprintf(stderr, "lord-vm: can't read %s\n", code); return 1; }
     }
@@ -743,6 +795,8 @@ static struct {
     int serial_fd, serial_log, qemu_err, passt_err, sig_fd;
     pid_t vfs[VM_SHARES];                   /* shared folders (6.7): each one's virtiofsd, and QEMU's end of its socket */
     int vfs_q[VM_SHARES];
+    pid_t tpm;                              /* the TPM (Windows 11): swtpm, and QEMU's end of its control socket */
+    int tpm_q;
     off_t serial_bytes;
     int lock_fd;
     int sandbox, cg_mode;
@@ -903,7 +957,7 @@ static int cg_write(const char *dir, const char *file, const char *val) {
     return r;
 }
 
-static int qemu_procs_fd = -1, passt_procs_fd = -1, vfs_procs_fd = -1;
+static int qemu_procs_fd = -1, passt_procs_fd = -1, vfs_procs_fd = -1, tpm_procs_fd = -1;
 
 /* the machine's scope, then leaves inside it when the scope is ours to divide (3.7) */
 static void setup_cgroups(void) {
@@ -949,6 +1003,17 @@ static void setup_cgroups(void) {
         char vf[PATH_MAX + 64];
         snprintf(vf, sizeof vf, "%s/cgroup.procs", v);
         vfs_procs_fd = open(vf, O_WRONLY | O_CLOEXEC);
+    }
+    char t[PATH_MAX + 32];
+    snprintf(t, sizeof t, "%s/swtpm", self);
+    if (S.m.tpm && (!mkdir(t, 0755) || errno == EEXIST)) {
+        /* the TPM: a small program with a few kilobytes of state */
+        cg_write(t, "memory.max", "67108864");
+        cg_write(t, "cpu.max", "50000 100000");
+        cg_write(t, "pids.max", "4");
+        char tf[PATH_MAX + 64];
+        snprintf(tf, sizeof tf, "%s/cgroup.procs", t);
+        tpm_procs_fd = open(tf, O_WRONLY | O_CLOEXEC);
     }
     char f[PATH_MAX + 64];
     snprintf(f, sizeof f, "%s/cgroup.procs", q);
@@ -1094,6 +1159,50 @@ static int spawn_virtiofsd(int i, char *err, size_t errlen) {
     return c;
 }
 
+/* the TPM (4.3; AGENTS.md, "Machines' TPM"): Debian's swtpm, one per machine, started by lord-vm as the session user.
+ * Its state is <machine>/disks/tpm (the only folder it may write); its control channel is one end of a socketpair (fd 3),
+ * QEMU gets the other (QEMU then hands it the data channel over that). Around it: our no_new_privs, seccomp (no sockets
+ * of its own) and Landlock (read /usr, write its folder, no TCP), its own --seccomp, a cgroup leaf, PR_SET_PDEATHSIG, no
+ * environment; --terminate ends it when QEMU closes the channel. */
+static int spawn_swtpm(char *err, size_t errlen) {
+    if (!file_exists(SWTPM)) { snprintf(err, errlen, "swtpm isn't installed (the TPM)"); return -1; }
+    char dir[PATH_MAX + 32], st[PATH_MAX + 64];
+    snprintf(dir, sizeof dir, "%s/tpm", S.disks);
+    if (mkdir(dir, 0700) && errno != EEXIST) { snprintf(err, errlen, "can't make the TPM's folder: %s", strerror(errno)); return -1; }
+    struct stat sb;
+    if (lstat(dir, &sb) || !S_ISDIR(sb.st_mode) || sb.st_uid != getuid()) { snprintf(err, errlen, "the TPM's folder isn't this account's"); return -1; }
+    snprintf(st, sizeof st, "dir=%s,mode=0600", dir);
+    int sv[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv)) { snprintf(err, errlen, "socketpair: %s", strerror(errno)); return -1; }
+    char logp[PATH_MAX + 64];
+    snprintf(logp, sizeof logp, "%s/log/swtpm.log", S.dir);
+    int lf = open(logp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    pid_t pid = fork();
+    if (pid < 0) { snprintf(err, errlen, "fork: %s", strerror(errno)); close(sv[0]); close(sv[1]); if (lf >= 0) close(lf); return -1; }
+    if (!pid) {
+        child_common(tpm_procs_fd);
+        int null = open("/dev/null", O_RDWR);
+        dup2(null, 0);
+        dup2(lf >= 0 ? lf : null, 1);
+        dup2(lf >= 0 ? lf : null, 2);
+        int fds[1] = { sv[1] };
+        place_fds(fds, 1);
+        const char *reads[] = { "/etc/ld.so.cache" };
+        int mask = vm_jail_tool_n(reads, 1, dir);
+        if (!(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_SECCOMP_OURS) || (vm_landlock_abi() > 0 && !(mask & VMS_LANDLOCK_FS))) _exit(126);
+        char *argv[] = { SWTPM, "socket", "--tpm2", "--tpmstate", st, "--ctrl", "type=unixio,clientfd=3", "--terminate",
+                         "--seccomp", "action=kill", "--log", "level=1", NULL };
+        char *env[] = { NULL };
+        execve(SWTPM, argv, env);
+        _exit(127);
+    }
+    close(sv[1]);
+    if (lf >= 0) close(lf);
+    S.tpm = pid;
+    vlog("tpm: swtpm pid %d, state in disks/tpm", (int)pid);
+    return sv[0];
+}
+
 /* every share's folder, checked again now (it may have become a link or moved since it was chosen), then its virtiofsd */
 static int start_shares(void) {
     if (!file_exists(VIRTIOFSD)) { fail_start("virtiofsd isn't installed (shared folders)"); return -1; }
@@ -1237,11 +1346,16 @@ static void build_qemu_args(void) {
     arg("-name"); argf("guest=%s,debug-threads=on", esc);
     arg("-uuid"); arg(m->id);
     /* shared folders (6.7): vhost-user needs the guest's memory in a shared memfd; machines without one keep private memory */
-    arg("-machine"); argf("%s,dump-guest-core=off%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "", m->n_shares ? ",memory-backend=mem" : "");
+    arg("-machine"); argf("%s,dump-guest-core=off%s%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "", m->n_shares ? ",memory-backend=mem" : "",
+                          m->secure_boot ? ",smm=on" : "");
+    /* secure boot: the firmware's variables can be written only from SMM, so the guest's system can't change its own keys */
+    if (m->secure_boot) { arg("-global"); arg("driver=cfi.pflash01,property=secure,value=on"); }
     if (m->n_shares) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=on", m->memory_mb); }
     if (kvm) { arg("-accel"); arg("kvm,device=/dev/fdset/1"); arg("-add-fd"); arg("fd=3,set=1,opaque=kvm"); }
     else { arg("-accel"); arg("tcg,thread=multi,tb-size=256"); }
-    arg("-cpu"); arg(kvm ? "host" : "max");
+    /* Hyper-V enlightenments: what Windows asks a hypervisor for (timers, interrupts, spinlocks); with KVM only */
+    arg("-cpu"); arg(!kvm ? "max" : m->hyperv ? "host,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,hv_vpindex,hv_runtime,hv_synic,hv_stimer,hv_time,"
+                                                 "hv_frequencies,hv_reset,hv_tlbflush,hv_ipi" : "host");
     if (m->cpu_sockets) { arg("-smp"); argf("%d,sockets=%d,cores=%d,threads=%d", m->vcpus, m->cpu_sockets, m->cpu_cores, m->cpu_threads); }
     else { arg("-smp"); argf("%d", m->vcpus); }
     arg("-m"); argf("%d", m->memory_mb);
@@ -1394,6 +1508,12 @@ static void build_qemu_args(void) {
         arg("-chardev"); argf("socket,id=vfs%d,fd=%d", i, (m->agent ? 9 : 7) + S.ncreds + i);
         arg("-device"); argf("vhost-user-fs-pci,id=share%d,chardev=vfs%d,tag=%s,addr=0x%x", i, i, m->share_tag[i], 0xb + i);
     }
+    if (m->tpm) {
+        /* a TPM 2.0 (CRB interface, what Windows 11 looks for) served by swtpm on the fd after the shares' */
+        arg("-chardev"); argf("socket,id=chrtpm,fd=%d", (m->agent ? 9 : 7) + S.ncreds + m->n_shares);
+        arg("-tpmdev"); arg("emulator,id=tpm0,chardev=chrtpm");
+        arg("-device"); arg("tpm-crb,tpmdev=tpm0");
+    }
 }
 
 static void fail_start(const char *fmt, ...) {
@@ -1494,6 +1614,12 @@ static int start_machine(void) {
         S.sandbox |= VMS_PDEATHSIG;
     }
     if (S.m.n_shares && start_shares()) return -1;
+    if (S.m.tpm) {
+        char terr[256];
+        S.tpm_q = spawn_swtpm(terr, sizeof terr);
+        if (S.tpm_q < 0) { fail_start("the TPM: %s", terr); return -1; }
+        S.sandbox |= VMS_PDEATHSIG;
+    }
     build_qemu_args();
     {
         char line[8192];
@@ -1518,11 +1644,12 @@ static int start_machine(void) {
         dup2(qerr[1], 1);
         dup2(qerr[1], 2);
         /* 3 kvm, 4 QMP, 5 serial, 6 network, 7.. credentials, then the status pipe (closed by exec) */
-        int fds[6 + MAX_CREDS + VM_SHARES + 1], nf = 0;
+        int fds[6 + MAX_CREDS + VM_SHARES + 2], nf = 0;
         fds[nf++] = kvm; fds[nf++] = qmp[1]; fds[nf++] = ser[1]; fds[nf++] = net[0] >= 0 ? net[0] : null;
         if (S.m.agent) { fds[nf++] = qga[1]; fds[nf++] = lag[1]; }
         for (int i = 0; i < S.ncreds; i++) fds[nf++] = S.cred_fd[i];
         for (int i = 0; i < S.m.n_shares; i++) fds[nf++] = S.vfs_q[i];
+        if (S.m.tpm) fds[nf++] = S.tpm_q;
         fds[nf++] = st[1];
         place_fds(fds, nf);
         int stf = 3 + nf - 1;
@@ -1551,6 +1678,7 @@ static int start_machine(void) {
     }
     for (int i = 0; i < S.ncreds; i++) { close(S.cred_fd[i]); S.cred_fd[i] = -1; }
     for (int i = 0; i < S.m.n_shares; i++) if (S.vfs_q[i] >= 0) { close(S.vfs_q[i]); S.vfs_q[i] = -1; }
+    if (S.tpm_q >= 0) { close(S.tpm_q); S.tpm_q = -1; }
     if (net[0] >= 0) close(net[0]);
     S.qemu_err = qerr[0];
     S.serial_fd = ser[0];
@@ -2102,6 +2230,10 @@ static const char *snap_devices(void) {
 static void snap_end(int ok, const char *why) {
     int kind = S.snap_kind == VSN_TAKE ? VJ_SNAPSHOT : S.snap_kind == VSN_REVERT ? VJ_REVERT : VJ_DELETE;
     if (ok) vlog("snapshot: %s %s done", S.snap_kind == VSN_TAKE ? "take" : S.snap_kind == VSN_REVERT ? "revert" : "delete", S.snap_tag);
+    /* the TPM's copy (tpm_snap): QEMU saves and restores swtpm's state with the machine's own, so a revert while running
+     * needs nothing here; the copy is for taking it back with the machine off */
+    if (ok && S.snap_kind == VSN_TAKE && tpm_snap(S.dir, &S.m, TPMS_TAKE, S.snap_tag)) vlog("snapshot: %s: the TPM's copy couldn't be kept", S.snap_tag);
+    if (ok && S.snap_kind == VSN_DELETE) tpm_snap(S.dir, &S.m, TPMS_DROP, S.snap_tag);
     else vlog("snapshot: %s failed: %s", S.snap_tag, why);
     send_job(kind, ok ? VJS_DONE : VJS_FAILED, ok ? 100 : -1, ok ? S.snap_tag : why);
     reply(S.snap_client, S.snap_seq, ok ? VME_OK : VME_QMP, ok ? S.snap_tag : why);
@@ -2949,6 +3081,7 @@ static void qemu_exited(int status) {
     if (S.passt > 0) kill(S.passt, SIGTERM);
     if (S.passt_pidfd >= 0) syscall(SYS_pidfd_send_signal, S.passt_pidfd, SIGTERM, NULL, 0);
     for (int i = 0; i < VM_SHARES; i++) if (S.vfs[i] > 0) kill(S.vfs[i], SIGTERM);
+    if (S.tpm > 0) kill(S.tpm, SIGTERM);
     if (why == VR_INSTALLED) unattended_done();
     set_state(st, why, code, d);
 }
@@ -2993,6 +3126,9 @@ static void reap(void) {
             vlog("share %d: virtiofsd exited (%s %d)", k + 1, WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
             /* it also ends by itself when QEMU closes the connection (a suspend, a shutdown): news only while the machine runs on */
             if (!S.qemu_done && !S.suspending && S.state == VS_RUNNING) vlog("share %d: the folder %s is gone from the machine until it starts again", k + 1, S.m.share_tag[k]);
+        } else if (p == S.tpm) {
+            S.tpm = 0;
+            vlog("tpm: swtpm exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
         } else if (p == S.keeper) { vlog("network: passt's keeper ended"); S.keeper = 0; if (S.keeper_fd >= 0) close(S.keeper_fd); S.keeper_fd = -1; }
     }
 }
@@ -3431,7 +3567,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = -1;
-    S.keeper_fd = S.passt_pidfd = -1;
+    S.keeper_fd = S.passt_pidfd = S.tpm_q = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {
@@ -3573,6 +3709,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         /* never ran: nothing of it may stay behind */
         if (S.passt > 0) { kill(S.passt, SIGKILL); waitpid(S.passt, NULL, 0); }
         for (int i = 0; i < VM_SHARES; i++) if (S.vfs[i] > 0) { kill(S.vfs[i], SIGKILL); waitpid(S.vfs[i], NULL, 0); S.vfs[i] = 0; }
+        if (S.tpm > 0) { kill(S.tpm, SIGKILL); waitpid(S.tpm, NULL, 0); S.tpm = 0; }
         if (S.qemu > 0) { kill(S.qemu, SIGKILL); waitpid(S.qemu, NULL, 0); }
         for (int k = 0; k < 20 && S.qemu_err >= 0; k++) pump_fd(&S.qemu_err, "qemu");
         S.qemu = 0;
@@ -4206,6 +4343,15 @@ static int cmd_clone(const char *src, int argc, char **argv) {
             if (vm_identity_write(tmp, hn)) { fprintf(stderr, "lord-vm: can't write identity.json\n"); goto out; }
         }
         for (int i = 0; i < n.n_extra_macs; i++) vm_new_mac(n.extra_macs[i]);
+    }
+    if (m.tpm) {
+        /* the TPM goes with the clone: the state now, or the snapshot's it starts from */
+        snprintf(p2, sizeof p2, "%s/disks/tpm", tmp);
+        if (mkdir(p2, 0700) && errno != EEXIST) { fprintf(stderr, "lord-vm: can't make the clone's TPM folder\n"); goto out; }
+        if (from_snap) snprintf(p1, sizeof p1, "%s/disks/tpm/snap-%s.permall", real, from_snap);
+        else snprintf(p1, sizeof p1, "%s/disks/tpm/tpm2-00.permall", real);
+        snprintf(p2, sizeof p2, "%s/disks/tpm/tpm2-00.permall", tmp);
+        if (copy_small(p1, p2)) { fprintf(stderr, "lord-vm: copying the TPM's state failed\n"); goto out; }
     }
     snprintf(p1, sizeof p1, "%s/app.json", real); snprintf(p2, sizeof p2, "%s/app.json", tmp); copy_small(p1, p2);
     snprintf(p1, sizeof p1, "%s/thumb.png", real); snprintf(p2, sizeof p2, "%s/thumb.png", tmp); copy_small(p1, p2);

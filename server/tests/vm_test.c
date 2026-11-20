@@ -63,7 +63,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "5", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "6", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -193,6 +193,47 @@ static void test_schema(void) {
         }
         snprintf(t, sizeof t, "%.*s\"schema\":3%.*s,%s}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10, s4[i].add);
         CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) != VM_OK || s4[i].want != VM_OK);    /* never in schema 3 */
+    }
+    /* schema 5 (Windows 11): secure boot, TPM 2.0, Hyper-V enlightenments; amd64 only, secure boot with UEFI only, never in
+     * schema 4 */
+    {
+        char amd[2048];
+        const char *a = "\"arch\":\"arm64\"", *mt = "\"machine_type\":\"virt-10.0\"", *fc = "/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd";
+        const char *pa = strstr(GOOD, a), *pm = strstr(GOOD, mt), *pf = strstr(GOOD, fc);
+        CHECK(pa && pm && pf && pa < pm && pm < pf);
+        snprintf(amd, sizeof amd, "%.*s\"arch\":\"amd64\"%.*s\"machine_type\":\"pc-q35-10.0\"%.*s/usr/share/OVMF/OVMF_CODE_4M.secboot.fd%s",
+                 (int)(pa - GOOD), GOOD, (int)(pm - pa - strlen(a)), pa + strlen(a), (int)(pf - pm - strlen(mt)), pm + strlen(mt), pf + strlen(fc));
+        struct { const char *add; int schema, want; } s5[] = {
+            { "\"secure_boot\":true,\"tpm\":true,\"hyperv\":true", 5, VM_OK },
+            { "\"tpm\":true", 5, VM_OK }, { "\"secure_boot\":false", 5, VM_OK },
+            { "\"tpm\":1", 5, VM_E_FIELD }, { "\"hyperv\":\"yes\"", 5, VM_E_FIELD },
+            { "\"tpm\":true", 4, VM_E_FIELD }, { "\"secure_boot\":true", 4, VM_E_FIELD },
+        };
+        for (size_t i = 0; i < sizeof s5 / sizeof s5[0]; i++) {
+            char t[4096];
+            const char *at = strstr(amd, "\"schema\":1");
+            snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - amd), amd, s5[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s5[i].add);
+            int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+            if (r != s5[i].want) fprintf(stderr, "  schema 5 %s: got %d (%s)\n", s5[i].add, r, err);
+            CHECK(r == s5[i].want);
+            if (r == VM_OK) {
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+        }
+        /* arm64 (GOOD) and a bios machine refuse them */
+        {
+            char t[4096];
+            const char *at = strstr(GOOD, "\"schema\":1");
+            snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"tpm\":true}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
+            CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_E_RANGE);
+            CHECK(vm_machine_parse(amd, strlen(amd), &m, err, sizeof err) == VM_OK);
+            m.schema = 5; m.firmware = VM_FW_BIOS; m.firmware_code[0] = m.firmware_sha256[0] = 0; m.secure_boot = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            m.secure_boot = 0; m.tpm = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_OK);
+        }
     }
     /* which folders may be shared (vm_share_allowed): a real folder in home (not home), under /media/<user> or /mnt, nothing
      * hidden, never the library or what holds it */

@@ -22,7 +22,7 @@
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. An older file is read as is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 4
+#define VM_SCHEMA 5
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -101,6 +101,10 @@ typedef struct {
     char share_tag[VM_SHARES][VM_TAG_MAX + 1];
     char share_path[VM_SHARES][VM_PATH_MAX];
     int share_rw[VM_SHARES];
+    /* schema 5: what Windows 11 asks of a machine (docs/VIRTUALIZATION.md 4.3), amd64 only for now */
+    int secure_boot;                    /* UEFI with secure boot and Microsoft's keys enrolled (OVMF .secboot + .ms) */
+    int tpm;                            /* a TPM 2.0, served by swtpm; its state in disks/tpm */
+    int hyperv;                         /* Hyper-V enlightenments, for Windows guests */
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 

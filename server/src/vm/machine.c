@@ -238,6 +238,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
         }
     }
     if (m->schema < 4 && m->n_shares) return fail(err, n, VM_E_FIELD, "shares need schema 4");
+    if ((m->secure_boot | m->tpm | m->hyperv) & ~1) return fail(err, n, VM_E_RANGE, "secure_boot, tpm and hyperv are true or false");
+    if (m->schema < 5 && (m->secure_boot || m->tpm || m->hyperv)) return fail(err, n, VM_E_FIELD, "secure_boot, tpm and hyperv need schema 5");
+    if ((m->secure_boot || m->tpm || m->hyperv) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "secure boot, TPM and Hyper-V are for amd64 machines for now");
+    if (m->secure_boot && m->firmware != VM_FW_UEFI) return fail(err, n, VM_E_RANGE, "secure boot needs UEFI");
     if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
                           m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
         return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
@@ -275,7 +279,7 @@ static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
-    "shares", NULL,
+    "shares", "secure_boot", "tpm", "hyperv", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -418,6 +422,16 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         if (json_get(o, "clipboard") && (r = get_enum(o, "clipboard", CLIPS, &m->clipboard, err, n))) goto out;
     }
     if ((r = parse3(o, m, err, n)) || (r = parse4(o, m, err, n))) goto out;
+    {
+        /* schema 5's keys */
+        const char *const B[] = { "secure_boot", "tpm", "hyperv" };
+        int *dst[] = { &m->secure_boot, &m->tpm, &m->hyperv };
+        for (int i = 0; i < 3; i++) {
+            const JVal *v = json_get(o, B[i]);
+            if (v && v->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "%s must be true or false", B[i]); goto out; }
+            *dst[i] = v ? json_bool(o, B[i], 0) : 0;
+        }
+    }
     r = vm_machine_check(m, err, n);
 out:
     json_free(&d);
@@ -481,6 +495,11 @@ char *vm_machine_json(const VmMachine *m) {
             jb_printf(&b, ", \"writable\": %s}", m->share_rw[i] ? "true" : "false");
         }
         jb_raw(&b, "]");
+    }
+    if (m->schema >= 5) {
+        if (m->secure_boot) jb_raw(&b, ",\n  \"secure_boot\": true");
+        if (m->tpm) jb_raw(&b, ",\n  \"tpm\": true");
+        if (m->hyperv) jb_raw(&b, ",\n  \"hyperv\": true");
     }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);
