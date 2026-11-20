@@ -307,5 +307,12 @@
   "multiarch.enabling": "Mengaktifkan…",
   "pkg32": "{name} (32-bit)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Aplikasi Flatpak"
+  "kind.flatpak": "Aplikasi Flatpak",
+  "section.origin": "Asal",
+  "section.picks": "Pilihan LordOS",
+  "src.debian": "Aplikasi Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Aplikasi Android",
+  "soon": "Segera",
+  "sub.all": "Semua"
 }

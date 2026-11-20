@@ -315,5 +315,12 @@
   "multiarch.enabling": "Inawezesha…",
   "pkg32": "{name} (biti 32)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Programu ya Flatpak"
+  "kind.flatpak": "Programu ya Flatpak",
+  "section.origin": "Chanzo",
+  "section.picks": "Zilizochaguliwa na LordOS",
+  "src.debian": "Programu za Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Programu za Android",
+  "soon": "Hivi karibuni",
+  "sub.all": "Zote"
 }

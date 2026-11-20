@@ -210,7 +210,7 @@ function DebCard({ a, onOpen }) {
   const cat = catOf(app);
   const action = desk ? h(Pill, { label: t('store.open'), onClick: () => launchApp(desk.id) })
     : h(Pill, { label: a.installed ? t('store.ai.view') : t('store.get'), onClick: () => onOpen(name) });
-  return h(Card, { icon: h(PkgIcon, { app, name, size: 56 }), name: app.name || name, kind: cat ? t(`store.cat.${cat}`) : '',
+  return h(Card, { icon: h(PkgIcon, { app, name, size: 56 }), name: app.name || name, tag: 'Debian', kind: cat ? t(`store.cat.${cat}`) : '',
     summary: app.summary || a.summary || '', note: a.size ? formatBytes(a.size) : '', action, onClick: () => onOpen(name) });
 }
 

@@ -307,5 +307,12 @@
   "multiarch.enabling": "Mendayakan…",
   "pkg32": "{name} (32-bit)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Apl Flatpak"
+  "kind.flatpak": "Apl Flatpak",
+  "section.origin": "Asal",
+  "section.picks": "Pilihan LordOS",
+  "src.debian": "Apl Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Apl Android",
+  "soon": "Akan datang",
+  "sub.all": "Semua"
 }

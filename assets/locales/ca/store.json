@@ -315,5 +315,12 @@
   "multiarch.enabling": "S’està habilitant…",
   "pkg32": "{name} (32 bits)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Aplicació Flatpak"
+  "kind.flatpak": "Aplicació Flatpak",
+  "section.origin": "Origen",
+  "section.picks": "Triades per LordOS",
+  "src.debian": "Apps de Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Apps d'Android",
+  "soon": "Aviat",
+  "sub.all": "Totes"
 }

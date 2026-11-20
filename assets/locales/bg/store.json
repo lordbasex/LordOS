@@ -315,5 +315,12 @@
   "multiarch.enabling": "Включване…",
   "pkg32": "{name} (32-битов)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Приложение Flatpak"
+  "kind.flatpak": "Приложение Flatpak",
+  "section.origin": "Произход",
+  "section.picks": "Избрани от LordOS",
+  "src.debian": "Приложения за Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Приложения за Android",
+  "soon": "Скоро",
+  "sub.all": "Всички"
 }

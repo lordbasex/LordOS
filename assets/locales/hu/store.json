@@ -315,5 +315,12 @@
   "multiarch.enabling": "Engedélyezés…",
   "pkg32": "{name} (32 bites)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak-alkalmazás"
+  "kind.flatpak": "Flatpak-alkalmazás",
+  "section.origin": "Forrás",
+  "section.picks": "A LordOS válogatása",
+  "src.debian": "Linux-appok (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android-appok",
+  "soon": "Hamarosan",
+  "sub.all": "Mind"
 }

@@ -43,6 +43,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   in `assets/machines/logos/README.md`. Ubuntu keeps Machines' own mark (Canonical asks for written permission), and so
   does Windows (Microsoft's logo isn't used, nor anything made to look like it).
 - `lord-vm --sha256 FILE` and `lord.vm.hash(path)`: an ISO's SHA-256 with progress, to check the one you downloaded.
+- **The Store is arranged by where apps come from** (`apps/store/index.jsx`). The sidebar has **Where apps come from**
+  (Linux apps from Debian, Flathub, Web apps, LordOS apps, and Wine and Android said as coming soon) and **Picked by
+  LordOS** (Artificial Intelligence, Commercial, Remote access, Third-party apps). Choosing an origin opens a second
+  column with All and its categories, each with how many apps it has (in a small window they are a row of buttons above
+  the list). Debian's cards carry a "Debian" tag and the catalog's own a "Linux app" one, beside Flathub's and the web
+  apps'. The pages that opened by name before (from Settings, Search and Lord Workspaces) open the origin's page.
 - **Machines looks like a native virtualization app** (the look of hypervisaur's screenshots, reimplemented: no code or
   images of it are used; `apps/machines/kit.jsx`). The assistant, Configure, Requirements and the Raspberry Pi page open
   as sheets over the window, which stays behind, dimmed. Configure has a glyph beside each section, a header with its

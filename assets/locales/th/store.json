@@ -307,5 +307,12 @@
   "multiarch.enabling": "กำลังเปิดใช้…",
   "pkg32": "{name} (32 บิต)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "แอป Flatpak"
+  "kind.flatpak": "แอป Flatpak",
+  "section.origin": "แหล่งที่มา",
+  "section.picks": "LordOS คัดสรร",
+  "src.debian": "แอป Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "แอป Android",
+  "soon": "เร็ว ๆ นี้",
+  "sub.all": "ทั้งหมด"
 }

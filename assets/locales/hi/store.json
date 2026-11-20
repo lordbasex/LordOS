@@ -315,5 +315,12 @@
   "multiarch.enabling": "चालू किया जा रहा है…",
   "pkg32": "{name} (32-बिट)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak ऐप"
+  "kind.flatpak": "Flatpak ऐप",
+  "section.origin": "स्रोत",
+  "section.picks": "LordOS की पसंद",
+  "src.debian": "Linux ऐप (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android ऐप",
+  "soon": "जल्द",
+  "sub.all": "सभी"
 }

@@ -307,5 +307,12 @@
   "multiarch.enabling": "正在启用…",
   "pkg32": "{name}（32 位）",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak 应用"
+  "kind.flatpak": "Flatpak 应用",
+  "section.origin": "来源",
+  "section.picks": "LordOS 精选",
+  "src.debian": "Linux 应用 (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android 应用",
+  "soon": "即将推出",
+  "sub.all": "全部"
 }

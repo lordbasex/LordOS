@@ -315,5 +315,12 @@
   "multiarch.enabling": "Habilitando…",
   "pkg32": "{name} (32 bits)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "App Flatpak"
+  "kind.flatpak": "App Flatpak",
+  "section.origin": "Origem",
+  "section.picks": "Escolhidos pelo LordOS",
+  "src.debian": "Apps de Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Apps de Android",
+  "soon": "Em breve",
+  "sub.all": "Todos"
 }

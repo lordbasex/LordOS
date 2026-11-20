@@ -315,5 +315,12 @@
   "multiarch.enabling": "فعال کیا جا رہا ہے…",
   "pkg32": "{name} (32 بٹ)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak ایپ"
+  "kind.flatpak": "Flatpak ایپ",
+  "section.origin": "ماخذ",
+  "section.picks": "LordOS کا انتخاب",
+  "src.debian": "Linux ایپس (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android ایپس",
+  "soon": "جلد",
+  "sub.all": "سب"
 }

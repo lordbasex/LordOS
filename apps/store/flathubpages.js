@@ -149,7 +149,7 @@ function InstalledList({ onOpen }) {
     })));
 }
 
-export function FlathubPage({ query, onOpen }) {
+export function FlathubPage({ query, onOpen, category = null }) {
   const th = useTheme();
   // what the page itself shows; a job's progress is JobProgress's own (it changes several times a second)
   const catalog = useStore(F.state, (x) => x.catalog);
@@ -158,9 +158,9 @@ export function FlathubPage({ query, onOpen }) {
   const s = { catalog, loaded };
   const fh = useFlathub();
   const [limit, setLimit] = useState(PAGE);
-  useEffect(() => { setLimit(PAGE); }, [query, fh.prefs.showAll]);
+  useEffect(() => { setLimit(PAGE); }, [query, fh.prefs.showAll, category]);
   useEffect(() => { if (fh.on) { if (!s.loaded) F.loadCatalog(); F.refreshInstalled(); } }, [fh.on]);
-  const list = useMemo(() => M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll }), [s.catalog, query, fh.prefs.showAll]);
+  const list = useMemo(() => M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll, category }), [s.catalog, query, fh.prefs.showAll, category]);
   const hidden = useMemo(() => (fh.prefs.showAll ? 0 : s.catalog.length - s.catalog.filter((a) => a.verified).length), [s.catalog, fh.prefs.showAll]);
   if (!fh.supported) return h(Line, { th }, t('flathub.notSupported'));
   if (!fh.on) return h(View, null, h(TurnOn));
@@ -179,6 +179,13 @@ export function FlathubPage({ query, onOpen }) {
     h(CardGrid, null, ...list.slice(0, limit).map((a) => h(FlathubCard, { key: a.id, a, onOpen }))),
     list.length > limit ? h(View, { style: { alignItems: 'center', marginTop: spacing.l } },
       h(Button, { label: t('flathub.showMore', { count: list.length - limit }), onClick: () => setLimit(limit + PAGE) })) : null);
+}
+
+// How many shown Flathub apps each category has (the Store's second column)
+export function useFlathubCounts() {
+  const catalog = useStore(F.state, (x) => x.catalog);
+  const showAll = useStore(settings, (st) => M.prefsOf(st.flathub).showAll);
+  return useMemo(() => M.categoryCounts(catalog, showAll), [catalog, showAll]);
 }
 
 // Discover's search: the Flathub apps that match, as their own shelf (when Flathub is on).
