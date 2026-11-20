@@ -181,11 +181,11 @@ static void to_server(const AgFrame *f) {
     if (f->kind == LAG_APPS && f->len == 1 && f->data[0] <= 1) { out[0] = f->data[0]; n = 1; }
     else if (f->kind == LAG_WINACT) {
         LagAct a;
-        if (!lag_act_parse(f->data, f->len, &a)) n = lag_act_write(&a, out, sizeof out);
+        if (!lag_winact_parse(f->data, f->len, &a)) n = lag_act_write(&a, out, sizeof out);
     } else if (f->kind == LAG_LAUNCH) {
         char tok[LAG_TOKEN_MAX + 1];
         static uint8_t lo[LAG_TOKEN_MAX + 2];
-        if (!lag_launch_parse(f->data, f->len, tok, sizeof tok) && app_list && lag_applist_has(app_list, tok)) {
+        if (!lag_launch_token(f->data, f->len, tok, sizeof tok) && app_list && lag_applist_has(app_list, tok)) {
             size_t k = lag_launch_write(tok, lo, sizeof lo);
             if (k) send_frame(wfd, LAG_LAUNCH, lo, (uint32_t)k);
         }
@@ -205,11 +205,11 @@ static int from_server(int port_fd) {
         if (used < 0 || (!used && win_n == WIN_BUF)) return -1;
         if (!used) break;
         size_t n = 0;
-        if (f.kind == LAG_WINDOWS && !lag_windows_parse(f.data, f.len, win_list)) n = lag_windows_write(win_list, win_tmp, WIN_BUF);
+        if (f.kind == LAG_WINDOWS && !lag_winlist_read(f.data, f.len, win_list)) n = lag_windows_write(win_list, win_tmp, WIN_BUF);
         else if (f.kind == LAG_WINICON) {
-            uint32_t id; int w, h; const uint8_t *px;
-            if (!lag_icon_parse(f.data, f.len, &id, &w, &h, &px)) n = lag_icon_write(id, w, h, px, win_tmp, WIN_BUF);
-        } else if (f.kind == LAG_APPLIST && !lag_applist_parse(f.data, f.len, app_list)) n = lag_applist_write(app_list, win_tmp, WIN_BUF);
+            uint32_t id; uint16_t w, h; const uint8_t *px;
+            if (!lag_winicon_parse(f.data, f.len, &id, &w, &h, &px)) n = lag_icon_write(id, w, h, px, win_tmp, WIN_BUF);
+        } else if (f.kind == LAG_APPLIST && !lag_applist_read(f.data, f.len, app_list)) n = lag_applist_write(app_list, win_tmp, WIN_BUF);
         if (n && port_fd >= 0 && send_frame(port_fd, f.kind, win_tmp, (uint32_t)n)) return -2;
         memmove(win_in, win_in + used, win_n - (size_t)used);
         win_n -= (size_t)used;

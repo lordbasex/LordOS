@@ -210,6 +210,16 @@ if [ -x server/build/lordos-guest ]; then
     install -m 755 server/build/lordos-guest "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}"
     "$STRIP" --strip-unneeded "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}" 2>/dev/null || true
 fi
+# lordos-guest-win.exe: the LordOS guest tools Machines installs into a Windows guest (x86-64), cross-built with mingw-w64
+# on the build machine (server/mk/vm.mk); an amd64 package without it can't give Windows guests their clipboard, display
+# size or apps mode, so it's required there (ALLOW_MISSING="lordos-guest-win.exe" to leave it out on purpose)
+if [ -f server/build/lordos-guest-win.exe ]; then
+    install -d "$L/guest/windows"
+    install -m 644 server/build/lordos-guest-win.exe "$L/guest/windows/lordos-guest-win.exe"
+elif [ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ]; then
+    case " ${ALLOW_MISSING:-} " in *" lordos-guest-win.exe "*) echo "mkdeb: leaving out lordos-guest-win.exe (ALLOW_MISSING)" >&2 ;;
+    *) echo "missing server/build/lordos-guest-win.exe (make -C server, with gcc-mingw-w64-x86-64-posix)" >&2; exit 1 ;; esac
+fi
 # lord-sql (0.8.8.7): the Databases app's MySQL / MariaDB client, sandboxed (docs/DATABASES.md)
 [ -x server/build/lord-sql ] && install -m 755 server/build/lord-sql "$L/bin/lord-sql"
 [ -x "$L/bin/lord-sql" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-sql" 2>/dev/null || true; }

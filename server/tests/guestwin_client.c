@@ -58,9 +58,9 @@ static int pump(int ms, int (*done)(void)) {
             if (k < 0) { fprintf(stderr, "bad frame\n"); exit(1); }
             if (!k) break;
             if (f.kind == AGK_HELLO) hello_windows = memmem(f.data, f.len, " windows", 8) != NULL;
-            else if (f.kind == LAG_WINDOWS) { if (lag_windows_parse(f.data, f.len, &wl)) { fprintf(stderr, "a window list that doesn't parse\n"); fails++; } else have_list = 1; }
-            else if (f.kind == LAG_APPLIST) { if (lag_applist_parse(f.data, f.len, &al)) { fprintf(stderr, "an app list that doesn't parse\n"); fails++; } else have_apps = 1; }
-            else if (f.kind == LAG_WINICON) { uint32_t id; int w, h; const uint8_t *px; if (lag_icon_parse(f.data, f.len, &id, &w, &h, &px)) fails++; else icons++; }
+            else if (f.kind == LAG_WINDOWS) { if (lag_winlist_read(f.data, f.len, &wl)) { fprintf(stderr, "a window list that doesn't parse\n"); fails++; } else have_list = 1; }
+            else if (f.kind == LAG_APPLIST) { if (lag_applist_read(f.data, f.len, &al)) { fprintf(stderr, "an app list that doesn't parse\n"); fails++; } else have_apps = 1; }
+            else if (f.kind == LAG_WINICON) { uint32_t id; uint16_t w, h; const uint8_t *px; if (lag_winicon_parse(f.data, f.len, &id, &w, &h, &px)) fails++; else icons++; }
             memmove(buf, buf + k, have - (size_t)k);
             have -= (size_t)k;
         }
@@ -76,9 +76,9 @@ static int grew(void) {
     new_id = wl.w[0].id;
     return 1;
 }
-static const LagWin *find(uint32_t id) { for (int i = 0; i < wl.n; i++) if (wl.w[i].id == id) return &wl.w[i]; return NULL; }
+static const LagWinEntry *find(uint32_t id) { for (int i = 0; i < wl.n; i++) if (wl.w[i].id == id) return &wl.w[i]; return NULL; }
 static int tx = 100, ty = 140, tw = 420, th = 300;      /* where the move puts the content (another place through the relay) */
-static int moved(void) { const LagWin *w = find(new_id); return w && abs(w->x - tx) <= 2 && abs(w->y - ty) <= 2 && abs(w->w - tw) <= 2 && abs(w->h - th) <= 2; }
+static int moved(void) { const LagWinEntry *w = find(new_id); return w && abs(w->x - tx) <= 2 && abs(w->y - ty) <= 2 && abs(w->w - tw) <= 2 && abs(w->h - th) <= 2; }
 static int gone(void) { return !find(new_id); }
 
 static void launch(const char *tok) { uint8_t b[LAG_TOKEN_MAX + 2]; size_t n = lag_launch_write(tok, b, sizeof b); send_frame(LAG_LAUNCH, b, n); }
@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
     CHECK(!pump(1500, grew), "a token that isn't listed opens nothing");
     launch(tok);
     CHECK(pump(10000, grew), "launching a listed app opens its window (id %u, %d windows)", new_id, wl.n);
-    const LagWin *w = find(new_id);
+    const LagWinEntry *w = find(new_id);
     if (w) printf("  window: \"%s\" (%s) %d,%d %dx%d flags %u\n", w->title, w->app, w->x, w->y, w->w, w->h, w->flags);
     if (strcmp(argv[1], "--direct")) { tx = 230; ty = 210; tw = 480; th = 360; }
     act(new_id, LAGA_MOVE, tx, ty, tw, th);

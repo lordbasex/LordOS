@@ -201,10 +201,10 @@ static void read_peer(void) {
                 e.type = 1; e.on = f.data[0];
                 apps_on = e.on;
                 push_ev(&e);
-            } else if (f.kind == LAG_WINACT && !lag_act_parse(f.data, f.len, &e.a) && listed(e.a.id)) {
+            } else if (f.kind == LAG_WINACT && !lag_winact_parse(f.data, f.len, &e.a) && listed(e.a.id)) {
                 e.type = 2;
                 push_ev(&e);
-            } else if (f.kind == LAG_LAUNCH && !lag_launch_parse(f.data, f.len, e.token, sizeof e.token) && apps && lag_applist_has(apps, e.token)) {
+            } else if (f.kind == LAG_LAUNCH && !lag_launch_token(f.data, f.len, e.token, sizeof e.token) && apps && lag_applist_has(apps, e.token)) {
                 e.type = 3;
                 push_ev(&e);
             }
@@ -296,7 +296,7 @@ static JSValue f_publish(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     JS_FreeValue(c, lv);
     for (uint32_t i = 0; i < len && l.n < LAG_WIN_MAX; i++) {
         JSValue o = JS_GetPropertyUint32(c, argv[0], i);
-        LagWin *w = &l.w[l.n];
+        LagWinEntry *w = &l.w[l.n];
         memset(w, 0, sizeof *w);
         w->id = (uint32_t)num(c, o, "id");
         w->x = num(c, o, "x"); w->y = num(c, o, "y"); w->w = num(c, o, "w"); w->h = num(c, o, "h");
@@ -370,7 +370,7 @@ static JSValue f_apps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     JS_FreeValue(c, lv);
     for (uint32_t i = 0; i < len && l.n < LAG_APPS_MAX; i++) {
         JSValue o = JS_GetPropertyUint32(c, argv[0], i);
-        LagApp *a = &l.a[l.n];
+        LagAppEntry *a = &l.a[l.n];
         clean_text(c, o, "name", a->name, LAG_APPNAME_MAX);
         clean_text(c, o, "token", a->token, LAG_TOKEN_MAX);
         JS_FreeValue(c, o);

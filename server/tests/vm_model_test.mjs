@@ -188,6 +188,9 @@ eq('storage bar no total', storageBar({}), []);
 eq('agent off lines', agentLines(null, {}).find((l) => l[0] === 'clipboard')[1], 'off');
 eq('agent connected', agentLines({ state: 'connected', caps: 1 | 2 | 16 | 32 }, { clipboard: 'both' }).filter((l) => l[1] === 'works').map((l) => l[0]), ['shell', 'logs', 'shutdown', 'time', 'clipboard', 'resolution']);
 eq('agent helper missing', agentLines({ state: 'connected', caps: 1 }, { clipboard: 'to-guest' }).find((l) => l[0] === 'clipboard')[1], 'needsHelper');
+eq('windows guest without the tools', agentLines({ state: 'connected', caps: 1 | 4 | 8, system: 'Windows 11 Pro' }, { clipboard: 'both' }).filter((l) => ['clipboard', 'resolution'].includes(l[0])).map((l) => l[1]), ['needsTools', 'needsTools']);
+eq('windows guest with the tools', agentLines({ state: 'connected', caps: 1 | 4 | 8 | 32 | 128 | 256, system: 'Windows 11 Pro' }, { clipboard: 'both' }).filter((l) => ['clipboard', 'resolution'].includes(l[0])).map((l) => l[1]), ['works', 'works']);
+eq('linux guest resolution', agentLines({ state: 'connected', caps: 1, system: 'Ubuntu 26.04' }, {}).find((l) => l[0] === 'resolution')[1], 'works');
 eq('agent tone', [agentTone(null, false), agentTone({ state: 'waiting' }, true), agentTone({ state: 'connected' }, true)], ['off', 'pause', 'run']);
 eq('clip ways', [clipTo('both'), clipTo('from-guest'), clipFrom('from-guest'), clipFrom('off')], [true, false, true, false]);
 
@@ -328,8 +331,8 @@ eq('follow stuck', [M.followStuck([1920, 1080], [1784, 830], 0, 5000), M.followS
 
 // ---- apps mode (7.2) ----
 eq('apps blocker', [M.appsBlocker(null, { agent: true }), M.appsBlocker({ state: 'connected', caps: 32 }, { agent: false }), M.appsBlocker({ state: 'connected', caps: 32 }, { agent: true }),
-  M.appsBlocker({ state: 'connected', caps: 160 }, { agent: true })], ['needsAgent', 'needsAgent', 'needsTools', null]);
-eq('agent lines say apps', agentLines({ state: 'connected', caps: 128 }, { agent: true }).find((x) => x[0] === 'apps')[1], 'works');
+  M.appsBlocker({ state: 'connected', caps: 288 }, { agent: true })], ['needsAgent', 'needsAgent', 'needsTools', null]);
+eq('agent lines say apps', agentLines({ state: 'connected', caps: 256 }, { agent: true }).find((x) => x[0] === 'apps')[1], 'works');
 eq('apps guest size', [M.appsGuestSize({ w: 1920, h: 1080 }), M.appsGuestSize({ w: 1367, h: 769 }), M.appsGuestSize({ w: 100, h: 50 }), M.appsGuestSize({ w: 10000, h: 9000 })],
   [[1920, 1080], [1366, 768], [320, 200], [8192, 8192]]);
 eq('guest scale', [M.guestScale(1920, 1080, { w: 1920, h: 1080 }), M.guestScale(3840, 2160, { w: 1920, h: 1080 }), M.guestScale(1024, 768, { w: 2048, h: 1080 }), M.guestScale(0, 0, { w: 1, h: 1 })], [1, 0.5, 1.40625, 1]);

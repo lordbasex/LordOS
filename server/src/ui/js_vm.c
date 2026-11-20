@@ -1135,7 +1135,7 @@ typedef struct {
     LagWinList *wins;
     struct { uint32_t id; int w, h; uint8_t *rgba; } icons[LAG_WIN_MAX];
     LagAppList *gapps;
-    int wins_seq, icons_seq, gapps_seq, apps_mode;
+    int wins_seq, icons_seq, gapps_seq, gapps_gen, apps_mode;
 } Sess;
 static Sess sess[MAX_SESS];
 
@@ -1572,7 +1572,7 @@ static void windata(Sess *s, const VmMsg *m, int fd) {
     if (!b || pread(fd, b, (size_t)m->a, 0) != m->a) { free(b); return; }
     if (m->b == LAG_WINDOWS) {
         LagWinList *l = malloc(sizeof *l);
-        if (l && !lag_windows_parse(b, (size_t)m->a, l)) {
+        if (l && !lag_winlist_read(b, (size_t)m->a, l)) {
             free(s->wins); s->wins = l; l = NULL; s->wins_seq++;
             /* icons of windows that are gone go too */
             for (int i = 0; i < LAG_WIN_MAX; i++) {
@@ -1584,8 +1584,8 @@ static void windata(Sess *s, const VmMsg *m, int fd) {
         }
         free(l);
     } else if (m->b == LAG_WINICON) {
-        uint32_t id; int w, h; const uint8_t *px;
-        if (!lag_icon_parse(b, (size_t)m->a, &id, &w, &h, &px)) {
+        uint32_t id; uint16_t w, h; const uint8_t *px;
+        if (!lag_winicon_parse(b, (size_t)m->a, &id, &w, &h, &px)) {
             int k = -1;
             for (int i = 0; i < LAG_WIN_MAX && k < 0; i++) if (s->icons[i].id == id) k = i;
             for (int i = 0; i < LAG_WIN_MAX && k < 0; i++) if (!s->icons[i].id) k = i;
@@ -1599,7 +1599,7 @@ static void windata(Sess *s, const VmMsg *m, int fd) {
         }
     } else if (m->b == LAG_APPLIST) {
         LagAppList *l = malloc(sizeof *l);
-        if (l && !lag_applist_parse(b, (size_t)m->a, l)) { free(s->gapps); s->gapps = l; l = NULL; s->gapps_seq++; }
+        if (l && !lag_applist_read(b, (size_t)m->a, l)) { free(s->gapps); s->gapps = l; l = NULL; s->gapps_seq++; s->gapps_gen = m->c; }
         free(l);
     }
     free(b);
@@ -2098,7 +2098,11 @@ static JSValue f_release(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 static JSValue f_resize(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
     int w = s ? ival(c, argv[1]) : 0, h = s ? ival(c, argv[2]) : 0;
-    if (s && w >= 320 && h >= 200 && w <= (int)VD_MAX_DIM && h <= (int)VD_MAX_DIM) vdsend(s, VD_RESIZE, w, h);
+    if (s && w >= 320 && h >= 200 && w <= (int)VD_MAX_DIM && h <= (int)VD_MAX_DIM) {
+        vdsend(s, VD_RESIZE, w, h);
+        /* and to lord-vm: a guest whose helper sets its own display's size (Windows) gets it from there */
+        if (s->vm >= 0) { VmMsg m = vm_msg(VM_DISPLAY_SIZE, ++s->seq, w, h, 0, 0, NULL); vm_send(s->vm, &m, -1); }
+    }
     return JS_UNDEFINED;
 }
 static JSValue f_rate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -2339,7 +2343,7 @@ static JSValue f_windows(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     JSValue a = JS_NewArray(c);
     if (!s || !s->wins) return a;
     for (int i = 0; i < s->wins->n; i++) {
-        const LagWin *w = &s->wins->w[i];
+        const LagWinEntry *w = &s->wins->w[i];
         JSValue o = JS_NewObject(c);
         JS_SetPropertyStr(c, o, "id", JS_NewFloat64(c, w->id));
         set_int(c, o, "x", w->x); set_int(c, o, "y", w->y); set_int(c, o, "w", w->w); set_int(c, o, "h", w->h);
@@ -2411,10 +2415,13 @@ static JSValue f_launch(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
     if (!s || s->vm < 0 || !s->gapps) return JS_FALSE;
     const char *tok = JS_ToCString(c, argv[1]);
-    int ok = tok && tok[0] && strlen(tok) <= LAG_TOKEN_MAX && lag_applist_has(s->gapps, tok);
-    VmMsg m = vm_msg(VM_LAUNCH, ++s->seq, 0, 0, 0, 0, ok ? tok : NULL);
+    /* the app's place in the list lord-vm passed on, with that list's generation: lord-vm sends the guest its own token */
+    int at = -1;
+    for (int i = 0; tok && i < s->gapps->n && at < 0; i++) if (!strcmp(s->gapps->a[i].token, tok)) at = i;
     if (tok) JS_FreeCString(c, tok);
-    return JS_NewBool(c, ok && !vm_send(s->vm, &m, -1));
+    if (at < 0 || s->gapps_gen <= 0) return JS_FALSE;
+    VmMsg m = vm_msg(VM_LAUNCH, ++s->seq, at, s->gapps_gen, 0, 0, NULL);
+    return JS_NewBool(c, !vm_send(s->vm, &m, -1));
 }
 
 /* clipboardSend(session, text) → bool: the host's clipboard text for the guest, in a sealed memfd (lord-vm passes it
