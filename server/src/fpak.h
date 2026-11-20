@@ -13,7 +13,7 @@
 #define FPAK_ID_MAX 59
 #define FPAK_BRANCH_MAX 64
 #define FPAK_FLATPAK "/usr/bin/flatpak"
-#define FPAK_ARGV_MAX 48
+#define FPAK_ARGV_MAX 80
 
 /* A Flatpak app id the launcher accepts: Flatpak's own rules (at least three dot-separated elements of [A-Za-z0-9_-],
  * none empty, none starting with a digit, '-' only in the last one) and at most FPAK_ID_MAX bytes. */

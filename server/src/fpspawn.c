@@ -291,11 +291,11 @@ static int read_spawn(const DMsg *m, Req *q) {
         dr_struct(&r);
         const char *k = dr_str(&r, NULL), *sig = dr_variant(&r);
         if (r.err || !k || !sig) return -1;
-        if (!strcmp(k, "sandbox-expose") && !strcmp(sig, "as")) { if (read_strv(q, &r, q->expose, FPAK_SPAWN_EXPOSE_MAX)) return -1; }
-        else if (!strcmp(k, "sandbox-expose-ro") && !strcmp(sig, "as")) { if (read_strv(q, &r, q->expose_ro, FPAK_SPAWN_EXPOSE_MAX)) return -1; }
-        else if (!strcmp(k, "unset-env") && !strcmp(sig, "as")) { if (read_strv(q, &r, q->unset, FPAK_SPAWN_ENV_MAX)) return -1; }
+        /* sandbox-expose(-ro) not served: the path is in a folder the app writes, and a link there would make
+         * Flatpak export whatever it points at (the session bus socket, the home). glycin doesn't use it. */
+        if (!strcmp(k, "unset-env") && !strcmp(sig, "as")) { if (read_strv(q, &r, q->unset, FPAK_SPAWN_ENV_MAX)) return -1; }
         else if (!strcmp(k, "sandbox-flags") && !strcmp(sig, "u")) q->sandbox_flags = dr_u32(&r);
-        else return -2;                 /* usr-fd, app-fd, sandbox-expose-fd(-ro) and anything else: not served */
+        else return -2;                 /* sandbox-expose(-ro), usr-fd, app-fd, sandbox-expose-fd(-ro) and anything else: not served */
     }
     return r.err ? -1 : 0;
 }

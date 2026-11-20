@@ -114,16 +114,6 @@ static const char *const hidden[] = { ".config/lordos", ".local/share/lordos", "
                                       ".local/share/flatpak", ".local/share/flatpak/overrides", ".local/share/flatpak/exports",
                                       ".cache/flatpak", NULL };
 
-static int plain_name(const char *n) {
-    size_t l = n ? strlen(n) : 0;
-    if (!l || l > 255 || n[0] == '.' || n[0] == '-') return 0;
-    for (size_t i = 0; i < l; i++) {
-        char c = n[i];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-')) return 0;
-    }
-    return 1;
-}
-
 static int env_name_ok(const char *n, size_t l) {
     if (!l || l > 255 || !((n[0] >= 'a' && n[0] <= 'z') || (n[0] >= 'A' && n[0] <= 'Z') || n[0] == '_')) return 0;
     for (size_t i = 1; i < l; i++) {
@@ -156,9 +146,9 @@ int fpak_spawn_ok(const FpakSpawn *s) {
         if (!eq || !env_name_ok(s->env[i], (size_t)(eq - s->env[i])) || !str_ok(s->env[i], 1)) return 0;
     }
     for (int i = 0; s->unset_env && s->unset_env[i]; i++) if (!env_name_ok(s->unset_env[i], strlen(s->unset_env[i]))) return 0;
-    if (list_len(s->expose) > FPAK_SPAWN_EXPOSE_MAX || list_len(s->expose_ro) > FPAK_SPAWN_EXPOSE_MAX) return 0;
-    for (int i = 0; s->expose && s->expose[i]; i++) if (!plain_name(s->expose[i])) return 0;
-    for (int i = 0; s->expose_ro && s->expose_ro[i]; i++) if (!plain_name(s->expose_ro[i])) return 0;
+    /* no expose names at all (Claude Security F1, 2026-11-20): ~/.var/app/<id>/sandbox is the app's own to write, so a
+     * name there may be a link to the session bus socket or the home, which Flatpak would follow */
+    if (list_len(s->expose) || list_len(s->expose_ro)) return 0;
     return 1;
 }
 
@@ -199,8 +189,6 @@ static int build_argv(const FpakRun *r, const FpakSpawn *sp, char **argv, int ma
             ARG(f & FPAK_SPAWN_SHARE_PIDS ? "--parent-share-pids" : "--parent-expose-pids");
         }
         if (sp->instance_fd >= 0) ARG("--instance-id-fd=%d", sp->instance_fd);
-        for (int i = 0; sp->expose && sp->expose[i]; i++) ARG("--filesystem=%s/.var/app/%s/sandbox/%s", r->home, r->id, sp->expose[i]);
-        for (int i = 0; sp->expose_ro && sp->expose_ro[i]; i++) ARG("--filesystem=%s/.var/app/%s/sandbox/%s:ro", r->home, r->id, sp->expose_ro[i]);
         if (sp->cwd) ARG("--cwd=%s", sp->cwd);
         for (int i = 0; sp->env && sp->env[i]; i++) ARG("--env=%s", sp->env[i]);
         for (int i = 0; sp->unset_env && sp->unset_env[i]; i++) ARG("--unset-env=%s", sp->unset_env[i]);
@@ -210,6 +198,32 @@ static int build_argv(const FpakRun *r, const FpakSpawn *sp, char **argv, int ma
     ARG("--nosocket=session-bus");
     ARG("--nosocket=system-bus");
     for (int i = 0; never_talk[i]; i++) ARG("--no-talk-name=%s", never_talk[i]);
+    /* and every wildcard that covers one of them or a name lord-server serves ("org.freedesktop.*",
+     * "org.freedesktop.secrets.*"…): xdg-dbus-proxy has no deny rule and grants the highest policy that matches, so an
+     * exact --no-talk-name alone leaves a wildcard the app declared in force (Claude Security F2, 2026-11-20) */
+    {
+        const char *const *lists[2] = { never_talk, talk_only };
+        char seen[48][96];
+        int ns = 0;
+        for (int l = 0; l < 2 && !bad; l++)
+            for (int i = 0; lists[l][i] && !bad; i++) {
+                const char *n = lists[l][i];
+                int dots = 0;
+                for (const char *d = n; ; d++) {
+                    if (*d != '.' && *d) continue;
+                    /* "org.*" isn't a valid name to Flatpak (two elements at least before ".*"), neither as an option
+                     * nor in an app's metadata: the shortest wildcard is "org.freedesktop.*" */
+                    if (*d == '.' && dots++ == 0) continue;
+                    char w[96];
+                    int wl = snprintf(w, sizeof w, "%.*s.*", (int)(d - n), n);
+                    if (wl < 0 || wl >= (int)sizeof w) { bad = 1; break; }
+                    int dup = 0;
+                    for (int k = 0; k < ns; k++) if (!strcmp(seen[k], w)) dup = 1;
+                    if (!dup && ns < 48) { snprintf(seen[ns++], sizeof seen[0], "%s", w); ARG("--no-talk-name=%s", w); }
+                    if (!*d) break;
+                }
+            }
+    }
     for (int i = 0; talk_only[i]; i++) ARG("--talk-name=%s", talk_only[i]);
     for (int i = 0; hidden[i]; i++) ARG("--nofilesystem=~/%s", hidden[i]);
     /* LordOS's restrictions, also in Flatpak's own terms (the kernel paths stay the boundary) */

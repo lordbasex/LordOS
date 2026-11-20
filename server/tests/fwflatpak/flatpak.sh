@@ -57,11 +57,17 @@ launch() {
 }
 # in_app <id> <shell command>: as the app's own process: its namespaces, scope and environment
 cat > "$TMPD/inapp.py" <<'PY'
+# runs as root: never with the app's own environment (its PATH or LD_PRELOAD would pick what root executes,
+# Claude Security F4). nsenter by absolute path with a fixed environment; the command inside the app's namespaces
+# gets only the app's variables it needs, and a PATH of its own runtime
 import os, sys
-pid, scope, cmd = sys.argv[1], sys.argv[2], sys.argv[3]
-env = dict(l.split('=', 1) for l in open(f'/proc/{pid}/environ').read().split('\0') if '=' in l)
+pid, scope, cmd, uid, gid = sys.argv[1:6]
+KEEP = ('HOME', 'XDG_RUNTIME_DIR', 'WAYLAND_DISPLAY', 'DISPLAY', 'DBUS_SESSION_BUS_ADDRESS', 'PULSE_SERVER', 'FLATPAK_ID', 'LANG')
+app = dict(l.split('=', 1) for l in open(f'/proc/{pid}/environ').read().split('\0') if '=' in l)
+inner = ['/usr/bin/env', '-i', 'PATH=/app/bin:/usr/bin:/bin'] + [f'{k}={app[k]}' for k in KEEP if k in app and '\n' not in app[k]]
 open(f'{scope}/cgroup.procs', 'w').write(str(os.getpid()))
-os.execvpe('nsenter', ['nsenter', '-t', pid, '-a', '-r', '-w', '-S', sys.argv[4], '-G', sys.argv[5], '/bin/sh', '-c', cmd], env)
+os.execve('/usr/bin/nsenter', ['nsenter', '-t', pid, '-a', '-r', '-w', '-S', uid, '-G', gid] + inner + ['/bin/sh', '-c', cmd],
+          {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin'})
 PY
 in_app() { sudo python3 -I "$TMPD/inapp.py" "$(main_pid "$1")" "$(fscope "$1")" "$2" "$U" "$G" 2>&1; }
 since() { date '+%Y-%m-%d %H:%M:%S'; }

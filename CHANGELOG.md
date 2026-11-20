@@ -95,7 +95,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Flatpak apps get Flatpak's sub-sandbox from LordOS itself** (in development; `server/src/fpspawn.c`, AGENTS.md E9):
   lord-server serves `org.freedesktop.portal.Flatpak` and runs each Spawn as the same app, in its own scope and view,
   under its restrictions; Flatpak's own portal stays masked. GNOME apps that load images through glycin needed it:
-  Meld crashed at start, Shortwave showed no images. The service exists only while `flatpak` is installed.
+  Meld crashed at start, Shortwave showed no images. The service exists only while `flatpak` is installed. A security
+  review of the branch then closed `sandbox-expose` (a link in the app's own folder could have exported the session
+  bus) and made the never-granted bus names cover their wildcards too (`org.freedesktop.*`…).
 - **Settings → Flatpak** (in development): whether Flatpak is installed, how much its apps, runtimes and their data
   take, Flathub shown in the Store or not, and "Remove Flatpak completely" (every Flathub app, the runtimes, Flathub,
   optionally the apps' data to the Trash, then the flatpak package with its plan shown and the administrator password).

@@ -18,12 +18,12 @@ import { useState } from 'react';
 const fwId = (a) => (a.kind === 'linux' || a.kind === 'flatpak' ? a.id : a.kind === 'package' || a.isolated ? `lpk:${a.id}` : 'lordos');
 // The desktop shell and the built-in apps share "lordos": these would cut the desktop off itself.
 const DESKTOP_ALWAYS = ['no-files', 'no-usb', 'no-clipboard', 'no-bluetooth'];
-// Linux apps: the clipboard of a Wayland app isn't mediated per app yet, so it isn't offered.
+// Linux and Flatpak apps: the clipboard of a Wayland app isn't mediated per app yet, so it isn't offered.
 const LINUX_NOT_YET = ['no-clipboard'];
 // For a Linux app every restriction applies at once (new connections, device opens, sockets,
 // sound streams, notifications), except files: the app's view is built when it starts.
 const NEXT_LAUNCH = ['no-files'];
-const isLinux = (id) => id.startsWith('desktop:');
+const isLinux = (id) => id.startsWith('desktop:') || id.startsWith('flatpak:');
 // (0.8.5) LordOS's components with their own scope (Mail, Store, Printers, Terminal, Blocklists): they
 // take restrictions like an app; the system services (system:*) and the VPN row never do
 const { COMPONENTS } = netModel;

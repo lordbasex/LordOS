@@ -118,6 +118,11 @@ int main(void) {
     r.branch = "stable";
     CHECK(fpak_argv(&r, argv, buf, 64) < 0);                      /* no room: refused, never cut short */
 
+    /* every wildcard covering a never-granted or LordOS-served name is cleared too (Claude Security F2) */
+    CHECK(!has(argv, "--no-talk-name=org.*") && has(argv, "--no-talk-name=org.freedesktop.*") &&
+          has(argv, "--no-talk-name=org.freedesktop.secrets.*") && has(argv, "--no-talk-name=org.freedesktop.systemd1.*") &&
+          has(argv, "--no-talk-name=org.kde.StatusNotifierWatcher.*") && has(argv, "--no-talk-name=org.freedesktop.portal.*"));
+    CHECK(idx(argv, "--talk-name=org.freedesktop.Notifications") > idx(argv, "--no-talk-name=org.freedesktop.*"));
     /* org.freedesktop.portal.Flatpak is talked to (lord-server serves it, E9), never owned */
     CHECK(has(argv, "--talk-name=org.freedesktop.portal.Flatpak") && !has(argv, "--no-talk-name=org.freedesktop.portal.Flatpak"));
 
@@ -150,12 +155,14 @@ int main(void) {
         CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);                         /* no parent to expose to */
         sp.flags = 0;
         const char *expose[] = { "glycin", NULL }, *bad_expose[] = { "../.ssh", NULL };
-        sp.expose = expose;
-        m = fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf);
-        { char want[600]; snprintf(want, sizeof want, "--filesystem=%s/.var/app/org.gnome.Calculator/sandbox/glycin", root); CHECK(has(sargv, want)); }
+        sp.expose = expose;                    /* sandbox-expose isn't served at all (Claude Security F1): a link there */
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
         sp.expose = bad_expose;
         CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
         sp.expose = NULL;
+        sp.expose_ro = expose;
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.expose_ro = NULL;
         sp.flags = 1u << 12;                                                                  /* an unknown flag */
         CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
         sp.flags = 0;

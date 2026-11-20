@@ -914,6 +914,28 @@ remote, no `libostree-1-1`, `libappstream5`, `libmalcontent-0-0` or the two libr
 apps' data in the Trash, and lord-server no longer on the bus as `org.freedesktop.portal.Flatpak`. The first run left
 `flatpak` in dpkg's "config files" state (its `/etc` files), hence `--purge` since.
 
+### Security review of the branch (Claude Security, 2026-11-20)
+
+A review of `feat/flatpak` against `main` (79 code files, high effort, 17 researchers, each candidate checked by a
+three-lens panel) found four problems, all fixed the same day and checked again on VM 127 (`0.8.9.3~ws86`, the
+automated plan 31/31, Meld's glycin sub-sandboxes):
+
+- **HIGH — `sandbox-expose` through a link.** The Spawn turned the app's expose names into `--filesystem` grants under
+  `~/.var/app/<id>/sandbox`, a folder the app writes: a link there to the session bus socket would have given the new
+  instance the unfiltered bus (and through systemd any command outside every sandbox), or the whole home. Expose is no
+  longer served (`fpak_spawn_ok` refuses it; glycin doesn't use it).
+- **MEDIUM — wildcard bus names.** The never-granted names were cleared by exact name only; xdg-dbus-proxy has no deny
+  rule, so an app declaring `org.freedesktop.*` (or `org.freedesktop.secrets.*`) would still have reached the Secret
+  Service. Every wildcard of two or more elements that covers a never-granted or LordOS-served name is now cleared as
+  well (`org.freedesktop.*`, `org.freedesktop.secrets.*`, `org.kde.*`…; `org.*` is no valid name to Flatpak, neither as
+  an option nor in metadata). The first version cleared `org.*` and Flatpak refused to start any app: the automated plan
+  caught it.
+- **LOW — "No clipboard" offered for Flatpak apps.** Nothing enforces it for Wayland clients yet, as for Linux apps;
+  Monitor and Settings no longer offer it for `flatpak:` ids.
+- **LOW — the test plan's root helper ran `nsenter` with the tested app's environment** (its `PATH` or `LD_PRELOAD`
+  would pick what root runs). It now runs `/usr/bin/nsenter` with a fixed environment and passes the command inside
+  only a short list of the app's variables.
+
 ### Sub-sandboxes (E9, built 2026-11-20)
 
 Flatpak's `flatpak-portal` serves `org.freedesktop.portal.Flatpak.Spawn` from the user's service manager, so what it
@@ -929,8 +951,8 @@ lord-server serves the name itself (`server/src/fpspawn.c`, the argument rules i
 - **What**: `flatpak run` of the same app id, with the app's command and arguments after the id (never read as
   flatpak options), its environment as `--env=` (names checked), `--sandbox` and the sandbox flags as flatpak-portal
   maps them, `--die-with-parent`, and then LordOS's never-granted options and current restrictions, so they win.
-  `usr-fd`, `app-fd` and the expose-fd options are refused; `sandbox-expose` names are one plain path element under
-  `~/.var/app/<id>/sandbox`.
+  `usr-fd`, `app-fd`, the expose-fd options and `sandbox-expose`/`sandbox-expose-ro` are refused (the last two since
+  the security review below: the path is in a folder the app writes, and Flatpak follows a link there).
 - **Where**: a waiter forked by lord-server enters the app's scope, then the user, IPC, mount and PID namespaces of
   that app's view (taken from the view's first process), applies Landlock's scoping again with `no_new_privs`, and starts
   `flatpak run`, which is born in the view. The app's fds go to the numbers it asked for (at most 16, 0-1023); everything
