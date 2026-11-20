@@ -126,7 +126,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   The Store's sidebar can be widened by dragging its edge (remembered), and Web apps are named "Web apps (PWA)".
 - **Lord Workspaces: the Store and Monitor on the Context Spine**, under Files, each with its own glyph (a bag, a pulse
   line), in keyboard focus order too.
-- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
+- **Machines: apps mode (in development).** Each window of a guest with the LordOS guest tools (the card in
+  `docs/VIRTUALIZATION.md` 4.3) or of a LordOS guest (lordos-guest 3) becomes its own LordOS window, with the guest's
+  title and the machine's name, and its app's icon in the Dock, the taskbar and the switcher, while the guest's own
+  desktop, taskbar or Dock is hidden. The toolbar's Apps button or Actions → Apps Mode turns it on (kept per machine);
+  the machine's window becomes a small controller with an Applications menu (the guest's own programs) and Leave Apps
+  Mode. Each window shows its part of the machine's one picture (`<MediaView crop>`, copied one pixel per pixel and
+  repainted only where that part changed); pointer and keyboard go to the guest; moving, resizing, minimizing, focusing
+  or closing the window does the same in the guest, and a window the guest moves is followed; menus and tooltips are
+  small frameless windows. lord-vm checks every window list, icon and app list to its last byte and writes it again, and
+  the host can only launch a program the guest itself listed. Inside a LordOS guest, lordos-guest asks the guest's own
+  lord-server through a private same-user socket made only inside a Machines guest, and the guest's desktop leaves out
+  wallpaper, widgets, Dock and bars while apps mode is on. Other Linux systems don't list their windows, so the button
+  says apps mode needs LordOS or the guest tools. Not yet seen drawing on a real display.
+- `machine.json` schema 6:- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
   `resolution`, `boot_order`, `boot_menu`;
   older files load unchanged.
 - **Machines looks like a native virtualization app** (the look of hypervisaur's screenshots, reimplemented: no code or
