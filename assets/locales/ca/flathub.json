@@ -100,7 +100,7 @@
   "showAllOff": "Només aplicacions verificades per Flathub. Ocultes: {count}",
   "showAllOn": "Es mostren totes les aplicacions de Flathub, verificades o no",
   "showMore": "Mostra’n més (en queden: {count})",
-  "subsandbox.text": "Aquesta aplicació està feta amb Chromium o Electron, que inicien els seus ajudants en entorns aïllats addicionals propis de Flatpak. LordOS encara no els ofereix, així que de moment no s’hi pot instal·lar.",
+  "subsandbox.text": "Aquesta aplicació està feta amb Chromium o Electron, els ajudants dels quals necessiten compartir els entorns aïllats de Flatpak d’una manera que LordOS encara no ofereix, així que de moment no s’hi pot instal·lar.",
   "subsandbox.title": "Encara no compatible amb LordOS",
   "subtitle": "Aplicacions de Linux de Flathub, que s’executen dins de l’entorn aïllat de LordOS sota el teu tallafoc.",
   "turnOff": "Desactiva",

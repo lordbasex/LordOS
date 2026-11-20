@@ -1,0 +1,194 @@
+{
+  "slug": "flatpak",
+  "order": 7.5,
+  "title": {
+    "en": "Flathub apps",
+    "es": "Apps de Flathub",
+    "pt": "Apps do Flathub"
+  },
+  "tagline": {
+    "en": "Thousands of Linux apps from Flathub, installed from the Store and run under LordOS's own rules: your Firewall, your restrictions, a read-only home. New in 0.8.9.4.",
+    "es": "Miles de apps de Linux de Flathub, instaladas desde la Tienda y corriendo con las reglas propias de LordOS: tu Firewall, tus restricciones, el home de solo lectura. Nuevo en la 0.8.9.4.",
+    "pt": "Milhares de apps Linux do Flathub, instalados pela Loja e rodando com as regras próprias do LordOS: o seu Firewall, as suas restrições, a home somente leitura. Novo na 0.8.9.4."
+  },
+  "lumo": {
+    "pose": "shield",
+    "intro": {
+      "en": "Flathub has thousands of apps. I let them in through the Store, one at a time, and each one gets my rules, not just its own: its own room, your Firewall at the door, and your home folder read-only.",
+      "es": "Flathub tiene miles de apps. Las dejo entrar por la Tienda, de a una, y cada una recibe mis reglas, no solo las suyas: su propio cuarto, tu Firewall en la puerta y tu carpeta personal de solo lectura.",
+      "pt": "O Flathub tem milhares de apps. Eu os deixo entrar pela Loja, um por vez, e cada um recebe as minhas regras, não só as dele: um quarto próprio, o seu Firewall na porta e a sua pasta pessoal somente leitura."
+    }
+  },
+  "screenshots": [
+    {
+      "file": "docs/flatpak-store-flathub.png",
+      "caption": {
+        "en": "Store → Flathub: the apps you installed from Flathub, with Update and Remove, and the catalog. By default only the apps Flathub verified as published by their own developers.",
+        "es": "Tienda → Flathub: las apps que instalaste desde Flathub, con Actualizar y Quitar, y el catálogo. De entrada, solo las apps que Flathub verificó como publicadas por sus propios desarrolladores.",
+        "pt": "Loja → Flathub: os apps que você instalou do Flathub, com Atualizar e Remover, e o catálogo. Por padrão, só os apps que o Flathub verificou como publicados pelos próprios desenvolvedores."
+      }
+    },
+    {
+      "file": "docs/flatpak-store-app.png",
+      "caption": {
+        "en": "An app's page before installing: who publishes it, its license, and what it declares, each with what LordOS lets you do about it in the Firewall.",
+        "es": "La página de una app antes de instalarla: quién la publica, su licencia y lo que declara, cada cosa con lo que LordOS te deja hacer al respecto en el Firewall.",
+        "pt": "A página de um app antes de instalar: quem o publica, a licença e o que ele declara, cada item com o que o LordOS deixa você fazer a respeito no Firewall."
+      }
+    },
+    {
+      "file": "docs/flatpak-store-meld.png",
+      "caption": {
+        "en": "An app that asks for all your files: LordOS says what it actually gets, a read-only home except your personal folders, with LordOS's settings, rules and launchers hidden.",
+        "es": "Una app que pide todos tus archivos: LordOS dice lo que recibe en realidad, el home de solo lectura salvo tus carpetas personales, con los ajustes, las reglas y los lanzadores de LordOS ocultos.",
+        "pt": "Um app que pede todos os seus arquivos: o LordOS diz o que ele recebe de fato, a home somente leitura, exceto as suas pastas pessoais, com as configurações, regras e lançadores do LordOS ocultos."
+      }
+    },
+    {
+      "file": "docs/flatpak-store-electron.png",
+      "caption": {
+        "en": "An Electron app: marked \"Not yet supported\", with the reason, and what it declares, including what LordOS never grants (your saved passwords).",
+        "es": "Una app de Electron: marcada «Todavía no compatible con LordOS», con el motivo, y lo que declara, incluido lo que LordOS nunca da (tus contraseñas guardadas).",
+        "pt": "Um app Electron: marcado “Ainda não suportado no LordOS”, com o motivo, e o que declara, incluindo o que o LordOS nunca concede (as suas senhas salvas)."
+      }
+    },
+    {
+      "file": "docs/flatpak-settings.png",
+      "caption": {
+        "en": "Settings → Flatpak: installed or not, Flathub shown in the Store or not, how many apps and how much space they and their data take, and Remove Flatpak completely.",
+        "es": "Ajustes → Flatpak: si está instalado, si Flathub se muestra en la Tienda, cuántas apps hay y cuánto ocupan ellas y sus datos, y Quitar Flatpak por completo.",
+        "pt": "Configurações → Flatpak: se está instalado, se o Flathub aparece na Loja, quantos apps há e quanto ocupam eles e seus dados, e Remover o Flatpak por completo."
+      }
+    },
+    {
+      "file": "docs/flatpak-remove-confirm.png",
+      "caption": {
+        "en": "Remove Flatpak completely: every Flathub app, their runtimes and Flathub, then exactly these packages, and the apps' own data to the Trash if you want.",
+        "es": "Quitar Flatpak por completo: todas las apps de Flathub, sus runtimes y Flathub, después exactamente estos paquetes, y los datos propios de las apps a la Papelera si querés.",
+        "pt": "Remover o Flatpak por completo: todos os apps do Flathub, seus runtimes e o Flathub, depois exatamente estes pacotes, e os dados dos próprios apps para o Lixo, se você quiser."
+      }
+    },
+    {
+      "file": "docs/flatpak-launchpad.png",
+      "caption": {
+        "en": "Flathub apps next to every other app in the launcher, with their own icons.",
+        "es": "Las apps de Flathub junto a todas las demás en el lanzador, con sus propios íconos.",
+        "pt": "Os apps do Flathub junto com todos os outros no lançador, com os próprios ícones."
+      }
+    },
+    {
+      "file": "docs/flatpak-dock.png",
+      "caption": {
+        "en": "A Flathub app kept in the Dock and opened from there, in its own window with LordOS's frame.",
+        "es": "Una app de Flathub fijada en el Dock y abierta desde ahí, en su propia ventana con el marco de LordOS.",
+        "pt": "Um app do Flathub fixado no Dock e aberto dali, na própria janela com a moldura do LordOS."
+      }
+    },
+    {
+      "file": "docs/flatpak-open-with.png",
+      "caption": {
+        "en": "Files → Open With offers the Flathub apps that open that kind of file. The app gets that one file, nothing else of your home.",
+        "es": "Archivos → Abrir con ofrece las apps de Flathub que abren ese tipo de archivo. La app recibe ese archivo y nada más de tu home.",
+        "pt": "Arquivos → Abrir com oferece os apps do Flathub que abrem esse tipo de arquivo. O app recebe esse arquivo e nada mais da sua home."
+      }
+    },
+    {
+      "file": "docs/flatpak-meld.png",
+      "caption": {
+        "en": "Meld, a GNOME app whose images load in sub-sandboxes, which LordOS runs inside the app's own sandbox.",
+        "es": "Meld, una app de GNOME que carga sus imágenes en sub-sandboxes, que LordOS corre dentro de la propia caja de arena de la app.",
+        "pt": "Meld, um app do GNOME que carrega as imagens em sub-sandboxes, que o LordOS roda dentro do próprio sandbox do app."
+      }
+    },
+    {
+      "file": "docs/flatpak-emacs-x11.png",
+      "caption": {
+        "en": "GNU Emacs, an X11-only app, through Xwayland with LordOS's frame.",
+        "es": "GNU Emacs, una app solo de X11, a través de Xwayland con el marco de LordOS.",
+        "pt": "GNU Emacs, um app só de X11, por meio do Xwayland com a moldura do LordOS."
+      }
+    },
+    {
+      "file": "docs/flatpak-kcalc.png",
+      "caption": {
+        "en": "KCalc, a KDE app (Qt 6), with LordOS's frame.",
+        "es": "KCalc, una app de KDE (Qt 6), con el marco de LordOS.",
+        "pt": "KCalc, um app do KDE (Qt 6), com a moldura do LordOS."
+      }
+    },
+    {
+      "file": "docs/flatpak-monitor-flathub.png",
+      "caption": {
+        "en": "Monitor → Network: Flathub's downloads are a row of their own, which the Firewall can block like any app.",
+        "es": "Monitor → Red: las descargas de Flathub son una fila propia, que el Firewall puede bloquear como cualquier app.",
+        "pt": "Monitor → Rede: os downloads do Flathub são uma linha própria, que o Firewall pode bloquear como qualquer app."
+      }
+    },
+    {
+      "file": "docs/flatpak-firewall-blocked.png",
+      "caption": {
+        "en": "A Flathub app with no internet: every connection it tries is denied and counted in Monitor.",
+        "es": "Una app de Flathub sin internet: cada conexión que intenta se rechaza y se cuenta en Monitor.",
+        "pt": "Um app do Flathub sem internet: cada conexão que tenta é negada e contada no Monitor."
+      }
+    }
+  ],
+  "sources": [
+    {
+      "path": "apps/store/flathubpages.js",
+      "what": {
+        "en": "The Store's Flathub section and app pages",
+        "es": "La sección Flathub de la Tienda y las páginas de las apps",
+        "pt": "A seção Flathub da Loja e as páginas dos apps"
+      }
+    },
+    {
+      "path": "apps/settings/Flatpak.jsx",
+      "what": {
+        "en": "Settings → Flatpak",
+        "es": "Ajustes → Flatpak",
+        "pt": "Configurações → Flatpak"
+      }
+    },
+    {
+      "path": "server/src/fpak.c",
+      "what": {
+        "en": "The flatpak run command line, with what is never granted",
+        "es": "La línea de comandos de flatpak run, con lo que nunca se da",
+        "pt": "A linha de comando do flatpak run, com o que nunca é concedido"
+      }
+    },
+    {
+      "path": "server/src/apps.c",
+      "what": {
+        "en": "The launcher: the app's scope and view",
+        "es": "El lanzador: el scope y la vista de la app",
+        "pt": "O lançador: o escopo e a visão do app"
+      }
+    },
+    {
+      "path": "server/src/fpspawn.c",
+      "what": {
+        "en": "LordOS's own sub-sandbox service",
+        "es": "El servicio de sub-sandbox propio de LordOS",
+        "pt": "O serviço de sub-sandbox próprio do LordOS"
+      }
+    },
+    {
+      "path": "server/tests/fwflatpak/flatpak.sh",
+      "what": {
+        "en": "The automated test plan (31 checks)",
+        "es": "El plan de pruebas automatizado (31 verificaciones)",
+        "pt": "O plano de testes automatizado (31 verificações)"
+      }
+    },
+    {
+      "path": "docs/FLATPAK.md",
+      "what": {
+        "en": "The full design review, the decisions and the test results",
+        "es": "La revisión de diseño completa, las decisiones y los resultados de las pruebas",
+        "pt": "A revisão de design completa, as decisões e os resultados dos testes"
+      }
+    }
+  ]
+}

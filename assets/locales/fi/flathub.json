@@ -100,7 +100,7 @@
   "showAllOff": "Vain Flathubin vahvistamat sovellukset. Piilotettu: {count}",
   "showAllOn": "Näytetään kaikki Flathub-sovellukset, vahvistetut ja vahvistamattomat",
   "showMore": "Näytä lisää (jäljellä: {count})",
-  "subsandbox.text": "Tämä sovellus perustuu Chromiumiin tai Electroniin, jotka käynnistävät apuohjelmansa Flatpakin omissa lisähiekkalaatikoissa. LordOS ei vielä tarjoa niitä, joten sitä ei toistaiseksi voi asentaa tähän.",
+  "subsandbox.text": "Tämä sovellus perustuu Chromiumiin tai Electroniin, joiden apuohjelmat tarvitsevat Flatpakin hiekkalaatikoita jaettuna tavalla, jota LordOS ei vielä tarjoa, joten sitä ei toistaiseksi voi asentaa tähän.",
   "subsandbox.title": "Ei vielä tuettu LordOS:ssä",
   "subtitle": "Linux-sovelluksia Flathubista, ajettuina LordOS:n omassa eristetyssä ympäristössä Palomuurisi alaisina.",
   "turnOff": "Poista käytöstä",

@@ -56,6 +56,10 @@
     [
       "LordOS Web Runtime",
       "Apps web y PWA como apps de LordOS de verdad: con su propia ventana, ícono en el Dock y cuentas, aparte de tu navegador."
+    ],
+    [
+      "Apps de Flathub",
+      "Miles de apps de Linux de Flathub, instaladas desde la Tienda y corriendo bajo tu Firewall y las reglas de LordOS. Ajustes → Flatpak lo quita todo."
     ]
   ],
   "showcase": [

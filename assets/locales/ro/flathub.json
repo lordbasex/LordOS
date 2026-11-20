@@ -100,7 +100,7 @@
   "showAllOff": "Doar aplicații verificate de Flathub. Ascunse: {count}",
   "showAllOn": "Se afișează toate aplicațiile Flathub, verificate sau nu",
   "showMore": "Afișează mai multe (rămase: {count})",
-  "subsandbox.text": "Această aplicație este construită pe Chromium sau Electron, care își pornesc procesele ajutătoare în medii izolate suplimentare proprii Flatpak. LordOS nu le oferă încă, așa că deocamdată nu poate fi instalată aici.",
+  "subsandbox.text": "Această aplicație este construită pe Chromium sau Electron, ale căror procese ajutătoare au nevoie ca mediile izolate ale Flatpak să fie partajate într-un mod pe care LordOS nu îl oferă încă, așa că deocamdată nu poate fi instalată aici.",
   "subsandbox.title": "Încă neacceptată în LordOS",
   "subtitle": "Aplicații Linux din Flathub, rulate în mediul izolat al LordOS sub firewallul dvs.",
   "turnOff": "Dezactivează",

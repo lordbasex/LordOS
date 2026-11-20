@@ -619,7 +619,7 @@ ${langMenu(t, page, true)}
 </footer>${toTop(t)}`;
 }
 
-const ICONS = ['M4 17l6-6-6-6M12 19h8', 'M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z', 'M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18M12 3a9 9 0 110 18 9 9 0 010-18', 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z', 'M4 6h16v12H4zM4 7l8 6 8-6', 'M4 5h16v14H4zM4 9h16M8 5v4', 'M3 5h18v14H3zM3 9h18M10 12l-2.5 2.5L10 17M14 12l2.5 2.5L14 17'];
+const ICONS = ['M4 17l6-6-6-6M12 19h8', 'M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z', 'M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18M12 3a9 9 0 110 18 9 9 0 010-18', 'M7 11V8a5 5 0 0110 0v3M5 11h14v10H5z', 'M4 6h16v12H4zM4 7l8 6 8-6', 'M4 5h16v14H4zM4 9h16M8 5v4', 'M3 5h18v14H3zM3 9h18M10 12l-2.5 2.5L10 17M14 12l2.5 2.5L14 17', 'M21 8l-9-5-9 5v8l9 5 9-5zM3 8l9 5 9-5M12 13v8'];
 const SHOWCASE_IMG = [r('docs/fans-monitor.png'), r('docs/polish/passwords-after-light.png'), r('docs/brand/screenshots/settings-light.png')];
 const TEASER_IDS = ['mail', 'calendar', 'files', 'passwords', 'photos', 'player', 'notes', 'monitor', 'terminal', 'store'];
 

@@ -1,7 +1,7 @@
 {
   "name": "lordos",
   "private": true,
-  "version": "0.8.9.3",
+  "version": "0.8.9.4",
   "description": "LordOS — React themes and apps for lord-server",
   "lordos": {
     "channel": "beta",

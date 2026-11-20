@@ -100,7 +100,7 @@
   "showAllOff": "Tylko aplikacje zweryfikowane przez Flathub. Ukryte: {count}",
   "showAllOn": "Pokazywane są wszystkie aplikacje z Flathub, zweryfikowane lub nie",
   "showMore": "Pokaż więcej (pozostało: {count})",
-  "subsandbox.text": "Ta aplikacja jest zbudowana na Chromium lub Electron, które uruchamiają swoje programy pomocnicze w dodatkowych piaskownicach samego Flatpaka. LordOS jeszcze ich nie oferuje, więc na razie nie można jej tu zainstalować.",
+  "subsandbox.text": "Ta aplikacja jest zbudowana na Chromium lub Electron, których programy pomocnicze wymagają współdzielenia piaskownic Flatpaka w sposób, którego LordOS jeszcze nie oferuje, więc na razie nie można jej tu zainstalować.",
   "subsandbox.title": "Jeszcze nieobsługiwane w LordOS",
   "subtitle": "Aplikacje dla Linuksa z Flathub, uruchamiane we własnym izolowanym środowisku LordOS pod twoją Zaporą.",
   "turnOff": "Wyłącz",

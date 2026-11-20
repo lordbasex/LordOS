@@ -10,16 +10,28 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9.4-beta] - 2026-11-20
+
 ### Added
 
-- **Flatpak and Flathub, phase 1 (in development; approved 2026-11-19, `docs/FLATPAK.md`).** The groundwork: the
+- **Flatpak apps from Flathub, managed from the Store** (`docs/FLATPAK.md`, lordos.org/features/flatpak). Store →
+  Flathub turns it on (it installs Debian's `flatpak`, 6 packages, 11 MB, nothing of it running in the background),
+  shows Flathub's verified apps with what each one declares and what LordOS does about it, and installs, updates and
+  removes them. Every Flatpak app runs under LordOS's own rules: its own root-owned scope and view, your Firewall and
+  restrictions, a read-only home but for its own folder and your folders, LordOS's folders hidden, the session bus
+  only through Flatpak's filtering proxy. The apps appear in search, the launcher, the Dock and "Open with". Settings →
+  Flatpak shows the space they take and removes Flatpak completely. PCs (x86-64) only for now; Electron and
+  Chromium-based apps are marked "not yet supported". Tested: GNOME Text Editor, Decibels, Shortwave, Meld, KCalc,
+  Firefox, GNU Emacs; the automated test plan (`server/tests/fwflatpak/flatpak.sh`) passes its 31 checks. The
+  entries below are the steps that built it.
+- **Flatpak and Flathub, phase 1 (approved 2026-11-19, `docs/FLATPAK.md`).** The groundwork: the
   package masks Flatpak's root helper (`flatpak-system-helper.service`), its sub-sandbox portal
   (`flatpak-portal.service`) and its session helper (`flatpak-session-helper.service`) with links to `/dev/null`, so
   once Flatpak is installed polkit can't reach the helper's actions, no app starts a sandbox outside its LordOS scope
   and `flatpak-spawn --host` has no service behind it; `~/.local/share/flatpak` (installations, trusted keys,
   overrides, exports) joins `lord.fs`'s deny list; desktop ids and app scopes starting with `fp-` are reserved for
   Flatpak apps (`app-lordos-fp-<id>.scope`, identity `flatpak:<id>`). Nothing installs Flatpak yet.
-- **The Flatpak launch path** (in development): `lord.apps.launchFlatpak(id)` and `launchFlatpakWith(id, path)` take
+- **The Flatpak launch path**: `lord.apps.launchFlatpak(id)` and `launchFlatpakWith(id, path)` take
   only an installed app's id (Flatpak's id rules, at most 59 bytes), read the installation without following a link
   out of the app's folder (`server/src/fpak.c`) and build the `flatpak run` command line in C, never from an export's
   `Exec` line: no unfiltered session or system bus; no `org.freedesktop.Flatpak`, `systemd1`, `secrets` or the
@@ -36,7 +48,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `/.flatpak-info` check reads. Checked in a LordOS session on VM 127: bubblewrap, the app and its D-Bus proxy in
   `app-lordos-fp-<id>.scope`, the window on the desktop. Tests: `fpak-test` (47), `fw-rules-test`;
   `build/flatpak-view-probe` and `launch-cli --flatpak` for the VM.
-- **Flatpak apps in the desktop** (in development): `lord.apps.flatpak()` lists the installed ones from their exported
+- **Flatpak apps in the desktop**: `lord.apps.flatpak()` lists the installed ones from their exported
   `.desktop` files (name, comment, categories, MIME types, icon; never `Exec`), so they show in search and the launcher
   as `flatpak:<id>` and open through the Flatpak launch path; the Monitor names every process of one (bubblewrap, its
   D-Bus proxy, the app) from its scope, and its firewall lists take `flatpak:<id>`; notification settings name them;
@@ -44,21 +56,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   chose (an SDL game says `tuxocide`). Their exported SVG icons, links into the installation, are allowed to lord-media.
   The launcher's view process shows as `lordos-view`. Checked on VM 127: Tuxocide found and opened from search, its
   window with its own icon, its five processes under its name in Monitor → Processes.
-- **Flathub's management commands** (in development, E3): `lord.flatpak` runs only a closed list of `flatpak --user`
+- **Flathub's management commands** (E3): `lord.flatpak` runs only a closed list of `flatpak --user`
   commands (add Flathub from the `.flatpakrepo` the package ships, update the catalog, info, install, update,
   uninstall, remove unused runtimes, list), one at a time, each in its own child in `lordos-net-flathub.scope`: a new
   firewall component, "Flathub" in Monitor → Network (named in every language), with its own rules. The only argument
   from the shell is a ref, checked in C (`app/<id>/<native arch>/<branch>`, never a runtime); never a URL, remote,
   key, file or option, and never `--no-gpg-verify`. Its output comes back as printable UTF-8 lines. Checked on VM 127
   in a session: install and uninstall of a Flathub app ran in that scope; a ref ending in an option was refused.
-- **Flathub's catalog, read in a sandbox** (in development, E7): `lord-appstream`, a new helper that links only the C
+- **Flathub's catalog, read in a sandbox** (E7): `lord-appstream`, a new helper that links only the C
   library, reads Flathub's AppStream file (opened by lord-server without following any link but Flatpak's own) and,
   inside `sandbox_apply_helper` (no network, no file opened by path, no exec, a memory cap), writes a compact index:
   id, branch, name and summary in the person's language, icon, categories, license, developer and whether Flathub
   verified the app. lord-server checks every line again before `lord.flatpak.catalog()` hands it to the shell. On
   Flathub's real catalog (52 MB): 3,366 apps, 2,240 verified, in 0.07 s. `fpakas-test` (2,096 checks, under
   AddressSanitizer, with random and cut documents).
-- **Flathub in the Store** (in development; PCs only): a "Flathub" section. Turning it on shows the package plan for
+- **Flathub in the Store** (PCs only): a "Flathub" section. Turning it on shows the package plan for
   `flatpak` (no Recommends) and installs it with the Store's own package job, then adds Flathub from the shipped file
   and fetches the catalog (again when the Store opens a day later; Refresh does it now). The catalog shows the apps
   Flathub verified, with a switch for the rest (`settings.flathub`), as cards with the category and the developer, in
@@ -77,7 +89,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   2,240 verified apps with their icons; GNOME Calculator showed "Internet and your local network", installed with the
   GNOME runtime, opened from its page in `app-lordos-fp-org.gnome.Calculator.scope`, and its removal took the runtime
   with it; MarkText was marked not supported; "Update Flathub apps" ran.
-- **Flatpak apps in the Dock and in "Open with"** (in development): the Dock pins a Flatpak app as `flatpak:<id>`
+- **Flatpak apps in the Dock and in "Open with"**: the Dock pins a Flatpak app as `flatpak:<id>`
   (Flatpak's id rules, `sdk/dockmodel.js`), from the launcher's "Keep in Dock" or by dragging; its windows group under
   that icon, and a session restore opens it again. Files' and the Terminal's "Open with" offer the Flatpak apps whose
   export declares the file's type (`lord.apps.launchFlatpakWith`), and lord-server refuses one that declares no
@@ -85,30 +97,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (Decibels, which asks for no files), whose sandbox saw only `~/Documents/tono-prueba.mp3` and nothing else of the
   home. GNOME Text Editor was pinned from the launcher, opened from the Dock in `app-lordos-fp-org.gnome.TextEditor.scope`
   under its icon, and opened a text file from Files. Tests: `dock-model-test`, `apps-actions-test`.
-- **Flatpak test plan run on VM 127** (in development; `docs/FLATPAK.md`, "Results"). Held: Flathub's downloads in
+- **Flatpak test plan run on VM 127** (`docs/FLATPAK.md`, "Results"). Held: Flathub's downloads in
   their own firewall component (blocked → denied, Monitor row), apps in their own scopes with nothing escaping to the
   user manager, no internet and per-domain rules per app, the never-granted bus names and folders even with user
   overrides, no files, no camera, no USB and no Bluetooth, no notifications, updates and freeing unused runtimes.
   Apps that work: GNOME Text Editor, Decibels, Shortwave (but its radio playback, which also fails outside LordOS), Meld, KCalc (Qt 6), Firefox and GNU Emacs (X11). Electron
   apps (MarkText) still don't start and stay marked. Spotify exits at start on any Wayland desktop (it starts on X11
   only and asks for X only as a fallback); its own flags file fixes it.
-- **Flatpak apps get Flatpak's sub-sandbox from LordOS itself** (in development; `server/src/fpspawn.c`, AGENTS.md E9):
+- **Flatpak apps get Flatpak's sub-sandbox from LordOS itself** (`server/src/fpspawn.c`, AGENTS.md E9):
   lord-server serves `org.freedesktop.portal.Flatpak` and runs each Spawn as the same app, in its own scope and view,
   under its restrictions; Flatpak's own portal stays masked. GNOME apps that load images through glycin needed it:
   Meld crashed at start, Shortwave showed no images. The service exists only while `flatpak` is installed. A security
   review of the branch then closed `sandbox-expose` (a link in the app's own folder could have exported the session
   bus) and made the never-granted bus names cover their wildcards too (`org.freedesktop.*`…).
-- **Settings → Flatpak** (in development): whether Flatpak is installed, how much its apps, runtimes and their data
+- **Settings → Flatpak**: whether Flatpak is installed, how much its apps, runtimes and their data
   take, Flathub shown in the Store or not, and "Remove Flatpak completely" (every Flathub app, the runtimes, Flathub,
   optionally the apps' data to the Trash, then the flatpak package with its plan shown and the administrator password).
   Flatpak is only installed when Flathub is turned on, and nothing of it runs in the background.
-- **X11 for Flatpak apps, as GNOME and KDE give it** (in development): an app with no files or device blocked keeps
+- **X11 for Flatpak apps, as GNOME and KDE give it**: an app with no files or device blocked keeps
   the X display (socket and cookie in its view); a restricted one gets none. GNU Emacs, X11 only, now starts.
 
 ### Fixed
 
-- **After one app with "no microphone" had run, no Flatpak app could record until the next login** (in development,
-  found by the test plan): the PipeWire guard counted an exited app's empty scope as running, and couldn't tell which
+- **After one app with "no microphone" had run, no Flatpak app could record until the next login** (found
+  by the test plan): the PipeWire guard counted an exited app's empty scope as running, and couldn't tell which
   Flatpak app a PulseAudio client was (it reports its pid inside its sandbox). Empty scopes no longer count, and a
   Flatpak app's client is matched to a process of its own scope (pipewire-pulse names the app; the pid and its
   connections are checked). The same empty-scope fix applies to Linux apps.
@@ -7547,7 +7559,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.3-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.4-beta...HEAD
+[0.8.9.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.3-beta...v0.8.9.4-beta
 [0.8.9.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.2-beta...v0.8.9.3-beta
 [0.8.9.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.1-beta...v0.8.9.2-beta
 [0.8.9.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9-beta...v0.8.9.1-beta

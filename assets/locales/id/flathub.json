@@ -100,7 +100,7 @@
   "showAllOff": "Hanya aplikasi yang diverifikasi Flathub. Tersembunyi: {count}",
   "showAllOn": "Menampilkan setiap aplikasi Flathub, terverifikasi atau tidak",
   "showMore": "Tampilkan lebih banyak (sisa {count})",
-  "subsandbox.text": "Aplikasi ini dibangun di atas Chromium atau Electron, yang menjalankan program pembantunya di sandbox tambahan milik Flatpak sendiri. LordOS belum menyediakannya, jadi untuk saat ini aplikasi ini tidak dapat diinstal di sini.",
+  "subsandbox.text": "Aplikasi ini dibangun di atas Chromium atau Electron, yang program pembantunya memerlukan sandbox Flatpak dibagikan dengan cara yang belum disediakan LordOS, jadi untuk saat ini aplikasi ini tidak dapat diinstal di sini.",
   "subsandbox.title": "Belum didukung di LordOS",
   "subtitle": "Aplikasi Linux dari Flathub, berjalan di dalam ruang terbatas milik LordOS sendiri di bawah Firewall Anda.",
   "turnOff": "Nonaktifkan",

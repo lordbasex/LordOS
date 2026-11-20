@@ -75,7 +75,7 @@
   "showAllOff": "Only apps verified by Flathub. Hidden: {count}",
   "showAllOn": "Showing every Flathub app, verified or not",
   "showMore": "Show more ({count} left)",
-  "subsandbox.text": "This app is built on Chromium or Electron, which start their helpers in Flatpak's own extra sandboxes. LordOS doesn't offer those yet, so it can't be installed here for now.",
+  "subsandbox.text": "This app is built on Chromium or Electron, whose helpers need Flatpak's sandboxes shared in a way LordOS doesn't offer yet, so it can't be installed here for now.",
   "subsandbox.title": "Not yet supported on LordOS",
   "subtitle": "Linux apps from Flathub, run inside LordOS's own view under your Firewall.",
   "turnOff": "Turn off",

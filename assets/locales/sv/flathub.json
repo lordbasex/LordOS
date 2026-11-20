@@ -100,7 +100,7 @@
   "showAllOff": "Bara appar som verifierats av Flathub. Dolda: {count}",
   "showAllOn": "Visar alla Flathub-appar, verifierade eller inte",
   "showMore": "Visa fler (kvar: {count})",
-  "subsandbox.text": "Den här appen bygger på Chromium eller Electron, som startar sina hjälpprogram i Flatpaks egna extra sandlådor. LordOS erbjuder inte dem än, så den kan inte installeras här för tillfället.",
+  "subsandbox.text": "Den här appen bygger på Chromium eller Electron, vars hjälpprogram behöver dela Flatpaks sandlådor på ett sätt som LordOS inte erbjuder än, så den kan inte installeras här för tillfället.",
   "subsandbox.title": "Stöds inte på LordOS än",
   "subtitle": "Linux-appar från Flathub, körda i LordOS egen isolerade miljö under din Brandvägg.",
   "turnOff": "Stäng av",

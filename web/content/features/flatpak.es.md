@@ -1,0 +1,104 @@
+## En pocas palabras
+
+Desde **LordOS 0.8.9.4**, las miles de apps de Linux de **Flathub** se instalan en LordOS, y **todo se hace desde la Tienda**. Ahí activás Flathub, recorrés sus apps, ves qué pide cada una y qué hace LordOS al respecto, y la instalás, actualizás o quitás, sin terminal. **Ajustes → Flatpak** muestra cuánto ocupan las apps y quita Flatpak por completo si cambiás de idea.
+
+Lo que lo hace de LordOS: cada app de Flathub corre con **las reglas propias de LordOS**, no solo con las suyas. Tiene su propia caja de arena dentro de la vista propia de LordOS, tu **Firewall** y tus restricciones se le aplican como a cualquier app, y **tu carpeta personal es de solo lectura** para ella salvo su propia carpeta y tus carpetas personales.
+
+[[shot:0]]
+
+Hoy funciona en **PC de 64 bits** (x86-64); la Raspberry Pi viene después.
+
+## Todo desde la Tienda
+
+**Activarlo.** Tienda → **Flathub** → **Activar Flathub**. La Tienda instala `flatpak` desde Debian como cualquier otro paquete (6 paquetes, 11 MB, nada se instala hasta que apretás el botón), agrega Flathub con la clave que trae LordOS y descarga el catálogo.
+
+**Recorrerlo.** Las apps de Flathub aparecen en su propia sección, en Descubrir y en la búsqueda, con los nombres, íconos y categorías del propio Flathub. De entrada la Tienda muestra **solo las apps que Flathub verificó como publicadas por sus propios desarrolladores**; un interruptor muestra el resto, marcadas como «No verificada».
+
+**Antes de instalar**, la página de cada app dice quién la publica, su licencia y **lo que declara**: internet, sonido, tus archivos, dispositivos, otras apps en el bus. Al lado de cada cosa, lo que hace LordOS al respecto: lo que podés bloquear en el Firewall, lo que LordOS limita y lo que nunca da.
+
+[[shot:1]]
+
+[[shot:2]]
+
+**Instalar, actualizar, quitar.** Un botón para cada cosa, con el progreso en la página. Quitar una app también quita los runtimes que ninguna otra app usa.
+
+Las apps **todavía no compatibles con LordOS** lo dicen antes de que lo intentes: las hechas con Chromium o Electron están marcadas y su botón Instalar está apagado.
+
+[[shot:3]]
+
+## Ajustes → Flatpak
+
+Ajustes tiene una página **Flatpak** propia: si Flatpak está instalado, si Flathub se muestra en la Tienda, cuántas apps de Flathub hay y cuánto ocupan ellas, sus runtimes y sus propios datos, y un botón para abrir Flathub en la Tienda.
+
+**Quitar Flatpak por completo** se lleva todas las apps de Flathub, los runtimes que usaban, el propio Flathub y el paquete `flatpak`, con los paquetes listados antes de que pase nada y la contraseña de administrador pedida, y opcionalmente manda los datos propios de las apps a la Papelera. Después no queda nada de Flatpak en la computadora.
+
+[[shot:4]]
+
+[[shot:5]]
+
+## En tu escritorio, como cualquier app
+
+Las apps de Flathub aparecen en la búsqueda, en el lanzador y en **Abrir con** de Archivos, y las podés fijar en el **Dock**. Tienen el marco de ventana de LordOS, su barra de menú y sus notificaciones con el nombre y el ícono de la propia app.
+
+[[shot:6]]
+
+[[shot:7]]
+
+Cuando abrís un archivo con una app de Flathub, **recibe ese archivo**, nada más de tu home.
+
+[[shot:8]]
+
+GTK 4 y GTK 3, Qt y KDE, las apps solo de X11 y la caja de arena propia de Firefox funcionan:
+
+[[shot:9]]
+
+[[shot:10]]
+
+[[shot:11]]
+
+## Bajo tu Firewall y tus reglas
+
+Cada app de Flathub corre en **su propio scope de root** (`flatpak:<id>` en el Firewall y en Monitor), así que nada de lo que arranca puede salir de ahí. Eso le da todo lo que tienen las apps de Linux:
+
+- **Sin internet, solo red local, reglas por dominio, listas de bloqueo**, aplicadas por el kernel, con su propia fila en Monitor → Red.
+- **Sin cámara, sin micrófono, sin USB, sin Bluetooth** y **sin acceso a tus archivos**, en Ajustes → Privacidad.
+- **Sin notificaciones**, si querés silencio.
+
+Las descargas del propio Flathub (el catálogo, las instalaciones y las actualizaciones) también son una fila propia, **Flathub**, que podés ver y bloquear.
+
+[[shot:12]]
+
+[[shot:13]]
+
+## Lo que LordOS nunca da
+
+Declare lo que declare una app, o lo que pida después un archivo de override:
+
+- **Tu carpeta personal es de solo lectura** para ella, salvo su propia carpeta (`~/.var/app/<id>`) y tus carpetas personales (Documentos, Descargas, Imágenes…). Ningún archivo de inicio, clave ni entrada de autoarranque se puede escribir, crear ni poner en su lugar renombrando.
+- **Las carpetas propias de LordOS están ocultas**: tus ajustes, las reglas del Firewall, los permisos, los lanzadores y el autoarranque.
+- **El bus de sesión solo a través del proxy filtrante de Flatpak**, y nunca los nombres que corren comandos fuera de la caja de arena (`org.freedesktop.Flatpak`, systemd) o guardan tus contraseñas (el Secret Service), ni ningún comodín que los cubra.
+- **Sin bus del sistema**, y nunca los servicios propios de LordOS para hacerse pasar por ellos.
+- **Sin X11** para una app que restringiste (las apps de X11 se pueden espiar entre sí).
+
+## Las decisiones detrás
+
+| Decisión | Por qué |
+|---|---|
+| Cada app en la vista y el scope propios de LordOS | Para que tu Firewall, tus restricciones y Monitor vean la app como lo que es. Un `flatpak run` común se saca solo de cualquier scope que le dé LordOS. |
+| Home de solo lectura, declare lo que declare la app | Un archivo de inicio o una entrada de autoarranque escritos por una app corren fuera de toda caja de arena en tu próximo inicio de sesión. |
+| Apps verificadas de entrada | Flathub comprueba que una app verificada viene de su propio desarrollador. El resto está a un interruptor de distancia, marcado. |
+| Instalado por usuario, nunca para todo el sistema | Sin root ni polkit: el ayudante de root de Flatpak está enmascarado. |
+| El portal propio de Flatpak y su ayudante de sesión enmascarados | Lo que arrancan corre fuera de la caja de arena de la app. LordOS sirve él mismo los sub-sandbox que necesitan las apps de GNOME, dentro de la caja de arena de la misma app. |
+| El catálogo se lee en una caja de arena propia | El catálogo de Flathub lo interpreta un ayudante chico sin red ni archivos, nunca el propio escritorio. |
+| Una fila propia en el Firewall para Flathub | Las descargas se ven, y las podés frenar como a cualquier app. |
+| Apps de Electron y Chromium marcadas | Sus ayudantes necesitan una forma de compartir la caja de arena que LordOS todavía no ofrece. Mejor marcadas que rotas. |
+| Nada en segundo plano | Ningún servicio de Flatpak corre si no hay una app abierta; la parte propia de LordOS existe solo mientras `flatpak` está instalado. |
+| Primero x86-64 | Ahí está probado; la Raspberry Pi viene después. |
+
+## Qué se probó
+
+En una máquina de prueba el 20 de noviembre de 2026, un **plan de pruebas automatizado** de 31 verificaciones corre cada vez (`server/tests/fwflatpak/flatpak.sh`): la fila de Flathub en el Firewall, la identidad de cada app, lo que nunca se da aun con un override, sin archivos, sin internet, los sub-sandbox, X11 con y sin restricción, y la restricción del micrófono entre dos apps. Las apps probadas a mano: **Editor de texto de GNOME, Decibels, Shortwave, Meld, KCalc, Firefox y GNU Emacs**. Una revisión de seguridad de todo el cambio encontró cuatro problemas, todos corregidos antes de la versión.
+
+**Todavía no:** las apps basadas en Electron y Chromium; Spotify arranca solo con sus propios flags de Wayland (decisión de quien la desarrolla, no de LordOS); la Raspberry Pi.
+
+El diseño completo, cada decisión y cada resultado de las pruebas están en `docs/FLATPAK.md`.

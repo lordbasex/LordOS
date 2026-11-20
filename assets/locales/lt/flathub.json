@@ -100,7 +100,7 @@
   "showAllOff": "Tik Flathub patikrintos programos. Paslėpta: {count}",
   "showAllOn": "Rodomos visos Flathub programos, patikrintos ar ne",
   "showMore": "Rodyti daugiau (liko: {count})",
-  "subsandbox.text": "Ši programa sukurta su Chromium arba Electron, kurie savo pagalbines programas paleidžia papildomose paties Flatpak smėlio dėžėse. LordOS jų dar nesiūlo, todėl kol kas jos čia įdiegti negalima.",
+  "subsandbox.text": "Ši programa sukurta su Chromium arba Electron, kurių pagalbinėms programoms reikia, kad Flatpak smėlio dėžės būtų bendrinamos taip, kaip LordOS dar nesiūlo, todėl kol kas jos čia įdiegti negalima.",
   "subsandbox.title": "LordOS dar nepalaikoma",
   "subtitle": "Linux programos iš Flathub, vykdomos pačios LordOS izoliuotoje aplinkoje pagal jūsų Užkardą.",
   "turnOff": "Išjungti",

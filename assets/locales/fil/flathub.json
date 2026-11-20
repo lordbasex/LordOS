@@ -100,7 +100,7 @@
   "showAllOff": "Mga app lang na na-verify ng Flathub. Nakatago: {count}",
   "showAllOn": "Ipinapakita ang bawat app ng Flathub, verified man o hindi",
   "showMore": "Magpakita pa ({count} ang natitira)",
-  "subsandbox.text": "Nakabatay ang app na ito sa Chromium o Electron, na nagsisimula ng kanilang mga helper sa sariling karagdagang sandbox ng Flatpak. Hindi pa iniaalok ng LordOS ang mga iyon, kaya hindi ito mai-install dito sa ngayon.",
+  "subsandbox.text": "Nakabatay ang app na ito sa Chromium o Electron, na ang mga helper ay nangangailangang ibahagi ang mga sandbox ng Flatpak sa paraang hindi pa iniaalok ng LordOS, kaya hindi ito mai-install dito sa ngayon.",
   "subsandbox.title": "Hindi pa suportado sa LordOS",
   "subtitle": "Mga Linux app mula sa Flathub, pinapatakbo sa loob ng sariling nakahiwalay na espasyo ng LordOS, sakop ng iyong Firewall.",
   "turnOff": "I-off",

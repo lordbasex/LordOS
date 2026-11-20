@@ -100,7 +100,7 @@
   "showAllOff": "Programu zilizothibitishwa na Flathub tu. Zilizofichwa: {count}",
   "showAllOn": "Inaonyesha kila programu ya Flathub, iwe imethibitishwa au la",
   "showMore": "Onyesha zaidi (zimebaki: {count})",
-  "subsandbox.text": "Programu hii imejengwa juu ya Chromium au Electron, ambazo huanzisha programu zao saidizi katika sandbox za ziada za Flatpak yenyewe. LordOS bado haitoi hizo, kwa hiyo haiwezi kusakinishwa hapa kwa sasa.",
+  "subsandbox.text": "Programu hii imejengwa juu ya Chromium au Electron, ambazo programu zao saidizi zinahitaji sandbox za Flatpak zishirikiwe kwa njia ambayo LordOS bado haitoi, kwa hiyo haiwezi kusakinishwa hapa kwa sasa.",
   "subsandbox.title": "Bado haitumiki kwenye LordOS",
   "subtitle": "Programu za Linux kutoka Flathub, zinazoendeshwa ndani ya mazingira yaliyotengwa ya LordOS yenyewe chini ya Ngome yako.",
   "turnOff": "Zima",

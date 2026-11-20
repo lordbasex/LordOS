@@ -56,6 +56,10 @@
     [
       "LordOS Web Runtime",
       "Web apps and PWAs as real LordOS apps: their own window, Dock icon and accounts, apart from your browser."
+    ],
+    [
+      "Flathub apps",
+      "Thousands of Linux apps from Flathub, installed from the Store and run under your Firewall and LordOS's rules. Settings → Flatpak removes it all."
     ]
   ],
   "showcase": [

@@ -100,7 +100,7 @@
   "showAllOff": "Solo app verificate da Flathub. Nascoste: {count}",
   "showAllOn": "Mostro tutte le app di Flathub, verificate o no",
   "showMore": "Mostra altre (rimanenti: {count})",
-  "subsandbox.text": "Questa app è basata su Chromium o Electron, che avviano i loro processi di supporto in ambienti isolati aggiuntivi propri di Flatpak. LordOS non li offre ancora, quindi per ora non può essere installata qui.",
+  "subsandbox.text": "Questa app è basata su Chromium o Electron, i cui processi di supporto hanno bisogno che gli ambienti isolati di Flatpak siano condivisi in un modo che LordOS non offre ancora, quindi per ora non può essere installata qui.",
   "subsandbox.title": "Non ancora supportata su LordOS",
   "subtitle": "App Linux da Flathub, eseguite nell’ambiente isolato di LordOS sotto il tuo firewall.",
   "turnOff": "Disattiva",

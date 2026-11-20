@@ -100,7 +100,7 @@
   "showAllOff": "Chỉ ứng dụng được Flathub xác minh. Đã ẩn: {count}",
   "showAllOn": "Đang hiển thị mọi ứng dụng Flathub, đã xác minh hay chưa",
   "showMore": "Xem thêm (còn {count})",
-  "subsandbox.text": "Ứng dụng này được xây dựng trên Chromium hoặc Electron, vốn khởi động các tiến trình phụ trong các hộp cát bổ sung riêng của Flatpak. LordOS chưa cung cấp những hộp cát đó, nên hiện chưa thể cài ứng dụng này ở đây.",
+  "subsandbox.text": "Ứng dụng này được xây dựng trên Chromium hoặc Electron, mà các tiến trình phụ của chúng cần chia sẻ hộp cát của Flatpak theo cách LordOS chưa cung cấp, nên hiện chưa thể cài ứng dụng này ở đây.",
   "subsandbox.title": "Chưa được hỗ trợ trên LordOS",
   "subtitle": "Ứng dụng Linux từ Flathub, chạy bên trong không gian giới hạn riêng của LordOS dưới Tường lửa của bạn.",
   "turnOff": "Tắt",

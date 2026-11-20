@@ -937,6 +937,15 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [x] **Raspberry Pi with 0.8.9.1** in the same report (2026-11-19): Lord Flow 113 MB and 6.2 % of one core, as 0.8.9;
   Lord Workspaces, measured on the Pi for the first time, 99 MB and 0.06 %.
 
+## Release 0.8.9.4 (released 2026-11-20)
+
+- [x] **Flatpak apps from Flathub** (`FLATPAK.md`, `CHANGELOG.md`): Store → Flathub (turn on, verified catalog, what
+  each app declares and what LordOS does about it, install, update, remove), Settings → Flatpak (space, remove
+  completely), every app in its own root-owned scope and LordOS's view under the Firewall and restrictions, LordOS's
+  own sub-sandbox service, X11 for unrestricted apps. x86-64 only. The automated test plan passes its 31 checks; a
+  security review's four findings were fixed before the release. Left for later: Electron/Chromium apps, the
+  Raspberry Pi 5.
+
 ## Release 0.8.9.3 (released 2026-11-20)
 
 - [x] **The per-app firewall applies its rules again** (`CHANGELOG.md`): the 0.8.8.6 to 0.8.9.2 PC (amd64) packages were
@@ -1094,7 +1103,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   *Can't be done as written:* the mount's traffic as a firewall app (the kernel's client has no cgroup of an app).
   *Not built:* IPv6.
 
-- [ ] **Flatpak and Flathub — approved 2026-11-19, phase 1 in development** (`FLATPAK.md`; the seven exceptions E1–E7
+- [x] **Flatpak and Flathub — approved 2026-11-19, phase 1 released in 0.8.9.4 (2026-11-20)** (`FLATPAK.md`; the seven exceptions E1–E7
   in `AGENTS.md`). Phase 1, x86-64 only: a Flathub switch in the Store (installs `flatpak` without Recommends, masks
   its root helper and portal), the `verified` catalog through a sandboxed parser, install/update/remove per user, the
   launcher in its root-owned `app-lordos-fp-<id>.scope` with LordOS's restrictions, firewall, Monitor and Privacy for

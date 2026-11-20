@@ -100,7 +100,7 @@
   "showAllOff": "Flathub が確認したアプリのみ。非表示：{count}",
   "showAllOn": "確認済みかどうかにかかわらず、すべての Flathub のアプリを表示しています",
   "showMore": "さらに表示（残り：{count}）",
-  "subsandbox.text": "このアプリは Chromium または Electron をベースにしており、それらは補助プロセスを Flatpak 独自の追加サンドボックスで起動します。LordOS はまだそれを提供していないため、現時点ではここにインストールできません。",
+  "subsandbox.text": "このアプリは Chromium または Electron をベースにしており、その補助プロセスには LordOS がまだ提供していない方法で Flatpak のサンドボックスを共有する必要があるため、現時点ではここにインストールできません。",
   "subsandbox.title": "LordOS ではまだ対応していません",
   "subtitle": "Flathub の Linux アプリを、LordOS 独自の隔離環境の中で、あなたのファイアウォールのもとで実行します。",
   "turnOff": "オフにする",

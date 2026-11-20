@@ -1,6 +1,6 @@
 # Flatpak and Flathub in LordOS: design review
 
-**Status (2026-11-19): approved; phase 1 in development** (branch `feat/flatpak`). On 2026-11-19 the maintainer approved
+**Status (2026-11-20): phase 1 released in LordOS 0.8.9.4** (x86-64 PCs; lordos.org/features/flatpak). Approved on 2026-11-19, built on branch `feat/flatpak`. On 2026-11-19 the maintainer approved
 the seven exceptions E1–E7 below (recorded in `AGENTS.md`, "Flatpak as an app source") and decided: phase 1 on x86-64
 PCs only (the Raspberry Pi 5 in phase 2); Flathub's `verified` subset by default, the rest behind a Store setting; apps
 that need Flatpak's sub-sandboxes (Chromium/Electron through zypak) are marked "not yet supported"; open question 11 as decided there (every Flatpak app in the view). No compatibility with any Flathub app is claimed until

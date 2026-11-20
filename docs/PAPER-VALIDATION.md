@@ -361,6 +361,15 @@ pre-release that never shipped. The paper marks all of it "0.8.9, in development
 | 5.1 | A paused Cloud account sends nothing to its provider: no mount retries, check listing, quota call, background listing or change polling (#194) | Test (`cloud-test` `t_pause`: `cloud_bring_up_ok` and the `vfs/poll-interval` call) | Not yet with a real Google account or a packet capture |
 | 5.1 | The package installs `assets/cloud/providers.json`, so verified providers read verified (#195) | Test (`cloud_model_test.mjs`: mkdeb.sh installs `assets/cloud`, the fallback) | Not yet in a built .deb |
 
+## 0.8.9.4 (released 2026-11-20)
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 6.6 | Flathub apps are installed, updated and removed from the Store, and Settings → Flatpak removes Flatpak completely | VM 127, `0.8.9.4~ws84`–`ws87`: Flathub turned on from the Store twice (6 packages, 11 MB), apps installed and removed; Settings → Flatpak removed every app, the runtimes, the remote, the packages and Flatpak's folders (`docs/FLATPAK.md`, "Settings → Flatpak") | Verified |
+| 6.6 | Each Flatpak app runs in its own root-owned scope inside LordOS's view, under the Firewall and the restrictions, with a read-only home and the never-granted names refused even with an override | `server/tests/fwflatpak/flatpak.sh`, 31 checks, 31 passed on VM 127 (`0.8.9.3~ws86` with the security fixes) | Verified |
+| 6.6 | Apps tried: GNOME Text Editor, Decibels, Shortwave, Meld, KCalc, Firefox, GNU Emacs | VM 127, 2026-11-20, screenshots in `docs/flatpak-*.png` | Verified |
+| 6.6 | Electron and Chromium-based apps don't run yet and are marked in the Store | MarkText on VM 127: bubblewrap refuses the Spawn that joins the caller's namespaces | Verified |
+
 ## 0.8.9.3 (released 2026-11-20)
 
 | § | Claim | How | State |

@@ -100,7 +100,7 @@
   "showAllOff": "仅显示经 Flathub 验证的应用。已隐藏：{count}",
   "showAllOn": "正在显示所有 Flathub 应用，无论是否经过验证",
   "showMore": "显示更多（剩余 {count}）",
-  "subsandbox.text": "此应用基于 Chromium 或 Electron，它们会在 Flatpak 自己的额外沙盒中启动辅助进程。LordOS 尚未提供这种沙盒，因此目前无法在此安装。",
+  "subsandbox.text": "此应用基于 Chromium 或 Electron，其辅助进程需要以 LordOS 尚未提供的方式共享 Flatpak 的沙盒，因此目前无法在此安装。",
   "subsandbox.title": "LordOS 尚不支持",
   "subtitle": "来自 Flathub 的 Linux 应用，在 LordOS 自己的隔离环境中运行，受你的防火墙约束。",
   "turnOff": "关闭",

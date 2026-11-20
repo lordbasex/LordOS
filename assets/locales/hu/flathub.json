@@ -100,7 +100,7 @@
   "showAllOff": "Csak a Flathub által ellenőrzött alkalmazások. Rejtve: {count}",
   "showAllOn": "Minden Flathub-alkalmazás látható, ellenőrzött vagy sem",
   "showMore": "Továbbiak (hátra van: {count})",
-  "subsandbox.text": "Ez az alkalmazás Chromiumra vagy Electronra épül, amelyek a segédprogramjaikat a Flatpak saját további elszigetelt környezeteiben indítják. A LordOS ezeket még nem kínálja, ezért egyelőre nem telepíthető itt.",
+  "subsandbox.text": "Ez az alkalmazás Chromiumra vagy Electronra épül, amelyek segédprogramjainak a Flatpak elszigetelt környezeteit olyan módon kell megosztaniuk, amelyet a LordOS még nem kínál, ezért egyelőre nem telepíthető itt.",
   "subsandbox.title": "A LordOS még nem támogatja",
   "subtitle": "Linux-alkalmazások a Flathubról, a LordOS saját elszigetelt környezetében futtatva, az Ön Tűzfala alatt.",
   "turnOff": "Kikapcsolás",

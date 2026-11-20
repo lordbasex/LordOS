@@ -100,7 +100,7 @@
   "showAllOff": "Yalnızca Flathub’ın doğruladığı uygulamalar. Gizli: {count}",
   "showAllOn": "Doğrulanmış olsun olmasın tüm Flathub uygulamaları gösteriliyor",
   "showMore": "Daha fazla göster (kalan: {count})",
-  "subsandbox.text": "Bu uygulama, yardımcı süreçlerini Flatpak’ın kendi ek yalıtım alanlarında başlatan Chromium veya Electron üzerine kurulu. LordOS bunları henüz sunmuyor, bu yüzden şimdilik buraya yüklenemez.",
+  "subsandbox.text": "Bu uygulama Chromium veya Electron üzerine kurulu; bunların yardımcı süreçleri, Flatpak’ın yalıtım alanlarının LordOS’un henüz sunmadığı bir şekilde paylaşılmasını gerektiriyor, bu yüzden şimdilik buraya yüklenemez.",
   "subsandbox.title": "LordOS’ta henüz desteklenmiyor",
   "subtitle": "Flathub’dan Linux uygulamaları, LordOS’un kendi yalıtım alanında ve güvenlik duvarınızın altında çalışır.",
   "turnOff": "Kapat",
