@@ -86,6 +86,7 @@ int main(void) {
     int n = fpak_argv(&r, argv, buf, sizeof buf);
     CHECK(n > 5 && !strcmp(argv[0], "/usr/bin/flatpak") && !strcmp(argv[1], "run") && !strcmp(argv[n - 1], "org.gnome.Calculator"));
     CHECK(has(argv, "--arch=x86_64") && has(argv, "--branch=stable") && has(argv, "--nosocket=session-bus"));
+    CHECK(has(argv, "--no-documents-portal"));        /* LordOS's view has no /run/user/<uid>/doc */
     CHECK(has(argv, "--no-talk-name=org.freedesktop.Flatpak") && has(argv, "--no-talk-name=org.freedesktop.systemd1"));
     CHECK(has(argv, "--no-talk-name=org.freedesktop.secrets") && has(argv, "--talk-name=org.freedesktop.Notifications"));
     CHECK(has(argv, "--nofilesystem=~/.config/lordos") && has(argv, "--nofilesystem=~/.config/autostart"));

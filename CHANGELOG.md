@@ -141,6 +141,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the ISO in Downloads under its newer file name (`Windows11_Client_x64_<language>_<build>.iso`).
 - **Machines on compatible devices start in their window** (`server/src/vm/lordvm.c`; the device sets of imported machines
   and of the new card in `docs/VIRTUALIZATION.md` 4.3): the window's sound output wasn't declared for them, and QEMU refused the sound card with "audiodev 'snd0' not found".
+- **Linux and Flathub apps start on a computer with a mount inside the home folder** (`server/src/sec/sandbox.c`): a
+  cloud drive (rclone's FUSE mount under `~/Cloud`) or a disk mounted in a folder made the kernel refuse the read-only
+  bind of the home in the app's user namespace (EINVAL), and no app with a read-only home started ("could not build
+  the app's view"). The home is now bound with what is mounted under it, and each of those mounts is made read-only
+  too. **Flathub apps start when the document portal runs** (`server/src/fpak.c`): `flatpak run` now gets
+  `--no-documents-portal`, since LordOS's view has no `/run/user/<uid>/doc` and bubblewrap stopped there. Found with
+  Whatsie on the maintainer's PC; checked there by launching it through LordOS's launcher.
 - **The desktop no longer stalls while the Store installs a Flathub app** (`sdk/flathub.js`, `apps/store/flathubpages.js`):
   every line flatpak printed changed the Store's state, which redrew the 60 cards of the Flathub page and filtered and
   sorted the 2 242 apps of the catalog again, several times a second. Progress now reaches the page at most every

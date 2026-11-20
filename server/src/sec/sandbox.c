@@ -362,6 +362,32 @@ static int is_under(const char *path, const char *dir) {
     return !strncmp(path, dir, n) && (path[n] == '/' || !path[n]);
 }
 
+/* every mount below dir (not dir itself) read-only, from /proc/self/mountinfo; -1 when one can't be */
+static int remount_ro_under(const char *dir) {
+    FILE *f = fopen("/proc/self/mountinfo", "re");
+    if (!f) return -1;
+    char line[4096], mp[PATH_MAX];
+    size_t n = strlen(dir);
+    int bad = 0;
+    while (!bad && fgets(line, sizeof line, f)) {
+        /* "id parent major:minor root mountpoint ..." (the mount point has \040-style escapes) */
+        char *q = line;
+        for (int k = 0; k < 4 && q; k++) { q = strchr(q, ' '); if (q) q++; }
+        if (!q) continue;
+        size_t o = 0;
+        for (; *q && *q != ' ' && o + 1 < sizeof mp; q++) {
+            if (*q == '\\' && q[1] >= '0' && q[1] <= '3' && q[2] >= '0' && q[2] <= '7' && q[3] >= '0' && q[3] <= '7') {
+                mp[o++] = (char)((q[1] - '0') * 64 + (q[2] - '0') * 8 + (q[3] - '0')); q += 3;
+            } else mp[o++] = *q;
+        }
+        mp[o] = 0;
+        if (strncmp(mp, dir, n) || mp[n] != '/') continue;
+        if (mount(NULL, mp, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV, NULL)) bad = 1;
+    }
+    fclose(f);
+    return bad ? -1 : 0;
+}
+
 int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     if (!cfg->home || cfg->home[0] != '/' || !strcmp(cfg->home, "/")) return -1;
     char map[64];
@@ -452,10 +478,14 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     if (!stat("/dev/shm", &vt)) bad |= mount("tmpfs", "/dev/shm", "tmpfs", MS_NOSUID | MS_NODEV, "mode=1777");
     bad |= mount("devpts", "/dev/pts", "devpts", MS_NOSUID | MS_NOEXEC, "newinstance,ptmxmode=0666,mode=0620");
     if (!bad) bad |= mount("/dev/pts/ptmx", "/dev/ptmx", NULL, MS_BIND, NULL);
-    /* the real home, read-only, under the writable folders bound next */
+    /* the real home, read-only, under the writable folders bound next. Recursive: a mount under it (a cloud drive's
+     * FUSE mount, a disk mounted in a folder) is locked in this user namespace, and the kernel refuses a plain bind
+     * that would leave it behind (EINVAL: no app started on a computer with one, 2026-11-20); each of those is made
+     * read-only too */
     if (!bad && cfg->keep_home && cfg->home_ro)
-        bad |= mount(cfg->home, cfg->home, NULL, MS_BIND, NULL) ||
-               mount(NULL, cfg->home, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV, NULL);
+        bad |= mount(cfg->home, cfg->home, NULL, MS_BIND | MS_REC, NULL) ||
+               mount(NULL, cfg->home, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV, NULL) ||
+               remount_ro_under(cfg->home);
     for (int i = 0; i < nk && !bad; i++) {
         if (bind_clone(keep[i].fd, keep[i].path, keep[i].dir)) { bad = 1; break; }
         if (keep[i].ro && mount(NULL, keep[i].path, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV, NULL)) { bad = 1; break; }
