@@ -882,6 +882,8 @@ static struct {
     uint8_t *lag_buf;
     size_t lag_n;
     int lag_hello, lag_clipx;               /* lordos-guest said hello; it takes AGK_CLIPX (pictures, rich text) */
+    int lag_windows, lag_apps;              /* its helper lists the guest's windows (apps mode, 7.2); apps mode is on */
+    LagAppList *lag_applist;                /* the apps the guest listed last: VM_LAUNCH sends back only these tokens */
     char lag_version[48];
     uint8_t *helper;                        /* lordos-guest for VAG_INSTALL, read before lord-vm's own Landlock */
     size_t helper_n, helper_off;
@@ -2733,7 +2735,7 @@ static void ag_lost(const char *why) {
     if (S.qga_up) vlog("agent: %s", why);
     S.qga_up = 0; S.agq_n = 0; S.jpid = 0; S.inhibit_done = 0;
     if (S.id_state == 2) { S.id_state = 1; S.id_poll_at = 0; }      /* tried again when the agent is back */
-    S.ag_caps &= VAC_CLIPBOARD;
+    S.ag_caps &= VAC_CLIPBOARD | VAC_WINDOWS;
     ag_set(VAS_WAITING);
 }
 
@@ -2791,7 +2793,7 @@ static void on_qga_reply(const JVal *root, int ok) {
     case AQ_INFO: {
         const char *v = ok ? json_str(r, "version") : NULL;
         snprintf(S.ag_version, sizeof S.ag_version, "%.40s", v ? v : "");
-        int caps = S.ag_caps & VAC_CLIPBOARD;
+        int caps = S.ag_caps & (VAC_CLIPBOARD | VAC_WINDOWS);
         const JVal *cmds = json_get(r, "supported_commands");
         for (const JVal *e = cmds && cmds->type == J_ARR ? cmds->kid : NULL; e; e = e->next) {
             const char *n = json_str(e, "name");
@@ -3351,6 +3353,50 @@ static int clip_clean(const uint8_t *in, size_t n, uint8_t **out, size_t *on, ch
     return 0;
 }
 
+/* ---- apps mode (7.2): the guest's windows, icons and apps, checked here and handed to lord-server ---- */
+static void lag_windows_set(int on) {
+    if (on == S.lag_windows) return;
+    S.lag_windows = on;
+    if (on) S.ag_caps |= VAC_WINDOWS;
+    else { S.ag_caps &= ~VAC_WINDOWS; S.lag_apps = 0; free(S.lag_applist); S.lag_applist = NULL; }
+    ag_broadcast();
+}
+
+/* a guest frame of apps mode: parsed with vmagent.c's strict parsers, written again (nothing the guest sent passes
+ * as it came), and given to every client as a sealed memfd (VM_WINDATA) */
+static void lag_windata(const AgFrame *f) {
+    static LagWinList wl;
+    uint8_t *out = NULL;
+    size_t n = 0;
+    if (f->kind == LAG_WINDOWS) {
+        if (lag_windows_parse(f->data, f->len, &wl)) { vlog("agent: the guest's window list was refused (malformed)"); return; }
+        out = malloc(LAG_WINDOWS_BYTES);
+        n = out ? lag_windows_write(&wl, out, LAG_WINDOWS_BYTES) : 0;
+    } else if (f->kind == LAG_WINICON) {
+        uint32_t id; int w, h; const uint8_t *px;
+        if (lag_icon_parse(f->data, f->len, &id, &w, &h, &px)) { vlog("agent: a window icon from the guest was refused (malformed)"); return; }
+        out = malloc(8 + LAG_ICON_MAX * LAG_ICON_MAX * 4);
+        n = out ? lag_icon_write(id, w, h, px, out, 8 + LAG_ICON_MAX * LAG_ICON_MAX * 4) : 0;
+    } else {
+        LagAppList *al = malloc(sizeof *al);
+        if (!al || lag_applist_parse(f->data, f->len, al)) { free(al); vlog("agent: the guest's list of apps was refused (malformed)"); return; }
+        free(S.lag_applist);
+        S.lag_applist = al;
+        out = malloc(LAG_APPLIST_BYTES);
+        n = out ? lag_applist_write(al, out, LAG_APPLIST_BYTES) : 0;
+        vlog("agent: the guest listed %d apps", al->n);
+    }
+    if (n && n <= VM_WINDATA_MAX) {
+        int fd = memfd_create("lordos-vm-windows", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+        if (fd >= 0 && !write_all(fd, out, n) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+            VmMsg m = vm_msg(VM_WINDATA, 0, (int)n, f->kind, 0, 0, "");
+            for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, fd);
+        }
+        if (fd >= 0) close(fd);
+    }
+    free(out);
+}
+
 static void drain_lag(void) {
     if (!S.lag_buf) { S.lag_buf = malloc(AG_FRAME_MAX + AG_HEAD); S.lag_n = 0; if (!S.lag_buf) return; }
     ssize_t r = read(S.lag_fd, S.lag_buf + S.lag_n, AG_FRAME_MAX + AG_HEAD - S.lag_n);
@@ -3370,11 +3416,15 @@ static void drain_lag(void) {
                 snprintf(S.lag_version, sizeof S.lag_version, "%.40s", t + 13);
                 char *sp = strchr(S.lag_version, ' ');
                 if (sp) *sp = 0;
-                S.lag_clipx = strstr(t + 13, " clipx") != NULL;
-                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "");
+                unsigned caps = ag_hello_caps((const uint8_t *)t + 13, l - 13);
+                S.lag_clipx = (caps & LAG_CAP_CLIPX) != 0;
+                int win = (caps & LAG_CAP_WINDOWS) != 0;
+                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "", win ? " (windows: apps mode)" : "");
+                else if (win != S.lag_windows) vlog("agent: the guest's helper %s list its windows", win ? "can now" : "can no longer");
                 S.lag_hello = 1;
                 S.ag_caps |= VAC_CLIPBOARD;
-                static const char me[] = "lord-vm 2 clipboard clipx";
+                lag_windows_set(win);
+                static const char me[] = "lord-vm 2 clipboard clipx windows";
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
                 ag_broadcast();
             }
@@ -3400,6 +3450,8 @@ static void drain_lag(void) {
                 if (fd >= 0) close(fd);
             }
             free(clean);
+        } else if ((f.kind == LAG_WINDOWS || f.kind == LAG_WINICON || f.kind == LAG_APPLIST) && S.lag_hello && S.lag_windows) {
+            lag_windata(&f);
         }
         /* other kinds: skipped, so either side can grow */
         memmove(S.lag_buf, S.lag_buf + k, S.lag_n - (size_t)k);
@@ -3584,6 +3636,40 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         reply(ci, m->seq, VME_OK, what);
         return;
     }
+    case VM_APPS: {
+        /* apps mode (7.2): only toward a helper that said it lists its windows */
+        if (!S.lag_hello || !S.lag_windows) { reply(ci, m->seq, VME_DENIED, "the guest's helper doesn't list its windows"); return; }
+        uint8_t on = (uint8_t)m->a;
+        S.lag_apps = m->a;
+        lag_send(LAG_APPS, &on, 1);
+        vlog("agent: apps mode %s", m->a ? "on" : "off");
+        reply(ci, m->seq, VME_OK, "");
+        return;
+    }
+    case VM_WINACT: {
+        if (!S.lag_hello || !S.lag_windows) { reply(ci, m->seq, VME_DENIED, "the guest's helper doesn't list its windows"); return; }
+        LagAct act = { .id = (uint32_t)m->a, .action = m->b };
+        if (m->b == LAGA_MOVE) {
+            char tail[4];
+            if (sscanf(m->text, "%d %d %d %d%3s", &act.x, &act.y, &act.w, &act.h, tail) != 4) { reply(ci, m->seq, VME_BAD_REQUEST, "a move needs x y w h"); return; }
+        }
+        uint8_t b[32];
+        size_t n = lag_act_write(&act, b, sizeof b);
+        if (!n) { reply(ci, m->seq, VME_BAD_REQUEST, "bad window action"); return; }
+        lag_send(LAG_WINACT, b, (uint32_t)n);
+        reply(ci, m->seq, VME_OK, "");
+        return;
+    }
+    case VM_LAUNCH: {
+        if (!S.lag_hello || !S.lag_windows || !S.lag_applist) { reply(ci, m->seq, VME_DENIED, "the guest listed no apps"); return; }
+        if (!lag_applist_has(S.lag_applist, m->text)) { reply(ci, m->seq, VME_DENIED, "not one of the guest's apps"); return; }
+        uint8_t b[LAG_TOKEN_MAX + 2];
+        size_t n = lag_launch_write(m->text, b, sizeof b);
+        if (!n) { reply(ci, m->seq, VME_BAD_REQUEST, "bad token"); return; }
+        lag_send(LAG_LAUNCH, b, (uint32_t)n);
+        reply(ci, m->seq, VME_OK, "");
+        return;
+    }
     case VM_SOUND: {
         /* machine.json's sound choices: nothing changes in QEMU (lord-server plays and records itself); lord-vm holds the
          * lock, so it writes the file */
@@ -3669,7 +3755,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { S.lag_hello = 0; S.lag_clipx = 0; S.ag_caps &= ~VAC_CLIPBOARD; S.lag_n = 0; ag_broadcast(); }
+            if (!open) { S.lag_hello = 0; S.lag_clipx = 0; S.ag_caps &= ~VAC_CLIPBOARD; S.lag_n = 0; lag_windows_set(0); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -3875,6 +3961,8 @@ static void drop_client(int i) {
     close(S.cl[i].fd);
     S.cl[i].fd = -1;
     for (int k = 0; k < S.pq_n; k++) { Pending *p = &S.pq[(S.pq_head + k) % MAX_PENDING]; if (p->client == i) p->client = -1; }
+    /* the window that had apps mode on is gone (Keep Running): the guest shows its own desktop again */
+    if (control && S.lag_apps) { uint8_t off = 0; S.lag_apps = 0; lag_send(LAG_APPS, &off, 1); vlog("agent: apps mode off (the window closed)"); }
     if (control && !S.keep_running && !S.qemu_done && S.state != VS_STOPPING) {
         /* the window went away without saying how (the session ended, lord-server stopped): saved, as at shutdown */
         if (S.qmp_up) host_stop("lord-server closed the control channel");

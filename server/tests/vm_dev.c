@@ -21,6 +21,10 @@
  *   sound-stats         bytes the stream took from the ring, the loudest sample in them, the guest's streams
  *   mic tone|silence|off   the microphone's ring, filled here at the real rate with a 440 Hz tone or silence (as
  *                       lord-server's capture stream would), or none
+ *   apps on|off         apps mode (VM_APPS): the guest's helper hides its desktop and lists its windows
+ *   windows             the guest's last window list (VM_WINDATA); apps-list: its apps
+ *   winact ID ACTION [X Y W H]   focus | close | minimize | restore | move (VM_WINACT)
+ *   launch TOKEN        one of the guest's apps (VM_LAUNCH; lord-vm refuses a token the guest didn't list)
  *   quit
  * stdout: one JSON line per event or answer. Binaries are looked for next to this one, or in $LORDVM_BIN.
  *
@@ -28,6 +32,7 @@
  * the first render node with EGL and the damaged rows are read back into the picture on each frame, so `png` shows what
  * the guest drew with virgl. Without Mesa it only counts those frames. */
 #include "vm/vmproto.h"
+#include "vm/vmagent.h"
 #include "media/media_int.h"
 #include "media/aring.h"
 
@@ -246,6 +251,43 @@ static void picture_for(int w, int h) {
     out("{\"ev\":\"picture\",\"w\":%d,\"h\":%d}", w, h);
 }
 
+/* apps mode: what lord-vm passed on (VM_WINDATA), parsed again here as lord-server does */
+static LagWinList dev_wins;
+static LagAppList dev_apps;
+static int dev_icons;
+static void jstr(char *o, size_t cap, const char *s) {
+    size_t k = 0;
+    for (; *s && k + 7 < cap; s++) {
+        unsigned char ch = (unsigned char)*s;
+        if (ch == '"' || ch == '\\') { o[k++] = '\\'; o[k++] = (char)ch; }
+        else if (ch < 0x20) k += (size_t)snprintf(o + k, cap - k, "\\u%04x", ch);
+        else o[k++] = (char)ch;
+    }
+    o[k] = 0;
+}
+static void print_windows(void) {
+    out("{\"ev\":\"windows\",\"serial\":%u,\"count\":%d,\"icons\":%d}", dev_wins.serial, dev_wins.n, dev_icons);
+    for (int i = 0; i < dev_wins.n; i++) {
+        const LagWin *w = &dev_wins.w[i];
+        char t[LAG_TITLE_MAX * 6 + 8], a[LAG_APPNAME_MAX * 6 + 8];
+        jstr(t, sizeof t, w->title); jstr(a, sizeof a, w->app);
+        out("{\"ev\":\"window\",\"id\":%u,\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"flags\":%u,\"owner\":%u,\"pid\":%u,\"title\":\"%s\",\"app\":\"%s\"}",
+            w->id, w->x, w->y, w->w, w->h, w->flags, w->owner, w->pid, t, a);
+    }
+}
+static void windata(const VmMsg *m, int fd) {
+    static uint8_t b[VM_WINDATA_MAX];
+    if (fd < 0 || pread(fd, b, (size_t)m->a, 0) != m->a) { out("{\"ev\":\"error\",\"what\":\"VM_WINDATA unreadable\"}"); return; }
+    if (m->b == LAG_WINDOWS) { if (lag_windows_parse(b, (size_t)m->a, &dev_wins)) out("{\"ev\":\"error\",\"what\":\"window list refused\"}"); else print_windows(); }
+    else if (m->b == LAG_WINICON) {
+        uint32_t id; int w, h; const uint8_t *px;
+        if (!lag_icon_parse(b, (size_t)m->a, &id, &w, &h, &px)) { dev_icons++; out("{\"ev\":\"icon\",\"id\":%u,\"w\":%d,\"h\":%d}", id, w, h); }
+    } else if (m->b == LAG_APPLIST) {
+        if (lag_applist_parse(b, (size_t)m->a, &dev_apps)) { out("{\"ev\":\"error\",\"what\":\"app list refused\"}"); return; }
+        out("{\"ev\":\"apps\",\"count\":%d}", dev_apps.n);
+    }
+}
+
 static void from_vm(void) {
     for (int k = 0; k < VD_POLL_MAX; k++) {
         VmMsg m;
@@ -265,6 +307,7 @@ static void from_vm(void) {
             if ((m.a == VS_RUNNING || m.a == VS_PAUSED) && !display_asked && machine_id[0]) { display_asked = 1; ask(VM_DISPLAY, 0, NULL); }
         } else if (m.type == VM_FILE_PROGRESS) out("{\"ev\":\"file\",\"seq\":%u,\"pct\":%d,\"name\":\"%s\"}", m.seq, m.a, m.text);
         else if (m.type == VM_AGENT_STATE) out("{\"ev\":\"agent\",\"state\":%d,\"caps\":%d}", m.a, m.b);
+        else if (m.type == VM_WINDATA) windata(&m, fd);
         else if (m.type == VM_REPLY) out("{\"ev\":\"reply\",\"seq\":%u,\"code\":%d,\"text\":\"%s\"}", m.seq, m.a, m.text);
         else if (m.type == VM_DISPLAY_FD) {
             if (fd < 0) { out("{\"ev\":\"error\",\"what\":\"VM_DISPLAY_FD without a descriptor\"}"); continue; }
@@ -515,6 +558,20 @@ static int handle(char *line) {
         else out("{\"ok\":true,\"cmd\":\"file\",\"seq\":%u}", seq);
         if (fd >= 0) close(fd);
     } else if (!strncmp(line, "qmp ", 4)) { snprintf(a1, sizeof a1, "%s", line + 4); ask(VM_QMP, 0, a1); }
+    else if (!strcmp(line, "apps on") || !strcmp(line, "apps off")) ask(VM_APPS, !strcmp(line, "apps on"), NULL);
+    else if (!strcmp(line, "windows")) print_windows();
+    else if (!strcmp(line, "apps-list")) {
+        for (int i = 0; i < dev_apps.n; i++) { char nm[LAG_APPNAME_MAX * 6 + 8], tk[LAG_TOKEN_MAX * 6 + 8]; jstr(nm, sizeof nm, dev_apps.a[i].name); jstr(tk, sizeof tk, dev_apps.a[i].token); out("{\"ev\":\"app\",\"name\":\"%s\",\"token\":\"%s\"}", nm, tk); }
+        out("{\"ok\":true,\"cmd\":\"apps-list\",\"count\":%d}", dev_apps.n);
+    } else if (!strncmp(line, "winact ", 7)) {
+        unsigned id = 0; char act[16] = ""; int wx = 0, wy = 0, ww = 0, wh = 0;
+        int k = sscanf(line + 7, "%u %15s %d %d %d %d", &id, act, &wx, &wy, &ww, &wh);
+        int an = !strcmp(act, "focus") ? 1 : !strcmp(act, "close") ? 2 : !strcmp(act, "minimize") ? 3 : !strcmp(act, "restore") ? 4 : !strcmp(act, "move") ? 5 : 0;
+        char t[64] = "";
+        if (an == 5) snprintf(t, sizeof t, "%d %d %d %d", wx, wy, ww, wh);
+        if (k < 2 || !an || (an == 5 && k < 6)) out("{\"ok\":false,\"cmd\":\"winact\"}");
+        else { VmMsg m = vm_msg(VM_WINACT, ++seq, (int)id, an, 0, 0, t); vm_send(vm, &m, -1); }
+    } else if (!strncmp(line, "launch ", 7)) ask(VM_LAUNCH, 0, line + 7);
     else if (sscanf(line, "wait-frames %d %d", &x, &y) >= 1) {
         if (sscanf(line, "wait-frames %d %d", &x, &y) < 2) y = 30;
         frames_target = frames + x;

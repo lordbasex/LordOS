@@ -63,6 +63,12 @@
  *     VM_SOUND      machine.json's sound choices while the machine runs (lord-vm holds the lock, so it writes the file):
  *                   a = sound (1 plays on this computer, 0 muted), b = volume 0..100, c = microphone (1 allowed, 0 not).
  *                   They change nothing in QEMU: lord-server applies them itself (6.9) → VM_REPLY
+ *     VM_APPS       apps mode (7.2): a = 1 on, 0 off; sent on to the guest's helper (LAG_APPS) only when the machine's
+ *                   agent is on and the helper said "windows" (VAC_WINDOWS) → VM_REPLY
+ *     VM_WINACT     a window of the guest: a = its id (as the guest named it), b = LAGA_* (focus, close, minimize,
+ *                   restore, move); move: text = "x y w h" (decimal, the new area in the guest's pixels, lag_rect_ok)
+ *                   → VM_REPLY. lord-vm builds the LAG_WINACT frame itself (lag_act_write)
+ *     VM_LAUNCH     text = a token from the guest's last LAG_APPLIST: refused unless the guest listed it → VM_REPLY
  *   from lord-vm (events and replies)
  *     VM_REPLY      seq of the request; a = VME_* (0 ok); text = reason in English, for the log
  *     VM_STATE      a = VS_*, b = VR_* (why), c = QEMU's exit status or signal, d = QEMU's pid; text = detail.
@@ -78,6 +84,9 @@
  *                   a PNG whose header is sane; lord-server still re-encodes the picture before it's used)
  *     VM_FILE_PROGRESS seq of the VM_FILE; a = percent copied (0..100); text = the file's name as the guest gets it.
  *                   Sent to the client that asked, at most every 250 ms
+ *     VM_WINDATA    apps mode: what the guest's helper said, checked (vmagent.h's parsers) and written again by lord-vm:
+ *                   a sealed memfd of a bytes (≤ VM_WINDATA_MAX), b = LAG_WINDOWS, LAG_WINICON or LAG_APPLIST, in that
+ *                   kind's layout. lord-server parses it again before use
  *     VM_JOB        progress of a long request: a = VJ_* (suspend, resume, snapshot), b = VJS_* (running, done,
  *                   failed), c = percent (0..100, -1 unknown), text = detail
  *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (VMN_NET_LOST: passt ended while
@@ -160,9 +169,10 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE,
-    VM_REQ_LAST = VM_FILE,
+    VM_APPS, VM_WINACT, VM_LAUNCH,
+    VM_REQ_LAST = VM_LAUNCH,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
-    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS,
+    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA,
 };
 /* VM_NOTICE a */
 enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VMN_COUNT };
@@ -172,7 +182,9 @@ enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
 /* VM_AGENT a, VM_AGENT_STATE a and b */
 enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL };
 enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
-enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64 };
+enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64,
+       VAC_WINDOWS = 128 /* the guest's helper lists its windows (apps mode, vmagent.h LAG_CAP_WINDOWS) */ };
+#define VM_WINDATA_MAX (1u << 20)
 #define VM_CLIP_MAX (11u << 20)
 /* VM_CLIP and VM_CLIP_DATA b: what the memfd holds */
 enum { VCF_TEXT = 0, VCF_CLIPX = 1 };
@@ -343,7 +355,10 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_INSTALL)) &&
                       (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX))) &&
                       (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1))) &&
-                      (m->type != VM_FILE || m->text[0]);
+                      (m->type != VM_FILE || m->text[0]) &&
+                      (m->type != VM_APPS || m->a == 0 || m->a == 1) &&
+                      (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
+                      (m->type != VM_LAUNCH || m->text[0]);
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
@@ -351,7 +366,8 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_DISPLAY_FD: return m->a >= 0 && m->b >= 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VM_NOTICE: return m->a > VMN_NONE && m->a < VMN_COUNT;
     case VM_CONSOLE_FD: return 1;
-    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 128;
+    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 256;
+    case VM_WINDATA: return m->a > 0 && (uint32_t)m->a <= VM_WINDATA_MAX && m->b >= 5 && m->b <= 9 && m->b != 7 && m->b != 8;
     case VM_CLIP_DATA: return m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX);
     case VM_FILE_PROGRESS: return m->a >= 0 && m->a <= 100;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;

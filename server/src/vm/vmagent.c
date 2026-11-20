@@ -455,3 +455,190 @@ int ag_drop_staging_ok(const char *p, int windows) {
     for (size_t i = l - 32; i < l; i++) if (!((p[i] >= '0' && p[i] <= '9') || (p[i] >= 'a' && p[i] <= 'f'))) return 0;
     return 1;
 }
+
+/* ---- Apps mode (vmagent.h, LAG_*) ---- */
+
+static uint16_t lag_rd16(const uint8_t *p) { return (uint16_t)(p[0] | p[1] << 8); }
+static void lag_wr16(uint8_t *p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
+static void lag_wr32(uint8_t *p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
+
+unsigned ag_hello_caps(const uint8_t *p, size_t n) {
+    unsigned caps = 0;
+    size_t i = 0;
+    while (i < n) {
+        while (i < n && p[i] == ' ') i++;
+        size_t s = i;
+        while (i < n && p[i] != ' ') i++;
+        size_t l = i - s;
+        if (l == 9 && !memcmp(p + s, "clipboard", 9)) caps |= LAG_CAP_CLIPBOARD;
+        else if (l == 5 && !memcmp(p + s, "clipx", 5)) caps |= LAG_CAP_CLIPX;
+        else if (l == 7 && !memcmp(p + s, "windows", 7)) caps |= LAG_CAP_WINDOWS;
+    }
+    return caps;
+}
+
+int lag_text_ok(const uint8_t *p, size_t n) {
+    if (!ag_utf8_ok(p, n)) return 0;
+    for (size_t i = 0; i < n; i++) if (p[i] < 0x20 || p[i] == 0x7f) return 0;
+    /* C1 controls (U+0080..U+009F: 0xC2 0x80..0x9F) too */
+    for (size_t i = 0; i + 1 < n; i++) if (p[i] == 0xc2 && p[i + 1] >= 0x80 && p[i + 1] <= 0x9f) return 0;
+    return 1;
+}
+
+int lag_rect_ok(int32_t x, int32_t y, int32_t w, int32_t h) {
+    return w >= 1 && h >= 1 && w <= LAG_DIM_MAX && h <= LAG_DIM_MAX && x >= -LAG_POS_MAX && x <= LAG_POS_MAX && y >= -LAG_POS_MAX && y <= LAG_POS_MAX;
+}
+
+/* a u16-length string at p[*o]: within max (and at least min) bytes, valid text, copied NUL-terminated into out */
+static int lag_str(const uint8_t *p, size_t n, size_t *o, size_t min, size_t max, char *out) {
+    if (*o + 2 > n) return -1;
+    size_t l = lag_rd16(p + *o);
+    *o += 2;
+    if (l < min || l > max || *o + l > n || !lag_text_ok(p + *o, l)) return -1;
+    memcpy(out, p + *o, l);
+    out[l] = 0;
+    *o += l;
+    return 0;
+}
+static size_t lag_put_str(uint8_t *out, size_t o, const char *s) {
+    size_t l = strlen(s);
+    lag_wr16(out + o, (uint32_t)l);
+    memcpy(out + o + 2, s, l);
+    return o + 2 + l;
+}
+
+int lag_windows_parse(const uint8_t *p, size_t n, LagWinList *out) {
+    if (n < 6) return -1;
+    out->serial = le32(p);
+    size_t cnt = lag_rd16(p + 4), o = 6;
+    if (cnt > LAG_WIN_MAX) return -1;
+    out->n = 0;
+    for (size_t i = 0; i < cnt; i++) {
+        LagWin *w = &out->w[i];
+        if (o + 24 > n) return -1;
+        w->id = le32(p + o);
+        w->x = (int32_t)le32(p + o + 4); w->y = (int32_t)le32(p + o + 8);
+        w->w = (int32_t)le32(p + o + 12); w->h = (int32_t)le32(p + o + 16);
+        w->flags = le32(p + o + 20);
+        o += 24;
+        w->owner = 0;
+        if (w->flags & LAGW_OWNED) { if (o + 4 > n) return -1; w->owner = le32(p + o); o += 4; }
+        if (o + 4 > n) return -1;
+        w->pid = le32(p + o);
+        o += 4;
+        if (!w->id || (w->flags & ~(uint32_t)LAGW_ALL) || ((w->flags & LAGW_OWNED) && (!w->owner || w->owner == w->id))) return -1;
+        if (w->flags & LAGW_MINIMIZED) w->x = w->y = w->w = w->h = 0;
+        else if (!lag_rect_ok(w->x, w->y, w->w, w->h)) return -1;
+        for (size_t j = 0; j < i; j++) if (out->w[j].id == w->id) return -1;
+        if (lag_str(p, n, &o, 0, LAG_TITLE_MAX, w->title) || lag_str(p, n, &o, 0, LAG_APPNAME_MAX, w->app)) return -1;
+        out->n = (int)i + 1;
+    }
+    return o == n ? 0 : -1;
+}
+
+size_t lag_windows_write(const LagWinList *l, uint8_t *out, size_t cap) {
+    if (l->n < 0 || l->n > LAG_WIN_MAX) return 0;
+    size_t need = 6;
+    for (int i = 0; i < l->n; i++) need += 28 + ((l->w[i].flags & LAGW_OWNED) ? 4 : 0) + 4 + strlen(l->w[i].title) + strlen(l->w[i].app);
+    if (need > cap) return 0;
+    lag_wr32(out, l->serial);
+    lag_wr16(out + 4, (uint32_t)l->n);
+    size_t o = 6;
+    for (int i = 0; i < l->n; i++) {
+        const LagWin *w = &l->w[i];
+        if (strlen(w->title) > LAG_TITLE_MAX || strlen(w->app) > LAG_APPNAME_MAX) return 0;
+        lag_wr32(out + o, w->id); lag_wr32(out + o + 4, (uint32_t)w->x); lag_wr32(out + o + 8, (uint32_t)w->y);
+        lag_wr32(out + o + 12, (uint32_t)w->w); lag_wr32(out + o + 16, (uint32_t)w->h); lag_wr32(out + o + 20, w->flags);
+        o += 24;
+        if (w->flags & LAGW_OWNED) { lag_wr32(out + o, w->owner); o += 4; }
+        lag_wr32(out + o, w->pid);
+        o += 4;
+        o = lag_put_str(out, o, w->title);
+        o = lag_put_str(out, o, w->app);
+    }
+    return o;
+}
+
+int lag_icon_parse(const uint8_t *p, size_t n, uint32_t *id, int *w, int *h, const uint8_t **px) {
+    if (n < 8) return -1;
+    uint32_t i = le32(p);
+    int ww = lag_rd16(p + 4), hh = lag_rd16(p + 6);
+    if (!i || ww < 1 || hh < 1 || ww > LAG_ICON_MAX || hh > LAG_ICON_MAX || n != 8 + (size_t)ww * hh * 4) return -1;
+    *id = i; *w = ww; *h = hh; *px = p + 8;
+    return 0;
+}
+
+size_t lag_icon_write(uint32_t id, int w, int h, const uint8_t *rgba, uint8_t *out, size_t cap) {
+    if (!id || w < 1 || h < 1 || w > LAG_ICON_MAX || h > LAG_ICON_MAX) return 0;
+    size_t need = 8 + (size_t)w * h * 4;
+    if (need > cap) return 0;
+    lag_wr32(out, id); lag_wr16(out + 4, (uint32_t)w); lag_wr16(out + 6, (uint32_t)h);
+    memcpy(out + 8, rgba, need - 8);
+    return need;
+}
+
+int lag_act_parse(const uint8_t *p, size_t n, LagAct *a) {
+    if (n < 5) return -1;
+    a->id = le32(p);
+    a->action = p[4];
+    a->x = a->y = a->w = a->h = 0;
+    if (!a->id || a->action < LAGA_FOCUS || a->action > LAGA_MOVE) return -1;
+    if (a->action != LAGA_MOVE) return n == 5 ? 0 : -1;
+    if (n != 21) return -1;
+    a->x = (int32_t)le32(p + 5); a->y = (int32_t)le32(p + 9); a->w = (int32_t)le32(p + 13); a->h = (int32_t)le32(p + 17);
+    return lag_rect_ok(a->x, a->y, a->w, a->h) ? 0 : -1;
+}
+
+size_t lag_act_write(const LagAct *a, uint8_t *out, size_t cap) {
+    if (!a->id || a->action < LAGA_FOCUS || a->action > LAGA_MOVE) return 0;
+    size_t need = a->action == LAGA_MOVE ? 21 : 5;
+    if (cap < need || (a->action == LAGA_MOVE && !lag_rect_ok(a->x, a->y, a->w, a->h))) return 0;
+    lag_wr32(out, a->id);
+    out[4] = (uint8_t)a->action;
+    if (a->action == LAGA_MOVE) { lag_wr32(out + 5, (uint32_t)a->x); lag_wr32(out + 9, (uint32_t)a->y); lag_wr32(out + 13, (uint32_t)a->w); lag_wr32(out + 17, (uint32_t)a->h); }
+    return need;
+}
+
+int lag_launch_parse(const uint8_t *p, size_t n, char *token, size_t cap) {
+    size_t o = 0;
+    if (cap < LAG_TOKEN_MAX + 1 || lag_str(p, n, &o, 1, LAG_TOKEN_MAX, token)) return -1;
+    return o == n ? 0 : -1;
+}
+
+size_t lag_launch_write(const char *token, uint8_t *out, size_t cap) {
+    size_t l = strlen(token);
+    if (!l || l > LAG_TOKEN_MAX || cap < l + 2 || !lag_text_ok((const uint8_t *)token, l)) return 0;
+    return lag_put_str(out, 0, token);
+}
+
+int lag_applist_parse(const uint8_t *p, size_t n, LagAppList *out) {
+    if (n < 2) return -1;
+    size_t cnt = lag_rd16(p), o = 2;
+    if (cnt > LAG_APPS_MAX) return -1;
+    out->n = 0;
+    for (size_t i = 0; i < cnt; i++) {
+        if (lag_str(p, n, &o, 1, LAG_APPNAME_MAX, out->a[i].name) || lag_str(p, n, &o, 1, LAG_TOKEN_MAX, out->a[i].token)) return -1;
+        out->n = (int)i + 1;
+    }
+    return o == n ? 0 : -1;
+}
+
+size_t lag_applist_write(const LagAppList *l, uint8_t *out, size_t cap) {
+    if (l->n < 0 || l->n > LAG_APPS_MAX) return 0;
+    size_t need = 2;
+    for (int i = 0; i < l->n; i++) {
+        size_t a = strlen(l->a[i].name), b = strlen(l->a[i].token);
+        if (!a || !b || a > LAG_APPNAME_MAX || b > LAG_TOKEN_MAX) return 0;
+        need += 4 + a + b;
+    }
+    if (need > cap) return 0;
+    lag_wr16(out, (uint32_t)l->n);
+    size_t o = 2;
+    for (int i = 0; i < l->n; i++) { o = lag_put_str(out, o, l->a[i].name); o = lag_put_str(out, o, l->a[i].token); }
+    return o;
+}
+
+int lag_applist_has(const LagAppList *l, const char *token) {
+    for (int i = 0; i < l->n; i++) if (!strcmp(l->a[i].token, token)) return 1;
+    return 0;
+}
