@@ -39,9 +39,9 @@ build/lord-vmdisplay: $(VMDISPLAY_SRC) $(VM_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ $(VMDISPLAY_SRC) $(shell pkg-config --libs libsystemd) -lpthread
 	chmod g-w $@
-build/lordvm-dev: tests/vm_dev.c src/vm/vmproto.h
+build/lordvm-dev: tests/vm_dev.c src/vm/vmproto.h src/media/maudio.c src/media/mpulse.c src/sound/pulse.c src/media/aring.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/vm_dev.c -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/vm_dev.c src/media/maudio.c src/media/mpulse.c src/sound/pulse.c -lm
 endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.

@@ -5,10 +5,10 @@
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
   View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
-  inhibitShortcuts, useNarrow, t as tr,
+  inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand, soundOf, audible, muteToggle, micLive, micAsk } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal } from './ui.jsx';
 import { openLogs, openSnapshots } from './library.jsx';
@@ -21,8 +21,9 @@ const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.install}` : '');
+const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}` : '');
 const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn'].every((k) => a[k] === b[k])
-  && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent);
+  && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
 function AgentButton({ ctl }) {
@@ -141,6 +142,9 @@ function Tools({ ctl, floating, compact }) {
     <BarGroup>
       <IconMenuBtn sym="display" label={resLabel} items={res} disabled={!a.keys} on={!follow} />
       <IconMenuBtn sym="eject" label={tr('machines.tb.devices')} items={ctl.devices} />
+      {/* the machine's sound (6.9): a click mutes it or turns it back on; the microphone shows while the guest hears it */}
+      <IconBtn sym={ctl.heard ? 'sound' : 'sound-off'} label={ctl.heard ? tr('machines.tb.mute') : tr('machines.tb.unmute')} onClick={ctl.toggleSound} />
+      {ctl.micLive ? <IconBtn sym="mic" color="#ff9f0a" label={tr('machines.tb.micLive')} onClick={() => ctl.configure('sound')} /> : null}
     </BarGroup>
     {compact ? null : <BarSep />}
     <BarGroup>
@@ -537,8 +541,19 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     const text = lord.vm.clipboardTake(sid);
     if (text) { clipSent.current = text; clipboard.set(text, { origin: 'machines' }); }
   }, [st?.clipIn]);
+  // sound and microphone (6.9): what this window's session reports (Configure's changes reach it at once)
+  const snd = st?.sound ? { sound: st.sound.on, volume: st.sound.volume, microphone: st.sound.microphone } : soundOf(cfgRef.current);
+  const heard = audible(snd);
+  const soundTo = (patch) => { if (has() && !lord.vm.sound(dir, patch)) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.cfg.soundFailed'), body: '', sound: false }); };
+  const toggleSound = () => soundTo(muteToggle(snd));
+  // the guest records and the machine allows the microphone: LordOS's own permission prompt, once per window (C checks
+  // it again before it opens the microphone)
+  const micAsked = useRef(false);
+  useEffect(() => { if (micAsk(st?.sound, micAsked.current)) { micAsked.current = true; requestPermission('machines', 'microphone'); } }, [st?.sound?.mic]);
+  const micOn = micLive(st?.sound);
+  useEffect(() => { markDeviceUse('machines', 'microphone', micOn); return micOn ? () => markDeviceUse('machines', 'microphone', false) : undefined; }, [micOn]);
   const ctl = {
-    sid, cfg,
+    sid, cfg, heard, toggleSound, micLive: micOn,
     shell, toggleShell: () => { setShell(!shell); setShellKeys(!shell); },
     rec: !!rec, recTime: `${String(Math.floor(recSecs / 60)).padStart(2, '0')}:${String(recSecs % 60).padStart(2, '0')}`, record,
     st, a, full, follow, cmd,
@@ -562,7 +577,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       { label: tr('machines.tb.cdChoose'), disabled: !cdOk, onClick: () => setPickCd(true) },
       { label: tr('machines.tb.cdEject'), disabled: !cdOk || !iso, onClick: () => cdTo('') },
       '-',
-      { label: tr('machines.tb.sound'), disabled: true, hint: tr('machines.later') },
+      { label: tr('machines.tb.sound'), checked: heard, onClick: toggleSound },
+      { label: tr('machines.cfg.microphone'), checked: snd.microphone, onClick: () => soundTo({ microphone: !snd.microphone }) },
+      { label: tr('machines.tb.soundSettings'), onClick: () => setCfgSheet({ section: 'sound' }) },
     ],
   };
   useEffect(() => {
@@ -586,7 +603,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       ] },
       { label: tr('machines.menu.devices'), items: ctl.devices.filter((x) => x !== '-') },
     ]);
-  }, [st?.state, full, iso, sid, cdWant]);
+  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone]);
 
   let card = null;
   let failed = null;

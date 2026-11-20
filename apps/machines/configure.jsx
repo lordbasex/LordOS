@@ -2,8 +2,8 @@
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. Sections of later phases say so.
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay } from '@lordos/sdk';
-import { useEffect, useState } from 'react';
-import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand } from './model.js';
+import { useEffect, useRef, useState } from 'react';
+import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand, soundOf, soundSummary } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
@@ -50,6 +50,9 @@ export function Configure({ dir, section: section0, onClose }) {
   const [picking, setPicking] = useState(false);
   const [pickShare, setPickShare] = useState(false);
   const [disk, setDisk] = useState(null);
+  const [sndDraft, setSndDraft] = useState({});
+  const volTimer = useRef(0);
+  useEffect(() => () => clearTimeout(volTimer.current), []);
   // a small window: the sections hide behind a button beside the title and open over the pane
   const side = useSidebar(640, 'machines-configure');
   const load = () => {
@@ -66,6 +69,7 @@ export function Configure({ dir, section: section0, onClose }) {
       const r = lord.vm.job(job);
       if (!r || !r.done) return;
       setJob(0);
+      setSndDraft({});
       if (r.ok) { setDraft({}); setMsg({ ok: true, text: tr('machines.cfg.saved') }); if (closing && onClose) onClose(); }
       else { setClosing(false); setMsg({ ok: false, text: r.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || r.out.trim() }); }
       load();
@@ -86,6 +90,19 @@ export function Configure({ dir, section: section0, onClose }) {
     const id = lord.vm.set(dir, change);
     if (!id) setMsg({ ok: false, text: vmRefusal(tr('machines.cfg.refused')) }); else { setJob(id); setMsg({ ok: true, text: tr('machines.cfg.saving') }); }
   };
+  // sound (6.9): lord.vm.sound applies it to a running machine now, or writes it with lord-vm --set (a job) when it's off
+  const setSound = (patch) => {
+    setSndDraft((d) => ({ ...d, ...patch }));
+    const r = has() ? lord.vm.sound(dir, patch) : null;
+    if (!r) { setSndDraft({}); setMsg({ ok: false, text: tr('machines.cfg.soundFailed') }); return; }
+    if (r.job) setJob(r.job); else { setSndDraft({}); load(); }
+  };
+  // the slider: shown as it moves, applied once it rests for a quarter second
+  const volumeTo = (v) => {
+    setSndDraft((d) => ({ ...d, volume: v }));
+    clearTimeout(volTimer.current);
+    volTimer.current = setTimeout(() => setSound({ volume: v }), 250);
+  };
   const emulated = m.accel === 'tcg';
   const prof = profileOf({ ...m, ...draft }, host, meta.profile);
   const summary = {
@@ -94,7 +111,7 @@ export function Configure({ dir, section: section0, onClose }) {
     cpu: tr('machines.cfg.sum.cpu', { n: m.vcpus, mem: gb(m.memoryMb) }),
     display: m.display === 'window' ? tr('machines.cfg.sum.display') : tr('machines.cfg.sum.noDisplay'),
     network: tr(`machines.cfg.net.${m.network}`),
-    sound: tr('machines.cfg.sum.sound'),
+    sound: (() => { const x = soundSummary(m); return `${tr(x.key, { volume: x.volume })}, ${tr(x.mic)}`; })(),
     disks: tr('machines.cfg.sum.disks', { n: m.diskGb }) + (m.dataDisks ? ` + ${m.dataDisks}` : '') + (m.devices === 'compat' ? `, ${tr('machines.cfg.devCompatShort')}` : '') + (m.iso ? `, ${tr('machines.isoAttached')}` : ''),
     // "Nothing shared" only when neither the clipboard nor a folder is
     sharing: m.shares?.length ? [m.clipboard && m.clipboard !== 'off' ? tr(`machines.cfg.clipSum.${m.clipboard}`) : null,
@@ -190,13 +207,30 @@ export function Configure({ dir, section: section0, onClose }) {
     </Group>
     <Later text={tr('machines.cfg.laterPorts')} />
   </>;
-  else if (sec === 'sound') pane = <>
-    <Group>
-      <Row label={tr('machines.cfg.keyboard')} value={tr('machines.cfg.keyboardValue')} />
-      <Row label={tr('machines.cfg.pointer')} value={tr('machines.cfg.pointerValue')} last note={tr('machines.cfg.pointerNote')} />
-    </Group>
-    <Later text={tr('machines.cfg.laterSound')} />
-  </>;
+  else if (sec === 'sound') {
+    // host-side choices (6.9): saved at once, and a running machine's window applies them at once too
+    const snd = { ...soundOf(m), ...sndDraft };
+    pane = <>
+      <Group>
+        <Row label={tr('machines.cfg.sound')} note={tr('machines.cfg.soundNote')}>
+          <Toggle on={snd.sound} onChange={(x) => setSound({ sound: x })} />
+        </Row>
+        <Row label={tr('machines.cfg.volume')} value={`${snd.volume}%`} last>
+          <Off off={!snd.sound}><Slider value={snd.volume} min={0} max={100} step={5} width={340}
+            onChange={(x) => volumeTo(Math.round(x / 5) * 5)} /></Off>
+        </Row>
+      </Group>
+      <Group>
+        <Row label={tr('machines.cfg.microphone')} last note={tr('machines.cfg.microphoneNote')}>
+          <Toggle on={snd.microphone} onChange={(x) => setSound({ microphone: x })} />
+        </Row>
+      </Group>
+      <Group>
+        <Row label={tr('machines.cfg.keyboard')} value={tr('machines.cfg.keyboardValue')} />
+        <Row label={tr('machines.cfg.pointer')} value={tr('machines.cfg.pointerValue')} last note={tr('machines.cfg.pointerNote')} />
+      </Group>
+    </>;
+  }
   else if (sec === 'disks') pane = <>
     <Group>
       <Row label={tr('machines.cfg.systemDisk')} value={tr('machines.disk', { n: cur.diskGb })} note={tr('machines.cfg.diskNote', { used: disk != null ? bytes(disk) : '—' }) + (offNote ? ` ${offNote}` : '')} last>

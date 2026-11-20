@@ -219,7 +219,7 @@ static int send_playback(LmPulse *p) {
     ts_u32(&t, 0xffffffffu);                         /* maxlength */
     ts_bool(&t, 1);                                  /* corked: starts when there's data */
     uint32_t bps = (uint32_t)rate * p->frame_bytes;
-    ts_u32(&t, bps / 5);                             /* tlength: 200 ms */
+    ts_u32(&t, p->tlength_ms > 0 ? bps / 1000 * (uint32_t)p->tlength_ms : bps / 5);   /* tlength: 200 ms unless asked */
     ts_u32(&t, 0xffffffffu);                         /* prebuf: the server's */
     ts_u32(&t, bps / 50);                            /* minreq: 20 ms */
     ts_u32(&t, 0);                                   /* syncid */

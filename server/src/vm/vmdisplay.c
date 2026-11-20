@@ -19,10 +19,14 @@
  *   - It never makes a blocking call to QEMU after setup (QEMU calls the listener from its main loop): input goes
  *     out as method calls that expect no reply.
  *   - Sound (6.9, 6.20): an org.qemu.Display1.AudioOutListener on a third peer connection, registered before the
- *     sandbox. Only 16-bit little-endian PCM is taken (QEMU is told 48 kHz stereo s16, -audiodev in lordvm.c); while
- *     a recording runs (VD_AUDIO_REC) it goes, mixed to one channel, into the ring lord-media reads, with silence for
- *     the time the guest plays nothing and nothing beyond 200 ms ahead of the clock, so it keeps time with the
- *     picture. */
+ *     sandbox. Only 16-bit little-endian PCM is taken (QEMU is told 48 kHz stereo s16, -audiodev in lordvm.c), with the
+ *     guest's own mute and volume applied. It goes into lord-server's speakers' ring (VD_AUDIO_OUT), never more than
+ *     VD_AUDIO_AHEAD_MS ahead of what lord-server read; and while a recording runs (VD_AUDIO_REC), mixed to one
+ *     channel, into the ring lord-media reads, with silence for the time the guest plays nothing and nothing beyond
+ *     200 ms ahead of the clock, so it keeps time with the picture.
+ *   - Microphone (6.9): an org.qemu.Display1.AudioInListener on a fourth connection. QEMU's Read calls are answered at
+ *     once, at the real rate: from lord-server's microphone ring (VD_MIC) when lord-server sent one, else silence. The
+ *     helper never opens a device: the microphone is lord-server's stream, opened only after LordOS's permission. */
 #include "vmproto.h"
 #include "vmkeys.h"
 #include "../sec/sandbox.h"
@@ -59,7 +63,7 @@
 #define RESIZE_GAP_MS 100
 #define STATS_MS      5000
 
-static sd_bus *bus, *lbus, *abus;
+static sd_bus *bus, *lbus, *abus, *ibus;
 
 /* where the picture comes from */
 enum { SRC_NONE = 0, SRC_MAP, SRC_FB };
@@ -156,28 +160,68 @@ static void damage(int x, int y, int w, int h) {
 /* ---- sound ---- */
 
 #define AU_STREAMS 8
+#define AU_RATE 48000
+/* one ring the helper maps: lord-server made it (sealed, its own size); the helper keeps its own cursor and size */
+typedef struct {
+    ARingHdr *h;
+    size_t len;
+    uint32_t size;
+    uint64_t pos;                   /* write cursor (speakers, recording) or read cursor (microphone) */
+} AuRing;
 static struct {
-    struct { uint64_t id; int used, ok, ch, on, mute; } st[AU_STREAMS];
-    ARingHdr *ring;                 /* a recording's ring (VD_AUDIO_REC), or NULL */
-    size_t ring_len;
-    uint32_t size;                  /* our copy of its data size, never the shared header's */
-    uint64_t wpos;
+    struct { uint64_t id; int used, ok, ch, on, mute, vol[2]; } st[AU_STREAMS];     /* the guest's output streams */
+    struct { uint64_t id; int used, ok, ch, on, mute, vol; long long t0; uint64_t given; } in[AU_STREAMS];   /* its input streams */
+    AuRing rec;                     /* a recording's ring (VD_AUDIO_REC, one channel), or none */
+    AuRing out;                     /* the speakers' ring (VD_AUDIO_OUT, two channels), or none */
+    AuRing mic;                     /* the microphone's ring (VD_MIC, one channel), or none */
     long long t0;                   /* when the recording started (CLOCK_MONOTONIC ms) */
     uint64_t samples;               /* written since t0 */
     long long writes, pads, dropped;
+    long long out_bytes, out_dropped, mic_bytes, mic_silence;
+    int out_on, in_on;              /* what lord-server was last told (VD_GUEST_AUDIO) */
 } A;
 
+static void ring_drop(AuRing *r) { if (r->h) munmap(r->h, r->len); memset(r, 0, sizeof *r); }
+/* maps a ring lord-server sent: sealed against shrinking, its header as aring.h says, 48 kHz, `ch` channels */
+static int ring_take(AuRing *r, int fd, uint32_t ch) {
+    ring_drop(r);
+    struct stat st;
+    int seals = fcntl(fd, F_GET_SEALS);
+    if (seals < 0 || !(seals & F_SEAL_SHRINK) || fstat(fd, &st) || st.st_size < AR_HDR) { close(fd); return -1; }
+    void *map = mmap(NULL, (size_t)st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+    if (map == MAP_FAILED) return -1;
+    ARingHdr *h = map;
+    uint32_t size = h->size;
+    if (h->magic != AR_MAGIC || h->rate != AR_RATE || h->channels != ch || !size || (size & (size - 1)) || ar_bytes(size) > (size_t)st.st_size) {
+        munmap(map, (size_t)st.st_size);
+        return -1;
+    }
+    r->h = h; r->len = (size_t)st.st_size; r->size = size;
+    r->pos = atomic_load(&h->wpos);
+    if (ch == 1 && r == &A.mic) atomic_store(&h->rpos, r->pos);     /* the microphone: from now on, nothing older */
+    return 0;
+}
+
 static int au_find(uint64_t id) { for (int i = 0; i < AU_STREAMS; i++) if (A.st[i].used && A.st[i].id == id) return i; return -1; }
+static int in_find(uint64_t id) { for (int i = 0; i < AU_STREAMS; i++) if (A.in[i].used && A.in[i].id == id) return i; return -1; }
+
+/* tells lord-server whether the guest plays or records anything now (the speakers' stream and the microphone follow) */
+static void au_tell(void) {
+    int out = 0, in = 0;
+    for (int i = 0; i < AU_STREAMS; i++) { if (A.st[i].used && A.st[i].ok && A.st[i].on) out = 1; if (A.in[i].used && A.in[i].ok && A.in[i].on) in = 1; }
+    if (out != A.out_on) { A.out_on = out; say(vd_msg(VD_GUEST_AUDIO, VDG_OUT, out, 0, 0, 0, 0), -1); }
+    if (in != A.in_on) { A.in_on = in; say(vd_msg(VD_GUEST_AUDIO, VDG_IN, in, 0, 0, 0, 0), -1); }
+}
 
 static void au_put(const int16_t *pcm, size_t k) {
-    size_t n = k * 2;
-    if (A.ring) ar_write_t(A.ring, A.size, &A.wpos, pcm, n);
+    if (A.rec.h) ar_write_t(A.rec.h, A.rec.size, &A.rec.pos, pcm, k * 2);
     A.samples += k;
 }
 /* silence up to `upto` samples since t0 */
 static void au_pad(uint64_t upto) {
     static const int16_t zero[960];
-    while (A.ring && A.samples < upto) {
+    while (A.rec.h && A.samples < upto) {
         size_t k = upto - A.samples < 960 ? (size_t)(upto - A.samples) : 960;
         au_put(zero, k);
         A.pads++;
@@ -186,7 +230,16 @@ static void au_pad(uint64_t upto) {
 static uint64_t au_expected(long long now) { return now > A.t0 ? (uint64_t)(now - A.t0) * 48 : 0; }
 static void au_tick(long long now) {
     uint64_t want = au_expected(now);
-    if (A.ring && A.samples + 2400 < want) au_pad(want - 960);         /* 50 ms behind: the guest is quiet */
+    if (A.rec.h && A.samples + 2400 < want) au_pad(want - 960);         /* 50 ms behind: the guest is quiet */
+}
+
+/* the speakers: stereo frames into lord-server's ring, unless that would put it more than VD_AUDIO_AHEAD_MS ahead of
+ * what lord-server read (then this piece is dropped: never a wait, never a growing delay) */
+static void out_put(const int16_t *lr, size_t frames) {
+    if (!A.out.h || !frames) return;
+    size_t n = frames * 4;
+    if (!vd_audio_fits(atomic_load_explicit(&A.out.h->rpos, memory_order_acquire), A.out.pos, A.out.size, n)) { A.out_dropped += (long long)n; return; }
+    A.out_bytes += (long long)ar_write_t(A.out.h, A.out.size, &A.out.pos, lr, n);
 }
 
 static int on_au_init(sd_bus_message *m, void *u, sd_bus_error *e) {
@@ -196,8 +249,8 @@ static int on_au_init(sd_bus_message *m, void *u, sd_bus_error *e) {
     int i = au_find(id);
     for (int k = 0; i < 0 && k < AU_STREAMS; k++) if (!A.st[k].used) i = k;
     if (i < 0) return 0;
-    A.st[i].used = 1; A.st[i].id = id; A.st[i].on = 0; A.st[i].mute = 0;
-    A.st[i].ok = bits == 16 && sgn && !flt && !be && freq == 48000 && (nch == 1 || nch == 2) && bpf == (uint32_t)nch * 2;
+    A.st[i].used = 1; A.st[i].id = id; A.st[i].on = 0; A.st[i].mute = 0; A.st[i].vol[0] = A.st[i].vol[1] = 255;
+    A.st[i].ok = bits == 16 && sgn && !flt && !be && freq == AU_RATE && (nch == 1 || nch == 2) && bpf == (uint32_t)nch * 2;
     A.st[i].ch = nch;
     if (!A.st[i].ok) fprintf(stderr, "lord-vmdisplay: sound stream %llu isn't 48 kHz 16-bit (%u bits, %u Hz, %u channels): not used\n", (unsigned long long)id, bits, freq, nch);
     return sd_bus_reply_method_return(m, "");
@@ -205,19 +258,33 @@ static int on_au_init(sd_bus_message *m, void *u, sd_bus_error *e) {
 static int on_au_fini(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)u; (void)e;
     uint64_t id;
-    if (sd_bus_message_read(m, "t", &id) >= 0) { int i = au_find(id); if (i >= 0) A.st[i].used = 0; }
+    if (sd_bus_message_read(m, "t", &id) >= 0) { int i = au_find(id); if (i >= 0) A.st[i].used = 0; au_tell(); }
     return sd_bus_reply_method_return(m, "");
 }
 static int on_au_enabled(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)u; (void)e;
     uint64_t id; int on;
-    if (sd_bus_message_read(m, "tb", &id, &on) >= 0) { int i = au_find(id); if (i >= 0) A.st[i].on = on; }
+    if (sd_bus_message_read(m, "tb", &id, &on) >= 0) { int i = au_find(id); if (i >= 0) A.st[i].on = on; au_tell(); }
     return sd_bus_reply_method_return(m, "");
 }
+/* the guest's own mute and volume (its mixer): QEMU leaves them to the listener, 0..255 per channel, linear as QEMU's
+ * own mixer applies them */
 static int on_au_volume(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)u; (void)e;
     uint64_t id; int mute;
-    if (sd_bus_message_read(m, "tb", &id, &mute) >= 0) { int i = au_find(id); if (i >= 0) A.st[i].mute = mute; }
+    const void *vol = NULL;
+    size_t nv = 0;
+    if (sd_bus_message_read(m, "tb", &id, &mute) >= 0) {
+        int i = au_find(id);
+        if (i >= 0) {
+            A.st[i].mute = mute;
+            if (sd_bus_message_read_array(m, 'y', &vol, &nv) >= 0 && nv >= 1) {
+                const uint8_t *v = vol;
+                A.st[i].vol[0] = v[0];
+                A.st[i].vol[1] = nv >= 2 ? v[1] : v[0];
+            }
+        }
+    }
     return sd_bus_reply_method_return(m, "");
 }
 static int on_au_write(sd_bus_message *m, void *u, sd_bus_error *e) {
@@ -227,29 +294,36 @@ static int on_au_write(sd_bus_message *m, void *u, sd_bus_error *e) {
     size_t n = 0;
     if (sd_bus_message_read(m, "t", &id) < 0 || sd_bus_message_read_array(m, 'y', &data, &n) < 0) return 0;
     int i = au_find(id);
-    if (i < 0 || !A.st[i].ok || !A.ring) return sd_bus_reply_method_return(m, "");
-    int ch = A.st[i].ch;
+    if (i < 0 || !A.st[i].ok || (!A.rec.h && !A.out.h)) return sd_bus_reply_method_return(m, "");
+    int ch = A.st[i].ch, vl = A.st[i].mute ? 0 : A.st[i].vol[0], vr = A.st[i].mute ? 0 : A.st[i].vol[1];
     size_t frames = n / ((size_t)ch * 2);
     long long now = now_ms();
-    uint64_t want = au_expected(now);
-    if (A.samples > want + 9600) { A.dropped += (long long)frames; return sd_bus_reply_method_return(m, ""); }   /* 200 ms ahead */
-    au_tick(now);
-    static int16_t mono[4096];
+    int rec = !!A.rec.h;
+    if (rec) {
+        uint64_t want = au_expected(now);
+        if (A.samples > want + 9600) { A.dropped += (long long)frames; rec = 0; }      /* 200 ms ahead */
+        else au_tick(now);
+    }
+    static int16_t mono[2048], lr[4096];
     const uint8_t *p = data;
     for (size_t f = 0; f < frames;) {
-        size_t k = frames - f < 4096 ? frames - f : 4096;
+        size_t k = frames - f < 2048 ? frames - f : 2048;
         for (size_t j = 0; j < k; j++, f++) {
             int16_t l, r;
             memcpy(&l, p + f * (size_t)ch * 2, 2);
             if (ch == 2) memcpy(&r, p + f * 4 + 2, 2); else r = l;
-            mono[j] = A.st[i].mute ? 0 : (int16_t)(((int)l + (int)r) / 2);
+            int sl = l * vl / 255, sr = r * vr / 255;
+            lr[j * 2] = (int16_t)sl;
+            lr[j * 2 + 1] = (int16_t)sr;
+            mono[j] = (int16_t)((sl + sr) / 2);
         }
-        au_put(mono, k);
+        if (rec) au_put(mono, k);
+        out_put(lr, k);
     }
     A.writes++;
     return sd_bus_reply_method_return(m, "");
 }
-/* QEMU reads the listener's Interfaces (no extra ones here: PCM goes as Write calls) while it registers it */
+/* QEMU reads the listener's Interfaces (no extra ones here: PCM goes as Write and Read calls) while it registers it */
 static int au_interfaces(sd_bus *b, const char *path, const char *iface, const char *prop, sd_bus_message *reply, void *u, sd_bus_error *e) {
     (void)b; (void)path; (void)iface; (void)prop; (void)u; (void)e;
     return sd_bus_message_append_strv(reply, NULL);
@@ -265,34 +339,123 @@ static const sd_bus_vtable audio_vt[] = {
     SD_BUS_VTABLE_END
 };
 
-/* RegisterOutListener's answer: 1 taken, 2 refused */
+/* ---- the guest's microphone (AudioInListener) ----
+ * QEMU asks with Read from its main loop and waits for the answer, so it's answered at once: the frames the time since
+ * the stream started is owed (never more than asked), from lord-server's microphone ring when there is one (VD_MIC),
+ * else silence. A guest that records never stalls, and hears nothing of this computer without the ring. */
+static int on_in_init(sd_bus_message *m, void *u, sd_bus_error *e) {
+    (void)u; (void)e;
+    uint64_t id; uint8_t bits, nch; int sgn, flt, be; uint32_t freq, bpf, bps;
+    if (sd_bus_message_read(m, "tybbuyuub", &id, &bits, &sgn, &flt, &freq, &nch, &bpf, &bps, &be) < 0) return 0;
+    int i = in_find(id);
+    for (int k = 0; i < 0 && k < AU_STREAMS; k++) if (!A.in[k].used) i = k;
+    if (i < 0) return 0;
+    A.in[i].used = 1; A.in[i].id = id; A.in[i].on = 0; A.in[i].mute = 0; A.in[i].vol = 255;
+    A.in[i].ok = bits == 16 && sgn && !flt && !be && freq == AU_RATE && (nch == 1 || nch == 2) && bpf == (uint32_t)nch * 2;
+    A.in[i].ch = nch;
+    if (!A.in[i].ok) fprintf(stderr, "lord-vmdisplay: input stream %llu isn't 48 kHz 16-bit (%u bits, %u Hz, %u channels): silence\n", (unsigned long long)id, bits, freq, nch);
+    return sd_bus_reply_method_return(m, "");
+}
+static int on_in_fini(sd_bus_message *m, void *u, sd_bus_error *e) {
+    (void)u; (void)e;
+    uint64_t id;
+    if (sd_bus_message_read(m, "t", &id) >= 0) { int i = in_find(id); if (i >= 0) A.in[i].used = 0; au_tell(); }
+    return sd_bus_reply_method_return(m, "");
+}
+static int on_in_enabled(sd_bus_message *m, void *u, sd_bus_error *e) {
+    (void)u; (void)e;
+    uint64_t id; int on;
+    if (sd_bus_message_read(m, "tb", &id, &on) >= 0) {
+        int i = in_find(id);
+        if (i >= 0) { A.in[i].on = on; A.in[i].t0 = now_ms(); A.in[i].given = 0; }
+        au_tell();
+    }
+    return sd_bus_reply_method_return(m, "");
+}
+/* the guest's capture mute and level (its mixer), applied here as for the speakers: a guest that muted its microphone
+ * hears silence */
+static int on_in_volume(sd_bus_message *m, void *u, sd_bus_error *e) {
+    (void)u; (void)e;
+    uint64_t id; int mute;
+    const void *vol = NULL;
+    size_t nv = 0;
+    if (sd_bus_message_read(m, "tb", &id, &mute) >= 0) {
+        int i = in_find(id);
+        if (i >= 0) {
+            A.in[i].mute = mute;
+            if (sd_bus_message_read_array(m, 'y', &vol, &nv) >= 0 && nv >= 1) A.in[i].vol = ((const uint8_t *)vol)[0];
+        }
+    }
+    return sd_bus_reply_method_return(m, "");
+}
+static int on_in_read(sd_bus_message *m, void *u, sd_bus_error *e) {
+    (void)u; (void)e;
+    uint64_t id, size;
+    if (sd_bus_message_read(m, "tt", &id, &size) < 0) return 0;
+    int i = in_find(id);
+    static int16_t buf[2 * 4800];               /* 100 ms of stereo at most per answer */
+    size_t frames = 0;
+    if (i >= 0 && A.in[i].ok) {
+        long long now = now_ms();
+        if (!A.in[i].t0) A.in[i].t0 = now;
+        size_t fb = (size_t)A.in[i].ch * 2, room = size / fb > 4800 ? 4800 : (size_t)(size / fb);
+        frames = vd_mic_owed(A.in[i].t0, now, &A.in[i].given, room);
+        static int16_t mono[4800];
+        size_t got = 0;
+        if (A.mic.h && frames) {
+            /* more than 100 ms waiting in the ring: the oldest is skipped, so the guest hears the microphone without delay */
+            uint64_t avail = ar_avail_t(A.mic.h, A.mic.size, A.mic.pos);
+            if (avail > (uint64_t)(frames + 4800) * 2) { A.mic.pos += (avail - (uint64_t)frames * 2) & ~(uint64_t)1; atomic_store(&A.mic.h->rpos, A.mic.pos); }
+            got = ar_read_t(A.mic.h, A.mic.size, &A.mic.pos, mono, frames * 2) / 2;
+            A.mic_bytes += (long long)got * 2;
+        }
+        if (got < frames) { memset(mono + got, 0, (frames - got) * 2); A.mic_silence += (long long)(frames - got); }
+        int gain = A.in[i].mute ? 0 : A.in[i].vol;
+        if (gain != 255) for (size_t k = 0; k < got; k++) mono[k] = (int16_t)(mono[k] * gain / 255);
+        if (A.in[i].ch == 2) for (size_t k = 0; k < frames; k++) buf[k * 2] = buf[k * 2 + 1] = mono[k];
+        else memcpy(buf, mono, frames * 2);
+        A.in[i].given += frames;
+        frames *= fb / 2;                       /* in samples of int16 */
+    }
+    sd_bus_message *r = NULL;
+    int rc = sd_bus_message_new_method_return(m, &r);
+    if (rc >= 0) rc = sd_bus_message_append_array(r, 'y', buf, frames * 2);
+    if (rc >= 0) rc = sd_bus_send(NULL, r, NULL);
+    sd_bus_message_unref(r);
+    return rc;
+}
+static const sd_bus_vtable audio_in_vt[] = {
+    SD_BUS_VTABLE_START(0),
+    SD_BUS_PROPERTY("Interfaces", "as", au_interfaces, 0, SD_BUS_VTABLE_PROPERTY_CONST),
+    SD_BUS_METHOD("Init", "tybbuyuub", "", on_in_init, 0),
+    SD_BUS_METHOD("Fini", "t", "", on_in_fini, 0),
+    SD_BUS_METHOD("SetEnabled", "tb", "", on_in_enabled, 0),
+    SD_BUS_METHOD("SetVolume", "tbay", "", on_in_volume, 0),
+    SD_BUS_METHOD("Read", "tt", "ay", on_in_read, 0),
+    SD_BUS_VTABLE_END
+};
+
+/* RegisterOutListener's and RegisterInListener's answer: 1 taken, 2 refused */
 static int au_registered(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)e;
     *(int *)u = sd_bus_message_is_method_error(m, NULL) ? 2 : 1;
-    if (*(int *)u == 2) fprintf(stderr, "lord-vmdisplay: RegisterOutListener: %s\n", sd_bus_message_get_error(m) ? sd_bus_message_get_error(m)->message : "?");
+    if (*(int *)u == 2) fprintf(stderr, "lord-vmdisplay: Register*Listener: %s\n", sd_bus_message_get_error(m) ? sd_bus_message_get_error(m)->message : "?");
     return 0;
+}
+
+static void au_counts(const char *why) {
+    if (A.writes || A.pads || A.out_bytes || A.out_dropped || A.mic_bytes)
+        fprintf(stderr, "lord-vmdisplay: sound (%s): %lld writes from QEMU; recording: %lld silences, %lld dropped; %lld bytes to the speakers, "
+                "%lld dropped to keep the delay; %lld bytes from the microphone, %lld frames of silence for it\n",
+                why, A.writes, A.pads, A.dropped, A.out_bytes, A.out_dropped, A.mic_bytes, A.mic_silence);
 }
 
 /* VD_AUDIO_REC: the recording's ring (checked: sealed against shrinking, the size it says, 48 kHz, one channel) */
 static void au_rec(int fd) {
-    if (A.ring) { munmap(A.ring, A.ring_len); A.ring = NULL; }
-    if (A.writes || A.pads) fprintf(stderr, "lord-vmdisplay: recording's sound: %lld writes, %lld silences, %lld dropped\n", A.writes, A.pads, A.dropped);
+    au_counts("recording");
     A.writes = A.pads = A.dropped = 0;
-    if (fd < 0) return;
-    struct stat st;
-    int seals = fcntl(fd, F_GET_SEALS);
-    if (seals < 0 || !(seals & F_SEAL_SHRINK) || fstat(fd, &st) || st.st_size < AR_HDR) { close(fd); return; }
-    void *map = mmap(NULL, (size_t)st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    close(fd);
-    if (map == MAP_FAILED) return;
-    ARingHdr *h = map;
-    uint32_t size = h->size;
-    if (h->magic != AR_MAGIC || h->rate != AR_RATE || h->channels != 1 || !size || (size & (size - 1)) || ar_bytes(size) > (size_t)st.st_size) {
-        munmap(map, (size_t)st.st_size);
-        return;
-    }
-    A.ring = h; A.ring_len = (size_t)st.st_size; A.size = size;
-    A.wpos = atomic_load(&h->wpos);
+    ring_drop(&A.rec);
+    if (fd < 0 || ring_take(&A.rec, fd, 1)) return;
     A.t0 = now_ms();
     A.samples = 0;
 }
@@ -650,10 +813,20 @@ static int from_server(void) {
         if (r < 0) return 1;
         if (!r) return 0;
         if (!vd_msg_valid(&m, 1)) { if (fd >= 0) close(fd); refuse("message", "type %u from lord-server", m.type); continue; }
-        if (m.type != VD_SHM && m.type != VD_AUDIO_REC && fd >= 0) { close(fd); fd = -1; }
+        if (m.type != VD_SHM && m.type != VD_AUDIO_REC && m.type != VD_AUDIO_OUT && m.type != VD_MIC && fd >= 0) { close(fd); fd = -1; }
         switch (m.type) {
         case VD_SHM: if (fd >= 0) take_picture(fd); break;
         case VD_AUDIO_REC: au_rec(m.a ? fd : -1); if (!m.a && fd >= 0) close(fd); break;
+        case VD_AUDIO_OUT:
+            /* the speakers' ring (two channels), or none: the guest's sound isn't heard */
+            if (m.a && fd >= 0) { if (ring_take(&A.out, fd, 2)) refuse("VD_AUDIO_OUT", "not a sealed 48 kHz stereo ring"); }
+            else { if (fd >= 0) close(fd); au_counts("speakers off"); ring_drop(&A.out); }
+            break;
+        case VD_MIC:
+            /* the microphone's ring (one channel), or none: the guest hears silence */
+            if (m.a && fd >= 0) { if (ring_take(&A.mic, fd, 1)) refuse("VD_MIC", "not a sealed 48 kHz mono ring"); }
+            else { if (fd >= 0) close(fd); ring_drop(&A.mic); }
+            break;
         case VD_FRAME_DONE: if (m.e == D.frame) D.acked = 1; break;
         case VD_KEY: key(m.a, m.b); break;
         case VD_MOTION: D.mx = m.a; D.my = m.b; D.motion_pending = 1; break;
@@ -730,6 +903,41 @@ static int uuid_ok(const char *s) {
     return 1;
 }
 
+/* A sound listener (out: the guest's sound; in: its microphone) on a new peer connection. QEMU asks the new listener
+ * for its properties before it answers Register*Listener: the call is made without waiting, and every connection is
+ * served until the answer comes (5 s at most). NULL: no such listener (no audio backend, or QEMU refused it). */
+static sd_bus *register_audio(const char *id, const char *method, const char *path, const char *iface, const sd_bus_vtable *vt) {
+    int av[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, av)) return NULL;
+    sd_bus *b = p2p(av[0]);
+    static int done;
+    done = 0;
+    sd_bus_slot *slot = NULL;
+    if (b && sd_bus_add_object_vtable(b, NULL, path, iface, vt, NULL) >= 0 &&
+        sd_bus_call_method_async(bus, &slot, NULL, "/org/qemu/Display1/Audio", "org.qemu.Display1.Audio", method, au_registered, &done, "h", av[1]) >= 0) {
+        close(av[1]);
+        av[1] = -1;
+        long long until = now_ms() + 5000;
+        /* the console's listener and the other sound one too: QEMU asks them for their properties and answers nothing
+         * else until it has them */
+        while (!done && now_ms() < until) {
+            sd_bus *all[4] = { lbus, b, bus, abus };
+            for (int k = 0; k < 4; k++) if (all[k]) while (sd_bus_process(all[k], NULL) > 0) ;
+            if (done) break;
+            struct pollfd pf[4];
+            int np = 0;
+            for (int k = 0; k < 4; k++) if (all[k]) pf[np++] = (struct pollfd){ sd_bus_get_fd(all[k]), (short)sd_bus_get_events(all[k]), 0 };
+            poll(pf, (nfds_t)np, 100);
+        }
+    }
+    sd_bus_slot_unref(slot);
+    if (av[1] >= 0) close(av[1]);
+    if (done == 1) { fprintf(stderr, "lord-vmdisplay %s: %s: listener registered\n", id, method); return b; }
+    fprintf(stderr, "lord-vmdisplay %s: %s: none (%s)\n", id, method, done == 2 ? "QEMU refused the listener" : b ? "no answer" : "no connection");
+    if (b) sd_bus_flush_close_unref(b);
+    return NULL;
+}
+
 int main(int argc, char **argv) {
     prctl(PR_SET_DUMPABLE, 0);
     signal(SIGPIPE, SIG_IGN);
@@ -778,42 +986,10 @@ int main(int argc, char **argv) {
     }
     sd_bus_message_unref(rep);
     close(lv[1]);
-    /* the guest's sound: a listener of its own, if QEMU has an audio backend on this display */
-    int av[2];
-    if (!socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, av)) {
-        abus = p2p(av[0]);
-        rep = NULL;
-        /* QEMU asks the new listener for its properties before it answers RegisterOutListener: the call is made
-         * without waiting, and both connections are served until the answer comes (5 s at most) */
-        static int au_done, au_ok;
-        au_done = au_ok = 0;
-        sd_bus_slot *slot = NULL;
-        if (abus && sd_bus_add_object_vtable(abus, NULL, "/org/qemu/Display1/AudioOutListener", "org.qemu.Display1.AudioOutListener", audio_vt, NULL) >= 0 &&
-            sd_bus_call_method_async(bus, &slot, NULL, "/org/qemu/Display1/Audio", "org.qemu.Display1.Audio", "RegisterOutListener", au_registered, &au_done, "h", av[1]) >= 0) {
-            close(av[1]);
-            av[1] = -1;
-            long long until = now_ms() + 5000;
-            /* the console's listener too: QEMU asks it for its properties right after RegisterListener, and answers
-             * nothing else until it has them */
-            while (!au_done && now_ms() < until) {
-                while (sd_bus_process(lbus, NULL) > 0) ;
-                while (sd_bus_process(abus, NULL) > 0) ;
-                while (sd_bus_process(bus, NULL) > 0) ;
-                if (au_done) break;
-                struct pollfd pf[3] = { { sd_bus_get_fd(abus), (short)sd_bus_get_events(abus), 0 }, { sd_bus_get_fd(bus), (short)sd_bus_get_events(bus), 0 },
-                                        { sd_bus_get_fd(lbus), (short)sd_bus_get_events(lbus), 0 } };
-                poll(pf, 3, 100);
-            }
-            au_ok = au_done == 1;
-        }
-        sd_bus_slot_unref(slot);
-        if (au_ok) fprintf(stderr, "lord-vmdisplay %s: sound listener registered\n", argv[1]);
-        else {
-            fprintf(stderr, "lord-vmdisplay %s: no sound (%s)\n", argv[1], au_done == 2 ? "QEMU refused the listener" : abus ? "no answer" : "no connection");
-            if (abus) { sd_bus_flush_close_unref(abus); abus = NULL; }
-        }
-        if (av[1] >= 0) close(av[1]);
-    }
+    /* the guest's sound and microphone: a listener of each, on a connection of its own, if QEMU has an audio backend on
+     * this display */
+    abus = register_audio(argv[1], "RegisterOutListener", "/org/qemu/Display1/AudioOutListener", "org.qemu.Display1.AudioOutListener", audio_vt);
+    ibus = register_audio(argv[1], "RegisterInListener", "/org/qemu/Display1/AudioInListener", "org.qemu.Display1.AudioInListener", audio_in_vt);
     fprintf(stderr, "lord-vmdisplay %s: console \"%s\" %ux%u, mouse %s\n", argv[1], label ? label : "", cw, ch, absm ? "absolute" : "relative");
     free(label);
 
@@ -837,8 +1013,12 @@ int main(int argc, char **argv) {
             while ((r = sd_bus_process(abus, NULL)) > 0) ;
             if (r < 0) { fprintf(stderr, "lord-vmdisplay: the sound connection went away\n"); sd_bus_flush_close_unref(abus); abus = NULL; }
         }
+        if (ibus) {
+            while ((r = sd_bus_process(ibus, NULL)) > 0) ;
+            if (r < 0) { fprintf(stderr, "lord-vmdisplay: the microphone connection went away\n"); sd_bus_flush_close_unref(ibus); ibus = NULL; }
+        }
         long long now = now_ms();
-        if (A.ring) au_tick(now);
+        if (A.rec.h) au_tick(now);
         send_input(now);
         flush(now);
         if (D.stats_changed && now - D.stats_ms >= STATS_MS) {
@@ -848,16 +1028,18 @@ int main(int argc, char **argv) {
             D.stats_ms = now;
         }
         if (D.updates) D.stats_changed = 1;
-        struct pollfd p[4] = {
+        struct pollfd p[5] = {
             { sd_bus_get_fd(lbus), (short)sd_bus_get_events(lbus), 0 },
             { sd_bus_get_fd(bus), (short)sd_bus_get_events(bus), 0 },
             { CH, POLLIN, 0 },
             { abus ? sd_bus_get_fd(abus) : -1, abus ? (short)sd_bus_get_events(abus) : 0, 0 },
+            { ibus ? sd_bus_get_fd(ibus) : -1, ibus ? (short)sd_bus_get_events(ibus) : 0, 0 },
         };
         int to = bus_timeout_ms(lbus), t2 = bus_timeout_ms(bus);
         if (t2 >= 0 && (to < 0 || t2 < to)) to = t2;
         if (abus) { int t3 = bus_timeout_ms(abus); if (t3 >= 0 && (to < 0 || t3 < to)) to = t3; }
-        if (A.ring && (to < 0 || to > 20)) to = 20;         /* silence keeps time while a recording runs */
+        if (ibus) { int t4 = bus_timeout_ms(ibus); if (t4 >= 0 && (to < 0 || t4 < to)) to = t4; }
+        if (A.rec.h && (to < 0 || to > 20)) to = 20;         /* silence keeps time while a recording runs */
         if (D.dirty && D.shm) {
             long long wake = D.acked ? D.next_ms : D.sent_ms + ACK_WAIT_MS;
             int tf = wake <= now ? 0 : (int)(wake - now);
@@ -865,11 +1047,12 @@ int main(int argc, char **argv) {
         }
         if (D.resize_pending) { int tr = (int)(D.resize_ms + RESIZE_GAP_MS - now); if (tr < 0) tr = 0; if (to < 0 || tr < to) to = tr; }
         if (D.stats_changed) { int ts = (int)(D.stats_ms + STATS_MS - now); if (ts < 0) ts = 0; if (to < 0 || ts < to) to = ts; }
-        if (poll(p, 4, to) < 0 && errno != EINTR) break;
+        if (poll(p, 5, to) < 0 && errno != EINTR) break;
         if (p[2].revents & (POLLHUP | POLLERR) && !(p[2].revents & POLLIN)) break;
         if (p[2].revents & POLLIN && from_server()) break;
     }
     release_all();
+    au_counts("end");
     sd_bus_process(bus, NULL);      /* pushes what the socket takes; never waits on QEMU */
     return rc;
 }

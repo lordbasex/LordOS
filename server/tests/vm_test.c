@@ -63,7 +63,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "6", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "7", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -235,6 +235,40 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_OK);
         }
     }
+    /* schema 6 (sound, 6.9): sound and microphone true or false, volume 0..100; a file without them reads as sound on
+     * at full volume and the microphone off; never in schema 5 */
+    {
+        struct { const char *add; int schema, want, sound, volume, mic; } s6[] = {
+            { "\"sound\":false,\"volume\":40,\"microphone\":true", 6, VM_OK, 0, 40, 1 },
+            { "\"volume\":0", 6, VM_OK, 1, 0, 0 }, { "\"volume\":100", 6, VM_OK, 1, 100, 0 },
+            { "\"microphone\":false", 6, VM_OK, 1, 100, 0 },
+            { "\"volume\":101", 6, VM_E_RANGE, 0, 0, 0 }, { "\"volume\":-1", 6, VM_E_RANGE, 0, 0, 0 },
+            { "\"volume\":50.5", 6, VM_E_FIELD, 0, 0, 0 }, { "\"volume\":\"50\"", 6, VM_E_FIELD, 0, 0, 0 },
+            { "\"sound\":1", 6, VM_E_FIELD, 0, 0, 0 }, { "\"microphone\":\"on\"", 6, VM_E_FIELD, 0, 0, 0 },
+            { "\"microphone\":true", 5, VM_E_FIELD, 0, 0, 0 }, { "\"sound\":false", 5, VM_E_FIELD, 0, 0, 0 },
+            { "\"volume\":100", 5, VM_OK, 1, 100, 0 },     /* the default it means anyway */
+        };
+        for (size_t i = 0; i < sizeof s6 / sizeof s6[0]; i++) {
+            char t[4096];
+            const char *at = strstr(GOOD, "\"schema\":1");
+            snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s6[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s6[i].add);
+            int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+            if (r != s6[i].want) fprintf(stderr, "  schema 6 %s: got %d (%s)\n", s6[i].add, r, err);
+            CHECK(r == s6[i].want);
+            if (r == VM_OK) {
+                CHECK(m.sound == s6[i].sound && m.volume == s6[i].volume && m.microphone == s6[i].mic);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && strstr(jj, "\"volume\"") && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+        }
+        /* an old file: the defaults */
+        CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && m.sound == 1 && m.volume == 100 && m.microphone == 0);
+        VmHost hh = { .arch = VM_ARCH_ARM64, .cpus = 4, .ram_mb = 8192, .kvm = 1 };
+        vm_machine_defaults(&m, &hh, VM_ARCH_ARM64);
+        CHECK(m.sound == 1 && m.volume == 100 && m.microphone == 0);
+    }
     /* which folders may be shared (vm_share_allowed): a real folder in home (not home), under /media/<user> or /mnt, nothing
      * hidden, never the library or what holds it */
     {
@@ -388,6 +422,42 @@ static void test_messages(void) {
     d = vd_msg(VD_CURSOR, 257, 64, 0, 0, 0, 0); CHECK(!vd_msg_valid(&d, 0));
     d = vd_msg(VD_FRAME, 0, 0, 640, 480, 1, 0); CHECK(vd_msg_valid(&d, 0) && vd_rect_inside(&d, 640, 480) && !vd_rect_inside(&d, 639, 480));
     d = vd_msg(VD_FRAME, 2147483000, 0, 2000, 1, 1, 0); CHECK(!vd_rect_inside(&d, 640, 480));
+    /* sound (6.9): the rings go to the helper; what the guest does comes from it */
+    d = vd_msg(VD_AUDIO_OUT, 1, 0, 0, 0, 0, 0); CHECK(vd_msg_valid(&d, 1) && !vd_msg_valid(&d, 0));
+    d = vd_msg(VD_AUDIO_OUT, 2, 0, 0, 0, 0, 0); CHECK(!vd_msg_valid(&d, 1));
+    d = vd_msg(VD_MIC, 0, 0, 0, 0, 0, 0); CHECK(vd_msg_valid(&d, 1) && !vd_msg_valid(&d, 0));
+    d = vd_msg(VD_MIC, -1, 0, 0, 0, 0, 0); CHECK(!vd_msg_valid(&d, 1));
+    d = vd_msg(VD_GUEST_AUDIO, VDG_IN, 1, 0, 0, 0, 0); CHECK(vd_msg_valid(&d, 0) && !vd_msg_valid(&d, 1));
+    d = vd_msg(VD_GUEST_AUDIO, VDG_OUT, 2, 0, 0, 0, 0); CHECK(!vd_msg_valid(&d, 0));
+    d = vd_msg(VD_GUEST_AUDIO, 2, 1, 0, 0, 0, 0); CHECK(!vd_msg_valid(&d, 0));
+    q = vm_msg(VM_SOUND, 1, 1, 80, 0, 0, NULL); CHECK(vm_msg_valid(&q, 1) && !vm_msg_valid(&q, 0));
+    q.b = 101; CHECK(!vm_msg_valid(&q, 1));
+    q.b = -1; CHECK(!vm_msg_valid(&q, 1));
+    q.b = 0; q.a = 2; CHECK(!vm_msg_valid(&q, 1));
+    q.a = 0; q.c = 2; CHECK(!vm_msg_valid(&q, 1));
+    /* the speakers' ring keeps at most VD_AUDIO_AHEAD_MS ahead of the reader (15 360 bytes at 80 ms), and a broken reader
+     * cursor counts as full */
+    CHECK(vd_audio_fits(0, 0, 1u << 18, 15360) && !vd_audio_fits(0, 0, 1u << 18, 15364));
+    CHECK(vd_audio_fits(1000, 1000 + 15000, 1u << 18, 360) && !vd_audio_fits(1000, 1000 + 15000, 1u << 18, 364));
+    CHECK(!vd_audio_fits(5000, 4000, 1u << 18, 4));                   /* reader ahead of the writer */
+    CHECK(!vd_audio_fits(0, (1u << 18) + 4, 1u << 18, 4));           /* further back than the ring */
+    CHECK(!vd_audio_fits(0, 0, 4096, 8192) && vd_audio_fits(0, 0, 4096, 4096));    /* a small ring caps itself */
+    /* the guest's microphone at the real rate: 48 frames a millisecond, at most what fits and 100 ms, no burst after a
+     * pause */
+    {
+        uint64_t given = 0;
+        CHECK(vd_mic_owed(1000, 1000, &given, 4800) == 0);
+        CHECK(vd_mic_owed(1000, 1010, &given, 4800) == 480);
+        given += 480;
+        CHECK(vd_mic_owed(1000, 1010, &given, 4800) == 0);
+        CHECK(vd_mic_owed(1000, 1030, &given, 100) == 100);
+        given += 100;
+        CHECK(vd_mic_owed(1000, 1030, &given, 4800) == 860);
+        given = 960;
+        CHECK(vd_mic_owed(1000, 6000, &given, 100000) == 4800 && given == 240000 - 4800);   /* a 5 s pause: 100 ms only */
+        given = 0;
+        CHECK(vd_mic_owed(1000, 900, &given, 4800) == 0);              /* a clock before the start */
+    }
 
     /* real sockets: lengths, versions, descriptors */
     int sv[2];

@@ -52,6 +52,9 @@
  *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
  *                   memory (QMP snapshot-save, snapshot-load, snapshot-delete jobs), under operation.json; the entry
  *                   in snapshots.json is written last (6.2). VM_JOB reports it; → VM_REPLY when it's done
+ *     VM_SOUND      machine.json's sound choices while the machine runs (lord-vm holds the lock, so it writes the file):
+ *                   a = sound (1 plays on this computer, 0 muted), b = volume 0..100, c = microphone (1 allowed, 0 not).
+ *                   They change nothing in QEMU: lord-server applies them itself (6.9) → VM_REPLY
  *   from lord-vm (events and replies)
  *     VM_REPLY      seq of the request; a = VME_* (0 ok); text = reason in English, for the log
  *     VM_STATE      a = VS_*, b = VR_* (why), c = QEMU's exit status or signal, d = QEMU's pid; text = detail.
@@ -107,6 +110,16 @@
  *   (sealed memfd, 48 kHz, 16-bit, one channel) that lord-media reads; the helper writes the guest's sound into it,
  *   mixed to one channel, and silence for the time the guest plays nothing, so the sound keeps time with the picture.
  *   a = 0: the recording ended.
+ *   VD_AUDIO_OUT a = 1 with one descriptor: the speakers' ring (aring.h: sealed memfd, 48 kHz, 16-bit, two channels)
+ *   that lord-server plays from its own PipeWire stream (media/maudio.c); the helper copies the guest's sound into it as
+ *   it comes, and drops what would put it more than VD_AUDIO_AHEAD_MS ahead of what lord-server read, so a slow reader
+ *   never adds delay and the helper never waits. a = 0: the sound is off (muted, or the machine's "sound" is off).
+ *   VD_MIC a = 1 with one descriptor: the microphone's ring (aring.h, 48 kHz, 16-bit, one channel) that lord-server
+ *   fills from the person's microphone, sent only while the machine's "microphone" is on, LordOS's microphone
+ *   permission allows Machines and the guest is recording. a = 0: no microphone. Whenever there is none, the guest
+ *   reads silence at the real rate, so a guest that records never stalls and never hears this computer.
+ *   VD_GUEST_AUDIO (helper → server) a = VDG_OUT or VDG_IN, b = 1 the guest started that stream / 0 stopped it: the
+ *   microphone opens only while the guest records, and the speakers' stream only plays while the guest plays.
  */
 #ifndef LORD_VM_PROTO_H
 #define LORD_VM_PROTO_H
@@ -128,8 +141,8 @@
 
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
-    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP,
-    VM_REQ_LAST = VM_CLIP,
+    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND,
+    VM_REQ_LAST = VM_SOUND,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA,
 };
@@ -198,10 +211,14 @@ typedef struct {
 /* ---- lord-server ↔ lord-vmdisplay ---- */
 
 enum {
-    VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS,               /* helper → server */
+    VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS, VD_GUEST_AUDIO, /* helper → server */
     VD_SHM = 64, VD_FRAME_DONE, VD_KEY, VD_MOTION, VD_BUTTON, VD_WHEEL, VD_RELEASE_ALL,       /* server → helper */
-    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC,
+    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC, VD_AUDIO_OUT, VD_MIC,
 };
+/* VD_GUEST_AUDIO a: which of the guest's streams */
+enum { VDG_OUT = 0, VDG_IN = 1 };
+/* the most the helper keeps in the speakers' ring ahead of lord-server's reading (VD_AUDIO_OUT) */
+#define VD_AUDIO_AHEAD_MS 80
 enum { VDS_CONNECTED = 0, VDS_NO_PICTURE, VDS_LOST };
 enum { VDR_NONE = 0, VDR_DISABLED, VDR_REFUSED, VDR_QEMU_GONE, VDR_SERVER_GONE, VDR_SETUP };
 /* buttons, as QEMU's InputButton numbers */
@@ -297,7 +314,8 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600)) &&
                       (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
                       (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_INSTALL)) &&
-                      (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX)));
+                      (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX))) &&
+                      (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1)));
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
@@ -324,7 +342,7 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_WHEEL: return m->a >= -32 && m->a <= 32 && m->b >= -32 && m->b <= 32;
     case VD_RESIZE: return m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VD_RATE: return m->a >= 1 && m->a <= 240;
-    case VD_AUDIO_REC: return m->a == 0 || m->a == 1;
+    case VD_AUDIO_REC: case VD_AUDIO_OUT: case VD_MIC: return m->a == 0 || m->a == 1;
     default: return 0;
     }
     switch (m->type) {
@@ -337,6 +355,7 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_POINTER: return m->c == 0 || m->c == 1;
     case VD_STATE: return m->a >= VDS_CONNECTED && m->a <= VDS_LOST && m->b >= VDR_NONE && m->b <= VDR_SETUP;
     case VD_STATS: return m->a >= 0 && m->b >= 0 && m->c >= 0;
+    case VD_GUEST_AUDIO: return (m->a == VDG_OUT || m->a == VDG_IN) && (m->b == 0 || m->b == 1);
     default: return 0;
     }
 }
@@ -344,6 +363,28 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
 /* a damage rectangle inside a w × h picture (lord-server checks every VD_FRAME with it) */
 static inline int vd_rect_inside(const VdMsg *m, int w, int h) {
     return m->a >= 0 && m->b >= 0 && m->c > 0 && m->d > 0 && (int64_t)m->a + m->c <= w && (int64_t)m->b + m->d <= h;
+}
+
+/* lord-vmdisplay, the speakers' ring (VD_AUDIO_OUT, 48 kHz stereo s16): may n more bytes go in without putting it more
+ * than VD_AUDIO_AHEAD_MS ahead of lord-server's reading? A reader cursor past the writer's, or further back than the
+ * ring holds (lord-server's side is not trusted), counts as full. 1 yes */
+static inline int vd_audio_fits(uint64_t rpos, uint64_t wpos, uint32_t size, size_t n) {
+    uint64_t used = (rpos > wpos || wpos - rpos > size) ? size : wpos - rpos;
+    uint64_t cap = (uint64_t)48000 * 4 * VD_AUDIO_AHEAD_MS / 1000;
+    if (cap > size) cap = size;
+    return used + n <= cap;
+}
+
+/* lord-vmdisplay, the guest's microphone (AudioInListener.Read): how many frames a stream started at t0_ms owes at
+ * now_ms, having been given *given: the real rate (48 per ms), at most `room` and 100 ms per answer. After a gap longer
+ * than 100 ms (a paused machine) the old time is forgotten (*given moves up), so no burst follows. */
+static inline size_t vd_mic_owed(long long t0_ms, long long now_ms, uint64_t *given, size_t room) {
+    uint64_t due = now_ms > t0_ms ? (uint64_t)(now_ms - t0_ms) * 48 : 0;
+    if (due > *given + 4800) *given = due - 4800;
+    uint64_t owed = due > *given ? due - *given : 0;
+    if (owed > room) owed = room;
+    if (owed > 4800) owed = 4800;
+    return (size_t)owed;
 }
 
 /* lord-server: the picture for VD_SIZE, sealed so the helper can't shrink it under lord-server's mapping */

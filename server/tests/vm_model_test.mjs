@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
 const D = await import(path.join(here, '../../apps/machines/diag.js'));
-const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom } = M;
+const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -258,6 +258,19 @@ eq('search none', M.filterMachines(lib, { query: 'nothing' }).length, 0);
 eq('share tag', [M.shareTag('Proyectos 2026'), M.shareTag('Música'), M.shareTag('...'), M.shareTag('Work', ['work', 'Work-2'])], ['Proyectos-2026', 'Musica', 'share', 'Work-3']);
 eq('share tag length', M.shareTag('a'.repeat(60)).length, 28);
 eq('mount command', M.mountCommand('Work'), 'sudo mkdir -p /mnt/Work && sudo mount -t virtiofs Work /mnt/Work');
+
+// sound and microphone (6.9)
+eq('sound of an older machine', soundOf({}), { sound: true, volume: 100, microphone: false });
+eq('sound of a muted one', soundOf({ sound: false, volume: 30, microphone: true }), { sound: false, volume: 30, microphone: true });
+eq('sound volume clamped', [soundOf({ volume: 140 }).volume, soundOf({ volume: -3 }).volume, soundOf({ volume: 33.6 }).volume, soundOf({ volume: 'x' }).volume], [100, 0, 34, 100]);
+eq('audible', [audible(soundOf({})), audible(soundOf({ sound: false })), audible(soundOf({ volume: 0 })), audible(null)], [true, false, false, false]);
+eq('summary on', soundSummary({ volume: 70, microphone: true }), { key: 'machines.cfg.sum.soundOn', volume: 70, mic: 'machines.cfg.sum.micOn' });
+eq('summary off', soundSummary({ sound: false }).key, 'machines.cfg.sum.soundOff');
+eq('summary zero', soundSummary({ volume: 0 }).key, 'machines.cfg.sum.soundOff');
+eq('mute toggle', [muteToggle({}), muteToggle({ sound: false, volume: 40 }), muteToggle({ volume: 0 }), muteToggle({ sound: false, volume: 0 })],
+  [{ sound: false }, { sound: true }, { sound: true, volume: 50 }, { sound: true, volume: 50 }]);
+eq('mic live', [micLive({ mic: 'live' }), micLive({ mic: 'wait' }), micLive(undefined)], [true, false, false]);
+eq('mic ask', [micAsk({ mic: 'wait' }, false), micAsk({ mic: 'wait' }, true), micAsk({ mic: 'off' }, false), micAsk(null, false)], [true, false, false, false]);
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

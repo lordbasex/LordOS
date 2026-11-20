@@ -20,9 +20,10 @@
 #include <stdint.h>
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
- * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. An older file is read as is and written as the current schema, with a copy of the old
+ * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers. 6: sound, volume,
+ * microphone. An older file is read as is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 5
+#define VM_SCHEMA 6
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -109,6 +110,12 @@ typedef struct {
     int tpm;                            /* a TPM 2.0, served by swtpm; its state in disks/tpm */
     int hyperv;                         /* Hyper-V enlightenments, for Windows guests */
     char drivers[VM_PATH_MAX];          /* a second CD/DVD with the guest's drivers (virtio-win), read-only; "" none */
+    /* schema 6: sound and microphone (6.9). Host-side choices, changed while the machine runs too: the guest's sound
+     * card stays the same either way. A file without them reads as sound on at full volume, microphone off */
+    int sound;                          /* 1: the guest's sound plays on this computer's speakers; 0 muted */
+    int volume;                         /* 0..100, the machine's own stream volume */
+    int microphone;                     /* 1: the guest may hear this computer's microphone, once LordOS's microphone
+                                         * permission for Machines allows it too (checked by lord-server); 0 silence */
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
