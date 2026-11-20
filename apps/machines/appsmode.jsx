@@ -35,7 +35,8 @@ function frameAround(r, inset) {
 export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave }) {
   const sent = useRef(false);
   const seen = useRef({ w: -1, i: -1, a: -1 });
-  const active = !!(on && ready && sid && st?.display === 'up' && st.state === 'running');
+  // a pause keeps the windows (their pictures stay as they were); stopping, or the agent going, ends it
+  const active = !!(on && ready && sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused'));
   useEffect(() => {
     if (!active) return undefined;
     sent.current = lord.vm.apps(sid, true);
@@ -83,7 +84,8 @@ function sync(dir, sid, mid, name, list, gw, gh) {
     wm.close(x.winId, true);
     windowPixelIcons.set((m) => { if (!(x.winId in m)) return m; const n = { ...m }; delete n[x.winId]; return n; });
   }
-  for (const w of plan.open) {
+  // bottom first, so the guest's front window ends up in front here too
+  for (const w of [...plan.open].reverse()) {
     const instance = guestInstance(mid, w.id);
     const r = toHostRect(w, k, d);
     const popup = isPopup(w);
