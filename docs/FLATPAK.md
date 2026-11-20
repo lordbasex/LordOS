@@ -501,6 +501,18 @@ FileChooser).
 - **Monitor** shows `flatpak:<id>` with the app's appstream name and icon; its processes appear as
   `bwrap` and the app's binaries inside the scope.
 
+**Built on 2026-11-19 (phase 1 step 5; `apps/store/flathub.js`, `flathubpages.js`, `sdk/flathubmodel.js`):** the
+metadata is parsed in **JS** (`flathubmodel.parseMetadata`), not in C as planned above: it only feeds what the page
+shows, and the launch never reads it (`fpak_argv` sets the never-granted options and the restrictions whatever an app
+declares), so a parser bug can mislabel a row but never widen what an app gets. Each row is a permission key with its
+LordOS change: never (session or system bus, `org.freedesktop.Flatpak` / `portal.Flatpak`, `systemd1`, `secrets`),
+limited (home or host: read-only but for the person's folders, LordOS's folders hidden; X11 off under any restriction;
+other bus names cut off under a device restriction) or blockable in Monitor → Firewall (network, microphone, camera,
+USB, Bluetooth: restrictions are set there, not in Settings → Privacy). Unknown sockets, devices and features are
+listed as "other". An app whose `[Application] base=` is `org.electronjs.Electron2.BaseApp`,
+`org.chromium.Chromium.BaseApp` or `io.atom.electron.BaseApp` is "Not yet supported" and its Install is disabled
+(open question 2, the maintainer's choice: mark them). Checked on VM 127 with GNOME Calculator and MarkText.
+
 ## Problem 4: installing
 
 ### Facts
@@ -615,6 +627,11 @@ default (maintainer's decision); the filter is the shell's, the index carries ev
   `update --appstream`; no new timer or daemon.
 - An app running during an update keeps its old deployment until restarted (Flatpak's behaviour);
   the Store says "restart to finish".
+
+**Built on 2026-11-19 (phase 1):** no update detection yet (open question 8 stays open): Store → Updates has "Update
+Flathub apps", which runs `update` (Flatpak finds what changed) then `uninstall --unused`; an app's page has Update for
+that ref. The catalog is fetched again when the Store opens a day after the last fetch (`settings.flathub.appstreamAt`)
+or on Refresh, instead of the hourly blocklist check. The page says an open app finishes updating when reopened.
 
 ## Dependency policy
 

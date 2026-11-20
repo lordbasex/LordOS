@@ -305,5 +305,7 @@
   "multiarch.body": "{name} cần thư viện hệ thống 32 bit; LordOS sẽ bật chúng. Khi đó trình quản lý gói có thể cài các gói 32 bit (i386) của Debian bên cạnh các gói 64 bit, được ký và kiểm tra như mọi gói khác. Chỉ những gì {name} cần mới được cài.",
   "multiarch.enable": "Bật và tiếp tục",
   "multiarch.enabling": "Đang bật…",
-  "pkg32": "{name} (32 bit)"
+  "pkg32": "{name} (32 bit)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Ứng dụng Flatpak"
 }

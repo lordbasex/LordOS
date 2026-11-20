@@ -13,6 +13,8 @@ import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
 import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits } from './webapps.js';
 import { WebAppDetail } from './webdetail.js';
+import { FlathubCategory, FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub } from './flathubpages.js';
+import * as flathub from './flathub.js';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
 // first of the usual names that exists, or the home folder itself.
@@ -292,6 +294,7 @@ function InstalledPage({ query, filter: initial }) {
   const [msg, setMsg] = useState(null);
   useEffect(() => { if (initial === 'off') setFilter('off'); }, [initial]);
   useStore(debian.state);
+  const fhJob = useStore(flathub.state, (st) => st.job);
   const offCount = apps.filter((a) => a.off).length;
   const shown = apps.filter((a) => (filter === 'off' ? a.off : true) && matches(query, [a.name, a.id, a.genericName], [a.comment]));
   // the kind, and a LordOS app's or package's own version (manifest "version")
@@ -323,6 +326,8 @@ function InstalledPage({ query, filter: initial }) {
               : <Button small label={tr('store.off.deactivate')} onClick={() => deactivate(a)} />)}
             {a.kind === 'linux' && debian.canRemove(a) && <Button small label={tr('store.remove')} disabled={!admin.available()}
               onClick={() => setRemoving(removing === a.id ? null : a.id)} />}
+            {a.kind === 'flatpak' && flathub.available() && <Button small label={tr('store.remove')} disabled={!!fhJob}
+              onClick={() => !fhJob && removeInstalled(a).then((ok) => setMsg(ok ? { ok: true, text: tr('flathub.msg.uninstallDone', { name: a.name }) } : flathub.state.get().msg))} />}
             {!a.off && <Button small label={tr('store.open')} onClick={() => launchApp(a.id)} />}
           </AppRow>
         ))}
@@ -338,7 +343,7 @@ function InstalledPage({ query, filter: initial }) {
 // Back returns to the page.
 // a small window (a Lord Workspaces tile): below SIDE_AT the pages and categories hide behind a toolbar button
 const SIDE_AT = 720;
-const PAGE_GLYPH = { suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, webapps: GLYPH.webapps, lordos: GLYPH.lordos };
+const PAGE_GLYPH = { flathub: GLYPH.flathub, suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, webapps: GLYPH.webapps, lordos: GLYPH.lordos };
 
 export default function Store() {
   const t = useTheme();
@@ -349,6 +354,7 @@ export default function Store() {
   const [query, setQuery] = useState('');
   const [file, setFile] = useState(null);
   const deb = useDebian();
+  const fh = useFlathub();
   const launcher = useLauncherApps();
   const go = (p) => { setApp(null); setPage(p); };
   const side = useSidebar(SIDE_AT);
@@ -383,18 +389,20 @@ export default function Store() {
   const openDeb = (name) => { remember(); setApp({ name, ai: false }); };
   const openAi = (name) => { remember(); setApp({ name, ai: true }); };
   const openWeb = (id) => { remember(); setApp({ name: id, web: true }); };
+  const openFlathub = (id) => { remember(); setApp({ name: id, flathub: true }); };
   const pageTitle = cat ? tr(`store.cat.${cat}`) : tr(`store.page.${page}`);
-  const appTitle = app && (app.web ? webCatalog().find((a) => a.id === app.name)?.name || webAppEntry(app.name)?.name
+  const appTitle = app && (app.flathub ? flathub.catalogApp(app.name)?.name : app.web ? webCatalog().find((a) => a.id === app.name)?.name || webAppEntry(app.name)?.name
     : app.ai ? catalogApp(app.name)?.name : (lord.pkg?.info?.(app.name, {})?.app?.name)) || app?.name;
   const searchable = !app && page !== 'updates' && page !== 'suggested';
   const onSearch = (v) => { setQuery(v); if (v && !searchable) go('discover'); };
   let body;
-  if (app) body = app.web ? <WebAppDetail id={app.name} /> : app.ai ? <AiDetail pkg={app.name} /> : <debian.Details name={app.name} />;
+  if (app) body = app.flathub ? <FlathubDetail id={app.name} /> : app.web ? <WebAppDetail id={app.name} /> : app.ai ? <AiDetail pkg={app.name} /> : <debian.Details name={app.name} />;
   else if (cat) {
     body = (
       <View style={{ gap: 26 }}>
         <CatalogCategory cat={cat} query={query} onOpen={openAi} />
         <WebCategory cat={cat} query={query} onOpen={openWeb} />
+        <FlathubCategory cat={cat} query={query} onOpen={openFlathub} />
         <debian.Category cat={cat} query={query} onOpen={openDeb} />
       </View>
     );
@@ -404,15 +412,17 @@ export default function Store() {
     // (and the package results leave them out)
     const hits = query.trim() ? searchCatalog(catalogApps(), query) : [];
     const web = query.trim() ? webHits(query) : 0;
+    const fhHits = query.trim() && fh.on ? flathub.state.get().catalog.length : 0;
     const top = !query.trim() ? (
       <View style={{ gap: 26 }}>
         <AiDiscover onOpen={openAi} onOpenDeb={openDeb} onMore={() => go('ai')} />
         <WebDiscover onOpen={openWeb} onMore={() => go('webapps')} />
       </View>
-    ) : hits.length || web ? (
+    ) : hits.length || web || fhHits ? (
       <View style={{ gap: 26 }}>
         {hits.length ? <CatalogResults query={query} onOpen={openAi} /> : null}
         {web ? <WebResults query={query} onOpen={openWeb} /> : null}
+        {fhHits ? <FlathubResults query={query} onOpen={openFlathub} onMore={() => go('flathub')} /> : null}
       </View>
     ) : null;
     body = <debian.Discover query={query} onOpen={openDeb} onCategory={(c) => go(`cat:${c}`)} top={top} hide={hits.map((a) => a.package)} />;
@@ -424,8 +434,9 @@ export default function Store() {
   else if (page === 'suites') body = <AiPage section="suites" query={query} onOpen={openAi} />;
   else if (page === 'lordos') body = <LordOSPage query={query} />;
   else if (page === 'webapps') body = <WebAppsPage query={query} onOpen={openWeb} />;
+  else if (page === 'flathub') body = <FlathubPage query={query} onOpen={openFlathub} />;
   else if (page === 'installed') body = <InstalledPage query={query} filter={args?.filter} />;
-  else body = <debian.Updates />;
+  else body = <View><FlathubUpdates /><debian.Updates /></View>;
   const item = (id, label, detail, glyph) => (
     <SidebarItem key={id} icon={glyph} label={label} detail={detail || null} selected={!app && page === id} onClick={() => { go(id); if (side.narrow) side.close(); }} />
   );
@@ -441,6 +452,7 @@ export default function Store() {
           <SectionTitle>{tr('store.section.categories')}</SectionTitle>
           {item('ai', tr('store.page.ai'), catalogApps('ai').length, PAGE_GLYPH.ai)}
           {item('webapps', tr('store.page.webapps'), webCatalog().length, PAGE_GLYPH.webapps)}
+          {fh.supported ? item('flathub', tr('store.page.flathub'), null, PAGE_GLYPH.flathub) : null}
           {catalogApps('commercial').length ? item('commercial', tr('store.page.commercial'), catalogApps('commercial').length, PAGE_GLYPH.commercial) : null}
           {catalogApps('remote').length ? item('remote', tr('store.page.remote'), catalogApps('remote').length, PAGE_GLYPH.remote) : null}
           {catalogApps('suites').length ? item('suites', tr('store.page.suites'), catalogApps('suites').length, PAGE_GLYPH.suites) : null}
@@ -464,7 +476,7 @@ export default function Store() {
           </View>
           {!app ? <SearchField value={query} onChange={onSearch} placeholder={tr('store.search')} width={side.narrow ? 150 : 200} /> : null}
         </Toolbar>
-        <ScrollView scrollRef={scroll} resetKey={app ? `app:${app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
+        <ScrollView scrollRef={scroll} resetKey={app ? `app:${app.flathub ? 'flathub' : app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
           {file && <InstallFile path={file} onDone={(cancel) => cancel && setFile(null)} />}
           {body}
           <View style={{ height: 24 }} />

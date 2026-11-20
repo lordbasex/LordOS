@@ -51,6 +51,7 @@ const DEFAULTS = {
   appsOff: [],                // 0.8.8.8, Store → Installed → Deactivate: built-in apps turned off (appsoff.js, appsoffmodel.js)
   webAppPrefs: {},            // 0.8.8.8, Settings → Web apps: per app { badge, dockPerProfile } (webappsmodel.js webPrefs); new key, no migration
   appsOffKept: null,         // what deactivating changed, to put back on Activate: { backupInterval } (appsoffactions.js)
+  flathub: null,              // 0.8.9.3, Store → Flathub: { on, showAll, appstreamAt } (flathubmodel.js prefsOf); new key, no migration
   cloudColors: {},            // 0.8.8.10 (#184), Settings → Cloud: a color chosen per account id (cloudmodel.js accountColor); new key, no migration
   themeOptions: {},           // 0.8.9, a theme's own choices from its theme.json "options", by theme id (thememeta.js); new key, no migration
   workspaces: null,           // 0.8.9, Lord Workspaces' activities: { v, activities } (themes/workspaces/model/activities.js); new key, no migration

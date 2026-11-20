@@ -135,8 +135,11 @@ static int split_kv(char *line, char **k, char **loc, char **v) {
     if (br) {
         *br = 0; *loc = br + 1;
         char *cb = strchr(*loc, ']'); if (cb) *cb = 0;
-        char *at = strchr(*loc, '@'); if (at) *at = 0;
         char *dot = strchr(*loc, '.'); if (dot) *dot = 0;
+        /* "en@shaw", "sr@latin": a modifier matches only a language that has it, and LordOS's never do (GNOME's
+         * .desktop files carry Name[en@shaw], in the Shavian alphabet, which used to win over the plain Name) */
+        static char never[] = "@";
+        if (strchr(*loc, '@')) *loc = never;
     }
     return 1;
 }

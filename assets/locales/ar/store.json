@@ -345,5 +345,7 @@
   "multiarch.body": "يحتاج {name} إلى مكتبات نظام 32 بت، وسيفعّلها LordOS. بعدها يستطيع محرك الحزم تثبيت حزم 32 بت (i386) من Debian بجانب حزم 64 بت، موقّعة ومُتحقَّق منها مثل أي حزمة أخرى. لا يُثبَّت إلا ما يحتاجه {name}.",
   "multiarch.enable": "تفعيل ومتابعة",
   "multiarch.enabling": "جارٍ التفعيل…",
-  "pkg32": "{name} (32 بت)"
+  "pkg32": "{name} (32 بت)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "تطبيق Flatpak"
 }

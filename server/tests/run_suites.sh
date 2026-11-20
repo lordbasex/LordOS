@@ -320,6 +320,7 @@ EOF
     # (0.8.8.8) web apps: the window's app id and its process, the Dock's profiles menu, the Store's address sheet,
     # LordOS's catalog (assets/webapps), Settings' rows (sdk/webappsmodel.js, docs/WEBAPPS.md)
     if have node; then run "webapps-model-test (sdk/webappsmodel.js)" node tests/webapps_model_test.mjs
+    if have node; then run "flathub-model-test (sdk/flathubmodel.js)" node tests/flathub_model_test.mjs; fi
     else skip "webapps-model-test" "node"; fi
     # (0.8.8.8) web apps follow the desktop's light or dark mode: the matchMedia script lord-web adds (src/web/webscheme.js)
     if have node; then run "webscheme-test (src/web/webscheme.js)" node tests/webscheme_test.mjs

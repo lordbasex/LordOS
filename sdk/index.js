@@ -37,6 +37,7 @@ export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, web
   webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy, webDeveloper, setWebDeveloperMode } from './webapps.js';
 export * as notifyTones from './notifytones.js';
 export * as webAppsModel from './webappsmodel.js';
+export * as flathubModel from './flathubmodel.js';
 export { compareNames } from './collate.js';
 import { windowIcon as windowIconOf } from './apps.js';
 import { ImeOverlay } from './ime.js';

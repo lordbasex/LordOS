@@ -313,5 +313,7 @@
   "multiarch.body": "A(z) {name} 32 bites rendszerkönyvtárakat igényel; a LordOS engedélyezi őket. Ezután a csomagkezelő a 64 bites csomagok mellé 32 bites (i386) Debian-csomagokat is telepíthet, aláírva és ellenőrizve, mint bármely más csomagot. Csak az kerül telepítésre, amire a(z) {name} igényt tart.",
   "multiarch.enable": "Engedélyezés és folytatás",
   "multiarch.enabling": "Engedélyezés…",
-  "pkg32": "{name} (32 bites)"
+  "pkg32": "{name} (32 bites)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Flatpak-alkalmazás"
 }

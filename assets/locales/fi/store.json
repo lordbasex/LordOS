@@ -313,5 +313,7 @@
   "multiarch.body": "{name} tarvitsee 32-bittisiä järjestelmäkirjastoja; LordOS ottaa ne käyttöön. Sen jälkeen pakettienhallinta voi asentaa Debianin 32-bittisiä (i386) paketteja 64-bittisten rinnalle, allekirjoitettuina ja tarkistettuina kuten minkä tahansa muun paketin. Vain se, mitä {name} tarvitsee, asennetaan.",
   "multiarch.enable": "Ota käyttöön ja jatka",
   "multiarch.enabling": "Otetaan käyttöön…",
-  "pkg32": "{name} (32-bittinen)"
+  "pkg32": "{name} (32-bittinen)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Flatpak-sovellus"
 }

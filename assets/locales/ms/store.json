@@ -305,5 +305,7 @@
   "multiarch.body": "{name} memerlukan pustaka sistem 32-bit; LordOS akan mendayakannya. Selepas itu enjin pakej boleh memasang pakej 32-bit (i386) daripada Debian di sebelah pakej 64-bit, ditandatangani dan disemak seperti pakej lain. Hanya apa yang diperlukan oleh {name} dipasang.",
   "multiarch.enable": "Dayakan dan teruskan",
   "multiarch.enabling": "Mendayakan…",
-  "pkg32": "{name} (32-bit)"
+  "pkg32": "{name} (32-bit)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Apl Flatpak"
 }

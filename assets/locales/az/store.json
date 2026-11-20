@@ -313,5 +313,7 @@
   "multiarch.body": "{name} 32 bitlik sistem kitabxanalarına ehtiyac duyur; LordOS onları aktivləşdirəcək. Bundan sonra paket mühərriki Debian-ın 32 bitlik (i386) paketlərini 64 bitlik paketlərin yanında, hər hansı digər paket kimi imzalanmış və yoxlanılmış şəkildə quraşdıra bilər. Yalnız {name} üçün lazım olanlar quraşdırılır.",
   "multiarch.enable": "Aktivləşdir və davam et",
   "multiarch.enabling": "Aktivləşdirilir…",
-  "pkg32": "{name} (32 bit)"
+  "pkg32": "{name} (32 bit)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Flatpak tətbiqi"
 }

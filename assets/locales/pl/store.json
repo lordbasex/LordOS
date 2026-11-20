@@ -329,5 +329,7 @@
   "multiarch.body": "{name} potrzebuje 32-bitowych bibliotek systemowych; LordOS je włączy. Menedżer pakietów będzie wtedy mógł instalować 32-bitowe pakiety (i386) z Debiana obok 64-bitowych, podpisane i sprawdzane jak każdy inny pakiet. Instalowane jest tylko to, czego potrzebuje {name}.",
   "multiarch.enable": "Włącz i kontynuuj",
   "multiarch.enabling": "Włączanie…",
-  "pkg32": "{name} (32-bitowy)"
+  "pkg32": "{name} (32-bitowy)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Aplikacja Flatpak"
 }

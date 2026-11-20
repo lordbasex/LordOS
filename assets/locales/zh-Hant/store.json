@@ -305,5 +305,7 @@
   "multiarch.body": "{name} 需要 32 位元系統程式庫，LordOS 將為其啟用。之後套件引擎就能在 64 位元套件旁邊安裝 Debian 的 32 位元（i386）套件，並像其他套件一樣經過簽章與驗證。只會安裝 {name} 需要的內容。",
   "multiarch.enable": "啟用並繼續",
   "multiarch.enabling": "正在啟用…",
-  "pkg32": "{name}（32 位元）"
+  "pkg32": "{name}（32 位元）",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Flatpak App"
 }

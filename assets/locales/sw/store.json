@@ -313,5 +313,7 @@
   "multiarch.body": "{name} inahitaji maktaba za mfumo za biti 32; LordOS itaziwezesha. Baada ya hapo injini ya vifurushi inaweza kusakinisha vifurushi vya biti 32 (i386) kutoka Debian kando ya vile vya biti 64, vilivyotiwa sahihi na kukaguliwa kama kifurushi kingine chochote. Kinachosakinishwa ni kile tu ambacho {name} inahitaji.",
   "multiarch.enable": "Wezesha na uendelee",
   "multiarch.enabling": "Inawezesha…",
-  "pkg32": "{name} (biti 32)"
+  "pkg32": "{name} (biti 32)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Programu ya Flatpak"
 }

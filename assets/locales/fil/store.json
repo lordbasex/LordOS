@@ -313,5 +313,7 @@
   "multiarch.body": "Kailangan ng {name} ang mga 32-bit na library ng system; ie-enable ito ng LordOS. Sa gayon, makakapag-install ang package engine ng mga 32-bit (i386) na package mula sa Debian katabi ng mga 64-bit, naka-sign at sinusuri gaya ng ibang package. Ang kailangan lang ng {name} ang ini-install.",
   "multiarch.enable": "I-enable at magpatuloy",
   "multiarch.enabling": "Ine-enable…",
-  "pkg32": "{name} (32-bit)"
+  "pkg32": "{name} (32-bit)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Flatpak app"
 }

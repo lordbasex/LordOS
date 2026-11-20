@@ -321,5 +321,7 @@
   "multiarch.body": "{name} reikia 32 bitų sistemos bibliotekų; LordOS jas įjungs. Tada paketų variklis galės diegti 32 bitų (i386) Debian paketus šalia 64 bitų, pasirašytus ir patikrintus kaip bet kurį kitą paketą. Įdiegiama tik tai, ko reikia {name}.",
   "multiarch.enable": "Įjungti ir tęsti",
   "multiarch.enabling": "Įjungiama…",
-  "pkg32": "{name} (32 bitų)"
+  "pkg32": "{name} (32 bitų)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Flatpak programa"
 }

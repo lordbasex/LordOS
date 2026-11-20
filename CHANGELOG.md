@@ -58,6 +58,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   verified the app. lord-server checks every line again before `lord.flatpak.catalog()` hands it to the shell. On
   Flathub's real catalog (52 MB): 3,366 apps, 2,240 verified, in 0.07 s. `fpakas-test` (2,096 checks, under
   AddressSanitizer, with random and cut documents).
+- **Flathub in the Store** (in development; PCs only): a "Flathub" section. Turning it on shows the package plan for
+  `flatpak` (no Recommends) and installs it with the Store's own package job, then adds Flathub from the shipped file
+  and fetches the catalog (again when the Store opens a day later; Refresh does it now). The catalog shows the apps
+  Flathub verified, with a switch for the rest (`settings.flathub`), as cards with the category and the developer, in
+  Discover's search and in each category. An app's page shows, before installing, what it declares (from
+  `flatpak remote-info --show-metadata`) in plain words and what LordOS changes for each: never granted (the whole
+  session or system bus, starting programs outside its sandbox, systemd, the keyring), narrowed (the home read-only
+  but for the person's folders, X11 off while a restriction is on, other apps' bus names cut off under a device
+  restriction) or blockable in the Firewall. Apps built on Chromium or Electron (their base is
+  `org.electronjs.Electron2.BaseApp` or `org.chromium.Chromium.BaseApp`) are marked "Not yet supported" and can't be
+  installed: they need Flatpak's sub-sandboxes, which LordOS doesn't serve yet. Install, Update and Remove (removing
+  also removes runtimes no app uses), with Flatpak's progress; Store → Updates has "Update Flathub apps" and
+  Store → Installed removes a Flatpak app. `lord.flatpak.supported()` hides the section on other machines. Every
+  text in the 35 languages. `sdk/flathubmodel.js` holds the logic (`flathub-model-test`, run on Flathub's real metadata).
+  Checked on VM 127 from a session, after removing `flatpak`: the plan said 6 packages, 2.2 MB to download, 11 MB on
+  disk, and exactly those were installed (no portal) with the three Flatpak services still masked; the catalog showed
+  2,240 verified apps with their icons; GNOME Calculator showed "Internet and your local network", installed with the
+  GNOME runtime, opened from its page in `app-lordos-fp-org.gnome.Calculator.scope`, and its removal took the runtime
+  with it; MarkText was marked not supported; "Update Flathub apps" ran.
+
+### Fixed
+
+- **Some apps were named in the Shavian alphabet.** A `.desktop` key with a language modifier (`Name[en@shaw]`, which
+  GNOME apps ship) was read as the plain language (`Name[en]`) and won over the untranslated name, so GNOME
+  Calculator from Flathub showed as "𐑒𐑨𐑤𐑒𐑿𐑤𐑱𐑑𐑼" in English. A key with a modifier now never matches, since LordOS's
+  languages have none (`apps-actions-test`).
 
 ## [0.8.9.2-beta] - 2026-11-19
 

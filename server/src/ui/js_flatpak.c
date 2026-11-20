@@ -3,6 +3,7 @@
  * each in its own child that enters lordos-net-flathub.scope (the firewall component lordos:flathub, a row in
  * Monitor → Network) before it execs /usr/bin/flatpak with a minimal environment, stdin /dev/null and its output on a
  * pipe. JS asks:
+ *   lord.flatpak.supported()      → this PC can have Flathub (phase 1: x86-64), installed or not
  *   lord.flatpak.available()      → Flatpak installed (root-owned /usr/bin/flatpak) on a supported PC (phase 1: x86-64)
  *   lord.flatpak.start(cmd, ref)  → a job id (cmd one of the names below; ref only where the command takes one), or -1
  *   lord.flatpak.take()           → [{ id, line } | { id, done: true, code }] since the last call
@@ -217,6 +218,12 @@ static JSValue f_available(JSContext *c, JSValueConst t, int argc, JSValueConst 
     return JS_NewBool(c, fpak_native_arch() && fpak_binary_ok());
 }
 
+/* this machine can have Flathub at all (phase 1: x86-64 only), whether or not flatpak is installed yet */
+static JSValue f_supported(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return JS_NewBool(c, fpak_native_arch() != NULL);
+}
+
 static int enqueue(int cmd, const char *ref);
 
 static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -338,6 +345,7 @@ static JSValue f_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
 
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("available", 0, f_available),
+    JS_CFUNC_DEF("supported", 0, f_supported),
     JS_CFUNC_DEF("start", 2, f_start),
     JS_CFUNC_DEF("take", 0, f_take),
     JS_CFUNC_DEF("cancel", 1, f_cancel),

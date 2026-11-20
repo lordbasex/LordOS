@@ -305,5 +305,7 @@
   "multiarch.body": "{name} には 32 ビットのシステムライブラリが必要です。LordOS が有効にします。これでパッケージエンジンは、Debian の 32 ビット (i386) パッケージを 64 ビットのものと並べて、ほかのパッケージと同じく署名を確認してインストールできるようになります。インストールされるのは {name} に必要なものだけです。",
   "multiarch.enable": "有効にして続ける",
   "multiarch.enabling": "有効にしています…",
-  "pkg32": "{name} (32 ビット)"
+  "pkg32": "{name} (32 ビット)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Flatpak アプリ"
 }

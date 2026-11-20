@@ -305,5 +305,7 @@
   "multiarch.body": "{name}에는 32비트 시스템 라이브러리가 필요합니다. LordOS가 이를 활성화합니다. 그러면 패키지 엔진이 Debian의 32비트(i386) 패키지를 64비트 패키지 옆에 다른 패키지와 똑같이 서명을 확인해 설치할 수 있습니다. {name}에 필요한 것만 설치됩니다.",
   "multiarch.enable": "활성화하고 계속",
   "multiarch.enabling": "활성화하는 중…",
-  "pkg32": "{name} (32비트)"
+  "pkg32": "{name} (32비트)",
+  "page.flathub": "Flathub",
+  "kind.flatpak": "Flatpak 앱"
 }

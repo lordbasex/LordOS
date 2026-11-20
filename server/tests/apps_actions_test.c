@@ -46,7 +46,8 @@ int main(void) {
     FILE *f = fopen(path, "w");
     if (!f) { perror(path); return 1; }
     fprintf(f,
-            "[Desktop Entry]\nType=Application\nName=Demo\nExec=/usr/bin/touch %s/main\n"
+            "[Desktop Entry]\nType=Application\nName=Demo\nName[en@shaw]=Shavian\nName[es@x]=Modificada\nName[es_AR]=Demo AR\n"
+            "Exec=/usr/bin/touch %s/main\n"
             "Actions=new-window;private;bad_name;noexec;nolabel;new-window;\n\n"
             "[Desktop Action new-window]\nName=New Window\nName[es]=Nueva ventana\nExec=/usr/bin/touch %s/act-new\n\n"
             "[Desktop Action private]\nName=Private\\sWindow\nExec=/usr/bin/touch %s/act-private\n\n"
@@ -91,6 +92,21 @@ int main(void) {
     CHECK("plain launch still works", apps_launch("lord-demo") == 0);
     snprintf(path, sizeof path, "%s/main", home);
     CHECK("main Exec ran", appeared(path));
+
+    /* a language modifier ("en@shaw") is never the plain language: GNOME apps showed in the Shavian alphabet */
+    {
+        const DesktopApp *l2;
+        int m = apps_list("en", &l2);
+        const char *nm = "";
+        for (int i = 0; i < m; i++) if (!strcmp(l2[i].id, "lord-demo")) nm = l2[i].name;
+        CHECK("Name[en@shaw] is not English", !strcmp(nm, "Demo"));
+        m = apps_list("es-AR", &l2);
+        for (int i = 0; i < m; i++) if (!strcmp(l2[i].id, "lord-demo")) nm = l2[i].name;
+        CHECK("es_AR wins, es@x never", !strcmp(nm, "Demo AR"));
+        m = apps_list("es", &l2);
+        for (int i = 0; i < m; i++) if (!strcmp(l2[i].id, "lord-demo")) nm = l2[i].name;
+        CHECK("es: not the modified one", !strcmp(nm, "Demo"));
+    }
 
     /* a package that names its file freely ("Lord Spaced App.desktop"): listed as Lord-Spaced-App,
      * launched from its real file (0.8.5) */
