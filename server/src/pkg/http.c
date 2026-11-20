@@ -314,7 +314,9 @@ static void get_file(Conn *c, const FetchItem *it, uint32_t idx) {
 /* Downloads one item: sends H, D… and E. */
 static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
     if (!strncmp(it->url, "file:", 5)) { get_file(c, it, idx); return; }
-    char url[1100], err[200] = "", line[4096];
+    /* GitHub's release downloads redirect to a signed URL of about 900 bytes and send a Content-Security-Policy line of
+     * about 4.2 KB (WinFsp, 2026-11-20): a header line may be up to 12 KB (the connection's buffer holds 16) */
+    char url[2200], err[200] = "", line[12288];
     snprintf(url, sizeof url, "%s", it->url);
     int was_tls = 0;
     for (int redirects = 0;; redirects++) {
@@ -359,7 +361,8 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
         if (sscanf(line, "HTTP/1.%d %d", &minor, &status) != 2) { conn_close(c); lerr_set(err, sizeof err, "pkg.http.badResponse", NULL); break; }
         int64_t clen = -1, lastmod = 0;
         int chunked = 0, close_after = minor == 0;
-        char location[1024] = "";
+        char location[2048] = "";
+        int location_cut = 0;
         unsigned long long cr_from = 0, cr_to = 0;
         int has_cr = 0;
         for (;;) {
@@ -372,7 +375,7 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
             if (!strcasecmp(line, "Content-Length")) clen = strtoll(v, NULL, 10);
             else if (!strcasecmp(line, "Transfer-Encoding") && strcasestr(v, "chunked")) chunked = 1;
             else if (!strcasecmp(line, "Connection") && strcasestr(v, "close")) close_after = 1;
-            else if (!strcasecmp(line, "Location")) snprintf(location, sizeof location, "%s", v);
+            else if (!strcasecmp(line, "Location")) location_cut = snprintf(location, sizeof location, "%s", v) >= (int)sizeof location;
             else if (!strcasecmp(line, "Last-Modified")) lastmod = http_parse_date(v);
             else if (!strcasecmp(line, "Content-Range")) has_cr = sscanf(v, "bytes %llu-%llu/", &cr_from, &cr_to) == 2;
         }
@@ -427,6 +430,7 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
         }
         if (close_after) conn_close(c);
         if (status == 416 && from) { from = 0; continue; }          /* the part is no use (the file changed): again */
+        if (redirect && location_cut) { lerr_set(err, sizeof err, "pkg.http.badHeaders", NULL); break; }   /* never a cut URL */
         if (redirect && redirects < 5) {
             if (location[0] == '/') snprintf(url, sizeof url, "%s://%s%s%s%s", tls ? "https" : "http", host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", location);
             else snprintf(url, sizeof url, "%s", location);

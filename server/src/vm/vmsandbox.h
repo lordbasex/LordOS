@@ -44,8 +44,9 @@ int vm_jail_tool2(const char *read_file, const char *read_file2, const char *rw_
 /* the same with any number of files it may read (an import: a VMDK descriptor and its extents, a chain of snapshot
  * layers); every one must exist, or nothing is allowed */
 int vm_jail_tool_n(const char *const *reads, int nreads, const char *rw_dir);
-/* lord-vm, after its children started: VMS_SUPERVISOR_LANDLOCK when applied */
-int vm_jail_self(const char *machine_dir, const char *runtime_dir);
+/* lord-vm, after its children started: VMS_SUPERVISOR_LANDLOCK when applied. xfer_dir (or NULL): the machine's transfer
+ * folder (6.7.1), where lord-vm makes, writes and removes the files dropped on the window (never folders, links or renames) */
+int vm_jail_self(const char *machine_dir, const char *runtime_dir, const char *xfer_dir);
 /* the kernel's Landlock ABI (0 none) */
 int vm_landlock_abi(void);
 

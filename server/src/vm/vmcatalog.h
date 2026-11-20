@@ -31,7 +31,7 @@ typedef struct {
     char keys[64];                /* the maker's key file, a plain name in the keys folder */
     char fprs[VMCAT_FPRS][41];    /* the primary keys of that file that may sign (40 hex digits, upper case) */
     int nfprs;
-    /* An entry whose maker signs no list (Windows' evaluation, virtio-win; docs/VIRTUALIZATION.md 4.3) names its files
+    /* An entry whose maker signs no list (Windows' evaluation, virtio-win, WinFsp; docs/VIRTUALIZATION.md 4.3, 6.7.1) names its files
      * itself, "pinned": each with its https URL, its SHA-256 (from the maker's page, checked against a download) and its
      * size. The catalog is part of LordOS's signed package; a pinned file is kept only with that hash. */
     int npins;

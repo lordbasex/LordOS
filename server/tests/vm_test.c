@@ -65,7 +65,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "7", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "8", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -289,6 +289,50 @@ static void test_schema(void) {
         vm_machine_defaults(&m, &hh, VM_ARCH_ARM64);
         CHECK(m.sound == 1 && m.volume == 100 && m.microphone == 0);
     }
+    /* schema 7 (the transfer folder, 6.7.1): true or false; a file without it reads as off (a machine made before keeps
+     * its hardware), new machines have it; never below schema 7; the tag LordOS is the transfer folder's then */
+    {
+        struct { const char *add; int schema, want, on; } s7[] = {
+            { "\"transfer\":true", 7, VM_OK, 1 }, { "\"transfer\":false", 7, VM_OK, 0 },
+            { "\"transfer\":1", 7, VM_E_FIELD, 0 }, { "\"transfer\":\"on\"", 7, VM_E_FIELD, 0 },
+            { "\"transfer\":true", 6, VM_E_FIELD, 0 }, { "\"transfer\":false", 6, VM_OK, 0 },
+            { "\"transfer\":true,\"shares\":[{\"tag\":\"LordOS\",\"path\":\"/home/u/x\",\"writable\":true}]", 7, VM_E_RANGE, 0 },
+            { "\"transfer\":false,\"shares\":[{\"tag\":\"LordOS\",\"path\":\"/home/u/x\",\"writable\":true}]", 7, VM_OK, 0 },
+            { "\"transfer\":true,\"shares\":[{\"tag\":\"Work\",\"path\":\"/home/u/x\",\"writable\":true}]", 7, VM_OK, 1 },
+        };
+        for (size_t i = 0; i < sizeof s7 / sizeof s7[0]; i++) {
+            char t[4096];
+            const char *at = strstr(GOOD, "\"schema\":1");
+            snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s7[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s7[i].add);
+            int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+            if (r != s7[i].want) fprintf(stderr, "  schema 7 %s (%d): got %d (%s)\n", s7[i].add, s7[i].schema, r, err);
+            CHECK(r == s7[i].want);
+            if (r == VM_OK) {
+                CHECK(m.transfer == s7[i].on);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && strstr(jj, s7[i].on ? "\"transfer\": true" : "\"transfer\": false") && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+        }
+        CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && m.transfer == 0);
+        VmHost hh = { .arch = VM_ARCH_AMD64, .cpus = 4, .ram_mb = 8192, .kvm = 1 };
+        vm_machine_defaults(&m, &hh, VM_ARCH_AMD64);
+        CHECK(m.transfer == 1 && m.schema == VM_SCHEMA && VM_SCHEMA >= 7);
+        /* where it is: <library>/Transfer/<folder name without .lordvm>; nothing for a folder that isn't <name>.lordvm */
+        char xp[PATH_MAX];
+        CHECK(vm_transfer_path("/home/u/Machines/Ubuntu 26.04.lordvm", xp, sizeof xp) == 0 && !strcmp(xp, "/home/u/Machines/Transfer/Ubuntu 26.04"));
+        CHECK(vm_transfer_path("/home/u/Machines/Win.lordvm/", xp, sizeof xp) == 0 && !strcmp(xp, "/home/u/Machines/Transfer/Win"));
+        CHECK(vm_transfer_path("/home/u/Machines/x.img", xp, sizeof xp) < 0);
+        CHECK(vm_transfer_path("/home/u/Machines/.lordvm", xp, sizeof xp) < 0);
+        CHECK(vm_transfer_path("/home/u/Machines/.hidden.lordvm", xp, sizeof xp) < 0);
+        CHECK(vm_transfer_path("x.lordvm", xp, sizeof xp) < 0);
+        CHECK(vm_transfer_path("/a.lordvm", xp, sizeof xp) < 0);
+        CHECK(vm_transfer_path("/home/u/Mach,ines/a.lordvm", xp, sizeof xp) < 0);       /* a path QEMU can't take */
+        CHECK(vm_transfer_path("/home/u/Machines/a.lordvm", xp, 20) < 0);                /* doesn't fit */
+        CHECK(vm_transfer_path(NULL, xp, sizeof xp) < 0);
+        /* a person's share can't be the transfer folder: it's inside the library */
+    }
     /* which folders may be shared (vm_share_allowed): a real folder in home (not home), under /media/<user> or /mnt, nothing
      * hidden, never the library or what holds it */
     {
@@ -421,6 +465,14 @@ static void test_messages(void) {
     q = vm_msg(VM_FILE, 6, 0, 0, 0, 0, "a.txt"); CHECK(vm_msg_valid(&q, 1) && !vm_msg_valid(&q, 0));
     q = vm_msg(VM_FILE, 6, 0, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
     q = vm_msg(VM_FILE_PROGRESS, 6, 42, 0, 0, 0, "a.txt"); CHECK(vm_msg_valid(&q, 0) && !vm_msg_valid(&q, 1));
+    q = vm_msg(VM_FILE_PROGRESS, 6, 42, 1, 0, 0, "a.txt"); CHECK(vm_msg_valid(&q, 0));       /* b: through the transfer folder */
+    /* the transfer folder (6.7.1): VAG_TRANSFER is an agent request (WinFsp's hash as text, or none); the agent's state
+     * says whether the guest has it (VAC_TRANSFER) or can once WinFsp is in (VAC_XFER_SETUP) */
+    q = vm_msg(VM_AGENT, 7, VAG_TRANSFER, 0, 0, 0, ""); CHECK(vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT, 7, VAG_TRANSFER + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_FILES | VAC_TRANSFER, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, 512, 0, 0, "1\tx"); CHECK(!vm_msg_valid(&q, 0));
     q.a = 101; CHECK(!vm_msg_valid(&q, 0));
     q.a = -1; CHECK(!vm_msg_valid(&q, 0));
     char longtext[400];

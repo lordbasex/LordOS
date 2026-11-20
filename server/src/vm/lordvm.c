@@ -49,6 +49,7 @@
 #include <linux/fs.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/random.h>
 #include <sys/resource.h>
 #include <sys/signalfd.h>
 #include <sys/socket.h>
@@ -170,25 +171,32 @@ static int write_all(int fd, const void *p, size_t n) {
 
 static int file_exists(const char *p) { struct stat st; return !stat(p, &st) && S_ISREG(st.st_mode); }
 
-static int sha256_file(const char *path, char out[65]) {
-    int fd = open(path, O_RDONLY | O_CLOEXEC);
-    if (fd < 0) return -1;
+/* the SHA-256 of what a descriptor holds, from its start (pread: its offset stays) */
+static int sha256_fd(int fd, char out[65]) {
     Sha256 s;
     sha256_init(&s);
     static uint8_t buf[1 << 16];
-    for (;;) {
-        ssize_t r = read(fd, buf, sizeof buf);
-        if (r < 0) { if (errno == EINTR) continue; close(fd); return -1; }
+    for (off_t off = 0;;) {
+        ssize_t r = pread(fd, buf, sizeof buf, off);
+        if (r < 0) { if (errno == EINTR) continue; return -1; }
         if (!r) break;
         sha256_update(&s, buf, (size_t)r);
+        off += r;
     }
-    close(fd);
     uint8_t d[32];
     sha256_final(&s, d);
     for (int i = 0; i < 32; i++) snprintf(out + i * 2, 3, "%02x", d[i]);
     return 0;
 }
 
+static int sha256_file(const char *path, char out[65]) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    int r = sha256_fd(fd, out);
+    close(fd);
+    return r;
+
+}
 /* runs a program (no shell) and waits; its output goes to the log. 0 when it exited with 0. With `jail_read`, the
  * program runs inside vm_jail_tool (it may read only that file and write only in `jail_rw`) or not at all. */
 static int run_tool_in(char *const argv[], char *out, size_t outcap, const char *jail_read, const char *jail_rw);
@@ -799,7 +807,9 @@ typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 /* a file dropped on the machine's window, for the guest (VM_FILE) */
 #define FX_QUEUE 8
-typedef struct { int fd, client; uint32_t seq; char name[AG_NAME_MAX + 1]; } FxReq;
+/* kind: a drop (FXK_DROP) or WinFsp's installer for the transfer folder (FXK_WINFSP, VAG_TRANSFER: sha is its hash) */
+enum { FXK_DROP = 0, FXK_WINFSP };
+typedef struct { int fd, client, kind; uint32_t seq; char name[AG_NAME_MAX + 1], sha[65]; } FxReq;
 
 /* each guest-file-write carries FX_CHUNK bytes (base64 in JSON) and FX_DEPTH of them are on their way at once: one at a
  * time, each waiting for its answer, an 8.7 GB file went at about 26 MB/s (2026-11-20) */
@@ -819,8 +829,14 @@ static struct {
     Client cl[MAX_CLIENTS];
     int ncl;
     int serial_fd, serial_log, qemu_err, passt_err, sig_fd;
-    pid_t vfs[VM_SHARES];                   /* shared folders (6.7): each one's virtiofsd, and QEMU's end of its socket */
-    int vfs_q[VM_SHARES];
+    pid_t vfs[VM_SHARES + 1];               /* shared folders (6.7): each one's virtiofsd, and QEMU's end of its socket; */
+    int vfs_q[VM_SHARES + 1];               /* the last is the transfer folder's (6.7.1) */
+    /* the transfer folder (6.7.1): on at this start (machine.json "transfer"), its path, a descriptor of it (O_PATH, opened
+     * like a share's) for the drops; what the guest said: XG_* */
+    int xfer_on, xfer_dfd, xfer_guest;
+    char xfer_path[PATH_MAX];
+    long xfer_pid;
+    long long xfer_poll_at;
     pid_t tpm;                              /* the TPM (Windows 11): swtpm, and QEMU's end of its control socket */
     int tpm_q;
     off_t serial_bytes;
@@ -917,7 +933,23 @@ static struct {
     size_t fx_chunks[FX_DEPTH];         /* the pieces on their way, oldest first */
     int fx_inflight, fx_eof;
     char fx_tmp[256];                      /* the private folder in the guest the file is written into */
+    /* a drop through the transfer folder (6.7.1): fx_via 1; the host's copy into it (a child of lord-vm: its pid, the pipe
+     * it reports on), the file's name there (.lordos-drop-<random>), whether the agent's way was tried after it failed */
+    int fx_via, fx_cpipe, fx_retried;
+    pid_t fx_cpid;
+    char fx_stage[40];
+    long long fx_t0;
 } S;
+
+/* what the guest said of the transfer folder */
+enum { XG_UNKNOWN = 0, XG_MOUNTED, XG_NEEDS_WINFSP, XG_NO_SERVICE, XG_FAILED };
+
+/* the start's shared folders: the person's (0 .. n_shares-1) and the transfer folder (VM_SHARES) */
+static int sh_on(int i) { return (i >= 0 && i < S.m.n_shares) || (i == VM_SHARES && S.xfer_on); }
+static int sh_count(void) { return S.m.n_shares + (S.xfer_on ? 1 : 0); }
+static const char *sh_tag(int i) { return i == VM_SHARES ? VM_XFER_TAG : S.m.share_tag[i]; }
+static const char *sh_path(int i) { return i == VM_SHARES ? S.xfer_path : S.m.share_path[i]; }
+static int sh_rw(int i) { return i == VM_SHARES ? 1 : S.m.share_rw[i]; }
 
 static void awake_update(void);
 static void send_to(int ci, const VmMsg *m, int fd) {
@@ -1050,7 +1082,7 @@ static void setup_cgroups(void) {
     cg_write(q, "memory.swap.max", "0");
     cg_write(p, "memory.max", "134217728");
     cg_write(p, "cpu.max", "200000 100000");
-    if (S.m.n_shares && (!mkdir(v, 0755) || errno == EEXIST)) {
+    if (sh_count() && (!mkdir(v, 0755) || errno == EEXIST)) {
         /* the shared folders' virtiofsd: 256 MB and two CPUs together (they cache file data in the guest, not here) */
         cg_write(v, "memory.max", "268435456");
         cg_write(v, "cpu.max", "200000 100000");
@@ -1258,7 +1290,7 @@ static int open_share(const char *path, char *err, size_t errlen) {
 }
 
 static int spawn_virtiofsd(int i, char *err, size_t errlen) {
-    int dfd = open_share(S.m.share_path[i], err, errlen);
+    int dfd = open_share(sh_path(i), err, errlen);
     if (dfd < 0) return -1;
     char path[PATH_MAX + 32];
     snprintf(path, sizeof path, "%s/fs%d.sock", S.rundir, i);
@@ -1285,7 +1317,7 @@ static int spawn_virtiofsd(int i, char *err, size_t errlen) {
         char dir[] = "--shared-dir=/proc/self/fd/4";
         /* find-paths: a suspended machine's open files are found again by their paths when it resumes (6.1) */
         char *argv[] = { VIRTIOFSD, "--fd=3", dir, "--sandbox=namespace", "--seccomp=kill", "--cache=auto", "--migration-mode=find-paths",
-                         "--migration-on-error=guest-error", "--log-level=warn", S.m.share_rw[i] ? NULL : "--readonly", NULL };
+                         "--migration-on-error=guest-error", "--log-level=warn", sh_rw(i) ? NULL : "--readonly", NULL };
         char *env[] = { NULL };
         execve(VIRTIOFSD, argv, env);
         _exit(127);
@@ -1298,7 +1330,7 @@ static int spawn_virtiofsd(int i, char *err, size_t errlen) {
     unlink(path);
     if (!ok) { snprintf(err, errlen, "can't reach virtiofsd: %s", strerror(errno)); if (c >= 0) close(c); kill(pid, SIGKILL); waitpid(pid, NULL, 0); return -1; }
     S.vfs[i] = pid;
-    vlog("share %d: virtiofsd pid %d, tag %s, %s, %s", i + 1, (int)pid, S.m.share_tag[i], S.m.share_rw[i] ? "writable" : "read-only", S.m.share_path[i]);
+    vlog("share %d: virtiofsd pid %d, tag %s, %s, %s", i + 1, (int)pid, sh_tag(i), sh_rw(i) ? "writable" : "read-only", sh_path(i));
     return c;
 }
 
@@ -1346,6 +1378,34 @@ static int spawn_swtpm(char *err, size_t errlen) {
     return sv[0];
 }
 
+/* the transfer folder (6.7.1): <library>/Transfer/<name>, made when it isn't there (Transfer 0700; the machine's folder
+ * 0777 inside it, so the guest's person can write whatever their uid: virtiofsd can't take the guest's uids), then checked:
+ * real folders owned by this account, no link on the way (open_share), and never the library, a machine's folder or a
+ * folder holding them other than as <library>/Transfer/<name>. lord-vm keeps a descriptor of it for the drops. */
+static int xfer_prepare(const char *lib, char *err, size_t errlen) {
+    char top[PATH_MAX + 16], want[PATH_MAX];
+    snprintf(top, sizeof top, "%s/" VM_XFER_DIR, lib);
+    const char *base = strrchr(S.dir, '/');
+    char real[PATH_MAX + 256];
+    snprintf(real, sizeof real, "%s%.255s", lib, base ? base : "/");
+    if (vm_transfer_path(real, want, sizeof want)) { snprintf(err, errlen, "the machine's folder name can't give one"); return -1; }
+    struct stat st;
+    if (mkdir(top, 0700) && errno != EEXIST) { snprintf(err, errlen, "can't make %.120s: %s", top, strerror(errno)); return -1; }
+    if (lstat(top, &st) || !S_ISDIR(st.st_mode) || st.st_uid != getuid()) { snprintf(err, errlen, "%.120s isn't a folder of this account", top); return -1; }
+    if (!mkdir(want, 0700)) {
+        int d = open(want, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        if (d >= 0) { if (fchmod(d, 0777)) {} close(d); }
+        vlog("transfer: made %s", want);
+    } else if (errno != EEXIST) { snprintf(err, errlen, "can't make %.120s: %s", want, strerror(errno)); return -1; }
+    int fd = open_share(want, err, errlen);
+    if (fd < 0) return -1;
+    if (fstat(fd, &st) || !S_ISDIR(st.st_mode) || st.st_uid != getuid()) { close(fd); snprintf(err, errlen, "%.120s isn't a folder of this account", want); return -1; }
+    snprintf(S.xfer_path, sizeof S.xfer_path, "%s", want);
+    if (S.xfer_dfd >= 0) close(S.xfer_dfd);
+    S.xfer_dfd = fd;
+    return 0;
+}
+
 /* every share's folder, checked again now (it may have become a link or moved since it was chosen), then its virtiofsd */
 static int start_shares(void) {
     if (!file_exists(VIRTIOFSD)) { fail_start("virtiofsd isn't installed (shared folders)"); return -1; }
@@ -1356,10 +1416,14 @@ static int start_shares(void) {
     char *sl = strrchr(parent, '/');
     if (sl && sl != parent) *sl = 0;
     if (!realpath(parent, lib)) snprintf(lib, sizeof lib, "%s", parent);
-    for (int i = 0; i < S.m.n_shares; i++) {
-        if (vm_share_allowed(S.m.share_path[i], home, pw->pw_name, lib, err, sizeof err)) { fail_start("shared folder %s: %s", S.m.share_tag[i], err); return -1; }
+    for (int i = 0; i <= VM_SHARES; i++) {
+        if (!sh_on(i)) continue;
+        if (i == VM_SHARES) {
+            /* the transfer folder: made here when it isn't there, checked as the machine's own (xfer_prepare) */
+            if (xfer_prepare(lib, err, sizeof err)) { fail_start("the transfer folder: %s", err); return -1; }
+        } else if (vm_share_allowed(S.m.share_path[i], home, pw->pw_name, lib, err, sizeof err)) { fail_start("shared folder %s: %s", S.m.share_tag[i], err); return -1; }
         S.vfs_q[i] = spawn_virtiofsd(i, err, sizeof err);
-        if (S.vfs_q[i] < 0) { fail_start("shared folder %s: %s", S.m.share_tag[i], err); return -1; }
+        if (S.vfs_q[i] < 0) { fail_start("shared folder %s: %s", sh_tag(i), err); return -1; }
     }
     S.sandbox |= VMS_PDEATHSIG;
     return 0;
@@ -1547,11 +1611,11 @@ static void build_qemu_args(void) {
     arg("-name"); argf("guest=%s,debug-threads=on", esc);
     arg("-uuid"); arg(m->id);
     /* shared folders (6.7): vhost-user needs the guest's memory in a shared memfd; machines without one keep private memory */
-    arg("-machine"); argf("%s,dump-guest-core=off%s%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "", m->n_shares ? ",memory-backend=mem" : "",
+    arg("-machine"); argf("%s,dump-guest-core=off%s%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "", sh_count() ? ",memory-backend=mem" : "",
                           m->secure_boot ? ",smm=on" : "");
     /* secure boot: the firmware's variables can be written only from SMM, so the guest's system can't change its own keys */
     if (m->secure_boot) { arg("-global"); arg("driver=cfi.pflash01,property=secure,value=on"); }
-    if (m->n_shares) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=on", m->memory_mb); }
+    if (sh_count()) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=on", m->memory_mb); }
     if (kvm) { arg("-accel"); arg("kvm,device=/dev/fdset/1"); arg("-add-fd"); arg("fd=3,set=1,opaque=kvm"); }
     else { arg("-accel"); arg("tcg,thread=multi,tb-size=256"); }
     /* Hyper-V enlightenments: what Windows asks a hypervisor for (timers, interrupts, spinlocks); with KVM only */
@@ -1748,14 +1812,16 @@ static void build_qemu_args(void) {
     if (S.resuming) { arg("-incoming"); arg("defer"); }
     /* credentials: memfds at fd 7, 8, ... (never their values on the command line) */
     for (int i = 0; i < S.ncreds; i++) { arg("-smbios"); argf("type=11,path=/proc/self/fd/%d", (m->agent ? 9 : 7) + i); }
-    /* shared folders: each virtiofsd's connection after the credentials, a device on slots 0xb to 0xe */
-    for (int i = 0; i < m->n_shares; i++) {
-        arg("-chardev"); argf("socket,id=vfs%d,fd=%d", i, (m->agent ? 9 : 7) + S.ncreds + i);
-        arg("-device"); argf("vhost-user-fs-pci,id=share%d,chardev=vfs%d,tag=%s,addr=0x%x", i, i, m->share_tag[i], 0xb + i);
+    /* shared folders: each virtiofsd's connection after the credentials, a device on slots 0xb to 0xe; the transfer folder
+     * (6.7.1) last, on slot 0xf, whatever the person's shares are */
+    for (int i = 0, k = 0; i <= VM_SHARES; i++) {
+        if (!sh_on(i)) continue;
+        arg("-chardev"); argf("socket,id=vfs%d,fd=%d", i, (m->agent ? 9 : 7) + S.ncreds + k++);
+        arg("-device"); argf("vhost-user-fs-pci,id=share%d,chardev=vfs%d,tag=%s,addr=0x%x", i, i, sh_tag(i), 0xb + i);
     }
     if (m->tpm) {
         /* a TPM 2.0 (CRB interface, what Windows 11 looks for) served by swtpm on the fd after the shares' */
-        arg("-chardev"); argf("socket,id=chrtpm,fd=%d", (m->agent ? 9 : 7) + S.ncreds + m->n_shares);
+        arg("-chardev"); argf("socket,id=chrtpm,fd=%d", (m->agent ? 9 : 7) + S.ncreds + sh_count());
         arg("-tpmdev"); arg("emulator,id=tpm0,chardev=chrtpm");
         arg("-device"); arg("tpm-crb,tpmdev=tpm0");
     }
@@ -1883,7 +1949,7 @@ static int start_machine(void) {
         vlog("passt: pid %d", (int)S.passt);
         S.sandbox |= VMS_PDEATHSIG;
     }
-    if (S.m.n_shares && start_shares()) return -1;
+    if (sh_count() && start_shares()) return -1;
     if (S.m.tpm) {
         char terr[256];
         S.tpm_q = spawn_swtpm(terr, sizeof terr);
@@ -1915,11 +1981,11 @@ static int start_machine(void) {
         dup2(qerr[1], 1);
         dup2(qerr[1], 2);
         /* 3 kvm, 4 QMP, 5 serial, 6 network, 7.. credentials, then the status pipe (closed by exec) */
-        int fds[6 + MAX_CREDS + VM_SHARES + 2], nf = 0;
+        int fds[6 + MAX_CREDS + VM_SHARES + 3], nf = 0;
         fds[nf++] = kvm; fds[nf++] = qmp[1]; fds[nf++] = ser[1]; fds[nf++] = net[0] >= 0 ? net[0] : null;
         if (S.m.agent) { fds[nf++] = qga[1]; fds[nf++] = lag[1]; }
         for (int i = 0; i < S.ncreds; i++) fds[nf++] = S.cred_fd[i];
-        for (int i = 0; i < S.m.n_shares; i++) fds[nf++] = S.vfs_q[i];
+        for (int i = 0; i <= VM_SHARES; i++) if (sh_on(i)) fds[nf++] = S.vfs_q[i];
         if (S.m.tpm) fds[nf++] = S.tpm_q;
         fds[nf++] = st[1];
         place_fds(fds, nf);
@@ -1950,7 +2016,7 @@ static int start_machine(void) {
         S.ag_next = now_ms() + 1000;
     }
     for (int i = 0; i < S.ncreds; i++) { close(S.cred_fd[i]); S.cred_fd[i] = -1; }
-    for (int i = 0; i < S.m.n_shares; i++) if (S.vfs_q[i] >= 0) { close(S.vfs_q[i]); S.vfs_q[i] = -1; }
+    for (int i = 0; i <= VM_SHARES; i++) if (sh_on(i) && S.vfs_q[i] >= 0) { close(S.vfs_q[i]); S.vfs_q[i] = -1; }
     if (S.tpm_q >= 0) { close(S.tpm_q); S.tpm_q = -1; }
     if (net[0] >= 0) close(net[0]);
     S.qemu_err = qerr[0];
@@ -2120,7 +2186,7 @@ static void state_paths(char *st, char *meta, char *tmp, char *mtmp, size_t n) {
     if (mtmp) snprintf(mtmp, n, "%s/.suspend.json.tmp", S.dir);
 }
 
-typedef struct { char qemu[64], machine_type[32], cpu[17], saved[21]; int vcpus, memory_mb; double bytes; } SuspendMeta;
+typedef struct { char qemu[64], machine_type[32], cpu[17], saved[21]; int vcpus, memory_mb, transfer; double bytes; } SuspendMeta;
 
 static int suspend_meta_read(const char *dir, SuspendMeta *sm) {
     memset(sm, 0, sizeof *sm);
@@ -2140,6 +2206,7 @@ static int suspend_meta_read(const char *dir, SuspendMeta *sm) {
     sm->vcpus = (int)json_num(d.root, "vcpus", 0);
     sm->memory_mb = (int)json_num(d.root, "memory_mb", 0);
     sm->bytes = json_num(d.root, "bytes", 0);
+    sm->transfer = json_bool(d.root, "transfer", 0);     /* the transfer folder's device was there (6.7.1) */
     json_free(&d);
     return q && mt && cpu ? 0 : -1;
 }
@@ -2195,7 +2262,7 @@ static void suspend_done(void) {
     jb_raw(&j, "{\"qemu\":"); jb_str(&j, S.qemu_version);
     jb_raw(&j, ",\"machine_type\":"); jb_str(&j, S.m.machine_type);
     jb_raw(&j, ",\"cpu\":"); jb_str(&j, S.cpu_id);
-    jb_printf(&j, ",\"vcpus\":%d,\"memory_mb\":%d,\"bytes\":%lld,\"saved\":", S.m.vcpus, S.m.memory_mb, (long long)sb.st_size);
+    jb_printf(&j, ",\"vcpus\":%d,\"memory_mb\":%d,\"bytes\":%lld,\"transfer\":%s,\"saved\":", S.m.vcpus, S.m.memory_mb, (long long)sb.st_size, S.xfer_on ? "true" : "false");
     jb_str(&j, now);
     jb_raw(&j, "}\n");
     int fd = j.oom ? -1 : open(mtmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
@@ -2623,7 +2690,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
-       AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW };
+       AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW, AQ_XEXEC, AQ_XSTATUS };
 
 /* A Clone's first start (6.3): one fixed script, run as root by qemu-guest-agent, with the new hostname as its only
  * argument (checked: one DNS label). The machine-id is made again by systemd from the clone's new SMBIOS UUID (the old
@@ -2654,6 +2721,62 @@ static void id_begin(void) {
     jb_raw(&b, "],\"capture-output\":true}");
     if (!b.oom && !qga_do("guest-exec", b.p, AQ_IDEXEC)) { S.id_state = 2; vlog("identity: giving the guest its own hostname (%s) and machine-id", S.id_hostname); }
     jb_free(&b);
+}
+
+/* ---- the transfer folder in the guest (6.7.1) ----
+ * At each connection of the agent (and on VAG_TRANSFER) one fixed script says whether the guest has it:
+ *   Linux, as root: mounts the tag at /mnt/LordOS (root's own folder: never a path in a person's home) with nosuid,nodev
+ *     unless it's mounted already, then, as each person with a home (runuser), adds ~/LordOS, a link to it, when that name
+ *     is free. Prints "mounted".
+ *   Windows, as SYSTEM: the virtio-win guest tools' VirtIO-FS service (VirtioFsSvc) serves it as a drive once WinFsp is
+ *     installed: "nosvc" without the service, "nowinfsp" without WinFsp (VAC_XFER_SETUP: VAG_TRANSFER installs it),
+ *     otherwise the service is set to start by itself and started: "mounted". */
+static const char XFER_MOUNT_SH[] =
+    "d=/mnt/LordOS; "
+    "if ! mountpoint -q \"$d\"; then "
+    "[ -L \"$d\" ] && { echo 'not a folder' >&2; exit 3; }; "
+    "mkdir -p \"$d\" && mount -t virtiofs -o nosuid,nodev " VM_XFER_TAG " \"$d\" || exit 4; fi; "
+    "getent passwd | awk -F: '$3>=1000 && $3<60000 && $7 !~ /(nologin|false)$/ {print $1}' | while read -r u; do "
+    "runuser -u \"$u\" -- /bin/sh -c '[ -d \"$HOME\" ] && [ ! -e \"$HOME/LordOS\" ] && [ ! -L \"$HOME/LordOS\" ] && ln -s /mnt/LordOS \"$HOME/LordOS\"' "
+    ">/dev/null 2>&1; done; printf mounted";
+static const char XFER_CHECK_PS[] =
+    "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';trap{[Console]::Error.Write($_.Exception.Message);exit 1};"
+    "$s=Get-Service VirtioFsSvc -ErrorAction SilentlyContinue;if(-not $s){[Console]::Out.Write('nosvc');exit 0};"
+    "$i=(Get-ItemProperty 'HKLM:\\SOFTWARE\\WOW6432Node\\WinFsp' -ErrorAction SilentlyContinue).InstallDir;"
+    "if(-not $i -or -not (Test-Path -LiteralPath (Join-Path $i 'bin\\winfsp-x64.dll'))){[Console]::Out.Write('nowinfsp');exit 0};"
+    "if($s.StartType -ne 'Automatic'){Set-Service VirtioFsSvc -StartupType Automatic};"
+    "if($s.Status -ne 'Running'){Start-Service VirtioFsSvc};[Console]::Out.Write('mounted')";
+
+static int fx_exec_ps(const char *script, int kind);
+static int fx_exec_sh(const char *script, const char *a1, const char *a2, const char *a3, int kind);
+static void ag_broadcast(void);
+static void xfer_set(int g) {
+    S.xfer_guest = g;
+    S.ag_caps &= ~(VAC_TRANSFER | VAC_XFER_SETUP);
+    if (g == XG_MOUNTED) S.ag_caps |= VAC_TRANSFER;
+    else if (g == XG_NEEDS_WINFSP) S.ag_caps |= VAC_XFER_SETUP;
+    ag_broadcast();
+}
+static void xfer_begin(void) {
+    if (!S.xfer_on || !S.qga_up || !(S.ag_caps & VAC_EXEC) || S.xfer_pid || S.xfer_poll_at) return;
+    int r = S.ag_windows ? fx_exec_ps(XFER_CHECK_PS, AQ_XEXEC) : fx_exec_sh(XFER_MOUNT_SH, NULL, NULL, NULL, AQ_XEXEC);
+    if (r) vlog("transfer: the guest agent is busy: the folder is looked at the next time");
+    else S.xfer_pid = -1;
+}
+static void xfer_reply(int kind, const JVal *root, const JVal *r, int ok) {
+    if (!ok) { S.xfer_pid = 0; S.xfer_poll_at = 0; vlog("transfer: qemu-guest-agent: %s", qmp_error_desc(root)); xfer_set(XG_FAILED); return; }
+    if (kind == AQ_XEXEC) { S.xfer_pid = (long)json_num(r, "pid", 0); S.xfer_poll_at = now_ms() + 300; return; }
+    if (!json_bool(r, "exited", 0)) { S.xfer_poll_at = now_ms() + 300; return; }
+    S.xfer_poll_at = 0; S.xfer_pid = 0;
+    int code = (int)json_num(r, "exitcode", -1);
+    char said[200];
+    ag_exec_text(json_str(r, code == 0 ? "out-data" : "err-data"), said, sizeof said);
+    int g = code != 0 ? XG_FAILED : !strcmp(said, "mounted") ? XG_MOUNTED : !strcmp(said, "nowinfsp") ? XG_NEEDS_WINFSP : !strcmp(said, "nosvc") ? XG_NO_SERVICE : XG_FAILED;
+    vlog("transfer: %s", g == XG_MOUNTED ? (S.ag_windows ? "the guest's VirtIO-FS service serves the folder" : "the guest has the folder at /mnt/LordOS (~/LordOS)")
+                       : g == XG_NEEDS_WINFSP ? "the guest needs WinFsp for the folder (Set Up the Transfer Folder)"
+                       : g == XG_NO_SERVICE ? "the guest has no VirtIO-FS service (virtio-win guest tools)" : "the guest couldn't mount the folder");
+    if (g == XG_FAILED && said[0]) vlog("transfer: the guest said (%d): %.150s", code, said);
+    xfer_set(g);
 }
 
 static void ag_broadcast(void) {
@@ -2714,6 +2837,7 @@ static void qga_sync(void) {
     char a[64];
     fx_fail_all("the guest agent started again");
     S.agq_n = 0;                        /* nothing sent before is waited for any more */
+    S.xfer_pid = 0; S.xfer_poll_at = 0;
     snprintf(a, sizeof a, "{\"id\":%ld}", ++S.sync_id);
     qga_do("guest-sync", a, AQ_SYNC);
     S.sync_at = now_ms();
@@ -2732,6 +2856,7 @@ static void ag_lost(const char *why) {
     fx_fail_all("qemu-guest-agent stopped answering in the guest");
     if (S.qga_up) vlog("agent: %s", why);
     S.qga_up = 0; S.agq_n = 0; S.jpid = 0; S.inhibit_done = 0;
+    S.xfer_pid = 0; S.xfer_poll_at = 0; S.xfer_guest = XG_UNKNOWN;
     if (S.id_state == 2) { S.id_state = 1; S.id_poll_at = 0; }      /* tried again when the agent is back */
     S.ag_caps &= VAC_CLIPBOARD;
     ag_set(VAS_WAITING);
@@ -2769,6 +2894,7 @@ static void on_qga_reply(const JVal *root, int ok) {
     const JVal *r = json_get(root, "return");
     switch (kind) {
     case AQ_FXEXEC: case AQ_FXSTATUS: case AQ_FXOPEN: case AQ_FXWRITE: case AQ_FXCLOSE: fx_on_reply(kind, root, r, ok); break;
+    case AQ_XEXEC: case AQ_XSTATUS: xfer_reply(kind, root, r, ok); break;
     case AQ_DEVRAW: {
         /* --dev-qmp: a qemu-guest-agent command for the tests; a pid, or what a guest-exec printed */
         char t[VM_TEXT_MAX], o[140];
@@ -2791,7 +2917,7 @@ static void on_qga_reply(const JVal *root, int ok) {
     case AQ_INFO: {
         const char *v = ok ? json_str(r, "version") : NULL;
         snprintf(S.ag_version, sizeof S.ag_version, "%.40s", v ? v : "");
-        int caps = S.ag_caps & VAC_CLIPBOARD;
+        int caps = S.ag_caps & (VAC_CLIPBOARD | VAC_TRANSFER | VAC_XFER_SETUP);
         const JVal *cmds = json_get(r, "supported_commands");
         for (const JVal *e = cmds && cmds->type == J_ARR ? cmds->kid : NULL; e; e = e->next) {
             const char *n = json_str(e, "name");
@@ -2826,6 +2952,7 @@ static void on_qga_reply(const JVal *root, int ok) {
                    "\"--why=The machine is kept awake while it runs\",\"--mode=block\",\"sleep\",\"infinity\"]}", AQ_INHIBIT);
         }
         id_begin();
+        xfer_begin();
         /* a machine that resumed from a saved state has a clipboard helper that said hello to the lord-vm before: it
          * is asked to say it again (once; its answer gets the plain hello) */
         if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
@@ -2945,8 +3072,19 @@ static void ag_install_step(void) {
  *            copies the file into their own Downloads under a free name (CreateNew, " (n)") and writes the outcome into
  *            the result file. SYSTEM waits for it, unregisters the task and deletes only the private folder. The copy is
  *            the person's own: whatever their Downloads points to, they only reach what their rights reach. The name
- *            reaches every script as base64, never as script text. */
-enum { FX_NONE = 0, FX_PREP, FX_OPEN, FX_WRITE, FX_CLOSE, FX_PLACE };
+ *            reaches every script as base64, never as script text.
+ * Through the transfer folder (6.7.1), when the guest has it mounted: lord-vm copies the file into the machine's transfer
+ * folder on this computer itself (FX_XCOPY: a child process, a reflink where the file system can, else copy_file_range),
+ * under a name it makes (.lordos-drop-<16 hex>, O_EXCL, never following a link: the guest can write that folder), then:
+ *   Linux:   one fixed script finds the person (as above) and, as that person (runuser), copies /mnt/LordOS/<that name>
+ *            into a hidden temporary file in their Downloads, moves it to a free name and removes the transfer copy.
+ *            Root only checks that the mount is there.
+ *   Windows: the private folder as above (it holds only the task's script and result file), and the person's own task
+ *            copies the file from the transfer drive (found by that name) into their Downloads.
+ * Any failure on that way tries the agent's way once more. lord-vm removes its file from the transfer folder whatever
+ * happens. FXK_WINFSP (VAG_TRANSFER) is WinFsp's installer for a Windows guest: the agent's way into a private folder,
+ * then one fixed script as SYSTEM checks its hash and signature, runs msiexec there and starts VirtioFsSvc. */
+enum { FX_NONE = 0, FX_PREP, FX_OPEN, FX_WRITE, FX_CLOSE, FX_PLACE, FX_XCOPY };
 
 static const char FX_PREP_SH[] = "umask 077; d=$(mktemp -d /var/tmp/lordos-drop.XXXXXXXX) && printf '%s' \"$d\"";
 /* as the person: $1 the file, $2 its name */
@@ -2969,6 +3107,44 @@ static const char FX_PLACE_SH[] =
     "g=$(id -gn \"$u\") && chown -R -- \"$u:$g\" \"$d\" || { rm -rf -- \"$d\"; exit 4; }; "
     "p=$(runuser -u \"$u\" -- /bin/sh -c \"$3\" lordos-drop \"$d/file\" \"$n\"); r=$?; rm -rf -- \"$d\"; "
     "[ \"$r\" -eq 0 ] || exit \"$r\"; printf '%s' \"$p\"";
+/* as the person, through the transfer folder: $1 the file there (/mnt/LordOS/.lordos-drop-...), $2 its name */
+static const char FX_XMOVE_SH[] =
+    "f=\"$1\"; n=\"$2\"; t=$(xdg-user-dir DOWNLOAD 2>/dev/null); "
+    "if [ -z \"$t\" ] || [ \"$t\" = \"$HOME\" ]; then t=\"$HOME/Downloads\"; fi; "
+    "mkdir -p -- \"$t\" || exit 5; "
+    "[ -e \"$HOME/LordOS\" ] || [ -L \"$HOME/LordOS\" ] || ln -s /mnt/LordOS \"$HOME/LordOS\" 2>/dev/null; "
+    "w=$(mktemp -p \"$t\" .lordos-drop.XXXXXXXX) || exit 5; "
+    "cp -- \"$f\" \"$w\" || { rm -f -- \"$w\"; exit 8; }; "
+    "case \"$n\" in ?*.*) b=\"${n%.*}\"; e=\".${n##*.}\";; *) b=\"$n\"; e=\"\";; esac; "
+    "p=\"$t/$n\"; i=2; "
+    "while [ -e \"$p\" ] || [ -L \"$p\" ]; do p=\"$t/$b ($i)$e\"; i=$((i+1)); [ \"$i\" -lt 1000 ] || { rm -f -- \"$w\"; exit 6; }; done; "
+    "mv -n -T -- \"$w\" \"$p\" && [ ! -e \"$w\" ] || { rm -f -- \"$w\"; exit 7; }; "
+    "rm -f -- \"$f\"; chmod 644 -- \"$p\" 2>/dev/null; printf '%s' \"$p\"";
+/* as root, through the transfer folder: $1 lord-vm's name for the file there, $2 its name, $3 FX_XMOVE_SH. Exit 9: the
+ * folder isn't mounted (the agent's way follows) */
+static const char FX_XPLACE_SH[] =
+    "s=\"$1\"; n=\"$2\"; mountpoint -q /mnt/LordOS || { echo 'the transfer folder is not mounted' >&2; exit 9; }; "
+    "u=$(loginctl list-sessions --no-legend 2>/dev/null | awk '$2>=1000 && $2<60000 && $4 ~ /^seat/ {print $3; exit}'); "
+    "[ -n \"$u\" ] || u=$(loginctl list-sessions --no-legend 2>/dev/null | awk '$2>=1000 && $2<60000 {print $3; exit}'); "
+    "[ -n \"$u\" ] || u=$(getent passwd | awk -F: '$3>=1000 && $3<60000 && $7 !~ /(nologin|false)$/ {print $1; exit}'); "
+    "if [ -z \"$u\" ]; then echo 'no account of a person in the guest' >&2; exit 3; fi; "
+    "runuser -u \"$u\" -- /bin/sh -c \"$3\" lordos-drop \"/mnt/LordOS/$s\" \"$n\"";
+/* Windows, as SYSTEM: WinFsp for the transfer folder (VAG_TRANSFER). %s: the private folder (base64 of UTF-8), then the
+ * installer's SHA-256 (hex). Checks the hash and Authenticode signature of the file the agent wrote there, installs it
+ * quietly (msiexec), sets the VirtIO-FS service to start by itself and starts it. The folder goes whatever happens */
+static const char XFER_WINFSP_PS[] =
+    "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';trap{[Console]::Error.Write($_.Exception.Message);exit 1};"
+    "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
+    "try{"
+    "$m=Join-Path $t 'winfsp.msi';Move-Item -LiteralPath (Join-Path $t 'file') -Destination $m;"
+    "if((Get-FileHash -LiteralPath $m -Algorithm SHA256).Hash -ne '%s'){throw 'the installer is not the one LordOS checked'};"
+    "$g=Get-AuthenticodeSignature -LiteralPath $m;if($g.Status -ne 'Valid'){throw ('the installer''s signature: '+$g.Status)};"
+    "$s=Get-Service VirtioFsSvc -ErrorAction SilentlyContinue;if(-not $s){throw 'the VirtIO-FS service is missing (virtio-win guest tools)'};"
+    "$p=Start-Process -FilePath msiexec.exe -ArgumentList @('/i',('\"'+$m+'\"'),'/qn','/norestart') -Wait -PassThru;"
+    "if($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010 -and $p.ExitCode -ne 1641){throw ('msiexec ended with '+$p.ExitCode)};"
+    "Set-Service VirtioFsSvc -StartupType Automatic;Start-Service VirtioFsSvc;"
+    "[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('mounted')))"   /* base64, as fx_exec_done reads */
+    "}finally{Remove-Item -LiteralPath $t -Recurse -Force -ErrorAction SilentlyContinue}";
 /* Windows, the private folder: made with its ACL at once (SYSTEM and Administrators, nothing inherited), then checked
  * (not a reparse point, owned by one of them, no other entry). Prints base64 of its path. No format: not for printf */
 static const char FX_PREP_PS[] =
@@ -2983,20 +3159,26 @@ static const char FX_PREP_PS[] =
     "$g=Get-Acl -LiteralPath $d;if($g.GetOwner([Security.Principal.SecurityIdentifier]).Value -notin $k){throw 'not ours'};"
     "foreach($r in $g.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])){if($r.IdentityReference.Value -notin $k){throw 'not private'}};"
     "[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($d)))";
-/* Windows, as the person (the scheduled task's script). %s: the private folder, then the name, each base64 of its UTF-8.
+/* Windows, as the person (the scheduled task's script). %s: the private folder, the name, and lord-vm's name for the file
+ * in the transfer folder ("" the agent's way: the file is in the private folder), each base64 of its UTF-8.
  * Writes "ok:" + base64 of the path the copy got, or "err:" + why, into the result file */
 static const char FX_COPY_PS[] =
     "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
     "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
+    "$sn=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
     "$r=Join-Path $t 'out';$p=$null;$o=$null;"
     "function Say($x){$y=[IO.File]::Open($r,'Open','Write');$b=[Text.Encoding]::UTF8.GetBytes($x);$y.SetLength(0);$y.Write($b,0,$b.Length);$y.Close()};"
     "try{"
+    /* the transfer folder's drive, found by the file lord-vm put there */
+    "$src=Join-Path $t 'file';if($sn){$src=$null;foreach($v in [IO.DriveInfo]::GetDrives()){try{$c=Join-Path $v.RootDirectory.FullName $sn;"
+    "if([IO.File]::Exists($c)){$src=$c;break}}catch{}};if(-not $src){throw 'the transfer folder is not there'}};"
     "try{$d=(New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path}catch{$d=$null};"
     "if(-not $d){$d=Join-Path $env:USERPROFILE 'Downloads'};"
     "if(-not (Test-Path -LiteralPath $d -PathType Container)){New-Item -ItemType Directory -Path $d|Out-Null};"
     "$b=[IO.Path]::GetFileNameWithoutExtension($n);$e=[IO.Path]::GetExtension($n);$q=Join-Path $d $n;$i=2;"
     "while(-not $o){try{$o=[IO.File]::Open($q,'CreateNew','Write');$p=$q}catch{if(-not (Test-Path -LiteralPath $q)){throw};if($i -gt 999){throw 'no free name'};$q=Join-Path $d ($b+' ('+$i+')'+$e);$i++}};"
-    "$s=[IO.File]::OpenRead((Join-Path $t 'file'));try{$s.CopyTo($o)}finally{$s.Close();$o.Close()};"
+    "$s=[IO.File]::OpenRead($src);try{$s.CopyTo($o,4194304)}finally{$s.Close();$o.Close()};"
+    "if($sn){Remove-Item -LiteralPath $src -Force -ErrorAction SilentlyContinue};"
     "Say('ok:'+[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($p)))"
     "}catch{if($o){$o.Close()};if($p){Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue};Say('err:'+$_.Exception.Message)}";
 /* Windows, the last step, as SYSTEM. %s: the private folder (base64 of UTF-8), then FX_COPY_PS (base64 of UTF-16LE),
@@ -3015,7 +3197,7 @@ static const char FX_PLACE_PS[] =
     "if($dir){[IO.Directory]::SetAccessControl($p,$a)}else{[IO.File]::SetAccessControl($p,$a)}};"
     /* the result file needs Read too: .NET's open for writing was refused with Write alone (2026-11-20). Only that file:
      * the person can't add, rename or replace anything in the folder */
-    "Grant $t 'Traverse' 1;Grant $f 'Read' 0;Grant $c 'Read' 0;Grant $r 'Read, Write' 0;"
+    "Grant $t 'Traverse' 1;if(Test-Path -LiteralPath $f){Grant $f 'Read' 0};Grant $c 'Read' 0;Grant $r 'Read, Write' 0;"
     "$tn='LordOS-drop-'+[guid]::NewGuid().ToString('N');"
     "$act=New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File \"'+$c+'\"');"
     "$pr=New-ScheduledTaskPrincipal -UserId $u -LogonType Interactive -RunLevel Limited;"
@@ -3083,11 +3265,23 @@ static void fx_progress(int force) {
     S.fx_told_at = now;
     int pct = S.fx_size > 0 ? (int)(S.fx_off * 100 / S.fx_size) : 0;
     if (pct > 99 && S.fx_step != FX_NONE) pct = 99;
-    VmMsg m = vm_msg(VM_FILE_PROGRESS, S.fx.seq, pct, 0, 0, 0, S.fx.name);
+    VmMsg m = vm_msg(VM_FILE_PROGRESS, S.fx.seq, pct, S.fx_via, 0, 0, S.fx.name);
     send_to(S.fx.client, &m, -1);
 }
 
+/* lord-vm's copy in the transfer folder: its child stopped, its file removed (the guest's copy is the person's) */
+static void fx_unstage(void) {
+    if (S.fx_cpid > 0) kill(S.fx_cpid, SIGKILL);
+    S.fx_cpid = 0;
+    if (S.fx_cpipe >= 0) close(S.fx_cpipe);
+    S.fx_cpipe = -1;
+    if (S.fx_stage[0] && S.xfer_dfd >= 0 && unlinkat(S.xfer_dfd, S.fx_stage, 0) && errno != ENOENT) vlog("files: can't remove %s from the transfer folder: %s", S.fx_stage, strerror(errno));
+    S.fx_stage[0] = 0;
+}
+
 static void fx_reset(void) {
+    fx_unstage();
+    S.fx_via = S.fx_retried = 0;
     if (S.fx.fd >= 0) close(S.fx.fd);
     memset(&S.fx, 0, sizeof S.fx);
     S.fx.fd = -1;
@@ -3099,8 +3293,25 @@ static void fx_reset(void) {
     S.fx_tmp[0] = 0;
 }
 
-/* the copy failed: what the guest has of it goes (when the agent still answers), the next file starts */
+static void fx_begin_agent(void);
+/* the copy failed: what the guest has of it goes (when the agent still answers), the next file starts. Through the
+ * transfer folder, the agent's way is tried once more first */
 static void fx_fail(int code, const char *why) {
+    if (S.fx_via && !S.fx_retried && S.fx.kind == FXK_DROP && S.fx.fd >= 0 && S.qga_up) {
+        vlog("files: %s: the transfer folder's way failed (%s): the agent's way instead", S.fx.name, why);
+        fx_unstage();
+        if (S.fx_tmp[0] && S.ag_windows) {
+            char b[400], ps[sizeof FX_DROP_PS + 400];
+            if (ag_b64_encode((const uint8_t *)S.fx_tmp, strlen(S.fx_tmp), b, sizeof b) > 0) { snprintf(ps, sizeof ps, FX_DROP_PS, b); fx_exec_ps(ps, AQ_IGNORE); }
+        }
+        S.fx_tmp[0] = 0;
+        S.fx_via = 0; S.fx_retried = 1;
+        S.fx_handle = S.fx_pid = 0; S.fx_poll_at = 0;
+        xfer_begin();                                     /* the guest's folder looked at (and mounted) again */
+        S.fx_off = S.fx_sent = 0; S.fx_inflight = S.fx_eof = 0;
+        fx_begin_agent();
+        return;
+    }
     vlog("files: %s wasn't copied: %s", S.fx.name, why);
     reply(S.fx.client, S.fx.seq, code, why);
     if (S.qga_up) {
@@ -3119,9 +3330,10 @@ static void fx_fail(int code, const char *why) {
 static void fx_done(const char *where) {
     S.fx_step = FX_NONE;
     S.fx_off = S.fx_size;
-    VmMsg m = vm_msg(VM_FILE_PROGRESS, S.fx.seq, 100, 0, 0, 0, S.fx.name);
+    VmMsg m = vm_msg(VM_FILE_PROGRESS, S.fx.seq, 100, S.fx_via, 0, 0, S.fx.name);
     send_to(S.fx.client, &m, -1);
-    vlog("files: %s copied into the guest (%lld bytes): %s", S.fx.name, (long long)S.fx_size, where);
+    long long ms = now_ms() - S.fx_t0;
+    vlog("files: %s copied into the guest (%lld bytes, %lld ms, %s): %s", S.fx.name, (long long)S.fx_size, ms, S.fx_via ? "the transfer folder's way" : "the agent's way", where);
     reply(S.fx.client, S.fx.seq, VME_OK, where);
     fx_reset();
     fx_next();
@@ -3167,6 +3379,98 @@ static void fx_open(const char *path) {
     jb_free(&j);
 }
 
+/* the agent's way: the private folder first (FX_PREP) */
+static void fx_begin_agent(void) {
+    S.fx_step = FX_PREP;
+    S.fx_deadline = now_ms() + 120000;
+    int r;
+    if (S.ag_windows) r = fx_exec_ps(FX_PREP_PS, AQ_FXEXEC);
+    else r = fx_exec_sh(FX_PREP_SH, NULL, NULL, NULL, AQ_FXEXEC);
+    if (r) fx_fail(VME_BUSY, "the guest agent is busy");
+}
+
+/* the transfer folder can take this drop: on at this start, its virtiofsd running, the guest has it */
+static int xfer_ready(void) { return S.xfer_on && S.xfer_dfd >= 0 && S.vfs[VM_SHARES] > 0 && S.xfer_guest == XG_MOUNTED; }
+
+/* lord-vm's copy into the transfer folder, in a child (lord-vm's loop never waits on a file): a reflink (FICLONE) where
+ * the file system can, else copy_file_range (the kernel copies; on one file system without reflink it still never
+ * passes through here), else read and write. It reports on the pipe: bytes so far, -1 done, -2 - errno failed */
+static void fx_copy_child(int src, int dst, int out, off_t size) {
+    int64_t v;
+    if (size > 0 && !ioctl(dst, FICLONE, src)) { v = size; write_all(out, &v, sizeof v); v = -1; write_all(out, &v, sizeof v); _exit(0); }
+    static char buf[1 << 20];
+    off_t in = 0;
+    int plain = 0;
+    long long told = 0;
+    for (;;) {
+        ssize_t n;
+        if (!plain) {
+            n = copy_file_range(src, &in, dst, NULL, 64 << 20, 0);
+            if (n < 0 && in == 0 && (errno == EXDEV || errno == EINVAL || errno == ENOSYS || errno == EOPNOTSUPP)) { plain = 1; continue; }
+        } else {
+            n = pread(src, buf, sizeof buf, in);
+            if (n > 0) { if (write_all(dst, buf, (size_t)n)) n = -1; else in += n; }
+        }
+        if (n < 0) { if (errno == EINTR) continue; v = -2 - errno; write_all(out, &v, sizeof v); _exit(1); }
+        if (n == 0) break;
+        long long now = now_ms();
+        if (now - told >= 100) { told = now; v = in; write_all(out, &v, sizeof v); }
+    }
+    v = in; write_all(out, &v, sizeof v);
+    v = -1; write_all(out, &v, sizeof v);
+    _exit(0);
+}
+
+/* 0 when the copy into the transfer folder started (FX_XCOPY) */
+static int fx_xcopy_start(void) {
+    uint64_t rnd;
+    if (getrandom(&rnd, sizeof rnd, 0) != sizeof rnd) return -1;
+    snprintf(S.fx_stage, sizeof S.fx_stage, ".lordos-drop-%016llx", (unsigned long long)rnd);
+    int dst = openat(S.xfer_dfd, S.fx_stage, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0644);
+    if (dst < 0) { vlog("files: can't make a file in the transfer folder: %s", strerror(errno)); S.fx_stage[0] = 0; return -1; }
+    if (fchmod(dst, 0644)) {}
+    int pp[2];
+    if (pipe2(pp, O_CLOEXEC)) { close(dst); fx_unstage(); return -1; }
+    pid_t pid = fork();
+    if (pid < 0) { close(dst); close(pp[0]); close(pp[1]); fx_unstage(); return -1; }
+    if (!pid) {
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        close(pp[0]);
+        fx_copy_child(S.fx.fd, dst, pp[1], S.fx_size);
+    }
+    close(dst);
+    close(pp[1]);
+    fcntl(pp[0], F_SETFL, O_NONBLOCK);
+    S.fx_cpipe = pp[0];
+    S.fx_cpid = pid;
+    S.fx_step = FX_XCOPY;
+    return 0;
+}
+
+static void fx_place(void);
+/* what the copy into the transfer folder says (lord-vm's loop, the pipe) */
+static void fx_xcopy_read(void) {
+    int64_t v[64];
+    ssize_t n = read(S.fx_cpipe, v, sizeof v);
+    if (n < 0 && (errno == EAGAIN || errno == EINTR)) return;
+    if (n <= 0) { fx_fail(VME_INTERNAL, "the copy into the transfer folder stopped"); return; }
+    for (size_t i = 0; i < (size_t)n / sizeof *v; i++) {
+        if (v[i] >= 0) { S.fx_off = (off_t)v[i]; fx_progress(0); continue; }
+        if (v[i] == -1) {
+            close(S.fx_cpipe); S.fx_cpipe = -1; S.fx_cpid = 0;           /* reaped by reap() */
+            long long ms = now_ms() - S.fx_t0;
+            vlog("files: %s is in the transfer folder (%lld bytes in %lld ms)", S.fx.name, (long long)S.fx_size, ms);
+            if (S.ag_windows) fx_begin_agent();                         /* the private folder for the person's task */
+            else fx_place();
+            return;
+        }
+        char why[120];
+        snprintf(why, sizeof why, "the copy into the transfer folder failed: %s", strerror((int)(-2 - v[i])));
+        fx_fail(VME_INTERNAL, why);
+        return;
+    }
+}
+
 /* the next file that waits, when nothing is being copied */
 static void fx_next(void) {
     if (S.fx_step || !S.fxq_n) return;
@@ -3177,15 +3481,25 @@ static void fx_next(void) {
     S.fx_size = !fstat(S.fx.fd, &st) ? st.st_size : 0;
     S.fx_off = S.fx_sent = 0;
     S.fx_inflight = S.fx_eof = 0;
+    S.fx_via = S.fx_retried = 0;
+    S.fx_t0 = now_ms();
     S.fx_step = FX_PREP;
     S.fx_deadline = now_ms() + 120000;
     if (!S.qga_up) { fx_fail(VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
+    if (S.fx.kind == FXK_DROP && xfer_ready()) {
+        S.fx_via = 1;
+        S.fx_step = FX_NONE;
+        if (!fx_xcopy_start()) {
+            vlog("files: copying %s (%lld bytes) into the guest through the transfer folder", S.fx.name, (long long)S.fx_size);
+            fx_progress(1);
+            return;
+        }
+        S.fx_via = 0;
+        S.fx_step = FX_PREP;
+    }
     vlog("files: copying %s (%lld bytes) into the guest", S.fx.name, (long long)S.fx_size);
     fx_progress(1);
-    int r;
-    if (S.ag_windows) r = fx_exec_ps(FX_PREP_PS, AQ_FXEXEC);
-    else r = fx_exec_sh(FX_PREP_SH, NULL, NULL, NULL, AQ_FXEXEC);
-    if (r) fx_fail(VME_BUSY, "the guest agent is busy");
+    fx_begin_agent();
 }
 
 /* Windows' scripts print base64 of UTF-8 (no console code page in the way): the text, or "" when it isn't sane */
@@ -3213,11 +3527,19 @@ static void fx_exec_done(const JVal *r) {
         /* only the private folder that script makes */
         if (!ag_drop_staging_ok(said, S.ag_windows)) { fx_fail(VME_QMP, "the guest didn't make a private folder"); return; }
         snprintf(S.fx_tmp, sizeof S.fx_tmp, "%s", said);
+        if (S.fx_via) { fx_place(); return; }             /* the file is in the transfer folder already */
         char p[sizeof S.fx_tmp + 8];
         snprintf(p, sizeof p, "%s%cfile", S.fx_tmp, S.ag_windows ? '\\' : '/');
         fx_open(p);
     } else if (S.fx_step == FX_PLACE) {
         S.fx_tmp[0] = 0;                                  /* the script removed it */
+        if (S.fx.kind == FXK_WINFSP) {
+            if (strcmp(said, "mounted")) { fx_fail(VME_QMP, "WinFsp's installer didn't finish"); return; }
+            vlog("transfer: WinFsp is installed in the guest, the VirtIO-FS service started");
+            xfer_set(XG_MOUNTED);
+            fx_done("the transfer folder is set up");
+            return;
+        }
         fx_done(said[0] ? said : S.fx.name);
     }
 }
@@ -3256,23 +3578,37 @@ static void fx_on_reply(int kind, const JVal *root, const JVal *r, int ok) {
     }
     case AQ_FXCLOSE:
         S.fx_handle = 0;
-        S.fx_step = FX_PLACE;
-        /* the last script copies the whole file once more (Windows: in the person's session): its time grows with it */
-        S.fx_deadline = now_ms() + 120000 + (long long)(S.fx_size / 10000);
-        if (S.ag_windows) {
-            char bt[400], bn[AG_NAME_MAX / 3 * 4 + 16], copy[sizeof FX_COPY_PS + 2 * sizeof bt];
-            if (ag_b64_encode((const uint8_t *)S.fx_tmp, strlen(S.fx_tmp), bt, sizeof bt) < 0 || ag_b64_encode((const uint8_t *)S.fx.name, strlen(S.fx.name), bn, sizeof bn) < 0) { fx_fail(VME_INTERNAL, "internal error"); break; }
-            snprintf(copy, sizeof copy, FX_COPY_PS, bt, bn);
-            char *enc = ps_encode(copy);
-            size_t pn = sizeof FX_PLACE_PS + sizeof bt + (enc ? strlen(enc) : 0);
-            char *ps = enc ? malloc(pn) : NULL;
-            if (ps) snprintf(ps, pn, FX_PLACE_PS, bt, enc);
-            if (!ps) fx_fail(VME_INTERNAL, "internal error");
-            else if (fx_exec_ps(ps, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
-            free(ps); free(enc);
-        } else if (fx_exec_sh(FX_PLACE_SH, S.fx_tmp, S.fx.name, FX_MOVE_SH, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
+        fx_place();
         break;
     }
+}
+
+/* the last step: the guest's fixed script puts the file where the person gets it (or installs WinFsp) */
+static void fx_place(void) {
+    S.fx_step = FX_PLACE;
+    /* the last script copies the whole file once more (Windows: in the person's session): its time grows with it */
+    S.fx_deadline = now_ms() + 120000 + (long long)(S.fx_size / 10000);
+    char bt[400];
+    if (S.ag_windows && ag_b64_encode((const uint8_t *)S.fx_tmp, strlen(S.fx_tmp), bt, sizeof bt) < 0) { fx_fail(VME_INTERNAL, "internal error"); return; }
+    if (S.fx.kind == FXK_WINFSP) {
+        char ps[sizeof XFER_WINFSP_PS + sizeof bt + 80];
+        snprintf(ps, sizeof ps, XFER_WINFSP_PS, bt, S.fx.sha);
+        if (fx_exec_ps(ps, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
+    } else if (S.ag_windows) {
+        char bn[AG_NAME_MAX / 3 * 4 + 16], bs[80] = "", copy[sizeof FX_COPY_PS + 2 * sizeof bt + 80];
+        if (ag_b64_encode((const uint8_t *)S.fx.name, strlen(S.fx.name), bn, sizeof bn) < 0 ||
+            (S.fx_via && ag_b64_encode((const uint8_t *)S.fx_stage, strlen(S.fx_stage), bs, sizeof bs) < 0)) { fx_fail(VME_INTERNAL, "internal error"); return; }
+        snprintf(copy, sizeof copy, FX_COPY_PS, bt, bn, bs);
+        char *enc = ps_encode(copy);
+        size_t pn = sizeof FX_PLACE_PS + sizeof bt + (enc ? strlen(enc) : 0);
+        char *ps = enc ? malloc(pn) : NULL;
+        if (ps) snprintf(ps, pn, FX_PLACE_PS, bt, enc);
+        if (!ps) fx_fail(VME_INTERNAL, "internal error");
+        else if (fx_exec_ps(ps, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
+        free(ps); free(enc);
+    } else if (S.fx_via) {
+        if (fx_exec_sh(FX_XPLACE_SH, S.fx_stage, S.fx.name, FX_XMOVE_SH, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
+    } else if (fx_exec_sh(FX_PLACE_SH, S.fx_tmp, S.fx.name, FX_MOVE_SH, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
 }
 
 static void fx_tick(long long now) {
@@ -3440,7 +3776,7 @@ static void ag_tick(long long now) {
 static void console_out(const char *b, size_t n);
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
-    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE) { close(fd); fd = -1; }
+    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && !(m->type == VM_AGENT && m->a == VAG_TRANSFER)) { close(fd); fd = -1; }
     int alive = S.qemu > 0 && !S.qemu_done && S.qmp_up;
     switch (m->type) {
     case VM_STATUS: {
@@ -3546,8 +3882,33 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         return;
     }
     case VM_AGENT:
-        if (!S.m.agent) { reply(ci, m->seq, VME_DENIED, "the guest agent is off for this machine"); return; }
-        if (!S.qga_up) { reply(ci, m->seq, VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
+        if (fd >= 0 && m->a != VAG_TRANSFER) { close(fd); fd = -1; }
+        if (!S.m.agent) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_DENIED, "the guest agent is off for this machine"); return; }
+        if (!S.qga_up) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
+        if (m->a == VAG_TRANSFER) {
+            /* the transfer folder (6.7.1): a Linux guest mounts it again; a Windows guest gets WinFsp, whose installer
+             * lord-server opened in the machines' image store: its hash is checked here (text), again in the guest with
+             * its signature */
+            const char *no = !S.xfer_on ? "the transfer folder is off at this start (it changes at the next start)"
+                           : !(S.ag_caps & VAC_EXEC) ? "the guest agent can't run commands" : NULL;
+            if (!no && !S.ag_windows) { if (fd >= 0) close(fd); xfer_begin(); reply(ci, m->seq, VME_OK, "looked at again"); return; }
+            struct stat st;
+            char sha[65];
+            if (!no && (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > (32 << 20))) no = "WinFsp's installer wasn't given";
+            if (!no && (strlen(m->text) != 64 || strspn(m->text, "0123456789abcdef") != 64)) no = "WinFsp's installer's hash isn't valid";
+            if (!no && (sha256_fd(fd, sha) || strcmp(sha, m->text))) no = "WinFsp's installer isn't the one the catalog names";
+            if (!no && (!(S.ag_caps & VAC_FILES))) no = "the guest agent can't write files";
+            if (!no && S.fxq_n >= FX_QUEUE) no = "too many files are waiting";
+            if (no) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_WRONG_STATE, no); return; }
+            FxReq *q = &S.fxq[S.fxq_n++];
+            memset(q, 0, sizeof *q);
+            q->fd = fd; q->client = ci; q->seq = m->seq; q->kind = FXK_WINFSP;
+            snprintf(q->name, sizeof q->name, "winfsp.msi");
+            memcpy(q->sha, sha, sizeof q->sha);
+            vlog("transfer: installing WinFsp in the guest");
+            fx_next();
+            return;
+        }
         if (m->a == VAG_SHUTDOWN) { qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1); reply(ci, m->seq, VME_OK, ""); return; }
         if (m->a == VAG_TIMESYNC) { ag_timesync(); reply(ci, m->seq, VME_OK, ""); return; }
         if (S.ag_windows) { reply(ci, m->seq, VME_WRONG_STATE, "lordos-guest is for Linux guests"); return; }
@@ -3613,7 +3974,8 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         }
         if (no) { if (fd >= 0) close(fd); reply(ci, m->seq, code, no); return; }
         FxReq *q = &S.fxq[S.fxq_n++];
-        q->fd = fd; q->client = ci; q->seq = m->seq;
+        memset(q, 0, sizeof *q);
+        q->fd = fd; q->client = ci; q->seq = m->seq; q->kind = FXK_DROP;
         memcpy(q->name, nm, sizeof q->name);
         fx_next();
         return;
@@ -3810,7 +4172,7 @@ static void qemu_exited(int status) {
     if (S.suspending) { if (S.susp_fd >= 0) close(S.susp_fd); S.susp_fd = -1; suspend_cleanup_tmp(); vm_op_end(S.dir); S.suspending = 0; reply(S.susp_client, S.susp_seq, VME_QMP, "QEMU stopped while saving"); }
     if (S.passt > 0) kill(S.passt, SIGTERM);
     if (S.passt_pidfd >= 0) syscall(SYS_pidfd_send_signal, S.passt_pidfd, SIGTERM, NULL, 0);
-    for (int i = 0; i < VM_SHARES; i++) if (S.vfs[i] > 0) kill(S.vfs[i], SIGTERM);
+    for (int i = 0; i <= VM_SHARES; i++) if (S.vfs[i] > 0) kill(S.vfs[i], SIGTERM);
     if (S.tpm > 0) kill(S.tpm, SIGTERM);
     if (why == VR_INSTALLED) unattended_done();
     set_state(st, why, code, d);
@@ -3839,7 +4201,7 @@ static void unattended_done(void) {
     vlog("unattended: the installer's files and the seed disk are removed, the ISO is out of the drive: the next start is the installed system");
 }
 
-static int vfs_index(pid_t p) { for (int i = 0; i < VM_SHARES; i++) if (p > 0 && S.vfs[i] == p) return i; return -1; }
+static int vfs_index(pid_t p) { for (int i = 0; i <= VM_SHARES; i++) if (p > 0 && S.vfs[i] == p) return i; return -1; }
 
 static void reap(void) {
     int status;
@@ -3855,7 +4217,7 @@ static void reap(void) {
             S.vfs[k] = 0;
             vlog("share %d: virtiofsd exited (%s %d)", k + 1, WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
             /* it also ends by itself when QEMU closes the connection (a suspend, a shutdown): news only while the machine runs on */
-            if (!S.qemu_done && !S.suspending && S.state == VS_RUNNING) vlog("share %d: the folder %s is gone from the machine until it starts again", k + 1, S.m.share_tag[k]);
+            if (!S.qemu_done && !S.suspending && S.state == VS_RUNNING) vlog("share %d: the folder %s is gone from the machine until it starts again", k + 1, sh_tag(k));
         } else if (p == S.tpm) {
             S.tpm = 0;
             vlog("tpm: swtpm exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
@@ -3972,6 +4334,7 @@ static void loop(void) {
         WATCH(S.lag_fd, -9);
         if (S.lag_fd >= 0 && lag_out_off < lag_out_n) p[n - 1].events |= POLLOUT;
         WATCH(S.passt_pidfd, -10);
+        WATCH(S.fx_cpipe, -12);
         if (logind_fd() >= 0) { p[n] = (struct pollfd){ logind_fd(), logind_events(), 0 }; ci[n] = -11; n++; }
         for (int i = 0; i < MAX_CLIENTS; i++) WATCH(S.cl[i].fd, i);
 #undef WATCH
@@ -3980,6 +4343,7 @@ static void loop(void) {
         if (S.net_retry_at && (next < 0 || S.net_retry_at < next)) next = S.net_retry_at;
         if (S.host_stopping && (next < 0 || now + 500 < next)) next = now + 500;
         if (S.id_poll_at && (next < 0 || S.id_poll_at < next)) next = S.id_poll_at;
+        if (S.xfer_poll_at && (next < 0 || S.xfer_poll_at < next)) next = S.xfer_poll_at;
         if (S.fx_poll_at && (next < 0 || S.fx_poll_at < next)) next = S.fx_poll_at;
         if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
@@ -3996,6 +4360,7 @@ static void loop(void) {
         }
         if (S.net_retry_at && now >= S.net_retry_at) net_restart();
         if (S.id_poll_at && now >= S.id_poll_at) { char a[48]; S.id_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.id_pid); qga_do("guest-exec-status", a, AQ_IDSTATUS); }
+        if (S.xfer_poll_at && now >= S.xfer_poll_at) { char a[48]; S.xfer_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.xfer_pid); if (qga_do("guest-exec-status", a, AQ_XSTATUS)) S.xfer_poll_at = now + 300; }
         fx_tick(now);
         host_stop_tick(now);
         if (S.shut_deadline && now >= S.shut_deadline) {
@@ -4043,6 +4408,7 @@ static void loop(void) {
                 break;
             }
             case -11: logind_process(); break;
+            case -12: fx_xcopy_read(); break;
             default: {
                 int k = ci[i];
                 if (S.cl[k].fd < 0) break;
@@ -4304,7 +4670,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = -1;
-    S.keeper_fd = S.passt_pidfd = S.tpm_q = -1;
+    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {
@@ -4378,6 +4744,15 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     S.serial_log = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
     vlog("lord-vm %d: machine %s \"%s\" (%s, %s, %d vCPU, %d MB, %s)", (int)getpid(), S.m.id, S.m.name, vm_arch_name(S.m.arch),
          S.m.accel ? "tcg" : "kvm", S.m.vcpus, S.m.memory_mb, S.m.machine_type);
+    /* the transfer folder (6.7.1): with virtiofsd there; a saved state keeps the hardware it was saved with */
+    S.xfer_on = S.m.transfer && file_exists(VIRTIOFSD);
+    if (S.m.transfer && !S.xfer_on) vlog("transfer: virtiofsd isn't installed (What Machines Needs): no transfer folder at this start");
+    {
+        char st[PATH_MAX + 32], meta[PATH_MAX + 32];
+        SuspendMeta sm;
+        state_paths(st, meta, NULL, NULL, sizeof st);
+        if (!discard && file_exists(st) && !suspend_meta_read(S.dir, &sm)) S.xfer_on = sm.transfer;
+    }
     RunInfo prev;
     int crashed = !runinfo_read(S.dir, &prev) && prev.state == VS_CRASHED &&
                   (prev.reason == VR_QEMU_SIGNAL || prev.reason == VR_OUT_OF_MEMORY || prev.reason == VR_SUPERVISOR_LOST);
@@ -4452,7 +4827,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     if (start_machine()) {
         /* never ran: nothing of it may stay behind */
         if (S.passt > 0) { kill(S.passt, SIGKILL); waitpid(S.passt, NULL, 0); }
-        for (int i = 0; i < VM_SHARES; i++) if (S.vfs[i] > 0) { kill(S.vfs[i], SIGKILL); waitpid(S.vfs[i], NULL, 0); S.vfs[i] = 0; }
+        for (int i = 0; i <= VM_SHARES; i++) if (S.vfs[i] > 0) { kill(S.vfs[i], SIGKILL); waitpid(S.vfs[i], NULL, 0); S.vfs[i] = 0; }
         if (S.tpm > 0) { kill(S.tpm, SIGKILL); waitpid(S.tpm, NULL, 0); S.tpm = 0; }
         if (S.qemu > 0) { kill(S.qemu, SIGKILL); waitpid(S.qemu, NULL, 0); }
         for (int k = 0; k < 20 && S.qemu_err >= 0; k++) pump_fd(&S.qemu_err, "qemu");
@@ -4468,7 +4843,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
             if (S.keeper < 0) { S.keeper = 0; vlog("network: no keeper: a passt that ends isn't replaced"); }
         }
         logind_open();
-        S.sandbox |= vm_jail_self(S.dir, S.rundir);
+        S.sandbox |= vm_jail_self(S.dir, S.rundir, S.xfer_on && S.xfer_dfd >= 0 ? S.xfer_path : NULL);
         vlog("lord-vm: own Landlock %s", S.sandbox & VMS_SUPERVISOR_LANDLOCK ? "applied (machine folder only)" : "not available");
         VmMsg i = info_msg();
         for (int k = 0; k < MAX_CLIENTS; k++) send_to(k, &i, -1);
@@ -4617,7 +4992,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, xfer = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -4648,6 +5023,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         /* sound (6.9): host-side choices, also while suspended (the guest's hardware doesn't change) */
         if (!strcmp(a, "--sound")) { sound = parse_enum(v, "off", "on"); if (sound < 0) { fprintf(stderr, "lord-vm: --sound on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--microphone")) { mic = parse_enum(v, "off", "on"); if (mic < 0) { fprintf(stderr, "lord-vm: --microphone on|off\n"); return 2; } continue; }
+        /* the transfer folder (6.7.1): a device of the machine, so like the shares, never while a state is saved */
+        if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
             char *end = NULL;
             long x = strtol(v, &end, 10);
@@ -4690,7 +5067,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
         /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || (gfx >= 0 && gfx != m.graphics))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
     if (vcpus && vcpus != m.vcpus) {
@@ -4717,6 +5094,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (vol >= 0) m.volume = vol;
     if (mic >= 0) m.microphone = mic;
     if (sound >= 0 || vol >= 0 || mic >= 0) m.schema = VM_SCHEMA;
+    if (xfer >= 0) { m.transfer = xfer; m.schema = VM_SCHEMA; }
     if (shares_set) {
         const struct passwd *pw = getpwuid(getuid());
         char home[PATH_MAX], lib[PATH_MAX], parent[PATH_MAX];
@@ -4769,9 +5147,9 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
-    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\"}\n", m.vcpus, m.memory_mb, m.disk_gb,
+    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\",\"transfer\":%s}\n", m.vcpus, m.memory_mb, m.disk_gb,
            VM_NET_NAMES[m.network], m.n_ports, m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices], VM_NIC_MODELS[m.nic_model],
-           m.graphics == VM_GFX_3D ? "3d" : "2d");
+           m.graphics == VM_GFX_3D ? "3d" : "2d", m.transfer ? "true" : "false");
     rc = 0;
 out:
     close(lock);
@@ -6269,6 +6647,7 @@ static int usage(void) {
             "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both] [--graphics 2d|3d]   (also on --create)\n"
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
             "                         [--sound on|off] [--volume 0..100] [--microphone on|off]   (with the machine off; Machines changes them live)\n"
+            "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"
             "                           [--resume-anyway] [--discard-state]\n"

@@ -173,6 +173,18 @@ int vm_share_allowed(const char *path, const char *home, const char *user, const
     return 0;
 }
 
+int vm_transfer_path(const char *dir, char *out, size_t n) {
+    size_t l = dir ? strlen(dir) : 0;
+    while (l > 1 && dir[l - 1] == '/') l--;
+    const char *b = l ? memrchr(dir, '/', l) : NULL;
+    if (!b || b == dir) return -1;
+    size_t bl = (size_t)(dir + l - (b + 1));
+    if (bl < 8 || bl > NAME_MAX || memcmp(dir + l - 7, ".lordvm", 7) || b[1] == '.') return -1;
+    int w = snprintf(out, n, "%.*s/" VM_XFER_DIR "/%.*s", (int)(b - dir), dir, (int)(bl - 7), b + 1);
+    if (w < 0 || (size_t)w >= n || !path_valid(out)) return -1;
+    return 0;
+}
+
 int vm_base_valid(const char *s) {
     size_t n = s ? strlen(s) : 0;
     return n > 15 && path_valid(s) && strstr(s, "/.shared/") && !strchr(strstr(s, "/.shared/") + 9, '/') && !strcmp(s + n - 6, ".qcow2");
@@ -320,6 +332,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if ((m->sound | m->microphone) & ~1) return fail(err, n, VM_E_RANGE, "sound and microphone are true or false");
     if (m->volume < 0 || m->volume > 100) return fail(err, n, VM_E_RANGE, "volume must be 0 to 100");
     if (m->schema < 6 && (!m->sound || m->volume != 100 || m->microphone)) return fail(err, n, VM_E_FIELD, "sound, volume and microphone need schema 6");
+    if (m->transfer & ~1) return fail(err, n, VM_E_RANGE, "transfer is true or false");
+    if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
+    for (int i = 0; m->transfer && i < m->n_shares; i++)
+        if (!strcmp(m->share_tag[i], VM_XFER_TAG)) return fail(err, n, VM_E_RANGE, "shares: the tag " VM_XFER_TAG " is the transfer folder's");
     if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
                           m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
         return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
@@ -357,7 +373,7 @@ static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
-    "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", NULL,
+    "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "transfer", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -545,6 +561,10 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         m->microphone = mi ? json_bool(o, "microphone", 0) : 0;
         m->volume = 100;
         if ((r = get_opt_int(o, "volume", &m->volume, err, n))) goto out;
+        /* schema 7: missing means no transfer folder (a machine made before keeps its hardware) */
+        const JVal *t = json_get(o, "transfer");
+        if (t && t->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "transfer must be true or false"); goto out; }
+        m->transfer = t ? json_bool(o, "transfer", 0) : 0;
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -627,6 +647,7 @@ char *vm_machine_json(const VmMachine *m) {
         }
     }
     if (m->schema >= 6) jb_printf(&b, ",\n  \"sound\": %s,\n  \"volume\": %d,\n  \"microphone\": %s", m->sound ? "true" : "false", m->volume, m->microphone ? "true" : "false");
+    if (m->schema >= 7) jb_printf(&b, ",\n  \"transfer\": %s", m->transfer ? "true" : "false");
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);
     jb_raw(&b, "\n}\n");
@@ -763,6 +784,7 @@ void vm_machine_defaults(VmMachine *m, const VmHost *h, int arch) {
     m->network = VM_NET_SHARED;
     m->sound = 1;
     m->volume = 100;
+    m->transfer = 1;
     vm_now_iso(m->created);
     memcpy(m->updated, m->created, sizeof m->updated);
 }

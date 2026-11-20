@@ -22,6 +22,7 @@ export function readMeta(dir) {
       if (typeof j.profile === 'string' && /^[a-z]{1,16}$/.test(j.profile)) meta.profile = j.profile;
       if (typeof j.cloneOf === 'string' && /^[0-9a-f-]{36}$/.test(j.cloneOf)) meta.cloneOf = j.cloneOf;
       if (typeof j.importedFrom === 'string') meta.importedFrom = j.importedFrom.slice(0, 1024);
+      if (typeof j.transferSetup === 'boolean') meta.transferSetup = j.transferSetup;   // set up the transfer folder once (Windows)
     }
   } catch (e) { meta = {}; }
   cache.set(dir, { mtime: st?.mtime, meta });

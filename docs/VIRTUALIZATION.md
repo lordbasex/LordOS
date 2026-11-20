@@ -1667,7 +1667,7 @@ the guest's memory is `memory-backend-memfd,share=on`; without one nothing chang
 slots 0xb–0xe. Suspend and snapshots with memory work: virtiofsd hands its state over (`find-paths`), and the shares can't
 change while a state is saved. A snapshot never rolls back the host's folder: on revert the guest sees the folder as it is
 now. The package `virtiofsd` comes with "What Machines Needs" (`vm-enable`), like passt. In the guest: `mount -t virtiofs
-TAG /mnt/TAG`; mounting it by itself through the agent is still to do.
+TAG /mnt/TAG`; the transfer folder (6.7.1) is mounted by itself through the agent.
 
 **Measured on 2026-11-04** (virtiofsd 1.13.2, `--readonly --sandbox namespace`, section 13.5):
 
@@ -1681,6 +1681,73 @@ TAG /mnt/TAG`; mounting it by itself through the agent is still to do.
   boot 42.4 s against 36.5 s (amd64, **nested**). This is why machines without a share don't get the backend.
 - **Boot order:** with the virtiofs device attached, the arm64 firmware went to its built-in shell instead of booting. **Decision:**
   `lord-vm` always gives the system disk an explicit `bootindex`.
+
+### 6.7.1 The transfer folder
+
+**Built (in development, after 0.8.9.4; maintainer's goal 2026-11-20: moving files between this computer and a machine must
+be near-instant, both ways).** Every machine can have one folder of this computer that is only for moving files:
+`<library>/Transfer/<machine folder's name without .lordvm>`, so `~/Machines/Transfer/Ubuntu 26.04/`, shown in Files like any
+folder. It's a shared folder with the fixed tag `LordOS`, writable, served by its own virtiofsd exactly as 6.7's (same arguments,
+same sandbox, same cgroup leaf, the descriptor and not the path), and its device is always on PCI slot `0xf` whatever the
+person's own shares are.
+
+- **On for new machines** (`vm_machine_defaults`: create, import), switchable in Configure → Sharing ("Transfer folder") and with
+  `lord-vm --set DIR --transfer on|off`. `machine.json` schema 7 `"transfer"`; a file without it reads as off, so a machine made
+  before keeps its hardware. Like the shares it is a device: it changes only with the machine off and never while a state is
+  saved (`--set` refuses); `suspend.json` records whether the saved state had the device, and a resume uses that, not
+  `machine.json`. Without virtiofsd installed a machine starts without it (logged) instead of failing. A person's share can't use
+  the tag `LordOS` while the transfer folder is on (`vm_machine_check`; Configure picks another tag).
+- **Where:** `vm_transfer_path` (machine.c). At each start `lord-vm` makes `<library>/Transfer` (0700) and the machine's folder
+  in it (0777: virtiofsd can't take the guest's uids, so this lets a guest person with another uid than this account's write
+  there; nothing outside the 0700 parent reaches it), then checks both are real folders of this account and opens the folder
+  without following a link at any step (`open_share`). `lord.vm.transferFolder(dir)` makes it the same way for Open Transfer
+  Folder before the first start. It is inside the library, which a person's share may never be (`vm_share_allowed`): this one
+  fixed path is the exception, and it holds no machine folder (the library lists only `<name>.lordvm` directly in it), so the
+  guest can't reach a `machine.json`. lord-server refuses a start when the folder is one `fsops_protected` covers, as for a
+  writable share.
+- **Cost:** the shared memory backend (6.7) for every machine that has it: the guest's memory counts in full once touched.
+- **Linux guests:** at each connection of the agent one fixed script, as root, mounts the tag at `/mnt/LordOS` (root's own
+  folder: never a path in a person's home) with `nosuid,nodev`, unless it's mounted already, then as each person with a home
+  (`runuser`) adds `~/LordOS`, a link to it, when that name is free. It prints "mounted": the agent's state gets `VAC_TRANSFER`.
+- **Windows guests:** the virtio-win guest tools install the VirtIO-FS service (`VirtioFsSvc`, the virtiofs driver's user-mode
+  half), which needs WinFsp. WinFsp is a pinned catalog download (`assets/machines/systems.json` "winfsp": 2.1, the project's own
+  GitHub release, SHA-256 and size pinned, GPLv3 with a FLOSS exception) through `vm-image-get`, kept in the image store like the
+  drivers' disc. At each connection the agent says `nosvc`, `nowinfsp` (`VAC_XFER_SETUP`) or, with WinFsp there, sets the service
+  to start by itself, starts it and says `mounted`. **Set Up the Transfer Folder** (the folder menu, the agent's popover, the
+  Actions menu; by itself once after an unattended install, `app.json` `transferSetup`) downloads the installer if needed,
+  lord-server opens only `/var/lib/lordos/machines/images/<sha256>.iso` whose root-owned record says `winfsp` and hands the
+  descriptor and the hash to `lord-vm` (`VAG_TRANSFER`), which hashes it again, writes it into a SYSTEM-only private folder
+  through the agent (the drops' way), and one fixed script as SYSTEM checks its SHA-256 and Authenticode signature, runs
+  `msiexec /i … /qn /norestart` there, sets VirtioFsSvc to start by itself and starts it. The folder is a drive (Z: on the
+  machines tested), visible in the signed-in person's session too.
+- **Drops (6.21) go through it** when the guest has it mounted: `lord-vm` copies the file lord-server opened into the transfer
+  folder itself, in a child process so its loop never waits (a reflink, `FICLONE`, where the file system can; else
+  `copy_file_range`, which on one file system never passes through user space; else read and write), under a name it makes
+  (`.lordos-drop-<16 hex>`, `O_EXCL | O_NOFOLLOW`, through the folder's descriptor: the guest can write that folder, so nothing
+  there is followed or trusted). Not a hard link: the guest could then write the person's original. Then, on Linux, root only
+  checks that `/mnt/LordOS` is mounted and, as the person, a fixed script copies the file into a hidden temporary file in their
+  Downloads, moves it to a free name and removes the transfer copy; on Windows the person's own scheduled task (the drops'
+  mechanism, 6.21) finds the transfer drive by that name and copies from it. Any failure tries the agent's way once more and
+  looks at the guest's folder again; `lord-vm` removes its file from the transfer folder whatever happens. The window's hint says
+  which way the files will go, the progress line says "through the transfer folder".
+- **Out of the guest:** what the guest saves in its LordOS folder or drive is in the transfer folder here at once (Open Transfer
+  Folder: the folder menu, the Actions menu, the library's menu). Dragging out of the guest's window still needs a helper inside
+  it: not built.
+- Nothing in LordOS opens, runs or indexes the transfer folder by itself: it's a folder of the person's like Downloads.
+
+**Measured on 2026-11-20** (amd64 host, NVMe, ext4: no reflink, so `copy_file_range`; KVM; 2 GB random file; through
+`lordvm-dev`, which plays lord-server's part, not the real lord-server window; times from the request to the guest's answer):
+
+| | Agent's way (before) | Transfer folder |
+|---|---|---|
+| Ubuntu 26.04 guest, drop into Downloads | about 26–30 MB/s (an 8.7 GB ISO took minutes) | 4.8 s, about 440 MB/s (host copy 0.7 s, the person's copy in the guest the rest); SHA-256 checked in the guest |
+| Windows 11 guest, drop into Downloads | about 26–30 MB/s | 24.5 s, about 88 MB/s (host copy 3.3 s; about 11 s is the fixed cost of the scheduled task and PowerShell, the same on the agent's way); SHA-256 checked in the guest |
+| Ubuntu guest → this computer (`cp` into ~/LordOS) | not possible | 2.4 s, about 880 MB/s, the file whole on the host when the copy returns |
+| Windows guest → this computer (`copy` to Z:) | not possible | 2.5 s, about 860 MB/s |
+| WinFsp set up in a Windows guest | — | 8 s (installer copied, checked, installed, service started) |
+
+Also checked: a machine suspended with the transfer folder resumes with it (suspend.json `"transfer": true`) and mounts it again;
+with the guest's mount gone, a drop falls back to the agent's way and the guest's folder is mounted again.
 
 ### 6.8 Clipboard and drag
 
@@ -1824,6 +1891,9 @@ The camera icon saves the guest's display at its real resolution, directly from 
 
 **Status (beta, 2026-11-05):** not built. The agent's channel carries the clipboard (text, rich text, pictures: 3.9), not files: copy and
 paste of files and drag in or out need the flow control, resume and panel below, and are Phase 3 work.
+**Since (in development, after 0.8.9.4):** files dropped on a machine's window go into the signed-in person's Downloads
+(`VM_FILE`, AGENTS.md "Machines' dropped files"), through the transfer folder at full speed when the guest has it (6.7.1), else
+through qemu-guest-agent.
 
 Drag files and folders onto a running machine's window to copy them to the desktop of the user signed in at its display, or onto a shared folder window to choose the place. It goes through the agent, so it needs neither network nor shared folders.
 
