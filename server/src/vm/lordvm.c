@@ -801,6 +801,10 @@ typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 #define FX_QUEUE 8
 typedef struct { int fd, client; uint32_t seq; char name[AG_NAME_MAX + 1]; } FxReq;
 
+/* each guest-file-write carries FX_CHUNK bytes (base64 in JSON) and FX_DEPTH of them are on their way at once: one at a
+ * time, each waiting for its answer, an 8.7 GB file went at about 26 MB/s (2026-11-20) */
+#define FX_CHUNK (192 * 1024)
+#define FX_DEPTH 3
 static struct {
     char dir[PATH_MAX], disks[PATH_MAX + 16], rundir[PATH_MAX], sock_path[PATH_MAX];
     VmMachine m;
@@ -909,8 +913,9 @@ static struct {
     int fxq_n, fx_step, fx_last;
     long fx_handle, fx_pid;
     long long fx_poll_at, fx_deadline, fx_told_at;
-    off_t fx_off, fx_size;
-    size_t fx_chunk;
+    off_t fx_off, fx_size, fx_sent;     /* written (answered), size, read and sent so far */
+    size_t fx_chunks[FX_DEPTH];         /* the pieces on their way, oldest first */
+    int fx_inflight, fx_eof;
     char fx_tmp[256];                      /* the private folder in the guest the file is written into */
 } S;
 
@@ -2942,7 +2947,6 @@ static void ag_install_step(void) {
  *            the person's own: whatever their Downloads points to, they only reach what their rights reach. The name
  *            reaches every script as base64, never as script text. */
 enum { FX_NONE = 0, FX_PREP, FX_OPEN, FX_WRITE, FX_CLOSE, FX_PLACE };
-#define FX_CHUNK (48 * 1024)
 
 static const char FX_PREP_SH[] = "umask 077; d=$(mktemp -d /var/tmp/lordos-drop.XXXXXXXX) && printf '%s' \"$d\"";
 /* as the person: $1 the file, $2 its name */
@@ -3090,7 +3094,8 @@ static void fx_reset(void) {
     S.fx_step = FX_NONE;
     S.fx_handle = S.fx_pid = 0;
     S.fx_poll_at = S.fx_deadline = 0;
-    S.fx_off = S.fx_size = 0;
+    S.fx_off = S.fx_size = S.fx_sent = 0;
+    S.fx_inflight = S.fx_eof = 0;
     S.fx_tmp[0] = 0;
 }
 
@@ -3129,22 +3134,26 @@ static void fx_fail_all(const char *why) {
     S.fxq_n = 0;
 }
 
+/* keeps FX_DEPTH pieces on their way (qemu-guest-agent answers them in order); closes the file once all were answered */
 static void fx_write_next(void) {
     static uint8_t buf[FX_CHUNK];
     static char b64[FX_CHUNK / 3 * 4 + 8], args[FX_CHUNK / 3 * 4 + 96];
-    ssize_t n = pread(S.fx.fd, buf, sizeof buf, S.fx_off);
-    if (n < 0) { fx_fail(VME_INTERNAL, "the file couldn't be read"); return; }
-    if (n == 0) {
+    while (!S.fx_eof && S.fx_inflight < FX_DEPTH) {
+        ssize_t n = pread(S.fx.fd, buf, sizeof buf, S.fx_sent);
+        if (n < 0) { fx_fail(VME_INTERNAL, "the file couldn't be read"); return; }
+        if (n == 0) { S.fx_eof = 1; break; }
+        if (ag_b64_encode(buf, (size_t)n, b64, sizeof b64) < 0) { fx_fail(VME_INTERNAL, "internal error"); return; }
+        snprintf(args, sizeof args, "{\"handle\":%ld,\"buf-b64\":\"%s\"}", S.fx_handle, b64);
+        if (qga_do("guest-file-write", args, AQ_FXWRITE)) { fx_fail(VME_BUSY, "the guest agent is busy"); return; }
+        S.fx_chunks[S.fx_inflight++] = (size_t)n;
+        S.fx_sent += n;
+    }
+    if (S.fx_eof && !S.fx_inflight) {
         char a[48];
         snprintf(a, sizeof a, "{\"handle\":%ld}", S.fx_handle);
         S.fx_step = FX_CLOSE;
         if (qga_do("guest-file-close", a, AQ_FXCLOSE)) fx_fail(VME_BUSY, "the guest agent is busy");
-        return;
     }
-    if (ag_b64_encode(buf, (size_t)n, b64, sizeof b64) < 0) { fx_fail(VME_INTERNAL, "internal error"); return; }
-    snprintf(args, sizeof args, "{\"handle\":%ld,\"buf-b64\":\"%s\"}", S.fx_handle, b64);
-    S.fx_chunk = (size_t)n;
-    if (qga_do("guest-file-write", args, AQ_FXWRITE)) fx_fail(VME_BUSY, "the guest agent is busy");
 }
 
 static void fx_open(const char *path) {
@@ -3166,7 +3175,8 @@ static void fx_next(void) {
     S.fxq_n--;
     struct stat st;
     S.fx_size = !fstat(S.fx.fd, &st) ? st.st_size : 0;
-    S.fx_off = 0;
+    S.fx_off = S.fx_sent = 0;
+    S.fx_inflight = S.fx_eof = 0;
     S.fx_step = FX_PREP;
     S.fx_deadline = now_ms() + 120000;
     if (!S.qga_up) { fx_fail(VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
@@ -3236,8 +3246,9 @@ static void fx_on_reply(int kind, const JVal *root, const JVal *r, int ok) {
         break;
     case AQ_FXWRITE: {
         long count = (long)json_num(r, "count", -1);
-        if (count != (long)S.fx_chunk) { fx_fail(VME_QMP, "the guest agent wrote less than it was given (is its disk full?)"); break; }
-        S.fx_off += (off_t)S.fx_chunk;
+        if (!S.fx_inflight || count != (long)S.fx_chunks[0]) { fx_fail(VME_QMP, "the guest agent wrote less than it was given (is its disk full?)"); break; }
+        S.fx_off += (off_t)S.fx_chunks[0];
+        memmove(S.fx_chunks, S.fx_chunks + 1, (size_t)(--S.fx_inflight) * sizeof *S.fx_chunks);
         if (S.fx_off > S.fx_size) S.fx_size = S.fx_off;
         fx_progress(0);
         fx_write_next();
