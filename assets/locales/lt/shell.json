@@ -840,5 +840,6 @@
   "widgets.claude.d": "{d} d. {h} val.",
   "widgets.claude.h": "{h} val. {m} min.",
   "widgets.claude.m": "{m} min.",
-  "widgets.claude.near": "Arti ribos"
+  "widgets.claude.near": "Arti ribos",
+  "guestWindowName": "{app} ({machine})"
 }

@@ -241,6 +241,13 @@ EOF
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
     esac
+    # apps mode's guest side: lord-server's window endpoint, directly and through lordos-guest (tests/guestwin_client.c)
+    sh tests/guestwin_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guestwin (tests/guestwin_client.c, headless lord-server and lordos-guest, apps mode)" ;;
+        77) skip "guestwin" "build/lord-server, build/lordos-guest and the default theme (make, npm run build)" ;;
+        *) bad "guestwin (tests/guestwin_client.c, headless lord-server and lordos-guest, apps mode)" ;;
+    esac
     # a getter that destroys the node lord.setProp / lord.setStyle are writing (Claude Security, 0.8.9)
     sh tests/js_getter_destroy.sh >"$T/out" 2>&1
     case $? in

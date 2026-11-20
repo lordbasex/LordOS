@@ -833,5 +833,6 @@
   "widgets.claude.d": "{d} ημ {h} ώ",
   "widgets.claude.h": "{h} ώ {m} λ",
   "widgets.claude.m": "{m} λ",
-  "widgets.claude.near": "Κοντά σε όριο"
+  "widgets.claude.near": "Κοντά σε όριο",
+  "guestWindowName": "{app} ({machine})"
 }

@@ -826,5 +826,6 @@
   "widgets.claude.d": "{d} 天 {h} 小時",
   "widgets.claude.h": "{h} 小時 {m} 分",
   "widgets.claude.m": "{m} 分",
-  "widgets.claude.near": "接近上限"
+  "widgets.claude.near": "接近上限",
+  "guestWindowName": "{app}（{machine}）"
 }

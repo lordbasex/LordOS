@@ -1034,6 +1034,123 @@ static void test_network(void) {
     }
 }
 
+
+/* apps mode (vmagent.h LAG_*): every guest → host payload is parsed strictly; the writers round-trip */
+static size_t put32(uint8_t *b, size_t o, uint32_t v) { b[o] = (uint8_t)v; b[o + 1] = (uint8_t)(v >> 8); b[o + 2] = (uint8_t)(v >> 16); b[o + 3] = (uint8_t)(v >> 24); return o + 4; }
+static size_t put16(uint8_t *b, size_t o, uint32_t v) { b[o] = (uint8_t)v; b[o + 1] = (uint8_t)(v >> 8); return o + 2; }
+static size_t putstr(uint8_t *b, size_t o, const char *s) { size_t l = strlen(s); o = put16(b, o, (uint32_t)l); memcpy(b + o, s, l); return o + l; }
+static size_t win1(uint8_t *b, size_t o, uint32_t id, int x, int y, int w, int h, uint32_t flags, uint32_t owner, const char *title, const char *app) {
+    o = put32(b, o, id); o = put32(b, o, (uint32_t)x); o = put32(b, o, (uint32_t)y); o = put32(b, o, (uint32_t)w); o = put32(b, o, (uint32_t)h);
+    o = put32(b, o, flags);
+    if (flags & LAGW_OWNED) o = put32(b, o, owner);
+    o = put32(b, o, 1234);
+    o = putstr(b, o, title);
+    return putstr(b, o, app);
+}
+static void test_apps_mode(void) {
+    static uint8_t b[LAG_WINDOWS_BYTES], c[LAG_WINDOWS_BYTES];
+    static LagWinList l, l2;
+    CHECK(ag_hello_caps((const uint8_t *)"2 clipboard clipx windows", 25) == (AG_HELLO_CLIPBOARD | AG_HELLO_CLIPX | AG_HELLO_WINDOWS));
+    CHECK(ag_hello_caps((const uint8_t *)"2 clipboard windowsx", 20) == AG_HELLO_CLIPBOARD && ag_hello_caps((const uint8_t *)"", 0) == 0);
+    size_t o = put32(b, 0, 7);
+    o = put16(b, o, 2);
+    o = win1(b, o, 10, 100, 50, 640, 480, LAGW_FOCUSED, 0, "Notes \xe2\x80\x94 untitled", "notepad.exe");
+    o = win1(b, o, 11, 120, 80, 300, 200, LAGW_OWNED | LAGW_TOPMOST, 10, "Save as", "notepad.exe");
+    CHECK(!lag_winlist_read(b, o, &l) && l.serial == 7 && l.n == 2 && l.w[0].id == 10 && l.w[0].w == 640 && l.w[1].owner == 10 && !strcmp(l.w[1].title, "Save as") && l.w[0].pid == 1234);
+    size_t n = lag_windows_write(&l, c, sizeof c);
+    CHECK(n == o && !memcmp(b, c, n) && !lag_winlist_read(c, n, &l2) && l2.n == 2);
+    CHECK(lag_winlist_read(b, o - 1, &l) == -1);                         /* cut short */
+    b[o] = 0;
+    CHECK(lag_winlist_read(b, o + 1, &l) == -1);                         /* a byte left over */
+    /* each field out of bounds */
+    size_t k;
+    k = put16(b, put32(b, 0, 1), LAG_WIN_MAX + 1); CHECK(lag_winlist_read(b, k, &l) == -1);                                      /* too many */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 0, 0, 0, 10, 10, 0, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);          /* id 0 */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 0, 10, 0, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);           /* w 0 */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, LAG_DIM_MAX + 1, 10, 0, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);        /* w too big */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, LAG_DIM_MAX + 1, 0, 10, 10, 0, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);      /* x too far */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, -32000, -32000, 160, 28, LAGW_MINIMIZED, 0, "a", "b");
+    CHECK(lag_winlist_read(b, k, &l) == -1);                                                                                     /* minimized: still a place */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 16, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);          /* unknown flag */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, LAGW_OWNED, 5, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);  /* owns itself */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, LAGW_OWNED, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);  /* owner 0 */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 0, 0, "a\x01", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);        /* control character */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 0, 0, "\xc2\x85", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);    /* C1 control */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 0, 0, "\xc3", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);        /* not UTF-8 */
+    k = win1(b, put16(b, put32(b, 0, 1), 2), 5, 0, 0, 10, 10, 0, 0, "a", "b"); k = win1(b, k, 5, 0, 0, 10, 10, 0, 0, "a", "b");
+    CHECK(lag_winlist_read(b, k, &l) == -1);                                                                                     /* same id twice */
+    {   /* a title longer than LAG_TITLE_MAX */
+        static char big[LAG_TITLE_MAX + 2];
+        memset(big, 'x', LAG_TITLE_MAX + 1);
+        k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 0, 0, big, "b"); CHECK(lag_winlist_read(b, k, &l) == -1);
+        big[LAG_TITLE_MAX] = 0;
+        k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 0, 0, big, "b"); CHECK(!lag_winlist_read(b, k, &l));
+    }
+    /* a length that points past the end */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 0, 0, "abc", "b");
+    put16(b, 6 + 28, 60000);
+    CHECK(lag_winlist_read(b, k, &l) == -1);
+    /* icons */
+    uint8_t rgba[16 * 16 * 4];
+    memset(rgba, 0x80, sizeof rgba);
+    n = lag_icon_write(10, 16, 16, rgba, c, sizeof c);
+    uint32_t id; uint16_t iw, ih; const uint8_t *px;
+    CHECK(n == 8 + sizeof rgba && !lag_winicon_parse(c, n, &id, &iw, &ih, &px) && id == 10 && iw == 16 && ih == 16 && px == c + 8);
+    CHECK(lag_winicon_parse(c, n - 1, &id, &iw, &ih, &px) == -1 && lag_winicon_parse(c, 7, &id, &iw, &ih, &px) == -1);
+    put16(c, 4, 65); CHECK(lag_winicon_parse(c, n, &id, &iw, &ih, &px) == -1);
+    put16(c, 4, 0); CHECK(lag_winicon_parse(c, n, &id, &iw, &ih, &px) == -1);
+    CHECK(!lag_icon_write(1, 65, 1, rgba, c, sizeof c) && !lag_icon_write(0, 1, 1, rgba, c, sizeof c));
+    /* actions (the guest checks them too) */
+    LagAct a = { 10, LAGA_MOVE, -5, 20, 800, 600 }, a2;
+    n = lag_act_write(&a, c, sizeof c);
+    CHECK(n == 21 && !lag_winact_parse(c, n, &a2) && a2.id == 10 && a2.x == -5 && a2.h == 600);
+    CHECK(lag_winact_parse(c, 20, &a2) == -1 && lag_winact_parse(c, 5, &a2) == -1);
+    a.action = LAGA_CLOSE;
+    n = lag_act_write(&a, c, sizeof c);
+    CHECK(n == 5 && !lag_winact_parse(c, 5, &a2) && a2.action == LAGA_CLOSE && lag_winact_parse(c, 6, &a2) == -1);
+    c[4] = 6; CHECK(lag_winact_parse(c, 5, &a2) == -1);
+    c[4] = 0; CHECK(lag_winact_parse(c, 5, &a2) == -1);
+    a.action = LAGA_MOVE; a.w = 0; CHECK(!lag_act_write(&a, c, sizeof c));
+    /* launch and the list of apps */
+    char tok[LAG_TOKEN_MAX + 1];
+    n = lag_launch_write("org.lordos.notes", c, sizeof c);
+    CHECK(n == 18 && !lag_launch_token(c, n, tok, sizeof tok) && !strcmp(tok, "org.lordos.notes"));
+    CHECK(!lag_launch_write("", c, sizeof c) && lag_launch_token(c, n + 1, tok, sizeof tok) == -1 && lag_launch_token(c, n, tok, 8) == -1);
+    static LagAppList al, al2;
+    al.n = 2;
+    snprintf(al.a[0].name, sizeof al.a[0].name, "Notes"); snprintf(al.a[0].token, sizeof al.a[0].token, "notes");
+    snprintf(al.a[1].name, sizeof al.a[1].name, "Calculadora"); snprintf(al.a[1].token, sizeof al.a[1].token, "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App");
+    static uint8_t big[LAG_APPLIST_BYTES];
+    n = lag_applist_write(&al, big, sizeof big);
+    CHECK(n && !lag_applist_read(big, n, &al2) && al2.n == 2 && lag_applist_has(&al2, "notes") && !lag_applist_has(&al2, "note") && !lag_applist_has(&al2, ""));
+    CHECK(lag_applist_read(big, n - 1, &al2) == -1);
+    put16(big, 0, LAG_APPS_MAX + 1); CHECK(lag_applist_read(big, n, &al2) == -1);
+    k = putstr(b, put16(b, 0, 1), "Name"); k = putstr(b, k, ""); CHECK(lag_applist_read(b, k, &al2) == -1);       /* empty token */
+    k = putstr(b, put16(b, 0, 1), ""); k = putstr(b, k, "t"); CHECK(lag_applist_read(b, k, &al2) == -1);          /* empty name */
+    CHECK(lag_rect_ok(0, 0, 1, 1) && !lag_rect_ok(0, 0, 1, 0) && !lag_rect_ok(LAG_DIM_MAX + 1, 0, 1, 1) && lag_rect_ok(-LAG_DIM_MAX, 0, LAG_DIM_MAX, 1));
+    /* the control messages around it */
+    VmMsg m = vm_msg(VM_APPS, 1, 1, 0, 0, 0, NULL);
+    CHECK(vm_msg_valid(&m, 1));
+    m.a = 2; CHECK(!vm_msg_valid(&m, 1));
+    m = vm_msg(VM_WINACT, 1, 10, LAGA_MOVE, 0, 0, "1 2 3 4"); CHECK(vm_msg_valid(&m, 1));
+    m.b = 6; CHECK(!vm_msg_valid(&m, 1));
+    m = vm_msg(VM_LAUNCH, 1, 0, 0, 0, 0, ""); CHECK(!vm_msg_valid(&m, 1));
+    m = vm_msg(VM_LAUNCH, 1, 3, 2, 0, 0, ""); CHECK(vm_msg_valid(&m, 1));
+    m.a = 256; CHECK(!vm_msg_valid(&m, 1));
+    m = vm_msg(VM_WINDATA, 0, 100, LAG_WINDOWS, 0, 0, NULL); CHECK(vm_msg_valid(&m, 0));
+    m.b = LAG_WINACT; CHECK(!vm_msg_valid(&m, 0));
+    m.b = LAG_APPLIST; m.a = (int)VM_WINDATA_MAX + 1; CHECK(!vm_msg_valid(&m, 0));
+    m = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_CLIPBOARD | (int)LAG_CAP_WINDOWS, 0, 0, NULL); CHECK(vm_msg_valid(&m, 0));
+    /* random bytes never crash a parser and never pass with a byte out of place */
+    uint32_t seed = 12345;
+    for (int it = 0; it < 20000; it++) {
+        size_t len = (seed = seed * 1103515245 + 12345) % 300;
+        for (size_t i = 0; i < len; i++) b[i] = (uint8_t)((seed = seed * 1103515245 + 12345) >> 16);
+        lag_winlist_read(b, len, &l); lag_winicon_parse(b, len, &id, &iw, &ih, &px); lag_winact_parse(b, len, &a2);
+        lag_launch_token(b, len, tok, sizeof tok); lag_applist_read(b, len, &al2);
+    }
+}
+
 /* the resolution a machine starts with (Configure → Display) */
 static void test_resolution(void) {
     int w = 0, h = 0;
@@ -1165,6 +1282,7 @@ static void test_lag(void) {
 int main(void) {
     test_resolution();
     test_lag();
+    test_apps_mode();
     test_clipx();
     test_log_clean();
     test_images();

@@ -1,5 +1,5 @@
 // meta.js — what the app keeps about a machine that lord-vm doesn't need: the system it runs (for the card's mark and
-// name), notes, what closing its window does (onClose) and whether it keeps this computer awake (keepAwake, read by
+// name), notes, what closing its window does (onClose), whether it opens in apps mode (appsMode) and whether it keeps this computer awake (keepAwake, read by
 // lord.vm.awake too). <machine>/app.json, written by the app as the person; machine.json stays lord-vm's alone.
 import { fs } from '@lordos/sdk';
 
@@ -19,6 +19,7 @@ export function readMeta(dir) {
       if (typeof j.notes === 'string') meta.notes = j.notes.slice(0, 4000);
       if (['ask', 'suspend', 'shutdown', 'keep'].includes(j.onClose)) meta.onClose = j.onClose;
       if (typeof j.keepAwake === 'boolean') meta.keepAwake = j.keepAwake;
+      if (typeof j.appsMode === 'boolean') meta.appsMode = j.appsMode;      // apps mode (7.2): the machine's window opens in it
       if (typeof j.profile === 'string' && /^[a-z]{1,16}$/.test(j.profile)) meta.profile = j.profile;
       if (typeof j.cloneOf === 'string' && /^[0-9a-f-]{36}$/.test(j.cloneOf)) meta.cloneOf = j.cloneOf;
       if (typeof j.importedFrom === 'string') meta.importedFrom = j.importedFrom.slice(0, 1024);

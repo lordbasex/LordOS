@@ -579,3 +579,161 @@ int lag_launch_parse(const uint8_t *p, size_t n, const uint8_t **tok, uint16_t *
     if (tok_n) *tok_n = tn;
     return 0;
 }
+
+/* ---- apps mode, copied out (vmagent.h: lord-vm's and lordos-guest's relays, lord-server) ---- */
+
+static void lag_wr16(uint8_t *p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
+static void lag_wr32(uint8_t *p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
+
+unsigned ag_hello_caps(const uint8_t *p, size_t n) {
+    unsigned caps = 0;
+    size_t i = 0;
+    while (i < n) {
+        while (i < n && p[i] == ' ') i++;
+        size_t s0 = i;
+        while (i < n && p[i] != ' ') i++;
+        size_t l = i - s0;
+        if (l == 9 && !memcmp(p + s0, "clipboard", 9)) caps |= AG_HELLO_CLIPBOARD;
+        else if (l == 5 && !memcmp(p + s0, "clipx", 5)) caps |= AG_HELLO_CLIPX;
+        else if (l == 7 && !memcmp(p + s0, "windows", 7)) caps |= AG_HELLO_WINDOWS;
+    }
+    return caps;
+}
+
+int lag_text_ok(const uint8_t *p, size_t n) {
+    if (!ag_utf8_ok(p, n)) return 0;
+    for (size_t i = 0; i < n; i++) if (p[i] < 0x20 || p[i] == 0x7f) return 0;
+    for (size_t i = 0; i + 1 < n; i++) if (p[i] == 0xc2 && p[i + 1] >= 0x80 && p[i + 1] <= 0x9f) return 0;     /* C1 */
+    return 1;
+}
+
+int lag_rect_ok(int32_t x, int32_t y, int32_t w, int32_t h) {
+    return w >= 1 && h >= 1 && w <= LAG_DIM_MAX && h <= LAG_DIM_MAX && x >= -LAG_DIM_MAX && x <= LAG_DIM_MAX && y >= -LAG_DIM_MAX && y <= LAG_DIM_MAX;
+}
+
+static void copy_text(char *out, const uint8_t *p, uint16_t n) { memcpy(out, p, n); out[n] = 0; }
+
+int lag_winlist_read(const uint8_t *p, size_t n, LagWinList *out) {
+    LagWin w[LAG_WIN_MAX];
+    uint32_t serial = 0;
+    int k = lag_windows_parse(p, n, &serial, w, LAG_WIN_MAX);
+    if (k < 0) return -1;
+    out->serial = serial;
+    out->n = 0;
+    for (int i = 0; i < k; i++) {
+        if (!lag_text_ok(w[i].title, w[i].title_n) || !lag_text_ok(w[i].app, w[i].app_n)) return -1;
+        LagWinEntry *e = &out->w[i];
+        e->id = w[i].id; e->flags = w[i].flags; e->owner = w[i].owner; e->pid = w[i].pid;
+        e->x = w[i].x; e->y = w[i].y; e->w = w[i].w; e->h = w[i].h;
+        copy_text(e->title, w[i].title, w[i].title_n);
+        copy_text(e->app, w[i].app, w[i].app_n);
+        out->n = i + 1;
+    }
+    return 0;
+}
+
+static size_t lag_put_str(uint8_t *out, size_t o, const char *s) {
+    size_t l = strlen(s);
+    lag_wr16(out + o, (uint32_t)l);
+    memcpy(out + o + 2, s, l);
+    return o + 2 + l;
+}
+
+size_t lag_windows_write(const LagWinList *l, uint8_t *out, size_t cap) {
+    if (l->n < 0 || l->n > LAG_WIN_MAX) return 0;
+    size_t need = 6;
+    for (int i = 0; i < l->n; i++) {
+        const LagWinEntry *w = &l->w[i];
+        if (!w->id || strlen(w->title) > LAG_TITLE_MAX || strlen(w->app) > LAG_APP_MAX) return 0;
+        if (!(w->flags & LAGW_MINIMIZED) && !lag_rect_ok(w->x, w->y, w->w, w->h)) return 0;
+        need += 28 + ((w->flags & LAGW_OWNED) ? 4 : 0) + 4 + strlen(w->title) + strlen(w->app);
+    }
+    if (need > cap) return 0;
+    lag_wr32(out, l->serial);
+    lag_wr16(out + 4, (uint32_t)l->n);
+    size_t o = 6;
+    for (int i = 0; i < l->n; i++) {
+        const LagWinEntry *w = &l->w[i];
+        int place = lag_rect_ok(w->x, w->y, w->w, w->h);         /* a minimized window without one: 0, 0, 1, 1 */
+        lag_wr32(out + o, w->id);
+        lag_wr32(out + o + 4, (uint32_t)(place ? w->x : 0)); lag_wr32(out + o + 8, (uint32_t)(place ? w->y : 0));
+        lag_wr32(out + o + 12, (uint32_t)(place ? w->w : 1)); lag_wr32(out + o + 16, (uint32_t)(place ? w->h : 1));
+        lag_wr32(out + o + 20, w->flags);
+        o += 24;
+        if (w->flags & LAGW_OWNED) { lag_wr32(out + o, w->owner); o += 4; }
+        lag_wr32(out + o, w->pid);
+        o += 4;
+        o = lag_put_str(out, o, w->title);
+        size_t a0 = o + 2;
+        o = lag_put_str(out, o, w->app);
+        for (size_t k = a0; k < o; k++) if (out[k] == '/' || out[k] == '\\' || out[k] == ':') out[k] = '_';   /* a file name */
+    }
+    return o;
+}
+
+size_t lag_icon_write(uint32_t id, int w, int h, const uint8_t *rgba, uint8_t *out, size_t cap) {
+    if (!id || w < 1 || h < 1 || w > LAG_ICON_MAX || h > LAG_ICON_MAX) return 0;
+    size_t need = 8 + (size_t)w * h * 4;
+    if (need > cap) return 0;
+    lag_wr32(out, id); lag_wr16(out + 4, (uint32_t)w); lag_wr16(out + 6, (uint32_t)h);
+    memcpy(out + 8, rgba, need - 8);
+    return need;
+}
+
+size_t lag_act_write(const LagAct *a, uint8_t *out, size_t cap) {
+    if (!a->id || a->action < LAGA_FOCUS || a->action > LAGA_MOVE) return 0;
+    size_t need = a->action == LAGA_MOVE ? 21 : 5;
+    if (cap < need || (a->action == LAGA_MOVE && !lag_rect_ok(a->x, a->y, a->w, a->h))) return 0;
+    lag_wr32(out, a->id);
+    out[4] = a->action;
+    if (a->action == LAGA_MOVE) { lag_wr32(out + 5, (uint32_t)a->x); lag_wr32(out + 9, (uint32_t)a->y); lag_wr32(out + 13, (uint32_t)a->w); lag_wr32(out + 17, (uint32_t)a->h); }
+    return need;
+}
+
+int lag_launch_token(const uint8_t *p, size_t n, char *token, size_t cap) {
+    const uint8_t *t;
+    uint16_t tn;
+    if (cap <= LAG_TOKEN_MAX || lag_launch_parse(p, n, &t, &tn) || !lag_text_ok(t, tn)) return -1;
+    copy_text(token, t, tn);
+    return 0;
+}
+
+size_t lag_launch_write(const char *token, uint8_t *out, size_t cap) {
+    size_t l = strlen(token);
+    if (!l || l > LAG_TOKEN_MAX || cap < l + 2 || !lag_text_ok((const uint8_t *)token, l)) return 0;
+    return lag_put_str(out, 0, token);
+}
+
+int lag_applist_read(const uint8_t *p, size_t n, LagAppList *out) {
+    static LagApp a[LAG_APPS_MAX];
+    int k = lag_applist_parse(p, n, a, LAG_APPS_MAX);
+    if (k < 0) return -1;
+    out->n = 0;
+    for (int i = 0; i < k; i++) {
+        if (!lag_text_ok(a[i].name, a[i].name_n) || !lag_text_ok(a[i].token, a[i].token_n)) return -1;
+        copy_text(out->a[i].name, a[i].name, a[i].name_n);
+        copy_text(out->a[i].token, a[i].token, a[i].token_n);
+        out->n = i + 1;
+    }
+    return 0;
+}
+
+size_t lag_applist_write(const LagAppList *l, uint8_t *out, size_t cap) {
+    if (l->n < 0 || l->n > LAG_APPS_MAX) return 0;
+    size_t need = 2;
+    for (int i = 0; i < l->n; i++) {
+        size_t a = strlen(l->a[i].name), b = strlen(l->a[i].token);
+        if (!a || !b || a > LAG_NAME_MAX || b > LAG_TOKEN_MAX) return 0;
+        need += 4 + a + b;
+    }
+    if (need > cap) return 0;
+    lag_wr16(out, (uint32_t)l->n);
+    size_t o = 2;
+    for (int i = 0; i < l->n; i++) { o = lag_put_str(out, o, l->a[i].name); o = lag_put_str(out, o, l->a[i].token); }
+    return o;
+}
+
+int lag_applist_has(const LagAppList *l, const char *token) {
+    for (int i = 0; i < l->n; i++) if (!strcmp(l->a[i].token, token)) return 1;
+    return 0;
+}

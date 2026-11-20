@@ -32,6 +32,7 @@
 #include "js_lan.h"
 #include "js_rdesk.h"
 #include "js_vm.h"
+#include "js_guestwin.h"
 #include "js_broker.h"
 #include "js_wasm.h"
 #include "../media/svgicon.h"
@@ -284,6 +285,23 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
         Session *s = term_get(id);
         if (s) s->node = n->id;
         node_invalidate(n);
+    } else if (n && key && !strcmp(key, "crop") && n->type == NODE_MEDIA) {
+        /* [x, y, w, h] in the source picture's pixels: the node shows that part (Machines' apps mode); null: all of it */
+        double v[4];
+        int ok = JS_IsArray(c, argv[2]);
+        for (int i = 0; i < 4 && ok; i++) {
+            JSValue e = JS_GetPropertyUint32(c, argv[2], (uint32_t)i);
+            ok = JS_IsNumber(e) && !JS_ToFloat64(c, &v[i], e) && v[i] == v[i] && v[i] > -65536 && v[i] < 65536;
+            JS_FreeValue(c, e);
+        }
+        n = arg_node(c, argv[0]);               /* the reads above can run getters (see f_set_style) */
+        if (n && n->type == NODE_MEDIA) {
+            if (ok && v[2] >= 1 && v[3] >= 1) {
+                if (!n->crop) n->crop = malloc(4 * sizeof(float));
+                if (n->crop) for (int i = 0; i < 4; i++) n->crop[i] = (float)v[i];
+            } else { free(n->crop); n->crop = NULL; }
+            node_invalidate(n);
+        }
     } else if (n && key && !strcmp(key, "media") && n->type == NODE_MEDIA) {
         int32_t id = 0;                     /* lord.media source (video, photo, screenshot, camera) */
         if (JS_IsNumber(argv[2])) JS_ToInt32(c, &id, argv[2]);
@@ -570,6 +588,7 @@ static void session_context(void) {
     js_cloud_register(ctx, lord);      /* lord.cloud: Cloud (cloud/, docs/CLOUD.md) */
     js_rdesk_register(ctx, lord);      /* lord.rdesk: the RDP and VNC apps */
     js_vm_register(ctx, lord);         /* lord.vm: Machines (vm/, docs/VIRTUALIZATION.md) */
+    js_guestwin_register(ctx, lord);   /* lord.guestwin: apps mode's guest side, inside a Machines guest (vmagent.h) */
     js_lan_register(ctx, lord);        /* lord.lan: Files → Network (lan/, docs/FILES.md) */
     js_clean_register(ctx, lord);      /* lord.clean: Cleaner (clean/, docs/CLEANER-ARCHITECTURE.md) */
     js_logs_register(ctx, lord);       /* lord.logs: journal and LordOS logs (Logs app) */

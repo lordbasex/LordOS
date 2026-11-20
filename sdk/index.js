@@ -31,7 +31,7 @@ export { OskPanel, OskIcon, OskStatus, oskLift } from './osk.jsx';
 export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe, TRACKPAD_DEFAULTS, trackpadConfig, setTrackpad } from './trackpad.js';
 export { ime, useIme } from './ime.js';
 export { wayland, x11SelfScale, setX11Scaling } from './wayland.js';
-export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, iconFromFile, webAppIcon, webProfileIcon, APP_CATEGORIES, appCategory } from './apps.js';
+export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, windowPixelIcons, LetterIcon, iconFromFile, webAppIcon, webProfileIcon, APP_CATEGORIES, appCategory } from './apps.js';
 // Web apps (docs/WEBAPPS.md): the registry through lord.webapps, profiles, the probe, the permission questions
 export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, webRunning, launchWebApp, probeWebApp, installWebApp, webAppCall, webAppOfWindow, webAppMemory, webEngine,
   webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy, webDeveloper, setWebDeveloperMode } from './webapps.js';
@@ -105,7 +105,7 @@ import { refreshPackages, forgetGonePackaged, packageList as packageListOf } fro
 export {
   windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, windowMenuTitle, windowAccent, appRegistry, appMenuClick,
   registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, isWindowLocked, moveGrab, SNAP_DWELL_MS, locksChanged, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
-  keepWindowsInWorkAreas, pointerDisplay,
+  keepWindowsInWorkAreas, pointerDisplay, windowChrome,
 } from './windows.js';
 // Desktops and the Overview (docs/DESKTOPS.md)
 export { desktopName, switchDesktop, nextDesktopBy, addDesktopAndShow, closeActiveDesktop, removeDesktopById, moveToDesktopItems, flowDesktopKeys, classicDesktopKeys, flowGrabs, ctrlArrowsOn, desktopSwipe, DesktopHud } from './desktops.js';
@@ -221,6 +221,9 @@ export { appsOff, isAppOff, useAppsOff } from './appsoff.js';
 export { DEACTIVATABLE, CORE_APPS, canDeactivate, isCoreApp, openersAvailable } from './appsoffmodel.js';
 export { deactivateApp, activateApp, offerActivate } from './appsoffactions.js';
 import { startAppsOff } from './appsoffactions.js';
+// apps mode's guest side: inside a Machines guest, this desktop's windows go to the host one by one (guestwin.js)
+export { guestAppsMode } from './guestwin.js';
+import { startGuestWin } from './guestwin.js';
 export { notifyPrefs, appNotifyPrefs, setAppNotifyPrefs, dndActive, NOTIFY_DEFAULTS } from './notify.js';
 
 // ---- installed themes ----
@@ -283,6 +286,7 @@ export function startShell(element) {
   try { lord.input?.pointerAccent?.(null); } catch (e) { /* older server */ }   // LordOS's black arrow; a theme may tint it (setPointerAccent)
   refreshPackages();                    // after the theme's configureWindows
   startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
+  startGuestWin();                      // inside a Machines guest only: apps mode's endpoint (guestwin.js)
   enableShellLayers();                  // menus, popovers and prompts go to their layer (sdk/layers.js)
   resetShortcuts();                     // the dispatcher exists only in the session (sdk/shortcuts.js)
   reopenAfterThemeSwitch();

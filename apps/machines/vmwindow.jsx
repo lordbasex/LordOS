@@ -8,7 +8,8 @@ import {
   inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker } from './model.js';
+import { useAppsMode, appsMenuItems, guests } from './appsmode.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp } from './ui.jsx';
 import { openLogs, openSnapshots } from './library.jsx';
@@ -22,7 +23,7 @@ const THUMB_MS = 5000;
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.install}` : '');
 const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'filesSeq'].every((k) => a[k] === b[k])
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
@@ -138,7 +139,7 @@ function Tools({ ctl, floating, compact }) {
         <AgentButton ctl={ctl} />
         <IconMenuBtn sym="clipboard" label={`${tr('machines.cfg.clipboard')}: ${tr(`machines.cfg.clip.${clip}`)}`} items={clipItems} color={clipOn ? '#7be3a4' : null} />
         <IconMenuBtn sym="sharing" label={shares.length ? tr('machines.tb.foldersN', { n: shares.length }) : tr('machines.tb.folders')} items={shareItems} color={shares.length ? '#7be3a4' : null} />
-        {compact ? null : <IconBtn sym="apps" label={tr('machines.tb.appsLater')} disabled />}
+        {compact ? null : <IconBtn sym="apps" label={ctl.appsLabel} on={ctl.appsOn} disabled={!!ctl.appsBlocked && !ctl.appsOn} onClick={ctl.toggleApps} />}
       </BarGroup>
       {compact ? null : <BarSep />}
     </> : null}
@@ -294,6 +295,26 @@ function Failed({ name, v, st, log, onStart, onSettings, onAnyway, onDiscard }) 
   );
 }
 
+// Apps mode's controller (7.2): what's left of the machine's window while its apps are windows of their own: the
+// machine's name, the guest's apps to open, how many windows it shows, and the way back to its desktop (Esc too)
+function AppsController({ name, g, onLeave }) {
+  const p = usePal();
+  const n = (g?.list || []).filter((w) => !w.minimized).length;
+  return (
+    <View style={{ flex: 1, padding: 18, gap: 10, backgroundColor: p.bg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <StateDot tone="run" size={9} />
+        <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{name}</Text>
+      </View>
+      <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.apps.controllerHint', { count: n })}</Text>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+        <IconMenuBtn sym="apps" label={tr('machines.apps.menu')} items={appsMenuItems(g)} />
+        <Btn label={tr('machines.apps.leave')} onClick={onLeave} />
+      </View>
+    </View>
+  );
+}
+
 export function MachineWindow({ dir, name: name0, loadvm }) {
   const p = usePal();
   const { id: winId, focused } = useAppWindow();
@@ -305,6 +326,10 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const [askClose, setAskClose] = useWindowState('vm.ask', false);
   const [always, setAlways] = useState(false);
   const [follow, setFollow] = useWindowState('vm.follow', true);
+  // apps mode (7.2): the person's choice, kept per machine (app.json), on once the guest's helper lists its windows
+  const [appsOn, setAppsOn] = useWindowState('vm.apps', () => !!readMeta(dir).appsMode);
+  const appsRef = useRef(false);
+  const preApps = useRef(null);
   const [log, setLog] = useState('');
   const [name, setName] = useState(name0);
   const [iso, setIso] = useState('');
@@ -378,14 +403,14 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       const z = sized.current;
       if (q.display === 'up' && !z.rate) { z.rate = true; try { lord.vm.rate(sid, refreshRate(lord.display.list())); } catch (e) { lord.vm.rate(sid, 60); } }
       // the window's size, to the guest after it stayed the same for 400 ms (unless a fixed resolution was chosen)
-      if (q.display === 'up' && box.current && followRef.current) {
+      if (q.display === 'up' && box.current && followRef.current && !appsRef.current) {
         const want = guestSize(lord.getLayout(box.current.id), z.last);
         if (!want) z.want = null;
         else if (!z.want || z.want[0] !== want[0] || z.want[1] !== want[1]) { z.want = want; z.at = now(); }
         else if (now() - z.at > 400) { lord.vm.resize(sid, want[0], want[1]); z.last = want; z.want = null; z.asked = want; z.askedAt = now(); }
       }
       // asked for a size the guest didn't take (Follow the window): the resolution menu says so
-      const stuckNow = q.display === 'up' && followRef.current && followStuck(z.asked, [q.w, q.h], z.askedAt, now());
+      const stuckNow = q.display === 'up' && followRef.current && !appsRef.current && followStuck(z.asked, [q.w, q.h], z.askedAt, now());
       setStuck((x) => (x === stuckNow ? x : stuckNow));
       if (q.filesSeq !== filesSeen.current || (q.ended && filesSeen.current !== -2)) { filesSeen.current = q.ended ? -2 : q.filesSeq; onFiles.current?.(lord.vm.files(sid)); }
       // the card picture in the library, every few seconds while it runs
@@ -449,7 +474,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   useEffect(() => { wm.setTitle(winId, windowTitle(name || dir, err ? tr('machines.state.crashed') : tr(`machines.state.${v.key}`))); }, [name, v.key, err]);
 
   // keyboard while in front; everything held is let go of on blur
-  const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing && !askClose && !(shell && shellKeys) && !pickCd;
+  const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing && !askClose && !(shell && shellKeys) && !pickCd && !appsRef.current;
   // the console's stream, asked for once the pane is open on a running machine
   useEffect(() => { if (shell && sid && !st?.console && (st?.state === 'running' || st?.state === 'paused')) lord.vm.console(sid); }, [shell, sid, st?.state, !!st?.console]);
   useEffect(() => {
@@ -597,7 +622,29 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     for (const f of failed) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.drop.failed', { machine: name, name: f.name }), body: f.message, sound: false });
   };
   const line = copyLine(copies);
+  // apps mode (7.2): the guest's windows as LordOS windows (appsmode.jsx); this window becomes a small controller
+  const appsBlocked = appsBlocker(st?.agent, cfg);
+  const setApps = (on) => {
+    setAppsOn(on);
+    writeMeta(dir, { appsMode: on });
+    if (!on) sized.current.last = null;            // the guest takes this window's size again (Follow)
+  };
+  const appsActive = useAppsMode({ dir, sid, st, name, mid: m0.id || dir.split('/').pop(), on: appsOn, ready: !appsBlocked, onLeave: () => setApps(false) });
+  appsRef.current = appsActive;
+  useEffect(() => {
+    const w = wm.get(winId);
+    if (appsActive) {
+      if (w && !preApps.current) preApps.current = { w: w.w, h: w.h };
+      if (full) wm.setFullscreen(winId, false);
+      wm.resize(winId, 460, 250);
+    } else if (preApps.current) { wm.resize(winId, preApps.current.w, preApps.current.h); preApps.current = null; }
+  }, [appsActive]);
+  const gApps = useStore(guests, (x) => x[dir] || null);
+  // why it can't be on: the agent, or a guest whose helper can't list its windows (it needs LordOS or Windows inside)
+  const appsWhy = appsBlocked === 'needsTools' ? tr('machines.win.appsNeedsTools') : appsBlocked ? tr('machines.apps.needsAgent') : '';
+  const appsLabel = appsOn ? tr('machines.apps.leave') : appsWhy || tr('machines.apps.enter');
   const ctl = {
+    appsOn, appsBlocked, appsLabel, toggleApps: () => setApps(!appsOn),
     sid, cfg, heard, toggleSound, micLive: micOn,
     shell, toggleShell: () => { setShell(!shell); setShellKeys(!shell); },
     rec: !!rec, recTime: `${String(Math.floor(recSecs / 60)).padStart(2, '0')}:${String(recSecs % 60).padStart(2, '0')}`, record,
@@ -646,10 +693,15 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         { label: full ? tr('machines.cmd.exitFullscreen') : tr('machines.cmd.fullscreen'), onClick: () => wm.setFullscreen(winId, !full) },
         { label: tr('machines.cmd.logs'), onClick: () => openLogs(m0) },
         { label: tr('machines.cmd.configure'), onClick: () => setCfgSheet({}) },
+        '-',
+        { label: tr('machines.apps.mode'), checked: appsOn, disabled: !!appsBlocked && !appsOn, hint: !appsOn ? appsWhy : '', onClick: () => setApps(!appsOn) },
       ] },
       { label: tr('machines.menu.devices'), items: ctl.devices.filter((x) => x !== '-') },
+      ...(appsActive ? [{ label: tr('machines.apps.menu'), items: appsMenuItems(gApps) }] : []),
     ]);
-  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone]);
+  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps]);
+  // Esc in the controller leaves apps mode (in a guest's window, Esc is the guest's)
+  useEffect(() => (appsActive && focused ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open) setApps(false); }) : undefined), [appsActive, focused]);
 
   let card = null;
   let failed = null;
@@ -678,9 +730,10 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
 
   return (
     <View ref={root} {...drop.props} style={{ flex: 1, backgroundColor: '#000' }}>
-      <View ref={box} onMouseDown={(e) => { setShellKeys(false); down(e); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
-        {st?.media && st.display === 'up' ? <MediaView media={st.media} style={{ flex: 1 }} /> : null}
-      </View>
+      {appsActive ? <AppsController name={name} g={gApps} onLeave={() => setApps(false)} />
+        : <View ref={box} onMouseDown={(e) => { setShellKeys(false); down(e); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
+          {st?.media && st.display === 'up' ? <MediaView media={st.media} style={{ flex: 1 }} /> : null}
+        </View>}
       {shell && !full ? (
         <View onMouseDown={() => setShellKeys(true)} style={{ height: 260, borderTopWidth: 2, borderColor: shellKeys ? '#0a84ff' : p.line, backgroundColor: '#101114' }}>
           <View style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, backgroundColor: '#1b1c20' }}>
@@ -727,7 +780,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         note={drop.over && !blocker && drop.over.files.length ? `${drop.over.skipped ? `${tr('machines.drop.skipped', { count: drop.over.skipped })} · ` : ''}${tr('machines.drop.oneWay')}` : ''} />
       {pickCd ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPickCd(false)}
         onPick={(x) => { setPickCd(false); cdTo(Array.isArray(x) ? x[0] : x); }} /> : null}
-      {full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}
+      {appsActive ? null : full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}
       {cfgSheet ? <Sheet width={1000} height={700} modal onClose={() => setCfgSheet(null)}>
         <Configure dir={dir} section={cfgSheet.section} onClose={() => setCfgSheet(null)} />
       </Sheet> : null}

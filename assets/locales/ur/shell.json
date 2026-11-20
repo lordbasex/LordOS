@@ -833,5 +833,6 @@
   "widgets.claude.d": "{d} د {h} گ",
   "widgets.claude.h": "{h} گ {m} منٹ",
   "widgets.claude.m": "{m} منٹ",
-  "widgets.claude.near": "حد کے قریب"
+  "widgets.claude.near": "حد کے قریب",
+  "guestWindowName": "{app} ({machine})"
 }

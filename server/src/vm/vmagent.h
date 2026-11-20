@@ -10,7 +10,8 @@
  * At most AG_FRAME_MAX bytes of payload; anything longer, or a stream that doesn't parse, is dropped whole (the guest
  * is untrusted: lord-vm parses this inside its own sandbox, never lord-server). Kinds a side doesn't know are skipped,
  * so either side can grow.
- *   AGK_HELLO  guest → host  "lordos-guest <version> <capability>…" (text); the host answers with its own hello
+ *   AGK_HELLO  guest → host  "lordos-guest <version> <capability>…" (text: clipboard, clipx, windows); the host answers
+ *                            with its own hello
  *   AGK_CLIP   both ways     the clipboard's text, UTF-8; only in the directions the machine allows (machine.json)
  *   AGK_CLIPX  both ways     the clipboard in up to three forms at once (capability "clipx" in both hellos): parts of
  *                            u8 form (AGF_TEXT, AGF_HTML, AGF_PNG), u32 length (little endian), bytes; each form at most
@@ -145,5 +146,38 @@ void ag_exec_text(const char *b64, char *out, size_t cap);
  * (8 letters or digits); Windows <drive>:\...\Temp\lordos-drop-<32 lowercase hex> (printable ASCII, no "..", no '/').
  * 1 it is one, 0 not */
 int ag_drop_staging_ok(const char *p, int windows);
+
+/* ---- Apps mode, copied out (lord-vm's relay, lord-server, lordos-guest's relay and its lord-server endpoint) ----
+ * The frames above, parsed with the lag_*_parse functions and then held as copies (NUL-terminated text) so they can
+ * outlive the payload and be written again: nothing a guest sends passes on as it came. On top of the parsers' checks,
+ * text must have no control character (lag_text_ok). A minimized window may have no place; it is kept, and written
+ * again, as 0, 0, 1, 1. */
+#define LAG_APPNAME_MAX LAG_APP_MAX
+/* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
+enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4 };
+typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
+typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
+typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;
+typedef struct { int n; LagAppEntry a[LAG_APPS_MAX]; } LagAppList;
+#define LAG_WINDOWS_BYTES (6 + LAG_WIN_MAX * (36 + LAG_TITLE_MAX + LAG_APP_MAX))
+#define LAG_APPLIST_BYTES (2 + LAG_APPS_MAX * (4 + LAG_NAME_MAX + LAG_TOKEN_MAX))
+
+unsigned ag_hello_caps(const uint8_t *p, size_t n);
+/* text from the other side: valid UTF-8, no NUL or other control character (C0, DEL, C1). 1 yes */
+int lag_text_ok(const uint8_t *p, size_t n);
+/* a rectangle a window may have (w, h 1..LAG_DIM_MAX, x, y within ±LAG_DIM_MAX). 1 yes */
+int lag_rect_ok(int32_t x, int32_t y, int32_t w, int32_t h);
+/* 0 well formed (lag_windows_parse, no control characters), copied into *out; -1 refused */
+int lag_winlist_read(const uint8_t *p, size_t n, LagWinList *out);
+size_t lag_windows_write(const LagWinList *l, uint8_t *out, size_t cap);   /* bytes written, 0 doesn't fit */
+size_t lag_icon_write(uint32_t id, int w, int h, const uint8_t *rgba, uint8_t *out, size_t cap);
+size_t lag_act_write(const LagAct *a, uint8_t *out, size_t cap);
+/* LAG_LAUNCH's token, NUL-terminated into token (cap > LAG_TOKEN_MAX); 0 ok */
+int lag_launch_token(const uint8_t *p, size_t n, char *token, size_t cap);
+size_t lag_launch_write(const char *token, uint8_t *out, size_t cap);
+int lag_applist_read(const uint8_t *p, size_t n, LagAppList *out);
+size_t lag_applist_write(const LagAppList *l, uint8_t *out, size_t cap);
+/* is token one of the list's? 1 yes */
+int lag_applist_has(const LagAppList *l, const char *token);
 
 #endif
