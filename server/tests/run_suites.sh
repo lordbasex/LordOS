@@ -509,6 +509,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "password-field-scene (sdk/components.jsx TextInput secure)" node tests/textfield_menu_test.mjs password_field_scene.mjs
     else skip "password-field-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.5, docs/MAIN-THREAD.md) <Toggle pending> and <Button pending> answer the press before the action, flip back on a
+    # failure; useTrackedSettings renders only for the keys read; ThemeProvider keeps equal tokens; sortByName's order
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "pending-scene (sdk/components.jsx Toggle/Button pending, sdk/settings.js, sdk/theme.js, sdk/collate.js)" node tests/textfield_menu_test.mjs pending_scene.mjs
+    else skip "pending-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) the ScreenCast chooser: the app's name, the pictures, Share only with a pick, Cancel, the app closing it (sdk/screencast.jsx)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "screencast-scene (sdk/screencast.jsx)" node tests/textfield_menu_test.mjs screencast_scene.mjs

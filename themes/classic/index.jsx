@@ -12,7 +12,7 @@
 //   components/QuickSettings.jsx, NotificationCenter.jsx, Menu.jsx
 //   placement.js                the work areas and the panels' places, with a taskbar on every display
 import {
-  startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows,
+  startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useTrackedSettings, useWindows, useStore, configureWindows,
   getApp, wm, t as tr, DesktopWidgets, displayAt, WidgetDropTarget, WidgetPicker, widgetPicker, startDeskWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
   emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text,
   useShortcuts, runShortcut, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, toggleShowDesktop, spotlight, launchApp, dockActivate,
@@ -58,7 +58,7 @@ function DragGhost({ t }) {
 // After an unpin: the button fades out where it was dropped (nothing with reduce motion).
 function PoofFade() {
   const poof = useStore(dockPoof);
-  const reduce = !!useStore(settings).reduceMotion;
+  const reduce = !!useStore(settings, (s) => s.reduceMotion);
   const [, tick] = useState(0);
   const p = poof ? Math.min(1, (Date.now() - poof.t0) / 300) : 1;
   useEffect(() => {
@@ -123,7 +123,7 @@ const classicTable = (ui) => {
 
 function App() {
   startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Lord Workspaces
-  const [s] = useSettings();
+  const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
   const t = makeTheme(s);
   const { mounted, focused } = useWindows();
   const taskView = !!useStore(overview);

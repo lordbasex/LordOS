@@ -19,7 +19,7 @@ import { settings } from './settings.js';
 import { locale, appName, t, direction } from './i18n.js';
 import { errorText } from './errors.js';
 import { notify } from './notify.js';
-import { compareNames } from './collate.js';
+import { sortByName } from './collate.js';
 import { iconSrc } from './iconsrc.js';
 import { listApps, wm, windows, appRegistry, getApp as registryApp, openAllowed } from './windows.js';
 import { appsOff } from './appsoff.js';
@@ -140,11 +140,30 @@ export function useLauncherApps({ all = false } = {}) {
   useStore(appRegistry);
   const web = useStore(webApps);
   useEffect(refreshWebApps, []);
-  const own = listApps().map((a) => ({ ...a, kind: a.package ? 'package' : 'lordos', name: appName(a) }));
-  const every = [...own, ...lin, ...fps, ...webItems(web)].sort((a, b) => compareNames(a.name, b.name));   // "go-link Desk" among the G's (#64)
+  return launcherList(lin, fps, web, all);
+}
+
+// The list is made once for what it depends on and shared by every caller: the Dock, the launcher, the Store's
+// cards (each one asked) and the start menu used to make and sort it on every render, ~1600 names with Linux
+// apps installed. Kept: the inputs it was made from (stores' values, which change identity when they change).
+let made = { deps: null, every: [], views: new Map() };
+function launcherList(lin, fps, web, all) {
+  const deps = [lin, fps, web, appRegistry.get(), locale.get()];
+  if (!made.deps || deps.some((d, i) => d !== made.deps[i])) {
+    const own = listApps().map((a) => ({ ...a, kind: a.package ? 'package' : 'lordos', name: appName(a) }));
+    // "go-link Desk" among the G's (#64)
+    made = { deps, every: sortByName([...own, ...lin, ...fps, ...webItems(web)], (a) => a.name), views: new Map() };
+  }
   const off = appsOff();
-  if (all) return off.length ? every.map((a) => (a.kind === 'lordos' && off.includes(a.id) ? { ...a, off: true } : a)) : every;
-  return launchable(every, off);
+  const key = `${all ? 1 : 0}\n${off.join('\n')}`;
+  let out = made.views.get(key);
+  if (!out) {
+    const every = made.every;
+    out = all ? (off.length ? every.map((a) => (a.kind === 'lordos' && off.includes(a.id) ? { ...a, off: true } : a)) : every) : launchable(every, off);
+    if (made.views.size > 8) made.views.clear();
+    made.views.set(key, out);
+  }
+  return out;
 }
 
 // Main freedesktop standard categories (the same as AppStream's in the Store).

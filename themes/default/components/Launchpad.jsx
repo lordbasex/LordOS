@@ -23,7 +23,7 @@ export function Launchpad({ t, apps, onOpen, onClose, area = { x: 0, y: 0, w: sc
   const rows = [];
   for (let i = 0; i < list.length; i += COLS) rows.push(list.slice(i, i + COLS));
   const open = (id) => { onClose(); onOpen(id); };
-  useStore(settings);                                         // «Keep in Dock» changes immediately
+  useStore(settings, (s) => s.dockPinned);                   // «Keep in Dock» changes immediately
   const [ctx, setCtx] = useState(null);                       // { app, x, y }
 
   return (

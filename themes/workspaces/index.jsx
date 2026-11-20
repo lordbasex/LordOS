@@ -14,7 +14,7 @@
 //                               ControlCenter, ActivityEditor (onboarding and edit), SnapAssist, Surface
 // The menus and the notification panel are Lord Classic's own components, restyled by these tokens.
 import {
-  startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows, getApp, wm, t as tr,
+  startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useTrackedSettings, useWindows, useStore, configureWindows, getApp, wm, t as tr,
   DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, displayFor, displayAt, startDeskWidgets, WidgetDropTarget, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, SlideshowWallpapers, slideshowPrefs, snapPreview, notifyHistory,
   useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers, appSettingsItem,
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
@@ -195,7 +195,7 @@ function App() {
   startMagnet();
   startDeskWidgets();
   useDropTarget();
-  const [s] = useSettings();
+  const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
   const prefs = wsPrefs(s);
   const surface = effectiveSurface(prefs, s);
   const t = useMemo(() => makeTheme({ mode: s.mode, accent: s.accent, effects: s.effects, surface, contrast: prefs.contrast }, lordosWallpapers),

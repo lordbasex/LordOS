@@ -1,8 +1,8 @@
 // theme.js — contract between themes and apps. The theme provides the tokens; apps use them
 // with useTheme() and so look right with any theme.
-import { createContext, createElement, useContext, useEffect } from 'react';
+import { createContext, createElement, useContext, useEffect, useRef } from 'react';
 import { settings } from './settings.js';
-import { createStore } from './store.js';
+import { createStore, useStore } from './store.js';
 import { windowButtonsPref, gtkButtonLayout } from './windowbuttons.js';
 
 // Minimal tokens every theme must provide (see themes/README.md).
@@ -85,11 +85,33 @@ function settingTokens() {
 // desktop) changes the colors of its own subtree, never what Linux apps and isolated apps are told. Otherwise the
 // portal's color scheme went light and back to dark on every render, and an app that follows it (Chrome's profile
 // picker) flickered between the two.
+//
+// The value stays the same object while the tokens are equal (sameTokens): a theme makes its tokens again on every
+// render of its root, and a new object made every component that reads useTheme() render again, in every open app.
 export function ThemeProvider({ tokens, children }) {
-  const value = { ...DEFAULT_TOKENS, ...settingTokens(), ...tokens };
+  useStore(settings, (s) => `${s.scrollBars || 'auto'}|${!!s.reduceMotion}`);   // settingTokens(), when only they change
+  const made = { ...DEFAULT_TOKENS, ...settingTokens(), ...tokens };
+  const kept = useRef(null);
+  if (!kept.current || !sameTokens(kept.current, made)) kept.current = made;
+  const value = kept.current;
   const outermost = useContext(ThemeContext) === DEFAULT_TOKENS;
-  useEffect(() => { if (!outermost) return; publishTokens(value); syncPortal(value); shellTokens.set(value); });
+  useEffect(() => { if (!outermost) return; publishTokens(value); shellTokens.set(value); }, [value, outermost]);
+  // the portal also follows settings outside the tokens (the title bars' buttons): small, compared before it is sent
+  useEffect(() => { if (outermost) syncPortal(value); });
   return createElement(ThemeContext.Provider, { value }, children);
+}
+
+// Tokens are plain data (colors, sizes, lists of wallpapers): equal when every value is, a few levels down; functions
+// and other objects by identity.
+export function sameTokens(a, b, depth = 0) {
+  if (Object.is(a, b)) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || depth > 4) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false;
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  for (const k of ka) if (!Object.prototype.hasOwnProperty.call(b, k) || !sameTokens(a[k], b[k], depth + 1)) return false;
+  return true;
 }
 
 export const useTheme = () => useContext(ThemeContext);

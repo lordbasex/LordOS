@@ -2,7 +2,7 @@
 // The theme builds the desktop (wallpaper, bar, dock, app launcher, Control Center) and the
 // window frames. Apps come from apps/ through the SDK.
 import {
-  startShell, View, Text, Image, screen, ThemeProvider, useSettings, useWindows, configureWindows, getApp, wm, addListener, t as tr,
+  startShell, View, Text, Image, screen, ThemeProvider, useSettings, useTrackedSettings, useWindows, configureWindows, getApp, wm, addListener, t as tr,
   useLauncherApps, launchApp, useDockEntries, dockActivate, dockMenu, dockPrefs, DOCK_LAUNCHER,
   useTrash, openTrash, emptyTrash, trashMenu, ConfirmDialog,
   DesktopWidgets, WidgetDropTarget, WidgetPicker, widgetPicker, startDeskWidgets, registerGestureActions, screenDisplays, mainDisplay, settings, Layer, PowerDialog,
@@ -124,7 +124,7 @@ function DockMenu({ pos, at, items, onClose }) {
 
 function App() {
   startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Lord Workspaces
-  const [s] = useSettings();
+  const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
   const t = makeTheme(s);
   const { windows, mounted, focused } = useWindows();
   const preview = useStore(snapPreview);
