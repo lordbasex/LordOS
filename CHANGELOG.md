@@ -97,7 +97,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   and any refusal; the resolution menu says when the guest kept its size (some guests' display drivers don't follow
   sizes asked while they run). Configure's boot section shows TPM 2.0 and Secure Boot; only the boot order is still
   "in a later version".
-- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`;
+- **Machines: where a machine starts from, and at what size.** Configure → Boot keeps *Automatic* (the system disk,
+  then the CD/DVD drive) or takes a chosen order of the system disk, the CD/DVD drive and the network (PXE), moved with
+  Up and Down, plus *Show the boot menu at start* (the firmware waits 5 seconds for Esc). lord-vm turns the order into
+  QEMU `bootindex` values for UEFI and BIOS machines alike; `lord-vm --set DIR --boot-order auto|disk,cd,network
+  --boot-menu on|off`. Configure → Display has the resolution a machine starts with: *Follows the window* or a fixed
+  size, given to the virtual display as its preferred mode, which every system takes at boot, including those whose
+  display drivers don't follow the window while they run (`lord-vm --set DIR --resolution follow|WxH`). Checked: a
+  machine on the device set of the card in `docs/VIRTUALIZATION.md` 4.3 started at 1920 × 1080 instead of 1280 × 800.
+- **Machines: an off machine's window is black with its Play button**, and the library's card pictures are taken only
+  while the guest's system is up, never its firmware, boot or shutdown screens.
+- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
+  `resolution`, `boot_order`, `boot_menu`;
   older files load unchanged.
 - **Machines looks like a native virtualization app** (the look of hypervisaur's screenshots, reimplemented: no code or
   images of it are used; `apps/machines/kit.jsx`). The assistant, Configure, Requirements and the Raspberry Pi page open
