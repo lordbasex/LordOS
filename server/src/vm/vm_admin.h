@@ -25,6 +25,17 @@
  *   vm-image-remove "<sha256>"                       deletes a downloaded image, or the part of a stopped
  *              download (every account's machines share it); refused while it downloads or any running machine
  *              has it in its CD drive (vm.imageInUse)                                                           admin
+ *   vm-net-bridge   "<machine id> <card> <mac>"     a bridged machine's network (6.5): a macvtap in bridge mode named
+ *              after the machine ("lvm" + 12 hex digits of its id) on that physical wired card (not Wi-Fi, a bridge, a
+ *              bond or anything virtual: refused with why), with that unicast MAC (never the card's own), the alias
+ *              "lordos-vm <uid> <id>", up and with nothing else (no address, route or forwarding), and its
+ *              /dev/tap<index> given to the calling user, 0600. One that is already there for the same user and machine
+ *              is used again (made again when its card or address changed and no process holds it); another's is
+ *              refused (vm.bridgeBusy). Answers vm.bridgeReady name=<macvtap>                                   admin
+ *   vm-net-unbridge "<machine id>"                   removes that machine's macvtap: only the caller's own (by the
+ *              alias), never while a process holds its device (vm.bridgeInUse)                                anyone
+ * At the helper's start and end (vm_net_sweep) the caller's macvtaps that no process holds are removed; a restart takes
+ * them all (they are never written to disk).
  * The downloads run in lordos-net-machines.scope (firewall app lordos:machines), with the Store's downloader
  * (pkg/http.c fetch_batch_in: a child as nobody, TLS by lord-tls).
  */
@@ -39,6 +50,10 @@ void vm_act_image_list(const AdminReq *r, const char *arg, size_t len);
 void vm_act_image_get(const AdminReq *r, const char *arg, size_t len);
 void vm_act_image_cancel(const AdminReq *r, const char *arg, size_t len);
 void vm_act_image_remove(const AdminReq *r, const char *arg, size_t len);
+void vm_act_net_bridge(const AdminReq *r, const char *arg, size_t len);
+void vm_act_net_unbridge(const AdminReq *r, const char *arg, size_t len);
+/* removes uid's macvtaps (by their alias) that no process holds */
+void vm_net_sweep(uid_t uid);
 
 /* the packages vm-enable installs for `arches` (VM_ARCH bits: 1 arm64, 2 amd64) that this computer lacks, by the
  * files each package brings; space-separated into out. Returns how many. Also used by lord.vm.requirements. */
@@ -50,6 +65,8 @@ int vm_missing_packages(int arches, char *out, size_t n);
     { "vm-image-list", vm_act_image_list, A_FORK | A_ANYONE }, \
     { "vm-image-get", vm_act_image_get, A_FORK | A_ANYONE }, \
     { "vm-image-cancel", vm_act_image_cancel, A_ANYONE }, \
-    { "vm-image-remove", vm_act_image_remove, 0 },
+    { "vm-image-remove", vm_act_image_remove, 0 }, \
+    { "vm-net-bridge", vm_act_net_bridge, 0 }, \
+    { "vm-net-unbridge", vm_act_net_unbridge, A_ANYONE },
 
 #endif

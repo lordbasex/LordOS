@@ -20,15 +20,30 @@
 #include <stdint.h>
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
- * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. An older file is read as is and written as the current schema, with a copy of the old
+ * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices. 6 (6.5):
+ * the bridged and host-only networks, bridge, ports. An older file is read as is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 5
+#define VM_SCHEMA 6
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
 enum { VM_FW_UEFI = 0, VM_FW_BIOS };
 enum { VM_DISPLAY_WINDOW = 0, VM_DISPLAY_NONE };
-enum { VM_NET_SHARED = 0, VM_NET_ISOLATED };
+/* the machine's network (6.5): shared (passt, out only, plus the forwarded ports), isolated (no card's backend), bridged
+ * (a macvtap on one of this computer's wired cards: the guest is another device on that network, by its DHCP), host-only
+ * (passt whose sockets are bound to 127.0.0.1: the guest reaches this computer and nothing else) */
+enum { VM_NET_SHARED = 0, VM_NET_ISOLATED, VM_NET_BRIDGED, VM_NET_HOSTONLY };
+extern const char *const VM_NET_NAMES[];   /* "shared", "isolated", "bridged", "hostonly" */
+/* forwarded ports (6.5): a port of this computer that passt opens and forwards to one of the guest's */
+enum { VM_PROTO_TCP = 0, VM_PROTO_UDP };
+enum { VM_OPEN_LOCAL = 0, VM_OPEN_LAN };    /* "this-computer" binds 127.0.0.1, "lan" 0.0.0.0 */
+#define VM_PORTS        32
+#define VM_PORT_HOST_MIN 1024           /* below it a port is root's: never offered */
+typedef struct { int proto, host, guest, open; } VmPort;
+/* the guest's addresses in host-only mode: passt hands them by DHCP; this computer is the gateway */
+#define VM_HOSTONLY_ADDR "10.0.2.15"
+#define VM_HOSTONLY_GW   "10.0.2.2"
+#define VM_IFNAME_MAX    15             /* IFNAMSIZ - 1 */
 /* the shared clipboard's direction (6.8): off unless chosen */
 enum { VM_CLIP_OFF = 0, VM_CLIP_TO_GUEST, VM_CLIP_FROM_GUEST, VM_CLIP_BOTH };
 /* the disks' and the pointer's devices (6.22): virtio (fast, needs the guest's drivers) or compat, the ones every system has
@@ -109,6 +124,10 @@ typedef struct {
     int tpm;                            /* a TPM 2.0, served by swtpm; its state in disks/tpm */
     int hyperv;                         /* Hyper-V enlightenments, for Windows guests */
     char drivers[VM_PATH_MAX];          /* a second CD/DVD with the guest's drivers (virtio-win), read-only; "" none */
+    /* schema 6: the network's details (6.5) */
+    char bridge[VM_IFNAME_MAX + 1];     /* the wired card a bridged machine joins ("" none); kept when the mode changes */
+    int n_ports;
+    VmPort ports[VM_PORTS];             /* used in shared and host-only modes; kept in the others */
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -138,6 +157,22 @@ int vm_tag_valid(const char *t);
  * and neither inside nor holding the machines' library (a guest could otherwise rewrite its own machine.json) nor the
  * machine's own folder. home and library are real paths. 0 allowed, else -1 and why in err */
 int vm_share_allowed(const char *path, const char *home, const char *user, const char *library, char *err, size_t errlen);
+
+/* a network interface's name as Linux allows it: 1 to 15 of [A-Za-z0-9_.-], not "." or ".." */
+int vm_ifname_valid(const char *s);
+/* the forwarded ports' rules: proto, a host port VM_PORT_HOST_MIN..65535, a guest port 1..65535, open; at most
+ * VM_PORTS; one rule per protocol and host port; host-only machines open ports to this computer only. 0 ok, else -1 and
+ * why in err (English) */
+int vm_ports_check(const VmPort *p, int n, int network, char *err, size_t errlen);
+/* one rule from the command line's text, "tcp|udp:HOST:GUEST[:this-computer|lan]" (this-computer when left out); 0 ok */
+int vm_port_parse(const char *s, VmPort *p);
+/* the same rule as that text (out: at least 40 bytes) */
+void vm_port_spec(const VmPort *p, char *out, size_t n);
+/* passt's forwarding options for the machine's rules of one protocol: "-t"/"-u" values like "127.0.0.1/2222:22", in
+ * out[] (each 48 bytes); "none" when there are none. Returns how many values */
+int vm_passt_ports(const VmMachine *m, int proto, char out[][48], int max);
+/* the name of a bridged machine's macvtap: "lvm" and the first 12 hex digits of its id (15 characters); -1 for a bad id */
+int vm_bridge_ifname(const char *id, char out[VM_IFNAME_MAX + 1]);
 
 /* parses machine.json text; err (optional) gets the reason in English. VM_OK or VM_E_* */
 int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size_t errlen);

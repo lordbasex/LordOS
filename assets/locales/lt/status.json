@@ -169,6 +169,8 @@
   "vm.imageRemoved": "Atvaizdas ištrintas",
   "vm.downloadResumed": "Tęsiamas sustabdytas atsisiuntimas (išsaugota baitų: {from})",
   "vm.kvmReady": "Leidžiama: mašinos dabar gali naudoti aparatinę virtualizaciją",
+  "vm.bridgeReady": "Tiltinis tinklas paruoštas ({name})",
+  "vm.bridgeGone": "Tiltinis tinklas pašalintas",
   "vm.kvmNextLogin": "Leidžiama nuo kito jūsų prisijungimo",
   "pkg.foreignArchAdded": "32 bitų ({arch}) paketai įjungti",
   "pkg.foreignArchPresent": "32 bitų ({arch}) paketai jau buvo įjungti",

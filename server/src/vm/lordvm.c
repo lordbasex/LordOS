@@ -4,7 +4,8 @@
  * reports state, and exits when QEMU has exited. It draws nothing: the picture is lord-vmdisplay's.
  *
  *   lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB]
- *                        [--disk GB] [--firmware uefi|bios] [--display window|none] [--network shared|isolated]
+ *                        [--disk GB] [--firmware uefi|bios] [--display window|none]
+ *                        [--network shared|isolated|bridged|hostonly]
  *                        [--import IMAGE] [--iso FILE]
  *   lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp]
  *                       [--credentials-file FILE]
@@ -53,6 +54,8 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/sysmacros.h>
+#include <netinet/in.h>
 #include <strings.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
@@ -386,6 +389,7 @@ static int firmware_for(int arch, const char **code, const char **vars) {
 }
 
 static int parse_enum(const char *s, const char *a, const char *b) { return !strcmp(s, a) ? 0 : !strcmp(s, b) ? 1 : -1; }
+static int parse_net(const char *s) { for (int i = 0; VM_NET_NAMES[i]; i++) if (!strcmp(s, VM_NET_NAMES[i])) return i; return -1; }
 static int parse_clip(const char *s) {
     return !strcmp(s, "off") ? VM_CLIP_OFF : !strcmp(s, "to-guest") ? VM_CLIP_TO_GUEST : !strcmp(s, "from-guest") ? VM_CLIP_FROM_GUEST : !strcmp(s, "both") ? VM_CLIP_BOTH : -1;
 }
@@ -647,7 +651,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--disk")) disk = atoi(v);
         else if (!strcmp(a, "--firmware")) fw = parse_enum(v, "uefi", "bios");
         else if (!strcmp(a, "--display")) disp = parse_enum(v, "window", "none");
-        else if (!strcmp(a, "--network")) net = parse_enum(v, "shared", "isolated");
+        else if (!strcmp(a, "--network")) { net = parse_net(v); if (net < 0 || net == VM_NET_BRIDGED) { fprintf(stderr, "lord-vm: --network shared|isolated|hostonly (bridged: --set with --bridge)\n"); return 2; } }
         else if (!strcmp(a, "--import")) import = v;
         else if (!strcmp(a, "--iso")) iso = v;
         else if (!strcmp(a, "--unattended")) unatt = v;
@@ -1086,6 +1090,97 @@ static void place_fds(const int *want, int n) {
     syscall(SYS_close_range, 3 + n, ~0u, 0);
 }
 
+/* passt's command line for the machine's network (6.5), into argv (NULL-terminated); the values live in static storage.
+ *  - Shared: out only, as any program of this computer would go out. The host's loopback isn't the gateway
+ *    (--no-map-gw). DNS: queries to one fixed address go to the host's first nameserver, loopback resolvers included
+ *    (with --dns as well, passt advertised the address but didn't answer on it: measured 2026-11-05).
+ *  - Host-only: every socket passt opens for the guest is bound to 127.0.0.1 (-o), so the kernel refuses any address
+ *    that isn't this computer's (EINVAL: a loopback source can't leave the computer); IPv4 only (-4), so no IPv6
+ *    socket goes out unbound; the guest gets fixed addresses (VM_HOSTONLY_ADDR, gateway VM_HOSTONLY_GW, which is this
+ *    computer's loopback) and no nameserver. No root, no device, no rule of the system's firewall.
+ *  - Both: the forwarded ports (-t, -u with the address to listen on: 127.0.0.1, or 0.0.0.0 for "lan" in Shared).
+ *    passt binds them in the machine's scope, so LordOS's firewall decides them as the incoming connections of
+ *    Machines (FIREWALL.md, "Machines"). */
+static int vm_passt_argv(const VmMachine *m, char **argv, int max) {
+    static char tv[VM_PORTS][48], uv[VM_PORTS][48];
+    int n = 0, nt = vm_passt_ports(m, VM_PROTO_TCP, tv, VM_PORTS), nu = vm_passt_ports(m, VM_PROTO_UDP, uv, VM_PORTS);
+    if (max < 20 + 2 * (nt + nu)) return -1;
+    argv[n++] = PASST; argv[n++] = "-f"; argv[n++] = "-q"; argv[n++] = "-1"; argv[n++] = "--fd"; argv[n++] = "3";
+    if (m->network == VM_NET_HOSTONLY) {
+        argv[n++] = "-4"; argv[n++] = "-o"; argv[n++] = "127.0.0.1";
+        argv[n++] = "-a"; argv[n++] = VM_HOSTONLY_ADDR; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = VM_HOSTONLY_GW;
+        argv[n++] = "--no-dhcp-dns"; argv[n++] = "--no-dhcp-search";
+    } else {
+        argv[n++] = "--no-map-gw"; argv[n++] = "--dns-forward"; argv[n++] = VM_DNS_ADDR;
+    }
+    for (int i = 0; i < nt; i++) { argv[n++] = "-t"; argv[n++] = tv[i]; }
+    for (int i = 0; i < nu; i++) { argv[n++] = "-u"; argv[n++] = uv[i]; }
+    argv[n] = NULL;
+    return n;
+}
+
+/* the forwarded ports are free before passt starts (6.5): passt would only say "Failed to bind" and end, and the
+ * network's healing would try again. Bound and let go here, in the machine's scope, so the firewall's answer is the one
+ * passt gets: EADDRINUSE another program has the port, EPERM/EACCES the firewall (no incoming connections for Machines) */
+static int ports_free(const VmMachine *m, char *err, size_t errlen) {
+    for (int i = 0; i < m->n_ports; i++) {
+        const VmPort *p = &m->ports[i];
+        int fd = socket(AF_INET, (p->proto == VM_PROTO_UDP ? SOCK_DGRAM : SOCK_STREAM) | SOCK_CLOEXEC, 0);
+        if (fd < 0) { snprintf(err, errlen, "can't check this computer's port %d: %s", p->host, strerror(errno)); return -1; }
+        int one = 1;
+        setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
+        struct sockaddr_in a = { .sin_family = AF_INET, .sin_port = htons((uint16_t)p->host) };
+        a.sin_addr.s_addr = htonl(p->open == VM_OPEN_LAN && m->network != VM_NET_HOSTONLY ? INADDR_ANY : INADDR_LOOPBACK);
+        int r = bind(fd, (struct sockaddr *)&a, sizeof a), e = errno;
+        close(fd);
+        if (!r) continue;
+        if (e == EADDRINUSE) snprintf(err, errlen, "port %d (%s) of this computer is in use by another program: forward another port", p->host, p->proto == VM_PROTO_UDP ? "udp" : "tcp");
+        else if (e == EPERM || e == EACCES) snprintf(err, errlen, "the firewall doesn't let Machines receive connections (port %d): allow incoming connections for Machines in Settings, Firewall", p->host);
+        else snprintf(err, errlen, "can't open port %d of this computer: %s", p->host, strerror(e));
+        return -1;
+    }
+    return 0;
+}
+
+/* a bridged machine's macvtap (6.5), made by the admin helper's vm-net-bridge before the start: an interface named
+ * after the machine (vm_bridge_ifname) on machine.json's wired card with the machine's MAC, whose /dev/tap<index> the
+ * helper gave to this user. Checked here by what it is (a macvtap of that card with that address) and opened; QEMU gets
+ * the descriptor. -1 and why in err */
+static int open_bridge_tap(const VmMachine *m, char *err, size_t errlen) {
+    char name[VM_IFNAME_MAX + 1], p[160], buf[64];
+    if (vm_bridge_ifname(m->id, name)) { snprintf(err, errlen, "the machine's id is wrong"); return -1; }
+    snprintf(p, sizeof p, "/sys/class/net/%s/ifindex", name);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t r = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (r <= 0) { snprintf(err, errlen, "the bridged network isn't ready (%s isn't there): start the machine from Machines, which asks for it", name); return -1; }
+    buf[r] = 0;
+    int idx = atoi(buf);
+    /* its lower card: /sys/class/net/<name>/lower_<card> */
+    snprintf(p, sizeof p, "/sys/class/net/%s/lower_%s", name, m->bridge);
+    struct stat st;
+    if (lstat(p, &st)) { snprintf(err, errlen, "%s isn't on %s: start the machine from Machines again", name, m->bridge); return -1; }
+    snprintf(p, sizeof p, "/sys/class/net/%s/address", name);
+    fd = open(p, O_RDONLY | O_CLOEXEC);
+    r = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (r < 17 || strncmp(buf, m->mac, 17)) { snprintf(err, errlen, "%s doesn't have the machine's address: start the machine from Machines again", name); return -1; }
+    snprintf(p, sizeof p, "/sys/class/net/%s/macvtap/tap%d/dev", name, idx);
+    fd = open(p, O_RDONLY | O_CLOEXEC);
+    r = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    unsigned ma = 0, mi = 0;
+    if (r <= 0 || (buf[r] = 0, sscanf(buf, "%u:%u", &ma, &mi) != 2)) { snprintf(err, errlen, "%s isn't a macvtap", name); return -1; }
+    snprintf(p, sizeof p, "/dev/tap%d", idx);
+    int t = open(p, O_RDWR | O_CLOEXEC | O_NOFOLLOW | O_NOCTTY);
+    if (t < 0) { snprintf(err, errlen, "can't open %s: %s", p, strerror(errno)); return -1; }
+    if (fstat(t, &st) || !S_ISCHR(st.st_mode) || major(st.st_rdev) != ma || minor(st.st_rdev) != mi || st.st_uid != getuid()) {
+        close(t); snprintf(err, errlen, "%s isn't this machine's device", p); return -1;
+    }
+    vlog("network: bridged on %s through %s (%s)", m->bridge, name, p);
+    return t;
+}
+
 static pid_t spawn_passt(int net_fd, int err_fd) {
     pid_t pid = fork();
     if (pid) return pid;
@@ -1096,11 +1191,9 @@ static pid_t spawn_passt(int net_fd, int err_fd) {
     dup2(err_fd, 2);
     int fds[1] = { net_fd };
     place_fds(fds, 1);
-    /* Shared (6.5): out only. No port forwarded in, and the host's loopback isn't the gateway (--no-map-gw). DNS:
-     * queries to one fixed address go to the host's first nameserver, loopback resolvers included (with --dns as
-     * well, passt advertised the address but didn't answer on it: measured 2026-11-05) */
-    char *argv[] = { PASST, "-f", "-q", "-1", "--fd", "3", "--no-map-gw", "-t", "none", "-u", "none",
-                     "--dns-forward", VM_DNS_ADDR, NULL };
+    char *argv[16 + 4 * VM_PORTS];
+    int n = vm_passt_argv(&S.m, argv, (int)(sizeof argv / sizeof argv[0]));
+    if (n < 0) _exit(127);
     char *env[] = { NULL };
     execve(PASST, argv, env);
     _exit(127);
@@ -1505,7 +1598,12 @@ static void build_qemu_args(void) {
         arg("-action"); arg("reboot=shutdown");
     }
     static const char *const NICDEV[VM_NIC_COUNT] = { "virtio-net-pci", "e1000e", "e1000", "e1000-82545em", "e1000-82544gc", "vmxnet3", "rtl8139", "pcnet" };
-    if (m->network == VM_NET_SHARED) {
+    if (m->network == VM_NET_BRIDGED) {
+        /* the macvtap's device, opened by lord-vm (6.5): the card straight on it; no vhost (QEMU opens no device) */
+        arg("-netdev"); arg("tap,id=nic0,fd=6,vhost=off");
+        arg("-device"); argf("%s,netdev=nic0,mac=%s,addr=0x2", NICDEV[m->nic_model], m->mac);
+    }
+    if (m->network == VM_NET_SHARED || m->network == VM_NET_HOSTONLY) {
         /* The card sits on a hub, and passt on another port of it: when passt ends, a new one is put on a new port
          * (QMP netdev_del, getfd, netdev_add socket + hubport) while the card stays as it was, so the guest keeps its
          * network without a restart (6.5). A card attached straight to its backend can't be given another one. */
@@ -1655,7 +1753,12 @@ static int start_machine(void) {
         }
     }
     if (!file_exists(QEMU_BIN_OF(S.m.arch))) { fail_start("%s isn't installed", QEMU_BIN_OF(S.m.arch)); return -1; }
-    if (S.m.network == VM_NET_SHARED && !file_exists(PASST)) { fail_start("passt isn't installed (Shared network)"); return -1; }
+    int passt_net = S.m.network == VM_NET_SHARED || S.m.network == VM_NET_HOSTONLY;
+    if (passt_net && !file_exists(PASST)) { fail_start("passt isn't installed (%s network)", S.m.network == VM_NET_SHARED ? "Shared" : "Host-only"); return -1; }
+    if (passt_net) {
+        char perr_[200];
+        if (ports_free(&S.m, perr_, sizeof perr_)) { fail_start("%s", perr_); return -1; }
+    }
     {
         char why[160];
         int u = suspend_usable(why, sizeof why);
@@ -1674,7 +1777,12 @@ static int start_machine(void) {
     if (S.m.agent && (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, qga) || socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, lag))) { fail_start("out of descriptors"); return -1; }
     if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, qmp) || socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, ser) ||
         pipe2(qerr, O_CLOEXEC) || pipe2(st, O_CLOEXEC)) { fail_start("out of descriptors"); return -1; }
-    if (S.m.network == VM_NET_SHARED) {
+    if (S.m.network == VM_NET_BRIDGED) {
+        char berr[240];
+        net[0] = open_bridge_tap(&S.m, berr, sizeof berr);
+        if (net[0] < 0) { fail_start("%s", berr); return -1; }
+    }
+    if (passt_net) {
         if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, net) || pipe2(perr, O_CLOEXEC)) { fail_start("out of descriptors"); return -1; }
         S.passt = spawn_passt(net[1], perr[1]);
         close(net[1]);
@@ -3832,7 +3940,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         fcntl(S.qemu_err, F_SETFL, O_NONBLOCK);
         if (S.passt_err >= 0) fcntl(S.passt_err, F_SETFL, O_NONBLOCK);
         /* what needs more than the machine's folder, before lord-vm's own Landlock: passt's keeper and logind */
-        if (S.m.network == VM_NET_SHARED) {
+        if (S.m.network == VM_NET_SHARED || S.m.network == VM_NET_HOSTONLY) {
             S.keeper = start_keeper(&S.keeper_fd);
             if (S.keeper < 0) { S.keeper = 0; vlog("network: no keeper: a passt that ends isn't replaced"); }
         }
@@ -3991,10 +4099,23 @@ static int cmd_set(const char *dir, int argc, char **argv) {
      * empties it */
     const char *share[VM_SHARES + 1];
     int nshare = 0, shares_set = 0;
+    /* the network (6.5): --port tcp|udp:HOST:GUEST[:this-computer|lan], as many as wanted up to VM_PORTS, replace the
+     * list; --ports none empties it. --bridge CARD: the wired card a bridged machine joins */
+    VmPort port[VM_PORTS];
+    int nport = 0, ports_set = 0;
+    const char *bridge = NULL;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
         i++;
+        if (!strcmp(a, "--port")) {
+            if (nport >= VM_PORTS) { fprintf(stderr, "lord-vm: at most %d forwarded ports\n", VM_PORTS); return 2; }
+            if (vm_port_parse(v, &port[nport])) { fprintf(stderr, "lord-vm: --port tcp|udp:HOST:GUEST[:this-computer|lan], this computer's port %d to 65535\n", VM_PORT_HOST_MIN); return 2; }
+            nport++; ports_set = 1;
+            continue;
+        }
+        if (!strcmp(a, "--ports")) { if (strcmp(v, "none")) { fprintf(stderr, "lord-vm: --ports none\n"); return 2; } ports_set = 1; continue; }
+        if (!strcmp(a, "--bridge")) { if (!vm_ifname_valid(v)) { fprintf(stderr, "lord-vm: --bridge CARD (a network interface's name)\n"); return 2; } bridge = v; continue; }
         if (!strcmp(a, "--share")) {
             if (nshare >= VM_SHARES) { fprintf(stderr, "lord-vm: at most %d shared folders\n", VM_SHARES); return 2; }
             share[nshare++] = v; shares_set = 1;
@@ -4012,7 +4133,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--memory")) mem = atoi(v);
         else if (!strcmp(a, "--disk")) disk = atoi(v);
         else if (!strcmp(a, "--display")) disp = parse_enum(v, "window", "none");
-        else if (!strcmp(a, "--network")) net = parse_enum(v, "shared", "isolated");
+        else if (!strcmp(a, "--network")) net = parse_net(v);
         else if (!strcmp(a, "--iso")) iso = v;
         else if (!strcmp(a, "--agent")) agent = parse_enum(v, "off", "on");
         else if (!strcmp(a, "--clipboard")) clip = parse_clip(v);
@@ -4034,7 +4155,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set)) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge)) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
     if (vcpus && vcpus != m.vcpus) {
@@ -4049,6 +4170,9 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (devs >= 0 || nicm >= 0) m.schema = VM_SCHEMA;
     if (disp >= 0) m.display = disp;
     if (net >= 0) m.network = net;
+    if (bridge) snprintf(m.bridge, sizeof m.bridge, "%s", bridge);
+    if (ports_set) { m.n_ports = nport; memcpy(m.ports, port, sizeof port[0] * (size_t)nport); }
+    if (m.network > VM_NET_ISOLATED || m.bridge[0] || m.n_ports) m.schema = VM_SCHEMA;
     if (agent >= 0) m.agent = agent;
     if (clip >= 0) m.clipboard = clip;
     if (m.agent || m.clipboard) m.schema = VM_SCHEMA;
@@ -4104,8 +4228,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
-    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\"}\n", m.vcpus, m.memory_mb, m.disk_gb,
-           m.network == VM_NET_SHARED ? "shared" : "isolated", m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices], VM_NIC_MODELS[m.nic_model]);
+    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\"}\n", m.vcpus, m.memory_mb, m.disk_gb,
+           VM_NET_NAMES[m.network], m.n_ports, m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices], VM_NIC_MODELS[m.nic_model]);
     rc = 0;
 out:
     close(lock);
@@ -5596,8 +5720,10 @@ out:
 static int usage(void) {
     fprintf(stderr,
             "usage: lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB] [--disk GB]\n"
-            "                            [--firmware uefi|bios] [--display window|none] [--network shared|isolated] [--import IMAGE] [--iso FILE]\n"
-            "       lord-vm --set DIR [--name N] [--vcpus N] [--memory MB] [--disk GB] [--display window|none] [--network shared|isolated] [--iso FILE|none]\n"
+            "                            [--firmware uefi|bios] [--display window|none] [--network shared|isolated|hostonly] [--import IMAGE] [--iso FILE]\n"
+            "       lord-vm --set DIR [--name N] [--vcpus N] [--memory MB] [--disk GB] [--display window|none] [--iso FILE|none]\n"
+            "                         [--network shared|isolated|bridged|hostonly] [--bridge CARD]   (bridged: a wired card's name)\n"
+            "                         [--port tcp|udp:HOST:GUEST[:this-computer|lan] ...] [--ports none]   (forwarded ports, replacing the list)\n"
             "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both]   (also on --create)\n"
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"

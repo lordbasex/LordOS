@@ -1567,6 +1567,49 @@ looks at. QEMU 10.0 has no `-netdev passt`, so it's connected through `-netdev s
 
 Each forwarded port has a scope: **Only this computer** by default, or **Your network**, which is a firewall rule the person sees.
 
+**Built (0.8.9, approved by the maintainer on 2026-11-20).** machine.json schema 6 (`server/src/vm/machine.{h,c}`): `network` is
+`shared`, `isolated`, `bridged` or `hostonly`; `bridge` names a wired card; `ports` is a list of at most 32 rules
+`{ "proto": "tcp"|"udp", "host": 1024–65535, "guest": 1–65535, "open": "this-computer"|"lan" }`, one per protocol and host port
+(`vm_ports_check`). Older files load unchanged and are written as schema 6 only when one of these is used. Configure → Network
+shows the four modes, the card and the port list; every change needs the machine off (`lord-vm --set`, which holds its lock).
+
+- **Forwarded ports (Shared and Host-only).** passt's own options, one per rule: `-t 127.0.0.1/H:G` (only this computer) or
+  `-t 0.0.0.0/H:G` (the network, Shared only; a host-only machine never listens beyond loopback, whatever the file says), the same
+  with `-u`. No rule: `-t none -u none` as before. passt binds them in the machine's scope, so `lord-netperm`'s bind programs decide
+  them as incoming connections of `lordos:machines` (FIREWALL.md, "Machines' downloads"): with "no incoming connections" for
+  Machines the bind is refused. Before passt starts, lord-vm binds and lets go of each port itself (`ports_free`), so a port in use
+  or a refusal by the firewall fails the start with a clear line instead of passt dying and the network's healing trying again.
+  passt has no Landlock of ours (3.3) and binds nothing else; QEMU still can't bind or connect (Landlock net + seccomp).
+- **Host-only.** Also passt, with no root and no device: `-4 -o 127.0.0.1 -a 10.0.2.15 -n 24 -g 10.0.2.2 --no-dhcp-dns
+  --no-dhcp-search`. Every socket passt opens for the guest is bound to 127.0.0.1, and the kernel refuses a loopback source towards
+  any address that isn't this computer's (EINVAL, **Measured** 2026-11-20); `-4` keeps IPv6 sockets, which `-o` wouldn't bind, out.
+  The gateway 10.0.2.2 is this computer's loopback (passt's default host mapping). Chosen over a root-made bridge without
+  forwarding because it needs no admin action, no device and no system firewall rule, and the guest's traffic stays sockets of the
+  machine's scope that the firewall sees. The cost, said in Configure: the guest also reaches what this computer serves only for
+  itself on 127.0.0.1, and this computer reaches the guest only through forwarded ports.
+- **Bridged.** A macvtap in bridge mode on a physical wired card, made by the closed admin action `vm-net-bridge "<id> <card>
+  <mac>"` (`server/src/vm/vmnet_admin.c`, our own netlink): checked on the root side (`vmnet_card`: exists, has a device, is
+  Ethernet, isn't Wi-Fi, a bridge, a bond or anything virtual, isn't a bridge or bond port), named `lvm` + 12 hex digits of the
+  machine's id, with the machine's MAC (unicast, never the card's own), the alias `lordos-vm <uid> <id>` (only root can write one),
+  no address of this computer's on it (IPv6 address generation off before it goes up), and `/dev/tap<index>` given to the caller,
+  0600, checked by its device number and changed through an `O_PATH` descriptor. Machines runs it just before a start; lord-vm
+  checks the interface (its lower card, its MAC, the device's number and owner), opens the device and QEMU gets
+  `-netdev tap,fd=6,vhost=off`. `vm-net-unbridge "<id>"` removes the caller's own, never while a process holds the device; lord-server
+  asks for it when the library sees the machine off (not within 30 s of a start), and the admin helper sweeps the caller's unused
+  ones when it starts and ends. They never survive a restart. Over Wi-Fi a macvtap can't work (an access point takes one address per
+  station), so Wi-Fi cards are listed but refused (`vm.bridgeWifi`). This computer can't reach its own guest over a macvtap, and the
+  guest's frames are not sockets, so LordOS's firewall doesn't see them: Configure says both. Administrators only.
+
+Verified on the development PC (2026-11-20, a copy of an Ubuntu 26.04 machine, headless, the probes run in the guest by a systemd
+unit passed as credentials and read from its journal through the guest agent): Shared with three rules, `curl 127.0.0.1:18080`
+and `172.17.0.5:18081` got the guest's page, a UDP echo through 19000 answered, a rule on loopback wasn't reachable on the LAN
+address, internet reachable, host loopback not; a port in use failed the start with its line. Host-only: the guest got 10.0.2.15,
+1.1.1.1:80, 9.9.9.9:443 and the LAN's gateway refused, 10.0.2.2:18999 and the host's LAN address reached, no DNS, the forwarded
+port reached the guest. Bridged on `enp3s0`: the guest got 172.17.0.11/24 from the LAN's DHCP server, reached the internet, not
+this computer (no route to host), as expected; `vm-net-unbridge` refused while it ran, the sweep removed the macvtap after, and a
+start without it failed with its line. Not tested: a real "no incoming connections" rule for Machines, a second LAN device reaching
+a "lan" port or the bridged guest, the Configure pane on screen.
+
 ### 6.6 USB
 
 `usbredir` over the Chardev stream: no root, device opened by a closed admin action `vm-usb-allow`, which claims the single device for that VM and writes nothing permanent. Menu lists devices with names. Auto-connect rules per VM. USB 3 through `qemu-xhci`. Weak: isochronous devices (webcams, audio) can stutter; Camera and Microphone have their own paths. Never offered: the boot disk or the keyboard in use.

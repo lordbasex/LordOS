@@ -151,6 +151,8 @@
   "vm.imageRemoved": "映像檔已刪除",
   "vm.downloadResumed": "繼續先前停止的下載（已保留 {from} 位元組）",
   "vm.kvmReady": "已允許：虛擬機器現在可以使用硬體虛擬化",
+  "vm.bridgeReady": "橋接網路已就緒（{name}）",
+  "vm.bridgeGone": "橋接網路已移除",
   "vm.kvmNextLogin": "下次登入後允許",
   "pkg.foreignArchAdded": "已啟用 32 位元（{arch}）套件",
   "pkg.foreignArchPresent": "32 位元（{arch}）套件已經啟用",

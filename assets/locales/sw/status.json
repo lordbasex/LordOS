@@ -160,6 +160,8 @@
   "vm.imageRemoved": "Taswira imefutwa",
   "vm.downloadResumed": "Inaendeleza upakuaji uliosimamishwa (baiti {from} zimehifadhiwa)",
   "vm.kvmReady": "Imeruhusiwa: mashine sasa zinaweza kutumia uigaji wa maunzi",
+  "vm.bridgeReady": "Mtandao wa daraja uko tayari ({name})",
+  "vm.bridgeGone": "Mtandao wa daraja umeondolewa",
   "vm.kvmNextLogin": "Imeruhusiwa kuanzia kuingia kwako kujako",
   "pkg.foreignArchAdded": "Vifurushi vya biti 32 ({arch}) vimewezeshwa",
   "pkg.foreignArchPresent": "Vifurushi vya biti 32 ({arch}) vilikuwa vimewezeshwa tayari",

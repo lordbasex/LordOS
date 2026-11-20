@@ -160,6 +160,8 @@
   "vm.imageRemoved": "Lemezkép törölve",
   "vm.downloadResumed": "Egy leállított letöltés folytatása ({from} bájt megtartva)",
   "vm.kvmReady": "Engedélyezve: a gépek mostantól használhatják a hardveres virtualizációt",
+  "vm.bridgeReady": "Áthidalt hálózat kész ({name})",
+  "vm.bridgeGone": "Áthidalt hálózat eltávolítva",
   "vm.kvmNextLogin": "Engedélyezve a következő bejelentkezéstől",
   "pkg.foreignArchAdded": "32 bites ({arch}) csomagok engedélyezve",
   "pkg.foreignArchPresent": "A 32 bites ({arch}) csomagok már engedélyezve voltak",

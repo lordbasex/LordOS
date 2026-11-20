@@ -479,3 +479,56 @@ export function planNotes(plan) {
 }
 // what stops the import: { code, text } in the order lord-vm found them
 export const planBlockers = (plan) => (plan?.blockers || []).map((b) => ({ code: b.code, text: b.text || '' }));
+
+// ---- the network (docs/VIRTUALIZATION.md 6.5; machine.json schema 6) ----
+// The four modes, in the order Configure shows them. Shared and host-only go through passt (the forwarded ports apply);
+// bridged puts the guest on one of this computer's wired cards (a macvtap the admin helper makes); isolated has none.
+export const NET_MODES = ['shared', 'bridged', 'hostonly', 'isolated'];
+export const PORTS_MAX = 32;
+export const PORT_HOST_MIN = 1024;
+export const usesPorts = (network) => network === 'shared' || network === 'hostonly';
+// a rule as lord.vm.set takes it
+export const portRule = (r) => ({ proto: r?.proto === 'udp' ? 'udp' : 'tcp', host: Number(r?.host) || 0, guest: Number(r?.guest) || 0,
+  open: r?.open === 'lan' ? 'lan' : 'this-computer' });
+// The rules' checks, the same as machine.c's vm_ports_check: [{ i, code }] for each wrong rule ('host', 'guest',
+// 'duplicate', 'lanHostOnly'), and 'tooMany' at index -1. Empty: fine.
+export function portProblems(ports, network) {
+  const out = [];
+  const list = ports || [];
+  if (list.length > PORTS_MAX) out.push({ i: -1, code: 'tooMany' });
+  const seen = new Set();
+  list.forEach((r0, i) => {
+    const r = portRule(r0);
+    if (!Number.isInteger(r.host) || r.host < PORT_HOST_MIN || r.host > 65535) out.push({ i, code: 'host' });
+    else if (!Number.isInteger(r.guest) || r.guest < 1 || r.guest > 65535) out.push({ i, code: 'guest' });
+    else if (seen.has(`${r.proto}:${r.host}`)) out.push({ i, code: 'duplicate' });
+    else if (r.open === 'lan' && network === 'hostonly') out.push({ i, code: 'lanHostOnly' });
+    seen.add(`${r.proto}:${r.host}`);
+  });
+  return out;
+}
+// a new rule: SSH to the guest on the first free port from 2222 (tcp)
+export function newPortRule(ports) {
+  const used = new Set((ports || []).filter((r) => r.proto !== 'udp').map((r) => Number(r.host)));
+  let host = 2222;
+  while (used.has(host) && host < 65535) host++;
+  return { proto: 'tcp', host, guest: 22, open: 'this-computer' };
+}
+// what changing the mode does to the rules: a host-only machine opens ports to this computer only
+export const portsForMode = (ports, network) => (network === 'hostonly' ? (ports || []).map((r) => ({ ...portRule(r), open: 'this-computer' })) : (ports || []).map(portRule));
+// digits typed into a port's field, as a number (0 while empty)
+export const portInput = (text) => Number(String(text || '').replace(/\D/g, '').slice(0, 5)) || 0;
+// the wired card a bridged machine joins by default: the one it had, else the first wired card that is up, else the first
+export function defaultCard(cards, current) {
+  const wired = (cards || []).filter((c) => c.kind === 'wired');
+  if (current && wired.some((c) => c.name === current)) return current;
+  return (wired.find((c) => c.up) || wired[0])?.name || '';
+}
+// vm-net-bridge's argument (vm_admin.h): "<id> <card> <mac>"
+export const bridgeArg = (m) => (m?.id && m?.bridge && m?.mac ? `${m.id} ${m.bridge} ${m.mac}` : '');
+// the summary line of Configure's Network section
+export function netSummary(m) {
+  const n = NET_MODES.includes(m?.network) ? m.network : 'shared';
+  return { mode: n, card: n === 'bridged' ? m.bridge || '' : '', ports: usesPorts(n) ? (m.ports || []).length : 0,
+    lan: usesPorts(n) && n !== 'hostonly' && (m.ports || []).some((r) => r.open === 'lan') };
+}

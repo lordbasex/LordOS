@@ -3,7 +3,8 @@
 // while the machine is off; what the app keeps (system, notes) is saved at once. Sections of later phases say so.
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
-import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand } from './model.js';
+import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
+  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
@@ -33,6 +34,67 @@ const Off = ({ off, children }) => <View style={{ opacity: off ? 0.45 : 1, point
 function Later({ text }) {
   const p = usePal();
   return <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.raised }}><Text style={{ fontSize: 13, color: p.dim, textAlign: 'start', lineHeight: 1.5 }}>{text || tr('machines.cfg.later')}</Text></View>;
+}
+
+// Configure → Network (6.5): the mode, the wired card of a bridged machine, the forwarded ports of a shared or host-only
+// one. Everything here needs the machine off; lord-vm checks it all again (machine.c, vm_ports_check).
+function NetworkPane({ m, cur, set, running, offNote, host, issues }) {
+  const p = usePal();
+  const cards = host?.cards || [];
+  const mode = (x) => {
+    const patch = { network: x, ports: portsForMode(cur.ports, x) };
+    if (x === 'bridged' && !cur.bridge) patch.bridge = defaultCard(cards, '');
+    set(patch);
+  };
+  const setRule = (i, patch) => set({ ports: cur.ports.map((r, k) => (k === i ? { ...r, ...patch } : r)) });
+  const problem = (i) => issues.find((x) => x.i === i);
+  const card = cards.find((c) => c.name === cur.bridge);
+  const cardLabel = (c) => (c.kind === 'wifi' ? tr('machines.cfg.bridgeWifi', { name: c.name }) : c.up ? c.name : tr('machines.cfg.bridgeCardDown', { name: c.name }));
+  const lan = cur.network === 'shared' && cur.ports.some((r) => r.open === 'lan');
+  const tooMany = issues.find((x) => x.i === -1);
+  return <>
+    <Group>
+      <Row label={tr('machines.cfg.netMode')} note={tr(`machines.cfg.netNote.${cur.network}`) + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><Segmented small value={cur.network} onChange={mode} options={NET_MODES.map((k) => [k, tr(`machines.cfg.net.${k}`)])} /></Off>
+      </Row>
+      {cur.network === 'bridged' ? (
+        <Row label={tr('machines.cfg.bridgeCard')} note={cards.some((c) => c.kind === 'wired') ? tr('machines.cfg.bridgeNote') : tr('machines.cfg.bridgeNoCards')}>
+          <Off off={running}><View style={{ alignSelf: 'flex-start' }}>
+            <MenuBtn label={card ? cardLabel(card) : cur.bridge || tr('machines.cfg.bridgePick')}
+              items={cards.map((c) => ({ label: cardLabel(c), disabled: c.kind !== 'wired', onClick: () => set({ bridge: c.name }) }))} />
+          </View></Off>
+        </Row>
+      ) : null}
+      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} last />
+    </Group>
+    {usesPorts(cur.network) ? (
+      <Group title={tr('machines.cfg.ports')}>
+        {cur.ports.length ? cur.ports.map((r, i) => {
+          const bad = problem(i);
+          return (
+            <Row key={i} label={tr('machines.cfg.portRule', { n: i + 1 })} note={bad ? tr(`machines.cfg.portProblem.${bad.code}`, { min: PORT_HOST_MIN }) : null}>
+              <Off off={running}><View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, direction: 'ltr' }}>
+                <Segmented small value={r.proto} onChange={(x) => setRule(i, { proto: x })} options={[['tcp', 'TCP'], ['udp', 'UDP']]} />
+                <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.cfg.portHost')}</Text>
+                <TextInput value={r.host ? String(r.host) : ''} onChange={(x) => setRule(i, { host: portInput(x) })} style={{ width: 64 }} />
+                <Text style={{ fontSize: 12, color: p.dim }}>→ {tr('machines.cfg.portGuest')}</Text>
+                <TextInput value={r.guest ? String(r.guest) : ''} onChange={(x) => setRule(i, { guest: portInput(x) })} style={{ width: 64 }} />
+                {cur.network === 'shared' ? <Segmented small value={r.open} onChange={(x) => setRule(i, { open: x })}
+                  options={[['this-computer', tr('machines.cfg.portOpen.local')], ['lan', tr('machines.cfg.portOpen.lan')]]} /> : null}
+                <Btn label={tr('machines.cfg.portRemove')} onClick={() => set({ ports: cur.ports.filter((_, k) => k !== i) })} />
+              </View></Off>
+            </Row>
+          );
+        }) : <Row label={tr('machines.cfg.portsNone')} />}
+        <Row label="" last note={tooMany ? tr('machines.cfg.portProblem.tooMany', { n: PORTS_MAX }) : tr(cur.network === 'hostonly' ? 'machines.cfg.portsNoteHostOnly' : 'machines.cfg.portsNote')}>
+          <Off off={running}><View style={{ alignSelf: 'flex-start' }}>
+            <Btn label={tr('machines.cfg.portsAdd')} disabled={running || cur.ports.length >= PORTS_MAX} onClick={() => set({ ports: [...cur.ports, newPortRule(cur.ports)] })} />
+          </View></Off>
+        </Row>
+      </Group>
+    ) : null}
+    {lan ? <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, color: p.text, textAlign: 'start', lineHeight: 1.5 }}>{tr('machines.cfg.portsLanWarn')}</Text></View> : null}
+  </>;
 }
 
 // onClose: shown as a sheet over the library or the machine's window (kit.jsx), with Cancel and Done; without it, a
@@ -75,10 +137,14 @@ export function Configure({ dir, section: section0, onClose }) {
   if (!m) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg }}><Text style={{ color: p.dim }}>{tr('machines.win.gone')}</Text></View>;
 
   const running = stateView(m.state).active;
-  const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, agent: !!m.agent, clipboard: m.clipboard || 'off', shares: m.shares || [], ...draft };
+  const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
+    agent: !!m.agent, clipboard: m.clipboard || 'off', shares: m.shares || [], ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
-  const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(m[k] || []) : val !== m[k]);
+  const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || []) : val !== (k === 'bridge' ? m.bridge || '' : m[k]));
+  // the network's rules are checked as lord-vm checks them: Save waits until they are right
+  const portIssues = portProblems(cur.ports, cur.network);
+  const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
   const dirty = Object.keys(draft).some((k) => differs(k, draft[k]));
   const save = (patch) => {
     const change = patch || Object.fromEntries(Object.entries(draft).filter(([k, val]) => differs(k, val)));
@@ -93,7 +159,10 @@ export function Configure({ dir, section: section0, onClose }) {
     startup: tr(`machines.cfg.close.${closeChoice(meta)}`) + (m.suspended ? `, ${tr('machines.doing.suspended')}` : ''),
     cpu: tr('machines.cfg.sum.cpu', { n: m.vcpus, mem: gb(m.memoryMb) }),
     display: m.display === 'window' ? tr('machines.cfg.sum.display') : tr('machines.cfg.sum.noDisplay'),
-    network: tr(`machines.cfg.net.${m.network}`),
+    network: (() => {
+      const ns = netSummary(m);
+      return [tr(`machines.cfg.net.${ns.mode}`), ns.card || null, ns.ports ? tr('machines.cfg.sum.ports', { n: ns.ports }) : null].filter(Boolean).join(', ');
+    })(),
     sound: tr('machines.cfg.sum.sound'),
     disks: tr('machines.cfg.sum.disks', { n: m.diskGb }) + (m.dataDisks ? ` + ${m.dataDisks}` : '') + (m.devices === 'compat' ? `, ${tr('machines.cfg.devCompatShort')}` : '') + (m.iso ? `, ${tr('machines.isoAttached')}` : ''),
     // "Nothing shared" only when neither the clipboard nor a folder is
@@ -181,15 +250,7 @@ export function Configure({ dir, section: section0, onClose }) {
     </Group>
     <Later text={tr('machines.cfg.later3d')} />
   </>;
-  else if (sec === 'network') pane = <>
-    <Group>
-      <Row label={tr('machines.cfg.netMode')} note={tr(`machines.cfg.netNote.${cur.network}`) + (offNote ? ` ${offNote}` : '')}>
-        <Off off={running}><Segmented small value={cur.network} onChange={(x) => set({ network: x })} options={[['shared', tr('machines.cfg.net.shared')], ['isolated', tr('machines.cfg.net.isolated')]]} /></Off>
-      </Row>
-      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} last />
-    </Group>
-    <Later text={tr('machines.cfg.laterPorts')} />
-  </>;
+  else if (sec === 'network') pane = <NetworkPane m={m} cur={cur} set={set} running={running} offNote={offNote} host={host} issues={portIssues} />;
   else if (sec === 'sound') pane = <>
     <Group>
       <Row label={tr('machines.cfg.keyboard')} value={tr('machines.cfg.keyboardValue')} />
@@ -264,9 +325,11 @@ export function Configure({ dir, section: section0, onClose }) {
     <Later text={tr('machines.cfg.laterTpm')} />
   </>;
   else if (sec === 'security') pane = <Group>
-    {['sandbox', 'files', 'network', 'limits', 'display', 'secrets'].map((k, i, a) => (
-      <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${k}`, { limit: gb(memLimit(m)) })} />
-    ))}
+    {['sandbox', 'files', 'network', 'limits', 'display', 'secrets'].map((k, i, a) => {
+      // the network's line follows the mode: passt listening on the forwarded ports, or the bridged card's device
+      const note = k !== 'network' ? k : m.network === 'bridged' ? 'networkBridged' : usesPorts(m.network) && m.ports?.length ? 'networkPorts' : k;
+      return <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${note}`, { limit: gb(memLimit(m)) })} />;
+    })}
   </Group>;
 
   const savable = ['general', 'cpu', 'network', 'disks', 'sharing', 'agent'].includes(sec);
@@ -280,7 +343,7 @@ export function Configure({ dir, section: section0, onClose }) {
       </ScrollView>
     </View>
   );
-  const done = () => { if (dirty && savable && !running) { setClosing(true); save(); } else onClose(); };
+  const done = () => { if (dirty && savable && !running && !netBad) { setClosing(true); save(); } else if (!netBad || !dirty) onClose(); };
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: onClose ? 'transparent' : p.bg }}>
       {side.narrow ? null : list}
@@ -297,12 +360,12 @@ export function Configure({ dir, section: section0, onClose }) {
         {onClose ? (
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
             <Pill label={tr('machines.cancel')} disabled={!!job} onClick={() => { setDraft({}); setMsg(null); onClose(); }} />
-            <Pill primary label={tr('machines.cfg.done')} disabled={!!job} onClick={done} />
+            <Pill primary label={tr('machines.cfg.done')} disabled={!!job || (dirty && netBad)} onClick={done} />
           </View>
         ) : savable ? (
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
             <Pill label={tr('machines.cancel')} disabled={!dirty || !!job} onClick={() => { setDraft({}); setMsg(null); }} />
-            <Pill primary label={tr('machines.cfg.save')} disabled={!dirty || running || !!job} onClick={() => save()} />
+            <Pill primary label={tr('machines.cfg.save')} disabled={!dirty || running || !!job || netBad} onClick={() => save()} />
           </View>
         ) : null}
       </View>

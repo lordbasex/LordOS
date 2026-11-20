@@ -10,7 +10,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
-import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal } from './ui.jsx';
+import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp } from './ui.jsx';
 import { openLogs, openSnapshots } from './library.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet, Pill } from './kit.jsx';
@@ -337,10 +337,15 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       const b = budgetCheck(lord.vm.list(), m, lord.vm.host());
       if (!b.ok) { setErr(tr('machines.win.noMemory', { need: b.need, free: b.free })); return; }
     }
-    const id = active ? lord.vm.attach(dir) : lord.vm.start(dir, opts || {});
-    if (!id) { setErr(active ? tr('machines.win.cantAttach') : vmRefusal(tr('machines.win.cantStart'))); return; }
-    sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0 };
-    setErr(''); setSt(null); setSid(id);
+    const go = () => {
+      const id = active ? lord.vm.attach(dir) : lord.vm.start(dir, opts || {});
+      if (!id) { setErr(active ? tr('machines.win.cantAttach') : vmRefusal(tr('machines.win.cantStart'))); return; }
+      sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0 };
+      setErr(''); setSt(null); setSid(id);
+    };
+    // a bridged machine's network first (6.5)
+    if (!active && m.network === 'bridged') bridgeUp(m).then(go, (e) => setErr(tr('machines.win.bridgeFailed', { why: e.message })));
+    else go();
   };
   // a window opened to go back to a snapshot (with memory, the machine off) starts from it
   useEffect(() => { if (!sid && !st && !err) begin(loadvm ? { loadvm } : undefined); }, []);

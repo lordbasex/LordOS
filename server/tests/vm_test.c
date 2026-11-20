@@ -12,6 +12,7 @@
 #include "vm/logclean.h"
 #include "vm/vmops.h"
 #include "vm/vmagent.h"
+#include "vm/vmnet.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -20,6 +21,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 static int fails, checks;
@@ -63,7 +65,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "6", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "7", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -78,7 +80,7 @@ static void test_schema(void) {
         { "firmware_code", "\"/home/x/CODE.fd\"", VM_E_RANGE }, { "firmware_code", "\"/usr/share/../etc/shadow\"", VM_E_RANGE },
         { "firmware_code", "\"/usr/share/a,b.fd\"", VM_E_RANGE },
         { "firmware_sha256", "\"00\"", VM_E_RANGE },
-        { "display", "\"spice\"", VM_E_RANGE }, { "network", "\"bridged\"", VM_E_RANGE }, { "network", "\"isolated\"", VM_OK },
+        { "display", "\"spice\"", VM_E_RANGE }, { "network", "\"bridged\"", VM_E_RANGE }, { "network", "\"hostonly\"", VM_E_FIELD }, { "network", "\"isolated\"", VM_OK },
         { "mac", "\"52:54:00:12:AB:CD\"", VM_E_RANGE }, { "mac", "\"01:00:5e:00:00:01\"", VM_E_RANGE }, { "mac", "\"52:54:00:12:ab\"", VM_E_RANGE },
         { "created", "\"yesterday\"", VM_E_RANGE }, { "updated", "\"2026-13-01T00:00:00Z\"", VM_E_RANGE }, { "created", NULL, VM_E_FIELD },
     };
@@ -656,11 +658,178 @@ static void test_clipx(void) {
     vm_hostname_from_name("--", hn, sizeof hn); CHECK(!strcmp(hn, "machine"));
 }
 
+
+/* schema 6 (6.5): the bridged and host-only networks, bridge, ports; the admin actions' arguments and the cards */
+static void mkfile(const char *path, const char *text) {
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd >= 0) { (void)!write(fd, text, strlen(text)); close(fd); }
+}
+static void test_network(void) {
+    VmMachine m;
+    char err[256], t[4096];
+    const char *at = strstr(GOOD, "\"schema\":1");
+    struct { const char *net, *add; int want; } s6[] = {
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":2222,\"guest\":22,\"open\":\"this-computer\"}]", VM_OK },
+        { "shared", "\"ports\":[{\"proto\":\"udp\",\"host\":5353,\"guest\":53}]", VM_OK },                   /* open: this computer */
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":8080,\"guest\":80,\"open\":\"lan\"}]", VM_OK },
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":80,\"guest\":80}]", VM_E_RANGE },                 /* < 1024 */
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":1023,\"guest\":80}]", VM_E_RANGE },
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":65536,\"guest\":80}]", VM_E_RANGE },
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":2222,\"guest\":0}]", VM_E_RANGE },
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":2222,\"guest\":65536}]", VM_E_RANGE },
+        { "shared", "\"ports\":[{\"proto\":\"sctp\",\"host\":2222,\"guest\":22}]", VM_E_RANGE },
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":2222,\"guest\":22,\"open\":\"world\"}]", VM_E_RANGE },
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":2222,\"guest\":22,\"via\":\"x\"}]", VM_E_FIELD },
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":\"2222\",\"guest\":22}]", VM_E_FIELD },
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":2222.5,\"guest\":22}]", VM_E_FIELD },
+        { "shared", "\"ports\":{}", VM_E_FIELD },
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":2222,\"guest\":22},{\"proto\":\"tcp\",\"host\":2222,\"guest\":23}]", VM_E_RANGE },
+        { "shared", "\"ports\":[{\"proto\":\"tcp\",\"host\":2222,\"guest\":22},{\"proto\":\"udp\",\"host\":2222,\"guest\":22}]", VM_OK },
+        { "hostonly", "\"ports\":[{\"proto\":\"tcp\",\"host\":2222,\"guest\":22}]", VM_OK },
+        { "hostonly", "\"ports\":[{\"proto\":\"tcp\",\"host\":2222,\"guest\":22,\"open\":\"lan\"}]", VM_E_RANGE },
+        { "bridged", "\"bridge\":\"enp3s0\"", VM_OK },
+        { "bridged", "\"bridge\":\"\"", VM_E_RANGE },
+        { "bridged", "\"bridge\":\"en p3\"", VM_E_RANGE },
+        { "bridged", "\"bridge\":\"..\"", VM_E_RANGE },
+        { "bridged", "\"bridge\":\"a-very-long-name0\"", VM_E_RANGE },
+        { "bridged", "\"bridge\":\"eth0/x\"", VM_E_RANGE },
+        { "isolated", "\"bridge\":\"eth0\"", VM_OK },                                                        /* kept */
+        { "nat", "\"bridge\":\"eth0\"", VM_E_RANGE },
+    };
+    for (size_t i = 0; i < sizeof s6 / sizeof s6[0]; i++) {
+        char g[4096];
+        snprintf(g, sizeof g, "%s", GOOD);
+        char *nv = strstr(g, "\"network\":\"shared\"");
+        char rest[4096];
+        snprintf(rest, sizeof rest, "%s", nv + strlen("\"network\":\"shared\""));
+        snprintf(nv, sizeof g - (size_t)(nv - g), "\"network\":\"%s\"%s", s6[i].net, rest);
+        const char *a6 = strstr(g, "\"schema\":1");
+        snprintf(t, sizeof t, "%.*s\"schema\":6%.*s,%s}", (int)(a6 - g), g, (int)(strlen(a6) - 10 - 1), a6 + 10, s6[i].add);
+        int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+        if (r != s6[i].want) fprintf(stderr, "  schema 6 %s %s: got %d (%s)\n", s6[i].net, s6[i].add, r, err);
+        CHECK(r == s6[i].want);
+        if (r == VM_OK) {
+            /* written and read back the same */
+            char *j = vm_machine_json(&m);
+            VmMachine m2;
+            CHECK(j && vm_machine_parse(j, strlen(j), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+            free(j);
+        }
+        /* never below schema 6 */
+        snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,%s}", (int)(a6 - g), g, (int)(strlen(a6) - 10 - 1), a6 + 10, s6[i].add);
+        CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) != VM_OK);
+    }
+    /* the old modes still load at every schema, and a schema 5 file isn't refused for its network */
+    snprintf(t, sizeof t, "%.*s\"schema\":5%s", (int)(at - GOOD), GOOD, at + 10);
+    CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_OK && m.network == VM_NET_SHARED && !m.n_ports && !m.bridge[0]);
+    /* at most VM_PORTS rules */
+    vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err);
+    m.schema = VM_SCHEMA;
+    for (int i = 0; i < VM_PORTS; i++) m.ports[i] = (VmPort){ i & 1, 2000 + i, 22, VM_OPEN_LOCAL };
+    m.n_ports = VM_PORTS;
+    CHECK(vm_machine_check(&m, err, sizeof err) == VM_OK);
+    m.n_ports = VM_PORTS + 1;
+    CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+    /* passt's options: 127.0.0.1 unless "lan", and never "lan" for a host-only machine; "none" without rules */
+    m.n_ports = 3;
+    m.ports[0] = (VmPort){ VM_PROTO_TCP, 2222, 22, VM_OPEN_LOCAL };
+    m.ports[1] = (VmPort){ VM_PROTO_TCP, 8080, 80, VM_OPEN_LAN };
+    m.ports[2] = (VmPort){ VM_PROTO_UDP, 5353, 53, VM_OPEN_LOCAL };
+    char pv[VM_PORTS][48];
+    m.network = VM_NET_SHARED;
+    CHECK(vm_passt_ports(&m, VM_PROTO_TCP, pv, VM_PORTS) == 2 && !strcmp(pv[0], "127.0.0.1/2222:22") && !strcmp(pv[1], "0.0.0.0/8080:80"));
+    CHECK(vm_passt_ports(&m, VM_PROTO_UDP, pv, VM_PORTS) == 1 && !strcmp(pv[0], "127.0.0.1/5353:53"));
+    m.network = VM_NET_HOSTONLY;
+    CHECK(vm_passt_ports(&m, VM_PROTO_TCP, pv, VM_PORTS) == 2 && !strcmp(pv[1], "127.0.0.1/8080:80"));
+    m.n_ports = 0;
+    CHECK(vm_passt_ports(&m, VM_PROTO_TCP, pv, VM_PORTS) == 1 && !strcmp(pv[0], "none"));
+    /* the command line's rules */
+    VmPort p;
+    char sp[48];
+    CHECK(!vm_port_parse("tcp:2222:22", &p) && p.proto == VM_PROTO_TCP && p.host == 2222 && p.guest == 22 && p.open == VM_OPEN_LOCAL);
+    CHECK(!vm_port_parse("udp:5353:53:lan", &p) && p.proto == VM_PROTO_UDP && p.open == VM_OPEN_LAN);
+    vm_port_spec(&p, sp, sizeof sp);
+    CHECK(!strcmp(sp, "udp:5353:53:lan"));
+    CHECK(!vm_port_parse("tcp:2222:22:this-computer", &p));
+    const char *badp[] = { "tcp:80:80", "tcp:2222", "tcp:2222:22:lan:x", "tcp:+2222:22", "tcp: 2222:22", "tcp:2222:-1", "icmp:2222:22",
+                           "tcp:2222:22:world", "tcp:70000:22", "tcp:2222:0", "", "tcp:2222:22x", "TCP:2222:22", NULL };
+    for (int i = 0; badp[i]; i++) { if (!vm_port_parse(badp[i], &p)) fprintf(stderr, "  port %s accepted\n", badp[i]); CHECK(vm_port_parse(badp[i], &p)); }
+    /* the macvtap's name */
+    char nm[16];
+    CHECK(!vm_bridge_ifname("0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b", nm) && !strcmp(nm, "lvm0f8e2c1a3b4d") && strlen(nm) == 15);
+    CHECK(vm_bridge_ifname("0F8E2C1A-3b4d-4e5f-8a6b-7c8d9e0f1a2b", nm));
+    CHECK(vm_bridge_ifname("../x", nm));
+    /* the admin actions' arguments, checked on the root side */
+    char id[37], card[16], mac[18];
+    const char *ok1 = "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b enp3s0 52:54:00:12:ab:cd";
+    CHECK(!vmnet_bridge_arg(ok1, strlen(ok1), id, card, mac) && !strcmp(card, "enp3s0") && !strcmp(mac, "52:54:00:12:ab:cd") && !strcmp(id, "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b"));
+    const char *badb[] = {
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b enp3s0  52:54:00:12:ab:cd",        /* two spaces */
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b enp3s0 52:54:00:12:AB:CD",         /* uppercase MAC */
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b enp3s0 53:54:00:12:ab:cd",         /* multicast */
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b enp3s0 00:00:00:00:00:00",
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b ../x 52:54:00:12:ab:cd",
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b a;b 52:54:00:12:ab:cd",
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b averyveryverylong0 52:54:00:12:ab:cd",
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2 enp3s0 52:54:00:12:ab:cd",
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b enp3s0 52:54:00:12:ab:cd ",
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b enp3s0",
+        "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b enp3s0 52:54:00:12:ab:cd\nx",
+        "", NULL };
+    for (int i = 0; badb[i]; i++) CHECK(vmnet_bridge_arg(badb[i], strlen(badb[i]), id, card, mac));
+    {
+        /* a NUL inside the argument: its length says more than the text */
+        char nul[] = "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b enp3s0 52:54:00:12:ab:cd";
+        nul[40] = 0;
+        CHECK(vmnet_bridge_arg(nul, sizeof nul - 1, id, card, mac));
+    }
+    CHECK(!vmnet_unbridge_arg("0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b", 36, id));
+    CHECK(vmnet_unbridge_arg("0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b ", 37, id) && vmnet_unbridge_arg("lvm0f8e2c1a3b4d", 15, id) && vmnet_unbridge_arg("", 0, id));
+    /* the alias */
+    char al[96], aid[37];
+    uid_t u = 0;
+    vmnet_alias(al, sizeof al, 1000, "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b");
+    CHECK(!strcmp(al, "lordos-vm 1000 0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b") && vmnet_alias_parse(al, &u, aid) && u == 1000 && !strcmp(aid, "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b"));
+    CHECK(vmnet_alias_parse("lordos-vm 1000 0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b\n", &u, NULL));
+    CHECK(!vmnet_alias_parse("lordos-vm -1 0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b", &u, NULL) && !vmnet_alias_parse("lordos-vm 1000 x", &u, NULL) &&
+          !vmnet_alias_parse("my card", &u, NULL) && !vmnet_alias_parse("lordos-vm 1000 0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2bx", &u, NULL) && !vmnet_alias_parse("", &u, NULL));
+    /* what a card is, over an invented sysfs */
+    char sys[] = "/tmp/vm-net-test.XXXXXX", q[512];
+    if (mkdtemp(sys)) {
+        const char *dirs[] = { "eth0", "eth0/device", "wlan0", "wlan0/device", "wlan0/wireless", "br0", "br0/bridge", "eth1", "eth1/device",
+                               "eth1/brport", "ib0", "ib0/device", "lvm0f8e2c1a3b4d", NULL };
+        for (int i = 0; dirs[i]; i++) { snprintf(q, sizeof q, "%s/%s", sys, dirs[i]); mkdir(q, 0755); }
+        snprintf(q, sizeof q, "%s/eth0/type", sys); mkfile(q, "1\n");
+        snprintf(q, sizeof q, "%s/eth0/operstate", sys); mkfile(q, "up\n");
+        snprintf(q, sizeof q, "%s/wlan0/type", sys); mkfile(q, "1\n");
+        snprintf(q, sizeof q, "%s/wlan0/operstate", sys); mkfile(q, "down\n");
+        snprintf(q, sizeof q, "%s/eth1/type", sys); mkfile(q, "1\n");
+        snprintf(q, sizeof q, "%s/ib0/type", sys); mkfile(q, "32\n");
+        snprintf(q, sizeof q, "%s/br0/type", sys); mkfile(q, "1\n");
+        CHECK(vmnet_card(sys, "eth0") == VMNET_WIRED);
+        CHECK(vmnet_card(sys, "wlan0") == VMNET_WIFI);
+        CHECK(vmnet_card(sys, "br0") == VMNET_VIRTUAL);
+        CHECK(vmnet_card(sys, "lvm0f8e2c1a3b4d") == VMNET_VIRTUAL);
+        CHECK(vmnet_card(sys, "eth1") == VMNET_ENSLAVED);
+        CHECK(vmnet_card(sys, "ib0") == VMNET_NOT_ETHER);
+        CHECK(vmnet_card(sys, "eth9") == VMNET_MISSING && vmnet_card(sys, "..") == VMNET_MISSING && vmnet_card(sys, "eth0/device") == VMNET_MISSING);
+        CHECK(!strcmp(vmnet_card_error(VMNET_WIFI), "vm.bridgeWifi") && !vmnet_card_error(VMNET_WIRED)[0]);
+        char *js = vmnet_cards_json(sys);
+        CHECK(js && strstr(js, "{\"name\":\"eth0\",\"kind\":\"wired\",\"up\":true}") && strstr(js, "{\"name\":\"wlan0\",\"kind\":\"wifi\",\"up\":false}") &&
+              !strstr(js, "br0") && !strstr(js, "eth1") && !strstr(js, "lvm"));
+        free(js);
+        char cmd[600];
+        snprintf(cmd, sizeof cmd, "rm -rf '%s'", sys);
+        (void)!system(cmd);
+    }
+}
+
 int main(void) {
     test_clipx();
     test_log_clean();
     test_images();
     test_schema();
+    test_network();
     test_ops();
     test_agent();
     test_host();

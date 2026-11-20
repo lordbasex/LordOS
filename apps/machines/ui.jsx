@@ -1,6 +1,7 @@
 // Pieces the Machines windows share: the state dot, the system marks, the three lights, bars, a context menu and the
 // surfaces of the Control Center (docs/VIRTUALIZATION.md, "The app"; the approved mocks, Main and Toolbar).
-import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, t as tr } from '@lordos/sdk';
+import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, t as tr } from '@lordos/sdk';
+import { bridgeArg } from './model.js';
 import { useEffect, useRef, useState } from 'react';
 
 export const TONE = { run: '#30d158', pause: '#ff9f0a', off: '#8e8e93', busy: '#0a84ff', bad: '#ff453a' };
@@ -300,4 +301,14 @@ export function Sheet({ title, children, actions, width = 560, onCancel }) {
       </View>
     </View>
   );
+}
+
+// A bridged machine's network (6.5) is made just before it starts: the admin helper's vm-net-bridge puts a macvtap on its
+// wired card and gives this user its device, which lord-vm opens. Resolves at once for the other modes; rejects with the
+// translated reason (Wi-Fi card, no administrator...).
+export async function bridgeUp(m) {
+  if (m?.network !== 'bridged') return;
+  const arg = bridgeArg(m);
+  if (!arg) throw new Error(tr('machines.win.noBridgeCard'));
+  await admin.run('vm-net-bridge', arg, undefined, { quiet: true });
 }

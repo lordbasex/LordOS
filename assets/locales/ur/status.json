@@ -160,6 +160,8 @@
   "vm.imageRemoved": "امیج حذف کر دی گئی",
   "vm.downloadResumed": "رکا ہوا ڈاؤن لوڈ جاری ہے ({from} بائٹس محفوظ)",
   "vm.kvmReady": "اجازت مل گئی: مشینیں اب ہارڈ ویئر ورچوئلائزیشن استعمال کر سکتی ہیں",
+  "vm.bridgeReady": "برج والا نیٹ ورک تیار ہے ({name})",
+  "vm.bridgeGone": "برج والا نیٹ ورک ہٹا دیا گیا",
   "vm.kvmNextLogin": "آپ کے اگلے لاگ ان سے اجازت ہے",
   "pkg.foreignArchAdded": "32 بٹ ({arch}) پیکیجز فعال کر دیے گئے",
   "pkg.foreignArchPresent": "32 بٹ ({arch}) پیکیجز پہلے سے فعال تھے",

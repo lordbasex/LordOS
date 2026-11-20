@@ -178,6 +178,70 @@ int vm_base_valid(const char *s) {
     return n > 15 && path_valid(s) && strstr(s, "/.shared/") && !strchr(strstr(s, "/.shared/") + 9, '/') && !strcmp(s + n - 6, ".qcow2");
 }
 
+static const char *const PROTOS[] = { "tcp", "udp", NULL };
+static const char *const OPENS[] = { "this-computer", "lan", NULL };
+
+int vm_ifname_valid(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (n < 1 || n > VM_IFNAME_MAX || !strcmp(s, ".") || !strcmp(s, "..")) return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = s[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == '-')) return 0;
+    }
+    return 1;
+}
+
+int vm_ports_check(const VmPort *p, int cnt, int network, char *err, size_t n) {
+    if (cnt < 0 || cnt > VM_PORTS) return fail(err, n, -1, "at most %d forwarded ports", VM_PORTS);
+    for (int i = 0; i < cnt; i++) {
+        if (p[i].proto != VM_PROTO_TCP && p[i].proto != VM_PROTO_UDP) return fail(err, n, -1, "ports: proto is tcp or udp");
+        if (p[i].host < VM_PORT_HOST_MIN || p[i].host > 65535) return fail(err, n, -1, "ports: this computer's port must be %d to 65535", VM_PORT_HOST_MIN);
+        if (p[i].guest < 1 || p[i].guest > 65535) return fail(err, n, -1, "ports: the machine's port must be 1 to 65535");
+        if (p[i].open != VM_OPEN_LOCAL && p[i].open != VM_OPEN_LAN) return fail(err, n, -1, "ports: open is this-computer or lan");
+        if (p[i].open == VM_OPEN_LAN && network == VM_NET_HOSTONLY) return fail(err, n, -1, "ports: a host-only machine opens ports to this computer only");
+        for (int k = 0; k < i; k++)
+            if (p[k].proto == p[i].proto && p[k].host == p[i].host) return fail(err, n, -1, "ports: %s port %d of this computer twice", p[i].proto ? "udp" : "tcp", p[i].host);
+    }
+    return 0;
+}
+
+int vm_port_parse(const char *s, VmPort *p) {
+    char proto[4], open[16] = "this-computer", tail;
+    int h, g, k = s ? sscanf(s, "%3[a-z]:%d:%d:%15[a-z-]%c", proto, &h, &g, open, &tail) : 0;
+    if (k != 3 && k != 4) return -1;
+    if (strlen(s) > 40) return -1;
+    memset(p, 0, sizeof *p);
+    if (!strcmp(proto, "tcp")) p->proto = VM_PROTO_TCP; else if (!strcmp(proto, "udp")) p->proto = VM_PROTO_UDP; else return -1;
+    if (!strcmp(open, "this-computer")) p->open = VM_OPEN_LOCAL; else if (!strcmp(open, "lan")) p->open = VM_OPEN_LAN; else return -1;
+    p->host = h; p->guest = g;
+    /* digits only between the colons: sscanf's %d took signs and spaces too */
+    for (const char *c = s + strlen(proto) + 1; *c && *c != ':' ; c++) if (*c < '0' || *c > '9') return -1;
+    const char *c2 = strchr(s + strlen(proto) + 1, ':');
+    for (const char *c = c2 + 1; *c && *c != ':'; c++) if (*c < '0' || *c > '9') return -1;
+    return vm_ports_check(p, 1, VM_NET_SHARED, NULL, 0);
+}
+
+void vm_port_spec(const VmPort *p, char *out, size_t n) { snprintf(out, n, "%s:%d:%d:%s", PROTOS[p->proto & 1], p->host, p->guest, OPENS[p->open & 1]); }
+
+int vm_passt_ports(const VmMachine *m, int proto, char out[][48], int max) {
+    int k = 0;
+    for (int i = 0; i < m->n_ports && k < max; i++) {
+        const VmPort *p = &m->ports[i];
+        if (p->proto != proto) continue;
+        /* host-only machines never listen beyond loopback, whatever the file says */
+        int lan = p->open == VM_OPEN_LAN && m->network != VM_NET_HOSTONLY;
+        snprintf(out[k++], 48, "%s/%d:%d", lan ? "0.0.0.0" : "127.0.0.1", p->host, p->guest);
+    }
+    if (!k && max > 0) snprintf(out[k++], 48, "none");
+    return k;
+}
+
+int vm_bridge_ifname(const char *id, char out[VM_IFNAME_MAX + 1]) {
+    if (!vm_uuid_valid(id)) return -1;
+    snprintf(out, VM_IFNAME_MAX + 1, "lvm%.8s%.4s", id, id + 9);
+    return 0;
+}
+
 int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 1 || m->schema > VM_SCHEMA) return fail(err, n, m->schema > VM_SCHEMA ? VM_E_NEWER : VM_E_SCHEMA, "schema %d", m->schema);
     if (!vm_uuid_valid(m->id)) return fail(err, n, VM_E_RANGE, "id is not a lowercase UUID");
@@ -196,7 +260,11 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
         for (int i = 0; i < 64; i++) { char c = m->firmware_sha256[i]; if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return fail(err, n, VM_E_RANGE, "firmware_sha256"); }
     } else if (m->firmware_code[0] || m->firmware_sha256[0]) return fail(err, n, VM_E_RANGE, "a bios machine has no firmware_code");
     if (m->display != VM_DISPLAY_WINDOW && m->display != VM_DISPLAY_NONE) return fail(err, n, VM_E_RANGE, "display");
-    if (m->network != VM_NET_SHARED && m->network != VM_NET_ISOLATED) return fail(err, n, VM_E_RANGE, "network");
+    if (m->network < VM_NET_SHARED || m->network > VM_NET_HOSTONLY) return fail(err, n, VM_E_RANGE, "network");
+    if (m->bridge[0] && !vm_ifname_valid(m->bridge)) return fail(err, n, VM_E_RANGE, "bridge must be a network interface's name");
+    if (m->network == VM_NET_BRIDGED && !m->bridge[0]) return fail(err, n, VM_E_RANGE, "a bridged machine names the wired card it joins (bridge)");
+    if (vm_ports_check(m->ports, m->n_ports, m->network, err, n)) return VM_E_RANGE;
+    if (m->schema < 6 && (m->network > VM_NET_ISOLATED || m->bridge[0] || m->n_ports)) return fail(err, n, VM_E_FIELD, "the bridged and host-only networks, bridge and ports need schema 6");
     if (!vm_mac_valid(m->mac)) return fail(err, n, VM_E_RANGE, "mac must be 52:54:00:xx:xx:xx, lowercase");
     if (m->iso[0] && !path_valid(m->iso)) return fail(err, n, VM_E_RANGE, "iso must be an absolute path without '..', ',' or control characters");
     if (!iso_time_valid(m->created) || !iso_time_valid(m->updated)) return fail(err, n, VM_E_RANGE, "created and updated are UTC times like 2026-11-04T20:00:00Z");
@@ -282,7 +350,7 @@ static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
-    "shares", "secure_boot", "tpm", "hyperv", "drivers", NULL,
+    "shares", "secure_boot", "tpm", "hyperv", "drivers", "bridge", "ports", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -315,7 +383,9 @@ static const char *const ARCHS[] = { "arm64", "amd64", NULL };
 static const char *const ACCELS[] = { "kvm", "tcg", NULL };
 static const char *const FWS[] = { "uefi", "bios", NULL };
 static const char *const DISPLAYS[] = { "window", "none", NULL };
-static const char *const NETS[] = { "shared", "isolated", NULL };
+static const char *const NETS[] = { "shared", "isolated", "bridged", "hostonly", NULL };
+const char *const VM_NET_NAMES[] = { "shared", "isolated", "bridged", "hostonly", NULL };
+
 static const char *const CLIPS[] = { "off", "to-guest", "from-guest", "both", NULL };
 static const char *const DEVS[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_DEV_NAMES[] = { "virtio", "compat", "windows", NULL };
@@ -389,6 +459,26 @@ static int parse4(const JVal *o, VmMachine *m, char *err, size_t n) {
     return VM_OK;
 }
 
+/* schema 6's keys: bridge and ports (6.5) */
+static int parse6(const JVal *o, VmMachine *m, char *err, size_t n) {
+    int r;
+    if ((r = get_str(o, "bridge", m->bridge, sizeof m->bridge, 0, err, n))) return r;
+    const JVal *x = json_get(o, "ports");
+    if (!x) return VM_OK;
+    if (x->type != J_ARR) return fail(err, n, VM_E_FIELD, "ports must be a list");
+    if (x->len > VM_PORTS) return fail(err, n, VM_E_RANGE, "at most %d ports", VM_PORTS);
+    for (const JVal *e = x->kid; e; e = e->next) {
+        if (e->type != J_OBJ) return fail(err, n, VM_E_FIELD, "ports: objects");
+        for (const JVal *k = e->kid; k; k = k->next)
+            if (strcmp(k->key, "proto") && strcmp(k->key, "host") && strcmp(k->key, "guest") && strcmp(k->key, "open")) return fail(err, n, VM_E_FIELD, "ports: unknown key");
+        VmPort *p = &m->ports[m->n_ports++];
+        if ((r = get_enum(e, "proto", PROTOS, &p->proto, err, n)) || (r = get_int(e, "host", &p->host, err, n)) || (r = get_int(e, "guest", &p->guest, err, n))) return r;
+        p->open = VM_OPEN_LOCAL;
+        if (json_get(e, "open") && (r = get_enum(e, "open", OPENS, &p->open, err, n))) return r;
+    }
+    return VM_OK;
+}
+
 int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size_t n) {
     memset(m, 0, sizeof *m);
     if (len > 64 * 1024) return fail(err, n, VM_E_JSON, "machine.json is larger than 64 KB");
@@ -437,6 +527,7 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         }
         if ((r = get_str(o, "drivers", m->drivers, sizeof m->drivers, 0, err, n))) goto out;
     }
+    if ((r = parse6(o, m, err, n))) goto out;
     r = vm_machine_check(m, err, n);
 out:
     json_free(&d);
@@ -506,6 +597,15 @@ char *vm_machine_json(const VmMachine *m) {
         if (m->tpm) jb_raw(&b, ",\n  \"tpm\": true");
         if (m->hyperv) jb_raw(&b, ",\n  \"hyperv\": true");
         if (m->drivers[0]) { jb_raw(&b, ",\n  \"drivers\": "); jb_str(&b, m->drivers); }
+    }
+    if (m->schema >= 6) {
+        if (m->bridge[0]) { jb_raw(&b, ",\n  \"bridge\": "); jb_str(&b, m->bridge); }
+        if (m->n_ports) {
+            jb_raw(&b, ",\n  \"ports\": [");
+            for (int i = 0; i < m->n_ports; i++)
+                jb_printf(&b, "%s{\"proto\": \"%s\", \"host\": %d, \"guest\": %d, \"open\": \"%s\"}", i ? ", " : "", PROTOS[m->ports[i].proto], m->ports[i].host, m->ports[i].guest, OPENS[m->ports[i].open]);
+            jb_raw(&b, "]");
+        }
     }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);

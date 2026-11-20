@@ -765,6 +765,9 @@ static void helper_request(int id, const char *action, char *arg, size_t len, vo
     cur_id = 0;
 }
 
+static volatile sig_atomic_t helper_term;
+static void on_term(int s) { (void)s; helper_term = 1; }
+
 static void helper(int fd, const char *user) {
     out_fd = fd;
     prctl(PR_SET_NAME, "lord-admin");
@@ -784,6 +787,12 @@ static void helper(int fd, const char *user) {
     int allowed = is_admin(user);
     AdminReq req = { .user = uname, .home = home, .uid = pw->pw_uid, .gid = pw->pw_gid, .admin = allowed };
     HelperCtx hc = { &req, allowed, uname };
+#ifndef LORD_NETD
+    /* Machines' bridged networks (vm_admin.h) a crashed session left, if no machine holds them */
+    vm_net_sweep(req.uid);
+#endif
+    struct sigaction term = { .sa_handler = on_term };     /* no SA_RESTART: poll returns, the loop ends and sweeps */
+    sigaction(SIGTERM, &term, NULL);
     char *in = malloc(ADMIN_ARG_MAX + 512);
     size_t inlen = 0;
     if (!in) _exit(1);
@@ -802,6 +811,7 @@ static void helper(int fd, const char *user) {
         pfd[n++] = (struct pollfd){ ino, POLLIN, 0 };
         for (int i = 0; i < MAX_KIDS; i++)
             if (kids[i].pid) { who[n] = &kids[i]; pfd[n++] = (struct pollfd){ kids[i].fd, POLLIN, 0 }; }
+        if (helper_term) break;
         if (poll(pfd, (nfds_t)n, -1) < 0) { if (errno == EINTR) continue; break; }
         for (int i = 3; i < n; i++) if (pfd[i].revents) kid_read(who[i]);
         if (pfd[1].fd >= 0 && pfd[1].revents) netd_read();
@@ -824,6 +834,9 @@ static void helper(int fd, const char *user) {
         parse_requests(in, &inlen, helper_request, &hc);
     }
     for (int i = 0; i < MAX_KIDS; i++) if (kids[i].pid) kill(kids[i].pid, SIGTERM);
+#ifndef LORD_NETD
+    vm_net_sweep(req.uid);
+#endif
     _exit(0);
 }
 
