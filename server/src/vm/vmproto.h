@@ -53,8 +53,9 @@
  *                   guest's file systems, ag_drop_name). lord-vm copies it through qemu-guest-agent, in pieces, one file
  *                   at a time (at most 8 wait), into the Downloads folder of the guest's signed-in person: on Linux
  *                   through a private temporary folder, then moved and owned by that person (runuser); on Windows
- *                   through a private SYSTEM-only folder in %SystemRoot%\Temp, then given to that person and moved
- *                   into their Downloads (never opened there). VM_FILE_PROGRESS on the way; → VM_REPLY with the file's path in the guest (the guest's words, text only) or why not
+ *                   through a private SYSTEM-only folder in %SystemRoot%\Temp, then copied into their Downloads by a
+ *                   one-shot scheduled task that runs as that person (refused when nobody is signed in).
+ *                   VM_FILE_PROGRESS on the way; → VM_REPLY with the file's path in the guest (the guest's words, text only) or why not
  *     VM_SNAPSHOT   a = VSN_TAKE, VSN_REVERT or VSN_DELETE; text = "TAG\tNAME" (take) or "TAG". qcow2 internal
  *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
  *                   memory (QMP snapshot-save, snapshot-load, snapshot-delete jobs), under operation.json; the entry
