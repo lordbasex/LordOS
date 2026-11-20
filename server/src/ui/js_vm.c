@@ -4,7 +4,8 @@
  * helper a sealed picture memfd that the engine shows as a media node, acknowledges frames once they were painted
  * and forwards input. Nothing here blocks: each poll takes at most VD_POLL_MAX messages per channel.
  *
- *   host() → { arch, cpus, ramMb, kvmDevice, kvm, vcpusRecommended, memMaxMb, missing: { amd64, arm64 }, ready }
+ *   host() → { arch, cpus, ramMb, kvmDevice, kvm, vcpusRecommended, memMaxMb, missing: { amd64, arm64 }, ready,
+ *             cards: [{ name, kind: 'wired'|'wifi', up }] }   (cards: what a bridged machine may join, 6.5)
  *   list() → [{ dir, folder, name, id, arch, accel, vcpus, memoryMb, diskGb, firmware, network, iso, state, reason,
  *              code, detail, since, error }]   the machines in ~/Machines (<name>.lordvm)
  *   create({ name, arch, vcpus, memoryMb, diskGb, import | iso }) → job id (0: refused);  job(id) → { done, ok, out, dir }
@@ -26,6 +27,7 @@
 #include "../vm/vmops.h"
 #include "../vm/logclean.h"
 #include "../vm/vmagent.h"
+#include "../vm/vmnet.h"
 #include "../wl/wl.h"
 #include "../gpu/gpu.h"
 #include "../sec/json.h"
@@ -38,6 +40,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <net/if.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -190,7 +193,28 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     if (mf >= 0) { ssize_t k = read(mf, model, sizeof model - 1); close(mf); if (k > 0) model[k] = 0; }
     for (char *q = model; *q; q++) if ((unsigned char)*q < 0x20) *q = 0;
     set_str(c, o, "board", model);
+    char *cards = vmnet_cards_json("/sys/class/net");
+    JS_SetPropertyStr(c, o, "cards", cards ? JS_ParseJSON(c, cards, strlen(cards), "<cards>") : JS_NewArray(c));
+    free(cards);
     return o;
+}
+
+/* a bridged machine's macvtap (6.5) that nothing runs on any more goes: the admin helper removes only the caller's and
+ * never one a process holds. Not within 30 s of a start (Machines makes it just before), and once a minute per machine */
+static time_t last_start;
+static void unbridge_idle(const VmMachine *m, const char *state) {
+    static struct { char id[37]; time_t at; } sent[8];
+    static int next;
+    char name[VM_IFNAME_MAX + 1];
+    if (vm_bridge_ifname(m->id, name) || !if_nametoindex(name)) return;
+    if (strcmp(state, "stopped") && strcmp(state, "crashed")) return;
+    time_t now = time(NULL);
+    if (now - last_start < 30) return;
+    for (int i = 0; i < 8; i++) if (!strcmp(sent[i].id, m->id) && now - sent[i].at < 60) return;
+    if (admin_fd() < 0 || admin_send("vm-net-unbridge", m->id, strlen(m->id)) < 0) return;
+    snprintf(sent[next].id, sizeof sent[next].id, "%s", m->id);
+    sent[next].at = now;
+    next = (next + 1) % 8;
 }
 
 /* ---- the library ---- */
@@ -278,7 +302,21 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_int(c, o, "memoryMb", m.memory_mb);
             set_int(c, o, "diskGb", m.disk_gb);
             set_str(c, o, "firmware", m.firmware == VM_FW_UEFI ? "uefi" : "bios");
-            set_str(c, o, "network", m.network == VM_NET_SHARED ? "shared" : "isolated");
+            set_str(c, o, "network", VM_NET_NAMES[m.network]);
+            set_str(c, o, "bridge", m.bridge);
+            {
+                /* forwarded ports (6.5): [{ proto, host, guest, open }] */
+                JSValue pa = JS_NewArray(c);
+                for (int i = 0; i < m.n_ports; i++) {
+                    JSValue e = JS_NewObject(c);
+                    set_str(c, e, "proto", m.ports[i].proto == VM_PROTO_UDP ? "udp" : "tcp");
+                    set_int(c, e, "host", m.ports[i].host);
+                    set_int(c, e, "guest", m.ports[i].guest);
+                    set_str(c, e, "open", m.ports[i].open == VM_OPEN_LAN ? "lan" : "this-computer");
+                    JS_SetPropertyUint32(c, pa, (uint32_t)i, e);
+                }
+                JS_SetPropertyStr(c, o, "ports", pa);
+            }
             set_str(c, o, "display", m.display == VM_DISPLAY_WINDOW ? "window" : "none");
             set_str(c, o, "iso", m.iso);
             set_str(c, o, "base", m.base);
@@ -320,6 +358,12 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "error", r == VM_E_NEWER ? "newer" : "invalid");
         }
         run_state(dir, c, o);
+        if (r == VM_OK) {
+            JSValue sv = JS_GetPropertyStr(c, o, "state");
+            const char *ss = JS_ToCString(c, sv);
+            if (ss) { unbridge_idle(&m, ss); JS_FreeCString(c, ss); }
+            JS_FreeValue(c, sv);
+        }
         /* an operation that was interrupted and waits for the next start (3.6) */
         {
             VmOp op;
@@ -726,13 +770,14 @@ static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return r;
 }
 
-/* set(dir, { name, vcpus, memoryMb, diskGb, network, iso, shares: [{ tag, path, writable }] }) → job id: lord-vm --set on a
+/* set(dir, { name, vcpus, memoryMb, diskGb, network, bridge, ports: [{ proto, host, guest, open }], iso,
+ *            shares: [{ tag, path, writable }] }) → job id: lord-vm --set on a
  * machine that is off (Configure). shares replaces the list ([] empties it); lord-vm decides which folders may be shared */
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[32 + 2 * VM_SHARES], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[40 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -749,9 +794,42 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "network");
     if (JS_IsString(v)) {
         const char *s = JS_ToCString(c, v);
-        if (s && (!strcmp(s, "shared") || !strcmp(s, "isolated"))) { snprintf(net, sizeof net, "%s", s); args[n++] = "--network"; args[n++] = net; } else ok = 0;
+        int known = 0;
+        for (int k = 0; s && VM_NET_NAMES[k]; k++) if (!strcmp(s, VM_NET_NAMES[k])) known = 1;
+        if (known) { snprintf(net, sizeof net, "%s", s); args[n++] = "--network"; args[n++] = net; } else ok = 0;
         if (s) JS_FreeCString(c, s);
     }
+    JS_FreeValue(c, v);
+    /* the network's details (6.5): the wired card a bridged machine joins, the forwarded ports (replacing the list; []
+     * empties it), each checked here and again by lord-vm */
+    v = JS_GetPropertyStr(c, argv[1], "bridge");
+    if (JS_IsString(v)) {
+        const char *bs = JS_ToCString(c, v);
+        if (bs && vm_ifname_valid(bs)) { snprintf(br, sizeof br, "%s", bs); args[n++] = "--bridge"; args[n++] = br; } else ok = 0;
+        if (bs) JS_FreeCString(c, bs);
+    } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "ports");
+    if (JS_IsArray(c, v)) {
+        uint32_t len = 0;
+        JSValue l = JS_GetPropertyStr(c, v, "length");
+        JS_ToUint32(c, &len, l);
+        JS_FreeValue(c, l);
+        VmPort ps[VM_PORTS];
+        if (len > VM_PORTS) ok = 0;
+        else if (!len) { args[n++] = "--ports"; args[n++] = "none"; }
+        for (uint32_t i = 0; ok && i < len; i++) {
+            JSValue e = JS_GetPropertyUint32(c, v, i), pr = JS_GetPropertyStr(c, e, "proto"), op = JS_GetPropertyStr(c, e, "open");
+            const char *prs = JS_IsString(pr) ? JS_ToCString(c, pr) : NULL, *ops = JS_IsString(op) ? JS_ToCString(c, op) : NULL;
+            int h = prop_int(c, e, "host"), g = prop_int(c, e, "guest");
+            ps[i] = (VmPort){ prs && !strcmp(prs, "udp") ? VM_PROTO_UDP : VM_PROTO_TCP, h, g, ops && !strcmp(ops, "lan") ? VM_OPEN_LAN : VM_OPEN_LOCAL };
+            if (!prs || (strcmp(prs, "tcp") && strcmp(prs, "udp")) || (ops && strcmp(ops, "lan") && strcmp(ops, "this-computer")) || vm_ports_check(ps, (int)i + 1, VM_NET_SHARED, NULL, 0)) ok = 0;
+            else { vm_port_spec(&ps[i], pv[i], sizeof pv[i]); args[n++] = "--port"; args[n++] = pv[i]; }
+            if (prs) JS_FreeCString(c, prs);
+            if (ops) JS_FreeCString(c, ops);
+            JS_FreeValue(c, pr); JS_FreeValue(c, op); JS_FreeValue(c, e);
+        }
+    } else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     char clip[16] = "";
     v = JS_GetPropertyStr(c, argv[1], "agent");
@@ -1175,6 +1253,7 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     }
     int slot = new_slot();
     if (slot < 0 || machine_dir(c, argv[0], dir, sizeof dir) || bin_path("lord-vm", bin, sizeof bin)) return JS_NewInt32(c, 0);
+    last_start = time(NULL);
     if (!machine_shares_ok(dir)) return JS_NewInt32(c, 0);
     int sv[2], ep[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return JS_NewInt32(c, 0);
@@ -2162,6 +2241,7 @@ static JSValue f_start_detached(JSContext *c, JSValueConst t, int argc, JSValueC
     (void)t; (void)argc;
     char dir[PATH_MAX], creds[PATH_MAX];
     if (machine_dir(c, argv[0], dir, sizeof dir) || !machine_shares_ok(dir)) return JS_NewInt32(c, 0);
+    last_start = time(NULL);
     int have = !write_creds(creds, sizeof creds, dir);
     char *args[] = { "lord-vm", "--start", dir, "--detach", "--keep-running", have ? "--credentials-file" : NULL, creds, NULL };
     int id = spawn_job(args, dir);

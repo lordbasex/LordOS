@@ -169,6 +169,8 @@
   "vm.imageRemoved": "Usunięto obraz",
   "vm.downloadResumed": "Wznawianie zatrzymanego pobierania (zachowano bajty: {from})",
   "vm.kvmReady": "Zezwolono: maszyny mogą już używać wirtualizacji sprzętowej",
+  "vm.bridgeReady": "Sieć mostkowana gotowa ({name})",
+  "vm.bridgeGone": "Sieć mostkowana usunięta",
   "vm.kvmNextLogin": "Zezwolono od następnego logowania",
   "pkg.foreignArchAdded": "Włączono pakiety 32-bitowe ({arch})",
   "pkg.foreignArchPresent": "Pakiety 32-bitowe ({arch}) były już włączone",

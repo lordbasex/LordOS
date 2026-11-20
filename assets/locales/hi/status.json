@@ -160,6 +160,8 @@
   "vm.imageRemoved": "इमेज हटाई गई",
   "vm.downloadResumed": "रुका हुआ डाउनलोड जारी है ({from} बाइट रखे गए)",
   "vm.kvmReady": "अनुमति दी गई: मशीनें अब हार्डवेयर वर्चुअलाइज़ेशन इस्तेमाल कर सकती हैं",
+  "vm.bridgeReady": "ब्रिज्ड नेटवर्क तैयार ({name})",
+  "vm.bridgeGone": "ब्रिज्ड नेटवर्क हटाया गया",
   "vm.kvmNextLogin": "आपके अगले लॉगिन से अनुमति दी गई",
   "pkg.foreignArchAdded": "32-बिट ({arch}) पैकेज चालू किए गए",
   "pkg.foreignArchPresent": "32-बिट ({arch}) पैकेज पहले से चालू थे",

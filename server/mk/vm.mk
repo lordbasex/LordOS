@@ -2,7 +2,7 @@
 # QMP, limits, state), and lord-vmdisplay, its picture and input over QEMU's peer-to-peer D-Bus display. libc and the
 # shared sandbox, cgroup and JSON code; lord-vmdisplay also links the system's D-Bus library (libsystemd), built only
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
-VM_COMMON := src/vm/machine.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
+VM_COMMON := src/vm/machine.c src/vm/vmnet.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
 LORDVM_SRC := src/vm/lordvm.c src/vm/qmp.c src/vm/vmsandbox.c src/vm/vmunattend.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
@@ -81,7 +81,7 @@ build/vm-test: tests/vm_test.c src/vm/qmp.c $(VM_COMMON) $(VM_HDR)
 	./$@ || { rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
-VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmthumb.c src/vm/vmagent.c
+VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmthumb.c src/vm/vmagent.c
 VM_SRV_OBJ := $(VM_SRV_SRC:src/%.c=build/obj/%.o)
 $(VM_SRV_OBJ): $(VM_HDR) src/ui/js_vm.h src/media/media_int.h src/pkg/pkg.h src/admin.h
 build/lord-server: $(VM_SRV_OBJ)
@@ -93,3 +93,10 @@ VMIMAGE_CLI_SRC := tests/vm_image_cli.c src/vm/vmimage_admin.c src/vm/vmcatalog.
 build/vm-image-cli: $(VMIMAGE_CLI_SRC) src/vm/vmcatalog.h src/vm/vm_admin.h src/pkg/http.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -DVM_CATALOG='"/var/tmp/lordos-vmimage-test/systems.json"' -DVM_STORE='"/var/tmp/lordos-vmimage-test/machines"' -DVM_KEYS='"/var/tmp/lordos-vmimage-test/keys"' -o $@ $(VMIMAGE_CLI_SRC)
+
+# vm-net-bridge and vm-net-unbridge like the admin helper runs them (tests/vm_net_cli.c; a manual check, not in make test:
+# it needs root and a wired card, and makes a real macvtap)
+VMNET_CLI_SRC := tests/vm_net_cli.c src/vm/vmnet_admin.c src/vm/vmnet.c src/vm/machine.c src/sec/json.c src/doc/wire.c src/net/nl.c
+build/vm-net-cli: $(VMNET_CLI_SRC) src/vm/vmnet.h src/vm/vm_admin.h src/net/netpriv.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(VMNET_CLI_SRC)

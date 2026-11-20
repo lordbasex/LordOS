@@ -269,5 +269,34 @@ eq('2D profile stays 2D', M.gfxFor('2d', { no3d: '' }, false), '2d');
 eq('arm64 machines stay 2D', [M.gfxFor('3d', { no3d: '' }, false, 'arm64'), M.no3dReason({ no3d: '' }, false, 'arm64')], ['2d', 'arch']);
 eq('Design profile asks for 3D', profileSize('design', { cpus: 8, ramMb: 16384, memMaxMb: 14336, vcpusRecommended: 7 }).gfx, '3d');
 eq('a running 3D machine', [M.runs3d({ sandbox: 511 | 512 }), M.runs3d({ sandbox: 511 }), M.runs3d(null)], [true, false, false]);
+
+// ---- the network (6.5): modes, forwarded ports, the bridged card ----
+eq('net modes', M.NET_MODES, ['shared', 'bridged', 'hostonly', 'isolated']);
+eq('ports in shared and host-only only', ['shared', 'bridged', 'hostonly', 'isolated'].map(M.usesPorts), [true, false, true, false]);
+const ssh = { proto: 'tcp', host: 2222, guest: 22, open: 'this-computer' };
+eq('a good rule', M.portProblems([ssh], 'shared'), []);
+eq('lan in shared', M.portProblems([{ ...ssh, open: 'lan' }], 'shared'), []);
+eq('lan in host-only', M.portProblems([{ ...ssh, open: 'lan' }], 'hostonly'), [{ i: 0, code: 'lanHostOnly' }]);
+eq('low host port', M.portProblems([{ ...ssh, host: 80 }, { ...ssh, host: 1023 }, { ...ssh, host: 1024 }], 'shared'), [{ i: 0, code: 'host' }, { i: 1, code: 'host' }]);
+eq('host port range', M.portProblems([{ ...ssh, host: 65536 }, { ...ssh, host: 0 }], 'shared').map((x) => x.code), ['host', 'host']);
+eq('guest port range', M.portProblems([{ ...ssh, guest: 0 }, { ...ssh, host: 2223, guest: 65536 }], 'shared').map((x) => x.code), ['guest', 'guest']);
+eq('duplicate per protocol', M.portProblems([ssh, { ...ssh, guest: 23 }, { ...ssh, proto: 'udp' }], 'shared'), [{ i: 1, code: 'duplicate' }]);
+eq('too many', M.portProblems(Array.from({ length: 33 }, (_, i) => ({ ...ssh, host: 3000 + i })), 'shared'), [{ i: -1, code: 'tooMany' }]);
+eq('32 is fine', M.portProblems(Array.from({ length: 32 }, (_, i) => ({ ...ssh, host: 3000 + i })), 'shared'), []);
+eq('a rule as set takes it', M.portRule({ proto: 'x', host: '8080', guest: 80, open: 'world' }), { proto: 'tcp', host: 8080, guest: 80, open: 'this-computer' });
+eq('new rule: ssh on 2222', M.newPortRule([]), ssh);
+eq('new rule: next free', M.newPortRule([ssh, { ...ssh, host: 2223 }, { ...ssh, proto: 'udp', host: 2224 }]).host, 2224);
+eq('host-only closes lan', M.portsForMode([{ ...ssh, open: 'lan' }], 'hostonly'), [ssh]);
+eq('shared keeps lan', M.portsForMode([{ ...ssh, open: 'lan' }], 'shared')[0].open, 'lan');
+eq('port input', [M.portInput('22a2'), M.portInput(''), M.portInput('1234567'), M.portInput('-80')], [222, 0, 12345, 80]);
+const cards = [{ name: 'wlan0', kind: 'wifi', up: true }, { name: 'enp4s0', kind: 'wired', up: false }, { name: 'enp3s0', kind: 'wired', up: true }];
+eq('card: the one it had', M.defaultCard(cards, 'enp4s0'), 'enp4s0');
+eq('card: first wired up', M.defaultCard(cards, 'wlan0'), 'enp3s0');
+eq('card: none', M.defaultCard([{ name: 'wlan0', kind: 'wifi', up: true }], ''), '');
+eq('bridge arg', M.bridgeArg({ id: '0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b', bridge: 'enp3s0', mac: '52:54:00:12:ab:cd' }), '0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b enp3s0 52:54:00:12:ab:cd');
+eq('bridge arg without a card', M.bridgeArg({ id: 'x', mac: 'y' }), '');
+eq('summary', [M.netSummary({ network: 'bridged', bridge: 'enp3s0' }), M.netSummary({ network: 'shared', ports: [{ ...ssh, open: 'lan' }] }), M.netSummary({ network: 'hostonly', ports: [{ ...ssh, open: 'lan' }] }), M.netSummary({})],
+  [{ mode: 'bridged', card: 'enp3s0', ports: 0, lan: false }, { mode: 'shared', card: '', ports: 1, lan: true }, { mode: 'hostonly', card: '', ports: 1, lan: false }, { mode: 'shared', card: '', ports: 0, lan: false }]);
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

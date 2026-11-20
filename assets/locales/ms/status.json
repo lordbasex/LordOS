@@ -151,6 +151,8 @@
   "vm.imageRemoved": "Imej dipadam",
   "vm.downloadResumed": "Menyambung muat turun yang dihentikan ({from} bait dikekalkan)",
   "vm.kvmReady": "Dibenarkan: mesin kini boleh menggunakan virtualisasi perkakasan",
+  "vm.bridgeReady": "Rangkaian berjambat sedia ({name})",
+  "vm.bridgeGone": "Rangkaian berjambat dialih keluar",
   "vm.kvmNextLogin": "Dibenarkan mulai log masuk anda yang seterusnya",
   "pkg.foreignArchAdded": "Pakej 32-bit ({arch}) didayakan",
   "pkg.foreignArchPresent": "Pakej 32-bit ({arch}) sudah didayakan",

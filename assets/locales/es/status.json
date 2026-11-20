@@ -160,6 +160,8 @@
   "vm.imageRemoved": "Imagen borrada",
   "vm.downloadResumed": "Continuando una descarga detenida ({from} bytes guardados)",
   "vm.kvmReady": "Listo: las máquinas ya pueden usar la virtualización por hardware",
+  "vm.bridgeReady": "Red en puente lista ({name})",
+  "vm.bridgeGone": "Red en puente quitada",
   "vm.kvmNextLogin": "Listo a partir de tu próximo inicio de sesión",
   "pkg.foreignArchAdded": "Paquetes de 32 bits ({arch}) habilitados",
   "pkg.foreignArchPresent": "Los paquetes de 32 bits ({arch}) ya estaban habilitados",

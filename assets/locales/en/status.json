@@ -160,6 +160,8 @@
   "vm.imageRemoved": "Image deleted",
   "vm.downloadResumed": "Continuing a stopped download ({from} bytes kept)",
   "vm.kvmReady": "Allowed: machines can use hardware virtualization now",
+  "vm.bridgeReady": "Bridged network ready ({name})",
+  "vm.bridgeGone": "Bridged network removed",
   "vm.kvmNextLogin": "Allowed from your next login",
   "pkg.foreignArchAdded": "32-bit ({arch}) packages enabled",
   "pkg.foreignArchPresent": "32-bit ({arch}) packages were already enabled",

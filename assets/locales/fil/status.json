@@ -160,6 +160,8 @@
   "vm.imageRemoved": "Binura ang image",
   "vm.downloadResumed": "Itinutuloy ang naitigil na download ({from} byte ang naitabi)",
   "vm.kvmReady": "Pinayagan: magagamit na ng mga makina ang hardware virtualization",
+  "vm.bridgeReady": "Handa na ang bridged na network ({name})",
+  "vm.bridgeGone": "Inalis ang bridged na network",
   "vm.kvmNextLogin": "Papayagan mula sa susunod mong pag-login",
   "pkg.foreignArchAdded": "Na-enable ang mga 32-bit ({arch}) na package",
   "pkg.foreignArchPresent": "Naka-enable na ang mga 32-bit ({arch}) na package",

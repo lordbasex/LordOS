@@ -169,6 +169,8 @@
   "vm.imageRemoved": "Imagine ștearsă",
   "vm.downloadResumed": "Se continuă o descărcare oprită ({from} octeți păstrați)",
   "vm.kvmReady": "Permis: mașinile pot folosi acum virtualizarea hardware",
+  "vm.bridgeReady": "Rețea în punte pregătită ({name})",
+  "vm.bridgeGone": "Rețea în punte eliminată",
   "vm.kvmNextLogin": "Permis de la următoarea autentificare",
   "pkg.foreignArchAdded": "Pachetele pe 32 de biți ({arch}) au fost activate",
   "pkg.foreignArchPresent": "Pachetele pe 32 de biți ({arch}) erau deja activate",
