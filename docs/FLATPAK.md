@@ -3,9 +3,13 @@
 **Status (2026-11-19): approved; phase 1 in development** (branch `feat/flatpak`). On 2026-11-19 the maintainer approved
 the seven exceptions E1–E7 below (recorded in `AGENTS.md`, "Flatpak as an app source") and decided: phase 1 on x86-64
 PCs only (the Raspberry Pi 5 in phase 2); Flathub's `verified` subset by default, the rest behind a Store setting; apps
-that need Flatpak's sub-sandboxes (Chromium/Electron through zypak) are marked "not yet supported" and their own spawn
-service waits for phase 2; open question 11 as decided there (every Flatpak app in the view). No compatibility with any Flathub app is claimed until
+that need Flatpak's sub-sandboxes (Chromium/Electron through zypak) are marked "not yet supported"; open question 11 as decided there (every Flatpak app in the view). No compatibility with any Flathub app is claimed until
 the test plan has run. The history of the review follows.
+
+**Update (2026-11-20, after the test plan): the maintainer asked for X11 the way GNOME and KDE give it, for the
+sub-sandbox, and for the problems found to be fixed.** lord-server now serves `org.freedesktop.portal.Flatpak` itself
+(E9, "Sub-sandboxes" below): GNOME 49+ apps that load images through glycin work (Meld, Emacs). Electron apps still
+don't start (they stay marked) and Flatpak's own `flatpak-portal` stays masked.
 
 **Earlier status (2026-10-27, rechecked 2026-11-19 against LordOS 0.8.9.1 and Debian 13's current packages): design review kept for the future; not planned for any release.** On 2026-10-27 the
 maintainer decided not to implement Flatpak for now, to keep the system stable and avoid the complexity and
@@ -403,9 +407,10 @@ Whatever the app declares, the launcher always adds:
 | **the home folder is read-only in the launcher's view** (decided by the maintainer on 2026-11-19 after a security review): writable only `~/.var/app/<id>`, the person's folders from `~/.config/user-dirs.dirs` (real folders, not links, not protected) and an opened path `grant_ok` allows; whatever Flatpak grants (metadata, override files, `~/.bashrc` asked for by name), nothing can write, create or rename a file of the home elsewhere. The metadata is never parsed for this. "Open with" never lends the home folder itself or a folder holding a protected one, and lends a sensitive path read-only | startup files, keys and autostart entries run outside any sandbox at the next login. Protecting them one by one (a first version) could be sidestepped by renaming their folder, by creating a file that didn't exist yet, or through a link; `--nofilesystem=<file>` doesn't hide a single file inside a granted home (checked) |
 
 `org.freedesktop.portal.Flatpak` (sub-sandboxes) can't be refused reliably by an option, so in
-phase 1 LordOS masks `flatpak-portal.service` (see "Exceptions to approve", E5): with no owner and
-no activation the name can't be called. A user who unmasks it in their own manager only loses
-per-app identity for those sub-sandboxes (they fall under the `user@` union), never a restriction.
+phase 1 LordOS masks `flatpak-portal.service` (see "Exceptions to approve", E5). Since 2026-11-20 lord-server owns that
+name itself and runs a Spawn inside the caller's own scope and view (E9, "Sub-sandboxes"); the name is in the talk-only
+list, so no app can own it. A user who unmasks Flatpak's portal in their own manager changes nothing while lord-server
+holds the name.
 
 The table is **Design**: whether each hidden path really disappears inside a sandbox granted
 `home` or `host` is part of the test plan.
@@ -747,8 +752,8 @@ library.
 
 - LordOS's portal frontends (E8) for Flatpak apps: FileChooser with a document store, Notification;
   identity by cgroup. OpenURI and Inhibit are already served for Linux apps (see "Portals").
-- Sub-sandboxes (`org.freedesktop.portal.Flatpak` served by LordOS so `flatpak-spawn` children
-  enter the same scope), which Chromium/Electron apps need.
+- Sub-sandboxes: served since 2026-11-20 (E9); what Chromium/Electron still need (sharing the caller's PID namespace
+  through bubblewrap, see "Sub-sandboxes") is left.
 - A session-bus filter for device-restricted apps (shared with Linux apps, already the "next step"
   in FIREWALL.md).
 - Per-app Flatpak permission editor in Settings.
@@ -816,11 +821,11 @@ removed after.
 | 2 | Flathub's key in the user's remote: `6E5C 05D9 79C7 6DAF 93C0 8135 4184 DD4D 907A 7CAE`. `update --appstream` ran in `lordos-net-flathub.scope`; Monitor → Network showed "Flathub" (311 MB after the installs). With `lordos:flathub` set to no internet: `denied out udp 8.8.8.8:53 (restricted no-internet)` and the fetch failed; lifted, it worked. Flatpak's message for that failure is "No such ref 'appstream2/x86_64'", which the Store shows as it is. |
 | 3 | Checked on 2026-11-19 (above). |
 | 4 | Every app launched in this run ran in its `app-lordos-fp-<id>.scope` with its `xdg-dbus-proxy`; nothing under `user@1000.service/app.slice/app-flatpak-*`. |
-| 5 | Shortwave with no internet: `denied out udp 8.8.8.8:53` and `denied in udp` for its device discovery, "Unable to find radio-browser.info server"; Monitor → Network: 185 denied. From inside it: `org.freedesktop.systemd1`, `org.freedesktop.Flatpak` (`flatpak-spawn --host`: "ServiceUnknown") and `org.freedesktop.secrets` unknown through the proxy, no `$XDG_RUNTIME_DIR/systemd`, no system bus socket, no `systemd-run`. Per-domain rules: not tried. |
+| 5 | Shortwave with no internet: `denied out udp 8.8.8.8:53` and `denied in udp` for its device discovery, "Unable to find radio-browser.info server"; Monitor → Network: 185 denied. From inside it: `org.freedesktop.systemd1`, `org.freedesktop.Flatpak` (`flatpak-spawn --host`: "ServiceUnknown") and `org.freedesktop.secrets` unknown through the proxy, no `$XDG_RUNTIME_DIR/systemd`, no system bus socket, no `systemd-run`. Per-domain rule (`*.radio-browser.info`, deny, out): DNS answered, then `denied out tcp 91.98.4.78:443 (rule)` and the same for its IPv6 address; Shortwave said "Unable to connect to de1.api.radio-browser.info". |
 | 6 | Text Editor given `host`, `session-bus`, `system-bus` and `--talk-name=org.freedesktop.systemd1` by a user override: `~/.config/lordos`, `~/.local/share/applications`, `~/.local/share/lordos` and `~/.cache/lordos` are empty tmpfs (a file written there never reached the home); `~/.config/autostart` can't be created (`~/.config` read-only); `~/.bashrc` readable, not writable; Documents writable; the session bus is still only the proxy (`systemd1` unknown, the same filtered names on both socket paths); no system bus. The overrides had no effect beyond `host`. |
 | 7 | Text Editor with no-files: its root is a tmpfs and only `~/.var/app/org.gnome.TextEditor` is real; no Documents, `~/.ssh`, `/media/alex` or other homes; no session bus. "Open with" lending exactly one file: checked on 2026-11-19 (Decibels). |
-| 8 | Firefox (declares `devices=all`) with no camera, USB and Bluetooth: `open("/dev/bus/usb/001/00x")` → `EPERM` and `socket(AF_BLUETOOTH)` → `EPERM` inside its scope; the same namespaces outside the scope opened both. Camera: not tried (no v4l2loopback on the VM). |
-| 9 | Playback: Decibels on 2026-11-19. The VM has no sound card, so a PipeWire virtual source stood in for a microphone. **Problem:** an unrestricted Flatpak app (Shortwave) didn't see it either, and the PipeWire guard logged `pwguard:  is restricted (no-mic): its capture stream … was closed` with an empty app. A Flatpak app's PulseAudio client reports a pid from the app's own pid namespace, so the guard can't verify it and treats it as restricted while any no-mic app runs ("unverified", `sec/pwguard.c`), and "runs" (`appid_running`) also counts an app scope that is empty after the app has exited, which stays until the session ends. So after one no-mic app has run, no Flatpak app can record until the next login. It fails closed (no restricted app gets a microphone) but it is wrong. ALSA capture: not tried (no card). |
+| 8 | Firefox (declares `devices=all`) with no camera, USB and Bluetooth: `open("/dev/bus/usb/001/00x")` → `EPERM` and `socket(AF_BLUETOOTH)` → `EPERM` inside its scope; the same namespaces outside the scope opened both. Camera, with `v4l2loopback` (`/dev/video9`): `EPERM` with no camera (`denied opening device 81:0 (no-camera)`), opened at once when lifted. |
+| 9 | Playback: Decibels on 2026-11-19. The VM has no sound card, so a PipeWire virtual source stood in for a microphone. **Problem (fixed the same day, see "Fixes after the test plan"):** an unrestricted Flatpak app (Shortwave) didn't see it either, and the PipeWire guard logged `pwguard:  is restricted (no-mic): its capture stream … was closed` with an empty app. A Flatpak app's PulseAudio client reports a pid from the app's own pid namespace, so the guard can't verify it and treats it as restricted while any no-mic app runs ("unverified", `sec/pwguard.c`), and "runs" (`appid_running`) also counts an app scope that is empty after the app has exited, which stays until the session ends. So after one no-mic app has run, no Flatpak app can record until the next login. It fails closed (no restricted app gets a microphone) but it is wrong. ALSA capture: not tried (no card). |
 | 10 | `notify-send` from inside Text Editor: shown. With no-notifications (set before login: lord-server reads `firewall.json` when the session starts and then only through its own pages): not shown, and the app still got an id (`1`). The notification shows a plain blue square, not the app's icon. |
 | 11 | Firefox, device-restricted, started without a session bus and showed its first-run page (not accepted). |
 | 12 | Text Editor taken back one commit, then `update` brought it to the newest; uninstalling KCalc and `uninstall --unused` removed the KDE 6.11 runtime, its locale and `KStyle.Adwaita` (7.1 → 6.2 GB). The Store still has no update detection (open question 8). |
@@ -830,16 +835,91 @@ removed after.
 |---|---|
 | GNOME Text Editor (GTK 4, libadwaita) | works: Dock, "Open with", the rows above |
 | Decibels (GTK 4, GJS; sound) | works (2026-11-19) |
-| Shortwave (GTK 4, Rust; network, sound) | the window and the station directory work; station covers don't load (images go through glycin, below); playback fails with "Stream doesn't contain enough data", the same with a plain `flatpak run` outside LordOS, so not LordOS's |
+| Shortwave (GTK 4, Rust; network, sound) | the window and the station directory work; station covers didn't load until the sub-sandbox (glycin, below); playback fails with "Stream doesn't contain enough data", the same with a plain `flatpak run` outside LordOS, so not LordOS's |
 | KCalc (Qt 6, KDE 6.11) | works, with LordOS's frame |
 | Firefox (its own sandbox inside Flatpak; `devices=all`) | works, restricted or not |
-| Meld (GTK 3; declares `host`) | **crashes at start**: GTK asks gdk-pixbuf for an SVG, gdk-pixbuf asks glycin, and glycin runs its loader through `flatpak-spawn --sandbox`, a sub-sandbox that needs `flatpak-portal`, which LordOS masks; GTK aborts when the icon can't load |
-| Emacs (X11 only) | **doesn't start** ("standard input is not a tty"), from the launcher and from search: the launcher never keeps X11 for a Flatpak app (`.x11 = 0` in `apps_launch_flatpak`, the view's `/tmp` has no X socket), although the table under Problem 1 and the Store's "Old-style X11 windows" row say it does when the app isn't restricted |
+| Meld (GTK 3; declares `host`) | works since E9 (2026-11-20); before it **crashed at start**: GTK asks gdk-pixbuf for an SVG, gdk-pixbuf asks glycin, and glycin runs its loader through `flatpak-spawn --sandbox`, a sub-sandbox that needs `flatpak-portal`, which LordOS masks; GTK aborts when the icon can't load |
+| Emacs (X11 only) | works since 2026-11-20, through Xwayland with LordOS's frame (it can't create `~/.emacs.d`: the home is read-only); before it **didn't start** ("standard input is not a tty"), from the launcher and from search: the launcher never keeps X11 for a Flatpak app (`.x11 = 0` in `apps_launch_flatpak`, the view's `/tmp` has no X socket), although the table under Problem 1 and the Store's "Old-style X11 windows" row say it does when the app isn't restricted |
 | Spotify (`extra-data`; X11 and Wayland) | installs (its extra data downloaded in the Flathub scope); exits at once with nothing in its log; not looked into further |
-| MarkText (Electron) | fails as expected: zypak needs `flatpak-portal` ("Unit flatpak-portal.service is masked"), then "Missing X server or $DISPLAY"; the Store already marks it |
+| MarkText (Electron) | fails as expected: zypak needs `flatpak-portal` ("Unit flatpak-portal.service is masked"), then "Missing X server or $DISPLAY"; the Store already marks it. With E9 its Spawn reaches lord-server, and bubblewrap then stops: "creation of new user namespaces was not disabled as requested" (not looked into further) |
 
 Smaller things seen: after an app closes, Monitor → Network names it by its raw id (`flatpak:de.haeckerfelix.Shortwave`)
-with a letter for an icon, and the Dock showed a letter for Shortwave while it ran.
+with a letter for an icon, and the Dock showed a letter for Shortwave while it ran. Both came from installing it from a
+terminal while those lists were open (a Store install refreshes them); fixed anyway (below).
+
+### Fixes after the test plan (2026-11-20)
+
+Checked on VM 127 with `0.8.9.3~ws82` and lord-server rebuilt from this branch:
+
+- **The Store says when the Firewall stopped Flathub** (`apps/store/flathub.js`): with `lordos:flathub` blocked (no
+  internet, no network, or an app rule "deny") it says so and where to allow it; with a connection a rule denied since
+  the job started, it names the host. A catalog refresh that failed used to keep the last catalog without a word; now it
+  says the catalog couldn't be updated.
+- **Monitor and Settings take rules and blocks for Flatpak apps**: `firewall.enforceable` in `sdk/monitor.js` left
+  `flatpak:` out, so Monitor offered no rule for them, although the firewall applies them. An exited app is named
+  without its `flatpak:` prefix, and a Flatpak id the lists don't know yet reads the list again once.
+- **Notifications**: lord-server's notification server adds the Flatpak app it found from the sender's scope
+  (`"flatpak"`, never from the desktop-entry the caller writes); the shell shows that app's name and icon and files it
+  under the same key Settings → Notifications lists. Checked: Text Editor's icon and name.
+- **The microphone guard and Flatpak apps** (`sec/pwguard.c`, `sec/appid.c`): an exited app's empty scope no longer
+  counts as running (`appid_running` reads `cgroup.events`); a Flatpak app's PulseAudio client is matched to its process
+  through the app's own scope: pipewire-pulse's `pipewire.access.portal.app_id` names the app, then a process of that
+  scope whose innermost pid (`NSpid`) is the one the client reported and which holds at least as many connections to
+  pipewire-pulse as there are clients claiming them. Neither the property nor the pid is taken on its word. The
+  connections are counted from pipewire-pulse's side, so an app with no network (another network namespace) is counted
+  too. Checked: Shortwave recorded the virtual source while Decibels, with no microphone, ran and couldn't; after
+  Decibels closed, recording kept working.
+- **X11 like GNOME and KDE give it**: an unrestricted Flatpak app's view keeps the X socket of `$DISPLAY`
+  (`/tmp/.X11-unix/X<n>`, bound into its private `/tmp`) and the session's X cookie (read-only, in its runtime
+  folder), and the launcher keeps `DISPLAY` and `XAUTHORITY`; `flatpak run` then gives X only to an app that declares
+  it. A restricted app gets none, as a restricted Linux app (X11 apps can watch each other, PRIVACY.md). The Store's
+  row now says exactly when X is off. Checked: GNU Emacs (X11 only) from search, through Xwayland.
+- **lord-server's D-Bus client**: a message with more fds than a connection takes (now 16, was 4) is answered with an
+  error and the connection carries on; it used to drop the whole connection (an Electron Spawn took the portal down).
+- **The build**: `server/Makefile`'s objects now depend on every header under `src/*/`: changing `vault/dbus.h` left
+  objects with the old struct size and lord-server crashed at start (found on the VM, before any release).
+
+### The automated run (`server/tests/fwflatpak/flatpak.sh`)
+
+The plan's checks that need no person at the screen are a script, run in the test VM as the session user
+(`make -C server build/launch-cli build/fpak-cli build/pwguard-cli && bash server/tests/fwflatpak/flatpak.sh`):
+Flathub's firewall component, the app's identity, never-granted with a user override, no files, the sub-sandbox
+(including a refused caller outside any Flatpak app), the X display with and without a restriction, no internet, and
+the PipeWire guard with two Flatpak apps (through `pwguard-cli`, which rereads `firewall.json`, so no new login is
+needed). On VM 127, 2026-11-20: **31 passed, 0 failed**. Its first runs found one more bug: lord-server's D-Bus client
+refused any message whose signature has an fd (`h`) when it carried none, so a Spawn with no fds (an empty `a{uh}`)
+closed the portal's connection; each fd index is now checked against the fds that came instead.
+
+### Sub-sandboxes (E9, built 2026-11-20)
+
+Flatpak's `flatpak-portal` serves `org.freedesktop.portal.Flatpak.Spawn` from the user's service manager, so what it
+starts leaves the app's scope, its firewall rules and its view; LordOS masks it (E5). GNOME 49+ runtimes need it even
+for ordinary apps: GTK asks gdk-pixbuf for an image, gdk-pixbuf asks glycin, and glycin runs each image loader as
+`flatpak-spawn --sandbox`. Without it Meld crashed at start and Shortwave showed no images.
+
+lord-server serves the name itself (`server/src/fpspawn.c`, the argument rules in `fpak.c`, `fpak_spawn_argv`):
+
+- **Who**: the bus gives the caller's pid; it must be in a root-owned `app-lordos-fp-<id>.scope` (a Flatpak app's
+  proxy runs there), and that process's `/.flatpak-info` must name the same app. Anything else is refused. The name
+  is talk-only for apps (`--talk-name`), so no app can own it.
+- **What**: `flatpak run` of the same app id, with the app's command and arguments after the id (never read as
+  flatpak options), its environment as `--env=` (names checked), `--sandbox` and the sandbox flags as flatpak-portal
+  maps them, `--die-with-parent`, and then LordOS's never-granted options and current restrictions, so they win.
+  `usr-fd`, `app-fd` and the expose-fd options are refused; `sandbox-expose` names are one plain path element under
+  `~/.var/app/<id>/sandbox`.
+- **Where**: a waiter forked by lord-server enters the app's scope, then the user, IPC, mount and PID namespaces of
+  that app's view (taken from the view's first process), applies Landlock's scoping again with `no_new_privs`, and starts
+  `flatpak run`, which is born in the view. The app's fds go to the numbers it asked for (at most 16, 0-1023); everything
+  else lord-server holds closes at exec. SpawnExited goes to the caller alone; WATCH_BUS ends the process group when the
+  caller leaves the bus; SpawnSignal only reaches the caller's own processes. At most 32 per app.
+- **Nothing in the background**: lord-server takes the name only while `flatpak` is installed (checked every 30 s, so
+  turning Flathub on needs no restart). Without Flatpak nothing is on the bus and nothing runs.
+
+Checked on VM 127: Meld and GNU Emacs start, with `glycin-svg` and `glycin-image-rs` in their own scopes; a running
+`glycin-svg` had `NoNewPrivs: 1`, was two PID namespaces below the view, had its own network namespace, no session bus,
+only `/dev/null`-class devices and an empty home. Electron (MarkText) reaches the Spawn and bubblewrap stops on
+"creation of new user namespaces was not disabled as requested" when it joins the caller's namespaces
+(`--parent-pid` with `--parent-expose-pids`); left for later, so Electron apps stay marked.
 
 ## Open questions
 
@@ -848,7 +928,7 @@ with a letter for an icon, and the Dock showed a letter for Shortwave while it r
    name the scope by a hash and keep a root-readable map?
 2. **Sub-sandboxes.** Masking `flatpak-portal` likely breaks most Chromium/Electron apps (zypak).
    Accept that in phase 1 and mark them in the Store, or ship phase 2's own Spawn implementation
-   first?
+   first? **Decided 2026-11-19: mark them; 2026-11-20: LordOS's own Spawn built (E9) because glycin needs it.**
 3. **`~/.ssh`, `~/.gnupg` and the `ssh-auth`/`gpg-agent` sockets.** Hide them from Flatpak apps that
    declare `home` by default (as the launcher's grant rules do for Linux apps with no-files), or
    honour the declaration and show it in the Store?

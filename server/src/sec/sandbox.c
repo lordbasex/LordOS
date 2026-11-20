@@ -347,6 +347,16 @@ static int bind_clone(int tree, const char *path, int is_dir) {
     return (int)syscall(SYS_move_mount, tree, "", AT_FDCWD, path, MOVE_MOUNT_F_EMPTY_PATH);
 }
 
+int sandbox_x11_path_ok(const char *path) {
+    static const char pre[] = "/tmp/.X11-unix/X";
+    if (!path || strncmp(path, pre, sizeof pre - 1)) return 0;
+    const char *d = path + sizeof pre - 1;
+    size_t n = strlen(d);
+    if (!n || n > 4) return 0;
+    for (size_t i = 0; i < n; i++) if (d[i] < '0' || d[i] > '9') return 0;
+    return 1;
+}
+
 static int is_under(const char *path, const char *dir) {
     size_t n = strlen(dir);
     return !strncmp(path, dir, n) && (path[n] == '/' || !path[n]);
@@ -381,7 +391,7 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     close(sync[0]);
 
     /* PID 1: clones of everything that stays visible, taken before the tmpfs hide the originals */
-    struct { int fd, dir; const char *path; int ro; } keep[2 * SANDBOX_FILES_MAX + 10];
+    struct { int fd, dir; const char *path; int ro; } keep[2 * SANDBOX_FILES_MAX + 12];
     int nk = 0;
     for (int pass = 0; pass < 2; pass++) {
         const char *const *list = pass ? cfg->ro : cfg->rw;
@@ -414,6 +424,20 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
         if (t < 0) continue;
         keep[nk].fd = t; keep[nk].dir = 0; keep[nk].path = sockpath[nsock]; keep[nk].ro = 0; nk++;
         nsock++;
+    }
+    /* an unrestricted Flatpak app's X display: the socket (into the private /tmp) and the cookie (read-only) */
+    static char xauthpath[PATH_MAX];
+    if (cfg->x11 && sandbox_x11_path_ok(cfg->x11)) {
+        struct stat st;
+        int t = !lstat(cfg->x11, &st) && S_ISSOCK(st.st_mode) ? (int)syscall(SYS_open_tree, AT_FDCWD, cfg->x11, OPEN_TREE_CLONE | O_CLOEXEC) : -1;
+        if (t >= 0) { keep[nk].fd = t; keep[nk].dir = 0; keep[nk].path = cfg->x11; keep[nk].ro = 0; nk++; }
+    }
+    if (cfg->xauth && cfg->runtime_dir && cfg->xauth[0] && cfg->xauth[0] != '.' && !strchr(cfg->xauth, '/') &&
+        snprintf(xauthpath, sizeof xauthpath, "%s/%s", cfg->runtime_dir, cfg->xauth) < (int)sizeof xauthpath) {
+        struct stat st;
+        int t = !lstat(xauthpath, &st) && S_ISREG(st.st_mode) && st.st_uid == getuid()
+                    ? (int)syscall(SYS_open_tree, AT_FDCWD, xauthpath, OPEN_TREE_CLONE | O_CLOEXEC | AT_SYMLINK_NOFOLLOW) : -1;
+        if (t >= 0) { keep[nk].fd = t; keep[nk].dir = 0; keep[nk].path = xauthpath; keep[nk].ro = 1; nk++; }
     }
     int bad = 0;
     const char *opts = "mode=0700,size=64m";

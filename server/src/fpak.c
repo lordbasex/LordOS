@@ -104,9 +104,9 @@ out:
  * app's policy to TALK, which replaces an OWN its metadata or an override file asked for (the command line is merged
  * last). The secret service is refused outright: talking to it would reach the person's stored secrets. */
 static const char *const talk_only[] = { "org.freedesktop.Notifications", "org.freedesktop.portal.Desktop",
-                                         "org.freedesktop.ScreenSaver", "org.kde.StatusNotifierWatcher", NULL };
-static const char *const never_talk[] = { "org.freedesktop.Flatpak", "org.freedesktop.systemd1", "org.freedesktop.secrets",
-                                          "org.freedesktop.portal.Flatpak", NULL };
+                                         "org.freedesktop.ScreenSaver", "org.kde.StatusNotifierWatcher",
+                                         "org.freedesktop.portal.Flatpak", NULL };   /* the last: lord-server's Spawn (E9) */
+static const char *const never_talk[] = { "org.freedesktop.Flatpak", "org.freedesktop.systemd1", "org.freedesktop.secrets", NULL };
 /* folders the system reads to start or install something, or that hold a security decision (fsops_protected): hidden
  * where Flatpak can hide them; the launcher's view also keeps them, and the shell's startup files, read-only */
 static const char *const hidden[] = { ".config/lordos", ".local/share/lordos", ".cache/lordos", ".local/share/applications",
@@ -114,23 +114,98 @@ static const char *const hidden[] = { ".config/lordos", ".local/share/lordos", "
                                       ".local/share/flatpak", ".local/share/flatpak/overrides", ".local/share/flatpak/exports",
                                       ".cache/flatpak", NULL };
 
-int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap) {
+static int plain_name(const char *n) {
+    size_t l = n ? strlen(n) : 0;
+    if (!l || l > 255 || n[0] == '.' || n[0] == '-') return 0;
+    for (size_t i = 0; i < l; i++) {
+        char c = n[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-')) return 0;
+    }
+    return 1;
+}
+
+static int env_name_ok(const char *n, size_t l) {
+    if (!l || l > 255 || !((n[0] >= 'a' && n[0] <= 'z') || (n[0] >= 'A' && n[0] <= 'Z') || n[0] == '_')) return 0;
+    for (size_t i = 1; i < l; i++) {
+        char c = n[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_')) return 0;
+    }
+    return 1;
+}
+
+static int str_ok(const char *v, int option) {
+    return v && strlen(v) < FPAK_SPAWN_STR_MAX && (!option || !strchr(v, '\n'));
+}
+
+static int list_len(const char *const *l) { int n = 0; while (l && l[n]) n++; return n; }
+
+int fpak_spawn_ok(const FpakSpawn *s) {
+    if (!s || (s->flags & ~FPAK_SPAWN_FLAGS_ALL) || (s->sandbox_flags & ~FPAK_SANDBOX_FLAGS_ALL)) return 0;
+    if ((s->flags & (FPAK_SPAWN_EXPOSE_PIDS | FPAK_SPAWN_SHARE_PIDS)) && s->parent_pid <= 0) return 0;
+    if (s->cwd) {
+        if (s->cwd[0] != '/' || !str_ok(s->cwd, 1)) return 0;
+        for (const char *p = s->cwd; (p = strstr(p, "..")); p += 2)
+            if (p[-1] == '/' && (p[2] == '/' || !p[2])) return 0;
+    }
+    int na = list_len(s->args);
+    if (na < 1 || na > FPAK_SPAWN_ARGS_MAX || !s->args[0][0]) return 0;
+    for (int i = 0; i < na; i++) if (!str_ok(s->args[i], i == 0)) return 0;
+    if (list_len(s->env) > FPAK_SPAWN_ENV_MAX || list_len(s->unset_env) > FPAK_SPAWN_ENV_MAX) return 0;
+    for (int i = 0; s->env && s->env[i]; i++) {
+        const char *eq = strchr(s->env[i], '=');
+        if (!eq || !env_name_ok(s->env[i], (size_t)(eq - s->env[i])) || !str_ok(s->env[i], 1)) return 0;
+    }
+    for (int i = 0; s->unset_env && s->unset_env[i]; i++) if (!env_name_ok(s->unset_env[i], strlen(s->unset_env[i]))) return 0;
+    if (list_len(s->expose) > FPAK_SPAWN_EXPOSE_MAX || list_len(s->expose_ro) > FPAK_SPAWN_EXPOSE_MAX) return 0;
+    for (int i = 0; s->expose && s->expose[i]; i++) if (!plain_name(s->expose[i])) return 0;
+    for (int i = 0; s->expose_ro && s->expose_ro[i]; i++) if (!plain_name(s->expose_ro[i])) return 0;
+    return 1;
+}
+
+static int build_argv(const FpakRun *r, const FpakSpawn *sp, char **argv, int max, char *buf, size_t cap) {
     if (!r || !fpak_id_ok(r->id) || !r->arch || !arch_ok(r->arch) || !fpak_branch_ok(r->branch) || !r->home ||
         r->home[0] != '/')
         return -1;
-    if (r->opened && (r->opened[0] != '/' || strchr(r->opened, ':') || strchr(r->opened, '\n'))) return -1;
+    if (r->opened && (sp || r->opened[0] != '/' || strchr(r->opened, ':') || strchr(r->opened, '\n'))) return -1;
+    if (sp && !fpak_spawn_ok(sp)) return -1;
     int argc = 0;
     size_t used = 0;
     int bad = 0;
 #define ARG(...) do { \
         int k_ = snprintf(buf + used, cap - used, __VA_ARGS__); \
-        if (k_ < 0 || (size_t)k_ >= cap - used || argc >= FPAK_ARGV_MAX - 1) { bad = 1; break; } \
+        if (k_ < 0 || (size_t)k_ >= cap - used || argc >= max - 1) { bad = 1; break; } \
         argv[argc++] = buf + used; used += (size_t)k_ + 1; \
     } while (0)
     ARG("%s", FPAK_FLATPAK);
     ARG("run");
     ARG("--arch=%s", r->arch);
     ARG("--branch=%s", r->branch);
+    if (sp) {
+        /* what the app asked for its new instance (flatpak-portal's mapping); everything after this can only take away */
+        uint32_t f = sp->flags, sf = sp->sandbox_flags;
+        ARG("--die-with-parent");      /* the new sandbox ends with the process lord-server watches */
+        if (f & FPAK_SPAWN_SANDBOX) {
+            ARG("--sandbox");
+            if (sf & FPAK_SANDBOX_SHARE_DISPLAY) { ARG("--socket=wayland"); ARG("--socket=fallback-x11"); }
+            if (sf & FPAK_SANDBOX_SHARE_SOUND) ARG("--socket=pulseaudio");
+            if (sf & FPAK_SANDBOX_SHARE_GPU) ARG("--device=dri");
+            ARG(sf & FPAK_SANDBOX_ALLOW_DBUS ? "--session-bus" : "--no-session-bus");
+            ARG(sf & FPAK_SANDBOX_ALLOW_A11Y ? "--a11y-bus" : "--no-a11y-bus");
+        }
+        if (f & FPAK_SPAWN_NO_NETWORK) ARG("--unshare=network");
+        if (f & FPAK_SPAWN_EMPTY_APP) ARG("--app-path=");
+        if (f & (FPAK_SPAWN_EXPOSE_PIDS | FPAK_SPAWN_SHARE_PIDS)) {
+            ARG("--parent-pid=%d", sp->parent_pid);
+            ARG(f & FPAK_SPAWN_SHARE_PIDS ? "--parent-share-pids" : "--parent-expose-pids");
+        }
+        if (sp->instance_fd >= 0) ARG("--instance-id-fd=%d", sp->instance_fd);
+        for (int i = 0; sp->expose && sp->expose[i]; i++) ARG("--filesystem=%s/.var/app/%s/sandbox/%s", r->home, r->id, sp->expose[i]);
+        for (int i = 0; sp->expose_ro && sp->expose_ro[i]; i++) ARG("--filesystem=%s/.var/app/%s/sandbox/%s:ro", r->home, r->id, sp->expose_ro[i]);
+        if (sp->cwd) ARG("--cwd=%s", sp->cwd);
+        for (int i = 0; sp->env && sp->env[i]; i++) ARG("--env=%s", sp->env[i]);
+        for (int i = 0; sp->unset_env && sp->unset_env[i]; i++) ARG("--unset-env=%s", sp->unset_env[i]);
+        ARG("--command=%s", sp->args[0]);
+    }
     /* never granted, whatever the app or an override file says */
     ARG("--nosocket=session-bus");
     ARG("--nosocket=system-bus");
@@ -150,10 +225,18 @@ int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap) {
     if (r->opened) ARG("--filesystem=%s%s", r->opened, r->opened_ro ? ":ro" : "");
     ARG("%s", r->id);
     if (r->opened) ARG("%s", r->opened);
+    for (int i = 1; sp && sp->args[i]; i++) ARG("%s", sp->args[i]);
 #undef ARG
     if (bad) return -1;
     argv[argc] = NULL;
     return argc;
+}
+
+int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap) { return build_argv(r, NULL, argv, FPAK_ARGV_MAX, buf, cap); }
+
+int fpak_spawn_argv(const FpakRun *r, const FpakSpawn *s, char **argv, char *buf, size_t cap) {
+    if (!s) return -1;
+    return build_argv(r, s, argv, FPAK_SPAWN_ARGV_MAX, buf, cap);
 }
 
 int fpak_ref_ok(const char *ref, const char *arch) {

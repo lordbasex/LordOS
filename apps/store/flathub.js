@@ -3,7 +3,7 @@
 // lordos-net-flathub.scope; the catalog read by the sandboxed lord-appstream. Turning Flathub on installs the `flatpak`
 // Debian package with the Store's own package job (debian.js, without Recommends), then adds the remote from the file
 // the lordos package ships and fetches the catalog. The pages are flathubpages.js; the plain logic sdk/flathubmodel.js.
-import { createStore, settings, locale, refreshApps, flathubModel as M, t } from '@lordos/sdk';
+import { createStore, settings, locale, refreshApps, flathubModel as M, firewall, firewallState, t } from '@lordos/sdk';
 
 const api = () => (typeof lord !== 'undefined' && lord.flatpak ? lord.flatpak : null);
 // this PC can have Flathub (phase 1: x86-64); flatpak itself is installed
@@ -49,7 +49,21 @@ const lastWords = (lines) => {
   const l = (lines || []).filter((x) => x.trim());
   return (l.find((x) => /^error:/i.test(x.trim())) || l[l.length - 1] || '').trim().slice(0, 300);
 };
-const failed = (r) => ({ ok: false, text: r.code === -1 ? t('flathub.msg.refused') : t('flathub.msg.failed', { reason: lastWords(r.lines) || r.code }) });
+// Flathub's downloads are the firewall component lordos:flathub. When one fails because of the Firewall, Flatpak only
+// says it found nothing ("No such ref …"), so the Store says what happened and where to change it: a block on the
+// whole component, or a connection a rule denied since the job started.
+const FW_APP = 'lordos:flathub';
+function firewallWords(since) {
+  if (!firewall.available()) return null;
+  if (firewall.appRule(FW_APP) === 'deny' || firewall.blocks(FW_APP, 'no-internet') || firewall.blocks(FW_APP, 'no-network')) {
+    return t('flathub.msg.fwBlocked');
+  }
+  firewall.refresh();
+  const e = (firewallState.get().events || []).filter((x) => x.app === FW_APP && x.v === 'deny' && x.dir === 'out' && (x.at || 0) >= since).pop();
+  return e ? t('flathub.msg.fwDenied', { host: (e.hosts && e.hosts[0]) || e.addr || '?' }) : null;
+}
+const failed = (r, since = 0) => ({ ok: false, text: r.code === -1 ? t('flathub.msg.refused')
+  : firewallWords(since) || t('flathub.msg.failed', { reason: lastWords(r.lines) || r.code }) });
 
 // ---- the catalog ----
 let loading = null;
@@ -57,6 +71,7 @@ let loading = null;
 export function loadCatalog({ fetch = false } = {}) {
   if (loading) return loading;
   loading = (async () => {
+    const since = Date.now();
     let fetched = false;
     const doFetch = async () => {
       patch({ busy: 'appstream' });
@@ -71,8 +86,10 @@ export function loadCatalog({ fetch = false } = {}) {
     let r = await run('catalog', M.catalogLang(locale.get().lang));
     if (r.code === 2 && !fetched) { fr = await doFetch(); patch({ busy: 'catalog' }); r = await run('catalog', M.catalogLang(locale.get().lang)); }
     const a = api();
-    if (r.code === 0 && a) patch({ catalog: a.catalog(), loaded: true, busy: '' });
-    else patch({ busy: '', loaded: state.get().loaded, msg: fr && fr.code !== 0 ? failed(fr) : { ok: false, text: t('flathub.msg.noCatalog') } });
+    // the last catalog stays when a fetch fails, but the person is told it couldn't be updated, and why
+    const stale = fr && fr.code !== 0 ? { ok: false, text: firewallWords(since) || t('flathub.msg.notRefreshed', { reason: lastWords(fr.lines) || fr.code }) } : null;
+    if (r.code === 0 && a) patch({ catalog: a.catalog(), loaded: true, busy: '', ...(stale ? { msg: stale } : {}) });
+    else patch({ busy: '', loaded: state.get().loaded, msg: fr && fr.code !== 0 ? failed(fr, since) : { ok: false, text: firewallWords(since) || t('flathub.msg.noCatalog') } });
     loading = null;
   })();
   return loading;
@@ -88,8 +105,9 @@ export async function refreshInstalled() {
 // Turning Flathub on, once flatpak is installed: the remote (if it isn't there), the catalog, what is installed.
 export async function turnOn() {
   patch({ busy: 'remote', msg: null });
+  const since = Date.now();
   const r = await run('remoteAdd');
-  if (r.code !== 0) { patch({ busy: '', msg: failed(r) }); return false; }
+  if (r.code !== 0) { patch({ busy: '', msg: failed(r, since) }); return false; }
   setPrefs({ on: true });
   await loadCatalog({ fetch: true });
   await refreshInstalled();
@@ -101,6 +119,7 @@ export const turnOff = () => setPrefs({ on: false });
 // ---- installing, removing, updating ----
 async function job(kind, app, steps) {
   if (state.get().job) return false;
+  const since = Date.now();
   patch({ job: { kind, id: app ? app.id : '', name: app ? app.name : '', pct: null, line: '' }, msg: null });
   const onLine = (line) => {
     const pct = M.progressOf(line);
@@ -115,7 +134,7 @@ async function job(kind, app, steps) {
   refreshApps();
   const ok = last.code === 0;
   const name = app ? app.name : '';
-  patch({ job: null, msg: { ...(ok ? { ok: true, text: t(`flathub.msg.${kind}Done`, { name }) } : failed(last)), id: app ? app.id : '' } });
+  patch({ job: null, msg: { ...(ok ? { ok: true, text: t(`flathub.msg.${kind}Done`, { name }) } : failed(last, since)), id: app ? app.id : '' } });
   return ok;
 }
 

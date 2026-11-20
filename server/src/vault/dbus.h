@@ -22,7 +22,7 @@
 
 #define DBUS_MAX_MSG    (128u * 1024 * 1024)
 #define DBUS_MAX_DEPTH  32               /* nested containers (the specification allows 64) */
-#define DBUS_MAX_FDS    4                /* fds one message may carry (dbus_open_fds connections only) */
+#define DBUS_MAX_FDS    16               /* fds one message may carry (dbus_open_fds connections only; a Flatpak Spawn passes several) */
 
 enum { DBUS_CALL = 1, DBUS_RETURN = 2, DBUS_ERROR = 3, DBUS_SIGNAL = 4 };
 enum { DBUS_NO_REPLY = 1, DBUS_NO_AUTOSTART = 2 };
@@ -49,7 +49,8 @@ long dbus_msg_size(const uint8_t *buf, size_t len);
  * carries fds is refused. */
 int  dbus_msg_parse(const uint8_t *buf, size_t len, DMsg *m);
 /* The same, allowing up to max_fds fds (*declared: how many it says it carries; the caller attaches
- * them). */
+ * them). -2: a valid message that carries more than max_fds (m is kept for an error reply; the caller frees it);
+ * -1: invalid (m freed). */
 int  dbus_msg_parse_fds(const uint8_t *buf, size_t len, DMsg *m, int max_fds, int *declared);
 void dbus_msg_free(DMsg *m);                     /* also closes its fds */
 void dbus_msg_drop_fds(DMsg *m);                 /* closes its fds now (a message that should carry none) */

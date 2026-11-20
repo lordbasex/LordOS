@@ -118,6 +118,70 @@ int main(void) {
     r.branch = "stable";
     CHECK(fpak_argv(&r, argv, buf, 64) < 0);                      /* no room: refused, never cut short */
 
+    /* org.freedesktop.portal.Flatpak is talked to (lord-server serves it, E9), never owned */
+    CHECK(has(argv, "--talk-name=org.freedesktop.portal.Flatpak") && !has(argv, "--no-talk-name=org.freedesktop.portal.Flatpak"));
+
+    /* a Spawn (E9): what the app asks for first, LordOS's options after it, the app's arguments after the id */
+    {
+        static char *sargv[FPAK_SPAWN_ARGV_MAX], sbuf[65536];
+        const char *args[] = { "/usr/libexec/glycin-loaders/2+/glycin-svg", "--dbus-fd", "3", "--filesystem=host", NULL };
+        const char *env[] = { "RUST_LOG=debug", NULL };
+        FpakSpawn sp = { .flags = FPAK_SPAWN_SANDBOX | FPAK_SPAWN_WATCH_BUS, .args = args, .env = env, .instance_fd = -1 };
+        r.restricted = FW_R_NO_NETWORK;
+        int m = fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf);
+        CHECK(m > 8 && has(sargv, "--sandbox") && has(sargv, "--no-session-bus") && has(sargv, "--no-a11y-bus"));
+        CHECK(has(sargv, "--command=/usr/libexec/glycin-loaders/2+/glycin-svg") && has(sargv, "--env=RUST_LOG=debug"));
+        int id_at = idx(sargv, "org.gnome.Calculator");
+        CHECK(id_at > 0 && idx(sargv, "--filesystem=host") > id_at && !strcmp(sargv[m - 1], "--filesystem=host"));
+        CHECK(idx(sargv, "--dbus-fd") == id_at + 1);
+        /* LordOS's restrictions and never-granted options come after what the app asked for */
+        CHECK(idx(sargv, "--unshare=network") > idx(sargv, "--sandbox") && idx(sargv, "--nosocket=session-bus") > idx(sargv, "--command=/usr/libexec/glycin-loaders/2+/glycin-svg"));
+        sp.flags = FPAK_SPAWN_SANDBOX;
+        sp.sandbox_flags = FPAK_SANDBOX_SHARE_DISPLAY | FPAK_SANDBOX_SHARE_GPU | FPAK_SANDBOX_ALLOW_DBUS;
+        r.x11 = 0;
+        m = fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf);
+        CHECK(has(sargv, "--socket=wayland") && has(sargv, "--device=dri") && has(sargv, "--session-bus"));
+        CHECK(idx(sargv, "--nosocket=fallback-x11") > idx(sargv, "--socket=fallback-x11"));   /* no X: the later one wins */
+        r.x11 = 1;
+        sp.flags = FPAK_SPAWN_EXPOSE_PIDS; sp.sandbox_flags = 0; sp.parent_pid = 7;
+        m = fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf);
+        CHECK(has(sargv, "--parent-pid=7") && has(sargv, "--parent-expose-pids") && !has(sargv, "--sandbox"));
+        sp.parent_pid = 0;
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);                         /* no parent to expose to */
+        sp.flags = 0;
+        const char *expose[] = { "glycin", NULL }, *bad_expose[] = { "../.ssh", NULL };
+        sp.expose = expose;
+        m = fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf);
+        { char want[600]; snprintf(want, sizeof want, "--filesystem=%s/.var/app/org.gnome.Calculator/sandbox/glycin", root); CHECK(has(sargv, want)); }
+        sp.expose = bad_expose;
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.expose = NULL;
+        sp.flags = 1u << 12;                                                                  /* an unknown flag */
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.flags = 0;
+        const char *bad_env[] = { "1X=y", NULL }, *nl_env[] = { "X=a\n--filesystem=host", NULL };
+        sp.env = bad_env;
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.env = nl_env;
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.env = env;
+        sp.cwd = "/app/../home";
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.cwd = "relative";
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.cwd = "/app/..data";                                                              /* a name, not ".." */
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) > 0);
+        sp.cwd = NULL;
+        const char *empty[] = { "", NULL };
+        sp.args = empty;
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.args = args;
+        r.opened = "/home/a/x";                                                               /* never both */
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        r.opened = NULL;
+        r.restricted = 0;
+    }
+
     /* refs and the closed list of management commands (E3) */
     CHECK(fpak_ref_ok("app/org.gnome.Calculator/x86_64/stable", "x86_64"));
     CHECK(!fpak_ref_ok("runtime/org.gnome.Platform/x86_64/48", "x86_64"));           /* never a runtime */

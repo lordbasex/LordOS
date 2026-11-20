@@ -202,6 +202,14 @@ static int helper_net_mode(void) {
 int main(int argc, char **argv) {
     home = getenv("HOME");
     const char *mode = argc > 1 ? argv[1] : "";
+    /* the X socket path a Flatpak app's view may keep (sandbox_x11_path_ok) */
+    static const struct { const char *p; int ok; } xp[] = {
+        { "/tmp/.X11-unix/X0", 1 }, { "/tmp/.X11-unix/X1024", 1 }, { "/tmp/.X11-unix/X", 0 }, { "/tmp/.X11-unix/X12345", 0 },
+        { "/tmp/.X11-unix/X0/../../etc", 0 }, { "/tmp/.X11-unix/Xa", 0 }, { "/run/user/1000/bus", 0 }, { NULL, 0 } };
+    for (int i = 0; i < (int)(sizeof xp / sizeof xp[0]); i++) {
+        checks++;
+        if (sandbox_x11_path_ok(xp[i].p) != xp[i].ok) { fails++; printf("FAIL: sandbox_x11_path_ok(%s)\n", xp[i].p ? xp[i].p : "NULL"); }
+    }
     if (!strcmp(mode, "helper")) helper_mode();
     else if (!strcmp(mode, "helper-net")) helper_net_mode();
     else app_mode(!strcmp(mode, "net"));

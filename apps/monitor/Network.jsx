@@ -188,7 +188,7 @@ function withFirewall(groups, fw, launcher) {
     if (have.has(key) || key === 'lordos' || !Array.isArray(v) || !(v[0] || v[1] || (hasBytes(fw, v) && (v[2] || v[3])))) continue;
     const la = launcher.find((a) => a.id === key || `lpk:${a.id}` === key);
     const comp = !!COMPONENTS[key];
-    const name = comp ? null : la?.name || key.replace(/^(desktop|lpk):/, '');
+    const name = comp ? null : la?.name || key.replace(/^(desktop|lpk|flatpak):/, '');
     const g = { key, item: comp ? { app: key } : { app: key, appName: name, name, appIcon: la?.icon || '' }, name, exe: '', pids: new Set(), conns: [], hosts: new Map(), sent: 0, recv: 0,
       rateTx: 0, rateRx: 0, listen: [], incoming: 0, verdict: v[1] && !v[0] ? 'deny' : 'allow', rule: firewall.appRule(key), allowed: v[0] || 0, denied: v[1] || 0,
       programs: new Set(), system: isSystemId(key) };
@@ -538,7 +538,7 @@ function Summary({ groups, conns, last, tr, fw, names, range, sysHist, launcher,
               <View key={id} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
                 <View style={{ paddingTop: 1 }}><AppGlyph item={item} size={14} /></View>
                 <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-                  <Text style={{ fontSize: 12, color: t.text, lineHeight: 1.3, textAlign: 'start' }} numberOfLines={2}>{id === 'lordos' ? tr('monitor.lordos') : la?.name || id.replace(/^(desktop|lpk):/, '')}</Text>
+                  <Text style={{ fontSize: 12, color: t.text, lineHeight: 1.3, textAlign: 'start' }} numberOfLines={2}>{id === 'lordos' ? tr('monitor.lordos') : la?.name || id.replace(/^(desktop|lpk|flatpak):/, '')}</Text>
                   <Text style={{ fontSize: 10, color: t.textDim, whiteSpace: 'nowrap', textAlign: 'start' }}>{upDown(tr, { recv: rx, sent: tx })}</Text>
                 </View>
               </View>
@@ -876,7 +876,7 @@ export function NetworkTab({ last, prefs }) {
   const histRoots = !live ? (sysHist?.h?.top || []).map(([id, rx, tx]) => {
     const la = launcher.find((a) => a.id === id || `lpk:${a.id}` === id || `desktop:${a.id}` === id);
     const g = byKey.get(id) || { key: id, item: COMPONENTS[id] ? { app: id } : { app: id, appName: la?.name, name: la?.name || id, appIcon: la?.icon || '', self: id === 'lordos' },
-      name: COMPONENTS[id] || id === 'lordos' ? null : la?.name || id.replace(/^(desktop|lpk):/, ''), conns: [], listen: [], hosts: new Map(), rule: firewall.appRule(id), denied: 0, programs: new Set() };
+      name: COMPONENTS[id] || id === 'lordos' ? null : la?.name || id.replace(/^(desktop|lpk|flatpak):/, ''), conns: [], listen: [], hosts: new Map(), rule: firewall.appRule(id), denied: 0, programs: new Set() };
     return { ...g, recv: rx, sent: tx, rateRx: 0, rateTx: 0, histOnly: true };
   }).filter((g) => {
     const f = { app: g.key, appName: labelOf(tr, g), name: null, addr: '', port: 0, proto: 'other', dir: 'out', cc: '' };

@@ -50,7 +50,7 @@ function AppLabel({ id, apps, tr }) {
     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0 }}>
       {Icon ? <Icon size={24} /> : <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: t.control }} />}
       <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-        <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{id === 'lordos' ? tr('monitor.lordos') : COMPONENTS[id] ? tr(COMPONENTS[id].label) : a?.name || id.replace(/^(desktop|lpk):/, '')}</Text>
+        <Text style={{ fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{id === 'lordos' ? tr('monitor.lordos') : COMPONENTS[id] ? tr(COMPONENTS[id].label) : a?.name || id.replace(/^(desktop|lpk|flatpak):/, '')}</Text>
         <Text style={{ fontSize: 10, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', fontFamily: 'monospace', textAlign: 'start' }}>{id}</Text>
       </View>
     </View>

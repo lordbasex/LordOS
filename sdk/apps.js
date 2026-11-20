@@ -207,11 +207,21 @@ export function launchApp(id) {
 export const windowLinuxApp = (appId) => linuxAppFor(appId) || flatpakAppFor(appId);
 
 // The Flatpak app of a Wayland window: its app_id is the Flatpak id (or the export's StartupWMClass).
+// An id it doesn't know may be an app installed since the list was read (a Store install refreshes it, a terminal
+// doesn't): the list is read again, once per id.
+const flatpakMissed = new Set();
 export function flatpakAppFor(appId) {
   if (!appId) return null;
   const want = String(appId).toLowerCase();
-  if (!flatpak.get().length) refreshApps();
-  return flatpak.get().find((a) => a.flatpakId.toLowerCase() === want || String(a.wmClass || '').toLowerCase() === want) || null;
+  const find = () => flatpak.get().find((a) => a.flatpakId.toLowerCase() === want || String(a.wmClass || '').toLowerCase() === want) || null;
+  let a = flatpak.get().length ? find() : null;
+  if (!a && !flatpakMissed.has(want)) {
+    if (flatpakMissed.size > 256) flatpakMissed.clear();
+    flatpakMissed.add(want);
+    refreshApps();
+    a = find();
+  }
+  return a;
 }
 
 // Linux app of a Wayland window (by its app_id: the .desktop name or StartupWMClass).

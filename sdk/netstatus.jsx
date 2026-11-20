@@ -108,7 +108,7 @@ function appLabel(id, launcher) {
   if (id === 'lordos') return t('monitor.lordos');
   if (COMPONENTS[id]) return t(COMPONENTS[id].label);
   const a = launcher.find((x) => x.id === id || `lpk:${x.id}` === id || `desktop:${x.id}` === id);
-  return a?.name || String(id).replace(/^(desktop|lpk):/, '');
+  return a?.name || String(id).replace(/^(desktop|lpk|flatpak):/, '');
 }
 
 function Panel({ onClose }) {

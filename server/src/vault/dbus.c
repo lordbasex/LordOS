@@ -95,7 +95,7 @@ int dbus_name_valid(const char *n) {
 
 /* ================= body validation ================= */
 
-typedef struct { const uint8_t *b; size_t len, pos; int be; } V;
+typedef struct { const uint8_t *b; size_t len, pos; int be; int fdcheck; uint32_t nfds; } V;   /* fdcheck: every h < nfds */
 
 static uint32_t rd32(const uint8_t *p, int be) {
     return be ? (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3]
@@ -152,7 +152,12 @@ static int v_type(V *v, const char *sig, size_t *used, int depth) {
         v->pos += 4;
         return 0;
     }
-    case 'i': case 'u': case 'h': if (v_align(v, 4) || v->pos + 4 > v->len) return -1; v->pos += 4; return 0;
+    case 'h':
+        if (v_align(v, 4) || v->pos + 4 > v->len) return -1;
+        if (v->fdcheck && rd32(v->b + v->pos, v->be) >= v->nfds) return -1;   /* an fd that didn't come */
+        v->pos += 4;
+        return 0;
+    case 'i': case 'u': if (v_align(v, 4) || v->pos + 4 > v->len) return -1; v->pos += 4; return 0;
     case 'x': case 't': case 'd': if (v_align(v, 8) || v->pos + 8 > v->len) return -1; v->pos += 8; return 0;
     case 's': return v_str(v, 0);
     case 'o': return v_str(v, 1);
@@ -205,11 +210,15 @@ static int v_body(V *v, const char *sig) {
     return 0;
 }
 
-int dbus_body_valid(const char *sig, const uint8_t *body, size_t len, int big_endian) {
+static int body_valid(const char *sig, const uint8_t *body, size_t len, int big_endian, int fdcheck, uint32_t nfds) {
     if (!dbus_sig_valid(sig)) return 0;
-    V v = { body, len, 0, big_endian };
+    V v = { body, len, 0, big_endian, fdcheck, nfds };
     if (v_body(&v, sig)) return 0;
     return v.pos == len;
+}
+
+int dbus_body_valid(const char *sig, const uint8_t *body, size_t len, int big_endian) {
+    return body_valid(sig, body, len, big_endian, 0, 0);
 }
 
 /* ================= messages ================= */
@@ -230,7 +239,9 @@ static const char *const field_sig[10] = { NULL, "o", "s", "s", "s", "u", "s", "
 
 int dbus_msg_parse(const uint8_t *buf, size_t len, DMsg *m) {
     int declared;
-    return dbus_msg_parse_fds(buf, len, m, 0, &declared);
+    int r = dbus_msg_parse_fds(buf, len, m, 0, &declared);
+    if (r == -2) { dbus_msg_free(m); return -1; }   /* carries fds: refused here */
+    return r;
 }
 
 int dbus_msg_parse_fds(const uint8_t *buf, size_t len, DMsg *m, int max_fds, int *declared) {
@@ -255,7 +266,7 @@ int dbus_msg_parse_fds(const uint8_t *buf, size_t len, DMsg *m, int max_fds, int
     uint32_t flen = rd32(buf + 12, be);
     size_t hend = 16 + flen;
     /* validate a(yv) from byte 12 with the message alignment */
-    V v = { m->raw, hend, 12, be };
+    V v = { m->raw, hend, 12, be, 0, 0 };
     size_t u;
     if (v_type(&v, "a(yv)", &u, 0) || v.pos != hend) goto bad;
     /* zero padding up to 8 */
@@ -297,14 +308,15 @@ int dbus_msg_parse_fds(const uint8_t *buf, size_t len, DMsg *m, int max_fds, int
             }
         } else {
             /* unknown field: skip it (already validated) */
-            V w = { m->raw, hend, p, be };
+            V w = { m->raw, hend, p, be, 0, 0 };
             size_t k;
             if (v_type(&w, vs, &k, 1)) goto bad;
             p = w.pos;
         }
     }
-    /* fds only where the connection asked for them (dbus_open_fds), and at most max_fds */
-    if (got_fds > (uint32_t)(max_fds > 0 ? max_fds : 0)) goto bad;
+    /* fds only where the connection asked for them (dbus_open_fds), and at most max_fds: more is refused below,
+     * once the rest of the message is known to be valid (the caller answers it and carries on) */
+    int too_many = got_fds > (uint32_t)(max_fds > 0 ? max_fds : 0);
     switch (type) {
     case DBUS_CALL: if (!m->path || !m->member) goto bad; break;
     case DBUS_RETURN: if (!m->reply_serial) goto bad; break;
@@ -323,10 +335,9 @@ int dbus_msg_parse_fds(const uint8_t *buf, size_t len, DMsg *m, int max_fds, int
     m->body = m->raw + bstart;
     m->body_len = (uint32_t)(len - bstart);
     if (!m->sig) { if (m->body_len) goto bad; m->sig = ""; }
-    else if (!dbus_body_valid(m->sig, m->body, m->body_len, be)) goto bad;
-    if (!got_fds && strchr(m->sig, 'h')) goto bad;      /* an fd's index with no fds */
+    else if (!body_valid(m->sig, m->body, m->body_len, be, 1, got_fds)) goto bad;   /* each fd index names an fd that came */
     *declared = (int)got_fds;
-    return 0;
+    return too_many ? -2 : 0;
 bad:
     dbus_msg_free(m);
     return -1;
@@ -403,7 +414,7 @@ void dr_struct(DRd *r) { r_align(r, 8); }
 const char *dr_variant(DRd *r) { return dr_sig(r); }
 void dr_skip(DRd *r, const char *sig) {
     if (r->err) return;
-    V v = { r->b, r->len, r->pos, r->be };
+    V v = { r->b, r->len, r->pos, r->be, 0, 0 };
     size_t u;
     if (v_type(&v, sig, &u, 0)) { r->err = 1; return; }
     r->pos = v.pos;
@@ -809,6 +820,19 @@ static int take(DConn *c, DMsg *m) {
     memmove(c->in, c->in + sz, rest);
     explicit_bzero(c->in + rest, (size_t)sz);
     c->in_n = rest;
+    if (r == -2 && c->unix_fds) {
+        /* a valid message with more fds than this connection takes: its fds are closed, a call is answered with
+         * an error, and the connection carries on (one app can't cut it for everyone) */
+        int n = declared < c->fdq_n ? declared : c->fdq_n;
+        for (int i = 0; i < n; i++) close(c->fdq[i]);
+        c->fdq_n -= n;
+        memmove(c->fdq, c->fdq + n, (size_t)c->fdq_n * sizeof c->fdq[0]);
+        if (m->type == DBUS_CALL && !(m->flags & 1)) dbus_error(c, m, "org.freedesktop.DBus.Error.LimitsExceeded", "too many file descriptors");
+        dbus_msg_free(m);
+        memset(m, 0, sizeof *m);
+        return take(c, m);
+    }
+    if (r == -2) dbus_msg_free(m);
     if (r) { c->dead = 1; return -1; }       /* the bus already validates: something invalid is a serious error */
     /* the fds came with the message's first bytes, in order: they are the oldest ones queued */
     if (declared > c->fdq_n) { dbus_msg_free(m); c->dead = 1; return -1; }

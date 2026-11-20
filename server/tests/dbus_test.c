@@ -9,7 +9,7 @@
  *     (our own client: modexp + HKDF + AES-128-CBC), create, search, read, change, delete,
  *     properties, introspection, lock and unlock with a prompt (Prompt + Completed);
  *   - fds (issue #36, logind's Inhibit): a reply carrying one is delivered with it only on a connection
- *     that negotiated fds, refused everywhere else; an 'h' with no fds is refused.
+ *     that negotiated fds, refused everywhere else; an 'h' naming an fd that didn't come is refused.
  *   - sending fds (the ScreenCast portal's OpenPipeWireRemote, ui/portal.c): each fd leaves with the first
  *     byte of its own message, in order with the plain messages queued around it. */
 #include "vault/dbus.h"
@@ -99,6 +99,27 @@ static void t_fds(void) {
     DBuf w0;
     fd_reply(&w0, 0);
     check(dbus_msg_parse_fds(w0.p, w0.n, &m, 4, &declared) != 0, "an 'h' with no fds is refused");
+    {   /* an empty a{uh} (a Spawn with no fds, as busctl sends it): valid with no fds */
+        DBuf e;
+        dw_init(&e);
+        dw_u8(&e, 'l'); dw_u8(&e, DBUS_RETURN); dw_u8(&e, 0); dw_u8(&e, 1);
+        dw_u32(&e, 8);                  /* body: the array's length and its padding to 8 */
+        dw_u32(&e, 8);
+        size_t mk = dw_arr_begin(&e, 8);
+        dw_struct(&e); dw_u8(&e, 5); dw_variant(&e, "u"); dw_u32(&e, 1);
+        dw_struct(&e); dw_u8(&e, 8); dw_variant(&e, "g"); dw_sig(&e, "a{uh}");
+        dw_arr_end(&e, mk);
+        dw_align(&e, 8);
+        dw_u32(&e, 0); dw_u32(&e, 0);   /* length 0, then padding to the dict entry's 8 */
+        DMsg me; int de = -1;
+        check(dbus_msg_parse_fds(e.p, e.n, &me, 4, &de) == 0 && de == 0, "an empty a{uh} with no fds is taken");
+        if (de == 0) dbus_msg_free(&me);
+        dw_free(&e);
+    }
+    { DMsg m2; int d2 = 0;
+      check(dbus_msg_parse_fds(w.p, w.n, &m2, 0, &d2) == -2 && d2 == 1, "more fds than allowed: -2, the message kept for an answer");
+      dbus_msg_free(&m2);
+      check(dbus_msg_parse(w.p, w.n, &m2) == -1, "the plain parser still refuses a message with fds"); }
     dw_free(&w0);
 
     for (int negotiated = 0; negotiated < 2; negotiated++) {

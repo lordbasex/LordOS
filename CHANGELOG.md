@@ -87,14 +87,37 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   under its icon, and opened a text file from Files. Tests: `dock-model-test`, `apps-actions-test`.
 - **Flatpak test plan run on VM 127** (in development; `docs/FLATPAK.md`, "Results"). Held: Flathub's downloads in
   their own firewall component (blocked → denied, Monitor row), apps in their own scopes with nothing escaping to the
-  user manager, no internet per app, the never-granted bus names and folders even with user overrides, no files, no
-  USB and no Bluetooth, no notifications, updates and freeing unused runtimes. Apps that worked: GNOME Text Editor,
-  Decibels, KCalc (Qt 6), Firefox; Shortwave without its station covers. Not yet: X11-only apps (Emacs) never get an
-  X display, apps whose GTK loads images through glycin crash or lose images (Meld crashes), Electron apps (marked),
-  and after one no-microphone app has run, no Flatpak app can record until the next login (the PipeWire guard can't
-  tell Flatpak apps apart and counts an exited app's empty scope as running).
+  user manager, no internet and per-domain rules per app, the never-granted bus names and folders even with user
+  overrides, no files, no camera, no USB and no Bluetooth, no notifications, updates and freeing unused runtimes.
+  Apps that work: GNOME Text Editor, Decibels, Shortwave (but its radio playback, which also fails outside LordOS), Meld, KCalc (Qt 6), Firefox and GNU Emacs (X11). Electron
+  apps (MarkText) still don't start and stay marked; Spotify exits at start.
+- **Flatpak apps get Flatpak's sub-sandbox from LordOS itself** (in development; `server/src/fpspawn.c`, AGENTS.md E9):
+  lord-server serves `org.freedesktop.portal.Flatpak` and runs each Spawn as the same app, in its own scope and view,
+  under its restrictions; Flatpak's own portal stays masked. GNOME apps that load images through glycin needed it:
+  Meld crashed at start, Shortwave showed no images. The service exists only while `flatpak` is installed.
+- **X11 for Flatpak apps, as GNOME and KDE give it** (in development): an app with no files or device blocked keeps
+  the X display (socket and cookie in its view); a restricted one gets none. GNU Emacs, X11 only, now starts.
 
 ### Fixed
+
+- **After one app with "no microphone" had run, no Flatpak app could record until the next login** (in development,
+  found by the test plan): the PipeWire guard counted an exited app's empty scope as running, and couldn't tell which
+  Flatpak app a PulseAudio client was (it reports its pid inside its sandbox). Empty scopes no longer count, and a
+  Flatpak app's client is matched to a process of its own scope (pipewire-pulse names the app; the pid and its
+  connections are checked). The same empty-scope fix applies to Linux apps.
+- **Monitor offered no rule or block for a Flatpak app**, although the firewall applies them (`firewall.enforceable`
+  left `flatpak:` out). An exited Flatpak app is named without its `flatpak:` prefix.
+- **The Store didn't say why Flathub failed**: with Flathub blocked in the Firewall it showed Flatpak's "No such ref",
+  and a failed catalog refresh kept the old catalog silently. It now says the Firewall blocked it and where to allow
+  it, or that the catalog couldn't be updated.
+- **A Flatpak app's notifications showed a plain square**: they now carry the app's name and icon, from the app
+  lord-server finds by the sender's scope.
+- **One D-Bus message with too many file descriptors closed the whole connection** of the lord-server service that got
+  it; it is now refused alone (16 fds per message, was 4). A message whose signature names an fd but carried none
+  (an empty list of fds) was taken as invalid and closed the connection too; each fd index is now checked against the
+  fds that came. The Flatpak test plan's checks run as `server/tests/fwflatpak/flatpak.sh` (31 on VM 127).
+- **`server/Makefile` didn't rebuild objects when a header outside a few folders changed** (`vault/`, `hw/` and others),
+  which could link structs of two sizes; every object now depends on every header under `src/*/`.
 
 - **Some SVG app icons stayed empty** (Print Editor, and most Flathub apps: their icons use gradients). nanosvg sets a
   gradient's focus only for a radial gradient; LordOS's check before drawing also read it on a linear one, where it is

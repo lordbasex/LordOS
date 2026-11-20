@@ -115,7 +115,7 @@ function ShareSection({ perm }) {
   return (
     <Section icon={<PermBadge glyph="▣" color="#ff453a" />} title={tr(`privacy.perm.${perm}`)} footer={tr(`privacy.permHint.${perm}`)}>
       {list.map((g) => (
-        <SettingRow key={g.id} label={g.id.replace(/^(desktop|lpk):/, '')} hint={g.exe}>
+        <SettingRow key={g.id} label={g.id.replace(/^(desktop|lpk|flatpak):/, '')} hint={g.exe}>
           <Segmented value={g.state} onChange={(v) => share.set(g.id, perm, v, g.exe)}
             options={[['allow', tr('privacy.allowShort')], ['ask', tr('privacy.askShort')], ['deny', tr('privacy.denyShort')]]} />
         </SettingRow>

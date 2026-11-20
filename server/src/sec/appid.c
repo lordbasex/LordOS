@@ -48,6 +48,14 @@ int appid_running(int (*match)(const char *app, void *u), void *u) {
     while (!found && (e = readdir(d))) {
         char path[512], app[FW_APP_MAX];
         if (strncmp(e->d_name, "app-lordos-", 11)) continue;
+        /* an app that has exited leaves its scope behind, empty, until the session ends: not running */
+        char ev[512], line[64];
+        snprintf(ev, sizeof ev, "%s/%s/cgroup.events", dir, e->d_name);
+        FILE *f = fopen(ev, "re");
+        int populated = 1;                          /* unreadable: counted, as before */
+        while (f && fgets(line, sizeof line, f)) if (!strncmp(line, "populated ", 10)) { populated = line[10] != '0'; break; }
+        if (f) fclose(f);
+        if (!populated) continue;
         snprintf(path, sizeof path, "/system.slice/lordos.service/lordos-session-%u/%s", (unsigned)getuid(), e->d_name);
         if (!appid_of_cgroup(path, app, sizeof app)) found = match(app, u);
     }

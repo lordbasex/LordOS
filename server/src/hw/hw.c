@@ -20,6 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+#include "../fpak.h"
+#include "../fpspawn.h"
 
 static const DisplayHost *host;
 static PowerState power;
@@ -63,6 +66,16 @@ static void td_signal(const DMsg *m) {
     if (m->path && !strcmp(m->path, "/org/freedesktop/timedate1") && m->member && !strcmp(m->member, "PropertiesChanged")) hw_timedate_refresh();
 }
 
+/* Flatpak's Spawn portal (fpspawn.c) only while flatpak is installed: nothing on the bus, no fd and no work when the
+ * person never turned Flathub on. Checked again every 30 s, so turning it on in the Store needs no restart. */
+static int fpspawn_bus;
+static double fpspawn_next;
+static void fpspawn_try(void) {
+    if (!fpspawn_bus || fpspawn_fd() >= 0 || hw_now_ms() < fpspawn_next) return;
+    fpspawn_next = hw_now_ms() + 30000;
+    if (access(FPAK_FLATPAK, X_OK) == 0 && fpspawn_start()) fprintf(stderr, "hw: no Flatpak Spawn portal (sub-sandboxes of Flatpak apps)\n");
+}
+
 void hw_start(const DisplayHost *h, int with_bus) {
     host = h;
     display_init(h);
@@ -72,6 +85,8 @@ void hw_start(const DisplayHost *h, int with_bus) {
     if (uevent_open()) fprintf(stderr, "hw: no kernel uevents (hotplugged displays and batteries are not followed)\n");
     if (with_bus && notifyd_start(hw_emit)) fprintf(stderr, "hw: no notification server for Linux apps\n");
     if (with_bus && mpris_start(hw_emit)) fprintf(stderr, "hw: no session bus for the Linux players (Now Playing)\n");
+    fpspawn_bus = with_bus;
+    fpspawn_try();
     if (with_bus && pwguard_start()) fprintf(stderr, "hw: PipeWire not reachable yet (the microphone and camera restrictions of Linux apps apply once it is)\n");
     if (with_bus && sysbus_start() == 0) {
         bt_start(hw_emit);
@@ -94,6 +109,7 @@ int hw_pollfds(struct pollfd *p, int max) {
     if (n < max && notifyd_fd() >= 0) p[n++] = (struct pollfd){ notifyd_fd(), (short)(POLLIN | (notifyd_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && mpris_fd() >= 0) p[n++] = (struct pollfd){ mpris_fd(), (short)(POLLIN | (mpris_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && sysbus_fd() >= 0) p[n++] = (struct pollfd){ sysbus_fd(), (short)(POLLIN | (sysbus_wants_write() ? POLLOUT : 0)), 0 };
+    if (n < max && fpspawn_fd() >= 0) p[n++] = (struct pollfd){ fpspawn_fd(), (short)(POLLIN | (fpspawn_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && pwguard_fd() >= 0) p[n++] = (struct pollfd){ pwguard_fd(), (short)(POLLIN | (pwguard_wants_write() ? POLLOUT : 0)), 0 };
     n += pkagent_pollfds(p + n, max - n);
     return n;
@@ -111,6 +127,7 @@ void hw_dispatch(const struct pollfd *p, int n) {
         else if (p[i].fd == notifyd_fd()) notifyd_dispatch();
         else if (p[i].fd == mpris_fd()) mpris_dispatch();
         else if (p[i].fd == pwguard_fd()) pwguard_dispatch();
+        else if (p[i].fd == fpspawn_fd()) fpspawn_dispatch();
     }
     pkagent_dispatch(p, n);
 }
@@ -122,6 +139,8 @@ void hw_events(void) {
     notifyd_tick();
     mpris_tick();
     pwguard_tick();
+    fpspawn_try();
+    fpspawn_tick();
     pkagent_tick();
     if (sysbus_up() && sysbus_wants_write()) dbus_flush(sysbus_conn());
 }

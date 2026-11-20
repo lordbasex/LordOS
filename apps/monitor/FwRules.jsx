@@ -36,7 +36,7 @@ function useAppIndex() {
 // (0.8.5) LordOS's own components with their own scope take rules too (Mail, Store, Printers, Terminal, Blocklists)
 const { COMPONENTS } = netModel;
 const COMPONENT_IDS = Object.keys(COMPONENTS).filter((id) => id.startsWith('lordos:') && !COMPONENTS[id].system);
-export const appLabelOf = (tr, apps, id) => (id === 'lordos' ? tr('monitor.lordos') : COMPONENTS[id] ? tr(COMPONENTS[id].label) : apps.get(id)?.name || id.replace(/^(desktop|lpk):/, ''));
+export const appLabelOf = (tr, apps, id) => (id === 'lordos' ? tr('monitor.lordos') : COMPONENTS[id] ? tr(COMPONENTS[id].label) : apps.get(id)?.name || id.replace(/^(desktop|lpk|flatpak):/, ''));
 
 function AppIcon({ a, size = 24 }) {
   const t = useTheme();

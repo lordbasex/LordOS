@@ -137,7 +137,15 @@ typedef struct {
      * (and the opened path) are bound over it writable. A Flatpak app's view (docs/FLATPAK.md): nothing it does can
      * create, rename or change a file of the home outside those folders, whatever Flatpak grants it. */
     int home_ro;
+    /* an unrestricted Flatpak app's X display (docs/FLATPAK.md, "X11"): x11 is the session's X socket
+     * (/tmp/.X11-unix/X<n>), bound into the private /tmp; xauth a plain file name in runtime_dir (the session's X
+     * cookie), bound read-only. NULL: none (every other view). */
+    const char *x11;
+    const char *xauth;
 } SandboxFilesCfg;
+
+/* "/tmp/.X11-unix/X<digits>" (1 to 4 digits): an X socket path the view may keep. */
+int sandbox_x11_path_ok(const char *path);
 
 /* Before sandbox_apply_files: the app's own view of the system, so no unix socket of the session
  * can be reached (Landlock in kernel 6.12 doesn't cover connect() on unix sockets, and the session

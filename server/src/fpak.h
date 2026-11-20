@@ -42,6 +42,55 @@ typedef struct {
  * the id and, for "Open with", the path. Strings go in buf (cap bytes). → argc, or -1 (bad input or no room). */
 int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap);
 
+/* ---- org.freedesktop.portal.Flatpak.Spawn served by lord-server (docs/FLATPAK.md, "Sub-sandboxes"; AGENTS.md E9) ----
+ * What an app asks for, already read from its D-Bus call. Its own command, arguments and environment go to the new
+ * instance of the same app; LordOS's never-granted options and restrictions come after what it asks for (Flatpak's
+ * last option wins) and the arguments after the app id (never read as flatpak options). */
+#define FPAK_SPAWN_ARGS_MAX 128     /* argv entries of the command */
+#define FPAK_SPAWN_ENV_MAX 64
+#define FPAK_SPAWN_EXPOSE_MAX 8
+#define FPAK_SPAWN_STR_MAX 4096
+#define FPAK_SPAWN_ARGV_MAX (FPAK_ARGV_MAX + FPAK_SPAWN_ARGS_MAX + 2 * FPAK_SPAWN_ENV_MAX + 2 * FPAK_SPAWN_EXPOSE_MAX + 24)
+
+/* Spawn's flags (flatpak-portal's FlatpakSpawnFlags) and sandbox-flags */
+#define FPAK_SPAWN_CLEAR_ENV      1u
+#define FPAK_SPAWN_LATEST_VERSION 2u
+#define FPAK_SPAWN_SANDBOX        4u
+#define FPAK_SPAWN_NO_NETWORK     8u
+#define FPAK_SPAWN_WATCH_BUS      16u
+#define FPAK_SPAWN_EXPOSE_PIDS    32u
+#define FPAK_SPAWN_NOTIFY_START   64u
+#define FPAK_SPAWN_SHARE_PIDS     128u
+#define FPAK_SPAWN_EMPTY_APP      256u
+#define FPAK_SPAWN_FLAGS_ALL      511u
+#define FPAK_SANDBOX_SHARE_DISPLAY 1u
+#define FPAK_SANDBOX_SHARE_SOUND   2u
+#define FPAK_SANDBOX_SHARE_GPU     4u
+#define FPAK_SANDBOX_ALLOW_DBUS    8u
+#define FPAK_SANDBOX_ALLOW_A11Y    16u
+#define FPAK_SANDBOX_FLAGS_ALL     31u
+
+typedef struct {
+    uint32_t flags, sandbox_flags;
+    const char *cwd;                                /* absolute, or NULL */
+    const char *const *args;                        /* the command and its arguments, NULL-terminated; args[0] = --command */
+    const char *const *env;                         /* "NAME=value", NULL-terminated (may be NULL) */
+    const char *const *unset_env;                   /* NAME, NULL-terminated (may be NULL) */
+    const char *const *expose, *const *expose_ro;   /* names under ~/.var/app/<id>/sandbox, NULL-terminated (may be NULL) */
+    int parent_pid;                                 /* the caller's instance in the view's PID namespace (EXPOSE/SHARE_PIDS) */
+    int instance_fd;                                /* --instance-id-fd (NOTIFY_START), or -1 */
+} FpakSpawn;
+
+/* What an app asked for is acceptable: known flags only, an absolute cwd with no ".." component, 1 to
+ * FPAK_SPAWN_ARGS_MAX arguments with a non-empty command, environment names [A-Za-z_][A-Za-z0-9_]* (none of
+ * LD_PRELOAD and the like matter: they reach only the app's own new sandbox), expose names that are one plain path
+ * element, every string under FPAK_SPAWN_STR_MAX bytes and none with a newline in an option. 1 yes, 0 no. */
+int fpak_spawn_ok(const FpakSpawn *s);
+
+/* argv for a Spawn of app r->id: as fpak_argv (r->opened must be NULL), with what s asks for. argv has room for
+ * FPAK_SPAWN_ARGV_MAX entries. → argc, or -1. */
+int fpak_spawn_argv(const FpakRun *r, const FpakSpawn *s, char **argv, char *buf, size_t cap);
+
 /* ---- the closed list of `flatpak --user` management commands (docs/FLATPAK.md, Problem 4; AGENTS.md E3) ----
  * Run by lord-server in lordos-net-flathub.scope (firewall component lordos:flathub). The only argument a caller gives
  * is a ref, validated here; never a URL, remote name, key, file or option. Flatpak's own TLS and signature checks are

@@ -499,7 +499,7 @@ static int open_log(const char *id, const char *action, const char *file) {
 
 typedef struct {
     SandboxFilesCfg cfg;
-    char home[PATH_MAX], runtime[PATH_MAX], wayland[64], opened[PATH_MAX], cwd[PATH_MAX];
+    char home[PATH_MAX], runtime[PATH_MAX], wayland[64], opened[PATH_MAX], cwd[PATH_MAX], x11[32], xauth[64];
     char buf[2 * SANDBOX_FILES_MAX][PATH_MAX];
     int nbuf, nrw, nro;
 } FilesPlan;
@@ -993,6 +993,25 @@ static void flatpak_writable(FilesPlan *p, const char *id, const char *opened) {
  * session bus, which the app reaches only through Flatpak's filtering proxy (--nosocket=session-bus). Device-restricted:
  * no bus, as for Linux apps. No access to files: an empty home with only its ~/.var/app/<id> (rw), the installation
  * (ro, `flatpak run` reads it) and the opened file. Never systemd/ or any other socket of the session. */
+/* An unrestricted Flatpak app keeps the session's X display, as an unrestricted Linux app does: the X socket of
+ * $DISPLAY (":<n>", the local Xwayland) and the cookie file of $XAUTHORITY when it is in the runtime folder.
+ * `flatpak run` then gives it to the app only if the app declares x11 or fallback-x11. A restricted one never
+ * gets it: X11 apps can watch each other's windows, input and selections (docs/PRIVACY.md, "X11 apps"). */
+static void flatpak_x11(FilesPlan *p) {
+    const char *d = getenv("DISPLAY"), *xa = getenv("XAUTHORITY");
+    if (!d || d[0] != ':') return;
+    char path[32];
+    if (snprintf(path, sizeof path, "/tmp/.X11-unix/X%s", d + 1) >= (int)sizeof path || !sandbox_x11_path_ok(path)) return;
+    snprintf(p->x11, sizeof p->x11, "%s", path);
+    p->cfg.x11 = p->x11;
+    size_t rl = strlen(p->runtime);
+    if (xa && rl && !strncmp(xa, p->runtime, rl) && xa[rl] == '/' && xa[rl + 1] && !strchr(xa + rl + 1, '/') &&
+        strlen(xa + rl + 1) < sizeof p->xauth) {
+        snprintf(p->xauth, sizeof p->xauth, "%s", xa + rl + 1);
+        p->cfg.xauth = p->xauth;
+    }
+}
+
 static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *opened) {
     FilesPlan *p = view_plan(NULL);
     if (!p) return NULL;
@@ -1002,6 +1021,7 @@ static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *
         while (p->cfg.sockets[n]) n++;
         if (n < 7) { p->cfg.sockets[n++] = "bus"; p->cfg.sockets[n] = NULL; }
     }
+    if (!dev) flatpak_x11(p);
     if (!(restricted & FW_R_NO_FILES)) {
         /* the real home, read-only: writable only its own ~/.var/app/<id> and the person's folders (Desktop,
          * Documents, Downloads, Music, Pictures, Videos, Public, Templates of ~/.config/user-dirs.dirs) and the opened
@@ -1065,7 +1085,7 @@ static int launch_flatpak(const char *id, const char *opened) {
     char *argv[FPAK_ARGV_MAX];
     char *buf = malloc(8192);
     FpakRun r = { .id = id, .arch = arch, .branch = branch, .restricted = restricted, .opened_ro = opened && !grant_ok(opened),
-                  .home = plan ? plan->home : NULL, .opened = opened, .x11 = 0 };  /* no X: the view's /tmp has no X socket */
+                  .home = plan ? plan->home : NULL, .opened = opened, .x11 = plan && plan->cfg.x11 };   /* flatpak_x11 */
     if (!plan || !buf || fpak_argv(&r, argv, buf, 8192) < 0) {
         fprintf(stderr, "apps: %s: the Flatpak app's view or command line can't be built: not launched\n", id);
         free(plan);
@@ -1096,7 +1116,7 @@ static int launch_flatpak(const char *id, const char *opened) {
             if (write(2, msg, sizeof msg - 1) < 0) {}
             _exit(126);
         }
-        xauth_env_drop();
+        if (!plan->cfg.x11) xauth_env_drop();          /* kept only with the X socket in its view (flatpak_x11) */
         /* a device-restricted app has no session bus at all: `flatpak run` then starts no proxy */
         if (restricted & (FW_R_NO_FILES | FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_USB | FW_R_NO_BLUETOOTH)) unsetenv("DBUS_SESSION_BUS_ADDRESS");
         if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");
@@ -1327,7 +1347,7 @@ static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const cha
     if (fd < 0) return;
     char num[32];
     int bad = lv_put(fd, "home", cfg->home) || lv_put(fd, "runtime", cfg->runtime_dir) || lv_put(fd, "cwd", cfg->cwd) ||
-              lv_put(fd, "opened", cfg->opened) || lv_put(fd, "prog", prog);
+              lv_put(fd, "opened", cfg->opened) || lv_put(fd, "prog", prog) || lv_put(fd, "x11", cfg->x11) || lv_put(fd, "xauth", cfg->xauth);
     for (int i = 0; !bad && i < SANDBOX_FILES_MAX && cfg->rw[i]; i++) bad = lv_put(fd, "rw", cfg->rw[i]);
     for (int i = 0; !bad && i < SANDBOX_FILES_MAX && cfg->ro[i]; i++) bad = lv_put(fd, "ro", cfg->ro[i]);
     for (int i = 0; !bad && i < 8 && cfg->sockets[i]; i++) bad = lv_put(fd, "sock", cfg->sockets[i]);
@@ -1369,6 +1389,8 @@ int apps_launch_view_main(void) {
         else if (!strcmp(k, "cwd")) cfg.cwd = v;
         else if (!strcmp(k, "opened")) cfg.opened = v;
         else if (!strcmp(k, "prog")) prog = v;
+        else if (!strcmp(k, "x11")) cfg.x11 = sandbox_x11_path_ok(v) ? v : NULL;
+        else if (!strcmp(k, "xauth")) cfg.xauth = v[0] && v[0] != '.' && !strchr(v, '/') ? v : NULL;
         else if (!strcmp(k, "rules")) rules = v;
         else if (!strcmp(k, "keephome")) cfg.keep_home = !strcmp(v, "1");
         else if (!strcmp(k, "homero")) cfg.home_ro = !strcmp(v, "1");

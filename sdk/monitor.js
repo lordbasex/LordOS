@@ -168,7 +168,7 @@ const fwCall = (fn, dflt) => { try { const api = fwApi(); return api ? fn(api) :
 // one of LordOS's own components with its own scope (lordos:mail, lordos:store, lordos:print,
 // lordos:terminal, lordos:lists). The essential system services (system:dns, system:time,
 // system:network) are shown but never take a rule.
-const fwEnforceable = (app) => app === 'lordos' || /^(desktop|lpk|lordos):/.test(app || '');
+const fwEnforceable = (app) => app === 'lordos' || /^(desktop|lpk|lordos|flatpak):/.test(app || '');
 const fwCallThrow = (fn) => { const api = fwApi(); if (!api) throw codeError('fw.list.unavailable'); return fn(api); };
 export const firewall = {
   available: () => !!fwApi(),

@@ -54,6 +54,7 @@ typedef struct {
     int unverified;             /* who it is can't be established: treated as restricted while restricted apps run */
     int daemon;                 /* pipewire-pulse's own connection: the streams of modules a pulse client loaded */
     int resolved;               /* app worked out (needs the client's info) */
+    char fpid[64];              /* pipewire.access.portal.app_id: the Flatpak app pipewire-pulse says it is (checked) */
     char app[FW_APP_MAX];
     uint32_t want, applied;     /* restrictions (FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_SCREEN) to apply / applied */
     int live;
@@ -427,15 +428,17 @@ static int unix_peers(uint32_t *ino, uint32_t *peer, int max) {
     return n;
 }
 
-/* How many distinct connections to pipewire-pulse (process pp) process pid holds; -1 if unknown. */
+/* How many distinct connections to pipewire-pulse (process pp) process pid holds; -1 if unknown.
+ * The server ends are pipewire-pulse's (always in our network namespace); their peers are the client
+ * ends, which pid holds even when it lives in a network namespace of its own (a Flatpak app with no
+ * network), where sock_diag doesn't list them. */
 static int pulse_connections(int pp, int pid) {
     static uint32_t ino[65536], peer[65536];
     int np = unix_peers(ino, peer, 65536);
     if (np < 0) return -1;
-    /* the server ends held by pipewire-pulse, and the client ends held by pid */
     char d[64], l[320], t[64];
-    uint32_t mine[4096];
-    int nm = 0;
+    static uint32_t clients[4096];
+    int nc = 0;
     for (int pass = 0; pass < 2; pass++) {
         snprintf(d, sizeof d, "/proc/%d/fd", pass ? pid : pp);
         DIR *dir = opendir(d);
@@ -450,18 +453,63 @@ static int pulse_connections(int pp, int pid) {
             if (k <= 0) continue;
             t[k] = 0;
             if (sscanf(t, "socket:[%lu]", &v) != 1) continue;
-            if (!pass) { if (nm < 4096) mine[nm++] = (uint32_t)v; continue; }
-            /* a client socket of pid whose peer is one of pipewire-pulse's */
-            for (int i = 0; i < np; i++) {
-                if (ino[i] != (uint32_t)v) continue;
-                for (int k2 = 0; k2 < nm; k2++) if (mine[k2] == peer[i]) { count++; break; }
-                break;
+            if (!pass) {
+                /* a socket of pipewire-pulse: its peer is a client's end */
+                for (int i = 0; i < np; i++) if (ino[i] == (uint32_t)v) { if (peer[i] && nc < 4096) clients[nc++] = peer[i]; break; }
+                continue;
             }
+            for (int i = 0; i < nc; i++) if (clients[i] == (uint32_t)v) { count++; break; }
         }
         closedir(dir);
         if (pass) return count;
     }
     return -1;
+}
+
+/* The pid as pid's innermost PID namespace sees it (the last NSpid field), or -1. */
+static int inner_pid(int pid) {
+    char p[64], line[256];
+    snprintf(p, sizeof p, "/proc/%d/status", pid);
+    FILE *f = fopen(p, "re");
+    int in = -1;
+    while (f && fgets(line, sizeof line, f)) {
+        if (strncmp(line, "NSpid:", 6)) continue;
+        char *s = line + 6, *end;
+        for (;;) {
+            long v = strtol(s, &end, 10);
+            if (end == s) break;
+            in = (int)v;
+            s = end;
+        }
+        break;
+    }
+    if (f) fclose(f);
+    return in;
+}
+
+/* A Flatpak app's pulse client reports its pid inside the app's sandbox, and pipewire-pulse says which app
+ * it is (pipewire.access.portal.app_id, from the connecting process's .flatpak-info). Neither is taken
+ * on its word: the pid outside is a process of that app's own root-owned scope whose innermost pid is
+ * the one reported and which holds at least as many connections to pipewire-pulse as there are clients
+ * claiming that app and pid. Returns it, or 0. */
+static int flatpak_host_pid(const PgClient *c, int claims) {
+    size_t n = strnlen(c->fpid, sizeof c->fpid);
+    if (!n || n > 59 || c->pid_app <= 0) return 0;
+    for (size_t i = 0; i < n; i++) {
+        char ch = c->fpid[i];
+        if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '.' || ch == '_' || ch == '-')) return 0;
+    }
+    if (c->fpid[0] == '.' || strstr(c->fpid, "..")) return 0;
+    char path[192];
+    snprintf(path, sizeof path, "/sys/fs/cgroup/system.slice/lordos.service/lordos-session-%u/app-lordos-fp-%s.scope/cgroup.procs",
+             (unsigned)getuid(), c->fpid);
+    FILE *f = fopen(path, "re");
+    if (!f) return 0;
+    int found = 0, pid;
+    while (!found && fscanf(f, "%d", &pid) == 1)
+        if (pid > 0 && inner_pid(pid) == c->pid_app && pulse_connections(c->pid_sec, pid) >= claims) found = pid;
+    fclose(f);
+    return found;
 }
 
 /* The pid as the process itself sees it is pid: it lives in our PID namespace. A process in another
@@ -511,14 +559,28 @@ static void resolve(PgClient *c) {
          * counts only if that process really holds as many connections to pipewire-pulse as
          * there are clients claiming it */
         int claims = 0;
-        for (int i = 0; i < MAX_CLIENTS; i++) if (P.cl[i].live && P.cl[i].pulse && P.cl[i].pid_app == c->pid_app) claims++;
-        int real = c->pid_app > 0 ? pulse_connections(c->pid_sec, c->pid_app) : -1;
-        if (real < claims || !same_pidns(c->pid_app)) { c->unverified = 1; return; }
-        pid = c->pid_app;
+        int fp = 0;
+        if (c->fpid[0] && c->pid_app > 0) {
+            /* a Flatpak app's: its pid inside the sandbox, found again in that app's scope. Tried first: that small
+             * pid is usually also some other process's out here, so "same PID namespace" can't tell them apart */
+            for (int i = 0; i < MAX_CLIENTS; i++)
+                if (P.cl[i].live && P.cl[i].pulse && P.cl[i].pid_app == c->pid_app && !strcmp(P.cl[i].fpid, c->fpid)) claims++;
+            fp = flatpak_host_pid(c, claims);
+            if (fp) pid = fp;
+            else if (!same_pidns(c->pid_app)) { c->unverified = 1; return; }
+            claims = 0;
+        }
+        if (!fp) {
+            for (int i = 0; i < MAX_CLIENTS; i++) if (P.cl[i].live && P.cl[i].pulse && P.cl[i].pid_app == c->pid_app) claims++;
+            int real = c->pid_app > 0 ? pulse_connections(c->pid_sec, c->pid_app) : -1;
+            if (real < claims || !same_pidns(c->pid_app)) { c->unverified = 1; return; }
+            pid = c->pid_app;
+        }
     }
     if (pid <= 0) { c->unverified = 1; return; }
     int r = appid_of_pid((unsigned)pid, c->app, sizeof c->app);
     if (r < 0) { c->unverified = 1; c->app[0] = 0; }  /* gone or unreadable */
+
     else if (r > 0) {                                /* not in any app's scope */
         c->app[0] = 0;
         /* escaped to the user's service manager while restricted apps run: treated as restricted
@@ -621,6 +683,8 @@ static void on_client_info(uint32_t proxy, PwPod body) {
     const char *sp = dict_get(props, "pipewire.sec.pid"), *ap = dict_get(props, "application.process.id");
     c->pid_sec = sp ? atoi(sp) : 0;
     c->pid_app = ap ? atoi(ap) : 0;
+    const char *fp = dict_get(props, "pipewire.access.portal.app_id");
+    snprintf(c->fpid, sizeof c->fpid, "%s", fp && strlen(fp) < sizeof c->fpid ? fp : "");
     /* a pulse client only if the connection really comes from the session's pipewire-pulse; the
      * pulse.server.type property alone is the client's word */
     int pulse_conn = c->pid_sec > 0 && is_pulse_daemon(c->pid_sec);

@@ -9,7 +9,7 @@
   "change.never": "Never granted on LordOS: LordOS removes it, so part of the app may not work.",
   "change.sound": "LordOS: you can block its microphone in the Firewall.",
   "change.talks": "LordOS: cut off while a camera, microphone, USB or Bluetooth block is on for it.",
-  "change.x11": "LordOS: off while any LordOS block is on for it.",
+  "change.x11": "LordOS: off while its files or a device (microphone, camera, USB, Bluetooth) are blocked for it.",
   "fact.branch": "Branch",
   "fact.developer": "Developer",
   "fact.license": "License",
@@ -85,5 +85,8 @@
   "updates.button": "Update Flathub apps",
   "updates.text": "Installed from Flathub: {count}. Flatpak checks each one and installs what changed; an open app finishes updating when you open it again.",
   "updates.title": "Flathub apps",
-  "verified": "Verified: published by {developer}"
+  "verified": "Verified: published by {developer}",
+  "msg.fwBlocked": "The Firewall blocks Flathub, so nothing could be downloaded. To install or update Flathub apps, allow “Flathub” in Monitor → Network.",
+  "msg.fwDenied": "The Firewall blocked a connection Flathub needed ({host}). Check Flathub's rules in Monitor → Network.",
+  "msg.notRefreshed": "Flathub's catalog couldn't be updated, so the last one is shown ({reason})."
 }

@@ -28,7 +28,7 @@ import { settings } from './settings.js';
 import { useTheme } from './theme.js';
 import { t, formatDate, formatTime, weekdayName } from './i18n.js';
 import { notify, dismissNotification } from './notify.js';
-import { linuxAppFor, shortAppName, windowAppName } from './apps.js';
+import { linuxAppFor, flatpakAppFor, shortAppName, windowAppName } from './apps.js';
 import { admin } from './admin.js';
 import { registerStatusItem, statusPanelAt } from './statusitems.js';
 import { Overlay } from './layers.js';
@@ -609,14 +609,17 @@ function webNotifyLook(n) {
 function linuxNotify(n) {
   if (!n || !n.id) return;
   const web = webNotifyLook(n);
-  const app = web ? null : linuxAppFor(n.desktop || n.app);
-  const key = web ? web.key : `linux:${app?.desktopId || n.desktop || n.app || 'app'}`;
+  // a Flatpak app: lord-server named it from the sender's scope (n.flatpak), never from the desktop-entry it wrote;
+  // filed under linux:<its id>, as Settings → Notifications lists a Flatpak app
+  const fp = web || !n.flatpak ? null : flatpakAppFor(n.flatpak);
+  const app = web ? null : fp || (n.flatpak ? null : linuxAppFor(n.desktop || n.app));
+  const key = web ? web.key : n.flatpak ? `linux:${n.flatpak}` : `linux:${app?.desktopId || n.desktop || n.app || 'app'}`;
   const prev = fromLinux.get(n.id);
   if (prev) dismissNotification(prev, 'replaced');
   const reason = { closed: 2, expired: 1, action: 2, replaced: 0, remote: 0 };
   const hasDefault = (n.actions || []).some(([k]) => k === 'default');
   const id = notify({
-    app: key, label: web ? web.label : shortAppName(app) || n.app, icon: web ? web.icon : app?.Icon || null,
+    app: key, label: web ? web.label : fp ? fp.name : shortAppName(app) || n.app, icon: web ? web.icon : app?.Icon || null,
     sound: web ? web.sound : !n.suppressSound,
     title: n.title, body: n.body, sticky: n.urgency === 2,
     timeout: n.timeout > 0 ? n.timeout : 6000,

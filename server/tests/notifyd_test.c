@@ -52,12 +52,17 @@ static void on_event(const char *kind, const char *json) {
     if (strstr(json, "\"webApp\":\"chat\",\"webProfile\":\"work\"") && write(shown_fd, "|web", 4) < 0) {}
     if (strstr(json, "\"appIcon\":\"/home/u/.config/lordos/web/icons/chat.png\"") && write(shown_fd, "|icon", 5) < 0) {}
     if (strstr(json, "\"suppressSound\":true") && write(shown_fd, "|quiet", 6) < 0) {}
+    if (strstr(json, "\"flatpak\":")) {
+        int own = strstr(json, "\"flatpak\":\"org.example.App\"") != NULL;
+        if (write(shown_fd, own ? "|flatpak" : "|otherflatpak", own ? 8 : 13) < 0) {}
+    }
     if (write(shown_fd, "\n", 1) < 0) {}
 }
 static int fake_app_of_pid(uint32_t pid, char *out, size_t n) {
     if (pid == 100) { snprintf(out, n, "desktop:bad"); return 0; }
     if (pid == 200) { snprintf(out, n, "desktop:good"); return 0; }
     if (pid == 300) return 1;                       /* lord-web: in no app's firewall scope here */
+    if (pid == 400) { snprintf(out, n, "flatpak:org.example.App"); return 0; }
     return -1;
 }
 static int fake_web_of_pid(uint32_t pid, char *app, char *profile) {
@@ -336,6 +341,15 @@ int main(void) {
     pid_answer(q, 200, "org.freedesktop.DBus");
     check(notify_answer(n, 2000) > 0, "1d: answered");
 
+    /* 1e. a Flatpak app (its scope, never its desktop-entry): shown with its id; Chrome's entry from it still
+     *     doesn't make it a Flatpak app other than its own */
+    n = notify("flatpak"); q = pid_question();
+    pid_answer(q, 400, "org.freedesktop.DBus");
+    check(notify_answer(n, 2000) > 0, "1e: a Flatpak app's Notify answered");
+    n = notify_chrome("fpchrome"); q = pid_question();
+    pid_answer(q, 400, "org.freedesktop.DBus");
+    check(notify_answer(n, 2000) > 0, "1e: answered");
+
     /* 2. restricted: answered, not shown */
     n = notify("bad"); q = pid_question();
     pid_answer(q, 100, "org.freedesktop.DBus");
@@ -368,7 +382,7 @@ int main(void) {
     char shown[512] = "";
     ssize_t r = read(pipefd[0], shown, sizeof shown - 1);
     shown[r > 0 ? r : 0] = 0;
-    const char *want = "good\nchrome|desktop|actions|quiet\nweb|web|icon\nnotweb\n";
+    const char *want = "good\nchrome|desktop|actions|quiet\nweb|web|icon\nnotweb\nflatpak|flatpak\nfpchrome|desktop|actions|quiet|flatpak\n";
     check(!strcmp(shown, want), "only the unrestricted notifications were shown, Chrome's with its entry, actions and suppress-sound, "
                                 "lord-web's as its web app with its icon, an impostor's without");
     if (strcmp(shown, want)) printf("  shown: %s\n", shown);
