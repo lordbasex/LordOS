@@ -2745,16 +2745,18 @@ static void ag_install_step(void) {
  *            (named: uutils' chown, Ubuntu 26.04's, leaves the group as it was for "user:") and moves the file,
  *            as that person (runuser), into their Downloads (xdg-user-dir) under a free name; the folder goes.
  *            The file is never written by root into a folder the person owns.
- *   Windows: the same shape (2026-11-20 security review: SYSTEM must never open or delete a path in a folder the person
- *            controls, a link or junction put there between two steps would turn it into SYSTEM writing or deleting any
- *            file). A fixed script makes %SystemRoot%\Temp\lordos-drop-<random> with a protected ACL (SYSTEM and
- *            Administrators only) and checks it; the file is written into it. The last script finds the signed-in
- *            person's Downloads (else the public one), refuses it when it or a folder above it is a reparse point, gives
- *            the staged file to the person (owner, full control, protected ACL) and moves it there under a free name with
- *            [IO.File]::Move, which fails on an existing name and never opens or follows the destination. Only the
- *            private folder is ever deleted. The name reaches every script as an argument or as base64, never as script
- *            text. What is left: a person who swaps their Downloads for a junction in the instant between the check and
- *            the move gets a file of their own placed in the junction's target. */
+ *   Windows: the same shape (2026-11-20 security reviews: SYSTEM must never act by path in a folder the person
+ *            controls; a link or junction put there between two steps would turn it into SYSTEM writing, deleting or
+ *            planting a file anywhere). A fixed script makes %SystemRoot%\Temp\lordos-drop-<random> with a protected ACL
+ *            (SYSTEM and Administrators only) and checks it; the file is written into it. The last script refuses when
+ *            nobody is signed in (no SYSTEM copy into Public\Downloads, which every account can write), gives the
+ *            signed-in person Traverse on the folder, Read on the file and on the copy script, Read and Write on one empty
+ *            result file there, and
+ *            runs a one-shot scheduled task AS that person (Interactive logon, no password stored) whose fixed script
+ *            copies the file into their own Downloads under a free name (CreateNew, " (n)") and writes the outcome into
+ *            the result file. SYSTEM waits for it, unregisters the task and deletes only the private folder. The copy is
+ *            the person's own: whatever their Downloads points to, they only reach what their rights reach. The name
+ *            reaches every script as base64, never as script text. */
 enum { FX_NONE = 0, FX_PREP, FX_OPEN, FX_WRITE, FX_CLOSE, FX_PLACE };
 #define FX_CHUNK (48 * 1024)
 
@@ -2793,29 +2795,51 @@ static const char FX_PREP_PS[] =
     "$g=Get-Acl -LiteralPath $d;if($g.GetOwner([Security.Principal.SecurityIdentifier]).Value -notin $k){throw 'not ours'};"
     "foreach($r in $g.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])){if($r.IdentityReference.Value -notin $k){throw 'not private'}};"
     "[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($d)))";
-/* Windows, the last step. %s: the private folder, then the name, each base64 of its UTF-8. Prints base64 of the path the
- * file got; the private folder goes whatever happens */
+/* Windows, as the person (the scheduled task's script). %s: the private folder, then the name, each base64 of its UTF-8.
+ * Writes "ok:" + base64 of the path the copy got, or "err:" + why, into the result file */
+static const char FX_COPY_PS[] =
+    "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
+    "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
+    "$r=Join-Path $t 'out';$p=$null;$o=$null;"
+    "function Say($x){$y=[IO.File]::Open($r,'Open','Write');$b=[Text.Encoding]::UTF8.GetBytes($x);$y.SetLength(0);$y.Write($b,0,$b.Length);$y.Close()};"
+    "try{"
+    "try{$d=(New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path}catch{$d=$null};"
+    "if(-not $d){$d=Join-Path $env:USERPROFILE 'Downloads'};"
+    "if(-not (Test-Path -LiteralPath $d -PathType Container)){New-Item -ItemType Directory -Path $d|Out-Null};"
+    "$b=[IO.Path]::GetFileNameWithoutExtension($n);$e=[IO.Path]::GetExtension($n);$q=Join-Path $d $n;$i=2;"
+    "while(-not $o){try{$o=[IO.File]::Open($q,'CreateNew','Write');$p=$q}catch{if(-not (Test-Path -LiteralPath $q)){throw};if($i -gt 999){throw 'no free name'};$q=Join-Path $d ($b+' ('+$i+')'+$e);$i++}};"
+    "$s=[IO.File]::OpenRead((Join-Path $t 'file'));try{$s.CopyTo($o)}finally{$s.Close();$o.Close()};"
+    "Say('ok:'+[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($p)))"
+    "}catch{if($o){$o.Close()};if($p){Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue};Say('err:'+$_.Exception.Message)}";
+/* Windows, the last step, as SYSTEM. %s: the private folder (base64 of UTF-8), then FX_COPY_PS (base64 of UTF-16LE),
+ * which goes into the private folder as copy.ps1 for the task (a task's arguments are too short for it inline).
+ * Prints the base64 path the person's copy got; the task and the private folder go whatever happens */
 static const char FX_PLACE_PS[] =
     "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';trap{[Console]::Error.Write($_.Exception.Message);exit 1};"
-    "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
+    "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));$tn=$null;"
     "try{"
-    "$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));$f=Join-Path $t 'file';$w=$null;$d=$null;"
-    "try{$u=(Get-CimInstance Win32_ComputerSystem).UserName;"
-    "if($u){$w=(New-Object Security.Principal.NTAccount($u)).Translate([Security.Principal.SecurityIdentifier]);"
-    "$h=(Get-CimInstance Win32_UserProfile -Filter (\"SID='\"+$w.Value+\"'\")).LocalPath;if($h){$d=Join-Path $h 'Downloads'}}}catch{$w=$null;$d=$null};"
-    "if(-not $d -or -not (Test-Path -LiteralPath $d -PathType Container)){$d=Join-Path $env:PUBLIC 'Downloads'};"
-    "if(-not (Test-Path -LiteralPath $d -PathType Container)){throw 'no Downloads folder'};"
-    "if(-not $w){$w=New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')};"
-    "function Chk($p){$q=$p;while($q){if((Get-Item -LiteralPath $q -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw ('a reparse point: '+$q)};$q=Split-Path -Parent $q}};"
-    "$s=New-Object Security.AccessControl.FileSecurity;$s.SetAccessRuleProtection($true,$false);"
-    "foreach($x in @($w,(New-Object Security.Principal.SecurityIdentifier('S-1-5-18')),(New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))){$s.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($x,'FullControl','Allow')))};"
-    "[IO.File]::SetAccessControl($f,$s);"
-    /* the owner too: icacls enables the restore privilege SYSTEM holds (.NET's SetOwner doesn't, it stayed Administrators) */
-    "& \"$env:SystemRoot\\System32\\icacls.exe\" $f /setowner ('*'+$w.Value) /q|Out-Null;"
-    "$b=[IO.Path]::GetFileNameWithoutExtension($n);$e=[IO.Path]::GetExtension($n);$p=Join-Path $d $n;$i=2;"
-    "while($true){Chk $d;try{[IO.File]::Move($f,$p);break}catch{if(-not (Test-Path -LiteralPath $p)){throw};if($i -gt 999){throw 'no free name'};$p=Join-Path $d ($b+' ('+$i+')'+$e);$i++}};"
-    "[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($p)))"
-    "}finally{Remove-Item -LiteralPath $t -Recurse -Force -ErrorAction SilentlyContinue}";
+    "$u=(Get-CimInstance Win32_ComputerSystem).UserName;if(-not $u){throw 'no one is signed in to the machine'};"
+    "$w=(New-Object Security.Principal.NTAccount($u)).Translate([Security.Principal.SecurityIdentifier]);"
+    "$f=Join-Path $t 'file';$r=Join-Path $t 'out';$c=Join-Path $t 'copy.ps1';[IO.File]::WriteAllBytes($r,[byte[]]@());"
+    "[IO.File]::WriteAllText($c,[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('%s')));"
+    "function Grant($p,$x,$dir){if($dir){$a=[IO.Directory]::GetAccessControl($p,'Access')}else{$a=[IO.File]::GetAccessControl($p,'Access')};"
+    "$a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($w,$x,'Allow')));"
+    "if($dir){[IO.Directory]::SetAccessControl($p,$a)}else{[IO.File]::SetAccessControl($p,$a)}};"
+    /* the result file needs Read too: .NET's open for writing was refused with Write alone (2026-11-20). Only that file:
+     * the person can't add, rename or replace anything in the folder */
+    "Grant $t 'Traverse' 1;Grant $f 'Read' 0;Grant $c 'Read' 0;Grant $r 'Read, Write' 0;"
+    "$tn='LordOS-drop-'+[guid]::NewGuid().ToString('N');"
+    "$act=New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File \"'+$c+'\"');"
+    "$pr=New-ScheduledTaskPrincipal -UserId $u -LogonType Interactive -RunLevel Limited;"
+    "$st=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 30);"
+    "Register-ScheduledTask -TaskName $tn -Action $act -Principal $pr -Settings $st|Out-Null;"
+    "Start-ScheduledTask -TaskName $tn;$end=(Get-Date).AddMinutes(30);$k=0;"
+    "while((Get-Item -LiteralPath $r).Length -eq 0){if((Get-Date) -gt $end){throw 'the copy in the person''s session took too long'};Start-Sleep -Milliseconds 250;$k++;"
+    "if($k -gt 40){$i=Get-ScheduledTaskInfo -TaskName $tn;if($i.LastTaskResult -ne 267009 -and $i.LastTaskResult -ne 267011){Start-Sleep 1;"
+    "if((Get-Item -LiteralPath $r).Length -eq 0){throw ('the copy in the person''s session ended without a word ('+$i.LastTaskResult+')')}}}};"
+    "$o=[IO.File]::ReadAllText($r);if($o.StartsWith('ok:')){[Console]::Out.Write($o.Substring(3))}else{throw ('in the person''s session: '+$o.Substring([Math]::Min(4,$o.Length)))}"
+    "}finally{if($tn){Stop-ScheduledTask -TaskName $tn -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $tn -Confirm:$false -ErrorAction SilentlyContinue};"
+    "Remove-Item -LiteralPath $t -Recurse -Force -ErrorAction SilentlyContinue}";
 /* %s: the private folder (checked by ag_drop_staging_ok), base64 */
 static const char FX_DROP_PS[] =
     "Remove-Item -LiteralPath ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'))) -Recurse -Force -ErrorAction SilentlyContinue";
@@ -2823,14 +2847,22 @@ static const char FX_DROP_PS[] =
 static void fx_next(void);
 
 /* guest-exec of a PowerShell script (pure ASCII): -EncodedCommand, base64 of its UTF-16LE */
-static int fx_exec_ps(const char *script, int kind) {
+static char *ps_encode(const char *script) {
     size_t n = strlen(script);
-    uint8_t *w = malloc(n * 2);
+    uint8_t *w = malloc(n * 2 + 1);
     char *b = malloc(n * 2 / 3 * 4 + 16);
-    int r = -1;
     if (w && b) {
         for (size_t i = 0; i < n; i++) { w[i * 2] = (uint8_t)script[i]; w[i * 2 + 1] = 0; }
-        if (ag_b64_encode(w, n * 2, b, n * 2 / 3 * 4 + 16) > 0) {
+        if (ag_b64_encode(w, n * 2, b, n * 2 / 3 * 4 + 16) <= 0) { free(b); b = NULL; }
+    } else { free(b); b = NULL; }
+    free(w);
+    return b;
+}
+static int fx_exec_ps(const char *script, int kind) {
+    char *b = ps_encode(script);
+    int r = -1;
+    {
+        if (b) {
             JBuf j;
             jb_init(&j);
             jb_raw(&j, "{\"path\":\"powershell.exe\",\"arg\":[\"-NoProfile\",\"-NonInteractive\",\"-ExecutionPolicy\",\"Bypass\",\"-EncodedCommand\",");
@@ -2840,7 +2872,7 @@ static int fx_exec_ps(const char *script, int kind) {
             jb_free(&j);
         }
     }
-    free(w); free(b);
+    free(b);
     return r;
 }
 static int fx_exec_sh(const char *script, const char *a1, const char *a2, const char *a3, int kind) {
@@ -3030,12 +3062,19 @@ static void fx_on_reply(int kind, const JVal *root, const JVal *r, int ok) {
     case AQ_FXCLOSE:
         S.fx_handle = 0;
         S.fx_step = FX_PLACE;
-        S.fx_deadline = now_ms() + 120000;
+        /* the last script copies the whole file once more (Windows: in the person's session): its time grows with it */
+        S.fx_deadline = now_ms() + 120000 + (long long)(S.fx_size / 10000);
         if (S.ag_windows) {
-            char bt[400], bn[AG_NAME_MAX / 3 * 4 + 16], ps[sizeof FX_PLACE_PS + sizeof bt + sizeof bn];
+            char bt[400], bn[AG_NAME_MAX / 3 * 4 + 16], copy[sizeof FX_COPY_PS + 2 * sizeof bt];
             if (ag_b64_encode((const uint8_t *)S.fx_tmp, strlen(S.fx_tmp), bt, sizeof bt) < 0 || ag_b64_encode((const uint8_t *)S.fx.name, strlen(S.fx.name), bn, sizeof bn) < 0) { fx_fail(VME_INTERNAL, "internal error"); break; }
-            snprintf(ps, sizeof ps, FX_PLACE_PS, bt, bn);
-            if (fx_exec_ps(ps, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
+            snprintf(copy, sizeof copy, FX_COPY_PS, bt, bn);
+            char *enc = ps_encode(copy);
+            size_t pn = sizeof FX_PLACE_PS + sizeof bt + (enc ? strlen(enc) : 0);
+            char *ps = enc ? malloc(pn) : NULL;
+            if (ps) snprintf(ps, pn, FX_PLACE_PS, bt, enc);
+            if (!ps) fx_fail(VME_INTERNAL, "internal error");
+            else if (fx_exec_ps(ps, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
+            free(ps); free(enc);
         } else if (fx_exec_sh(FX_PLACE_SH, S.fx_tmp, S.fx.name, FX_MOVE_SH, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
         break;
     }
