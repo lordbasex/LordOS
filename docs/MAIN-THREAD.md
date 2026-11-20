@@ -101,7 +101,24 @@ Longest single run of the main thread per scenario (ms), before the fixes (commi
 and after. The numbers vary by a few ms between runs (other work on the machine); the Store's sidebar and its
 categories had been fixed already (0efdde63).
 
-See the table in the change's report and `CHANGELOG.md`; `tests/perf_headless.sh` reproduces them.
+| Scenario | Lord Flow | Lord Classic | Lord Workspaces |
+|---|---|---|---|
+| A setting changed, Store, Settings and Files open | 161 → 20 | 163 → 18 | 171 → 27 |
+| A setting changed, no window open | 29 → 31 (noise) | 51 → 13 | 43 → 4 |
+| Focusing a window (Store, Settings, Files open) | 241 → 31 | 173 → 40 | 174 → 39 |
+| Opening the Store with two apps open | 509 → 197 | 469 → 232 | 521 → 210 |
+| Opening the Store alone | 468 → 152 | | |
+| The Store's sidebar (categories, pages) | 168 → 91 | | |
+| Files: a folder of 2220 entries (`/usr/share/doc`) | 1986 → 229 (heap +69 MB → +9 MB, 20 497 → 3217 nodes) | | |
+| Files: Recents | 662 → 151 | | |
+| Settings: every pane | 50 → 69 (noise) | | |
+| Monitor alone, 30 s | 12 → 44 (noise: its charts) | | |
+| The app launcher (F4) | 62 → 63 | 22 → 11 | 35 → 27 |
+
+Before, the run that changed a setting with three apps open re-rendered all three apps; after, only the
+components that read that setting. The heap stays flat over repeated actions (Store, Settings, focus, idle: a
+few tens of KB up and down); Monitor's grows by ~600 KB in its first minute (its 60-second sample history) and
+then stays.
 
 ## What remains
 
