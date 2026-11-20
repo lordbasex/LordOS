@@ -86,7 +86,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   copied into the Downloads folder of the person signed in to the guest, through the guest agent, with progress under
   the picture and a notice saying where each landed. lord-server hands lord-vm only a descriptor of the person's file
   and a name made safe for the guest's file systems; the guest never chooses a path on this computer. On Linux guests
-  root writes only into a fresh private folder and the move into the person's folder runs as that person. When the
+  root writes only into a fresh private folder and the move into the person's folder runs as that person; on the
+  other guests the file is written into a private folder only the system account and administrators can open, then
+  copied into the signed-in person's Downloads by a one-time task that runs as that person (with nobody signed in, the
+  copy is refused). When the
   agent is off, isn't answering or can't write files, the hint says so before the files are let go. Files only go in; a
   shared folder brings them out. Any answer from the guest agent now counts as its ping, so a long copy no longer makes
   it look lost.
