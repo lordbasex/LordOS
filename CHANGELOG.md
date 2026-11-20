@@ -137,6 +137,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Calculator from Flathub showed as "𐑒𐑨𐑤𐑒𐑿𐑤𐑱𐑑𐑼" in English. A key with a modifier now never matches, since LordOS's
   languages have none (`apps-actions-test`).
 
+## [0.8.9.3-beta] - 2026-11-20
+
+### Security
+
+- **On PCs, the per-app firewall enforced no rule in 0.8.8.6 to 0.8.9.2.** `lord-netperm` compiles its cgroup BPF
+  programs with clang, and `server/Makefile` quietly built it without them when clang was missing. The PC (amd64)
+  packages from 0.8.8.6 on were built on a machine without clang, so every "no internet", per-domain rule and blocklist in Monitor → Firewall
+  was stored but not applied (the service logged `BPF not available (fw.bpfNotBuilt): no rule is enforced`, and
+  Monitor → Firewall showed it in its status line). The device restrictions lost their kernel-side part as well:
+  camera, USB and ALSA microphone nodes (`cgroup/dev`) and Bluetooth sockets. What other parts enforce still held:
+  the PipeWire guard (microphone, camera), the private view and Landlock (files), notifyd (notifications).
+  Found while testing Flatpak apps on a VM, then checked in every package still in the APT repository: 0.8.1 to
+  0.8.8.5 have the programs, 0.8.8.6, 0.8.8.7, 0.8.8.8, 0.8.8.9, 0.8.9, 0.8.9.1 and 0.8.9.2 don't. The Raspberry Pi
+  (arm64) packages are built on the Pi and have them in every version (checked: 0.8.8.5, 0.8.8.6, 0.8.9, 0.8.9.2). `tools/iso/mkdeb.sh` now refuses to
+  build a package whose `lord-netperm` lacks them, with no way to skip that check, and `make` warns when clang is
+  missing. Updating to this version restores the rules already saved; nothing has to be set again.
+
 ## [0.8.9.2-beta] - 2026-11-19
 
 ### Fixed
@@ -7530,7 +7547,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.2-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.3-beta...HEAD
+[0.8.9.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.2-beta...v0.8.9.3-beta
 [0.8.9.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.1-beta...v0.8.9.2-beta
 [0.8.9.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9-beta...v0.8.9.1-beta
 [0.8.9-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.8.9-beta...v0.8.9-beta

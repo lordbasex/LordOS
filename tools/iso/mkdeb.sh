@@ -70,6 +70,12 @@ ROOT=$(pwd)
 VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 [ -x server/build/lord-server ] || { echo "missing server/build/lord-server (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-netperm ] || { echo "missing server/build/lord-netperm (make -C server; clang for BPF)" >&2; exit 1; }
+# Without clang, make builds lord-netperm with no BPF programs: the firewall then enforces no rule at all, and only
+# Monitor → Firewall says so. 0.8.8.6 to 0.8.9.2 shipped like that. No ALLOW_MISSING for this one.
+if grep -q fw.bpfNotBuilt server/build/lord-netperm; then
+    echo "server/build/lord-netperm was built without BPF, so the firewall would enforce nothing: install clang, then make -C server" >&2
+    exit 1
+fi
 [ -x server/build/lord-netd ] || { echo "missing server/build/lord-netd (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-fand ] || { echo "missing server/build/lord-fand (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-browser-prefs ] || { echo "missing server/build/lord-browser-prefs (make -C server)" >&2; exit 1; }
