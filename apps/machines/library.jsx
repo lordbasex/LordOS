@@ -11,6 +11,8 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines } from './model.js';
 import { Assistant } from './assistant.jsx';
+import { Configure } from './configure.jsx';
+import { Sheet } from './kit.jsx';
 import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, StateDot, markColors, overlayRoot, vmRefusal } from './ui.jsx';
 import { readMeta } from './meta.js';
 import { CloneSheet } from './clone.jsx';
@@ -342,7 +344,8 @@ export function Library() {
   const [host, setHost] = useState(() => (has() ? lord.vm.host() : null));
   const [list, setList] = useState([]);
   const [sel, setSel] = useState(null);
-  const [page, setPage] = useState('main');          // main, new, requirements, pi
+  const [page, setPage] = useState('main');          // main, new, requirements, pi: the last three as sheets over the library
+  const [cfg, setCfg] = useState(null);              // Configure as a sheet: { dir, section }
   const [newMode, setNewMode] = useState(null);
   const [menu, setMenu] = useState(null);
   const [del, setDel] = useState(null);
@@ -425,7 +428,7 @@ export function Library() {
       { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => stop('reset') },
       { label: tr('machines.cmd.poweroff'), destructive: true, disabled: !a.poweroff, onClick: () => stop('poweroff') },
       '-',
-      { label: tr('machines.cmd.configure'), onClick: () => openConfigure(m) },
+      { label: tr('machines.cmd.configure'), onClick: () => setCfg({ dir: m.dir }) },
       { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m) },
       { label: tr('machines.cmd.clone'), onClick: () => setCopying(m) },
       { label: tr('machines.cmd.logs'), onClick: () => openLogs(m) },
@@ -448,12 +451,19 @@ export function Library() {
     onMenu: (e) => setMenu({ x: e.x, y: e.y, m }) });
 
   let body;
-  if (page === 'new') body = <Assistant host={host} mode={newMode} names={list.map((m) => m.name)} onClose={() => { setPage('main'); setNewMode(null); refresh(); }}
-    onCreated={(m) => { setPage('main'); setNewMode(null); refresh(); if (m) openMachine(m); }} onConfigure={(m) => { setPage('main'); refresh(); if (m) openConfigure(m, 'cpu'); }}
-    onNeeds={() => setPage('requirements')} />;
-  else if (page === 'requirements') body = <Requirements host={host} onBack={() => setPage('main')} onChanged={refresh} />;
-  else if (page === 'pi') body = <PiView host={host} list={list} onBack={() => setPage('main')} />;
-  else if (!list.length) body = <FirstRun host={host} onNew={() => setPage('new')} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} />;
+  // the assistant, the requirements and the Pi page are sheets over the library, which stays behind them
+  const sheet = page === 'new' ? (
+    <Sheet width={940} height={700} modal onClose={() => { setPage('main'); setNewMode(null); }}>
+      <Assistant host={host} mode={newMode} names={list.map((m) => m.name)} onClose={() => { setPage('main'); setNewMode(null); refresh(); }}
+        onCreated={(m) => { setPage('main'); setNewMode(null); refresh(); if (m) openMachine(m); }} onConfigure={(m) => { setPage('main'); refresh(); if (m) setCfg({ dir: m.dir, section: 'cpu' }); }}
+        onNeeds={() => setPage('requirements')} />
+    </Sheet>
+  ) : page === 'requirements' ? (
+    <Sheet width={760} height={600} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><Requirements host={host} onBack={() => setPage('main')} onChanged={refresh} /></View></Sheet>
+  ) : page === 'pi' ? (
+    <Sheet width={820} height={640} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><PiView host={host} list={list} onBack={() => setPage('main')} /></View></Sheet>
+  ) : null;
+  if (!list.length) body = <FirstRun host={host} onNew={() => setPage('new')} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} />;
   else if (!sorted.length) body = <EmptyState icon="⌕" hint={query.trim() ? tr('machines.lib.noMatch', { q: query.trim() }) : tr(`machines.lib.none.${lv.show}`)} />;
   else if (lv.view === 'list') body = (
     <ScrollView style={{ flex: 1 }} contentStyle={{ padding: 16, gap: 2 }}>
@@ -471,7 +481,7 @@ export function Library() {
     </ScrollView>
   );
 
-  const full = page === 'new' || page === 'requirements' || page === 'pi';
+  const full = false;
   const sortItems = ['name', 'state', 'last', 'disk'].map((k) => ({ label: tr(`machines.lib.sort.${k}`), checked: lv.sort === k, onClick: () => putView({ sort: k }) }));
   const showItems = ['all', 'running', 'off'].map((k) => ({ label: tr(`machines.lib.show.${k}`), checked: lv.show === k, onClick: () => putView({ show: k }) }));
   const addItems = [
@@ -509,6 +519,10 @@ export function Library() {
       ) : null}
       {menu ? <PopMenu x={Math.min(menu.x - rl[0], rl[2] - 232)} y={Math.min(menu.y - rl[1], rl[3] - 330)}
         items={menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
+      {sheet}
+      {cfg ? <Sheet width={1000} height={700} modal onClose={() => setCfg(null)}>
+        <Configure dir={cfg.dir} section={cfg.section} onClose={() => { setCfg(null); refresh(); }} />
+      </Sheet> : null}
       {copying ? <CloneSheet m={copying} running={stateView(copying.state, copying.reason).active} onClose={() => setCopying(null)}
         onDone={(out) => { setCopying(null); refresh(); if (out?.dir) setSel(out.dir); }} /> : null}
       {discard ? <ConfirmDialog title={tr('machines.discard.title', { name: discard.name })} detail={tr('machines.discard.detail')} okLabel={tr('machines.fail.discardState')} cancelLabel={tr('machines.cancel')} destructive

@@ -1,18 +1,20 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. Sections of later phases say so.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
+import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
 
 const SECTIONS = ['general', 'startup', 'cpu', 'display', 'network', 'sound', 'disks', 'sharing', 'agent', 'boot', 'security'];
+// each section's glyph (assets/machines/symbols)
+const ICONS = { general: 'general', startup: 'startup', cpu: 'cpu', display: 'display', network: 'network', sound: 'sound', disks: 'disks',
+  sharing: 'sharing', agent: 'agent', boot: 'boot', security: 'security' };
 
-function Group({ children }) {
-  const p = usePal();
-  return <View style={{ borderRadius: 12, backgroundColor: p.card }}>{children}</View>;
-}
+// a group of rows on a rounded card, with a title above it when it has one
+function Group({ children, title }) { return <Section title={title}>{children}</Section>; }
 function Row({ label, value, children, last, note }) {
   const p = usePal();
   return (
@@ -33,7 +35,9 @@ function Later({ text }) {
   return <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.raised }}><Text style={{ fontSize: 13, color: p.dim, textAlign: 'start', lineHeight: 1.5 }}>{text || tr('machines.cfg.later')}</Text></View>;
 }
 
-export function Configure({ dir, section: section0 }) {
+// onClose: shown as a sheet over the library or the machine's window (kit.jsx), with Cancel and Done; without it, a
+// window of its own (args.configure) as before
+export function Configure({ dir, section: section0, onClose }) {
   const p = usePal();
   const { id: winId } = useAppWindow();
   const [m, setM] = useState(null);
@@ -54,15 +58,16 @@ export function Configure({ dir, section: section0 }) {
     if (x) { const s = lord.vm.stats(dir); setDisk(s?.diskBytes ?? null); }
   };
   useEffect(() => { load(); const timer = setInterval(load, 2000); return () => clearInterval(timer); }, []);
-  useEffect(() => { if (m) wm.setTitle(winId, tr('machines.cfg.title', { name: m.name })); }, [m?.name]);
+  useEffect(() => { if (m && !onClose) wm.setTitle(winId, tr('machines.cfg.title', { name: m.name })); }, [m?.name]);
+  const [closing, setClosing] = useState(false);     // Done pressed: close once the save is through
   useEffect(() => {
     if (!job) return undefined;
     const timer = setInterval(() => {
       const r = lord.vm.job(job);
       if (!r || !r.done) return;
       setJob(0);
-      if (r.ok) { setDraft({}); setMsg({ ok: true, text: tr('machines.cfg.saved') }); }
-      else setMsg({ ok: false, text: r.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || r.out.trim() });
+      if (r.ok) { setDraft({}); setMsg({ ok: true, text: tr('machines.cfg.saved') }); if (closing && onClose) onClose(); }
+      else { setClosing(false); setMsg({ ok: false, text: r.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || r.out.trim() }); }
       load();
     }, 300);
     return () => clearInterval(timer);
@@ -153,12 +158,16 @@ export function Configure({ dir, section: section0 }) {
     pane = <>
       <Group>
         <Row label={tr('machines.cfg.cores')} value={tr('machines.cfg.ofN', { a: cur.vcpus, b: cpus })}>
-          <Bar frac={cur.vcpus / cpus} color={p.accent} />
-          <Off off={running}><Stepper value={cur.vcpus} min={1} max={cpus} onChange={(x) => set({ vcpus: x })} /></Off>
+          <Off off={running}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flex: 1 }}><Slider value={cur.vcpus} min={1} max={cpus} step={1} width={340} onChange={(x) => set({ vcpus: Math.round(x) })} /></View>
+            <Stepper value={cur.vcpus} min={1} max={cpus} onChange={(x) => set({ vcpus: x })} />
+          </View></Off>
         </Row>
         <Row label={tr('machines.cfg.memory')} value={tr('machines.cfg.ofN', { a: gb(cur.memoryMb), b: gb(host?.ramMb || memMax) })} last>
-          <Bar frac={cur.memoryMb / (host?.ramMb || memMax)} color={p.accent} />
-          <Off off={running}><Stepper value={cur.memoryMb} min={256} max={memMax} step={256} width={80} format={(x) => `${x} MB`} onChange={(x) => set({ memoryMb: x })} /></Off>
+          <Off off={running}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flex: 1 }}><Slider value={cur.memoryMb} min={256} max={memMax} step={256} width={340} onChange={(x) => set({ memoryMb: Math.round(x / 256) * 256 })} /></View>
+            <Stepper value={cur.memoryMb} min={256} max={memMax} step={256} width={80} format={(x) => `${x} MB`} onChange={(x) => set({ memoryMb: x })} />
+          </View></Off>
         </Row>
       </Group>
       <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
@@ -262,33 +271,38 @@ export function Configure({ dir, section: section0 }) {
 
   const savable = ['general', 'cpu', 'network', 'disks', 'sharing', 'agent'].includes(sec);
   const list = (
-    <View style={{ width: 260, ...(side.narrow ? { flex: 1 } : null), paddingHorizontal: 10, paddingVertical: 14, gap: 1, backgroundColor: p.raised }}>
-      <Text style={{ marginHorizontal: 8, marginBottom: 8, fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{m.name}</Text>
-      {SECTIONS.map((k) => (
-        <View key={k} onClick={() => { setSec(k); if (side.narrow) side.close(); }} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: sec === k ? p.accent : 'transparent' }}>
-          <Text style={{ fontSize: 13, fontWeight: 600, color: sec === k ? '#fff' : p.text, textAlign: 'start' }}>{tr(`machines.cfg.sec.title.${k}`)}</Text>
-          <Text style={{ fontSize: 12, color: sec === k ? '#e6f1ff' : p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{summary[k]}</Text>
-        </View>
-      ))}
+    <View style={{ width: 250, ...(side.narrow ? { flex: 1 } : null), paddingHorizontal: 10, paddingVertical: 12, gap: 2,
+      backgroundColor: p.dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)', borderEndWidth: 1, borderColor: p.line }}>
+      <Text style={{ marginHorizontal: 10, marginBottom: 6, fontSize: 12, fontWeight: 700, color: p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{m.name}</Text>
+      <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 2 }}>
+        {SECTIONS.map((k) => <SideRow key={k} icon={ICONS[k]} title={tr(`machines.cfg.sec.title.${k}`)} detail={summary[k]} selected={sec === k}
+          onClick={() => { setSec(k); if (side.narrow) side.close(); }} />)}
+      </ScrollView>
     </View>
   );
+  const done = () => { if (dirty && savable && !running) { setClosing(true); save(); } else onClose(); };
   return (
-    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: p.bg }}>
+    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: onClose ? 'transparent' : p.bg }}>
       {side.narrow ? null : list}
-      <View style={{ flex: 1, minWidth: 0, padding: side.narrow ? 16 : 22, gap: 14 }}>
+      <View style={{ flex: 1, minWidth: 0, padding: side.narrow ? 16 : 22, gap: 16 }}>
         {side.narrow ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <SidebarToggle shown={side.shown} onClick={side.toggle} />
-            <Text style={{ flex: 1, minWidth: 0, fontSize: 18, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.cfg.sec.title.${sec}`)}</Text>
+            <View style={{ flex: 1, minWidth: 0 }}><PaneHeader icon={ICONS[sec]} title={tr(`machines.cfg.sec.title.${sec}`)} detail={summary[sec]} /></View>
           </View>
-        ) : <Text style={{ fontSize: 18, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.cfg.sec.title.${sec}`)}</Text>}
+        ) : <PaneHeader icon={ICONS[sec]} title={tr(`machines.cfg.sec.title.${sec}`)} detail={summary[sec]} />}
         {running ? <View style={{ padding: 10, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.cfg.runningBanner')}</Text></View> : null}
         <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 14 }}>{pane}</ScrollView>
         {msg ? <Text style={{ fontSize: 13, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text> : null}
-        {savable ? (
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
-            <Btn label={tr('machines.cancel')} disabled={!dirty || !!job} onClick={() => { setDraft({}); setMsg(null); }} />
-            <Btn primary label={tr('machines.cfg.save')} disabled={!dirty || running || !!job} onClick={() => save()} />
+        {onClose ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+            <Pill label={tr('machines.cancel')} disabled={!!job} onClick={() => { setDraft({}); setMsg(null); onClose(); }} />
+            <Pill primary label={tr('machines.cfg.done')} disabled={!!job} onClick={done} />
+          </View>
+        ) : savable ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+            <Pill label={tr('machines.cancel')} disabled={!dirty || !!job} onClick={() => { setDraft({}); setMsg(null); }} />
+            <Pill primary label={tr('machines.cfg.save')} disabled={!dirty || running || !!job} onClick={() => save()} />
           </View>
         ) : null}
       </View>

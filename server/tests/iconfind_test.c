@@ -123,6 +123,10 @@ static void test_allowed(void) {
         { "/usr/share/../../etc/a.svg", 0 },
         { "usr/share/a.svg", 0 },
         { "/home/user2/.icons/a.svg", 0 },
+        { "/usr/lib/lordos/assets/machines/logos/debian.svg", 1 },
+        { "/usr/lib/lordos/assets/machines/symbols/cpu-symbolic.svg", 1 },
+        { "/usr/lib/lordos/bin/a.svg", 0 },
+        { "/usr/lib/lordos/assets/../bin/a.svg", 0 },
     };
     for (size_t i = 0; i < sizeof cases / sizeof *cases; i++)
         if (iconfind_svg_allowed(cases[i].path, "/home/u") != cases[i].ok) { fails++; printf("FAIL allowed %s\n", cases[i].path); }

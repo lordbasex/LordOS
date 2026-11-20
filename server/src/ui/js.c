@@ -214,7 +214,16 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
              * parsed here (media/svgicon.c); empty until it answers */
             int svg = !num && !strncmp(src, "svg:", 4);
             size_t sl = strlen(src);
-            if (svg) n->img = svgicon_get_spec(src);
+            if (svg) {
+                /* "svg:<px>:<hex>:asset:<path>": an icon of LordOS's own assets, tinted like a symbolic one (Machines'
+                 * sidebar and toolbar glyphs); never "..", never outside the assets folder */
+                const char *as = strstr(src, ":asset:");
+                char spec[2300];
+                if (as && !strstr(as, "..") && (size_t)(as - src) < 40 &&
+                    snprintf(spec, sizeof spec, "%.*s:%s/%s", (int)(as - src), src, js_sys_assets(), as + 7) < (int)sizeof spec)
+                    n->img = svgicon_get_spec(spec);
+                else n->img = svgicon_get_spec(src);
+            }
             else if (num) {
                 /* an optional ":<stamp>" after the size, the file's "<mtime>.<size>" (sdk/filekinds.js thumbSrc): a
                  * picture replaced under the same name gets its own thumbnail (GitHub #180). The path starts with '/'. */

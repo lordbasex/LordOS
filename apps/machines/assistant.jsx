@@ -12,12 +12,13 @@
 // Windows 11 (windows.js, 4.3): the person's own multi-edition ISO from Microsoft's page (found in Downloads and checked
 // against Microsoft's published SHA-256) or Microsoft's 90-day evaluation (downloaded by the helper); the machine is
 // made ready for it (secure boot, TPM 2.0, virtio-win drivers) and installs without questions or with Windows' own.
-import { View, Text, TextInput, FilePicker, Toggle, admin, fs, openUrl, userDirs, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
 import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor } from './catalog.js';
 import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, PROFILES, profileSize } from './model.js';
 import { usePal, OsMark, Btn, Bar, gb, bytes } from './ui.jsx';
+import { SheetHeader, Pill, Round, Sym } from './kit.jsx';
 import { writeMeta } from './meta.js';
 import { Migrate } from './migrate.jsx';
 import { windowsEntry, driversFor, matchIso, evalFiles, evalFor, newestDownload, windowsZone, inputLocale, userLocale, editionPlan, checkWindowsSetup, windowsHostname, windowsSize } from './windows.js';
@@ -507,23 +508,25 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     </View>
   );
 
+  // a sheet over the library (kit.jsx): its title bar with Back, the step's content, the buttons at the bottom
+  const back = step > 0 && !(step === 4 && !fail && !stopped) ? () => (stopped ? (setStopped(false), setStep(3)) : setStep(step - 1)) : null;
   return (
-    <View style={{ flex: 1, paddingHorizontal: 28, paddingVertical: 24, gap: 16, borderRadius: 12, backgroundColor: p.raised, border: `1px solid ${p.line}` }}>
-      <View style={{ flexDirection: 'row', gap: 20 }}>
-        {STEPS.map((s, i) => <Text key={s} style={{ fontSize: 12, fontWeight: i === step ? 700 : 400, color: i === step ? p.text : p.dim }}>{`${i + 1} ${tr(`machines.as.step.${s === 'name' && uo ? 'setup' : s}`)}`}</Text>)}
+    <View style={{ flex: 1 }}>
+      <SheetHeader onBack={back} title={tr('machines.newMachine')}
+        subtitle={`${tr('machines.as.stepOf', { n: step + 1, total: STEPS.length })} · ${tr(`machines.as.step.${STEPS[step] === 'name' && (uo || windows) ? 'setup' : STEPS[step]}`)}`}
+        right={<Round title={tr('machines.cancel')} onClick={onClose}><Text style={{ fontSize: 15, color: p.dim }}>✕</Text></Round>} />
+      <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 28, paddingVertical: 20, gap: 16 }}>
+        <Text style={{ fontSize: 22, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
+        <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 14, paddingBottom: 8 }}>{body}</ScrollView>
       </View>
-      <Text style={{ fontSize: 22, fontWeight: 600, color: p.text, textAlign: 'start' }}>{title}</Text>
-      {body}
-      <View style={{ flex: 1 }} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderColor: p.line }}>
         {step === 0 ? <Btn link label={arch === host.arch ? tr('machines.as.otherArch', { arch: other }) : tr('machines.as.thisArch', { arch: host.arch })}
           onClick={() => setArch(arch === host.arch ? other : host.arch)} /> : null}
         <View style={{ flex: 1 }} />
-        {stopped ? <Btn label={tr('machines.back')} onClick={() => { setStopped(false); setStep(3); }} /> : null}
-        {step === 4 && !fail && !stopped ? null : <Btn label={step === 0 || fail || stopped ? tr('machines.cancel') : tr('machines.back')} onClick={() => (step === 0 || fail || stopped ? onClose() : setStep(step - 1))} />}
-        {stopped ? <Btn primary label={tr('machines.dl.continue')} onClick={create} /> : null}
-        {step < 3 ? <Btn primary label={tr('machines.as.continue')} disabled={!can} onClick={() => setStep(step + 1)} /> : null}
-        {step === 3 ? <Btn primary label={customize ? tr('machines.as.createConfigure') : tr('machines.as.createStart')} disabled={!can} onClick={create} /> : null}
+        {step === 4 && !fail && !stopped ? null : <Pill label={step === 0 || fail || stopped ? tr('machines.cancel') : tr('machines.back')} onClick={() => (step === 0 || fail || stopped ? onClose() : setStep(step - 1))} />}
+        {stopped ? <Pill primary label={tr('machines.dl.continue')} onClick={create} /> : null}
+        {step < 3 ? <Pill primary label={tr('machines.as.continue')} disabled={!can} onClick={() => setStep(step + 1)} /> : null}
+        {step === 3 ? <Pill primary label={customize ? tr('machines.as.createConfigure') : tr('machines.as.createStart')} disabled={!can} onClick={create} /> : null}
       </View>
       {picking ? <FilePicker title={source === 'iso' || windows ? tr('machines.new.pickIso') : source === 'migrate' ? tr('machines.mig.pick') : tr('machines.new.pickImage')}
         filter={source === 'iso' || windows ? /\.iso$/i : source === 'migrate' ? MIGRATE_FILES : /\.(qcow2|img|raw)$/i}

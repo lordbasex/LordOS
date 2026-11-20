@@ -11,7 +11,9 @@ import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal } from './ui.jsx';
-import { openConfigure, openLogs, openSnapshots } from './library.jsx';
+import { openLogs, openSnapshots } from './library.jsx';
+import { Configure } from './configure.jsx';
+import { Sheet } from './kit.jsx';
 
 const BAR = 48;
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
@@ -120,36 +122,36 @@ function Tools({ ctl, floating, compact }) {
     {!floating ? <>
       <BarGroup>
         <AgentButton ctl={ctl} />
-        <IconMenuBtn icon={icons.clipboard} label={`${tr('machines.cfg.clipboard')}: ${tr(`machines.cfg.clip.${clip}`)}`} items={clipItems} color={clipOn ? '#7be3a4' : null} />
-        <IconMenuBtn icon={icons.folder} label={shares.length ? tr('machines.tb.foldersN', { n: shares.length }) : tr('machines.tb.folders')} items={shareItems} color={shares.length ? '#7be3a4' : null} />
-        {compact ? null : <IconBtn icon={icons.apps} label={tr('machines.tb.appsLater')} disabled />}
+        <IconMenuBtn sym="clipboard" label={`${tr('machines.cfg.clipboard')}: ${tr(`machines.cfg.clip.${clip}`)}`} items={clipItems} color={clipOn ? '#7be3a4' : null} />
+        <IconMenuBtn sym="sharing" label={shares.length ? tr('machines.tb.foldersN', { n: shares.length }) : tr('machines.tb.folders')} items={shareItems} color={shares.length ? '#7be3a4' : null} />
+        {compact ? null : <IconBtn sym="apps" label={tr('machines.tb.appsLater')} disabled />}
       </BarGroup>
       {compact ? null : <BarSep />}
     </> : null}
     <BarGroup>
-      <IconMenuBtn glyph="⛶" size={15} label={resLabel} items={res} disabled={!a.keys} on={!follow} />
-      <IconMenuBtn glyph="⏏" label={tr('machines.tb.devices')} items={ctl.devices} />
+      <IconMenuBtn sym="display" label={resLabel} items={res} disabled={!a.keys} on={!follow} />
+      <IconMenuBtn sym="eject" label={tr('machines.tb.devices')} items={ctl.devices} />
     </BarGroup>
     {compact ? null : <BarSep />}
     <BarGroup>
-      {!floating ? <IconBtn glyph=">_" size={12} label={tr('machines.tb.shell')} on={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} /> : null}
-      <IconBtn glyph="≡" label={tr('machines.cmd.logs')} onClick={ctl.logs} />
-      <IconBtn glyph="◉" label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} />
-      {ctl.rec ? <IconBtn icon={icons.stop} danger label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} />
-        : <IconBtn icon={icons.record} color="#ff453a" label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} />}
+      {!floating ? <IconBtn sym="terminal" label={tr('machines.tb.shell')} on={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} /> : null}
+      <IconBtn sym="logs" label={tr('machines.cmd.logs')} onClick={ctl.logs} />
+      <IconBtn sym="snapshot" label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} />
+      {ctl.rec ? <IconBtn sym="stop" danger label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} />
+        : <IconBtn sym="record" color="#ff453a" label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} />}
     </BarGroup>
     {ctl.rec ? <Text style={{ fontSize: 12, fontWeight: 600, color: '#ff6b6b', marginLeft: 4 }}>{ctl.recTime}</Text> : null}
     {compact ? null : <BarSep />}
     <BarGroup>
-      {a.start ? <IconBtn glyph="▶" color="#30d158" label={st?.suspended || stateView(st?.state, st?.reason).key === 'suspended' ? tr('machines.cmd.resume') : tr('machines.start')} onClick={ctl.begin} />
-        : <IconBtn glyph={a.resume ? '▶' : null} icon={a.resume ? null : icons.pause} label={a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause')} disabled={!a.pause && !a.resume} onClick={() => ctl.cmd(a.resume ? 'resume' : 'pause')} />}
-      <IconMenuBtn icon={icons.power} label={tr('machines.cmd.power')} items={ctl.power} disabled={a.start} />
+      {a.start ? <IconBtn sym="play" color="#30d158" label={st?.suspended || stateView(st?.state, st?.reason).key === 'suspended' ? tr('machines.cmd.resume') : tr('machines.start')} onClick={ctl.begin} />
+        : <IconBtn sym={a.resume ? 'play' : 'pause'} label={a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause')} disabled={!a.pause && !a.resume} onClick={() => ctl.cmd(a.resume ? 'resume' : 'pause')} />}
+      <IconMenuBtn sym="power" label={tr('machines.cmd.power')} items={ctl.power} disabled={a.start} />
     </BarGroup>
     {compact ? null : <BarSep />}
     <BarGroup>
-      {!floating ? <IconBtn glyph="⚙" label={tr('machines.cmd.configure')} onClick={() => ctl.configure()} /> : null}
-      {floating ? <IconBtn glyph="⤡" label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} />
-        : <IconBtn glyph="⤢" label={tr('machines.cmd.fullscreen')} onClick={() => ctl.setFull(true)} />}
+      {!floating ? <IconBtn sym="gear" label={tr('machines.cmd.configure')} onClick={() => ctl.configure()} /> : null}
+      {floating ? <IconBtn sym="fullscreen-exit" label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} />
+        : <IconBtn sym="fullscreen" label={tr('machines.cmd.fullscreen')} onClick={() => ctl.setFull(true)} />}
     </BarGroup>
   </>;
 }
@@ -287,6 +289,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // the Shell (6.18): the guest's serial console in a terminal pane under the picture; the keyboard goes to whichever
   // of the two was clicked last
   const [shell, setShell] = useWindowState('vm.shell', false);
+  const [cfgSheet, setCfgSheet] = useState(null);     // Configure as a sheet over the machine's picture
   const [shellKeys, setShellKeys] = useState(false);
   const shellRef = useRef(null);
   const [rec, setRec] = useWindowState('vm.rec', null);       // { id, at } while the picture is recorded
@@ -525,7 +528,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     setFollow: (on) => { setFollow(on); sized.current.last = null; },
     fixed: (w, h) => { setFollow(false); if (sid) lord.vm.resize(sid, w, h); },
     logs: () => openLogs(m0),
-    configure: (section) => openConfigure(m0, section),
+    configure: (section) => setCfgSheet({ section }),
     begin: () => begin(),
     screenshot: shot,
     power: [
@@ -561,7 +564,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         { label: tr('machines.tb.screenshot'), disabled: !a.keys, onClick: shot },
         { label: full ? tr('machines.cmd.exitFullscreen') : tr('machines.cmd.fullscreen'), onClick: () => wm.setFullscreen(winId, !full) },
         { label: tr('machines.cmd.logs'), onClick: () => openLogs(m0) },
-        { label: tr('machines.cmd.configure'), onClick: () => openConfigure(m0) },
+        { label: tr('machines.cmd.configure'), onClick: () => setCfgSheet({}) },
       ] },
       { label: tr('machines.menu.devices'), items: ctl.devices.filter((x) => x !== '-') },
     ]);
@@ -581,7 +584,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   else if (closing === 'suspend') card = <Card title={tr('machines.job.suspend', { name })} text={tr('machines.job.wait')} />;
   else if (closing) card = <Card title={tr('machines.win.shuttingDown', { name })} text={tr('machines.win.shuttingDownHint')} actions={[<Btn key="f" danger label={tr('machines.cmd.poweroff')} onClick={() => cmd('poweroff')} />]} />;
   else if (!sid && st) {
-    if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={() => begin()} onSettings={() => openConfigure(m0)}
+    if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={() => begin()} onSettings={() => setCfgSheet({})}
       onAnyway={() => begin({ resumeAnyway: true })} onDiscard={() => begin({ discardState: true })} />;
     else if (v.key === 'suspended') card = <OffView dir={dir} name={name} title={tr('machines.state.suspended')} hint={tr('machines.win.suspendedHint')} label={tr('machines.cmd.resume')} onPlay={() => begin()} />;
     else card = <OffView dir={dir} name={name} title={tr(`machines.state.${v.key}`)} hint={tr('machines.win.playHint')} label={tr('machines.start')} onPlay={() => begin()} />;
@@ -633,6 +636,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       {pickCd ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPickCd(false)}
         onPick={(x) => { setPickCd(false); cdTo(Array.isArray(x) ? x[0] : x); }} /> : null}
       {full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}
+      {cfgSheet ? <Sheet width={1000} height={700} modal onClose={() => setCfgSheet(null)}>
+        <Configure dir={dir} section={cfgSheet.section} onClose={() => setCfgSheet(null)} />
+      </Sheet> : null}
     </View>
   );
 }

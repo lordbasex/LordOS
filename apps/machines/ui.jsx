@@ -13,6 +13,18 @@ export const bytes = (b) => (b >= 1e12 ? `${Math.round(b / 1e11) / 10} TB` : b >
 export const gib = (b) => `${Math.round((b / 1073741824) * 10) / 10}`;
 
 // surfaces: dark like the mocks, light from the theme
+// a color as rrggbb for a tinted glyph ('#rgb', '#rrggbb[aa]', 'rgb(…)'); white when it isn't one
+export function hexOf(c) {
+  const s = String(c || '').trim().toLowerCase();
+  let m = /^#([0-9a-f]{3})$/.exec(s);
+  if (m) return m[1].split('').map((d) => d + d).join('');
+  m = /^#([0-9a-f]{6})/.exec(s);
+  if (m) return m[1];
+  m = /^rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/.exec(s);
+  if (m) return m.slice(1, 4).map((v) => Math.max(0, Math.min(255, Math.round(+v))).toString(16).padStart(2, '0')).join('');
+  return 'ffffff';
+}
+
 export function usePal() {
   const t = useTheme();
   const dark = t.mode === 'dark';
@@ -26,7 +38,8 @@ export function usePal() {
     btn: dark ? '#3b3b43' : 'rgba(0,0,0,0.07)',
     hover: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
     text: t.text, dim: t.textDim,
-    accent: '#0a84ff', cpu: '#6cb6ff', mem: '#c79bff', disk: '#ffb340', ok: '#30d158', warn: '#ffc56e', bad: '#ff9a9a',
+    // the accent the person chose (Settings → Appearance): selections, buttons and Machines' glyphs follow it
+    accent: t.accent || '#0a84ff', cpu: '#6cb6ff', mem: '#c79bff', disk: '#ffb340', ok: '#30d158', warn: '#ffc56e', bad: '#ff9a9a',
     warnBg: dark ? '#4a3512' : '#fff1d6', badBg: dark ? '#4a2028' : '#ffe1e4',
   };
 }
@@ -101,31 +114,32 @@ export function Btn({ label, onClick, primary, disabled, big, link, danger, styl
 
 // A toolbar button with a glyph (or a drawn icon) and its name as the tooltip (the mock "Session": agent, shell, logs,
 // screenshot, record, pause, power)
-export function IconBtn({ glyph, icon, label, onClick, disabled, on, danger, color, size = 14 }) {
+// sym: a glyph of assets/machines/symbols (kit.jsx's Sym), tinted like the text
+export function IconBtn({ glyph, icon, sym, label, onClick, disabled, on, danger, color, size = 14 }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   const fg = on || danger ? '#fff' : color || p.text;
+  const hex = hexOf(fg);
   return (
     <View onClick={disabled ? undefined : onClick} title={label} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ width: 32, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1,
+      style={{ width: 36, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1,
         backgroundColor: danger ? '#8f1f2c' : on ? p.accent : hover && !disabled ? p.hover : 'transparent' }}>
-      {icon ? icon(fg) : <Text style={{ fontSize: size, fontWeight: 700, color: fg }}>{glyph}</Text>}
+      {sym ? <Image src={`svg:40:${hex}:asset:machines/symbols/${sym}-symbolic.svg`} style={{ width: 18, height: 18 }} />
+        : icon ? icon(fg) : <Text style={{ fontSize: size, fontWeight: 700, color: fg }}>{glyph}</Text>}
     </View>
   );
 }
 
-// A row of bar buttons in one rounded container, and the thin line between groups (5.3: grouped, icons with tooltips)
+// A row of bar buttons on one pill, and the space between pills (5.3: grouped, icons with tooltips)
 export function BarGroup({ children }) {
   const p = usePal();
-  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1, padding: 2, borderRadius: 9, backgroundColor: p.btn }}>{children}</View>;
+  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: 3, borderRadius: 20, backgroundColor: p.btn,
+    border: `1px solid ${p.dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)'}` }}>{children}</View>;
 }
-export function BarSep() {
-  const p = usePal();
-  return <View style={{ width: 1, height: 20, marginHorizontal: 4, backgroundColor: p.line }} />;
-}
+export function BarSep() { return <View style={{ width: 6 }} />; }
 
 // An icon button that opens a menu under itself (resolution, devices, clipboard, power)
-export function IconMenuBtn({ glyph, icon, label, items, disabled, on, color, size }) {
+export function IconMenuBtn({ glyph, icon, sym, label, items, disabled, on, color, size }) {
   const [open, setOpen] = useState(false);
   const [end, setEnd] = useState(false);
   const ref = useRef(null);
@@ -137,7 +151,7 @@ export function IconMenuBtn({ glyph, icon, label, items, disabled, on, color, si
   };
   return (
     <View ref={ref}>
-      <IconBtn glyph={glyph} icon={icon} label={label} disabled={disabled} on={on || open} color={color} size={size} onClick={() => (open ? setOpen(false) : show())} />
+      <IconBtn glyph={glyph} icon={icon} sym={sym} label={label} disabled={disabled} on={on || open} color={color} size={size} onClick={() => (open ? setOpen(false) : show())} />
       {open ? (
         <Overlay anchor={ref}>
           <View style={{ position: 'absolute', top: 32, width: 260, ...(end ? { right: 0 } : { left: 0 }) }}>
