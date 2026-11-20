@@ -3,7 +3,7 @@
 // while the machine is off; what the app keeps (system, notes) is saved at once. Sections of later phases say so.
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
-import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand } from './model.js';
+import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand, no3dReason, gfxFor } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
@@ -75,7 +75,8 @@ export function Configure({ dir, section: section0, onClose }) {
   if (!m) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg }}><Text style={{ color: p.dim }}>{tr('machines.win.gone')}</Text></View>;
 
   const running = stateView(m.state).active;
-  const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, agent: !!m.agent, clipboard: m.clipboard || 'off', shares: m.shares || [], ...draft };
+  const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, agent: !!m.agent, clipboard: m.clipboard || 'off', shares: m.shares || [],
+    graphics: m.graphics || '2d', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(m[k] || []) : val !== m[k]);
@@ -92,7 +93,7 @@ export function Configure({ dir, section: section0, onClose }) {
     general: [meta.osName || systemOf(m.name).name, m.arch, prof ? tr(`machines.as.profile.${prof}`) : null].filter(Boolean).join(', '),
     startup: tr(`machines.cfg.close.${closeChoice(meta)}`) + (m.suspended ? `, ${tr('machines.doing.suspended')}` : ''),
     cpu: tr('machines.cfg.sum.cpu', { n: m.vcpus, mem: gb(m.memoryMb) }),
-    display: m.display === 'window' ? tr('machines.cfg.sum.display') : tr('machines.cfg.sum.noDisplay'),
+    display: m.display === 'window' ? tr('machines.cfg.sum.display') + (m.graphics === '3d' ? `, ${tr('machines.cfg.graphics3d')}` : '') : tr('machines.cfg.sum.noDisplay'),
     network: tr(`machines.cfg.net.${m.network}`),
     sound: tr('machines.cfg.sum.sound'),
     disks: tr('machines.cfg.sum.disks', { n: m.diskGb }) + (m.dataDisks ? ` + ${m.dataDisks}` : '') + (m.devices === 'compat' ? `, ${tr('machines.cfg.devCompatShort')}` : '') + (m.iso ? `, ${tr('machines.isoAttached')}` : ''),
@@ -123,7 +124,7 @@ export function Configure({ dir, section: section0, onClose }) {
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><MenuBtn label={prof ? tr(`machines.as.profile.${prof}`) : tr('machines.cfg.profileCustom')}
           items={PROFILES.map((k) => { const s = profileSize(k, host); return { label: tr(`machines.as.profile.${k}`), checked: prof === k,
             hint: tr('machines.as.spec', { cpus: s.vcpus, mem: gb(s.memoryMb), gfx: tr(`machines.as.gfx.${s.gfx}`) }),
-            onClick: () => { set({ vcpus: s.vcpus, memoryMb: s.memoryMb, network: s.network }); writeMeta(dir, { profile: k }); setMeta(readMeta(dir)); } }; })} /></View></Off>
+            onClick: () => { set({ vcpus: s.vcpus, memoryMb: s.memoryMb, network: s.network, graphics: gfxFor(s.gfx, host, m.windowsDevices, m.arch) }); writeMeta(dir, { profile: k }); setMeta(readMeta(dir)); } }; })} /></View></Off>
       </Row>
       <Row label={tr('machines.cfg.arch')} value={emulated ? `${m.arch}, ${tr('machines.emulatedLower')}` : m.arch} />
       <Row label={tr('machines.cfg.created')} value={(m.created || '').replace('T', ' ').replace('Z', ' UTC')} />
@@ -174,13 +175,21 @@ export function Configure({ dir, section: section0, onClose }) {
         {tr('machines.cfg.cpuNote', { limit: gb(memLimit({ ...m, ...cur })), max: gb(memMax) })}{offNote ? ` ${offNote}` : ''}</Text>
       {cur.vcpus > (host?.vcpusRecommended || 99) ? <Text style={{ fontSize: 12, color: '#ff9f0a', textAlign: 'start' }}>{tr('machines.new.warn.vcpus', { n: host.vcpusRecommended })}</Text> : null}
     </>;
-  } else if (sec === 'display') pane = <>
+  } else if (sec === 'display') {
+    // 3D (6.10): Linux machines on a computer that can give it; a machine that has it can always go back to 2D
+    const why3d = no3dReason(host, m.windowsDevices, m.arch);
+    const note = [cur.graphics === '3d' ? tr('machines.cfg.graphics3dNote') : tr('machines.cfg.graphics2dNote'), why3d ? tr(`machines.cfg.no3d.${why3d}`) : null, offNote]
+      .filter(Boolean).join(' ');
+    pane = <>
     <Group>
       <Row label={tr('machines.cfg.resolution')} value={tr('machines.cfg.followsWindow')} note={tr('machines.cfg.resolutionNote')} />
-      <Row label={tr('machines.cfg.graphics')} value={tr('machines.cfg.graphics2d')} last />
+      <Row label={tr('machines.cfg.graphics')} last note={note}>
+        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set({ graphics: x })}
+          options={[['2d', tr('machines.cfg.graphics2d')], ['3d', tr('machines.cfg.graphics3d'), !!why3d && cur.graphics !== '3d']]} /></Off>
+      </Row>
     </Group>
-    <Later text={tr('machines.cfg.later3d')} />
   </>;
+  }
   else if (sec === 'network') pane = <>
     <Group>
       <Row label={tr('machines.cfg.netMode')} note={tr(`machines.cfg.netNote.${cur.network}`) + (offNote ? ` ${offNote}` : '')}>

@@ -9,7 +9,13 @@
  * Decisions (Phase 0, section 13.6):
  *   - It requires org.qemu.Display1.Listener.Unix.Map: QEMU shares its picture once as a memfd and sends
  *     rectangles. Plain Scanout/Update arrays are still accepted and copied, because QEMU uses them for surfaces
- *     it can't share. DMABUF (3D) is refused in the alpha.
+ *     it can't share.
+ *   - 3D (a machine with graphics "3d", QEMU's gl=on): the picture is a dmabuf QEMU's GPU context draws into
+ *     (ScanoutDMABUF, single plane: Debian's 10.0 has no ScanoutDMABUF2). Its size, stride, fourcc and real length
+ *     are checked, and the descriptor goes on to lord-server (VD_DMABUF), which reads it back with its own GPU
+ *     context into the shared picture; this helper copies nothing. QEMU waits for the answer to each UpdateDMABUF
+ *     before the guest draws again, so the answer waits until lord-server read that frame (VD_FRAME_DONE), or
+ *     250 ms: the picture never tears, and a stalled lord-server never stalls the guest for long.
  *   - QEMU's memfd is sealed only against new seals, so QEMU can shrink it under our mapping: every read of it
  *     runs under a SIGBUS guard, and a fault drops that mapping (the picture waits for the next ScanoutMap).
  *     Refusing unsealed buffers would mean no picture at all with QEMU 10.0.
@@ -62,7 +68,7 @@
 static sd_bus *bus, *lbus, *abus;
 
 /* where the picture comes from */
-enum { SRC_NONE = 0, SRC_MAP, SRC_FB };
+enum { SRC_NONE = 0, SRC_MAP, SRC_FB, SRC_DMABUF };
 static struct {
     int src;
     uint32_t w, h;
@@ -94,7 +100,10 @@ static struct {
     /* counters */
     long long stats_ms;
     int refused, updates, copies, stats_changed;
-    int refused_dmabuf_told;
+    /* SRC_DMABUF: the UpdateDMABUF whose answer waits for lord-server (see the top), and since when */
+    sd_bus_message *upd;
+    long long upd_ms;
+    int dmabufs;
 } D;
 
 static long long now_ms(void) {
@@ -143,6 +152,21 @@ static void drop_fb(void) {
     free(D.fb);
     D.fb = NULL;
     if (D.src == SRC_FB) D.src = SRC_NONE;
+}
+
+/* QEMU's UpdateDMABUF waiting for its answer: given now */
+static void answer_update(void) {
+    if (!D.upd) return;
+    sd_bus_reply_method_return(D.upd, NULL);
+    D.upd = sd_bus_message_unref(D.upd);
+}
+
+/* the picture stops being a dmabuf: lord-server drops its copy of the descriptor (VD_DMABUF a = 0) */
+static void drop_dmabuf(void) {
+    answer_update();
+    if (D.src != SRC_DMABUF) return;
+    D.src = SRC_NONE;
+    say(vd_msg(VD_DMABUF, 0, 0, 0, 0, 0, 0), -1);
 }
 
 static void damage(int x, int y, int w, int h) {
@@ -318,7 +342,7 @@ static int copy_damage(int x, int y, int w, int h) {
     volatile uint32_t sstride;
     if (D.src == SRC_MAP) { src = D.map + D.off; sstride = D.stride; }
     else if (D.src == SRC_FB) { src = D.fb; sstride = D.w * 4; }
-    else return 0;
+    else return 0;          /* a dmabuf: lord-server reads it itself */
     uint8_t *volatile dst = D.shm;
     size_t dstride = (size_t)D.w * 4, row = (size_t)w * 4;
     if (D.src == SRC_MAP) {
@@ -393,6 +417,7 @@ static int on_scanout(sd_bus_message *m, void *u, sd_bus_error *e) {
     if (len != bytes) { refuse("Scanout", "%zu bytes for stride × height %" PRIu64, len, bytes); return ok(m); }
     drop_map();
     drop_fb();
+    drop_dmabuf();
     D.fb = malloc((size_t)w * h * 4);
     if (!D.fb) { refuse("Scanout", "out of memory"); return ok(m); }
     for (uint32_t row = 0; row < h; row++) memcpy(D.fb + (size_t)row * w * 4, (const uint8_t *)data + (size_t)row * stride, (size_t)w * 4);
@@ -421,26 +446,61 @@ static int on_update(sd_bus_message *m, void *u, sd_bus_error *e) {
     return ok(m);
 }
 
-static void told_dmabuf(void) {
-    if (D.refused_dmabuf_told) return;
-    D.refused_dmabuf_told = 1;
-    say(vd_msg(VD_STATE, VDS_NO_PICTURE, VDR_REFUSED, 0, 0, 0, 0), -1);
-}
+/* the formats a dmabuf picture may have: 32-bit RGB, one plane (QEMU's GL scanouts) */
+static bool dmabuf_fmt_ok(uint32_t f) { return f == VD_FOURCC_XRGB8888 || f == VD_FOURCC_ARGB8888 || f == VD_FOURCC_XBGR8888 || f == VD_FOURCC_ABGR8888; }
 
 static int on_scanout_dmabuf(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)u; (void)e;
-    refuse("ScanoutDMABUF", "3D pictures aren't used in this version");
+    int fd;
+    uint32_t w, h, stride, fourcc;
+    uint64_t mod;
+    int y0_top;
+    if (sd_bus_message_read(m, "huuuutb", &fd, &w, &h, &stride, &fourcc, &mod, &y0_top) < 0) { refuse("ScanoutDMABUF", "malformed"); return ok(m); }
+    D.updates++;
+    if (!w || !h || w > VD_MAX_DIM || h > VD_MAX_DIM || (uint64_t)w * h * 4 > VD_MAX_BYTES) { refuse("ScanoutDMABUF", "size %ux%u out of limits", w, h); return ok(m); }
+    if (!dmabuf_fmt_ok(fourcc)) { refuse("ScanoutDMABUF", "fourcc 0x%08x", fourcc); return ok(m); }
+    if ((uint64_t)stride < (uint64_t)w * 4 || stride % 4 || stride > VD_DMABUF_STRIDE_MAX) { refuse("ScanoutDMABUF", "stride %u for width %u", stride, w); return ok(m); }
+    /* its real length: never shorter than what it says it holds (a tiled buffer may be longer) */
+    off_t real = lseek(fd, 0, SEEK_END);
+    uint64_t bytes = (uint64_t)stride * h;
+    if (real < 0 || (uint64_t)real < bytes || (uint64_t)real > (uint64_t)VD_MAX_BYTES * 2) {
+        refuse("ScanoutDMABUF", "%lld bytes against stride × height %" PRIu64, (long long)real, bytes);
+        return ok(m);
+    }
     drop_map();
     drop_fb();
-    told_dmabuf();
-    return ok(m);       /* sd-bus closes the descriptor with the message */
+    answer_update();
+    D.src = SRC_DMABUF;
+    if (!D.dmabufs++) fprintf(stderr, "lord-vmdisplay: QEMU's 3D picture: %ux%u dmabuf, fourcc 0x%08x, modifier 0x%" PRIx64 ", %lld bytes, %s\n",
+                              w, h, fourcc, mod, (long long)real, y0_top ? "bottom row first" : "top row first");
+    /* sd-bus keeps its descriptor and closes it with the message; lord-server gets its own. QEMU's y0_top is in GL's
+     * terms (its own windows blit with a flip when it's false): set, the first row in memory is the picture's bottom
+     * (measured 2026-11-20, virgl on amd64: false, rows top first) */
+    say(vd_msg(VD_DMABUF, (int)w, (int)h, (int)stride | (y0_top ? VD_DMABUF_FLIP : 0), (int32_t)fourcc, (int32_t)(uint32_t)mod, (int32_t)(uint32_t)(mod >> 32)), fd);
+    new_size(w, h);
+    return ok(m);
 }
-static int on_update_dmabuf(sd_bus_message *m, void *u, sd_bus_error *e) { (void)u; (void)e; D.updates++; return ok(m); }
+
+/* the damage, and QEMU's answer held until lord-server read the frame (the top of this file) */
+static int on_update_dmabuf(sd_bus_message *m, void *u, sd_bus_error *e) {
+    (void)u; (void)e;
+    int32_t x, y, w, h;
+    if (sd_bus_message_read(m, "iiii", &x, &y, &w, &h) < 0) { refuse("UpdateDMABUF", "malformed"); return ok(m); }
+    D.updates++;
+    if (D.src != SRC_DMABUF) { refuse("UpdateDMABUF", "no dmabuf picture"); return ok(m); }
+    if (!rect_ok("UpdateDMABUF", x, y, w, h)) return ok(m);
+    damage(x, y, w, h);
+    answer_update();
+    D.upd = sd_bus_message_ref(m);
+    D.upd_ms = now_ms();
+    return 1;
+}
 
 static int on_disable(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)u; (void)e;
     drop_map();
     drop_fb();
+    drop_dmabuf();
     D.dirty = 0;
     say(vd_msg(VD_STATE, VDS_NO_PICTURE, VDR_DISABLED, 0, 0, 0, 0), -1);
     return ok(m);
@@ -504,6 +564,7 @@ static int on_scanout_map(sd_bus_message *m, void *u, sd_bus_error *e) {
     if (p == MAP_FAILED) { refuse("ScanoutMap", "mmap: %s", strerror(errno)); return ok(m); }
     drop_map();
     drop_fb();
+    drop_dmabuf();
     D.map = p; D.map_len = (size_t)real; D.off = off; D.stride = stride;
     D.src = SRC_MAP;
     static int seals_told;
@@ -841,6 +902,8 @@ int main(int argc, char **argv) {
         if (A.ring) au_tick(now);
         send_input(now);
         flush(now);
+        /* QEMU's held UpdateDMABUF: once lord-server read the frame, when there's nowhere to send it, or after 250 ms */
+        if (D.upd && ((D.acked && !D.dirty) || !D.shm || now - D.upd_ms >= ACK_WAIT_MS)) answer_update();
         if (D.stats_changed && now - D.stats_ms >= STATS_MS) {
             say(vd_msg(VD_STATS, D.refused, D.updates, D.copies, (int)D.w, (int)D.h, D.frame), -1);
             D.refused = D.updates = D.copies = 0;
@@ -863,6 +926,7 @@ int main(int argc, char **argv) {
             int tf = wake <= now ? 0 : (int)(wake - now);
             if (to < 0 || tf < to) to = tf;
         }
+        if (D.upd) { int tu = (int)(D.upd_ms + ACK_WAIT_MS - now); if (tu < 0) tu = 0; if (to < 0 || tu < to) to = tu; }
         if (D.resize_pending) { int tr = (int)(D.resize_ms + RESIZE_GAP_MS - now); if (tr < 0) tr = 0; if (to < 0 || tr < to) to = tr; }
         if (D.stats_changed) { int ts = (int)(D.stats_ms + STATS_MS - now); if (ts < 0) ts = 0; if (to < 0 || ts < to) to = ts; }
         if (poll(p, 4, to) < 0 && errno != EINTR) break;
@@ -870,6 +934,7 @@ int main(int argc, char **argv) {
         if (p[2].revents & POLLIN && from_server()) break;
     }
     release_all();
+    answer_update();
     sd_bus_process(bus, NULL);      /* pushes what the socket takes; never waits on QEMU */
     return rc;
 }

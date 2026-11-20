@@ -37,6 +37,7 @@ int  gpu_tex_current(const GpuTex *t) { (void)t; return 0; }
 unsigned gpu_generation(void) { return 0; }
 void gpu_set_hooks(void (*lost)(void), void (*changed)(void)) { (void)lost; (void)changed; }
 int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h) { (void)t; (void)px; (void)w; (void)h; return -1; }
+int  gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip) { (void)t; (void)px; (void)y; (void)h; (void)flip; return -1; }
 int  gpu_add_output(Kms *k) { (void)k; return -1; }
 int  gpu_frame(int out, const Canvas *s, Rect d, void (*f)(int)) { (void)out; (void)s; (void)d; (void)f; return -1; }
 int  gpu_gdrag_ready(int out) { (void)out; return 0; }
@@ -791,6 +792,68 @@ int gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glDeleteFramebuffers(1, &fbo);
     glDeleteTextures(1, &tex);
+    return ok ? 0 : -1;
+}
+
+/* gpu_tex_read_rows' framebuffer: kept between calls, made again for another size or context */
+static struct { GLuint tex, fbo; int w, h; unsigned gen; } vrb;
+
+int gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip) {
+    if (!gpu_tex_current(t) || !px || t->w <= 0 || t->h <= 0 || t->w > 8192 || t->h > 8192 || y < 0 || h <= 0 || y + h > t->h) return -1;
+    if (eglGetCurrentContext() != G.ctx) {
+        int ok = 0;
+        for (int i = 0; i < OUT_MAX && !ok; i++) if (G.out[i].used && eglMakeCurrent(G.dpy, G.out[i].surf, G.out[i].surf, G.ctx)) ok = 1;
+        if (!ok) return -1;
+    }
+    while (glGetError() != GL_NO_ERROR) {}
+    if (vrb.fbo && (vrb.w != t->w || vrb.h != t->h || vrb.gen != G.gen)) {
+        if (vrb.gen == G.gen) { glDeleteFramebuffers(1, &vrb.fbo); glDeleteTextures(1, &vrb.tex); }
+        vrb.fbo = vrb.tex = 0;
+    }
+    if (!vrb.fbo) {
+        glGenTextures(1, &vrb.tex);
+        glBindTexture(GL_TEXTURE_2D, vrb.tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glGenFramebuffers(1, &vrb.fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, vrb.fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, vrb.tex, 0);
+        vrb.w = t->w; vrb.h = t->h; vrb.gen = G.gen;
+    } else glBindFramebuffer(GL_FRAMEBUFFER, vrb.fbo);
+    int ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    if (ok) {
+        glViewport(0, 0, t->w, t->h);
+        glDisable(GL_BLEND);
+        glDisable(GL_SCISSOR_TEST);
+        int p = t->external ? 1 : 0;
+        glUseProgram(G.prog[p]);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(t->external ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D, t->id);
+        glUniform1i(G.u_tex[p], 0);
+        glUniform1f(G.u_op[p], 1.0f);
+        glUniform1f(G.u_opaque[p], 1.0f);
+        glUniform1f(G.u_swap[p], t->swap ? 1.0f : 0.0f);
+        /* the picture's first row at y = -1: glReadPixels returns it first */
+        GLfloat t0 = flip ? 1.0f : 0.0f, t1 = flip ? 0.0f : 1.0f;
+        const GLfloat v[] = { -1, -1, 0, t0,  1, -1, 1, t0,  -1, 1, 0, t1,  1, 1, 1, t1 };
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        uint8_t *rows = px + (size_t)y * (size_t)t->w * 4;
+        glReadPixels(0, y, t->w, h, GL_RGBA, GL_UNSIGNED_BYTE, rows);
+        ok = glGetError() == GL_NO_ERROR;
+        for (size_t i = 0, n = (size_t)t->w * (size_t)h; ok && i < n; i++) {    /* R, G, B, A → B, G, R, X */
+            uint8_t r = rows[i * 4];
+            rows[i * 4] = rows[i * 4 + 2];
+            rows[i * 4 + 2] = r;
+            rows[i * 4 + 3] = 255;
+        }
+        glEnable(GL_BLEND);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return ok ? 0 : -1;
 }
 

@@ -114,8 +114,10 @@ Still open in Phase 2:
 - [ ] UEFI secure boot and TPM (swtpm, its state in snapshots: To test).
 - [ ] virtio-win guests on both architectures with automatic driver setup (4.3; pinned virtio-win version, answer-file edition
   selection, the generic key only as fallback).
-- [ ] 3D: virgl and venus on amd64; the arm64 3D abort (13.8 item 2, open decision 5).
-- [ ] dmabuf import in the compositor (13.8 item 3) and latency to the screen (13.8 item 4).
+- [x] 3D with virgl for Linux guests on amd64 (6.10, "3D graphics (built)" below). Still open: venus; the arm64 3D abort (13.8
+  item 2, open decision 5).
+- [x] dmabuf import in the compositor (13.8 item 3): read back into the picture by the GPU path (3.2). Still open: showing the
+  dmabuf with no copy, and latency to the screen (13.8 item 4).
 - [ ] Picture in Picture, multi-head.
 - [ ] Export, backups of machines, Monitor integration.
 - [ ] `lordvm` command line: shell, exec, logs, cp.
@@ -368,6 +370,34 @@ introspection, the module or the 10.0.0 interface file), so Debian 13 offers sin
   than stride × height. The compositor imports with that modifier; a linear map would scramble the picture. Whether the import works and
   the picture is right is **To test**.
 
+**3D graphics (built, 2026-11-20).** A Linux machine can have Graphics 3D (machine.json `"graphics": "3d"`, schema 5; Configure →
+Display; the Design profile picks it where the computer can give it). `lord-vm` then starts QEMU with `virtio-vga-gl` and
+`-display dbus,p2p=yes,gl=on,rendernode=/dev/dri/renderD<N>` (`decide_graphics` in `lordvm.c`), only when all of these hold: the
+device set isn't the windows one (machine.json refuses `3d` with it: no stable 3D driver for that system), the display is a
+window, guest and host are amd64 (the arm64 abort of this section), QEMU's GL modules are there, and the render node lord-server
+names (`--render-node`, the one its own GPU path uses) can be opened. Otherwise the machine starts with 2D and its log says why;
+lord-server passes `--render-node none` when it draws without a GPU, so the CPU path never gets a 3D picture it can't read.
+
+- With `gl=on` every picture is a dmabuf: `ScanoutDMABUF` (single plane: 10.0.13 has no `ScanoutDMABUF2`) and `UpdateDMABUF`.
+  `lord-vmdisplay` checks size, stride, fourcc (`XR24`, `AR24`, `XB24`, `AB24`) and the descriptor's real length (`lseek`), copies
+  nothing, and passes the descriptor on (`VD_DMABUF`, `vmproto.h`). QEMU doesn't let the guest draw again until `UpdateDMABUF` is
+  answered, so the helper answers once lord-server read that frame (`VD_FRAME_DONE`) or after 250 ms: no tearing, and a stuck
+  compositor holds the guest 250 ms at most.
+- lord-server imports each dmabuf once with EGL (`gpu_tex_dmabuf`; QEMU names the same few buffers again on each flip, known by
+  inode, four kept) and reads the damaged rows back into the shared picture (`gpu_tex_read_rows`), so the rest of the picture's path
+  (MediaView, thumbnails, recordings) is unchanged. It never waits on the guest's GPU work: the dmabuf's fence is polled, and a frame
+  that isn't done yet is read at the next poll. An import the GPU refuses leaves the picture black and is logged once.
+- QEMU's `y0_top` is in GL's terms: false means the first row in memory is the top (**Measured**, virgl on amd64, RX 580).
+- virgl's state can't be migrated, so a running 3D machine can't be suspended or take or revert a snapshot with its memory:
+  `lord-vm` refuses those (the app dims them), and the session's end shuts such a machine down instead of saving it.
+- **Measured** 2026-11-20 on an RX 580 (amdgpu, Mesa radeonsi, Debian 13's QEMU 10.0.13 and virglrenderer 1.1.0): an Ubuntu 26.04
+  guest with UEFI under the full sandbox; its kernel said `[drm] features: +virgl +edid` (read through the guest agent's journal),
+  QEMU traced `virtio_gpu_features virgl 1` and `virtio_gpu_cmd_ctx_create ... name gnome-shell`, its picture came as `XB24`/`AB24`
+  dmabufs with modifier `DRM_FORMAT_MOD_INVALID`, 1280 × 800, and `lordvm-dev` (built with Mesa it reads them back as lord-server
+  does) saved the login screen right side up; 23 frames read back of 23, no refusals. A UEFI reset (QMP `system_reset`) didn't
+  abort QEMU on amd64. Mesa in QEMU warns `os_same_file_description couldn't determine...` because our seccomp refuses `kcmp`: kept
+  refused.
+
 ### 3.3 Sandbox
 
 QEMU parses guest-controlled data all day, so **assume it can be compromised**. What a compromised QEMU may reach is the design:
@@ -379,6 +409,11 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
   ioctls on `/dev/kvm`, and `lord-server`'s helper filter can't be reused unchanged. QEMU's own filter costs nothing measurable: boot
   to login 36.5 s with it and 36.0 s without, QEMU RSS 424 MB against 422.5 MB (**Measured**, 2026-11-04, amd64, **nested**, 6 boots
   each). It also ran in every Pi run, 3D included, with no trouble (**Measured**, 2026-11-04, Pi 5). Our own filter on top is **To test**.
+- **3D graphics (6.10, approved 2026-11-20):** only a Linux machine with Graphics 3D chosen gets, in QEMU's Landlock rules, read,
+  write and device ioctls on the GPU's render node (`/dev/dri/renderD<N>`, never the primary `card` node), a listing of `/dev/dri`
+  (names only) and read access to that GPU's PCI device folder in sysfs; without the last two Mesa's EGL doesn't start (**Measured**).
+  Every other machine keeps no GPU access. QEMU's `rendernode=` takes a path, so the node can't come as a descriptor (yet). Checked
+  through `--dev-qmp`: QEMU of a 3D machine still can't open `/dev/dri/card0`, `/dev/mem`, `/etc/hostname` or another sysfs device.
 - `/dev/kvm`, `/dev/vhost-net`, render node and tap are opened by `lord-vm` and passed as descriptors, so QEMU can't open devices. For KVM, `-add-fd` plus `-accel kvm,device=/dev/fdset/NN`, which Debian 13's QEMU manual documents, works on both architectures with the sandbox on (**Measured**, 2026-11-04, Pi 5 and **nested** amd64). Passing the render node by descriptor is **To test**: in Phase 0 QEMU opened it itself, through the user's `render` group.
 - On amd64 with `-nodefaults`, the guest needs a display device, or its kernel never starts (**Measured**, 2026-11-04, **nested**); `lord-vm` always adds one, `-display none` included. On arm64 `virt` has no keyboard of its own, so a machine with a picture also gets `virtio-keyboard-pci`.
 - No network sockets of its own: networking is an fd. Debian 13's QEMU has no `-netdev passt`, so `passt` gets one end of a socketpair and QEMU the other through `-netdev stream,addr.type=fd` (**Measured**, 2026-11-04, both hosts).
@@ -504,8 +539,8 @@ lord-server ──fd 3, VdMsg──▶ lord-vmdisplay <id> (lordos-vmdisplay-<id
   that buffer until the next `ScanoutMap`. The damaged area is copied into lord-server's picture (sealed by lord-server against
   shrinking and growing), at most `VD_RATE` times a second (60 by default; lord-server sends the display's real rate), and not again
   until lord-server acknowledges the frame or 250 ms pass, so lord-server never reads a picture while it's written and never sees
-  QEMU's memory. Plain `Scanout`/`Update` arrays are still copied (QEMU uses them for surfaces it can't share); `ScanoutDMABUF` is
-  refused in the alpha (no 3D). Input goes out as D-Bus calls that expect no reply: evdev key codes mapped to QEMU's numbers
+  QEMU's memory. Plain `Scanout`/`Update` arrays are still copied (QEMU uses them for surfaces it can't share); `ScanoutDMABUF`
+  is taken for 3D machines (3.2, "3D graphics (built)"). Input goes out as D-Bus calls that expect no reply: evdev key codes mapped to QEMU's numbers
   (`vmkeys.h`), absolute pointer (relative while the guest's tablet driver isn't up; `IsAbsolute` is asked again while the pointer
   moves), buttons, wheel steps, release-all on focus loss, and `SetUIInfo` at most every 100 ms for the window's size. The cursor
   (`CursorDefine`) goes to lord-server in its own sealed memfd.
@@ -822,7 +857,7 @@ counted), the split (disks, saved session, snapshots as *about* their memory's s
 bases nobody uses. Shared extents weren't seen: VM 125 and the build VM are ext4.
 
 *Profiles, resolution, recording.* Profiles per 5.6 (Productivity, Software Development, Testing, Design, Light desktop) scaled to the
-host; Testing is Isolated; Design says 3D comes later. The resolution menu lists the sizes that fit the display. **Record** feeds the guest's
+host; Testing is Isolated; Design asks for 3D graphics (a Linux machine gets them where the computer can give them, 6.10; others say why they start with 2D). The resolution menu lists the sizes that fit the display. **Record** feeds the guest's
 picture (not the screen) into lord-media's screen recorder (`media_framerec_*`), into `~/Pictures/Screenshots`; no sound yet. Seen on VM
 125: a 26 s recording, a 1022 × 598 H.264 MP4 of 25 KB, and the notification with Open and Show in Files.
 
@@ -1620,10 +1655,13 @@ Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: a
 |---|---|---|
 | Linux | Any Mesa GPU | virgl: OpenGL; venus: Vulkan, needs blob resources, guest kernel ≥ 5.16 (**Reported**, Mesa docs) |
 | Linux | Pi V3D | virgl: QEMU 10.0.13 aborts on every UEFI boot with `gl=on` (3.2), works only with a directly booted kernel, picture not yet checked (**Measured**, 2026-11-04); venus **To test**: V3D's Vulkan features may not be enough |
-| virtio-win | Any | 2D only: no good free 3D driver exists |
+| virtio-win | Any | 2D only: no good free 3D driver exists (Configure says so; machine.json refuses `3d` with the windows devices) |
 | Emulated | Any | 2D |
 
 Reported notes: Intel Meteor Lake or `xe` hosts need kernel 6.16+ and QEMU 11.0+ with `honor-guest-pat=on` for venus; Debian 13 has 10.0 (**Measured**), so venus on those hosts waits for a newer QEMU. NVIDIA proprietary needs 570.86+ for venus (**Reported**). Recent security fixes around virtio-gpu blob scanouts are a reason to keep 3D opt-in. In the sandbox, 3D gives QEMU a render node: a larger attack surface, stated in Security. `vhost-user-gpu` would put rendering in its own process: to evaluate in Phase 3.
+
+**Built (2026-11-20): virgl for Linux guests on amd64** (3.2, "3D graphics (built)"): Graphics 2D or 3D in Configure → Display, 3D
+for Linux machines only, the Design profile picks it where it can.
 
 **Decision (changed): 3D isn't offered on arm64 hosts with Debian 13's QEMU** until the reset abort of 3.2 is fixed there, by Debian, by
 a patch of ours (open decision 5) or upstream. The fault is guest-triggerable, so a direct-kernel-boot workaround isn't enough to ship it.

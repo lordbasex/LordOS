@@ -259,5 +259,15 @@ eq('share tag', [M.shareTag('Proyectos 2026'), M.shareTag('Música'), M.shareTag
 eq('share tag length', M.shareTag('a'.repeat(60)).length, 28);
 eq('mount command', M.mountCommand('Work'), 'sudo mkdir -p /mnt/Work && sudo mount -t virtiofs Work /mnt/Work');
 
+// 3D graphics (6.10): Linux machines where the computer can give them; the request names them only when chosen
+eq('3D asked', createRequest({ ...good, graphics: '3d' }).graphics, '3d');
+eq('2D not named', createRequest({ ...good, graphics: '2d' }).graphics, undefined);
+eq('3D for Linux here', M.gfxFor('3d', { no3d: '' }, false), '3d');
+eq('never for the windows devices', [M.gfxFor('3d', { no3d: '' }, true), M.no3dReason({ no3d: '' }, true)], ['2d', 'windows']);
+eq('2D without a GPU path', [M.gfxFor('3d', { no3d: 'gpu' }, false), M.no3dReason({ no3d: 'gpu' }, false)], ['2d', 'gpu']);
+eq('2D profile stays 2D', M.gfxFor('2d', { no3d: '' }, false), '2d');
+eq('arm64 machines stay 2D', [M.gfxFor('3d', { no3d: '' }, false, 'arm64'), M.no3dReason({ no3d: '' }, false, 'arm64')], ['2d', 'arch']);
+eq('Design profile asks for 3D', profileSize('design', { cpus: 8, ramMb: 16384, memMaxMb: 14336, vcpusRecommended: 7 }).gfx, '3d');
+eq('a running 3D machine', [M.runs3d({ sandbox: 511 | 512 }), M.runs3d({ sandbox: 511 }), M.runs3d(null)], [true, false, false]);
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

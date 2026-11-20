@@ -52,6 +52,7 @@
 #include <sys/signalfd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/statvfs.h>
 #include <strings.h>
 #include <sys/syscall.h>
@@ -633,7 +634,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     vm_host_probe(&h);
     int arch = h.arch >= 0 ? h.arch : VM_ARCH_AMD64;
     const char *name = NULL, *import = NULL, *iso = NULL, *unatt = NULL;
-    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1, sb = 0, tpm = 0, hv = 0, rtc = -1, devs = -1;
+    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1, sb = 0, tpm = 0, hv = 0, rtc = -1, devs = -1, gfx = -1;
     const char *drivers = NULL;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
@@ -659,6 +660,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--rtc")) { rtc = parse_enum(v, "utc", "local"); if (rtc < 0) { fprintf(stderr, "lord-vm: --rtc utc|local\n"); return 2; } }
         else if (!strcmp(a, "--devices")) { devs = !strcmp(v, "windows") ? VM_DEV_WINDOWS : parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat|windows\n"); return 2; } }
         else if (!strcmp(a, "--drivers")) drivers = v;
+        else if (!strcmp(a, "--graphics")) { gfx = parse_enum(v, "2d", "3d"); if (gfx < 0) { fprintf(stderr, "lord-vm: --graphics 2d|3d\n"); return 2; } }
         else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
     }
     /* an unattended install (vmunattend.h): the spec lord-server wrote (0600, the password only as a hash), read and
@@ -696,6 +698,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     if (rtc >= 0) m.rtc = rtc;
     if (devs >= 0) m.devices = devs;
     if (m.devices == VM_DEV_WINDOWS) m.nic_model = VM_NIC_VIRTIO;
+    if (gfx >= 0) m.graphics = gfx;
     char drvreal[PATH_MAX];
     if (drivers) {
         if (!realpath(drivers, drvreal) || !file_exists(drvreal) || strlen(drvreal) >= sizeof m.drivers) { fprintf(stderr, "lord-vm: %s isn't a file\n", drivers); return 1; }
@@ -825,6 +828,9 @@ static struct {
     Pending pq[MAX_PENDING];
     int pq_head, pq_n;
     int dev_qmp, paused_start, keep_running;
+    /* 3D (virgl, 6.10): machine.json asks for it and this start can give it (decide_graphics); the render node QEMU opens */
+    int gl;
+    char render[32], render_want[32];
     int notify_fd;
     int display_n;
     int cred_fd[MAX_CREDS];
@@ -1360,6 +1366,64 @@ static void argf(const char *fmt, ...) {
 }
 static void argj(char *json) { if (json) { arg(json); free(json); } }
 
+/* ---- 3D graphics (6.10) ---- */
+
+/* QEMU's GL display and virtio-gpu GL modules (qemu-system-modules-opengl, which also brings virglrenderer) */
+static int gl_modules(void) {
+    static const char *const MOD[] = { "ui-opengl.so", "hw-display-virtio-vga-gl.so", "hw-display-virtio-gpu-gl.so", NULL };
+    char p[160];
+    for (int i = 0; MOD[i]; i++) {
+        snprintf(p, sizeof p, "/usr/lib/x86_64-linux-gnu/qemu/%s", MOD[i]);
+        if (!file_exists(p)) return 0;
+    }
+    return 1;
+}
+
+/* a render node's path as lord-vm takes it: /dev/dri/renderD<digits>, a character device of DRM (major 226) */
+static int render_node_ok(const char *p) {
+    if (strncmp(p, "/dev/dri/renderD", 16) || !p[16] || strlen(p) > 24) return 0;
+    for (const char *q = p + 16; *q; q++) if (*q < '0' || *q > '9') return 0;
+    struct stat st;
+    return !stat(p, &st) && S_ISCHR(st.st_mode) && major(st.st_rdev) == 226 && !access(p, R_OK | W_OK);
+}
+
+/* the one asked for (lord-server names the one its own GPU path uses), else the first this user can open */
+static int pick_render_node(char *out, size_t n) {
+    if (S.render_want[0]) {
+        if (!render_node_ok(S.render_want)) return -1;
+        snprintf(out, n, "%s", S.render_want);
+        return 0;
+    }
+    for (int i = 128; i < 192; i++) {
+        char p[32];
+        snprintf(p, sizeof p, "/dev/dri/renderD%d", i);
+        if (render_node_ok(p)) { snprintf(out, n, "%s", p); return 0; }
+    }
+    return -1;
+}
+
+/* Graphics 3D only for a Linux machine in a window, amd64 on amd64 (QEMU 10.0's 3D aborts on arm64's firmware reset,
+ * 3.2), with QEMU's GL modules and a render node; otherwise the machine starts with 2D graphics and the log says why.
+ * Only then does QEMU's sandbox get the render node (vm_jail_qemu, VmQemuJail.render). */
+static void decide_graphics(void) {
+    S.gl = 0;
+    S.render[0] = 0;
+    if (S.m.graphics != VM_GFX_3D) return;
+    const char *why = NULL;
+    VmHost h;
+    vm_host_probe(&h);
+    if (S.m.devices == VM_DEV_WINDOWS) why = "3D graphics are for Linux machines";
+    else if (S.m.display != VM_DISPLAY_WINDOW) why = "the machine has no display";
+    else if (S.m.arch != VM_ARCH_AMD64 || h.arch != VM_ARCH_AMD64) why = "3D graphics are for amd64 machines on amd64 computers for now";
+    else if (!strcmp(S.render_want, "none")) why = "the desktop draws without a GPU";
+    else if (!gl_modules()) why = "QEMU's OpenGL modules (qemu-system-modules-opengl) aren't installed";
+    else if (S.render_want[0] && strcmp(S.render_want, "none") && !render_node_ok(S.render_want)) why = "the desktop's render node can't be opened";
+    else if (pick_render_node(S.render, sizeof S.render)) why = "no GPU render node can be opened";
+    if (why) { S.render[0] = 0; vlog("graphics: 2D instead of 3D: %s", why); return; }
+    S.gl = 1;
+    vlog("graphics: 3D (virgl) on %s", S.render);
+}
+
 /* fds inside QEMU: 3 /dev/kvm (or /dev/null), 4 QMP, 5 serial, 6 network (or /dev/null) */
 static void build_qemu_args(void) {
     const VmMachine *m = &S.m;
@@ -1518,7 +1582,12 @@ static void build_qemu_args(void) {
     for (int i = 0; i < m->n_extra_macs; i++) { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
     arg("-device"); arg("virtio-rng-pci,addr=0x3");
     /* amd64 with -nodefaults needs a display device or its kernel never starts (3.3); arm64's virt has no keyboard */
-    if (!arm) { arg("-device"); arg("virtio-vga,id=video0,addr=0x4"); }
+    /* 3D (decide_graphics): the same slot with virgl, and the D-Bus display shares its pictures as dmabufs (gl=on) made on
+     * the render node QEMU's sandbox may open */
+    if (!arm) { arg("-device"); arg(S.gl ? "virtio-vga-gl,id=video0,addr=0x4" : "virtio-vga,id=video0,addr=0x4"); }
+    char dbus_disp[96];
+    if (S.gl) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=%s,audiodev=snd0", S.render);
+    else snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,audiodev=snd0");
     if (m->display == VM_DISPLAY_WINDOW && (m->devices == VM_DEV_COMPAT || m->devices == VM_DEV_WINDOWS)) {
         /* a USB tablet (and keyboard on arm64) on xHCI: drivers every system has */
         if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); }
@@ -1528,14 +1597,14 @@ static void build_qemu_args(void) {
         /* the same sound path as below: the HDA card after this needs its audiodev (a Windows machine in a window
          * failed to start without it, "audiodev 'snd0' not found") */
         arg("-audiodev"); arg("dbus,id=snd0,out.frequency=48000,out.channels=2,out.format=s16,in.frequency=48000,in.channels=2,in.format=s16");
-        arg("-display"); arg("dbus,p2p=yes,audiodev=snd0");
+        arg("-display"); arg(dbus_disp);
     } else if (m->display == VM_DISPLAY_WINDOW) {
         if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); arg("-device"); arg("virtio-keyboard-pci,addr=0x5"); }
         arg("-device"); arg(arm ? "virtio-tablet-pci,addr=0x6" : "virtio-tablet-pci,addr=0x5");
         /* the guest's sound goes out through the same peer-to-peer D-Bus as the picture (lord-vmdisplay listens): 48 kHz,
          * 16-bit stereo, what lord-server's recordings and speakers take without converting */
         arg("-audiodev"); arg("dbus,id=snd0,out.frequency=48000,out.channels=2,out.format=s16,in.frequency=48000,in.channels=2,in.format=s16");
-        arg("-display"); arg("dbus,p2p=yes,audiodev=snd0");
+        arg("-display"); arg(dbus_disp);
     } else { arg("-audiodev"); arg("none,id=snd0"); arg("-display"); arg("none"); }
     /* a sound card (HDA, which every Linux and Windows guest has a driver for), on its own slot after the CD/DVD
      * drive's: a machine made before it had none, and a state saved without it still loads (a device the saved
@@ -1691,6 +1760,7 @@ static int start_machine(void) {
         if (S.tpm_q < 0) { fail_start("the TPM: %s", terr); return -1; }
         S.sandbox |= VMS_PDEATHSIG;
     }
+    decide_graphics();
     build_qemu_args();
     {
         char line[8192];
@@ -1726,13 +1796,14 @@ static int start_machine(void) {
         int stf = 3 + nf - 1;
         fcntl(stf, F_SETFD, FD_CLOEXEC);
         VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
-                         S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM };
+                         S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : NULL };
         int mask = vm_jail_qemu(&j);
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
         if (!(mask & VMS_SECCOMP_OURS) || !(mask & VMS_NO_NEW_PRIVS)) { write_all(stf, msg, sizeof msg[0]); _exit(126); }
         write_all(stf, msg, sizeof msg[0]);
-        char *env[] = { "LC_ALL=C.UTF-8", NULL };
+        /* 3D: Mesa in QEMU can't write a shader cache (its sandbox has no home folder): told not to try */
+        char *env[] = { "LC_ALL=C.UTF-8", S.gl ? "MESA_SHADER_CACHE_DISABLE=true" : NULL, NULL };
         execve(qargv[0], qargv, env);
         msg[1] = errno ? errno : ENOEXEC;
         write_all(stf, &msg[1], sizeof msg[1]);
@@ -1762,9 +1833,9 @@ static int start_machine(void) {
     if (n < 4 || !(got[0] & VMS_SECCOMP_OURS) || !(got[0] & VMS_NO_NEW_PRIVS)) { fail_start("QEMU's sandbox couldn't be set up (seccomp %d, no_new_privs %d)", !!(got[0] & VMS_SECCOMP_OURS), !!(got[0] & VMS_NO_NEW_PRIVS)); return -1; }
     if (n == sizeof got) { fail_start("can't run QEMU: %s", strerror(got[1])); return -1; }
     S.sandbox |= VMS_SECCOMP_QEMU | VMS_PDEATHSIG;
-    vlog("qemu: pid %d; sandbox: landlock-fs=%d landlock-net=%d landlock-scope=%d seccomp(ours)=%d no-new-privs=%d kvm-by-fd=%d",
+    vlog("qemu: pid %d; sandbox: landlock-fs=%d landlock-net=%d landlock-scope=%d seccomp(ours)=%d no-new-privs=%d kvm-by-fd=%d%s",
          (int)pid, !!(S.sandbox & VMS_LANDLOCK_FS), !!(S.sandbox & VMS_LANDLOCK_NET), !!(S.sandbox & VMS_LANDLOCK_SCOPE),
-         !!(S.sandbox & VMS_SECCOMP_OURS), !!(S.sandbox & VMS_NO_NEW_PRIVS), !!(S.sandbox & VMS_KVM_FD));
+         !!(S.sandbox & VMS_SECCOMP_OURS), !!(S.sandbox & VMS_NO_NEW_PRIVS), !!(S.sandbox & VMS_KVM_FD), S.gl ? " render-node=1" : "");
     if (!(S.sandbox & VMS_LANDLOCK_FS)) vlog("note: no Landlock on this kernel: weaker isolation (3.3)");
     if (qmp_open(&S.qmp, qmp[0])) { fail_start("out of memory"); return -1; }
     if (qmp_handshake(&S.qmp, 20000, err, sizeof err)) {
@@ -2190,6 +2261,7 @@ static void host_stop(const char *why) {
     if (S.state == VS_STOPPING) return;                         /* already shutting down */
     char err[160];
     int ok_state = S.state == VS_RUNNING || S.state == VS_PAUSED;
+    if (ok_state && S.gl) { vlog("a machine with 3D graphics can't be saved to disk (virgl can't be migrated): shutting it down"); begin_shutdown(30); return; }
     if (ok_state && !S.snap_kind && !S.cd_busy) { begin_suspend(-1, 0); return; }
     if (ok_state && (S.snap_kind || S.cd_busy)) return;         /* tried again from the loop once that's done */
     snprintf(err, sizeof err, "the machine can't be saved now (%s): shutting it down", STATE_NAME[S.state]);
@@ -2207,7 +2279,7 @@ static void host_stop_tick(long long now) {
         return;
     }
     if (!S.suspending && S.state != VS_STOPPING && (S.state == VS_RUNNING || S.state == VS_PAUSED) && !S.snap_kind && !S.cd_busy) {
-        if (now < S.host_stop_deadline) begin_suspend(-1, 0);
+        if (now < S.host_stop_deadline && !S.gl) begin_suspend(-1, 0);
         else begin_shutdown(30);
     }
 }
@@ -2925,11 +2997,14 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
     case VM_SUSPEND:
         if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
         if (S.suspending || S.cd_busy || S.snap_kind) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
+        if (S.gl) { reply(ci, m->seq, VME_WRONG_STATE, "a machine with 3D graphics can't be suspended (virgl can't be migrated): shut it down"); return; }
         begin_suspend(ci, m->seq);
         return;
     case VM_SNAPSHOT:
         if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
         if (S.snap_kind || S.suspending) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
+        /* snapshots of a running machine hold its memory: QEMU can't save virgl's state */
+        if (S.gl && m->a != VSN_DELETE) { reply(ci, m->seq, VME_WRONG_STATE, "a running machine with 3D graphics can't take or revert a snapshot with its memory: shut it down first"); return; }
         begin_snapshot(ci, m->seq, m->a, m->text);
         return;
     case VM_CONSOLE: {
@@ -3688,6 +3763,13 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         else if (!strcmp(argv[i], "--detach")) detach = 1;
         else if (!strcmp(argv[i], "--keep-running")) S.keep_running = 1;
         else if (!strcmp(argv[i], "--dev-qmp")) S.dev_qmp = 1;
+        else if (!strcmp(argv[i], "--render-node") && i + 1 < argc) {
+            /* the render node for 3D graphics (lord-server passes its own GPU's), or "none": the desktop has no GPU path,
+             * so a 3D machine starts with 2D graphics */
+            const char *v = argv[++i];
+            if (strcmp(v, "none") && (strncmp(v, "/dev/dri/renderD", 16) || strlen(v) >= sizeof S.render_want)) { fprintf(stderr, "lord-vm: --render-node /dev/dri/renderDN|none\n"); return 2; }
+            snprintf(S.render_want, sizeof S.render_want, "%s", v);
+        }
         else if (!strcmp(argv[i], "--resume-anyway")) S.resume_anyway = 1;
         else if (!strcmp(argv[i], "--loadvm") && i + 1 < argc) { if (!vm_snap_tag_valid(argv[++i])) { fprintf(stderr, "lord-vm: --loadvm TAG\n"); return 2; } snprintf(S.loadvm, sizeof S.loadvm, "%s", argv[i]); }
         else if (!strcmp(argv[i], "--discard-state")) discard = 1;
@@ -3986,7 +4068,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -4002,6 +4084,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         }
         if (!strcmp(a, "--shares")) { if (strcmp(v, "none")) { fprintf(stderr, "lord-vm: --shares none\n"); return 2; } shares_set = 1; continue; }
         if (!strcmp(a, "--devices")) { devs = parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat\n"); return 2; } continue; }
+        if (!strcmp(a, "--graphics")) { gfx = parse_enum(v, "2d", "3d"); if (gfx < 0) { fprintf(stderr, "lord-vm: --graphics 2d|3d\n"); return 2; } continue; }
         if (!strcmp(a, "--nic-model")) {
             for (int k = 0; VM_NIC_MODELS[k]; k++) if (!strcmp(v, VM_NIC_MODELS[k])) nicm = k;
             if (nicm < 0) { fprintf(stderr, "lord-vm: --nic-model virtio|e1000e|e1000|e1000-82545em|e1000-82544gc|vmxnet3|rtl8139|pcnet\n"); return 2; }
@@ -4034,7 +4117,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set)) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || (gfx >= 0 && gfx != m.graphics))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
     if (vcpus && vcpus != m.vcpus) {
@@ -4052,6 +4136,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (agent >= 0) m.agent = agent;
     if (clip >= 0) m.clipboard = clip;
     if (m.agent || m.clipboard) m.schema = VM_SCHEMA;
+    if (gfx >= 0) m.graphics = gfx;
+    if (m.graphics) m.schema = VM_SCHEMA;
     if (shares_set) {
         const struct passwd *pw = getpwuid(getuid());
         char home[PATH_MAX], lib[PATH_MAX], parent[PATH_MAX];
@@ -4104,8 +4190,9 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
-    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\"}\n", m.vcpus, m.memory_mb, m.disk_gb,
-           m.network == VM_NET_SHARED ? "shared" : "isolated", m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices], VM_NIC_MODELS[m.nic_model]);
+    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\"}\n", m.vcpus, m.memory_mb, m.disk_gb,
+           m.network == VM_NET_SHARED ? "shared" : "isolated", m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices], VM_NIC_MODELS[m.nic_model],
+           m.graphics == VM_GFX_3D ? "3d" : "2d");
     rc = 0;
 out:
     close(lock);
@@ -5598,9 +5685,10 @@ static int usage(void) {
             "usage: lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB] [--disk GB]\n"
             "                            [--firmware uefi|bios] [--display window|none] [--network shared|isolated] [--import IMAGE] [--iso FILE]\n"
             "       lord-vm --set DIR [--name N] [--vcpus N] [--memory MB] [--disk GB] [--display window|none] [--network shared|isolated] [--iso FILE|none]\n"
-            "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both]   (also on --create)\n"
+            "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both] [--graphics 2d|3d]   (also on --create)\n"
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
+            "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"
             "                           [--resume-anyway] [--discard-state]\n"
             "       lord-vm --suspend DIR | --discard-state DIR | --agent DIR shutdown|timesync|install\n"
             "       lord-vm --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list   (and --start DIR --loadvm TAG)\n"

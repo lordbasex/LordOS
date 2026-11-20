@@ -245,6 +245,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 5 && (m->secure_boot || m->tpm || m->hyperv)) return fail(err, n, VM_E_FIELD, "secure_boot, tpm and hyperv need schema 5");
     if ((m->secure_boot || m->tpm || m->hyperv) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "secure boot, TPM and Hyper-V are for amd64 machines for now");
     if (m->secure_boot && m->firmware != VM_FW_UEFI) return fail(err, n, VM_E_RANGE, "secure boot needs UEFI");
+    if (m->graphics != VM_GFX_2D && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "graphics");
+    if (m->schema < 5 && m->graphics) return fail(err, n, VM_E_FIELD, "graphics needs schema 5");
+    if (m->graphics == VM_GFX_3D && m->devices == VM_DEV_WINDOWS) return fail(err, n, VM_E_RANGE, "3D graphics are for Linux machines (the windows devices stay 2D)");
+    if (m->graphics == VM_GFX_3D && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "3D graphics are for amd64 machines for now");
     if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
                           m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
         return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
@@ -282,7 +286,7 @@ static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
-    "shares", "secure_boot", "tpm", "hyperv", "drivers", NULL,
+    "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -436,6 +440,8 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
             *dst[i] = v ? json_bool(o, B[i], 0) : 0;
         }
         if ((r = get_str(o, "drivers", m->drivers, sizeof m->drivers, 0, err, n))) goto out;
+        static const char *const GFX[] = { "2d", "3d", NULL };
+        if (json_get(o, "graphics") && (r = get_enum(o, "graphics", GFX, &m->graphics, err, n))) goto out;
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -506,6 +512,7 @@ char *vm_machine_json(const VmMachine *m) {
         if (m->tpm) jb_raw(&b, ",\n  \"tpm\": true");
         if (m->hyperv) jb_raw(&b, ",\n  \"hyperv\": true");
         if (m->drivers[0]) { jb_raw(&b, ",\n  \"drivers\": "); jb_str(&b, m->drivers); }
+        if (m->graphics == VM_GFX_3D) jb_raw(&b, ",\n  \"graphics\": \"3d\"");
     }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);

@@ -41,7 +41,7 @@ build/lord-vmdisplay: $(VMDISPLAY_SRC) $(VM_HDR)
 	chmod g-w $@
 build/lordvm-dev: tests/vm_dev.c src/vm/vmproto.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/vm_dev.c -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/vm_dev.c -lm $(if $(filter 1,$(GPU)),$(shell pkg-config --libs gbm egl glesv2))
 endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.

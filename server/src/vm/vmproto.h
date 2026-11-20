@@ -94,6 +94,14 @@
  *   VD_STATE a = VDS_*, b = VDR_*: connected, picture lost (Disable), or the QEMU side went away.
  *   VD_STATS a = messages refused since the last VD_STATS, b = updates received, c = copies made, d = width,
  *   e = height: every 5 s while something changed, for Logs and tests.
+ *   VD_DMABUF (3D, a machine with graphics "3d"): the picture is a dmabuf QEMU draws with the GPU. One descriptor;
+ *   a, b = width, height (also sent as VD_SIZE: the shared picture is still made), c = stride, with VD_DMABUF_FLIP set
+ *   when its first row in memory is the picture's bottom, d = DRM fourcc (one of VD_FOURCC_*, one plane), e, f = the
+ *   modifier's low and high 32 bits. The helper copies nothing then: on each VD_FRAME lord-server imports the dmabuf
+ *   with its GPU context (EGL) and reads the damaged rows back into the shared picture, and answers VD_FRAME_DONE as
+ *   before; it never waits on the dmabuf's fence (it polls it, and tries again later). Without a GPU path lord-server
+ *   can't read it: the picture stays black (lord-vm starts 3D machines with 2D graphics there, --render-node none).
+ *   a = 0 (no descriptor): the picture isn't a dmabuf any more.
  *
  *   Input (server → helper): VD_KEY a = Linux evdev key code (KEY_*), b = 1 down / 0 up.
  *   VD_MOTION a, b = absolute position in picture coordinates (clamped). VD_BUTTON a = VDB_*, b = 1 / 0.
@@ -178,6 +186,8 @@ enum {
 enum {
     VMS_LANDLOCK_FS = 1, VMS_LANDLOCK_NET = 2, VMS_LANDLOCK_SCOPE = 4, VMS_SECCOMP_OURS = 8, VMS_SECCOMP_QEMU = 16,
     VMS_NO_NEW_PRIVS = 32, VMS_KVM_FD = 64, VMS_SUPERVISOR_LANDLOCK = 128, VMS_PDEATHSIG = 256,
+    VMS_RENDER_NODE = 512,  /* 3D graphics: QEMU may open the GPU's render node (only a Linux machine with graphics "3d");
+                             * such a machine can't be suspended or snapshotted with its memory (virgl can't be migrated) */
 };
 /* VM_INFO d: cgroups */
 enum {
@@ -198,7 +208,7 @@ typedef struct {
 /* ---- lord-server ↔ lord-vmdisplay ---- */
 
 enum {
-    VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS,               /* helper → server */
+    VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS, VD_DMABUF,    /* helper → server */
     VD_SHM = 64, VD_FRAME_DONE, VD_KEY, VD_MOTION, VD_BUTTON, VD_WHEEL, VD_RELEASE_ALL,       /* server → helper */
     VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC,
 };
@@ -219,6 +229,13 @@ typedef struct {
 #define VD_MAX_BYTES    (256u * 1024 * 1024)
 #define VD_MAX_CURSOR   256
 #define VD_POLL_MAX     256         /* messages lord-server takes per poll, as Remote Desk */
+/* VD_DMABUF */
+#define VD_DMABUF_FLIP        0x40000000    /* in c: the first row in memory is the picture's bottom */
+#define VD_DMABUF_STRIDE_MAX  (VD_MAX_DIM * 4 * 2)
+#define VD_FOURCC_XRGB8888    0x34325258u   /* 'XR24' */
+#define VD_FOURCC_ARGB8888    0x34325241u   /* 'AR24' */
+#define VD_FOURCC_XBGR8888    0x34324258u   /* 'XB24' */
+#define VD_FOURCC_ABGR8888    0x34324241u   /* 'AB24' */
 
 /* ---- helpers shared by both ends ---- */
 
@@ -337,6 +354,14 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_POINTER: return m->c == 0 || m->c == 1;
     case VD_STATE: return m->a >= VDS_CONNECTED && m->a <= VDS_LOST && m->b >= VDR_NONE && m->b <= VDR_SETUP;
     case VD_STATS: return m->a >= 0 && m->b >= 0 && m->c >= 0;
+    case VD_DMABUF: {
+        if (!m->a) return !m->b;
+        uint32_t f = (uint32_t)m->d;
+        int32_t st = m->c & ~VD_DMABUF_FLIP;
+        return m->a > 0 && m->b > 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM &&
+               (uint64_t)m->a * (uint64_t)m->b * 4 <= VD_MAX_BYTES && st >= m->a * 4 && st % 4 == 0 && (uint32_t)st <= VD_DMABUF_STRIDE_MAX &&
+               (f == VD_FOURCC_XRGB8888 || f == VD_FOURCC_ARGB8888 || f == VD_FOURCC_XBGR8888 || f == VD_FOURCC_ABGR8888);
+    }
     default: return 0;
     }
 }

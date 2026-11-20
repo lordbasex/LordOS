@@ -27,6 +27,7 @@
 #include "../vm/logclean.h"
 #include "../vm/vmagent.h"
 #include "../wl/wl.h"
+#include "../gpu/gpu.h"
 #include "../sec/json.h"
 #include "ui.h"
 #include "../term/term.h"
@@ -150,6 +151,20 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     JS_SetPropertyStr(c, o, "missing", miss);
     JS_SetPropertyStr(c, o, "ready", JS_NewBool(c, !bin_path("lord-vm", bin, sizeof bin)));
     JS_SetPropertyStr(c, o, "display", JS_NewBool(c, !bin_path("lord-vmdisplay", bin, sizeof bin)));
+    /* 3D graphics (6.10): "" when a Linux machine can have them here, else why not: "arch" (amd64 only for now),
+     * "gpu" (this desktop draws without a GPU, so it couldn't read the pictures back), "modules" (QEMU's OpenGL
+     * modules missing: vm-enable installs qemu-system-modules-opengl), "node" (no render node this user can open) */
+    {
+        GpuInfo gi;
+        gpu_info(&gi);
+        const char *why3d = "";
+        struct stat rs;
+        if (a != VM_ARCH_AMD64) why3d = "arch";
+        else if (!gpu_active() || !gi.dmabuf || !gi.render_node || strncmp(gi.render_node, "/dev/dri/renderD", 16)) why3d = "gpu";
+        else if (access("/usr/lib/x86_64-linux-gnu/qemu/hw-display-virtio-vga-gl.so", F_OK) || access("/usr/lib/x86_64-linux-gnu/qemu/ui-opengl.so", F_OK)) why3d = "modules";
+        else if (stat(gi.render_node, &rs) || !S_ISCHR(rs.st_mode) || access(gi.render_node, R_OK | W_OK)) why3d = "node";
+        set_str(c, o, "no3d", why3d);
+    }
     char lib[PATH_MAX];
     set_str(c, o, "library", library(lib, sizeof lib, 0) ? "" : lib);
     /* where machines live: free space and what kind of disk (a microSD card is slow for machines) */
@@ -276,6 +291,9 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
                 set_str(c, o, "identityPending", vm_identity_read(dir, idh, sizeof idh) ? "" : idh);
             }
             set_str(c, o, "devices", m.devices == VM_DEV_COMPAT ? "compat" : "virtio");
+            /* the windows device set (4.3), and the graphics (6.10): 3D for Linux machines only */
+            JS_SetPropertyStr(c, o, "windowsDevices", JS_NewBool(c, m.devices == VM_DEV_WINDOWS));
+            set_str(c, o, "graphics", m.graphics == VM_GFX_3D ? "3d" : "2d");
             set_str(c, o, "nicModel", VM_NIC_MODELS[m.nic_model]);
             set_int(c, o, "dataDisks", m.n_data);
             {
@@ -578,6 +596,15 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         JS_FreeValue(c, vdr);
     }
     JS_FreeValue(c, vw);
+    JSValue vg = JS_GetPropertyStr(c, argv[0], "graphics");
+    int gfx3d = 0;
+    if (JS_IsString(vg)) {
+        const char *gs = JS_ToCString(c, vg);
+        if (gs && !strcmp(gs, "3d")) gfx3d = 1;
+        else if (!gs || strcmp(gs, "2d")) ok = 0;
+        if (gs) JS_FreeCString(c, gs);
+    }
+    JS_FreeValue(c, vg);
     int id = 0;
     if (ok) {
         char folder[64], dir[PATH_MAX + 80];
@@ -593,6 +620,8 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         while (args[na]) na++;
         if (spec[0]) { args[na++] = "--unattended"; args[na++] = spec; }
         if (share) { args[na++] = "--agent"; args[na++] = "on"; args[na++] = "--clipboard"; args[na++] = "both"; }
+        /* the Design profile's 3D graphics (6.10): Linux machines only; lord-vm refuses them for the windows devices */
+        if (gfx3d && !windows) { args[na++] = "--graphics"; args[na++] = "3d"; }
         if (windows) {
             static char *const W[] = { "--secure-boot", "on", "--tpm", "on", "--hyperv", "on", "--rtc", "local", "--devices", "windows", "--drivers" };
             for (size_t i = 0; i < sizeof W / sizeof W[0]; i++) args[na++] = W[i];
@@ -733,6 +762,14 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         const char *cs = JS_ToCString(c, v);
         if (cs && (!strcmp(cs, "off") || !strcmp(cs, "to-guest") || !strcmp(cs, "from-guest") || !strcmp(cs, "both"))) { snprintf(clip, sizeof clip, "%s", cs); args[n++] = "--clipboard"; args[n++] = clip; } else ok = 0;
         if (cs) JS_FreeCString(c, cs);
+    }
+    JS_FreeValue(c, v);
+    char gfx[8] = "";
+    v = JS_GetPropertyStr(c, argv[1], "graphics");
+    if (JS_IsString(v)) {
+        const char *gs = JS_ToCString(c, v);
+        if (gs && (!strcmp(gs, "2d") || !strcmp(gs, "3d"))) { snprintf(gfx, sizeof gfx, "%s", gs); args[n++] = "--graphics"; args[n++] = gfx; } else ok = 0;
+        if (gs) JS_FreeCString(c, gs);
     }
     JS_FreeValue(c, v);
     char devs[16] = "", nicm[24] = "";
@@ -938,6 +975,8 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 /* ---- sessions: one running machine and its window ---- */
 
 #define MAX_SESS 4
+/* one dmabuf of a 3D machine's picture (VD_DMABUF) and its texture */
+typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; unsigned used; } VmDmabuf;
 typedef struct {
     int used, vm, vd, err;              /* channels; lord-vm's stderr (until its log is open) */
     pid_t vm_pid, vd_pid;
@@ -982,6 +1021,15 @@ typedef struct {
     int rec_sound;                      /* lord-vmdisplay writes the guest's sound into the recording's ring */
     int notice, notice_code, notice_seq; /* VM_NOTICE: VMN_*, its number, a counter of them, and its words */
     char notice_text[VM_TEXT_MAX];
+    /* 3D (VD_DMABUF): the dmabufs QEMU draws into, imported once each (QEMU flips between a few, and names each
+     * again on every ScanoutDMABUF: known by inode), the one shown now, and the rows still to read back into the
+     * picture (their frame waits until the dmabuf's fence has signalled: never a wait) */
+    VmDmabuf db[4];
+    int db_cur;                         /* index in db, -1: the picture isn't a dmabuf */
+    unsigned db_tick;
+    int db_y0, db_y1, db_frame, db_pending;
+    long db_reads, db_fails;
+    int db_warned;
 } Sess;
 static Sess sess[MAX_SESS];
 
@@ -1014,6 +1062,8 @@ static void init_sess(Sess *s, const char *dir) {
     s->vm = s->vd = s->err = -1;
     s->state = VS_STARTING;
     s->vd_state = -1;
+    s->db_cur = -1;
+    for (int i = 0; i < 4; i++) s->db[i].fd = -1;
     snprintf(s->dir, sizeof s->dir, "%s", dir);
 }
 
@@ -1134,6 +1184,12 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     fcntl(ep[0], F_SETFL, O_NONBLOCK);
     char creds[PATH_MAX];
     int have_creds = !write_creds(creds, sizeof creds, dir);
+    char rnode[64] = "none";
+    {
+        GpuInfo gi;
+        gpu_info(&gi);
+        if (gpu_active() && gi.dmabuf && gi.render_node && !strncmp(gi.render_node, "/dev/dri/renderD", 16)) snprintf(rnode, sizeof rnode, "%s", gi.render_node);
+    }
     pid_t p = fork();
     if (!p) {
         int ch = fcntl(sv[1], F_DUPFD, 10), e = fcntl(ep[1], F_DUPFD, 11);
@@ -1146,9 +1202,12 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
         /* no cgroup_enter here: lord-vm places itself in the machine's scope through lord-sessiond */
-        char *args[16];
+        char *args[20];
         int k = 0;
         args[k++] = "lord-vm"; args[k++] = "--start"; args[k++] = dir; args[k++] = "--control-fd"; args[k++] = "3"; args[k++] = "--paused";
+        /* 3D graphics (6.10): QEMU draws on the GPU this desktop composes with, whose dmabufs it can read back; without
+         * a GPU path a 3D machine starts with 2D graphics */
+        args[k++] = "--render-node"; args[k++] = rnode;
         if (anyway) args[k++] = "--resume-anyway";
         if (discard) args[k++] = "--discard-state";
         if (loadvm[0]) { args[k++] = "--loadvm"; args[k++] = loadvm; }
@@ -1233,6 +1292,73 @@ static void maybe_display(Sess *s) {
     else s->display_seq = (uint32_t)q;
 }
 
+/* ---- 3D pictures (VD_DMABUF, vmproto.h) ---- */
+
+static void db_free(Sess *s, int i) {
+    if (s->db[i].tex) gpu_tex_free(s->db[i].tex);
+    if (s->db[i].fd >= 0) close(s->db[i].fd);
+    memset(&s->db[i], 0, sizeof s->db[i]);
+    s->db[i].fd = -1;
+    if (s->db_cur == i) s->db_cur = -1;
+}
+static void db_drop_all(Sess *s) {
+    for (int i = 0; i < 4; i++) db_free(s, i);
+    s->db_cur = -1;
+    s->db_pending = 0;
+}
+
+/* VD_DMABUF: the dmabuf the picture is now (fd), or none (fd < 0, m->a == 0) */
+static void db_take(Sess *s, const VdMsg *m, int fd) {
+    if (!m->a || fd < 0) { if (fd >= 0) close(fd); s->db_cur = -1; s->db_pending = 0; return; }
+    struct stat st;
+    if (fstat(fd, &st)) { close(fd); return; }
+    int st_stride = m->c & ~VD_DMABUF_FLIP, flip = (m->c & VD_DMABUF_FLIP) != 0;
+    uint64_t mod = (uint64_t)(uint32_t)m->e | (uint64_t)(uint32_t)m->f << 32;
+    int k = -1;
+    for (int i = 0; i < 4; i++)
+        if (s->db[i].fd >= 0 && s->db[i].ino == st.st_ino && s->db[i].w == m->a && s->db[i].h == m->b && s->db[i].stride == st_stride &&
+            s->db[i].fourcc == (uint32_t)m->d && s->db[i].mod == mod) k = i;
+    if (k >= 0) close(fd);
+    else {
+        /* a new one: in a free place, or the one shown longest ago */
+        for (int i = 0; i < 4 && k < 0; i++) if (s->db[i].fd < 0) k = i;
+        if (k < 0) { k = 0; for (int i = 1; i < 4; i++) if (s->db[i].used < s->db[k].used) k = i; }
+        db_free(s, k);
+        s->db[k].fd = fd; s->db[k].ino = st.st_ino; s->db[k].w = m->a; s->db[k].h = m->b; s->db[k].stride = st_stride;
+        s->db[k].fourcc = (uint32_t)m->d; s->db[k].mod = mod;
+    }
+    s->db[k].flip = flip;
+    s->db[k].used = ++s->db_tick;
+    s->db_cur = k;
+}
+
+/* The pending rows read back into the picture: 1 done (the frame counts), 0 not yet (the dmabuf's fence hasn't
+ * signalled: tried again at the next poll, and lord-vmdisplay goes on by itself after 250 ms), -1 can't (no GPU path,
+ * an import refused: the picture stays as it was, and the frame is acknowledged so the guest isn't held) */
+static int db_read(Sess *s, MediaSrc *ms) {
+    if (s->db_cur < 0 || !ms || !ms->map) return -1;
+    VmDmabuf *d = &s->db[s->db_cur];
+    if (d->w != s->w || d->h != s->h) return -1;
+    struct pollfd pf = { d->fd, POLLIN, 0 };
+    if (poll(&pf, 1, 0) == 0) return 0;
+    if (d->tex && !gpu_tex_current(d->tex)) { gpu_tex_free(d->tex); d->tex = NULL; }
+    if (!d->tex) {
+        GpuDmabuf b = { .width = d->w, .height = d->h, .nplanes = 1, .fourcc = d->fourcc, .modifier = d->mod, .fd = { d->fd, -1, -1, -1 },
+                        .offset = { 0 }, .stride = { (uint32_t)d->stride } };
+        d->tex = gpu_active() ? gpu_tex_dmabuf(&b) : NULL;
+        if (!d->tex) {
+            if (!s->db_warned++) fprintf(stderr, "machines: a 3D picture can't be shown: %s\n", gpu_active() ? "the GPU refused its dmabuf" : "the desktop draws without a GPU");
+            s->db_fails++;
+            return -1;
+        }
+    }
+    int y0 = s->db_y0 < 0 ? 0 : s->db_y0, y1 = s->db_y1 > s->h ? s->h : s->db_y1;
+    if (y1 <= y0) return 1;
+    if (gpu_tex_read_rows(d->tex, (uint8_t *)ms->map, y0, y1 - y0, d->flip)) { s->db_fails++; return -1; }
+    s->db_reads++;
+    return 1;
+}
+
 static void drop_display(Sess *s, int close_helper) {
     if (s->vd >= 0) { if (close_helper) vdsend(s, VD_CLOSE, 0, 0); close(s->vd); s->vd = -1; }
     if (s->vd_pid > 0) {
@@ -1241,6 +1367,7 @@ static void drop_display(Sess *s, int close_helper) {
     }
     s->vd_up = 0;
     s->ack_pending = 0;
+    db_drop_all(s);
     /* the next helper gets the guest's pointer again from QEMU; until then, the host's */
     free(s->cur); s->cur = NULL;
     if (s->media) media_src_cursor(s->media, NULL, 0, 0, 0, 0);
@@ -1346,7 +1473,8 @@ static void set_picture(Sess *s, int w, int h) {
     size_t len = (size_t)w * h * 4;
     int fd = vm_picture_memfd(len);
     if (fd < 0) return;
-    uint8_t *map = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
+    /* writable: a 3D machine's frames are read back into it here (db_read) */
+    uint8_t *map = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (map == MAP_FAILED) { close(fd); return; }
     MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
     if (!m) m = media_src_new(SK_IMAGE, "machines");
@@ -1397,8 +1525,16 @@ static void from_vd(Sess *s) {
         case VD_SIZE: set_picture(s, m.a, m.b); break;
         case VD_FRAME:
             if (!s->media || !vd_rect_inside(&m, s->w, s->h)) break;
+            if (s->db_cur >= 0) {
+                /* a 3D picture: its rows are read back below, once the GPU is done with them */
+                if (!s->db_pending) { s->db_y0 = m.b; s->db_y1 = m.b + m.d; }
+                else { if (m.b < s->db_y0) s->db_y0 = m.b; if (m.b + m.d > s->db_y1) s->db_y1 = m.b + m.d; }
+                s->db_pending = 1; s->db_frame = m.e;
+                break;
+            }
             frames++; last = m.e;
             break;
+        case VD_DMABUF: db_take(s, &m, fd); fd = -1; break;
         case VD_CURSOR:
             /* the guest's pointer: shown instead of the host's over the picture (main.c, media_node_cursor) */
             if (fd >= 0 && !vm_cursor_check(fd, m.a, m.b)) guest_cursor(s, fd, m.a, m.b, m.c, m.d);
@@ -1413,6 +1549,10 @@ static void from_vd(Sess *s) {
         if (fd >= 0) close(fd);
     }
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
+    if (s->db_pending) {
+        int r = db_read(s, ms);
+        if (r) { s->db_pending = 0; frames++; last = s->db_frame; }
+    }
     if (frames && ms) {
         ms->frame_seq++;
         media_src_damage(ms);

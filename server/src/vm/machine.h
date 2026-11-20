@@ -41,6 +41,9 @@ extern const char *const VM_DEV_NAMES[];   /* "virtio", "compat", "windows" */
 enum { VM_NIC_VIRTIO = 0, VM_NIC_E1000E, VM_NIC_E1000, VM_NIC_E1000_82545EM, VM_NIC_E1000_82544GC, VM_NIC_VMXNET3, VM_NIC_RTL8139, VM_NIC_PCNET, VM_NIC_COUNT };
 extern const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1];   /* "virtio", "e1000e", ... (machine.json's names) */
 enum { VM_RTC_UTC = 0, VM_RTC_LOCAL };
+/* the guest's graphics (schema 5): 2D, a virtio GPU whose picture QEMU draws in shared memory; 3D, virgl (virtio-vga-gl),
+ * which opens the host GPU's render node from QEMU's sandbox: Linux guests only (no device set "windows") */
+enum { VM_GFX_2D = 0, VM_GFX_3D };
 #define VM_EXTRA_NICS  7            /* cards beyond the first, carried from an import: present with their MAC, not connected */
 #define VM_DATA_DISKS  4            /* disks/data-1.qcow2 ... data-4.qcow2 */
 #define VM_SMBIOS_MAX  64           /* bytes of printable ASCII per SMBIOS string */
@@ -109,6 +112,7 @@ typedef struct {
     int tpm;                            /* a TPM 2.0, served by swtpm; its state in disks/tpm */
     int hyperv;                         /* Hyper-V enlightenments, for Windows guests */
     char drivers[VM_PATH_MAX];          /* a second CD/DVD with the guest's drivers (virtio-win), read-only; "" none */
+    int graphics;                       /* VM_GFX_*; "graphics": "3d" is written only when chosen (schema 5) */
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
