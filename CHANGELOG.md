@@ -85,6 +85,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (Decibels, which asks for no files), whose sandbox saw only `~/Documents/tono-prueba.mp3` and nothing else of the
   home. GNOME Text Editor was pinned from the launcher, opened from the Dock in `app-lordos-fp-org.gnome.TextEditor.scope`
   under its icon, and opened a text file from Files. Tests: `dock-model-test`, `apps-actions-test`.
+- **Flatpak test plan run on VM 127** (in development; `docs/FLATPAK.md`, "Results"). Held: Flathub's downloads in
+  their own firewall component (blocked → denied, Monitor row), apps in their own scopes with nothing escaping to the
+  user manager, no internet per app, the never-granted bus names and folders even with user overrides, no files, no
+  USB and no Bluetooth, no notifications, updates and freeing unused runtimes. Apps that worked: GNOME Text Editor,
+  Decibels, KCalc (Qt 6), Firefox; Shortwave without its station covers. Not yet: X11-only apps (Emacs) never get an
+  X display, apps whose GTK loads images through glycin crash or lose images (Meld crashes), Electron apps (marked),
+  and after one no-microphone app has run, no Flatpak app can record until the next login (the PipeWire guard can't
+  tell Flatpak apps apart and counts an exited app's empty scope as running).
 
 ### Fixed
 

@@ -798,6 +798,49 @@ flatpak `1.16.6-1~deb13u3` and xdg-dbus-proxy `0.1.6-1+deb13u3` (2026-11-19).
     (expected to fail or degrade without the Flatpak portal), an app declaring `host`, an app with
     `extra-data`.
 
+### Results (VM 127, 2026-11-20)
+
+LordOS `0.8.9.3~ws81` with a `lord-netperm` rebuilt with its BPF programs (see the first row), flatpak
+`1.16.6-1~deb13u3`, kernel 6.12.116. The installs and updates ran through `build/fpak-cli`, the same closed commands
+in `lordos-net-flathub.scope` that the Store runs; the launches through `build/launch-cli` (the real
+`apps_launch_flatpak`) from the session's `server` leaf, and from desktop search where noted. The probes inside an
+app ran with `nsenter` into its namespaces after moving the probe into the app's scope, so the firewall and the
+devices program see the app; Landlock isn't inherited that way, which doesn't change these results (Flatpak apps
+get only Landlock's scoping, never file rules). The two test tools were copied to LordOS's bin folder for the run and
+removed after.
+
+| Step | Result |
+|---|---|
+| — | **The firewall enforced nothing.** The VM's `lord-netperm`, like every release package from 0.8.8.6 to 0.8.9.2, was built without clang and so without BPF (`fw.bpfNotBuilt`). Fixed on its own branch (`fix/netperm-bpf`: `mkdeb.sh` refuses such a binary); the rows below used one built with BPF (11 programs attached). |
+| 1 | `flatpak` brought `libappstream5`, `libmalcontent-0-0` and `libostree-1-1` (bubblewrap and xdg-dbus-proxy were already there): 10.3 MB. No `xdg-desktop-portal`. `flatpak-portal` and `flatpak-session-helper` are masked in `/etc/systemd/user`. |
+| 2 | Flathub's key in the user's remote: `6E5C 05D9 79C7 6DAF 93C0 8135 4184 DD4D 907A 7CAE`. `update --appstream` ran in `lordos-net-flathub.scope`; Monitor → Network showed "Flathub" (311 MB after the installs). With `lordos:flathub` set to no internet: `denied out udp 8.8.8.8:53 (restricted no-internet)` and the fetch failed; lifted, it worked. Flatpak's message for that failure is "No such ref 'appstream2/x86_64'", which the Store shows as it is. |
+| 3 | Checked on 2026-11-19 (above). |
+| 4 | Every app launched in this run ran in its `app-lordos-fp-<id>.scope` with its `xdg-dbus-proxy`; nothing under `user@1000.service/app.slice/app-flatpak-*`. |
+| 5 | Shortwave with no internet: `denied out udp 8.8.8.8:53` and `denied in udp` for its device discovery, "Unable to find radio-browser.info server"; Monitor → Network: 185 denied. From inside it: `org.freedesktop.systemd1`, `org.freedesktop.Flatpak` (`flatpak-spawn --host`: "ServiceUnknown") and `org.freedesktop.secrets` unknown through the proxy, no `$XDG_RUNTIME_DIR/systemd`, no system bus socket, no `systemd-run`. Per-domain rules: not tried. |
+| 6 | Text Editor given `host`, `session-bus`, `system-bus` and `--talk-name=org.freedesktop.systemd1` by a user override: `~/.config/lordos`, `~/.local/share/applications`, `~/.local/share/lordos` and `~/.cache/lordos` are empty tmpfs (a file written there never reached the home); `~/.config/autostart` can't be created (`~/.config` read-only); `~/.bashrc` readable, not writable; Documents writable; the session bus is still only the proxy (`systemd1` unknown, the same filtered names on both socket paths); no system bus. The overrides had no effect beyond `host`. |
+| 7 | Text Editor with no-files: its root is a tmpfs and only `~/.var/app/org.gnome.TextEditor` is real; no Documents, `~/.ssh`, `/media/alex` or other homes; no session bus. "Open with" lending exactly one file: checked on 2026-11-19 (Decibels). |
+| 8 | Firefox (declares `devices=all`) with no camera, USB and Bluetooth: `open("/dev/bus/usb/001/00x")` → `EPERM` and `socket(AF_BLUETOOTH)` → `EPERM` inside its scope; the same namespaces outside the scope opened both. Camera: not tried (no v4l2loopback on the VM). |
+| 9 | Playback: Decibels on 2026-11-19. The VM has no sound card, so a PipeWire virtual source stood in for a microphone. **Problem:** an unrestricted Flatpak app (Shortwave) didn't see it either, and the PipeWire guard logged `pwguard:  is restricted (no-mic): its capture stream … was closed` with an empty app. A Flatpak app's PulseAudio client reports a pid from the app's own pid namespace, so the guard can't verify it and treats it as restricted while any no-mic app runs ("unverified", `sec/pwguard.c`), and "runs" (`appid_running`) also counts an app scope that is empty after the app has exited, which stays until the session ends. So after one no-mic app has run, no Flatpak app can record until the next login. It fails closed (no restricted app gets a microphone) but it is wrong. ALSA capture: not tried (no card). |
+| 10 | `notify-send` from inside Text Editor: shown. With no-notifications (set before login: lord-server reads `firewall.json` when the session starts and then only through its own pages): not shown, and the app still got an id (`1`). The notification shows a plain blue square, not the app's icon. |
+| 11 | Firefox, device-restricted, started without a session bus and showed its first-run page (not accepted). |
+| 12 | Text Editor taken back one commit, then `update` brought it to the newest; uninstalling KCalc and `uninstall --unused` removed the KDE 6.11 runtime, its locale and `KStyle.Adwaita` (7.1 → 6.2 GB). The Store still has no update detection (open question 8). |
+| 13 | See the next table. |
+
+| App (toolkit, what it declares) | What happened |
+|---|---|
+| GNOME Text Editor (GTK 4, libadwaita) | works: Dock, "Open with", the rows above |
+| Decibels (GTK 4, GJS; sound) | works (2026-11-19) |
+| Shortwave (GTK 4, Rust; network, sound) | the window and the station directory work; station covers don't load (images go through glycin, below); playback fails with "Stream doesn't contain enough data", the same with a plain `flatpak run` outside LordOS, so not LordOS's |
+| KCalc (Qt 6, KDE 6.11) | works, with LordOS's frame |
+| Firefox (its own sandbox inside Flatpak; `devices=all`) | works, restricted or not |
+| Meld (GTK 3; declares `host`) | **crashes at start**: GTK asks gdk-pixbuf for an SVG, gdk-pixbuf asks glycin, and glycin runs its loader through `flatpak-spawn --sandbox`, a sub-sandbox that needs `flatpak-portal`, which LordOS masks; GTK aborts when the icon can't load |
+| Emacs (X11 only) | **doesn't start** ("standard input is not a tty"), from the launcher and from search: the launcher never keeps X11 for a Flatpak app (`.x11 = 0` in `apps_launch_flatpak`, the view's `/tmp` has no X socket), although the table under Problem 1 and the Store's "Old-style X11 windows" row say it does when the app isn't restricted |
+| Spotify (`extra-data`; X11 and Wayland) | installs (its extra data downloaded in the Flathub scope); exits at once with nothing in its log; not looked into further |
+| MarkText (Electron) | fails as expected: zypak needs `flatpak-portal` ("Unit flatpak-portal.service is masked"), then "Missing X server or $DISPLAY"; the Store already marks it |
+
+Smaller things seen: after an app closes, Monitor → Network names it by its raw id (`flatpak:de.haeckerfelix.Shortwave`)
+with a letter for an icon, and the Dock showed a letter for Shortwave while it ran.
+
 ## Open questions
 
 1. **Long ids.** The scope name allows 62 bytes for the id part; Flatpak ids may be 255. Refuse
