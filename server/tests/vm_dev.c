@@ -21,6 +21,7 @@
  *   sound-stats         bytes the stream took from the ring, the loudest sample in them, the guest's streams
  *   mic tone|silence|off   the microphone's ring, filled here at the real rate with a 440 Hz tone or silence (as
  *                       lord-server's capture stream would), or none
+ *   agent install       copies lordos-guest into the guest (VAG_INSTALL, as Install Helper does)
  *   apps on|off         apps mode (VM_APPS): the guest's helper hides its desktop and lists its windows
  *   windows             the guest's last window list (VM_WINDATA); apps-list: its apps
  *   winact ID ACTION [X Y W H]   focus | close | minimize | restore | move (VM_WINACT)
@@ -558,6 +559,7 @@ static int handle(char *line) {
         else out("{\"ok\":true,\"cmd\":\"file\",\"seq\":%u}", seq);
         if (fd >= 0) close(fd);
     } else if (!strncmp(line, "qmp ", 4)) { snprintf(a1, sizeof a1, "%s", line + 4); ask(VM_QMP, 0, a1); }
+    else if (!strcmp(line, "agent install")) ask(VM_AGENT, VAG_INSTALL, NULL);
     else if (!strcmp(line, "apps on") || !strcmp(line, "apps off")) ask(VM_APPS, !strcmp(line, "apps on"), NULL);
     else if (!strcmp(line, "windows")) print_windows();
     else if (!strcmp(line, "apps-list")) {
