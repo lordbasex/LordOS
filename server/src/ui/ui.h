@@ -103,6 +103,8 @@ typedef struct Node {
     Image *img;                 /* NODE_IMAGE */
     struct WaveConf *wave;      /* NODE_WAVE: its look and its last raster (wave.h) */
     int term;                   /* NODE_TERM: session id; NODE_SURFACE: Wayland surface id; NODE_MEDIA: source (media/) */
+    float *crop;                /* NODE_MEDIA: the part of the source's picture it shows (x, y, w, h in picture pixels;
+                                 * NULL the whole picture): Machines' apps mode, one window of the guest (media/mview.c) */
     uint8_t protect;            /* protected window: black in screenshots, recordings and remote desktop (media/capture.c) */
     uint8_t rtl;                /* effective direction (computed in layout) */
     uint8_t own_tf, has_tf;     /* it has a scale/rotate; it or an ancestor has one (tf is set) */

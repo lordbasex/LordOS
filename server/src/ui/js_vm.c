@@ -1130,8 +1130,20 @@ typedef struct {
      * guest's path (done) or why not, for the app to show; files() hands finished ones over once */
     struct { uint32_t seq; int state, pct; long long size; char name[VM_TEXT_MAX], msg[VM_TEXT_MAX]; } fx[16];
     int fx_changes;
+    /* apps mode (7.2): the guest's windows, their icons and its apps, as lord-vm passed them on (VM_WINDATA, parsed
+     * again here); seqs count changes for the app; apps_mode: the picture may have no node that shows all of it */
+    LagWinList *wins;
+    struct { uint32_t id; int w, h; uint8_t *rgba; } icons[LAG_WIN_MAX];
+    LagAppList *gapps;
+    int wins_seq, icons_seq, gapps_seq, apps_mode;
 } Sess;
 static Sess sess[MAX_SESS];
+
+static void win_free(Sess *s) {
+    free(s->wins); s->wins = NULL;
+    free(s->gapps); s->gapps = NULL;
+    for (int i = 0; i < LAG_WIN_MAX; i++) { free(s->icons[i].rgba); s->icons[i].rgba = NULL; s->icons[i].id = 0; }
+}
 
 /* lord-vm processes whose window closed before they exited */
 static pid_t orphans[16];
@@ -1550,6 +1562,49 @@ static int fx_reply(Sess *s, const VmMsg *m) {
     return 0;
 }
 
+/* VM_WINDATA: the guest's windows, an icon or its apps; the memfd is checked sealed and of its size, and what it holds
+ * is parsed again with vmagent.c's parsers (lord-vm wrote it, but this side trusts no length) */
+static void windata(Sess *s, const VmMsg *m, int fd) {
+    int seals = fcntl(fd, F_GET_SEALS);
+    struct stat st;
+    if (seals < 0 || (seals & (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW)) != (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW) || fstat(fd, &st) || st.st_size != m->a) return;
+    uint8_t *b = malloc((size_t)m->a);
+    if (!b || pread(fd, b, (size_t)m->a, 0) != m->a) { free(b); return; }
+    if (m->b == LAG_WINDOWS) {
+        LagWinList *l = malloc(sizeof *l);
+        if (l && !lag_windows_parse(b, (size_t)m->a, l)) {
+            free(s->wins); s->wins = l; l = NULL; s->wins_seq++;
+            /* icons of windows that are gone go too */
+            for (int i = 0; i < LAG_WIN_MAX; i++) {
+                if (!s->icons[i].id) continue;
+                int there = 0;
+                for (int k = 0; k < s->wins->n && !there; k++) there = s->wins->w[k].id == s->icons[i].id;
+                if (!there) { free(s->icons[i].rgba); s->icons[i].rgba = NULL; s->icons[i].id = 0; }
+            }
+        }
+        free(l);
+    } else if (m->b == LAG_WINICON) {
+        uint32_t id; int w, h; const uint8_t *px;
+        if (!lag_icon_parse(b, (size_t)m->a, &id, &w, &h, &px)) {
+            int k = -1;
+            for (int i = 0; i < LAG_WIN_MAX && k < 0; i++) if (s->icons[i].id == id) k = i;
+            for (int i = 0; i < LAG_WIN_MAX && k < 0; i++) if (!s->icons[i].id) k = i;
+            uint8_t *copy = k >= 0 ? malloc((size_t)w * h * 4) : NULL;
+            if (copy) {
+                memcpy(copy, px, (size_t)w * h * 4);
+                free(s->icons[k].rgba);
+                s->icons[k].id = id; s->icons[k].w = w; s->icons[k].h = h; s->icons[k].rgba = copy;
+                s->icons_seq++;
+            }
+        }
+    } else if (m->b == LAG_APPLIST) {
+        LagAppList *l = malloc(sizeof *l);
+        if (l && !lag_applist_parse(b, (size_t)m->a, l)) { free(s->gapps); s->gapps = l; l = NULL; s->gapps_seq++; }
+        free(l);
+    }
+    free(b);
+}
+
 static void from_vm(Sess *s) {
     for (int k = 0; k < VD_POLL_MAX && s->vm >= 0; k++) {
         VmMsg m;
@@ -1606,6 +1661,9 @@ static void from_vm(Sess *s) {
                     free(t);
                 }
             }
+            break;
+        case VM_WINDATA:
+            if (fd >= 0) windata(s, &m, fd);
             break;
         case VM_CONSOLE_FD:
             if (fd >= 0 && m.seq == s->console_seq) {
@@ -1692,6 +1750,7 @@ static void guest_cursor(Sess *s, int fd, int w, int h, int hx, int hy) {
 
 static void from_vd(Sess *s) {
     int frames = 0, last = 0;
+    struct { int x0, y0, x1, y1, c; } du = { 0, 0, 0, 0, 0 };     /* the frames' changed area, together (2D) */
     for (int k = 0; k < VD_POLL_MAX && s->vd >= 0; k++) {
         VdMsg m;
         int fd = -1;
@@ -1716,6 +1775,8 @@ static void from_vd(Sess *s) {
                 break;
             }
             frames++; last = m.e;
+            if (!du.c) { du.x0 = m.a; du.y0 = m.b; du.x1 = m.a + m.c; du.y1 = m.b + m.d; du.c = 1; }
+            else { du.x0 = m.a < du.x0 ? m.a : du.x0; du.y0 = m.b < du.y0 ? m.b : du.y0; du.x1 = m.a + m.c > du.x1 ? m.a + m.c : du.x1; du.y1 = m.b + m.d > du.y1 ? m.b + m.d : du.y1; }
             break;
         case VD_DMABUF: db_take(s, &m, fd); fd = -1; break;
         case VD_CURSOR:
@@ -1734,14 +1795,17 @@ static void from_vd(Sess *s) {
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
     if (s->db_pending) {
         int r = db_read(s, ms);
-        if (r) { s->db_pending = 0; frames++; last = s->db_frame; }
+        if (r) { s->db_pending = 0; frames++; last = s->db_frame; du.x0 = 0; du.x1 = s->w; du.y0 = s->db_y0; du.y1 = s->db_y1; du.c = 1; }
     }
     if (frames && ms) {
         ms->frame_seq++;
-        media_src_damage(ms);
+        int shown = du.c ? media_src_damage_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0) : (media_src_damage(ms), 1);
+        /* apps mode: what changed isn't in any of the guest's windows shown here (or none is): nothing to paint, so
+         * the frame counts as read at once (the helper isn't held 250 ms) */
+        if (s->apps_mode && !shown) ms->painted_seq = ms->frame_seq;
         /* the node it was drawn in went away (the window's tree was made again): one repaint of everything finds
          * the new node, and that paint binds it */
-        if (!ms->node) damage_add((Box){ 0, 0, 16384, 16384 });
+        else if (!ms->node && !media_src_crop_count(ms)) damage_add((Box){ 0, 0, 16384, 16384 });
         s->frames += frames;
         s->ack_pending = 1; s->ack_frame = last; s->ack_seq = ms->frame_seq;
     }
@@ -1879,6 +1943,9 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_SetPropertyStr(c, o, "sound", so);
     }
     set_int(c, o, "filesSeq", s->fx_changes);
+    set_int(c, o, "windowsSeq", s->wins_seq);
+    set_int(c, o, "iconsSeq", s->icons_seq);
+    set_int(c, o, "guestAppsSeq", s->gapps_seq);
     return o;
 }
 
@@ -2061,6 +2128,7 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
     if (m) media_src_close(m);
     free(s->cur);
+    win_free(s);
     memset(s, 0, sizeof *s);
     return JS_UNDEFINED;
 }
@@ -2159,6 +2227,7 @@ static JSValue f_stop(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         if (r.type == VM_REPLY && r.seq == (uint32_t)seq) break;
     }
     close(s->vm);
+    win_free(s);
     memset(s, 0, sizeof *s);
     return JS_NewBool(c, ok);
 }
@@ -2246,6 +2315,106 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     if (q < 0) return JS_FALSE;
     if (a == VAG_INSTALL) { s->ag_seq = (uint32_t)q; s->ag_result = 1; s->ag_msg[0] = 0; }
     return JS_TRUE;
+}
+
+/* ---- apps mode (docs/VIRTUALIZATION.md 7.2) ----
+ * apps(session, on) → bool: asks the guest's helper to hide its desktop and list its windows (lord-vm refuses unless the
+ * helper said "windows"). windows(session) → [{ id, x, y, w, h, focused, minimized, topmost, owner, pid, title, app }]
+ * top to bottom, in the guest's pixels (poll's windowsSeq counts changes). winIcon(session, id) → { width, height, data }
+ * (RGBA, at most 64 × 64) or null (iconsSeq). winAct(session, id, 'focus'|'close'|'minimize'|'restore'|'move'[, x, y, w,
+ * h]) → bool. guestApps(session) → [{ name, token }] (guestAppsSeq); launch(session, token) → bool: lord-vm sends only a
+ * token the guest listed. Everything the guest said is shown as text only. */
+static JSValue f_apps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0) return JS_FALSE;
+    int on = JS_ToBool(c, argv[1]) > 0;
+    s->apps_mode = on;
+    return JS_NewBool(c, ask(s, VM_APPS, on) >= 0);
+}
+
+static JSValue f_windows(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    JSValue a = JS_NewArray(c);
+    if (!s || !s->wins) return a;
+    for (int i = 0; i < s->wins->n; i++) {
+        const LagWin *w = &s->wins->w[i];
+        JSValue o = JS_NewObject(c);
+        JS_SetPropertyStr(c, o, "id", JS_NewFloat64(c, w->id));
+        set_int(c, o, "x", w->x); set_int(c, o, "y", w->y); set_int(c, o, "w", w->w); set_int(c, o, "h", w->h);
+        JS_SetPropertyStr(c, o, "focused", JS_NewBool(c, w->flags & LAGW_FOCUSED));
+        JS_SetPropertyStr(c, o, "minimized", JS_NewBool(c, w->flags & LAGW_MINIMIZED));
+        JS_SetPropertyStr(c, o, "topmost", JS_NewBool(c, w->flags & LAGW_TOPMOST));
+        JS_SetPropertyStr(c, o, "owner", JS_NewFloat64(c, w->owner));
+        JS_SetPropertyStr(c, o, "pid", JS_NewFloat64(c, w->pid));
+        set_str(c, o, "title", w->title);
+        set_str(c, o, "app", w->app);
+        JS_SetPropertyUint32(c, a, (uint32_t)i, o);
+    }
+    return a;
+}
+
+static JSValue f_win_icon(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    double idd = 0;
+    if (!s || JS_ToFloat64(c, &idd, argv[1]) || idd < 1 || idd > 4294967295.0) return JS_NULL;
+    for (int i = 0; i < LAG_WIN_MAX; i++) {
+        if (!s->icons[i].rgba || s->icons[i].id != (uint32_t)idd) continue;
+        JSValue o = JS_NewObject(c);
+        set_int(c, o, "width", s->icons[i].w);
+        set_int(c, o, "height", s->icons[i].h);
+        JS_SetPropertyStr(c, o, "data", JS_NewArrayBufferCopy(c, s->icons[i].rgba, (size_t)s->icons[i].w * s->icons[i].h * 4));
+        return o;
+    }
+    return JS_NULL;
+}
+
+static JSValue f_win_act(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
+    double idd = 0;
+    if (!s || s->vm < 0 || JS_ToFloat64(c, &idd, argv[1]) || idd < 1 || idd > 4294967295.0) return JS_FALSE;
+    const char *w = JS_ToCString(c, argv[2]);
+    int a = !w ? 0 : !strcmp(w, "focus") ? LAGA_FOCUS : !strcmp(w, "close") ? LAGA_CLOSE : !strcmp(w, "minimize") ? LAGA_MINIMIZE
+          : !strcmp(w, "restore") ? LAGA_RESTORE : !strcmp(w, "move") ? LAGA_MOVE : 0;
+    if (w) JS_FreeCString(c, w);
+    if (!a) return JS_FALSE;
+    char text[64] = "";
+    if (a == LAGA_MOVE) {
+        if (argc < 7) return JS_FALSE;
+        int x = ival(c, argv[3]), y = ival(c, argv[4]), ww = ival(c, argv[5]), hh = ival(c, argv[6]);
+        if (!lag_rect_ok(x, y, ww, hh)) return JS_FALSE;
+        snprintf(text, sizeof text, "%d %d %d %d", x, y, ww, hh);
+    }
+    VmMsg m = vm_msg(VM_WINACT, ++s->seq, (int32_t)(uint32_t)idd, a, 0, 0, text);
+    return JS_NewBool(c, !vm_send(s->vm, &m, -1));
+}
+
+static JSValue f_guest_apps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    JSValue a = JS_NewArray(c);
+    if (!s || !s->gapps) return a;
+    for (int i = 0; i < s->gapps->n; i++) {
+        JSValue o = JS_NewObject(c);
+        set_str(c, o, "name", s->gapps->a[i].name);
+        set_str(c, o, "token", s->gapps->a[i].token);
+        JS_SetPropertyUint32(c, a, (uint32_t)i, o);
+    }
+    return a;
+}
+
+static JSValue f_launch(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0 || !s->gapps) return JS_FALSE;
+    const char *tok = JS_ToCString(c, argv[1]);
+    int ok = tok && tok[0] && strlen(tok) <= LAG_TOKEN_MAX && lag_applist_has(s->gapps, tok);
+    VmMsg m = vm_msg(VM_LAUNCH, ++s->seq, 0, 0, 0, 0, ok ? tok : NULL);
+    if (tok) JS_FreeCString(c, tok);
+    return JS_NewBool(c, ok && !vm_send(s->vm, &m, -1));
 }
 
 /* clipboardSend(session, text) → bool: the host's clipboard text for the guest, in a sealed memfd (lord-vm passes it
@@ -3071,6 +3240,8 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("sendFile", 2, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
+    JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act),
+    JS_CFUNC_DEF("guestApps", 1, f_guest_apps), JS_CFUNC_DEF("launch", 2, f_launch),
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {

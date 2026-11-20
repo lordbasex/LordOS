@@ -228,6 +228,7 @@ void node_destroy(Node *n) {
     image_release(n->img);
     wave_conf_free(n->wave);
     free(n->text);
+    free(n->crop);
     free(n->tf);
     free(n->s.ext);
     free(n);
