@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} s · c’est suffisant : appuyez sur Terminé quand vous voulez (arrêt automatique à 30).",
   "ai.pv.freeShort": "Pas assez de parole : parlez un peu plus longtemps, au moins 15 secondes.",
   "ai.pv.noMic": "Aucun son ne provient du micro. Vérifiez qu’il est branché et non coupé (Réglages → Son), puis réessayez.",
-  "section.battery": "Batterie"
+  "section.battery": "Batterie",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub apps applications runtimes supprimer désinstaller effacer espace disque bac à sable sandbox"
 }

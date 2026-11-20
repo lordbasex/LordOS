@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} s · das reicht: Drücke „Fertig“, wann du willst (bei 30 stoppt es von selbst).",
   "ai.pv.freeShort": "Es war nicht genug Sprache: Sprich etwas länger, mindestens 15 Sekunden.",
   "ai.pv.noMic": "Vom Mikrofon kommt kein Ton. Prüfe, ob es angeschlossen und nicht stummgeschaltet ist (Einstellungen → Ton), und versuch es erneut.",
-  "section.battery": "Akku"
+  "section.battery": "Akku",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub apps anwendungen runtimes entfernen deinstallieren löschen speicherplatz platz festplatte sandbox"
 }

@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} s · that’s enough: press Done whenever you like (it stops by itself at 30).",
   "ai.pv.freeShort": "There wasn’t enough speech: talk a little longer, at least 15 seconds.",
   "ai.pv.noMic": "No sound is coming from the microphone. Check that it is plugged in and not muted (Settings → Sound), then try again.",
-  "section.battery": "Battery"
+  "section.battery": "Battery",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub apps runtimes remove uninstall space disk sandbox"
 }

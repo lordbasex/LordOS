@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} mp · ennyi elég: nyomd meg a Kész gombot, amikor akarod (30-nál magától leáll).",
   "ai.pv.freeShort": "Nem volt elég beszéd: beszélj kicsit tovább, legalább 15 másodpercig.",
   "ai.pv.noMic": "Nem jön hang a mikrofonból. Ellenőrizd, hogy be van-e dugva és nincs-e némítva (Beállítások → Hang), majd próbáld újra.",
-  "section.battery": "Akkumulátor"
+  "section.battery": "Akkumulátor",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub alkalmazások programok futtatókörnyezetek runtime eltávolítás törlés hely lemez homokozó sandbox"
 }

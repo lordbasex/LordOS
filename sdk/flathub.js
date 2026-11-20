@@ -1,9 +1,14 @@
-// flathub.js — the Store's Flathub jobs and state (docs/FLATPAK.md, phase 1 step 5). Everything goes through
+// flathub.js — Flathub's jobs and state, for the Store and Settings → Flatpak (docs/FLATPAK.md, phase 1 step 5). Everything goes through
 // lord.flatpak (server/src/ui/js_flatpak.c): the closed list of `flatpak --user` commands, one at a time, each in
 // lordos-net-flathub.scope; the catalog read by the sandboxed lord-appstream. Turning Flathub on installs the `flatpak`
 // Debian package with the Store's own package job (debian.js, without Recommends), then adds the remote from the file
 // the lordos package ships and fetches the catalog. The pages are flathubpages.js; the plain logic sdk/flathubmodel.js.
-import { createStore, settings, locale, refreshApps, flathubModel as M, firewall, firewallState, t } from '@lordos/sdk';
+import { createStore } from './store.js';
+import { settings } from './settings.js';
+import { locale, t } from './i18n.js';
+import { refreshApps } from './apps.js';
+import * as M from './flathubmodel.js';
+import { firewall, firewallState } from './monitor.js';
 
 const api = () => (typeof lord !== 'undefined' && lord.flatpak ? lord.flatpak : null);
 // this PC can have Flathub (phase 1: x86-64); flatpak itself is installed
@@ -143,6 +148,34 @@ export const install = (app) => job('install', app, [['install', M.refOf(app.id,
 export const uninstall = (app) => job('uninstall', app, [['uninstall', M.refOf(app.id, app.branch)], ['uninstallUnused']]);
 export const update = (app) => job('update', app, [['update', M.refOf(app.id, app.branch)], ['uninstallUnused']]);
 export const updateAll = () => job('updateAll', null, [['update'], ['uninstallUnused']]);
+// Settings → Flatpak, "Remove Flatpak completely" (the Flathub part): every Flathub app, the runtimes left unused and the
+// Flathub remote. data: also each removed app's own folder ~/.var/app/<id>, to the Trash (it can be restored). The
+// flatpak package itself is removed afterwards by the package engine, with its plan shown (Settings). → true when done.
+export async function removeAll({ data = false } = {}) {
+  await refreshInstalled();
+  const apps = state.get().installed.slice();
+  const steps = apps.map((a) => ['uninstall', M.refOf(a.id, a.branch)]).filter(([, ref]) => ref);
+  steps.push(['uninstallUnused']);
+  const ok = await job('removeAll', null, steps);
+  if (!ok) return false;
+  const rd = await run('remoteDelete');       // gone already (never added, or removed by hand) is not a failure
+  if (rd.code !== 0 && !rd.lines.some((l) => /not found|no remote/i.test(l))) { patch({ msg: failed(rd) }); return false; }
+  setPrefs({ on: false, appstreamAt: 0 });
+  patch({ catalog: [], loaded: false, installed: [] });
+  if (data) {
+    // every app folder in ~/.var/app (only Flatpak uses it), also of apps removed earlier
+    const home = typeof lord !== 'undefined' && lord.fs ? lord.fs.home() : '';
+    let ids = apps.map((a) => a.id);
+    try { ids = [...new Set([...ids, ...lord.fs.list(`${home}/.var/app`).map((e) => e.name)])]; } catch (e) { /* no folder */ }
+    for (const id of ids) {
+      if (!home || !M.idOk(id)) continue;
+      try { lord.fs.trash(`${home}/.var/app/${id}`); } catch (e) { /* not there, or not movable: left as it is */ }
+    }
+  }
+  refreshApps();
+  return true;
+}
+
 export const cancelJob = () => {
   const a = api();
   for (const id of waiting.keys()) if (a) a.cancel(id);

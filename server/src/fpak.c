@@ -266,6 +266,7 @@ int fpak_cmd_argv(int cmd, const char *ref, const char *arch, char **argv, char 
         [FPAK_CMD_UNINSTALL]  = { "uninstall", "--user", "--noninteractive", "-y", NULL },
         [FPAK_CMD_UNUSED]     = { "uninstall", "--user", "--noninteractive", "-y", "--unused", NULL },
         [FPAK_CMD_LIST]       = { "list", "--user", "--app", "--columns=application,branch,version,origin", NULL },
+        [FPAK_CMD_REMOTE_DELETE] = { "remote-delete", "--user", "--force", "flathub", NULL },
     };
     int argc = 0;
     size_t used = 0;

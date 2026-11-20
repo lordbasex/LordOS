@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} s · dat is genoeg: druk op Klaar wanneer je wilt (het stopt vanzelf bij 30).",
   "ai.pv.freeShort": "Er was niet genoeg spraak: praat iets langer, minstens 15 seconden.",
   "ai.pv.noMic": "Er komt geen geluid van de microfoon. Controleer of hij aangesloten is en niet gedempt (Instellingen → Geluid) en probeer het opnieuw.",
-  "section.battery": "Batterij"
+  "section.battery": "Batterij",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub apps programma's runtimes verwijderen deïnstalleren ruimte opslag schijf sandbox"
 }

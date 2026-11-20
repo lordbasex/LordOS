@@ -732,5 +732,7 @@
   "ai.pv.freeEnough": "{s} giây · vậy là đủ: nhấn Xong bất cứ lúc nào (tự dừng ở giây 30).",
   "ai.pv.freeShort": "Chưa đủ giọng nói: hãy nói lâu hơn một chút, ít nhất 15 giây.",
   "ai.pv.noMic": "Không có âm thanh từ micrô. Kiểm tra micrô đã được cắm và không bị tắt tiếng (Cài đặt → Âm thanh), rồi thử lại.",
-  "section.battery": "Pin"
+  "section.battery": "Pin",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub ứng dụng app runtime gỡ gỡ cài đặt xóa dung lượng ổ đĩa hộp cát sandbox"
 }

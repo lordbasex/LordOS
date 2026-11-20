@@ -38,6 +38,7 @@ export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, web
 export * as notifyTones from './notifytones.js';
 export * as webAppsModel from './webappsmodel.js';
 export * as flathubModel from './flathubmodel.js';
+export * as flathub from './flathub.js';           // Flathub's jobs and state (the Store, Settings → Flatpak)
 export { compareNames } from './collate.js';
 import { windowIcon as windowIconOf } from './apps.js';
 import { ImeOverlay } from './ime.js';

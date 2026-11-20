@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "Sekunde {s} · inatosha: bonyeza Imekamilika wakati wowote (husimama yenyewe kwa 30).",
   "ai.pv.freeShort": "Usemaji haukutosha: zungumza kwa muda mrefu kidogo, angalau sekunde 15.",
   "ai.pv.noMic": "Hakuna sauti inayotoka kwenye maikrofoni. Hakikisha imechomekwa na haijanyamazishwa (Mipangilio → Sauti), kisha ujaribu tena.",
-  "section.battery": "Betri"
+  "section.battery": "Betri",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub programu apps runtime ondoa sakinusha futa nafasi diski sanduku la mchanga sandbox"
 }

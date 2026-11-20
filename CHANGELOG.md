@@ -90,11 +90,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   user manager, no internet and per-domain rules per app, the never-granted bus names and folders even with user
   overrides, no files, no camera, no USB and no Bluetooth, no notifications, updates and freeing unused runtimes.
   Apps that work: GNOME Text Editor, Decibels, Shortwave (but its radio playback, which also fails outside LordOS), Meld, KCalc (Qt 6), Firefox and GNU Emacs (X11). Electron
-  apps (MarkText) still don't start and stay marked; Spotify exits at start.
+  apps (MarkText) still don't start and stay marked. Spotify exits at start on any Wayland desktop (it starts on X11
+  only and asks for X only as a fallback); its own flags file fixes it.
 - **Flatpak apps get Flatpak's sub-sandbox from LordOS itself** (in development; `server/src/fpspawn.c`, AGENTS.md E9):
   lord-server serves `org.freedesktop.portal.Flatpak` and runs each Spawn as the same app, in its own scope and view,
   under its restrictions; Flatpak's own portal stays masked. GNOME apps that load images through glycin needed it:
   Meld crashed at start, Shortwave showed no images. The service exists only while `flatpak` is installed.
+- **Settings → Flatpak** (in development): whether Flatpak is installed, how much its apps, runtimes and their data
+  take, Flathub shown in the Store or not, and "Remove Flatpak completely" (every Flathub app, the runtimes, Flathub,
+  optionally the apps' data to the Trash, then the flatpak package with its plan shown and the administrator password).
+  Flatpak is only installed when Flathub is turned on, and nothing of it runs in the background.
 - **X11 for Flatpak apps, as GNOME and KDE give it** (in development): an app with no files or device blocked keeps
   the X display (socket and cookie in its view); a restricted one gets none. GNU Emacs, X11 only, now starts.
 

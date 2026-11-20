@@ -732,5 +732,7 @@
   "ai.pv.freeEnough": "{s}초 · 충분합니다. 원할 때 완료를 누르십시오(30초가 되면 자동으로 멈춥니다).",
   "ai.pv.freeShort": "말소리가 충분하지 않습니다. 최소 15초 이상 조금 더 길게 말하십시오.",
   "ai.pv.noMic": "마이크에서 소리가 들어오지 않습니다. 연결되어 있고 음소거되지 않았는지 확인한 후(설정 → 사운드) 다시 시도하십시오.",
-  "section.battery": "배터리"
+  "section.battery": "배터리",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub 앱 애플리케이션 런타임 runtime 제거 삭제 설치 제거 공간 용량 디스크 샌드박스 sandbox"
 }

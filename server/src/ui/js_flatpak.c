@@ -35,11 +35,12 @@
 #include <unistd.h>
 #include <limits.h>
 #include <ctype.h>
+#include <ftw.h>
 
 static const char *const names[FPAK_CMD_COUNT] = {
     [FPAK_CMD_REMOTE_ADD] = "remoteAdd", [FPAK_CMD_APPSTREAM] = "appstream", [FPAK_CMD_INFO] = "info",
     [FPAK_CMD_INSTALL] = "install", [FPAK_CMD_UPDATE] = "update", [FPAK_CMD_UNINSTALL] = "uninstall",
-    [FPAK_CMD_UNUSED] = "uninstallUnused", [FPAK_CMD_LIST] = "list",
+    [FPAK_CMD_UNUSED] = "uninstallUnused", [FPAK_CMD_LIST] = "list", [FPAK_CMD_REMOTE_DELETE] = "remoteDelete",
 };
 
 #define QMAX 16
@@ -218,6 +219,34 @@ static JSValue f_available(JSContext *c, JSValueConst t, int argc, JSValueConst 
     return JS_NewBool(c, fpak_native_arch() && fpak_binary_ok());
 }
 
+/* lord.flatpak.forget() → true when done: once the flatpak package is gone (Settings → Flatpak, "Remove Flatpak
+ * completely"), Flatpak's own folders of this user, ~/.local/share/flatpak and ~/.cache/flatpak, which lord.fs may not
+ * touch (fsops_protected): what's left of the catalog and the repository. Refused while flatpak is installed. Never
+ * follows a link (a link in their place is removed as a link) nor crosses into another filesystem. */
+static int forget_cb(const char *p, const struct stat *st, int flag, struct FTW *f) {
+    (void)st; (void)f;
+    return flag == FTW_DP ? rmdir(p) : unlink(p);
+}
+static int forget_tree(const char *p) {
+    struct stat st;
+    if (lstat(p, &st)) return errno == ENOENT ? 0 : -1;
+    if (!S_ISDIR(st.st_mode)) return unlink(p);
+    return nftw(p, forget_cb, 32, FTW_DEPTH | FTW_PHYS | FTW_MOUNT);
+}
+static JSValue f_forget(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    struct stat st;
+    const char *home = getenv("HOME");
+    if (!lstat(FPAK_FLATPAK, &st) || !home || home[0] != '/' || strstr(home, "/../") || strlen(home) > PATH_MAX - 64) return JS_FALSE;
+    char p[PATH_MAX];
+    int bad = 0;
+    snprintf(p, sizeof p, "%s/.local/share/flatpak", home);
+    bad |= forget_tree(p);
+    snprintf(p, sizeof p, "%s/.cache/flatpak", home);
+    bad |= forget_tree(p);
+    return JS_NewBool(c, !bad);
+}
+
 /* this machine can have Flathub at all (phase 1: x86-64 only), whether or not flatpak is installed yet */
 static JSValue f_supported(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
@@ -345,6 +374,7 @@ static JSValue f_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
 
 static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("available", 0, f_available),
+    JS_CFUNC_DEF("forget", 0, f_forget),
     JS_CFUNC_DEF("supported", 0, f_supported),
     JS_CFUNC_DEF("start", 2, f_start),
     JS_CFUNC_DEF("take", 0, f_take),

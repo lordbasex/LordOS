@@ -732,5 +732,7 @@
   "ai.pv.freeEnough": "{s} 秒 · 十分です：いつでも「完了」を押してください（30 秒で自動的に止まります）。",
   "ai.pv.freeShort": "発話が足りませんでした：もう少し長く、15 秒以上話してください。",
   "ai.pv.noMic": "マイクから音が来ていません。接続されていてミュートになっていないか確認し（設定 → サウンド）、もう一度試してください。",
-  "section.battery": "バッテリー"
+  "section.battery": "バッテリー",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub アプリ ランタイム runtime 削除 アンインストール 容量 空き ディスク サンドボックス sandbox"
 }

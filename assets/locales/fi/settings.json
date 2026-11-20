@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} s · se riittää: paina Valmis milloin haluat (pysähtyy itsestään 30 sekunnissa).",
   "ai.pv.freeShort": "Puhetta ei ollut tarpeeksi: puhu hieman pidempään, vähintään 15 sekuntia.",
   "ai.pv.noMic": "Mikrofonista ei tule ääntä. Tarkista, että se on kytketty eikä mykistetty (Asetukset → Ääni), ja yritä uudelleen.",
-  "section.battery": "Akku"
+  "section.battery": "Akku",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub sovellukset ohjelmat runtimet ajoympäristöt poista asennuksen poisto tila levy hiekkalaatikko sandbox"
 }

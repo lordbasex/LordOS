@@ -11,5 +11,6 @@ int  fpspawn_fd(void);                  /* -1 when not running */
 int  fpspawn_wants_write(void);
 void fpspawn_dispatch(void);
 void fpspawn_tick(void);                /* children that exited, callers that left the bus, instance ids */
+void fpspawn_stop(void);                /* flatpak was removed: the name is given up (processes already started go on) */
 
 #endif

@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} s · det räcker: tryck på Klar när du vill (det stannar av sig självt vid 30).",
   "ai.pv.freeShort": "Det var inte tillräckligt med tal: prata lite längre, minst 15 sekunder.",
   "ai.pv.noMic": "Inget ljud kommer från mikrofonen. Kontrollera att den är ansluten och inte avstängd (Inställningar → Ljud) och försök igen.",
-  "section.battery": "Batteri"
+  "section.battery": "Batteri",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub appar program runtimes ta bort avinstallera radera utrymme disk sandlåda sandbox"
 }

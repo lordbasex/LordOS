@@ -71,9 +71,11 @@ static void td_signal(const DMsg *m) {
 static int fpspawn_bus;
 static double fpspawn_next;
 static void fpspawn_try(void) {
-    if (!fpspawn_bus || fpspawn_fd() >= 0 || hw_now_ms() < fpspawn_next) return;
+    if (!fpspawn_bus || hw_now_ms() < fpspawn_next) return;
     fpspawn_next = hw_now_ms() + 30000;
-    if (access(FPAK_FLATPAK, X_OK) == 0 && fpspawn_start()) fprintf(stderr, "hw: no Flatpak Spawn portal (sub-sandboxes of Flatpak apps)\n");
+    int has = access(FPAK_FLATPAK, X_OK) == 0;
+    if (fpspawn_fd() >= 0) { if (!has) fpspawn_stop(); return; }     /* removed (Settings → Flatpak): nothing left on the bus */
+    if (has && fpspawn_start()) fprintf(stderr, "hw: no Flatpak Spawn portal (sub-sandboxes of Flatpak apps)\n");
 }
 
 void hw_start(const DisplayHost *h, int with_bus) {

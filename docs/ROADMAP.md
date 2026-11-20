@@ -1092,8 +1092,12 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   in `AGENTS.md`). Phase 1, x86-64 only: a Flathub switch in the Store (installs `flatpak` without Recommends, masks
   its root helper and portal), the `verified` catalog through a sandboxed parser, install/update/remove per user, the
   launcher in its root-owned `app-lordos-fp-<id>.scope` with LordOS's restrictions, firewall, Monitor and Privacy for
-  `flatpak:<id>`, and the VM test plan. Phase 2: LordOS's portals for Flatpak callers, the sub-sandbox service for
-  Chromium/Electron apps, the Raspberry Pi 5. History: a Flathub section in the Store. On
+  `flatpak:<id>`, and the VM test plan (run 2026-11-20; automated as `server/tests/fwflatpak/flatpak.sh`). Built after
+  the test plan: LordOS's own sub-sandbox service (E9; GNOME apps that load images through glycin need it), X11 for
+  unrestricted apps, Settings → Flatpak with "Remove Flatpak completely". Phase 2: LordOS's portals for Flatpak callers,
+  **Electron/Chromium apps** (zypak's Spawn reaches LordOS's service, then bubblewrap refuses to join the caller's
+  namespaces: "creation of new user namespaces was not disabled as requested"; until then they stay marked "not yet
+  supported" in the Store), the Raspberry Pi 5. History: a Flathub section in the Store. On
   2026-10-27 the maintainer decided not to implement it for now: the priority is the system's stability, and Flatpak
   would add complexity (bubblewrap, OSTree, portals, seven new exceptions to `AGENTS.md`) and future problems. The
   design review is kept as documentation (`FLATPAK.md`); nothing is built until the maintainer decides whether to

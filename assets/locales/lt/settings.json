@@ -746,5 +746,7 @@
   "ai.pv.freeEnough": "{s} s · užtenka: paspauskite „Atlikta“, kada norite (ties 30 sustos savaime).",
   "ai.pv.freeShort": "Kalbos buvo per mažai: pakalbėkite ilgiau, bent 15 sekundžių.",
   "ai.pv.noMic": "Iš mikrofono negaunamas garsas. Patikrinkite, ar jis prijungtas ir neišjungtas (Nustatymai → Garsas), tada bandykite dar kartą.",
-  "section.battery": "Baterija"
+  "section.battery": "Baterija",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub programos programėlės vykdymo aplinkos runtime pašalinti išdiegti vieta diskas smėlio dėžė sandbox"
 }

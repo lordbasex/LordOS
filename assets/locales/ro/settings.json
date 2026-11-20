@@ -746,5 +746,7 @@
   "ai.pv.freeEnough": "{s} s · ajunge: apăsați Gata oricând doriți (se oprește singur la 30).",
   "ai.pv.freeShort": "Nu a fost suficientă vorbire: vorbiți puțin mai mult, cel puțin 15 secunde.",
   "ai.pv.noMic": "Nu vine niciun sunet de la microfon. Verificați că este conectat și nu este dezactivat (Setări → Sunet), apoi încercați din nou.",
-  "section.battery": "Baterie"
+  "section.battery": "Baterie",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub aplicații programe runtime-uri elimina dezinstala șterge spațiu disc sandbox"
 }

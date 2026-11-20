@@ -840,7 +840,7 @@ removed after.
 | Firefox (its own sandbox inside Flatpak; `devices=all`) | works, restricted or not |
 | Meld (GTK 3; declares `host`) | works since E9 (2026-11-20); before it **crashed at start**: GTK asks gdk-pixbuf for an SVG, gdk-pixbuf asks glycin, and glycin runs its loader through `flatpak-spawn --sandbox`, a sub-sandbox that needs `flatpak-portal`, which LordOS masks; GTK aborts when the icon can't load |
 | Emacs (X11 only) | works since 2026-11-20, through Xwayland with LordOS's frame (it can't create `~/.emacs.d`: the home is read-only); before it **didn't start** ("standard input is not a tty"), from the launcher and from search: the launcher never keeps X11 for a Flatpak app (`.x11 = 0` in `apps_launch_flatpak`, the view's `/tmp` has no X socket), although the table under Problem 1 and the Store's "Old-style X11 windows" row say it does when the app isn't restricted |
-| Spotify (`extra-data`; X11 and Wayland) | installs (its extra data downloaded in the Flathub scope); exits at once with nothing in its log; not looked into further |
+| Spotify (`extra-data`; declares `fallback-x11` and `wayland`) | installs (its extra data downloaded in the Flathub scope); exits at once with status 1 and nothing in its log. Found 2026-11-20, the same with a plain `flatpak run` outside LordOS: with a Wayland socket, Flatpak gives a `fallback-x11` app no X display, and Spotify's CEF starts on X11 only. With `--enable-features=UseOzonePlatform --ozone-platform=wayland` it showed its login page (on VM 127 also `--disable-gpu`, which has no GPU). A person can put those flags in `~/.var/app/com.spotify.Client/config/spotify-flags.conf`, which Spotify's own launcher reads; LordOS doesn't patch apps one by one |
 | MarkText (Electron) | fails as expected: zypak needs `flatpak-portal` ("Unit flatpak-portal.service is masked"), then "Missing X server or $DISPLAY"; the Store already marks it. With E9 its Spawn reaches lord-server, and bubblewrap then stops: "creation of new user namespaces was not disabled as requested" (not looked into further) |
 
 Smaller things seen: after an app closes, Monitor → Network names it by its raw id (`flatpak:de.haeckerfelix.Shortwave`)
@@ -889,6 +889,30 @@ the PipeWire guard with two Flatpak apps (through `pwguard-cli`, which rereads `
 needed). On VM 127, 2026-11-20: **31 passed, 0 failed**. Its first runs found one more bug: lord-server's D-Bus client
 refused any message whose signature has an fd (`h`) when it carried none, so a Spawn with no fds (an empty `a{uh}`)
 closed the portal's connection; each fd index is now checked against the fds that came instead.
+
+### Settings → Flatpak (built 2026-11-20)
+
+Flatpak costs nothing until it is used: the package is installed only when Flathub is turned on in the Store, and
+nothing of it runs in the background afterwards (checked on VM 127: no Flatpak process, timer or unit with no app open;
+its three services are masked; lord-server's Spawn service exists only while `/usr/bin/flatpak` does, checked every
+30 s, and gives its bus name up when the package goes). Settings → Flatpak (`apps/settings/Flatpak.jsx`) shows whether
+it is installed, how many Flathub apps there are and how much the apps, runtimes and their own data take, Flathub shown
+in the Store or not, and **Remove Flatpak completely**: every Flathub app, the runtimes left unused and the Flathub
+remote through the closed list (`sdk/flathub.js` `removeAll`; one more command, `remote-delete --user --force flathub`,
+E3), optionally each app's `~/.var/app/<id>` to the Trash, then `flatpak` and the libraries it brought
+(`libostree-1-1`, `libappstream5`, `libmalcontent-0-0`, when nothing else needs them) through the package engine's
+`pkg-remove --purge` (its `/etc/profile.d` and `Xsession.d` files too), with the plan checked first: a plan that
+would remove anything else than those and the packages they pulled in that nothing needs any more (`pkg.why.auto`) is
+refused. Last, `lord.flatpak.forget()` deletes Flatpak's own folders, `~/.local/share/flatpak` and `~/.cache/flatpak`
+(closed to `lord.fs`, E6), and only once `/usr/bin/flatpak` is gone: never following a link, never into another
+filesystem. The Store's Flathub jobs moved to the SDK for it (`sdk/flathub.js`, was `apps/store/flathub.js`).
+
+Checked on VM 127 (`0.8.9.3~ws84` and `ws85`), twice: with nine apps installed, then again after turning Flathub on
+from the Store (which installed `flatpak` again, 6 packages, 11 MB): afterwards no `flatpak` binary, no Flathub
+remote, no `libostree-1-1`, `libappstream5`, `libmalcontent-0-0` or the two libraries they had pulled in
+(`libxmlb2`, `libstemmer0d`), no `~/.local/share/flatpak` (113 MB before `forget` existed) or `~/.cache/flatpak`, the
+apps' data in the Trash, and lord-server no longer on the bus as `org.freedesktop.portal.Flatpak`. The first run left
+`flatpak` in dpkg's "config files" state (its `/etc` files), hence `--purge` since.
 
 ### Sub-sandboxes (E9, built 2026-11-20)
 

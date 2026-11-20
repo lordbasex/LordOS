@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} san · bu kifayətdir: istədiyiniz vaxt Hazırdır düyməsinə basın (30-da özü dayanır).",
   "ai.pv.freeShort": "Kifayət qədər nitq olmadı: bir az daha uzun, ən azı 15 saniyə danışın.",
   "ai.pv.noMic": "Mikrofondan səs gəlmir. Onun qoşulduğunu və səsinin bağlı olmadığını yoxlayın (Parametrlər → Səs), sonra yenidən cəhd edin.",
-  "section.battery": "Batareya"
+  "section.battery": "Batareya",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub tətbiqlər proqramlar runtime icra mühitləri sil silmək yer disk qum qutusu sandbox"
 }

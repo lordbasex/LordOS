@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} s · ja n’hi ha prou: prem Fet quan vulguis (s’atura sol als 30).",
   "ai.pv.freeShort": "No hi ha hagut prou veu: parla una mica més, com a mínim 15 segons.",
   "ai.pv.noMic": "No arriba cap so del micròfon. Comprova que estigui connectat i no silenciat (Configuració → So) i torna-ho a provar.",
-  "section.battery": "Bateria"
+  "section.battery": "Bateria",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub apps aplicacions runtimes suprimir desinstal·lar eliminar espai disc entorn aïllat sandbox"
 }

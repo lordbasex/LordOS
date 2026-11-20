@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} s · ya alcanza: apretá Listo cuando quieras (a los 30 se corta solo).",
   "ai.pv.freeShort": "No alcanzó la voz grabada: hablá un poco más, al menos 15 segundos.",
   "ai.pv.noMic": "No llega sonido del micrófono. Revisá que esté conectado y sin silenciar (Ajustes → Sonido) y probá de nuevo.",
-  "section.battery": "Batería"
+  "section.battery": "Batería",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub apps aplicaciones runtimes quitar desinstalar borrar eliminar espacio disco entorno aislado sandbox"
 }

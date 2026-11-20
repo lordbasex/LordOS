@@ -649,6 +649,15 @@ int fpspawn_start(void) {
 }
 
 int fpspawn_fd(void) { return up ? conn.fd : -1; }
+
+void fpspawn_stop(void) {
+    if (!up) return;
+    for (int i = 0; i < npending; i++) { reply_error(&pending[i].call, "org.freedesktop.DBus.Error.ServiceUnknown", "Flatpak was removed"); dbus_msg_free(&pending[i].call); }
+    npending = 0;
+    dbus_flush(&conn);
+    dbus_close(&conn);                      /* the bus releases the name with the connection */
+    up = 0;
+}
 int fpspawn_wants_write(void) { return up && dbus_pending_out(&conn); }
 
 /* NOTIFY_START: flatpak wrote the new instance's id; its process as the caller's PID namespace sees it */

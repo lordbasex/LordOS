@@ -2,7 +2,7 @@
 // package through the Store's package job, then the remote and the catalog), the catalog as cards (Flathub's verified
 // apps unless the setting shows the rest), each app's page with what it declares and what LordOS changes before it is
 // installed, the apps that need Flatpak's sub-sandboxes (Chromium, Electron) marked "not yet supported", and the
-// installed ones with Update and Remove. The jobs and state are flathub.js's; the logic sdk/flathubmodel.js's.
+// installed ones with Update and Remove. The jobs and state are sdk/flathub.js's; the logic sdk/flathubmodel.js's.
 import { createElement as h, useEffect, useState } from 'react';
 import {
   View, Text, Image, Button, GroupBox, Toggle, LetterIcon, useTheme, useStore, useLauncherApps, launchApp, admin, formatBytes, errorText, settings,
@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import { debian } from './debian.js';
 import { Card, CardGrid, Facts, Pill, Shelf, Tag } from './ui.js';
-import * as F from './flathub.js';
+import { flathub as F } from '@lordos/sdk';
 
 const PAGE = 60;            // cards shown at first, and how many "Show more" adds
 const SHELF = 8;            // cards in a Discover or category shelf

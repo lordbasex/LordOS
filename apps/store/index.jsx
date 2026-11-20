@@ -14,7 +14,7 @@ import { GLYPH } from './ui.js';
 import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits } from './webapps.js';
 import { WebAppDetail } from './webdetail.js';
 import { FlathubCategory, FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub } from './flathubpages.js';
-import * as flathub from './flathub.js';
+import { flathub } from '@lordos/sdk';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
 // first of the usual names that exists, or the home folder itself.

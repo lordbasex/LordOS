@@ -739,5 +739,7 @@
   "ai.pv.freeEnough": "{s} s · sapat na iyan: pindutin ang Tapos na kahit kailan mo gusto (kusa itong hihinto sa 30).",
   "ai.pv.freeShort": "Hindi sapat ang pagsasalita: magsalita nang mas matagal nang kaunti, hindi bababa sa 15 segundo.",
   "ai.pv.noMic": "Walang tunog na nanggagaling sa mikropono. Tingnan kung nakasaksak ito at hindi naka-mute (Mga Setting → Tunog), at subukan ulit.",
-  "section.battery": "Baterya"
+  "section.battery": "Baterya",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub apps app runtime alisin i-uninstall burahin espasyo disk sandbox"
 }

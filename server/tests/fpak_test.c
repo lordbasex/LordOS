@@ -197,6 +197,9 @@ int main(void) {
     CHECK(fpak_cmd_argv(FPAK_CMD_INSTALL, NULL, "x86_64", argv, buf, sizeof buf) < 0);               /* a ref is needed */
     CHECK(fpak_cmd_argv(FPAK_CMD_INSTALL, "flathub", "x86_64", argv, buf, sizeof buf) < 0);
     CHECK(fpak_cmd_argv(FPAK_CMD_APPSTREAM, "app/org.gnome.Calculator/x86_64/stable", "x86_64", argv, buf, sizeof buf) < 0);
+    n = fpak_cmd_argv(FPAK_CMD_REMOTE_DELETE, NULL, "x86_64", argv, buf, sizeof buf);
+    CHECK(n == 5 && !strcmp(argv[1], "remote-delete") && !strcmp(argv[2], "--user") && !strcmp(argv[4], "flathub") && !argv[5]);
+    CHECK(fpak_cmd_argv(FPAK_CMD_REMOTE_DELETE, "app/org.gnome.Calculator/x86_64/stable", "x86_64", argv, buf, sizeof buf) < 0);   /* only Flathub, no ref */
     n = fpak_cmd_argv(FPAK_CMD_REMOTE_ADD, NULL, "x86_64", argv, buf, sizeof buf);
     CHECK(n > 0 && !strcmp(argv[n - 1], FPAK_REPO_FILE) && has(argv, "--from") && !has(argv, "--no-gpg-verify"));
     n = fpak_cmd_argv(FPAK_CMD_UPDATE, NULL, "x86_64", argv, buf, sizeof buf);

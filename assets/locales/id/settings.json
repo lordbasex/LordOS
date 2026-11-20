@@ -732,5 +732,7 @@
   "ai.pv.freeEnough": "{s} dtk · sudah cukup: tekan Selesai kapan saja (berhenti sendiri di 30).",
   "ai.pv.freeShort": "Ucapannya kurang: bicaralah sedikit lebih lama, minimal 15 detik.",
   "ai.pv.noMic": "Tidak ada suara dari mikrofon. Pastikan tersambung dan tidak dibisukan (Pengaturan → Suara), lalu coba lagi.",
-  "section.battery": "Baterai"
+  "section.battery": "Baterai",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub aplikasi apl runtime hapus copot uninstal ruang disk penyimpanan sandbox"
 }

@@ -1891,6 +1891,15 @@ Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm mo
 monitor's `mouse_move` doesn't reach the guest; the pointer is moved with QMP `input-send-event` (`abs` x and y in 0–32767 on
 the HID tablet, `btn` for clicks and the wheel) on `/var/run/qemu-server/127.qmp`.
 
+**2026-11-20, the Flatpak test plan** (docs/FLATPAK.md, "Results"; `server/tests/fwflatpak/flatpak.sh`). From Debian, for
+the camera restriction: `sudo apt-get install -y --no-install-recommends linux-headers-$(uname -r) v4l2loopback-dkms
+v4l2loopback-utils v4l-utils` (loaded by hand with `modprobe v4l2loopback devices=1 video_nr=9 card_label=TestCam
+exclusive_caps=1`; the module isn't loaded at boot). From Flathub, through the Store's closed `flatpak --user` commands:
+Text Editor, Decibels, Shortwave, Meld, GNU Emacs, Firefox, KCalc (removed again with the KDE runtime), Spotify and MarkText;
+`flatpak` itself came with turning Flathub on in the Store. `/etc/sudoers.d/90-lordos-tests` (passwordless sudo for the
+test user) stays until the end of Flatpak's phase 1. The test tools (`launch-cli`, `fpak-cli`) are copied to
+`/usr/lib/lordos/bin` only for a run and removed after it.
+
 **2026-11-12, tray menus of Linux apps** (CHANGELOG, Fixed: tray menus). Nothing installed from Debian. pasystray and CopyQ
 (already there) and the generic go-link Desk 1.8.2-dev1 (Fyne, fyne.io/systray), run from an unpacked release tarball in
 `~/tray-test/` without installing it, with `busctl --user monitor --match interface=com.canonical.dbusmenu` to see the

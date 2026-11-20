@@ -104,6 +104,7 @@ enum {
     FPAK_CMD_UNINSTALL,         /* uninstall <ref> */
     FPAK_CMD_UNUSED,            /* uninstall --unused */
     FPAK_CMD_LIST,              /* list --app --columns=application,branch,version,origin */
+    FPAK_CMD_REMOTE_DELETE,     /* remote-delete --force flathub (Settings → Flatpak, "Remove Flatpak completely") */
     FPAK_CMD_COUNT
 };
 #define FPAK_REPO_FILE "/usr/lib/lordos/assets/flatpak/flathub.flatpakrepo"

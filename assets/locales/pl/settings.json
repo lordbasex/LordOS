@@ -746,5 +746,7 @@
   "ai.pv.freeEnough": "{s} s · wystarczy: naciśnij Gotowe, kiedy chcesz (zatrzyma się samo po 30).",
   "ai.pv.freeShort": "Za mało mowy: mów trochę dłużej, co najmniej 15 sekund.",
   "ai.pv.noMic": "Z mikrofonu nie dochodzi żaden dźwięk. Sprawdź, czy jest podłączony i niewyciszony (Ustawienia → Dźwięk), i spróbuj ponownie.",
-  "section.battery": "Bateria"
+  "section.battery": "Bateria",
+  "section.flatpak": "Flatpak",
+  "keywords.flatpak": "flatpak flathub aplikacje programy runtime środowiska usuń odinstaluj miejsce dysk piaskownica sandbox"
 }
