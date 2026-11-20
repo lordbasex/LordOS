@@ -267,7 +267,7 @@ static int read_spawn(const DMsg *m, Req *q) {
     while (!r.err && dr_more(&r, end)) {
         dr_struct(&r);
         uint32_t t = dr_u32(&r), h = dr_u32(&r);
-        if (r.err || q->nfd >= DBUS_MAX_FDS || t > 1023 || (int)h >= m->n_fds) return -1;
+        if (r.err || q->nfd >= DBUS_MAX_FDS || t > 1023 || m->n_fds <= 0 || h >= (uint32_t)m->n_fds) return -1;   /* unsigned: never a negative index */
         for (int i = 0; i < q->nfd; i++) if (q->target[i] == t) return -1;
         q->target[q->nfd] = t;
         q->handle[q->nfd++] = h;
@@ -341,7 +341,7 @@ static void waiter(const char *scope, pid_t root, char *const argv[], char *cons
         close(o);
     }
     int src[DBUS_MAX_FDS];
-    for (int i = 0; i < q->nfd; i++) if ((src[i] = HIGH(m->fds[q->handle[i]])) < 0) _exit(126);
+    for (int i = 0; i < q->nfd; i++) if (q->handle[i] >= (uint32_t)m->n_fds || (src[i] = HIGH(m->fds[q->handle[i]])) < 0) _exit(126);
     int inst_hi = HIGH(inst_w), log_hi = HIGH(logfd), report = HIGH(report_w);
     int o = open("/dev/null", O_RDWR | O_CLOEXEC), null = HIGH(o);
     if (o >= 0) close(o);
