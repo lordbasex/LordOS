@@ -939,8 +939,8 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Release 0.8.9.3 (released 2026-11-20)
 
-- [x] **The per-app firewall applies its rules again** (`CHANGELOG.md`): the 0.8.8.6 to 0.8.9.2 packages were built
-  without clang, so `lord-netperm` had no BPF programs. Found while testing Flatpak on VM 127; `tools/iso/mkdeb.sh` now
+- [x] **The per-app firewall applies its rules again** (`CHANGELOG.md`): the 0.8.8.6 to 0.8.9.2 PC (amd64) packages were
+  built without clang, so `lord-netperm` had no BPF programs. Found while testing Flatpak on VM 127; `tools/iso/mkdeb.sh` now
   refuses such a build.
 
 ## Release 0.8.9.2 (released 2026-11-19; the clipboard items move to the next update)
