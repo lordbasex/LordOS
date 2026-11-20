@@ -39,6 +39,8 @@ const dl = [{ name: 'Win11_26H2_Spanish_x64.iso', size: 7.5e9, mtime: 10 }, { na
 eq('downloads: the newest x64 one', newestDownload(dl, 'amd64')?.name, 'Win11_26H2_English_x64v2.iso');
 eq('downloads: arm64', newestDownload(dl, 'arm64')?.name, 'Win11_26H2_English_Arm64.iso');
 eq('downloads: none', newestDownload([], 'amd64'), null);
+eq('downloads: the newer name', newestDownload([{ name: 'Windows11_Client_x64_es-mx_26300_9457.iso', size: 8.7e9, mtime: 70 }, ...dl], 'amd64')?.name,
+  'Windows11_Client_x64_es-mx_26300_9457.iso');
 
 // time zones (CLDR) and keyboards
 eq('zones', [windowsZone(ZONES, 'America/Argentina/Buenos_Aires'), windowsZone(ZONES, 'America/Sao_Paulo'), windowsZone(ZONES, 'Europe/Madrid'),

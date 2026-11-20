@@ -819,6 +819,7 @@ static struct {
     long long win_key_at;                /* an unattended Windows install's first seconds: Enter for "Press any key to boot
                                           * from CD or DVD" (Microsoft's DVD asks; a reset inside QEMU doesn't come here) */
     int win_keys;        /* the first start of an unattended install (disks/unattended), and its end */
+    int win_armed;       /* the Enters above were set for this start (the first time it runs, paused start or not) */
     char un_cmd[640];
     long long shut_deadline, kill_deadline;
     Pending pq[MAX_PENDING];
@@ -923,6 +924,15 @@ static void set_state(int st, int why, int code, const char *detail) {
     memcpy(r.detail, S.detail, sizeof r.detail);
     runinfo_write(S.dir, &r);
     if (changed || why == VR_GUEST_RESET) vlog("state %s (%s%s%s)", STATE_NAME[st], REASON_NAME[why], S.detail[0] ? ": " : "", S.detail);
+    /* Windows' DVD asks "Press any key to boot from CD or DVD" for 5 seconds: Enter a few times from when the machine
+     * first runs, unattended or guided. Machines starts it paused until its window is there (--paused), so this waits
+     * for that rather than for QEMU's own start (it went to the firmware's menu otherwise, 2026-11-20) */
+    if (st == VS_RUNNING && S.win_seed && !S.win_armed) {
+        S.win_armed = 1;
+        S.win_key_at = now_ms() + 1500;
+        S.win_keys = 16;
+        vlog("unattended: Enter for Windows' \"Press any key to boot from CD or DVD\" in the next seconds");
+    }
     VmMsg m = state_msg();
     for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
     if (st == VS_RUNNING || st == VS_PAUSED) notify_parent(1);
@@ -1612,6 +1622,7 @@ static int start_machine(void) {
     S.unattended = 0;
     S.install_done = 0;
     S.win_seed = 0;
+    S.win_armed = 0;
     {
         char cp[PATH_MAX + 64];
         snprintf(cp, sizeof cp, "%s/unattended/cmdline", S.disks);
@@ -1779,7 +1790,6 @@ static int start_machine(void) {
     }                   /* the state goes in first (P_VERSION → begin_resume), then cont */
     if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "started paused");
     else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
-    if (S.win_seed == 1 && !S.paused_start) { S.win_key_at = now_ms() + 1500; S.win_keys = 16; }
     return 0;
 }
 

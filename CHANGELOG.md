@@ -66,6 +66,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **An unattended install from the New Machine assistant no longer stops in the firmware's menu**
+  (`server/src/vm/lordvm.c`): the Enters that answer the install disc's "Press any key to boot from CD or DVD" were only
+  sent when lord-vm started the machine running, and Machines starts it paused until its window is there, so the
+  prompt timed out. They're now sent from when the machine first runs, for a guided install too. Machines also finds
+  the ISO in Downloads under its newer file name (`Windows11_Client_x64_<language>_<build>.iso`).
 - **Machines on compatible devices start in their window** (`server/src/vm/lordvm.c`; the device sets of imported machines
   and of the new card in `docs/VIRTUALIZATION.md` 4.3): the window's sound output wasn't declared for them, and QEMU refused the sound card with "audiodev 'snd0' not found".
 - **The desktop no longer stalls while the Store installs a Flathub app** (`sdk/flathub.js`, `apps/store/flathubpages.js`):

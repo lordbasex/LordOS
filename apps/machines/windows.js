@@ -45,9 +45,10 @@ export function evalFor(entry, uiLang) {
 }
 
 // the newest Windows ISO in a folder listing ([{ name, size, mtime }]), to offer the one just downloaded from
-// Microsoft's page: its files are named Win11_<version>_<language>_x64[v<n>].iso (Arm64 for arm64)
+// Microsoft's page: its files are named Win11_<version>_<language>_x64[v<n>].iso (Arm64 for arm64), or, more recently,
+// Windows11_Client_x64_<language>_<build>.iso
 export function newestDownload(entries, arch) {
-  const re = arch === 'arm64' ? /^Win11_.*_Arm64.*\.iso$/i : /^Win11_.*_x64.*\.iso$/i;
+  const re = arch === 'arm64' ? /^Win(dows)?11_.*_Arm64.*\.iso$/i : /^Win(dows)?11_.*_x64.*\.iso$/i;
   const list = (entries || []).filter((e) => e && !e.dir && re.test(e.name) && e.size > 1e9);
   list.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
   return list[0] || null;
