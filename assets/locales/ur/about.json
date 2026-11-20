@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} نوڈ",
     "other": "{ms} ms · {count} نوڈز"
   },
+  "pauses": "50 ms سے لمبے وقفے",
+  "pausesValue": "{count} (سب سے لمبا: {ms} ms)",
   "server": "ڈسپلے سرور",
   "systemApp": "سسٹم ایپ",
   "systemReport": "سسٹم رپورٹ…",

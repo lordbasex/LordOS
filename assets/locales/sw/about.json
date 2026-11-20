@@ -34,6 +34,8 @@
     "one": "{ms} ms · nodi {count}",
     "other": "{ms} ms · nodi {count}"
   },
+  "pauses": "Visimamisho zaidi ya ms 50",
+  "pausesValue": "{count} (kirefu zaidi: ms {ms})",
   "server": "Seva ya skrini",
   "systemApp": "Programu ya mfumo",
   "systemReport": "Ripoti ya Mfumo…",

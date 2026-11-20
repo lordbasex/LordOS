@@ -32,6 +32,8 @@
   "renderValue": {
     "other": "{ms}ms · 노드 {count}개"
   },
+  "pauses": "50ms 넘는 멈춤",
+  "pausesValue": "{count}회 (최장 {ms}ms)",
   "server": "디스플레이 서버",
   "systemApp": "시스템 앱",
   "systemReport": "시스템 리포트…",

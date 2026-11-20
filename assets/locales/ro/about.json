@@ -36,6 +36,8 @@
     "few": "{ms} ms · {count} noduri",
     "other": "{ms} ms · {count} de noduri"
   },
+  "pauses": "Pauze de peste 50 ms",
+  "pausesValue": "{count} (cea mai lungă: {ms} ms)",
   "server": "Server de afișare",
   "systemApp": "Aplicație de sistem",
   "systemReport": "Raport de sistem…",

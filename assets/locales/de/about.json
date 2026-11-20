@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} Knoten",
     "other": "{ms} ms · {count} Knoten"
   },
+  "pauses": "Pausen über 50 ms",
+  "pausesValue": "{count} (längste: {ms} ms)",
   "server": "Anzeigeserver",
   "systemApp": "System-App",
   "systemReport": "Systembericht …",

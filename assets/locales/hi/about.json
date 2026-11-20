@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} नोड",
     "other": "{ms} ms · {count} नोड"
   },
+  "pauses": "50 ms से लंबे ठहराव",
+  "pausesValue": "{count} (सबसे लंबा: {ms} ms)",
   "server": "डिस्प्ले सर्वर",
   "systemApp": "सिस्टम ऐप",
   "systemReport": "सिस्टम रिपोर्ट…",

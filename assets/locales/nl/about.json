@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} knoop",
     "other": "{ms} ms · {count} knopen"
   },
+  "pauses": "Pauzes langer dan 50 ms",
+  "pausesValue": "{count} (langste: {ms} ms)",
   "server": "Beeldserver",
   "systemApp": "Systeemapp",
   "systemReport": "Systeemrapport…",

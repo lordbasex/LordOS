@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} node",
     "other": "{ms} ms · {count} nodes"
   },
+  "pauses": "Pauses over 50 ms",
+  "pausesValue": "{count} (longest: {ms} ms)",
   "server": "Display server",
   "systemApp": "System app",
   "systemReport": "System Report…",

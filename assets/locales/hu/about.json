@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} csomópont",
     "other": "{ms} ms · {count} csomópont"
   },
+  "pauses": "50 ms-nál hosszabb szünetek",
+  "pausesValue": "{count} (leghosszabb: {ms} ms)",
   "server": "Megjelenítőszerver",
   "systemApp": "Rendszeralkalmazás",
   "systemReport": "Rendszerjelentés…",

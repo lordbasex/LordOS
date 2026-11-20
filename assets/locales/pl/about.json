@@ -36,6 +36,8 @@
     "few": "{ms} ms · {count} węzły",
     "many": "{ms} ms · {count} węzłów"
   },
+  "pauses": "Przerwy dłuższe niż 50 ms",
+  "pausesValue": "{count} (najdłuższa: {ms} ms)",
   "server": "Serwer wyświetlania",
   "systemApp": "Aplikacja systemowa",
   "systemReport": "Raport systemowy…",

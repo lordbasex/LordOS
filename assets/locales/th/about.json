@@ -32,6 +32,8 @@
   "renderValue": {
     "other": "{ms} มิลลิวินาที · {count} โหนด"
   },
+  "pauses": "การหยุดชะงักเกิน 50 มิลลิวินาที",
+  "pausesValue": "{count} (นานสุด: {ms} มิลลิวินาที)",
   "server": "เซิร์ฟเวอร์การแสดงผล",
   "systemApp": "แอประบบ",
   "systemReport": "รายงานระบบ…",

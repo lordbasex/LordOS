@@ -32,6 +32,8 @@
   "renderValue": {
     "other": "{ms} ms · {count} nod"
   },
+  "pauses": "Jeda melebihi 50 ms",
+  "pausesValue": "{count} (paling lama: {ms} ms)",
   "server": "Pelayan paparan",
   "systemApp": "Apl sistem",
   "systemReport": "Laporan Sistem…",

@@ -32,6 +32,8 @@
   "renderValue": {
     "other": "{ms} 毫秒 · {count} 個節點"
   },
+  "pauses": "超過 50 毫秒的停頓",
+  "pausesValue": "{count} 次(最長 {ms} 毫秒)",
   "server": "顯示伺服器",
   "systemApp": "系統 App",
   "systemReport": "系統報告…",

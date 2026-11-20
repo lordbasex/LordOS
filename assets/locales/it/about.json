@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} nodo",
     "other": "{ms} ms · {count} nodi"
   },
+  "pauses": "Pause oltre 50 ms",
+  "pausesValue": "{count} (la più lunga: {ms} ms)",
   "server": "Server grafico",
   "systemApp": "App di sistema",
   "systemReport": "Resoconto di sistema…",

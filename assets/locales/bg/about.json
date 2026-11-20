@@ -34,6 +34,8 @@
     "one": "{ms} мс · {count} възел",
     "other": "{ms} мс · {count} възела"
   },
+  "pauses": "Паузи над 50 мс",
+  "pausesValue": "{count} (най-дългата: {ms} мс)",
   "server": "Сървър на дисплея",
   "systemApp": "Системно приложение",
   "systemReport": "Системен отчет…",

@@ -36,6 +36,8 @@
     "few": "{ms} ms · {count} mazgai",
     "other": "{ms} ms · {count} mazgų"
   },
+  "pauses": "Pauzės ilgesnės nei 50 ms",
+  "pausesValue": "{count} (ilgiausia: {ms} ms)",
   "server": "Ekrano serveris",
   "systemApp": "Sistemos programa",
   "systemReport": "Sistemos ataskaita…",
