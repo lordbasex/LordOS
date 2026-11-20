@@ -15,6 +15,7 @@
  *   lord.portal.set({ dark, accent: '#rrggbb', accentName, buttons })
  *       what GTK, GNOME and Qt apps read through org.freedesktop.portal.Settings (portal.c). */
 #include "js_wm.h"
+#include "js.h"
 #include "grab.h"
 #include "portal.h"
 #include "webask.h"
@@ -164,6 +165,7 @@ void js_wm_end(int node, int edges, float dx, float dy, float dw, float dh) {
         JS_SetPropertyStr(c, d, "dw", JS_NewFloat64(c, dw));
         JS_SetPropertyStr(c, d, "dh", JS_NewFloat64(c, dh));
         JSValue args[2] = { JS_NewString(c, "end"), d };
+        js_stall_begin();
         JSValue r = JS_Call(c, f, g, 2, args);
         if (JS_IsException(r)) {
             JSValue e = JS_GetException(c);
@@ -177,6 +179,7 @@ void js_wm_end(int node, int edges, float dx, float dy, float dw, float dh) {
         JS_FreeValue(c, args[1]);
         JSContext *jc;
         while (JS_ExecutePendingJob(JS_GetRuntime(c), &jc) > 0) {}
+        js_stall_end("__lordWm end");
     }
     JS_FreeValue(c, f);
     JS_FreeValue(c, g);

@@ -4,7 +4,7 @@ import Reconciler from 'react-reconciler';
 import { ConcurrentRoot, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants';
 import { createContext, useEffect, useState } from 'react';
 import { flatten, normalize, applyStyle } from './style.js';
-import { register, unregister, currentPriority, addListener, setKeyFilter, setKeyFocus } from './events.js';
+import { register, unregister, ops, wrapTick, currentPriority, addListener, setKeyFilter, setKeyFocus } from './events.js';
 
 export { addListener, setKeyFilter, setKeyFocus };
 export { setLayout, getLayout, layouts, modifiers, capsLock } from './keymap.js';
@@ -166,6 +166,8 @@ const host = {
   createInstance(type, props) {
     const inst = { id: lord.createNode(type), type, props, style: {}, parent: null, ...treeLinks() };
     register(inst);
+    ops.created++;
+    ops.last = inst;
     applyProps(inst, {}, props);
     return inst;
   },
@@ -187,8 +189,8 @@ const host = {
 
   finalizeInitialChildren: () => false,
   // React 19: no prepareUpdate; commitUpdate receives the type and the old and new props
-  commitUpdate(inst, _type, prev, next) { applyProps(inst, prev, next); inst.props = next; },
-  commitTextUpdate(inst, _old, text) { lord.setText(inst.id, text); },
+  commitUpdate(inst, _type, prev, next) { applyProps(inst, prev, next); inst.props = next; ops.updated++; ops.last = inst; },
+  commitTextUpdate(inst, _old, text) { lord.setText(inst.id, text); ops.updated++; },
   resetTextContent() {},
   shouldSetTextContent: () => false,
   hideInstance(inst) { inst.hidden = true; lord.setStyle(inst.id, 'display', 'none'); },
@@ -316,6 +318,7 @@ export function createPortal(children, container, key = null) {
 }
 
 export function render(element) {
+  wrapTick();
   const rootId = lord.createNode('view');
   rootNode = rootId;
   lord.setStyle(rootId, 'width', screen.width);

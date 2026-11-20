@@ -75,7 +75,7 @@ export function WindowShell({ win, style, children, onMouseDown, resizable = tru
   return (
     // the press focuses the window in the capture phase: a sheet, a dialog or a control inside that stops the press still
     // brings its window forward, so the keyboard follows (a Linux window in front kept it while a Settings sheet was typed into)
-    <View ref={wm.frameRef(win.id, m)} onMouseDownCapture={tv ? undefined : onMouseDown}
+    <View ref={wm.frameRef(win.id, m)} lordWin={win.id} onMouseDownCapture={tv ? undefined : onMouseDown}
       style={{ position: 'absolute', left: geo.x - m, top: geo.y - m, width: geo.w + 2 * m, height: geo.h + 2 * m, display: here && (!win.minimized || tv || leaving) ? 'flex' : 'none', ...(tv ? { pointerEvents: 'box-none' } : null) }}>
       <View ref={inner.current} style={{ position: 'absolute', left: m, top: m, right: m, bottom: m, ...style, ...place }}>
         {tv ? h(OverviewPlaceholder, { win, scale: tv.scale }) : null}
