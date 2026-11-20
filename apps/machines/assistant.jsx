@@ -302,8 +302,8 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       <View key={i} style={{ flexDirection: 'row', gap: 12 }}>
         {row.map((s) => {
           const mine = (downloading && dl?.id === s.id) || (windows && s.kind === 'windows');
-          const exact = mine && dl.image?.size > 0;
-          const title = [s.name, mine && dl.phase === 'ready' ? ver : s.release].filter(Boolean).join(' ');
+          const exact = mine && dl?.image?.size > 0;
+          const title = [s.name, mine && dl?.phase === 'ready' ? ver : s.release].filter(Boolean).join(' ');
           const sz = bytes(exact ? dl.image.size : s.approxMb * 1048576);
           return <Tile key={s.id} height={118} selected={mine} mark={<OsMark id={s.id} size={40} />} title={title}
             hint={tr(exact ? 'machines.dl.size' : 'machines.dl.sizeAbout', { arch, size: sz })} onClick={() => pickDownload(s)} />;
