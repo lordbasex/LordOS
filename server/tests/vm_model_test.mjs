@@ -324,10 +324,33 @@ eq('drop: no file writes', M.dropBlocker({ state: 'running', agent: ag(4) }, tru
 eq('drop: no exec', M.dropBlocker({ state: 'running', agent: ag(8) }, true), 'agentCant');
 eq('drop: ok', M.dropBlocker({ state: 'running', agent: ag(1 | 4 | 8) }, true), null);
 eq('copy line none', M.copyLine([{ id: 1, state: 'done', pct: 100, size: 5 }]), null);
-eq('copy line by size', M.copyLine([{ id: 7, name: 'b', state: 'copying', pct: 0, size: 300 }, { id: 3, name: 'a', state: 'copying', pct: 50, size: 100 }]), { name: 'a', pct: 12, waiting: 1 });
-eq('copy line empty files', M.copyLine([{ id: 1, name: 'z', state: 'copying', pct: 100, size: 0 }]), { name: 'z', pct: 99, waiting: 0 });
+eq('copy line by size', M.copyLine([{ id: 7, name: 'b', state: 'copying', pct: 0, size: 300 }, { id: 3, name: 'a', state: 'copying', pct: 50, size: 100 }]), { name: 'a', pct: 12, waiting: 1, fast: false });
+eq('copy line empty files', M.copyLine([{ id: 1, name: 'z', state: 'copying', pct: 100, size: 0 }]), { name: 'z', pct: 99, waiting: 0, fast: false });
 eq('guest folder', [M.guestFolder('/home/ana/Descargas/x (2).txt'), M.guestFolder('C:\\Users\\Ana\\Downloads\\x.txt'), M.guestFolder('x.txt'), M.guestFolder('/x')], ['/home/ana/Descargas', 'C:\\Users\\Ana\\Downloads', '', '/']);
 eq('follow stuck', [M.followStuck([1920, 1080], [1784, 830], 0, 5000), M.followStuck([1920, 1080], [1784, 830], 0, 3000), M.followStuck([1920, 1080], [1918, 1080], 0, 9000), M.followStuck(null, [1, 1], 0, 9000)], [true, false, false, false]);
+eq('copy line through the transfer folder', M.copyLine([{ id: 2, name: 'iso', state: 'copying', pct: 40, size: 10, via: 'transfer' }]).fast, true);
+// the transfer folder (6.7.1): what the window says of it, how a drop goes, WinFsp in the catalog
+const T = 512, S = 1024;
+const runT = (caps, extra = {}) => ({ state: 'running', agent: { state: 'connected', caps, ...extra } });
+eq('transfer: off', M.transferState({ transfer: false }, runT(T)), 'off');
+eq('transfer: no row', M.transferState(null, runT(T)), 'off');
+eq('transfer: stopped', M.transferState({ transfer: true }, { state: 'stopped' }), 'waiting');
+eq('transfer: agent waiting', M.transferState({ transfer: true }, { state: 'running', agent: { state: 'waiting', caps: 0 } }), 'waiting');
+eq('transfer: mounted', M.transferState({ transfer: true }, runT(T | 12)), 'ready');
+eq('transfer: paused, mounted', M.transferState({ transfer: true }, { state: 'paused', agent: { state: 'connected', caps: T } }), 'ready');
+eq('transfer: needs WinFsp', M.transferState({ transfer: true }, runT(S | 12)), 'setup');
+eq('transfer: setting up', M.transferState({ transfer: true }, runT(S, { transfer: 1 })), 'settingUp');
+eq('transfer: not yet', M.transferState({ transfer: true }, runT(12)), 'waiting');
+eq('drop way', [M.dropWay({ transfer: true }, runT(T)), M.dropWay({ transfer: true }, runT(S)), M.dropWay({ transfer: false }, runT(T)), M.dropWay({ transfer: true }, runT(0))], ['fast', 'agent', 'off', 'agent']);
+eq('agent lines: the transfer folder counts as folders', agentLines({ state: 'connected', caps: T }, { transfer: true }).find((l) => l[0] === 'folders')[1], 'works');
+eq('agent lines: not mounted', agentLines({ state: 'connected', caps: 0 }, { transfer: true }).find((l) => l[0] === 'folders')[1], 'none');
+eq('auto setup', [M.autoTransferSetup({ transferSetup: true }, 'setup'), M.autoTransferSetup({ transferSetup: false }, 'setup'), M.autoTransferSetup({ transferSetup: true }, 'ready'), M.autoTransferSetup(null, 'setup')], [true, false, false, false]);
+{
+  const cat = JSON.parse((await import('node:fs')).readFileSync(path.join(here, '../../assets/machines/systems.json'), 'utf8'));
+  const w = M.winfspFor(cat, 'amd64');
+  eq('winfsp pinned', w && { id: w.id, name: w.name, size: w.size, sha: w.sha.length }, { id: 'winfsp', name: 'winfsp-2.1.25156.msi', size: 2191360, sha: 64 });
+  eq('winfsp arm64: none yet', M.winfspFor(cat, 'arm64'), null);
+}
 
 // ---- apps mode (7.2) ----
 eq('apps blocker', [M.appsBlocker(null, { agent: true }), M.appsBlocker({ state: 'connected', caps: 32 }, { agent: false }), M.appsBlocker({ state: 'connected', caps: 32 }, { agent: true }),

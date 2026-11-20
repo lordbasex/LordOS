@@ -366,6 +366,10 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
                     JS_SetPropertyUint32(c, sh, (uint32_t)i, e);
                 }
                 JS_SetPropertyStr(c, o, "shares", sh);
+                /* the transfer folder (6.7.1): on, and where it is (made at the machine's start, or by transferFolder) */
+                char xp[PATH_MAX];
+                JS_SetPropertyStr(c, o, "transfer", JS_NewBool(c, m.transfer));
+                set_str(c, o, "transferPath", vm_transfer_path(dir, xp, sizeof xp) ? "" : xp);
             }
             {
                 char ip[PATH_MAX + 320];
@@ -782,6 +786,8 @@ static int machine_shares_ok(const char *dir) {
     if (vm_machine_load(dir, &m, err, sizeof err) != VM_OK) return 1;   /* a bad machine.json is lord-vm's to report */
     for (int i = 0; i < m.n_shares; i++)
         if (m.share_rw[i] && !share_writable_ok(m.share_path[i])) { snprintf(refusal, sizeof refusal, "vm.shareProtected"); return 0; }
+    char xp[PATH_MAX];
+    if (m.transfer && !vm_transfer_path(dir, xp, sizeof xp) && !share_writable_ok(xp)) { snprintf(refusal, sizeof refusal, "vm.shareProtected"); return 0; }
     return 1;
 }
 static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -896,6 +902,10 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         if (known) { snprintf(nicm, sizeof nicm, "%s", ns); args[n++] = "--nic-model"; args[n++] = nicm; } else ok = 0;
         if (ns) JS_FreeCString(c, ns);
     }
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "transfer");
+    if (JS_IsBool(v)) { args[n++] = "--transfer"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "shares");
     if (JS_IsArray(c, v)) {
@@ -1126,6 +1136,9 @@ typedef struct {
     int ag_state, ag_caps;              /* the guest agent (VM_AGENT_STATE), and what it said about itself */
     char ag_text[VM_TEXT_MAX];
     uint32_t ag_seq;                    /* an Install Agent request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
+    uint32_t xf_seq;                    /* a Set Up the Transfer Folder request (VAG_TRANSFER), the same way */
+    int xf_result;
+    char xf_msg[VM_TEXT_MAX];
     int ag_result;
     char ag_msg[VM_TEXT_MAX];
     char *clip_in;                      /* the guest's clipboard text (VM_CLIP_DATA), and a counter of them */
@@ -1163,7 +1176,7 @@ typedef struct {
     char name[VM_NAME_MAX + 1];
     /* files dropped on the window, on their way into the guest (VM_FILE): 1 copying, 2 done, 3 failed; msg is the
      * guest's path (done) or why not, for the app to show; files() hands finished ones over once */
-    struct { uint32_t seq; int state, pct; long long size; char name[VM_TEXT_MAX], msg[VM_TEXT_MAX]; } fx[16];
+    struct { uint32_t seq; int state, pct, via; long long size; char name[VM_TEXT_MAX], msg[VM_TEXT_MAX]; } fx[16];
     int fx_changes;
     /* apps mode (7.2): the guest's windows, their icons and its apps, as lord-vm passed them on (VM_WINDATA, parsed
      * again here); seqs count changes for the app; apps_mode: the picture may have no node that shows all of it */
@@ -1718,11 +1731,12 @@ static void from_vm(Sess *s) {
             snprintf(s->notice_text, sizeof s->notice_text, "%s", m.text);
             break;
         case VM_FILE_PROGRESS:
-            for (int i = 0; i < 16; i++) if (s->fx[i].state == 1 && s->fx[i].seq == m.seq) { s->fx[i].pct = m.a; s->fx_changes++; }
+            for (int i = 0; i < 16; i++) if (s->fx[i].state == 1 && s->fx[i].seq == m.seq) { s->fx[i].pct = m.a; s->fx[i].via = m.b == 1; s->fx_changes++; }
             break;
         case VM_REPLY:
             if (fx_reply(s, &m)) break;
             if (s->ag_seq && m.seq == s->ag_seq) { s->ag_result = m.a == VME_OK ? 2 : 3; snprintf(s->ag_msg, sizeof s->ag_msg, "%s", m.text); s->ag_seq = 0; }
+            if (s->xf_seq && m.seq == s->xf_seq) { s->xf_result = m.a == VME_OK ? 2 : 3; snprintf(s->xf_msg, sizeof s->xf_msg, "%s", m.text); s->xf_seq = 0; }
             if (s->cd_seq && m.seq == s->cd_seq) { s->cd_state = m.a == VME_OK ? 2 : 3; snprintf(s->cd_msg, sizeof s->cd_msg, "%s", m.text); s->cd_seq = 0; }
             if (m.a != VME_OK) {
                 snprintf(s->last_error, sizeof s->last_error, "%s", m.text);
@@ -1945,6 +1959,8 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         set_str(c, ag, "system", tab ? tab + 1 : "");
         set_int(c, ag, "install", s->ag_result);
         set_str(c, ag, "message", s->ag_msg);
+        set_int(c, ag, "transfer", s->xf_result);
+        set_str(c, ag, "transferMessage", s->xf_msg);
         JS_SetPropertyStr(c, o, "agent", ag);
     }
     set_int(c, o, "clipIn", s->clip_seq);
@@ -2017,7 +2033,7 @@ static JSValue f_send_file(JSContext *c, JSValueConst t, int argc, JSValueConst 
             VmMsg m = vm_msg(VM_FILE, ++s->seq, 0, 0, 0, 0, name);
             if (!vm_send(s->vm, &m, fd)) {
                 q = m.seq;
-                s->fx[slot].seq = q; s->fx[slot].state = 1; s->fx[slot].pct = 0; s->fx[slot].size = (long long)st.st_size;
+                s->fx[slot].seq = q; s->fx[slot].state = 1; s->fx[slot].pct = 0; s->fx[slot].via = 0; s->fx[slot].size = (long long)st.st_size;
                 snprintf(s->fx[slot].name, sizeof s->fx[slot].name, "%s", name);
                 s->fx[slot].msg[0] = 0;
                 s->fx_changes++;
@@ -2045,10 +2061,38 @@ static JSValue f_files(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         set_int(c, o, "pct", s->fx[i].pct);
         set_str(c, o, "state", s->fx[i].state == 1 ? "copying" : s->fx[i].state == 2 ? "done" : "failed");
         set_str(c, o, "message", s->fx[i].msg);
+        set_str(c, o, "via", s->fx[i].via ? "transfer" : "agent");
         JS_SetPropertyUint32(c, a, k++, o);
         if (s->fx[i].state != 1) s->fx[i].state = 0;
     }
     return a;
+}
+
+/* transferFolder(dir) → the machine's transfer folder (6.7.1), made and claimed for it as lord-vm does at its start
+ * (vm_transfer_claim: a folder of that name that's another machine's moves aside), or null; for Open Transfer Folder
+ * before the first start. transferAside(dir) → bool: before the machine goes to the Trash, its own transfer folder moves
+ * aside to "<name> (old YYYY-MM-DD)" (kept, never deleted), so a new machine of that name doesn't get its files */
+static int machine_id_of(const char *dir, char id[37]) {
+    VmMachine m;
+    char err[256];
+    if (vm_machine_load(dir, &m, err, sizeof err) != VM_OK) return -1;
+    memcpy(id, m.id, 37);
+    return 0;
+}
+static JSValue f_transfer_folder(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX], xp[PATH_MAX], id[37], moved[NAME_MAX + 1];
+    if (argc < 1 || machine_dir(c, argv[0], dir, sizeof dir) || machine_id_of(dir, id)) return JS_NULL;
+    if (vm_transfer_claim(dir, id, xp, sizeof xp, moved, sizeof moved)) return JS_NULL;
+    struct stat st;
+    if (lstat(xp, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) return JS_NULL;
+    return JS_NewString(c, xp);
+}
+static JSValue f_transfer_aside(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX], id[37], moved[NAME_MAX + 1];
+    if (argc < 1 || machine_dir(c, argv[0], dir, sizeof dir) || machine_id_of(dir, id)) return JS_FALSE;
+    return JS_NewBool(c, vm_transfer_aside(dir, id, moved, sizeof moved) >= 0);
 }
 
 /* cdrom(id, path | null) → bool: a disc into the running machine's drive (the file is opened here, for the person, and
@@ -2343,13 +2387,55 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
 
 /* agent(session, 'install'|'timesync'|'shutdown') → bool: a guest agent request (poll's agent.install says how
  * Install went) */
+/* WinFsp's installer for agent(id, 'transfer', path): only a file the admin helper keeps in the machines' image store,
+ * root's, named by its SHA-256 (images/<sha256>.iso), whose record there says it's the catalog's "winfsp" entry. The
+ * descriptor, and the hash as text, go to lord-vm, which hashes the file again; the guest checks its signature too */
+#define VM_IMAGE_STORE "/var/lib/lordos/machines/images/"
+static int winfsp_file(JSContext *c, JSValueConst v, char sha[65]) {
+    const char *p = JS_IsString(v) ? JS_ToCString(c, v) : NULL;
+    size_t sl = strlen(VM_IMAGE_STORE);
+    int ok = p && !strncmp(p, VM_IMAGE_STORE, sl) && strlen(p) == sl + 68 && !strcmp(p + sl + 64, ".iso") && strspn(p + sl, "0123456789abcdef") == 64;
+    if (ok) { memcpy(sha, p + sl, 64); sha[64] = 0; }
+    if (p) JS_FreeCString(c, p);
+    if (!ok) return -1;
+    char info[sizeof VM_IMAGE_STORE + 80], buf[512];
+    snprintf(info, sizeof info, VM_IMAGE_STORE "%s.json", sha);
+    int fd = open(info, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    struct stat st;
+    ssize_t n = fd >= 0 && !fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    JDoc d;
+    if (n <= 0 || json_parse(buf, (size_t)n, &d, NULL, 0)) return -1;
+    const char *id = json_str(d.root, "id");
+    ok = id && !strcmp(id, "winfsp");
+    json_free(&d);
+    if (!ok) return -1;
+    snprintf(info, sizeof info, VM_IMAGE_STORE "%s.iso", sha);
+    fd = open(info, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NOCTTY);
+    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_uid != 0 || (st.st_mode & 022)) { if (fd >= 0) close(fd); return -1; }
+    return fd;
+}
+
 static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
     const char *w = argc >= 2 ? JS_ToCString(c, argv[1]) : NULL;
-    int a = !w ? 0 : !strcmp(w, "install") ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN : 0;
+    int a = !w ? 0 : !strcmp(w, "install") ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN :
+            !strcmp(w, "transfer") ? VAG_TRANSFER : 0;
     if (w) JS_FreeCString(c, w);
     if (!s || !a || s->vm < 0) return JS_FALSE;
+    if (a == VAG_TRANSFER) {
+        /* the transfer folder (6.7.1): looked at again in the guest, or (a path) WinFsp installed in a Windows guest */
+        char sha[65] = "";
+        int fd = -1;
+        if (argc >= 3 && !JS_IsUndefined(argv[2]) && !JS_IsNull(argv[2]) && (fd = winfsp_file(c, argv[2], sha)) < 0) return JS_FALSE;
+        VmMsg m = vm_msg(VM_AGENT, ++s->seq, VAG_TRANSFER, 0, 0, 0, sha);
+        int bad = vm_send(s->vm, &m, fd);
+        if (fd >= 0) close(fd);
+        if (bad) return JS_FALSE;
+        s->xf_seq = m.seq; s->xf_result = 1; s->xf_msg[0] = 0;
+        return JS_TRUE;
+    }
     int q = ask(s, VM_AGENT, a);
     if (q < 0) return JS_FALSE;
     if (a == VAG_INSTALL) { s->ag_seq = (uint32_t)q; s->ag_result = 1; s->ag_msg[0] = 0; }
@@ -3278,7 +3364,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
-    JS_CFUNC_DEF("agent", 2, f_agent), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
+    JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
     JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("sendFile", 2, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),

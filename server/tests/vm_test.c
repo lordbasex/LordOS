@@ -65,7 +65,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "7", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "8", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -289,6 +289,104 @@ static void test_schema(void) {
         vm_machine_defaults(&m, &hh, VM_ARCH_ARM64);
         CHECK(m.sound == 1 && m.volume == 100 && m.microphone == 0);
     }
+    /* schema 7 (the transfer folder, 6.7.1): true or false; a file without it reads as off (a machine made before keeps
+     * its hardware), new machines have it; never below schema 7; the tag LordOS is the transfer folder's then */
+    {
+        struct { const char *add; int schema, want, on; } s7[] = {
+            { "\"transfer\":true", 7, VM_OK, 1 }, { "\"transfer\":false", 7, VM_OK, 0 },
+            { "\"transfer\":1", 7, VM_E_FIELD, 0 }, { "\"transfer\":\"on\"", 7, VM_E_FIELD, 0 },
+            { "\"transfer\":true", 6, VM_E_FIELD, 0 }, { "\"transfer\":false", 6, VM_OK, 0 },
+            { "\"transfer\":true,\"shares\":[{\"tag\":\"LordOS\",\"path\":\"/home/u/x\",\"writable\":true}]", 7, VM_E_RANGE, 0 },
+            { "\"transfer\":false,\"shares\":[{\"tag\":\"LordOS\",\"path\":\"/home/u/x\",\"writable\":true}]", 7, VM_OK, 0 },
+            { "\"transfer\":true,\"shares\":[{\"tag\":\"Work\",\"path\":\"/home/u/x\",\"writable\":true}]", 7, VM_OK, 1 },
+        };
+        for (size_t i = 0; i < sizeof s7 / sizeof s7[0]; i++) {
+            char t[4096];
+            const char *at = strstr(GOOD, "\"schema\":1");
+            snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s7[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s7[i].add);
+            int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+            if (r != s7[i].want) fprintf(stderr, "  schema 7 %s (%d): got %d (%s)\n", s7[i].add, s7[i].schema, r, err);
+            CHECK(r == s7[i].want);
+            if (r == VM_OK) {
+                CHECK(m.transfer == s7[i].on);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && strstr(jj, s7[i].on ? "\"transfer\": true" : "\"transfer\": false") && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+        }
+        CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && m.transfer == 0);
+        VmHost hh = { .arch = VM_ARCH_AMD64, .cpus = 4, .ram_mb = 8192, .kvm = 1 };
+        vm_machine_defaults(&m, &hh, VM_ARCH_AMD64);
+        CHECK(m.transfer == 1 && m.schema == VM_SCHEMA && VM_SCHEMA >= 7);
+        /* where it is: <library>/Transfer/<folder name without .lordvm>; nothing for a folder that isn't <name>.lordvm */
+        char xp[PATH_MAX];
+        CHECK(vm_transfer_path("/home/u/Machines/Ubuntu 26.04.lordvm", xp, sizeof xp) == 0 && !strcmp(xp, "/home/u/Machines/Transfer/Ubuntu 26.04"));
+        CHECK(vm_transfer_path("/home/u/Machines/Win.lordvm/", xp, sizeof xp) == 0 && !strcmp(xp, "/home/u/Machines/Transfer/Win"));
+        CHECK(vm_transfer_path("/home/u/Machines/x.img", xp, sizeof xp) < 0);
+        CHECK(vm_transfer_path("/home/u/Machines/.lordvm", xp, sizeof xp) < 0);
+        CHECK(vm_transfer_path("/home/u/Machines/.hidden.lordvm", xp, sizeof xp) < 0);
+        CHECK(vm_transfer_path("x.lordvm", xp, sizeof xp) < 0);
+        CHECK(vm_transfer_path("/a.lordvm", xp, sizeof xp) < 0);
+        CHECK(vm_transfer_path("/home/u/Mach,ines/a.lordvm", xp, sizeof xp) < 0);       /* a path QEMU can't take */
+        CHECK(vm_transfer_path("/home/u/Machines/a.lordvm", xp, 20) < 0);                /* doesn't fit */
+        CHECK(vm_transfer_path(NULL, xp, sizeof xp) < 0);
+        /* a person's share can't be the transfer folder: it's inside the library */
+    }
+    /* the transfer folder is tied to its machine (vm_transfer_claim): an owner record beside it with the machine's id; a
+     * folder of that name that's another machine's, or nobody's and not empty, moves aside, never deleted; the Trash moves
+     * a machine's own folder aside (vm_transfer_aside) */
+    {
+        char lib[] = "/tmp/vm-xfer.XXXXXX";
+        if (mkdtemp(lib)) {
+            const char *A = "0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b", *B = "1f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2c";
+            char dir[PATH_MAX], xp[PATH_MAX], xp2[PATH_MAX], mv[NAME_MAX + 1], p2[PATH_MAX + 64], own[PATH_MAX + 128];
+            snprintf(dir, sizeof dir, "%s/Ubuntu.lordvm", lib);
+            struct stat st;
+            CHECK(vm_transfer_claim(dir, A, xp, sizeof xp, mv, sizeof mv) == 0 && !mv[0] && !lstat(xp, &st) && S_ISDIR(st.st_mode) && (st.st_mode & 0777) == 0777);
+            snprintf(own, sizeof own, "%s/Transfer/.Ubuntu.machine", lib);
+            CHECK(!lstat(own, &st) && S_ISREG(st.st_mode));
+            snprintf(p2, sizeof p2, "%s/Transfer", lib);
+            CHECK(!lstat(p2, &st) && (st.st_mode & 0777) == 0700);
+            snprintf(p2, sizeof p2, "%s/a.txt", xp);
+            FILE *f = fopen(p2, "w"); if (f) { fputs("A's\n", f); fclose(f); }
+            /* the same machine again: the same folder, its files there */
+            CHECK(vm_transfer_claim(dir, A, xp2, sizeof xp2, mv, sizeof mv) == 0 && !mv[0] && !strcmp(xp, xp2) && !access(p2, F_OK));
+            /* another machine of the same name: A's folder moves aside with its files, B gets an empty one */
+            CHECK(vm_transfer_claim(dir, B, xp2, sizeof xp2, mv, sizeof mv) == 0 && !strncmp(mv, "Ubuntu (old ", 12) && access(p2, F_OK));
+            char aside[PATH_MAX + 64];
+            snprintf(aside, sizeof aside, "%s/Transfer/%s/a.txt", lib, mv);
+            CHECK(!access(aside, F_OK));
+            snprintf(aside, sizeof aside, "%s/Transfer/.%s.machine", lib, mv);
+            CHECK(!access(aside, F_OK));                       /* its owner record went with it */
+            /* once more for A: B's (empty) folder moves aside too, under another name */
+            char mv2[NAME_MAX + 1];
+            CHECK(vm_transfer_claim(dir, A, xp2, sizeof xp2, mv2, sizeof mv2) == 0 && mv2[0] && strcmp(mv, mv2));
+            /* a folder nobody claimed: taken when empty, moved aside when not */
+            snprintf(dir, sizeof dir, "%s/Debian.lordvm", lib);
+            snprintf(p2, sizeof p2, "%s/Transfer/Debian", lib); mkdir(p2, 0700);
+            CHECK(vm_transfer_claim(dir, B, xp, sizeof xp, mv, sizeof mv) == 0 && !mv[0]);
+            snprintf(dir, sizeof dir, "%s/Fedora.lordvm", lib);
+            snprintf(p2, sizeof p2, "%s/Transfer/Fedora", lib); mkdir(p2, 0700);
+            snprintf(own, sizeof own, "%s/x", p2); f = fopen(own, "w"); if (f) fclose(f);
+            CHECK(vm_transfer_claim(dir, B, xp, sizeof xp, mv, sizeof mv) == 0 && !strncmp(mv, "Fedora (old ", 12));
+            /* a link where the folder should be: moved aside, never followed */
+            snprintf(dir, sizeof dir, "%s/Arch.lordvm", lib);
+            snprintf(p2, sizeof p2, "%s/Transfer/Arch", lib);
+            CHECK(!symlink("/etc", p2));
+            CHECK(vm_transfer_claim(dir, A, xp, sizeof xp, mv, sizeof mv) == 0 && mv[0] && !lstat(xp, &st) && S_ISDIR(st.st_mode));
+            /* the Trash: only the machine's own folder moves */
+            snprintf(dir, sizeof dir, "%s/Ubuntu.lordvm", lib);
+            CHECK(vm_transfer_aside(dir, B, mv, sizeof mv) == 1);              /* A's now: B's id doesn't move it */
+            CHECK(vm_transfer_aside(dir, A, mv, sizeof mv) == 0 && mv[0]);
+            CHECK(vm_transfer_path(dir, xp, sizeof xp) == 0 && lstat(xp, &st));
+            CHECK(vm_transfer_aside(dir, A, mv, sizeof mv) == 1);              /* nothing left to move */
+            CHECK(vm_transfer_claim(dir, "not-an-id", xp, sizeof xp, mv, sizeof mv) < 0);
+            char cmd[PATH_MAX + 16];
+            snprintf(cmd, sizeof cmd, "rm -rf '%s'", lib);
+            if (system(cmd)) {}
+        }
+    }
     /* schema 6's boot order: a list of 1 to 3 different devices (disk, cd, network), and boot_menu; neither in the file is
      * auto (the system disk, then the CD/DVD), which is how every older file reads and what a new machine writes */
     {
@@ -490,6 +588,15 @@ static void test_messages(void) {
     q = vm_msg(VM_FILE, 6, 0, 0, 0, 0, "a.txt"); CHECK(vm_msg_valid(&q, 1) && !vm_msg_valid(&q, 0));
     q = vm_msg(VM_FILE, 6, 0, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
     q = vm_msg(VM_FILE_PROGRESS, 6, 42, 0, 0, 0, "a.txt"); CHECK(vm_msg_valid(&q, 0) && !vm_msg_valid(&q, 1));
+    q = vm_msg(VM_FILE_PROGRESS, 6, 42, 1, 0, 0, "a.txt"); CHECK(vm_msg_valid(&q, 0));       /* b: through the transfer folder */
+    /* the transfer folder (6.7.1): VAG_TRANSFER is an agent request (WinFsp's hash as text, or none); the agent's state
+     * says whether the guest has it (VAC_TRANSFER) or can once WinFsp is in (VAC_XFER_SETUP) */
+    q = vm_msg(VM_AGENT, 7, VAG_TRANSFER, 0, 0, 0, ""); CHECK(vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT, 7, VAG_TRANSFER + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_FILES | VAC_TRANSFER, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_DISPLAY | (int)LAG_CAP_WINDOWS | VAC_TRANSFER | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, 2048, 0, 0, "1\tx"); CHECK(!vm_msg_valid(&q, 0));
     q.a = 101; CHECK(!vm_msg_valid(&q, 0));
     q.a = -1; CHECK(!vm_msg_valid(&q, 0));
     char longtext[400];

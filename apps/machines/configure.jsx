@@ -138,7 +138,7 @@ export function Configure({ dir, section: section0, onClose }) {
 
   const running = stateView(m.state).active;
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
-    agent: !!m.agent, clipboard: m.clipboard || 'off', shares: m.shares || [],
+    agent: !!m.agent, clipboard: m.clipboard || 'off', shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu, ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
@@ -181,8 +181,8 @@ export function Configure({ dir, section: section0, onClose }) {
     sound: (() => { const x = soundSummary(m); return `${tr(x.key, { volume: x.volume })}, ${tr(x.mic)}`; })(),
     disks: tr('machines.cfg.sum.disks', { n: m.diskGb }) + (m.dataDisks ? ` + ${m.dataDisks}` : '') + (m.devices === 'compat' ? `, ${tr('machines.cfg.devCompatShort')}` : '') + (m.iso ? `, ${tr('machines.isoAttached')}` : ''),
     // "Nothing shared" only when neither the clipboard nor a folder is
-    sharing: m.shares?.length ? [m.clipboard && m.clipboard !== 'off' ? tr(`machines.cfg.clipSum.${m.clipboard}`) : null,
-      m.shares.length === 1 ? tr('machines.cfg.shareSum1') : tr('machines.cfg.shareSum', { n: m.shares.length })].filter(Boolean).join(', ')
+    sharing: m.shares?.length || m.transfer ? [m.transfer ? tr('machines.cfg.transfer') : null, m.clipboard && m.clipboard !== 'off' ? tr(`machines.cfg.clipSum.${m.clipboard}`) : null,
+      m.shares?.length === 1 ? tr('machines.cfg.shareSum1') : m.shares?.length ? tr('machines.cfg.shareSum', { n: m.shares.length }) : null].filter(Boolean).join(', ')
       : tr(`machines.cfg.clipSum.${m.clipboard || 'off'}`),
     agent: m.agent ? (m.agentState === 'connected' ? tr('machines.agent.connected') : tr('machines.cfg.agentOn')) : tr('machines.cfg.agentOffSum'),
     boot: [m.firmware === 'uefi' ? 'UEFI' : 'BIOS', bootSummary(m.bootOrder) ? tr(bootSummary(m.bootOrder)) : null, m.tpm ? tr('machines.cfg.tpm') : null,
@@ -330,6 +330,18 @@ export function Configure({ dir, section: section0, onClose }) {
     </Group>
   </>;
   else if (sec === 'sharing') pane = <>
+    {/* the transfer folder (6.7.1): on for new machines; a device of the machine, so it changes with the machine off */}
+    <Group>
+      <Row label={tr('machines.cfg.transfer')} note={tr('machines.cfg.transferNote') + (m.windowsDevices ? ` ${tr('machines.win.transferNote')}` : '') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><Toggle on={!!cur.transfer} onChange={(x) => set({ transfer: x })} /></Off>
+      </Row>
+      <Row label={tr('machines.cfg.transferWhere')} last>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{m.transferPath || ''}</Text>
+          <Btn label={tr('machines.tb.transferOpen')} disabled={!m.transfer} onClick={() => { const x = lord.vm.transferFolder(dir); if (x) revealPath(x); }} style={{ height: 28 }} />
+        </View>
+      </Row>
+    </Group>
     <Group>
       <Row label={tr('machines.cfg.clipboard')} note={tr('machines.cfg.clipboardNote') + (offNote ? ` ${offNote}` : '')} last>
         <Off off={running}><Segmented small value={cur.clipboard} onChange={(x) => set({ clipboard: x, ...(x !== 'off' ? { agent: true } : {}) })}
@@ -446,7 +458,7 @@ export function Configure({ dir, section: section0, onClose }) {
           setPickShare(false);
           const path = Array.isArray(x) ? x[0] : x;
           if (!path || cur.shares.some((y) => y.path === path)) return;
-          set({ shares: [...cur.shares, { tag: shareTag(path.split('/').pop(), cur.shares.map((y) => y.tag)), path, writable: false }] });
+          set({ shares: [...cur.shares, { tag: shareTag(path.split('/').pop(), [...cur.shares.map((y) => y.tag), 'LordOS']), path, writable: false }] });
         }} /> : null}
       {picking ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPicking(false)}
         onPick={(x) => { setPicking(false); save({ iso: Array.isArray(x) ? x[0] : x }); }} /> : null}

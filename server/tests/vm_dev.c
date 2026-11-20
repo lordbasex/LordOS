@@ -20,6 +20,7 @@
  *   raw-apps 0|1 | raw-winact ID N [X Y W H] | raw-launch TOKEN    apps mode straight to the guest (lord-vm --dev-qmp: lord-vm logs what the
  *                       guest sends: the window list, icons, the program list)
  *   file PATH           copy a file into the guest through its agent (VM_FILE, as a drop on the window does)
+ *   transfer [SHA PATH] the transfer folder (VAG_TRANSFER): looked at again; a Windows guest gets WinFsp's installer
  *   wait-frames N [S]   wait until N more frames arrived (at most S seconds, default 30)
  *   sound play [VOL]    the guest's sound through lord-server's own code (media/maudio.c, a PipeWire stream) at VOL
  *                       percent (default 0: the stream runs and nothing is heard); sound off: no speakers' ring
@@ -313,7 +314,7 @@ static void from_vm(void) {
             vm_state = m.a;
             out("{\"ev\":\"state\",\"state\":\"%s\",\"reason\":%d,\"code\":%d,\"qemu_pid\":%d,\"detail\":\"%s\"}", STATES[m.a], m.b, m.c, m.d, m.text);
             if ((m.a == VS_RUNNING || m.a == VS_PAUSED) && !display_asked && machine_id[0]) { display_asked = 1; ask(VM_DISPLAY, 0, NULL); }
-        } else if (m.type == VM_FILE_PROGRESS) out("{\"ev\":\"file\",\"seq\":%u,\"pct\":%d,\"name\":\"%s\"}", m.seq, m.a, m.text);
+        } else if (m.type == VM_FILE_PROGRESS) out("{\"ev\":\"file\",\"seq\":%u,\"pct\":%d,\"via\":%d,\"name\":\"%s\"}", m.seq, m.a, m.b, m.text);
         else if (m.type == VM_AGENT_STATE) out("{\"ev\":\"agent\",\"state\":%d,\"caps\":%d}", m.a, m.b);
         else if (m.type == VM_WINDATA) windata(&m, fd);
         else if (m.type == VM_CLIP_DATA) clip_got(&m, fd);
@@ -634,6 +635,13 @@ static int handle(char *line) {
         VmMsg m = vm_msg(VM_FILE, ++seq, 0, 0, 0, 0, slash ? slash + 1 : line + 5);
         if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"file\"}");
         else out("{\"ok\":true,\"cmd\":\"file\",\"seq\":%u}", seq);
+        if (fd >= 0) close(fd);
+    } else if (!strncmp(line, "transfer", 8)) {
+        char sha[80] = "", path[1024] = "";
+        int fd = sscanf(line + 8, " %79s %1023s", sha, path) == 2 ? open(path, O_RDONLY | O_CLOEXEC) : -1;
+        VmMsg m = vm_msg(VM_AGENT, ++seq, VAG_TRANSFER, 0, 0, 0, sha);
+        if (vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"transfer\"}");
+        else out("{\"ok\":true,\"cmd\":\"transfer\",\"seq\":%u}", seq);
         if (fd >= 0) close(fd);
     } else if (!strncmp(line, "qmpf ", 5)) {
         /* a QMP or guest agent command longer than a message's text, from a file (lord-vm --dev-qmp only) */

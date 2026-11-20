@@ -337,7 +337,9 @@ export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math
 // ---- the guest agent (6.17) ----
 
 // lord-vm's capability bits (vmproto.h VAC_*) → the popover's list: what works now, and what doesn't and why
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256 };
+// transfer: the guest has the transfer folder (6.7.1) mounted; transferSetup: a Windows guest that gets it once WinFsp is
+// installed (Set Up the Transfer Folder)
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -353,7 +355,7 @@ export function agentLines(agent, cfg) {
     ['awake', on && caps & AGENT_CAPS.awake ? 'works' : 'needsAgent'],
     ['clipboard', clip === 'off' ? 'off' : caps & AGENT_CAPS.clipboard ? 'works' : win ? 'needsTools' : 'needsHelper'],
     ['resolution', !win || caps & AGENT_CAPS.display ? 'works' : 'needsTools'],
-    ['folders', cfg?.shares?.length ? 'works' : 'none'], ['apps', appsBlocker(agent, cfg) || 'works'],
+    ['folders', cfg?.shares?.length || (cfg?.transfer && caps & AGENT_CAPS.transfer) ? 'works' : 'none'], ['apps', appsBlocker(agent, cfg) || 'works'],
   ];
 }
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
@@ -372,15 +374,44 @@ export function dropBlocker(st, agentOn) {
   return g.caps & AGENT_CAPS.files && g.caps & AGENT_CAPS.exec ? null : 'agentCant';
 }
 // the line under the picture while files go in (lord.vm.files): the first one still copying, the whole percentage by
-// size, how many wait after it; null when none is copying
+// size, how many wait after it, whether the first goes through the transfer folder; null when none is copying
 export function copyLine(list) {
   const going = (list || []).filter((f) => f && f.state === 'copying').sort((a, b) => a.id - b.id);
   if (!going.length) return null;
   const total = going.reduce((a, f) => a + Math.max(0, f.size || 0), 0);
   const pct = total > 0 ? Math.floor(going.reduce((a, f) => a + Math.max(0, f.size || 0) * Math.min(100, Math.max(0, f.pct || 0)), 0) / total)
     : Math.floor(going.reduce((a, f) => a + Math.min(100, Math.max(0, f.pct || 0)), 0) / going.length);
-  return { name: going[0].name, pct: Math.min(99, pct), waiting: going.length - 1 };
+  return { name: going[0].name, pct: Math.min(99, pct), waiting: going.length - 1, fast: going[0].via === 'transfer' };
 }
+
+// ---- the transfer folder (6.7.1): <library>/Transfer/<name>, the guest's LordOS folder or drive ----
+// What the machine's window says of it: 'off' (Configure), 'ready' (the guest has it mounted), 'setup' (a Windows guest
+// that needs WinFsp: Set Up the Transfer Folder), 'settingUp' (that is running), 'waiting' (the machine isn't running,
+// its agent hasn't answered, or the guest hasn't mounted it yet). cfg: lord.vm.list()'s row; st: the session's poll
+export function transferState(cfg, st) {
+  if (!cfg?.transfer) return 'off';
+  const g = st?.agent;
+  if (!st || (st.state !== 'running' && st.state !== 'paused') || !g || g.state !== 'connected') return 'waiting';
+  if (g.transfer === 1) return 'settingUp';
+  if (g.caps & AGENT_CAPS.transfer) return 'ready';
+  if (g.caps & AGENT_CAPS.transferSetup) return 'setup';
+  return 'waiting';
+}
+// the note under the drop hint: how the files will go ('fast' through the transfer folder, 'agent' because it isn't
+// ready yet, 'off' when the machine has none)
+export function dropWay(cfg, st) {
+  const x = transferState(cfg, st);
+  return x === 'ready' ? 'fast' : x === 'off' ? 'off' : 'agent';
+}
+// WinFsp's installer for a Windows guest's transfer folder: { id, name, sha, size } of the catalog's pinned file, or null
+export function winfspFor(cat, arch) {
+  const s = (cat?.systems || []).find((x) => x?.id === 'winfsp');
+  const f = s?.arch?.[arch]?.pinned?.[0];
+  return f ? { id: 'winfsp', name: f.name, sha: f.sha256, size: f.bytes } : null;
+}
+// Set Up the Transfer Folder runs by itself once, after an unattended Windows install (app.json transferSetup), when the
+// guest says it needs WinFsp
+export const autoTransferSetup = (meta, state) => !!meta?.transferSetup && state === 'setup';
 // the folder of a path in the guest, Linux's or Windows' ('' for a bare name)
 export function guestFolder(p) {
   const s = String(p || '');

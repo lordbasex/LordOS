@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 6
+#define VM_SCHEMA 7
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -68,6 +68,8 @@ extern const char *const VM_BOOT_NAMES[];  /* "disk", "cd", "network" */
 #define VM_SMBIOS_MAX  64           /* bytes of printable ASCII per SMBIOS string */
 #define VM_SERIAL_MAX  20           /* a disk's serial: ATA's 20 characters */
 #define VM_SHARES      4            /* shared folders (6.7), each a vhost-user-fs device on PCI slots 0xb to 0xe */
+#define VM_XFER_TAG    "LordOS"     /* the transfer folder's mount tag (6.7.1); its device is on slot 0xf */
+#define VM_XFER_DIR    "Transfer"   /* <library>/Transfer/<machine folder's name without .lordvm>: the transfer folders */
 #define VM_TAG_MAX     32           /* a share's mount tag: letters, digits, '-', '_' (virtio-fs allows 36 bytes) */
 
 /* Limits that hold on every computer */
@@ -151,6 +153,9 @@ typedef struct {
     int n_boot;
     int boot_order[VM_BOOT_DEVS];       /* VM_BOOT_*, each at most once */
     int boot_menu;
+    /* schema 7: the transfer folder (6.7.1), <library>/Transfer/<name>, shared writable under the tag VM_XFER_TAG. On for
+     * new machines; a file without it reads as off, so a machine made before keeps its hardware (and its saved states) */
+    int transfer;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -180,6 +185,19 @@ int vm_tag_valid(const char *t);
  * and neither inside nor holding the machines' library (a guest could otherwise rewrite its own machine.json) nor the
  * machine's own folder. home and library are real paths. 0 allowed, else -1 and why in err */
 int vm_share_allowed(const char *path, const char *home, const char *user, const char *library, char *err, size_t errlen);
+/* the transfer folder of the machine in `dir` (6.7.1): <library>/Transfer/<folder name without .lordvm>, where the library
+ * is the folder that holds `dir`. 0, or -1 when the machine's folder name can't give one (not <name>.lordvm, hidden, too
+ * long) */
+int vm_transfer_path(const char *dir, char *out, size_t n);
+/* the transfer folder of the machine `id` in `dir`, made when it isn't there (<library>/Transfer 0700, the folder 0777)
+ * and tied to the machine: its owner record, <library>/Transfer/.<name>.machine, holds the machine's id. A folder there
+ * that another machine owns (a deleted, renamed or remade machine of the same name), or that nobody owns and isn't
+ * empty, is moved aside to "<name> (old YYYY-MM-DD)" (its new name in moved), never deleted. 0 and the path in out,
+ * else -1 */
+int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char *moved, size_t mn);
+/* the machine goes (to the Trash): its transfer folder, when it's this machine's, moves aside as above. 0 moved, 1 there
+ * was none of this machine's, -1 it couldn't be moved */
+int vm_transfer_aside(const char *dir, const char *id, char *moved, size_t mn);
 
 /* a network interface's name as Linux allows it: 1 to 15 of [A-Za-z0-9_.-], not "." or ".." */
 int vm_ifname_valid(const char *s);

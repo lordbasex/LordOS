@@ -5,10 +5,11 @@
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
   View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
-  inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, t as tr,
+  inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, admin, t as tr,
 } from '@lordos/sdk';
+import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
 import { useAppsMode, appsMenuItems, guests } from './appsmode.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp } from './ui.jsx';
@@ -21,7 +22,7 @@ const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.n
 const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
-const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.install}` : '');
+const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.install}.${g.transfer}` : '');
 const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}` : '');
 const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
@@ -89,6 +90,8 @@ function AgentPop({ ctl, onClose }) {
             <Pill label={g.install === 1 ? tr('machines.agent.installing') : guestWindows(g) ? tr('machines.agent.installTools') : tr('machines.agent.installHelper')}
               disabled={g.install === 1} onClick={() => lord.vm.agent(ctl.sid, 'install')} />
             <Pill label={tr('machines.agent.timesync')} onClick={() => lord.vm.agent(ctl.sid, 'timesync')} />
+            {ctl.xfer.state === 'setup' || ctl.xfer.state === 'settingUp'
+              ? <Pill label={ctl.xfer.state === 'settingUp' ? tr('machines.tb.transferSettingUp') : tr('machines.tb.transferSetup')} disabled={ctl.xfer.state === 'settingUp'} onClick={ctl.xfer.setup} /> : null}
           </View>
         ) : null}
         {g?.install === 2 ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{guestWindows(g) ? tr('machines.agent.toolsInstalled') : tr('machines.agent.installed')}</Text> : null}
@@ -125,7 +128,17 @@ function Tools({ ctl, floating, compact }) {
   ];
   // shared folders (6.7): each one opens in Files; the mount command for a Linux guest is a click away
   const shares = cfg?.shares || [];
+  // the transfer folder (6.7.1) first: open it here, where the machine has it, its setup in a Windows machine
+  const xf = ctl.xfer;
+  const xferItems = !cfg?.transfer ? [{ label: tr('machines.tb.transferOff'), onClick: () => ctl.configure('sharing') }, '-'] : [
+    { label: tr('machines.tb.transferOpen'), onClick: xf.open },
+    { label: xf.state === 'ready' ? (xf.windows ? tr('machines.win.transferDrive') : tr('machines.tb.transferLinux'))
+      : xf.state === 'setup' ? tr('machines.tb.transferNeedsSetup') : xf.state === 'settingUp' ? tr('machines.tb.transferSettingUp') : tr('machines.tb.transferWaiting'), disabled: true },
+    xf.state === 'setup' ? { label: tr('machines.tb.transferSetup'), onClick: xf.setup } : null,
+    '-',
+  ];
   const shareItems = [
+    ...xferItems,
     ...shares.map((x) => ({ label: `${x.path.split('/').pop()}  ·  ${x.tag}`, hint: tr(x.writable ? 'machines.tb.shareRw' : 'machines.tb.shareRo'), onClick: () => revealPath(x.path) })),
     ...shares.map((x) => ({ label: tr('machines.tb.shareCopy', { tag: x.tag }), onClick: () => clipboard.set(mountCommand(x.tag)) })),
     shares.length ? '-' : null,
@@ -138,7 +151,7 @@ function Tools({ ctl, floating, compact }) {
       <BarGroup>
         <AgentButton ctl={ctl} />
         <IconMenuBtn sym="clipboard" label={`${tr('machines.cfg.clipboard')}: ${tr(`machines.cfg.clip.${clip}`)}`} items={clipItems} color={clipOn ? '#7be3a4' : null} />
-        <IconMenuBtn sym="sharing" label={shares.length ? tr('machines.tb.foldersN', { n: shares.length }) : tr('machines.tb.folders')} items={shareItems} color={shares.length ? '#7be3a4' : null} />
+        <IconMenuBtn sym="sharing" label={shares.length ? tr('machines.tb.foldersN', { n: shares.length }) : tr('machines.tb.folders')} items={shareItems} color={shares.length || xf.state === 'ready' ? '#7be3a4' : null} />
         {compact ? null : <IconBtn sym="apps" label={ctl.appsLabel} on={ctl.appsOn} disabled={!!ctl.appsBlocked && !ctl.appsOn} onClick={ctl.toggleApps} />}
       </BarGroup>
       {compact ? null : <BarSep />}
@@ -569,7 +582,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // guest's picture is re-encoded on this side before any app sees it
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
-  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, shares: m.shares || [] }); } }, [sid, st?.state]);
+  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch }); } }, [sid, st?.state]);
   const clipSent = useRef('');
   useEffect(() => {
     if (!focused || !sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined) return;
@@ -603,6 +616,39 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // lord-vm; a line under the picture while they go, a notice when they're there. Only into the guest: nothing comes
   // out by dragging (a shared folder does that)
   const blocker = dropBlocker(st, !!cfg.agent);
+  // the transfer folder (6.7.1): Open Transfer Folder, and for a Windows guest, WinFsp (the admin helper downloads the
+  // catalog's pinned installer once; lord-server hands lord-vm only that file from the image store)
+  const xstate = transferState(cfg, st);
+  const xferOpen = () => { const p = has() ? lord.vm.transferFolder(dir) : null; if (p) revealPath(p); };
+  const xferBusy = useRef(false);
+  const xferSetup = async () => {
+    const s = sidRef.current;
+    const f = winfspFor(CATALOG, cfg.arch || 'amd64');
+    if (!s || !f || xferBusy.current) return;
+    xferBusy.current = true;
+    try {
+      const path = String(await admin.run('vm-image-get', `winfsp ${cfg.arch || 'amd64'} ${f.name} ${f.sha}`, null, { quiet: true })).trim();
+      if (!lord.vm.agent(s, 'transfer', path)) throw new Error(tr('machines.tb.transferFailed', { machine: name }));
+    } catch (e) {
+      notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.tb.transferFailed', { machine: name }), body: e?.code === 'admin.unavailable' ? tr('machines.dl.noHelper') : e?.message || '', sound: false });
+    } finally { xferBusy.current = false; }
+  };
+  // how it went (poll's agent.transfer: 2 done, 3 failed), said once
+  const xferSaid = useRef(0);
+  useEffect(() => {
+    const r = st?.agent?.transfer;
+    if (r !== 2 && r !== 3) { xferSaid.current = 0; return; }
+    if (xferSaid.current === r) return;
+    xferSaid.current = r;
+    notify({ app: 'machines', label: tr('machines.title'), title: tr(r === 2 ? 'machines.tb.transferReady' : 'machines.tb.transferFailed', { machine: name }),
+      body: r === 2 ? tr('machines.win.transferDrive') : st.agent.transferMessage || '', sound: false });
+  }, [st?.agent?.transfer]);
+  // after an unattended Windows install the app sets it up by itself, once (app.json transferSetup)
+  useEffect(() => {
+    if (!autoTransferSetup(readMeta(dir), xstate)) return;
+    writeMeta(dir, { transferSetup: false });
+    xferSetup();
+  }, [xstate]);
   const sendFiles = (files) => {
     const s = sidRef.current;
     const why = dropBlocker(stRef.current, !!cfg.agent);
@@ -646,6 +692,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const ctl = {
     appsOn, appsBlocked, appsLabel, toggleApps: () => setApps(!appsOn),
     sid, cfg, heard, toggleSound, micLive: micOn,
+    xfer: { state: xstate, open: xferOpen, setup: xferSetup, windows: !!cfg.windows || /^windows/i.test(st?.agent?.system || '') },
     shell, toggleShell: () => { setShell(!shell); setShellKeys(!shell); },
     rec: !!rec, recTime: `${String(Math.floor(recSecs / 60)).padStart(2, '0')}:${String(recSecs % 60).padStart(2, '0')}`, record,
     st, a, full, follow, cmd,
@@ -689,6 +736,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         { label: tr('machines.snap.takeNow'), disabled: !sid || busy || runs3d(st) || !(st?.state === 'running' || st?.state === 'paused'), onClick: snapNow },
         { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m0) },
         '-',
+        { label: tr('machines.tb.transferOpen'), disabled: !cfg.transfer, onClick: xferOpen },
+        ...(xstate === 'setup' ? [{ label: tr('machines.tb.transferSetup'), onClick: xferSetup }] : []),
+        '-',
         { label: tr('machines.tb.screenshot'), disabled: !a.keys, onClick: shot },
         { label: full ? tr('machines.cmd.exitFullscreen') : tr('machines.cmd.fullscreen'), onClick: () => wm.setFullscreen(winId, !full) },
         { label: tr('machines.cmd.logs'), onClick: () => openLogs(m0) },
@@ -699,7 +749,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       { label: tr('machines.menu.devices'), items: ctl.devices.filter((x) => x !== '-') },
       ...(appsActive ? [{ label: tr('machines.apps.menu'), items: appsMenuItems(gApps) }] : []),
     ]);
-  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps]);
+  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, cfg.transfer, xstate]);
   // Esc in the controller leaves apps mode (in a guest's window, Esc is the guest's)
   useEffect(() => (appsActive && focused ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open) setApps(false); }) : undefined), [appsActive, focused]);
 
@@ -771,13 +821,13 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ maxWidth: 560, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
             <Text style={{ fontSize: 13, color: '#f2f2f5', textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {tr('machines.drop.copying', { name: line.name, pct: line.pct }) + (line.waiting ? ` · ${tr('machines.drop.waiting', { count: line.waiting })}` : '')}
+              {tr(line.fast ? 'machines.drop.copyingFast' : 'machines.drop.copying', { name: line.name, pct: line.pct }) + (line.waiting ? ` · ${tr('machines.drop.waiting', { count: line.waiting })}` : '')}
             </Text>
           </View>
         </View>
       ) : null}
       <FilesDropHint over={drop.over} title={drop.over && (blocker ? tr(`machines.drop.no.${blocker}`) : drop.over.files.length ? tr('machines.drop.title') : tr('machines.drop.none'))}
-        note={drop.over && !blocker && drop.over.files.length ? `${drop.over.skipped ? `${tr('machines.drop.skipped', { count: drop.over.skipped })} · ` : ''}${tr('machines.drop.oneWay')}` : ''} />
+        note={drop.over && !blocker && drop.over.files.length ? `${drop.over.skipped ? `${tr('machines.drop.skipped', { count: drop.over.skipped })} · ` : ''}${tr(`machines.drop.way.${dropWay(cfg, st)}`)}` : ''} />
       {pickCd ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPickCd(false)}
         onPick={(x) => { setPickCd(false); cdTo(Array.isArray(x) ? x[0] : x); }} /> : null}
       {appsActive ? null : full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}

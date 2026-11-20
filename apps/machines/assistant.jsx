@@ -16,7 +16,7 @@ import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openU
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
 import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor } from './catalog.js';
-import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, PROFILES, profileSize, gfxFor, no3dReason } from './model.js';
+import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, PROFILES, profileSize, gfxFor, no3dReason, winfspFor } from './model.js';
 import { usePal, OsMark, Btn, Bar, gb, bytes } from './ui.jsx';
 import { SheetHeader, Pill, Round, Sym } from './kit.jsx';
 import { writeMeta } from './meta.js';
@@ -214,7 +214,8 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       if (!r || !r.done) return;
       setJob(0);
       if (r.ok) {
-        writeMeta(r.dir, { os: sys.id, osName: [sys.name, ver].filter(Boolean).join(' '), profile });
+        // a Windows machine sets up its transfer folder (WinFsp) by itself once its guest tools are in (6.7.1)
+        writeMeta(r.dir, { os: sys.id, osName: [sys.name, ver].filter(Boolean).join(' '), profile, ...(windows ? { transferSetup: true } : {}) });
         const m = lord.vm.list().find((x) => x.dir === r.dir);
         if (customize) onConfigure(m || null); else onCreated(m || null);
       } else setFail(r.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || r.out.trim() || '?');
@@ -237,6 +238,9 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     try {
       iso = win.mode === 'eval' ? await fetchImage('windows', evalFile) : win.iso.path;
       drivers = await fetchImage('virtio-win', driversFor(CATALOG, arch));
+      // WinFsp for the transfer folder, kept in the image store for the machine's first sign-in; not needed to install
+      const fsp = winfspFor(CATALOG, arch);
+      if (fsp) { try { await fetchImage('winfsp', fsp); } catch (e) { if (cancelled.current) throw e; } }
     } catch (e) {
       setGot(null);
       if (cancelled.current) { setStopped(true); return; }

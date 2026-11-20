@@ -44,7 +44,11 @@
  *     VM_AGENT      the guest agent (6.17; machine.json "agent"): a = VAG_SHUTDOWN (guest-shutdown), VAG_TIMESYNC
  *                   (guest-set-time from this computer's clock), VAG_INSTALL (copies lordos-guest, the clipboard helper,
  *                   into a Linux guest through qemu-guest-agent and enables it; into a Windows guest, the LordOS guest
- *                   tools, lordos-guest-win.exe, into %ProgramFiles%\LordOS, started at every sign-in) → VM_REPLY
+ *                   tools, lordos-guest-win.exe, into %ProgramFiles%\LordOS, started at every sign-in), VAG_TRANSFER (the
+ *                   transfer folder, 6.7.1: a Linux guest mounts it again; a Windows guest gets WinFsp: one descriptor, its
+ *                   installer, which lord-server opened in the machines' image store, text = its SHA-256 (64 hex), checked
+ *                   again here and in the guest with its signature, installed by msiexec as SYSTEM from a private folder)
+ *                   → VM_REPLY
  *     VM_CLIP       the host's clipboard for the guest: one descriptor, a memfd of a bytes (at most VM_CLIP_MAX); b =
  *                   VCF_TEXT: UTF-8 text; VCF_CLIPX: text, HTML and/or a PNG in AGK_CLIPX's layout (vmagent.h), checked
  *                   and sanitized again here. Sent on only when machine.json's clipboard allows to-guest and
@@ -59,6 +63,11 @@
  *                   through a private temporary folder, then moved and owned by that person (runuser); on Windows
  *                   through a private SYSTEM-only folder in %SystemRoot%\Temp, then copied into their Downloads by a
  *                   one-shot scheduled task that runs as that person (refused when nobody is signed in).
+ *                   When the guest has the transfer folder mounted (VAC_TRANSFER, 6.7.1), the file is first copied by
+ *                   lord-vm into that folder on this computer (a reflink when the file system can; in a child process)
+ *                   in a 0700 folder of its own, with the file's SHA-256, and the person's own copy in the guest reads it
+ *                   from there and is named only when its size and hash match; if that way fails, the agent's way is
+ *                   tried once.
  *                   VM_FILE_PROGRESS on the way; → VM_REPLY with the file's path in the guest (the guest's words, text only) or why not
  *     VM_SNAPSHOT   a = VSN_TAKE, VSN_REVERT or VSN_DELETE; text = "TAG\tNAME" (take) or "TAG". qcow2 internal
  *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
@@ -87,7 +96,8 @@
  *     VM_CLIP_DATA  the guest's clipboard (machine.json allows from-guest): a sealed memfd of a bytes; b = VCF_TEXT
  *                   (UTF-8) or VCF_CLIPX (AGK_CLIPX's layout, every part already checked: UTF-8 text, sanitized HTML,
  *                   a PNG whose header is sane; lord-server still re-encodes the picture before it's used)
- *     VM_FILE_PROGRESS seq of the VM_FILE; a = percent copied (0..100); text = the file's name as the guest gets it.
+ *     VM_FILE_PROGRESS seq of the VM_FILE; a = percent copied (0..100); b = 1 through the transfer folder, 0 the agent's
+ *                   way; text = the file's name as the guest gets it.
  *                   Sent to the client that asked, at most every 250 ms
  *     VM_WINDATA    apps mode: what the guest's helper said, checked (vmagent.h's parsers) and written again by lord-vm:
  *                   a sealed memfd of a bytes (≤ VM_WINDATA_MAX), b = LAG_WINDOWS, LAG_WINICON or LAG_APPLIST, in that
@@ -185,10 +195,13 @@ enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VM
 enum { VJ_NONE = 0, VJ_SUSPEND, VJ_RESUME, VJ_SNAPSHOT, VJ_REVERT, VJ_DELETE, VJ_COUNT };
 enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
 /* VM_AGENT a, VM_AGENT_STATE a and b */
-enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL };
+enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL, VAG_TRANSFER };
 enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
-enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128 };
-/* 256: LAG_CAP_WINDOWS (vmagent.h), the guest's helper does apps mode */
+/* 256: LAG_CAP_WINDOWS (vmagent.h), the guest's helper does apps mode.
+ * VAC_TRANSFER: the guest has the transfer folder (6.7.1) mounted (Linux: /mnt/LordOS; Windows: VirtioFsSvc runs);
+ * VAC_XFER_SETUP: a Windows guest that can have it once WinFsp is installed (VAG_TRANSFER) */
+enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
+       VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024 };
 #define VM_WINDATA_MAX (1u << 20)
 #define VM_CLIP_MAX (11u << 20)
 /* VM_CLIP and VM_CLIP_DATA b: what the memfd holds */
@@ -357,7 +370,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (m->version != VM_PROTO_VERSION) return 0;
     if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600)) &&
                       (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
-                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_INSTALL)) &&
+                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_TRANSFER)) &&
                       (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX))) &&
                       (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1))) &&
                       (m->type != VM_FILE || m->text[0]) &&
@@ -372,7 +385,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_DISPLAY_FD: return m->a >= 0 && m->b >= 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VM_NOTICE: return m->a > VMN_NONE && m->a < VMN_COUNT;
     case VM_CONSOLE_FD: return 1;
-    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 512;
+    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 2048;
     /* b: LAG_WINDOWS (6), LAG_WINICON (7) or LAG_APPLIST (10), vmagent.h; c: LAG_APPLIST's generation (VM_LAUNCH) */
     case VM_WINDATA: return m->a > 0 && (uint32_t)m->a <= VM_WINDATA_MAX && (m->b == 6 || m->b == 7 || m->b == 10) && m->c >= 0;
     case VM_CLIP_DATA: return m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX);
