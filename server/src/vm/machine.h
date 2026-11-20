@@ -20,8 +20,9 @@
 #include <stdint.h>
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
- * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices. 6 (6.5):
- * the bridged and host-only networks, bridge, ports. An older file is read as is and written as the current schema, with a copy of the old
+ * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9). An older file is read as
+ * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
 #define VM_SCHEMA 6
 
@@ -132,6 +133,12 @@ typedef struct {
     char bridge[VM_IFNAME_MAX + 1];     /* the wired card a bridged machine joins ("" none); kept when the mode changes */
     int n_ports;
     VmPort ports[VM_PORTS];             /* used in shared and host-only modes; kept in the others */
+    /* schema 6: sound and microphone (6.9). Host-side choices, changed while the machine runs too: the guest's sound
+     * card stays the same either way. A file without them reads as sound on at full volume, microphone off */
+    int sound;                          /* 1: the guest's sound plays on this computer's speakers; 0 muted */
+    int volume;                         /* 0..100, the machine's own stream volume */
+    int microphone;                     /* 1: the guest may hear this computer's microphone, once LordOS's microphone
+                                         * permission for Machines allows it too (checked by lord-server); 0 silence */
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 

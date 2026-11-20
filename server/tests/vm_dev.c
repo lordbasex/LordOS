@@ -15,6 +15,11 @@
  *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON
  *   noack 0|1           stop acknowledging frames (tests the 250 ms fallback)
  *   wait-frames N [S]   wait until N more frames arrived (at most S seconds, default 30)
+ *   sound play [VOL]    the guest's sound through lord-server's own code (media/maudio.c, a PipeWire stream) at VOL
+ *                       percent (default 0: the stream runs and nothing is heard); sound off: no speakers' ring
+ *   sound-stats         bytes the stream took from the ring, the loudest sample in them, the guest's streams
+ *   mic tone|silence|off   the microphone's ring, filled here at the real rate with a 440 Hz tone or silence (as
+ *                       lord-server's capture stream would), or none
  *   quit
  * stdout: one JSON line per event or answer. Binaries are looked for next to this one, or in $LORDVM_BIN.
  *
@@ -22,6 +27,8 @@
  * the first render node with EGL and the damaged rows are read back into the picture on each frame, so `png` shows what
  * the guest drew with virgl. Without Mesa it only counts those frames. */
 #include "vm/vmproto.h"
+#include "media/media_int.h"
+#include "media/aring.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -65,7 +72,15 @@ static long long frames_deadline;
 static uint32_t seq = 100;
 static int vm_state = -1;
 static int cursor_w, cursor_h;
+static MAudio *spk;
+static ARingHdr *spk_ring;          /* our read-only view of the stream's ring, to look at what it took */
+static size_t spk_len;
+static uint64_t spk_seen;
+static int spk_peak;
+static long long spk_loud;          /* samples above 1/100 of full scale */
+static int guest_out, guest_in;
 
+static void vdsend_fd(int type, int a, int fd);
 static void out(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void out(const char *fmt, ...) {
     va_list ap;
@@ -296,6 +311,10 @@ static void from_vd(void) {
             }
             break;
         case VD_STATE: out("{\"ev\":\"display_state\",\"state\":%d,\"reason\":%d}", m.a, m.b); break;
+        case VD_GUEST_AUDIO:
+            if (m.a == VDG_OUT) { guest_out = m.b; if (spk) maudio_playing(spk, m.b); } else guest_in = m.b;
+            out("{\"ev\":\"guest_audio\",\"stream\":\"%s\",\"on\":%d}", m.a == VDG_OUT ? "out" : "in", m.b);
+            break;
         case VD_STATS: out("{\"ev\":\"display_stats\",\"refused\":%d,\"updates\":%d,\"copies\":%d,\"w\":%d,\"h\":%d,\"frame\":%d,\"frames_here\":%ld,\"dmabuf_reads\":%ld,\"dmabuf_fails\":%ld}",
                            m.a, m.b, m.c, m.d, m.e, m.f, frames, dmab.reads, dmab.fails); break;
         }
@@ -303,7 +322,80 @@ static void from_vd(void) {
     }
 }
 
+/* ---- sound (6.9): lord-server's part, with lord-server's own code for the speakers (media/maudio.c) ---- */
+int media_pulse_fd(void) {
+    char path[sizeof ((struct sockaddr_un *)0)->sun_path];
+    const char *ps = getenv("PULSE_SERVER"), *rt = getenv("XDG_RUNTIME_DIR");
+    if (ps && !strncmp(ps, "unix:", 5)) snprintf(path, sizeof path, "%s", ps + 5);
+    else snprintf(path, sizeof path, "%s/pulse/native", rt ? rt : "/nonexistent");
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    struct sockaddr_un a = { .sun_family = AF_UNIX };
+    memcpy(a.sun_path, path, strlen(path) + 1);
+    if (fd >= 0 && connect(fd, (struct sockaddr *)&a, sizeof a)) { close(fd); fd = -1; }
+    return fd;
+}
+static ARingHdr *mic;
+static size_t mic_len;
+static uint64_t mic_w, mic_samples;
+static long long mic_t0;
+static int mic_tone;
+static void spk_look(void) {
+    if (!spk || !spk_ring) return;
+    uint64_t now = maudio_bytes(spk);
+    uint32_t size = spk_ring->size;
+    if (now - spk_seen > size) spk_seen = now - size;
+    for (uint64_t p = spk_seen & ~(uint64_t)1; p + 2 <= now; p += 2) {
+        int16_t v;
+        memcpy(&v, ar_data(spk_ring) + (p & (size - 1)), 2);
+        int a = v < 0 ? -v : v;
+        if (a > spk_peak) spk_peak = a;
+        if (a > 327) spk_loud++;
+    }
+    spk_seen = now;
+}
+static void sound_off(void) {
+    if (!spk) return;
+    vdsend_fd(VD_AUDIO_OUT, 0, -1);
+    spk_look();
+    munmap(spk_ring, spk_len);
+    maudio_close(spk);
+    spk = NULL; spk_ring = NULL;
+}
+static void mic_off(void) {
+    if (!mic) return;
+    vdsend_fd(VD_MIC, 0, -1);
+    munmap(mic, mic_len);
+    mic = NULL;
+}
+static void mic_on(int tone) {
+    mic_off();
+    uint32_t size = 1u << 17;
+    mic_len = ar_bytes(size);
+    int fd = (int)syscall(SYS_memfd_create, "lordos-audio", 3u);
+    if (fd < 0 || ftruncate(fd, (off_t)mic_len) || fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL)) { if (fd >= 0) close(fd); return; }
+    mic = mmap(NULL, mic_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (mic == MAP_FAILED) { mic = NULL; close(fd); return; }
+    memset(mic, 0, AR_HDR);
+    mic->rate = AR_RATE; mic->channels = 1; mic->size = size; mic->magic = AR_MAGIC;
+    mic_w = 0; mic_samples = 0; mic_t0 = now_ms(); mic_tone = tone;
+    vdsend_fd(VD_MIC, 1, fd);
+    close(fd);
+}
+/* the microphone's ring at the real rate, as lord-server's capture stream writes it */
+static void mic_feed(void) {
+    if (!mic) return;
+    uint64_t due = (uint64_t)(now_ms() - mic_t0) * 48;
+    static int16_t buf[4800];
+    while (mic_samples < due) {
+        size_t k = due - mic_samples > 4800 ? 4800 : (size_t)(due - mic_samples);
+        for (size_t i = 0; i < k; i++) buf[i] = mic_tone ? (int16_t)(8000 * sin(2 * 3.14159265358979 * 440 * (double)(mic_samples + i) / 48000)) : 0;
+        ar_write_t(mic, mic->size, &mic_w, buf, k * 2);
+        mic_samples += k;
+    }
+}
+
 static void vdsend(int type, int a, int b) { if (vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, b, 0, 0, 0, 0); vd_send(vd, &m, -1); } }
+static void vdsend_fd(int type, int a, int fd) { if (vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, 0, 0, 0, 0, 0); vd_send(vd, &m, fd); } }
 
 /* ASCII to evdev (US layout); bit 8: shift */
 static int ascii_key(char c) {
@@ -379,6 +471,32 @@ static int handle(char *line) {
     else if (sscanf(line, "resize %d %d", &x, &y) == 2) { vdsend(VD_RESIZE, x, y); out("{\"ok\":true,\"cmd\":\"resize\"}"); }
     else if (sscanf(line, "rate %d", &x) == 1) { vdsend(VD_RATE, x, 0); out("{\"ok\":true,\"cmd\":\"rate\"}"); }
     else if (sscanf(line, "noack %d", &x) == 1) { noack = x; out("{\"ok\":true,\"cmd\":\"noack\"}"); }
+    else if (sscanf(line, "sound play %d", &x) >= 0 && !strncmp(line, "sound play", 10)) {
+        if (sscanf(line, "sound play %d", &x) < 1) x = 0;
+        sound_off();
+        int ring = -1;
+        spk = maudio_open(0, "Machines", "lordvm-dev", "video", &ring);
+        if (spk) {
+            maudio_latency(spk, 60);
+            maudio_volume(spk, x / 100.0);
+            spk_len = ar_bytes(1u << 18);
+            spk_ring = mmap(NULL, spk_len, PROT_READ, MAP_SHARED, maudio_ring_fd(spk), 0);
+            if (spk_ring == MAP_FAILED) spk_ring = NULL;
+            spk_seen = 0; spk_peak = 0; spk_loud = 0;
+            vdsend_fd(VD_AUDIO_OUT, 1, maudio_ring_fd(spk));
+            if (guest_out) maudio_playing(spk, 1);
+        }
+        out("{\"ok\":%s,\"cmd\":\"sound play\",\"volume\":%d}", spk ? "true" : "false", x);
+    } else if (!strcmp(line, "sound off")) { sound_off(); out("{\"ok\":true,\"cmd\":\"sound off\"}"); }
+    else if (!strcmp(line, "sound-stats")) {
+        spk_look();
+        uint64_t fill = spk_ring ? atomic_load(&spk_ring->wpos) - maudio_bytes(spk) : 0;
+        out("{\"ev\":\"sound\",\"ring_ms\":%.1f,\"bytes\":%llu,\"peak\":%d,\"loud\":%lld,\"pipewire\":%s,\"guest_out\":%d,\"guest_in\":%d,\"mic\":%s,\"mic_read\":%llu}",
+            fill / 192.0, (unsigned long long)maudio_bytes(spk), spk_peak, spk_loud, spk && !maudio_failed(spk) ? "true" : "false", guest_out, guest_in,
+            mic ? (mic_tone ? "\"tone\"" : "\"silence\"") : "null", mic ? (unsigned long long)atomic_load(&mic->rpos) : 0ULL);
+    } else if (!strcmp(line, "mic tone")) { mic_on(1); out("{\"ok\":%s,\"cmd\":\"mic tone\"}", mic ? "true" : "false"); }
+    else if (!strcmp(line, "mic silence")) { mic_on(0); out("{\"ok\":%s,\"cmd\":\"mic silence\"}", mic ? "true" : "false"); }
+    else if (!strcmp(line, "mic off")) { mic_off(); out("{\"ok\":true,\"cmd\":\"mic off\"}"); }
     else if (!strcmp(line, "release")) { vdsend(VD_RELEASE_ALL, 0, 0); out("{\"ok\":true,\"cmd\":\"release\"}"); }
     else if (!strcmp(line, "status")) ask(VM_STATUS, 0, NULL);
     else if (!strcmp(line, "pause")) ask(VM_PAUSE, 0, NULL);
@@ -466,9 +584,14 @@ int main(int argc, char **argv) {
             frames_target = -1;
         }
         if (vm < 0 && vd < 0) break;
-        struct pollfd p[3] = { { vm, POLLIN, 0 }, { vd, POLLIN, 0 }, { stdin_open ? 0 : -1, POLLIN, 0 } };
+        short aev = 0;
+        int afd = spk ? maudio_pollfd(spk, &aev) : -1;
+        struct pollfd p[4] = { { vm, POLLIN, 0 }, { vd, POLLIN, 0 }, { stdin_open ? 0 : -1, POLLIN, 0 }, { afd, aev, 0 } };
         int to = kq_h != kq_t ? 12 : frames_target >= 0 ? 50 : 500;
-        poll(p, 3, to);
+        if ((spk || mic) && to > 10) to = 10;
+        poll(p, 4, to);
+        if (spk) { maudio_service(spk); spk_look(); }
+        mic_feed();
         if (p[0].revents) from_vm();
         if (p[1].revents) from_vd();
         if (p[2].revents) {
@@ -484,6 +607,8 @@ int main(int argc, char **argv) {
             if (quit) break;
         }
     }
+    sound_off();
+    mic_off();
     if (vd >= 0) { vdsend(VD_CLOSE, 0, 0); close(vd); }
     if (vd_pid > 0) waitpid(vd_pid, NULL, 0);
     if (vm >= 0) close(vm);          /* lord-vm shuts the machine down when its control channel closes */

@@ -1706,9 +1706,13 @@ static void build_qemu_args(void) {
     } else { arg("-audiodev"); arg("none,id=snd0"); arg("-display"); arg("none"); }
     /* a sound card (HDA, which every Linux and Windows guest has a driver for), on its own slot after the CD/DVD
      * drive's: a machine made before it had none, and a state saved without it still loads (a device the saved
-     * stream doesn't name keeps its reset state) */
+     * stream doesn't name keeps its reset state). Its codec has a speaker and a microphone (hda-micro) on every
+     * machine, so the guest's hardware never changes with the microphone setting (snapshots and saved states keep
+     * loading): what the guest's microphone hears is lord-server's choice, silence unless the machine's "microphone"
+     * and LordOS's permission allow it (6.9). The codecs share one saved form ("hda-audio", the same output nodes), so
+     * a state saved with the former hda-output still loads. */
     arg("-device"); arg("intel-hda,id=sound0,addr=0x9");
-    arg("-device"); arg("hda-output,id=sound0-codec0,bus=sound0.0,cad=0,audiodev=snd0");
+    arg("-device"); arg("hda-micro,id=sound0-codec0,bus=sound0.0,cad=0,audiodev=snd0");
     arg("-chardev"); arg("socket,id=qmp,fd=4"); arg("-mon"); arg("chardev=qmp,mode=control");
     arg("-chardev"); arg("socket,id=ser0,fd=5"); arg("-serial"); arg("chardev:ser0");
     if (m->agent) {
@@ -3187,6 +3191,19 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         reply(ci, m->seq, VME_OK, what);
         return;
     }
+    case VM_SOUND: {
+        /* machine.json's sound choices: nothing changes in QEMU (lord-server plays and records itself); lord-vm holds the
+         * lock, so it writes the file */
+        VmMachine nm = S.m;
+        nm.sound = m->a; nm.volume = m->b; nm.microphone = m->c;
+        nm.schema = VM_SCHEMA;
+        vm_now_iso(nm.updated);
+        if (vm_machine_check(&nm, NULL, 0) || vm_machine_save(S.dir, &nm)) { reply(ci, m->seq, VME_INTERNAL, "can't write machine.json"); return; }
+        S.m = nm;
+        vlog("sound: %s, volume %d, microphone %s", nm.sound ? "on" : "muted", nm.volume, nm.microphone ? "allowed" : "off");
+        reply(ci, m->seq, VME_OK, "");
+        return;
+    }
     case VM_KEEP:
         S.keep_running = m->a ? 1 : 0;
         vlog("keep running without lord-server: %s", S.keep_running ? "yes" : "no");
@@ -4176,7 +4193,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -4204,6 +4221,16 @@ static int cmd_set(const char *dir, int argc, char **argv) {
             continue;
         }
         if (!strcmp(a, "--shares")) { if (strcmp(v, "none")) { fprintf(stderr, "lord-vm: --shares none\n"); return 2; } shares_set = 1; continue; }
+        /* sound (6.9): host-side choices, also while suspended (the guest's hardware doesn't change) */
+        if (!strcmp(a, "--sound")) { sound = parse_enum(v, "off", "on"); if (sound < 0) { fprintf(stderr, "lord-vm: --sound on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--microphone")) { mic = parse_enum(v, "off", "on"); if (mic < 0) { fprintf(stderr, "lord-vm: --microphone on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--volume")) {
+            char *end = NULL;
+            long x = strtol(v, &end, 10);
+            if (!*v || *end || x < 0 || x > 100) { fprintf(stderr, "lord-vm: --volume 0..100\n"); return 2; }
+            vol = (int)x;
+            continue;
+        }
         if (!strcmp(a, "--devices")) { devs = parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat\n"); return 2; } continue; }
         if (!strcmp(a, "--graphics")) { gfx = parse_enum(v, "2d", "3d"); if (gfx < 0) { fprintf(stderr, "lord-vm: --graphics 2d|3d\n"); return 2; } continue; }
         if (!strcmp(a, "--nic-model")) {
@@ -4262,6 +4289,10 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (m.agent || m.clipboard) m.schema = VM_SCHEMA;
     if (gfx >= 0) m.graphics = gfx;
     if (m.graphics) m.schema = VM_SCHEMA;
+    if (sound >= 0) m.sound = sound;
+    if (vol >= 0) m.volume = vol;
+    if (mic >= 0) m.microphone = mic;
+    if (sound >= 0 || vol >= 0 || mic >= 0) m.schema = VM_SCHEMA;
     if (shares_set) {
         const struct passwd *pw = getpwuid(getuid());
         char home[PATH_MAX], lib[PATH_MAX], parent[PATH_MAX];
@@ -5813,6 +5844,7 @@ static int usage(void) {
             "                         [--port tcp|udp:HOST:GUEST[:this-computer|lan] ...] [--ports none]   (forwarded ports, replacing the list)\n"
             "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both] [--graphics 2d|3d]   (also on --create)\n"
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
+            "                         [--sound on|off] [--volume 0..100] [--microphone on|off]   (with the machine off; Machines changes them live)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"
             "                           [--resume-anyway] [--discard-state]\n"

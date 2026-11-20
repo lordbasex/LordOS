@@ -27,6 +27,7 @@ struct MAudio {
     uint64_t pos;                   /* own cursor: write (recording) or read (playback) */
     LmPulse pa;
     int started, want_play;
+    int lat_ms;                     /* playback's target buffer (maudio_latency), 0 the default */
     double volume;
     int volume_sent;
     uint32_t serial_seen;
@@ -79,7 +80,10 @@ static int start(MAudio *a) {
         lmp_record(&a->pa, a->source, AR_RATE, 1, a->title);
         a->pa.on_record = on_mic;
         a->pa.ud = a;
-    } else lmp_playback(&a->pa, AR_RATE, 2, a->title, a->role);
+    } else {
+        lmp_playback(&a->pa, AR_RATE, 2, a->title, a->role);
+        a->pa.tlength_ms = a->lat_ms;
+    }
     return 0;
 }
 
@@ -185,6 +189,9 @@ void maudio_volume(MAudio *a, double v) {
     maudio_service(a);
 }
 
+void maudio_latency(MAudio *a, int ms) { if (a && !a->rec && !a->started) a->lat_ms = ms; }
+uint64_t maudio_bytes(const MAudio *a) { return a ? a->pos : 0; }
+int maudio_ring_fd(const MAudio *a) { return a ? a->ring_fd : -1; }
 int maudio_overruns(const MAudio *a) { return a && a->ring ? (int)atomic_load(&a->ring->overruns) : 0; }
 void maudio_mic_drain(MAudio *a) { if (a && a->ring && a->rec) atomic_store(&a->ring->rpos, atomic_load(&a->ring->wpos)); }
 int maudio_failed(const MAudio *a) { return !a || a->pa.failed; }

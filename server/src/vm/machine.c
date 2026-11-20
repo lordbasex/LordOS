@@ -317,6 +317,9 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 5 && m->graphics) return fail(err, n, VM_E_FIELD, "graphics needs schema 5");
     if (m->graphics == VM_GFX_3D && m->devices == VM_DEV_WINDOWS) return fail(err, n, VM_E_RANGE, "3D graphics are for Linux machines (the windows devices stay 2D)");
     if (m->graphics == VM_GFX_3D && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "3D graphics are for amd64 machines for now");
+    if ((m->sound | m->microphone) & ~1) return fail(err, n, VM_E_RANGE, "sound and microphone are true or false");
+    if (m->volume < 0 || m->volume > 100) return fail(err, n, VM_E_RANGE, "volume must be 0 to 100");
+    if (m->schema < 6 && (!m->sound || m->volume != 100 || m->microphone)) return fail(err, n, VM_E_FIELD, "sound, volume and microphone need schema 6");
     if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
                           m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
         return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
@@ -354,7 +357,7 @@ static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
-    "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", NULL,
+    "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -534,6 +537,15 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         if (json_get(o, "graphics") && (r = get_enum(o, "graphics", GFX, &m->graphics, err, n))) goto out;
     }
     if ((r = parse6(o, m, err, n))) goto out;
+    {
+        /* schema 6's keys: missing means sound on at full volume, microphone off */
+        const JVal *so = json_get(o, "sound"), *mi = json_get(o, "microphone");
+        if ((so && so->type != J_BOOL) || (mi && mi->type != J_BOOL)) { r = fail(err, n, VM_E_FIELD, "sound and microphone must be true or false"); goto out; }
+        m->sound = so ? json_bool(o, "sound", 1) : 1;
+        m->microphone = mi ? json_bool(o, "microphone", 0) : 0;
+        m->volume = 100;
+        if ((r = get_opt_int(o, "volume", &m->volume, err, n))) goto out;
+    }
     r = vm_machine_check(m, err, n);
 out:
     json_free(&d);
@@ -614,6 +626,7 @@ char *vm_machine_json(const VmMachine *m) {
             jb_raw(&b, "]");
         }
     }
+    if (m->schema >= 6) jb_printf(&b, ",\n  \"sound\": %s,\n  \"volume\": %d,\n  \"microphone\": %s", m->sound ? "true" : "false", m->volume, m->microphone ? "true" : "false");
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);
     jb_raw(&b, "\n}\n");
@@ -748,6 +761,8 @@ void vm_machine_defaults(VmMachine *m, const VmHost *h, int arch) {
     m->firmware = VM_FW_UEFI;
     m->display = VM_DISPLAY_WINDOW;
     m->network = VM_NET_SHARED;
+    m->sound = 1;
+    m->volume = 100;
     vm_now_iso(m->created);
     memcpy(m->updated, m->created, sizeof m->updated);
 }

@@ -19,6 +19,7 @@ typedef struct {
     /* playback */
     uint32_t play_ch, play_index, frame_bytes;
     int rate, channels, corked;
+    int tlength_ms;                     /* the stream's target buffer (0: 200 ms); set after lmp_playback */
     int64_t requested;                  /* bytes the server asked for that weren't sent */
     int64_t written;                    /* bytes sent since the stream was created */
     /* latency (GET_PLAYBACK_LATENCY) */

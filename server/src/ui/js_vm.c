@@ -31,6 +31,8 @@
 #include "../wl/wl.h"
 #include "../gpu/gpu.h"
 #include "../sec/json.h"
+#include "../sec/perms.h"
+#include "../sec/restrict.h"
 #include "ui.h"
 #include "../term/term.h"
 #include "../fsops.h"
@@ -323,6 +325,10 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             JS_SetPropertyStr(c, o, "agent", JS_NewBool(c, m.agent));
             set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
             set_str(c, o, "mac", m.mac);
+            /* sound (6.9): host-side choices */
+            JS_SetPropertyStr(c, o, "sound", JS_NewBool(c, m.sound));
+            set_int(c, o, "volume", m.volume);
+            JS_SetPropertyStr(c, o, "microphone", JS_NewBool(c, m.microphone));
             {
                 /* a Clone whose guest is still to get its own hostname and machine-id (6.3) */
                 char idh[VM_HOSTNAME_MAX + 1] = "";
@@ -1108,6 +1114,15 @@ typedef struct {
     int db_y0, db_y1, db_frame, db_pending;
     long db_reads, db_fails;
     int db_warned;
+    /* sound (6.9): machine.json's choices, what the guest does now (VD_GUEST_AUDIO), and what this side has open. The
+     * speakers' stream and the microphone's belong to the picture's media source (m->audio, m->mic), so lord-server's
+     * loop serves them; their rings go to lord-vmdisplay (VD_AUDIO_OUT, VD_MIC) */
+    int snd_on, snd_vol, mic_allowed;
+    int guest_out, guest_in;
+    int spk_sent, mic_sent;             /* the current helper has the speakers' / microphone's ring */
+    int mic_wait;                       /* the guest records and the machine allows it, LordOS's permission not (yet) */
+    int spk_vol, spk_play;              /* what the speakers' stream was last given */
+    char name[VM_NAME_MAX + 1];
 } Sess;
 static Sess sess[MAX_SESS];
 
@@ -1143,6 +1158,65 @@ static void init_sess(Sess *s, const char *dir) {
     s->db_cur = -1;
     for (int i = 0; i < 4; i++) s->db[i].fd = -1;
     snprintf(s->dir, sizeof s->dir, "%s", dir);
+    VmMachine m;
+    if (!vm_machine_load(dir, &m, NULL, 0)) { s->snd_on = m.sound; s->snd_vol = m.volume; s->mic_allowed = m.microphone; snprintf(s->name, sizeof s->name, "%s", m.name); }
+    else { s->snd_on = 1; s->snd_vol = 100; }
+}
+
+/* ---- sound (6.9) ----
+ * The guest's sound plays from lord-server's own PipeWire stream (media/maudio.c), fed from a ring lord-vmdisplay writes;
+ * the guest's microphone reads a ring lord-server fills from the person's microphone. lord-vmdisplay never gets the
+ * PipeWire socket. The microphone opens only while all three hold: the machine's "microphone" is on, LordOS's
+ * microphone permission allows Machines (asked with the system prompt, revocable in Settings → Privacy; checked here,
+ * not only in the app), and the guest records now. Otherwise the guest reads silence (lord-vmdisplay). */
+#define BUILTIN_FWID "lordos"           /* built-in apps' firewall id (docs/FIREWALL.md), as js_media.c */
+static int mic_permitted(void) {
+    uint32_t rf = restrict_flag_of(PERM_MICROPHONE);
+    if (rf && restrict_blocks(BUILTIN_FWID, rf)) return 0;
+    return perm_get("machines", PERM_MICROPHONE) == PERM_ALLOW;
+}
+static void vdsend_fd(Sess *s, int type, int a, int fd) { if (s->vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, 0, 0, 0, 0, 0); vd_send(s->vd, &m, fd); } }
+
+static void snd_apply(Sess *s) {
+    MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
+    int up = s->vd >= 0 && s->vd_up && ms;
+    /* the speakers: a stream while the machine's sound is on (60 ms of buffer; the helper keeps at most 80 more) */
+    if (up && s->snd_on) {
+        if (!ms->audio) {
+            int ring = -1;
+            ms->audio = maudio_open(0, "Machines", s->name[0] ? s->name : "Machine", "video", &ring);
+            if (ms->audio) maudio_latency(ms->audio, 60);
+            s->spk_sent = 0;
+            s->spk_vol = -1;
+            s->spk_play = -1;
+        }
+        if (ms->audio) {
+            if (!s->spk_sent) { vdsend_fd(s, VD_AUDIO_OUT, 1, maudio_ring_fd(ms->audio)); s->spk_sent = 1; }
+            if (s->spk_vol != s->snd_vol) { s->spk_vol = s->snd_vol; maudio_volume(ms->audio, s->snd_vol / 100.0); }
+            if (s->spk_play != s->guest_out) { s->spk_play = s->guest_out; maudio_playing(ms->audio, s->guest_out); }
+        }
+    } else if (ms && ms->audio) {
+        if (s->spk_sent) vdsend(s, VD_AUDIO_OUT, 0, 0);
+        maudio_close(ms->audio);
+        ms->audio = NULL;
+        s->spk_sent = 0;
+    }
+    /* the microphone: not for a paused machine either (its input stays enabled while nothing runs) */
+    int want = up && s->mic_allowed && s->guest_in && s->state == VS_RUNNING, perm = want && mic_permitted();
+    s->mic_wait = want && !perm;
+    if (perm) {
+        if (!ms->mic) {
+            int ring = -1;
+            ms->mic = maudio_open(1, "Machines", s->name[0] ? s->name : "Machine", "", &ring);
+            s->mic_sent = 0;
+        }
+        if (ms->mic && !s->mic_sent) { vdsend_fd(s, VD_MIC, 1, maudio_ring_fd(ms->mic)); s->mic_sent = 1; }
+    } else if (ms && ms->mic) {
+        if (s->mic_sent) vdsend(s, VD_MIC, 0, 0);
+        maudio_close(ms->mic);
+        ms->mic = NULL;
+        s->mic_sent = 0;
+    }
 }
 
 /* First-boot settings for a guest that asks for them (systemd's credentials: a Debian "nocloud" image otherwise stops
@@ -1447,6 +1521,9 @@ static void drop_display(Sess *s, int close_helper) {
     s->vd_up = 0;
     s->ack_pending = 0;
     db_drop_all(s);
+    /* the next helper gets the rings again; until then nothing plays and the microphone is closed */
+    s->guest_out = s->guest_in = 0;
+    snd_apply(s);
     /* the next helper gets the guest's pointer again from QEMU; until then, the host's */
     free(s->cur); s->cur = NULL;
     if (s->media) media_src_cursor(s->media, NULL, 0, 0, 0, 0);
@@ -1600,8 +1677,12 @@ static void from_vd(Sess *s) {
         if (!r) break;
         if (!vd_msg_valid(&m, 0)) { if (fd >= 0) close(fd); continue; }
         switch (m.type) {
-        case VD_READY: s->vd_up = 1; break;
-        case VD_SIZE: set_picture(s, m.a, m.b); break;
+        case VD_READY: s->vd_up = 1; snd_apply(s); break;
+        case VD_SIZE: set_picture(s, m.a, m.b); snd_apply(s); break;
+        case VD_GUEST_AUDIO:
+            if (m.a == VDG_OUT) s->guest_out = m.b; else s->guest_in = m.b;
+            snd_apply(s);
+            break;
         case VD_FRAME:
             if (!s->media || !vd_rect_inside(&m, s->w, s->h)) break;
             if (s->db_cur >= 0) {
@@ -1687,6 +1768,10 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     if (s->vd >= 0) from_vd(s);
     ack(s);
     read_err(s);
+    snd_apply(s);                       /* a permission given or taken since */
+    MediaSrc *sm = s->media ? media_src_get(s->media) : NULL;
+    if (sm && sm->audio) maudio_service(sm->audio);      /* what the helper wrote since, without waiting for PipeWire to ask */
+    if (sm && sm->mic) maudio_service(sm->mic);
     if (s->vm < 0 && !s->ended) {
         int st;
         if (s->vm_pid > 0) {
@@ -1756,6 +1841,20 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_SetPropertyStr(c, o, "job", j);
     }
     set_str(c, o, "noticeText", s->notice_text);
+    {
+        /* sound (6.9): mic "off" (not allowed, or the guest doesn't record), "wait" (the guest records and the machine
+         * allows it: the app asks for LordOS's permission), "live" (the guest hears the microphone) */
+        JSValue so = JS_NewObject(c);
+        JS_SetPropertyStr(c, so, "on", JS_NewBool(c, s->snd_on));
+        set_int(c, so, "volume", s->snd_vol);
+        JS_SetPropertyStr(c, so, "microphone", JS_NewBool(c, s->mic_allowed));
+        JS_SetPropertyStr(c, so, "playing", JS_NewBool(c, s->guest_out));
+        JS_SetPropertyStr(c, so, "recording", JS_NewBool(c, s->guest_in));
+        set_str(c, so, "mic", sm && sm->mic && s->mic_sent ? "live" : s->mic_wait ? "wait" : "off");
+        JS_SetPropertyStr(c, so, "bytes", JS_NewFloat64(c, sm && sm->audio ? (double)maudio_bytes(sm->audio) : 0));
+        JS_SetPropertyStr(c, so, "micBytes", JS_NewFloat64(c, sm && sm->mic ? (double)maudio_bytes(sm->mic) : 0));
+        JS_SetPropertyStr(c, o, "sound", so);
+    }
     return o;
 }
 
@@ -1873,6 +1972,72 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     free(s->cur);
     memset(s, 0, sizeof *s);
     return JS_UNDEFINED;
+}
+
+/* sound(dir, { sound, volume, microphone }) → { live, job }: the machine's sound choices (6.9). A machine whose window is
+ * here gets them now (this side plays and records) and its lord-vm writes machine.json (VM_SOUND); one running without
+ * a window gets VM_SOUND through its runtime socket; one that is off gets lord-vm --set (job). null when refused. */
+static JSValue f_sound(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX];
+    VmMachine m;
+    if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir) || vm_machine_load(dir, &m, NULL, 0)) return JS_NULL;
+    int so = m.sound, vo = m.volume, mi = m.microphone, ok = 1;
+    JSValue v = JS_GetPropertyStr(c, argv[1], "sound");
+    if (JS_IsBool(v)) so = JS_ToBool(c, v); else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "microphone");
+    if (JS_IsBool(v)) mi = JS_ToBool(c, v); else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "volume");
+    if (JS_IsNumber(v)) { double d = 0; JS_ToFloat64(c, &d, v); if (d >= 0 && d <= 100) vo = (int)(d + 0.5); else ok = 0; } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    if (!ok) return JS_NULL;
+    int live = 0, job = 0;
+    for (int i = 0; i < MAX_SESS; i++) {
+        Sess *s = &sess[i];
+        if (!s->used || s->vm < 0 || s->ended || strcmp(s->dir, dir)) continue;
+        VmMsg q = vm_msg(VM_SOUND, ++s->seq, so, vo, mi, 0, NULL);
+        if (vm_send(s->vm, &q, -1)) continue;
+        s->snd_on = so; s->snd_vol = vo; s->mic_allowed = mi;
+        snd_apply(s);
+        live = 1;
+    }
+    if (!live) {
+        /* running without a window here: its runtime socket, one request, its answer awaited briefly */
+        const char *rt = getenv("XDG_RUNTIME_DIR");
+        char base[256], path[sizeof ((struct sockaddr_un *)0)->sun_path];
+        if (rt && rt[0] == '/') snprintf(base, sizeof base, "%s", rt); else snprintf(base, sizeof base, "/run/user/%u", (unsigned)getuid());
+        int fd = (size_t)snprintf(path, sizeof path, "%s/lordos-vm/%s.sock", base, m.id) < sizeof path ? socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0) : -1;
+        struct sockaddr_un a = { .sun_family = AF_UNIX };
+        if (fd >= 0) memcpy(a.sun_path, path, strlen(path) + 1);
+        if (fd >= 0 && !connect(fd, (struct sockaddr *)&a, sizeof a)) {
+            VmMsg q = vm_msg(VM_SOUND, 1, so, vo, mi, 0, NULL);
+            if (!vm_send(fd, &q, -1)) {
+                for (int k = 0; k < 8; k++) {
+                    struct pollfd pf = { fd, POLLIN, 0 };
+                    if (poll(&pf, 1, 60) <= 0) continue;
+                    VmMsg r;
+                    int rfd = -1, got = vm_recv(fd, &r, &rfd);
+                    if (rfd >= 0) close(rfd);
+                    if (got <= 0) break;
+                    if (r.type == VM_REPLY && r.seq == 1) { live = r.a == VME_OK; break; }
+                }
+            }
+        }
+        if (fd >= 0) close(fd);
+    }
+    if (!live) {
+        char sv[8];
+        snprintf(sv, sizeof sv, "%d", vo);
+        char *args[] = { "lord-vm", "--set", dir, "--sound", so ? "on" : "off", "--volume", sv, "--microphone", mi ? "on" : "off", NULL };
+        job = spawn_job(args, dir);
+        if (!job) return JS_NULL;
+    }
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "live", JS_NewBool(c, live));
+    set_int(c, o, "job", job);
+    return o;
 }
 
 /* a machine with no window here (started elsewhere, or kept running): one request through its runtime socket */
@@ -2814,7 +2979,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("agent", 2, f_agent), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
     JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
-    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
+    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {

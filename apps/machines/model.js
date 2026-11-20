@@ -368,6 +368,31 @@ export const mountCommand = (tag) => `sudo mkdir -p /mnt/${tag} && sudo mount -t
 export const clipTo = (c) => c === 'both' || c === 'to-guest';
 export const clipFrom = (c) => c === 'both' || c === 'from-guest';
 
+// ---- sound and microphone (6.9) ----
+// A machine's choices (machine.json schema 6; an older machine reads as sound on at full volume, microphone off)
+export function soundOf(m) {
+  const v = Number(m?.volume);
+  return { sound: m?.sound !== false, volume: Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : 100, microphone: m?.microphone === true };
+}
+// heard: the sound is on and not at zero
+export const audible = (s) => !!s && s.sound && s.volume > 0;
+// Configure's one-line summary: which keys of machines.cfg.sum.* and their values
+export function soundSummary(m) {
+  const s = soundOf(m);
+  return { key: audible(s) ? 'machines.cfg.sum.soundOn' : 'machines.cfg.sum.soundOff', volume: s.volume,
+    mic: s.microphone ? 'machines.cfg.sum.micOn' : 'machines.cfg.sum.micOff' };
+}
+// the toolbar's speaker: a click mutes, or turns the sound back on (at 50 when it was at zero)
+export function muteToggle(s) {
+  const c = soundOf(s);
+  if (audible(c)) return { sound: false };
+  return c.volume > 0 ? { sound: true } : { sound: true, volume: 50 };
+}
+// lord.vm.poll's sound.mic: 'live' shows the microphone in use (the bar's light and the menu bar's indicator); 'wait'
+// asks LordOS's microphone permission once per window while the guest records
+export const micLive = (snd) => snd?.mic === 'live';
+export const micAsk = (snd, asked) => snd?.mic === 'wait' && !asked;
+
 // ---- snapshots (6.2) ----
 
 // a new snapshot's suggested name: "Snapshot 3", the first number not in use

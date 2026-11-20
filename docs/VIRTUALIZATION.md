@@ -983,8 +983,8 @@ Clone sheet with the name inside the machine and *Keep identity*, and a Clone (`
 
 *Not done or not verified:* snapshot sizes count only the memory, not the disk clusters a snapshot keeps; shared extents and the
 reflink path weren't seen (no btrfs or XFS here); a power cut isn't simulated; the agent's own shell (6.18) is the serial console for
-now; files by copy and paste or drag (6.21) aren't built; a sound card's playback on this computer's speakers isn't built (only
-recordings take the guest's sound).
+now; files by copy and paste or drag (6.21) aren't built. The guest's sound on this computer's speakers and its microphone are
+built since (6.9).
 
 *Release gates on the Pi 5 with `machines-089`* (2026-11-06; 0.8.8.4 with the beta and the import merged; `lord-vm`
 built for arm64 in the arm64 build root and run from a scratch folder, the installed packages untouched, Debian 13's
@@ -1691,6 +1691,37 @@ If the D-Bus clipboard turns out unworkable on a guest, the clipboard moves to t
 ### 6.9 Sound, camera, microphone
 
 Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: asked once per VM with the existing Permissions flow; camera through USB redirect or `uvc` emulation. Off by default.
+
+**Built (in development, after 0.8.9.4): speakers and microphone.**
+
+- *The card.* Every machine has an HDA controller with one `hda-micro` codec (a speaker and a microphone), on every machine and
+  whatever its settings, so the guest's hardware never changes with them and snapshots and saved states keep loading. Machines made
+  before had `hda-output`: a state they saved loads into `hda-micro` (**Measured**, 2026-11-20: suspended by the previous build, resumed
+  by this one, sound playing after). The other way round does not: an older build can't resume a state saved by this one (QEMU stops on
+  an assertion while loading), but an older build can't open a schema 6 machine anyway.
+- *Speakers.* lord-vmdisplay registers an `AudioOutListener` and an `AudioInListener`, each on a peer connection of its own, before
+  its sandbox. It applies the guest's own mute and volume (QEMU leaves them to the listener, 0..255 a channel) and copies the PCM
+  (48 kHz, 16-bit stereo) into a ring lord-server made (`VD_AUDIO_OUT`, `media/aring.h`), never more than 80 ms ahead of what
+  lord-server read: past that a piece is dropped, never waited for. lord-server plays the ring from its own PipeWire stream
+  (`media/maudio.c`, a 60 ms target buffer; PipeWire granted 50 ms), named after the machine, corked while the guest plays nothing
+  (`VD_GUEST_AUDIO`). lord-vmdisplay never gets the PipeWire socket.
+- *Microphone.* QEMU asks the `AudioInListener` with `Read` from its main loop and waits, so the helper answers at once: the frames the
+  time owes at 48 kHz (at most 100 ms an answer; a paused machine doesn't get a burst after), from lord-server's microphone ring
+  (`VD_MIC`) when there is one, else silence, with the guest's own capture mute and level applied. lord-server opens the microphone
+  (its own capture stream) only while three things hold: the machine's `microphone` is on, LordOS's microphone permission allows
+  Machines (`perm_get("machines", PERM_MICROPHONE)` and the restrictions, checked in C in `js_vm.c`, not only by the app), and the
+  guest records now. The app asks for the permission with the system prompt the first time the guest records with the setting on; while
+  the microphone is open the bar shows it and the menu bar's microphone indicator lights.
+- *Settings.* machine.json schema 6: `sound` (true), `volume` (0..100, 100), `microphone` (false); an older file reads as those. They
+  are host-side and change while the machine runs: through `VM_SOUND` to its lord-vm, which writes the file (it holds the lock), or
+  `lord-vm --set --sound --volume --microphone` with it off. Configure → Sound and input has them; the bar's speaker mutes and unmutes.
+- *Checked (**Measured**, 2026-11-20, amd64, a clone of an Ubuntu 26.04 guest, with `lordvm-dev`, which plays lord-server's part with
+  lord-server's own `maudio.c` and a PipeWire stream at volume 0):* GNOME's screen reader at the login screen and `speaker-test`
+  reached the stream at the real rate (192 000 bytes a second), every byte the helper wrote was taken (0 dropped), the ring stayed
+  empty between PipeWire's requests; the guest's `arecord` of the microphone ring's 440 Hz tone measured 440 Hz at the level sent,
+  half of it with the guest's capture at 50 %, silence with its capture off or without a ring, always the full length (2 s took 2 s of
+  frames). *Not checked:* the whole path inside a running lord-server (the window, Configure, the permission prompt and the
+  indicator) on screen; a Windows guest.
 
 ### 6.10 Graphics
 
