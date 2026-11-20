@@ -475,6 +475,8 @@
   "ws.spine.activities": "Activități",
   "ws.spine.apps": "Aplicații",
   "ws.spine.files": "Fișiere",
+  "ws.spine.store": "Magazin",
+  "ws.spine.monitor": "Monitor",
   "ws.spine.control": "Comenzi",
   "ws.spine.collapse": "Restrânge coloana",
   "ws.spine.expand": "Extinde coloana",

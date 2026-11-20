@@ -124,6 +124,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   until the index or the language changes (each walked the whole index on lord-server's thread and built thousands of
   objects on every render, and the heap grew until the Store was closed), and a category shows 60 cards at a time.
   The Store's sidebar can be widened by dragging its edge (remembered), and Web apps are named "Web apps (PWA)".
+- **Lord Workspaces: the Store and Monitor on the Context Spine**, under Files, each with its own glyph (a bag, a pulse
+  line), in keyboard focus order too.
 - `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
   `resolution`, `boot_order`, `boot_menu`;
   older files load unchanged.

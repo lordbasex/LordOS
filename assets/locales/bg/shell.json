@@ -468,6 +468,8 @@
   "ws.spine.activities": "Дейности",
   "ws.spine.apps": "Приложения",
   "ws.spine.files": "Файлове",
+  "ws.spine.store": "Магазин",
+  "ws.spine.monitor": "Монитор",
   "ws.spine.control": "Управление",
   "ws.spine.collapse": "Свий лентата",
   "ws.spine.expand": "Разгъни лентата",

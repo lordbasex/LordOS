@@ -468,6 +468,8 @@
   "ws.spine.activities": "Activitats",
   "ws.spine.apps": "Apps",
   "ws.spine.files": "Fitxers",
+  "ws.spine.store": "Botiga",
+  "ws.spine.monitor": "Monitor",
   "ws.spine.control": "Controls",
   "ws.spine.collapse": "Plega la columna",
   "ws.spine.expand": "Desplega la columna",
