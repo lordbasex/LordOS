@@ -831,5 +831,6 @@
   "widgets.claude.d": "{d} a {h} o",
   "widgets.claude.h": "{h} o {m} min",
   "widgets.claude.m": "{m} min",
-  "widgets.claude.near": "Malapit sa limit"
+  "widgets.claude.near": "Malapit sa limit",
+  "guestWindowName": "{app} ({machine})"
 }

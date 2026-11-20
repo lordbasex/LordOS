@@ -758,7 +758,6 @@
   "dl.resumed": "Dilanjutkan dari {size} yang diunduh sebelumnya",
   "as.r.download": "Unduhan",
   "tb.clipChange": "Ubah di Konfigurasi…",
-  "tb.appsLater": "Mode aplikasi: hadir di versi mendatang",
   "win.playHint": "Klik untuk memulainya.",
   "first.addHint": "Tambahkan mesin virtual untuk menjalankan sistem lain di jendela desktop ini: unduh satu, pasang dari ISO, atau bawa dari aplikasi lain.",
   "lib.noMatch": "Tidak ada mesin yang cocok dengan “{q}”.",
@@ -917,5 +916,16 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Aktif",
   "cfg.off": "Nonaktif",
-  "cfg.setAtCreate": "Dipilih saat mesin dibuat."
+  "cfg.setAtCreate": "Dipilih saat mesin dibuat.",
+  "apps.enter": "Mode aplikasi: setiap aplikasi mesin di jendelanya sendiri",
+  "apps.mode": "Mode Aplikasi",
+  "apps.leave": "Keluar dari Mode Aplikasi",
+  "apps.menu": "Aplikasi",
+  "apps.needsAgent": "Mode aplikasi memerlukan agen mesin yang terhubung",
+  "win.appsNeedsTools": "Mode aplikasi memerlukan LordOS atau Windows di mesin, dengan alat LordOS",
+  "apps.noApps": "Mesin belum mendaftarkan aplikasinya",
+  "apps.gone": "Jendela ini ditutup di dalam mesin",
+  "apps.windowTitle": "{title} — {machine}",
+  "apps.controllerHint": "Aplikasi mesin ada di jendelanya sendiri, dan desktopnya disembunyikan. Esc atau Keluar dari Mode Aplikasi menampilkannya lagi.",
+  "agent.st.needsTools": "Perlu alatnya"
 }

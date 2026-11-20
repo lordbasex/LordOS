@@ -824,5 +824,6 @@
   "widgets.claude.d": "{d}일 {h}시간",
   "widgets.claude.h": "{h}시간 {m}분",
   "widgets.claude.m": "{m}분",
-  "widgets.claude.near": "한도에 가까움"
+  "widgets.claude.near": "한도에 가까움",
+  "guestWindowName": "{app} ({machine})"
 }

@@ -831,5 +831,6 @@
   "widgets.claude.d": "{d} n {h} ó",
   "widgets.claude.h": "{h} ó {m} perc",
   "widgets.claude.m": "{m} perc",
-  "widgets.claude.near": "Közel egy korláthoz"
+  "widgets.claude.near": "Közel egy korláthoz",
+  "guestWindowName": "{app} ({machine})"
 }

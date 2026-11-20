@@ -824,5 +824,6 @@
   "widgets.claude.d": "{d} h {h} j",
   "widgets.claude.h": "{h} j {m} mnt",
   "widgets.claude.m": "{m} mnt",
-  "widgets.claude.near": "Dekat batas"
+  "widgets.claude.near": "Dekat batas",
+  "guestWindowName": "{app} ({machine})"
 }

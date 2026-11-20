@@ -758,7 +758,6 @@
   "dl.resumed": "Continuată de la cei {size} descărcați anterior",
   "as.r.download": "Descărcare",
   "tb.clipChange": "Schimbă în Configurare…",
-  "tb.appsLater": "Modul aplicații: vine într-o versiune ulterioară",
   "win.playHint": "Faceți clic pentru a o porni.",
   "first.addHint": "Adăugați o mașină virtuală pentru a rula alt sistem într-o fereastră a acestui desktop: descărcați unul, instalați-l dintr-un ISO sau aduceți-l din altă aplicație.",
   "lib.noMatch": "Nicio mașină nu corespunde cu „{q}”.",
@@ -917,5 +916,16 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Activat",
   "cfg.off": "Dezactivat",
-  "cfg.setAtCreate": "Ales la crearea mașinii."
+  "cfg.setAtCreate": "Ales la crearea mașinii.",
+  "apps.enter": "Modul aplicații: fiecare aplicație a mașinii în propria fereastră",
+  "apps.mode": "Modul aplicații",
+  "apps.leave": "Ieși din modul aplicații",
+  "apps.menu": "Aplicații",
+  "apps.needsAgent": "Modul aplicații are nevoie de agentul mașinii, conectat",
+  "win.appsNeedsTools": "Modul aplicații are nevoie de LordOS sau Windows în mașină, cu instrumentele LordOS",
+  "apps.noApps": "Mașina nu și-a listat încă aplicațiile",
+  "apps.gone": "Această fereastră s-a închis în mașină",
+  "apps.windowTitle": "{title} — {machine}",
+  "apps.controllerHint": "Aplicațiile mașinii sunt în ferestre proprii, iar desktopul ei este ascuns. Esc sau Ieși din modul aplicații îl arată din nou.",
+  "agent.st.needsTools": "Necesită instrumentele"
 }

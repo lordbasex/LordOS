@@ -831,5 +831,6 @@
   "widgets.claude.d": "{d} g {h} s",
   "widgets.claude.h": "{h} s {m} dəq",
   "widgets.claude.m": "{m} dəq",
-  "widgets.claude.near": "Limitə yaxın"
+  "widgets.claude.near": "Limitə yaxın",
+  "guestWindowName": "{app} ({machine})"
 }

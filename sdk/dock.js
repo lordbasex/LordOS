@@ -151,7 +151,7 @@ let openIds = new Set();
 windows.subscribe(() => {
   const now = new Set();
   for (const w of windows.get()) if (!(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'))) now.add(launcherIdOf(w));
-  const fresh = [...now].filter((id) => !openIds.has(id) && !id.startsWith('linux:'));
+  const fresh = [...now].filter((id) => !openIds.has(id) && !id.startsWith('linux:') && !id.startsWith('vm:'));
   openIds = now;
   if (!fresh.length) return;
   const cur = settings.get().dockRecentApps || [];
@@ -161,6 +161,8 @@ windows.subscribe(() => {
 
 // Which launcher app a window belongs to: its LordOS app, or the Linux app from its .desktop.
 export function launcherIdOf(w) {
+  // a guest's window (Machines' apps mode): one icon per app of that machine, never a launcher entry of this computer
+  if (w.args?.guest) return `vm:${w.args.guest.mid || ''}:${w.args.guest.key || w.args.guest.app || w.id}`;
   if (!String(w.id).startsWith('linux#')) return appIdOf(w.id);
   const web = webAppOfWindow(w);
   if (web) return `web:${web.entry.id}`;            // every profile's windows under the app
@@ -175,7 +177,7 @@ export function dockIdOfWindow(w) {
   const web = String(w.id).startsWith('linux#') ? webAppOfWindow(w) : null;
   if (web) return webDockId(web.entry, web.profile, webPrefs(settings.get(), web.entry.id).dockPerProfile);
   const k = launcherIdOf(w);
-  return k.startsWith('linux:') ? k : dockIdOf(k) || k;
+  return k.startsWith('linux:') || k.startsWith('vm:') ? k : dockIdOf(k) || k;
 }
 
 // opts.recents: how many recent apps (neither pinned nor open) are appended at the end, with recent: true.

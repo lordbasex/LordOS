@@ -831,5 +831,6 @@
   "widgets.claude.d": "{d} s {h} s",
   "widgets.claude.h": "{h} s {m} dk",
   "widgets.claude.m": "{m} dk",
-  "widgets.claude.near": "Karibu na kikomo"
+  "widgets.claude.near": "Karibu na kikomo",
+  "guestWindowName": "{app} ({machine})"
 }

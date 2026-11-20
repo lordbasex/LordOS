@@ -758,7 +758,6 @@
   "dl.resumed": "從先前已下載的 {size} 繼續",
   "as.r.download": "下載",
   "tb.clipChange": "在「設定」中變更…",
-  "tb.appsLater": "App 模式：將在之後的版本推出",
   "win.playHint": "按一下以啟動。",
   "first.addHint": "加入虛擬機器，以便在此桌面的視窗中執行另一個系統：下載一個、從 ISO 安裝，或從其他 App 移轉。",
   "lib.noMatch": "沒有符合「{q}」的虛擬機器。",
@@ -917,5 +916,16 @@
   "cfg.secureBoot": "安全開機",
   "cfg.on": "開啟",
   "cfg.off": "關閉",
-  "cfg.setAtCreate": "建立虛擬機器時已選定。"
+  "cfg.setAtCreate": "建立虛擬機器時已選定。",
+  "apps.enter": "應用程式模式：機器中的每個應用程式都在獨立視窗中",
+  "apps.mode": "應用程式模式",
+  "apps.leave": "離開應用程式模式",
+  "apps.menu": "應用程式",
+  "apps.needsAgent": "應用程式模式需要已連線的機器代理程式",
+  "win.appsNeedsTools": "應用程式模式需要機器中裝有 LordOS 工具的 LordOS 或 Windows",
+  "apps.noApps": "機器尚未列出其應用程式",
+  "apps.gone": "此視窗已在機器中關閉",
+  "apps.windowTitle": "{title} — {machine}",
+  "apps.controllerHint": "機器的應用程式在各自的視窗中，其桌面已隱藏。按 Esc 或「離開應用程式模式」可再次顯示。",
+  "agent.st.needsTools": "需要工具"
 }

@@ -824,5 +824,6 @@
   "widgets.claude.d": "{d} h {h} j",
   "widgets.claude.h": "{h} j {m} min",
   "widgets.claude.m": "{m} min",
-  "widgets.claude.near": "Hampir had"
+  "widgets.claude.near": "Hampir had",
+  "guestWindowName": "{app} ({machine})"
 }

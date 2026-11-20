@@ -824,5 +824,6 @@
   "widgets.claude.d": "{d} วัน {h} ชม.",
   "widgets.claude.h": "{h} ชม. {m} นาที",
   "widgets.claude.m": "{m} นาที",
-  "widgets.claude.near": "ใกล้ถึงขีดจำกัด"
+  "widgets.claude.near": "ใกล้ถึงขีดจำกัด",
+  "guestWindowName": "{app} ({machine})"
 }

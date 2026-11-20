@@ -758,7 +758,6 @@
   "dl.resumed": "从之前已下载的 {size} 处继续",
   "as.r.download": "下载",
   "tb.clipChange": "在“配置”中更改…",
-  "tb.appsLater": "应用模式：将在以后的版本中推出",
   "win.playHint": "点按以启动。",
   "first.addHint": "添加一台虚拟机，在此桌面的窗口中运行另一个系统：下载一个系统、从 ISO 安装，或从其他应用迁移。",
   "lib.noMatch": "没有虚拟机与“{q}”匹配。",
@@ -917,5 +916,16 @@
   "cfg.secureBoot": "安全启动",
   "cfg.on": "已开启",
   "cfg.off": "已关闭",
-  "cfg.setAtCreate": "创建虚拟机时已选定。"
+  "cfg.setAtCreate": "创建虚拟机时已选定。",
+  "apps.enter": "应用模式：机器中的每个应用都在单独的窗口中",
+  "apps.mode": "应用模式",
+  "apps.leave": "退出应用模式",
+  "apps.menu": "应用程序",
+  "apps.needsAgent": "应用模式需要已连接的机器代理",
+  "win.appsNeedsTools": "应用模式需要机器中装有 LordOS 工具的 LordOS 或 Windows",
+  "apps.noApps": "机器尚未列出其应用",
+  "apps.gone": "此窗口已在机器中关闭",
+  "apps.windowTitle": "{title} — {machine}",
+  "apps.controllerHint": "机器的应用在各自的窗口中，其桌面已隐藏。按 Esc 或“退出应用模式”可再次显示。",
+  "agent.st.needsTools": "需要工具"
 }

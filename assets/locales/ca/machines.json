@@ -758,7 +758,6 @@
   "dl.resumed": "S’ha continuat a partir dels {size} baixats abans",
   "as.r.download": "Baixada",
   "tb.clipChange": "Canvia-ho a Configura…",
-  "tb.appsLater": "Mode d’apps: arribarà en una versió posterior",
   "win.playHint": "Fes clic per iniciar-la.",
   "first.addHint": "Afegeix una màquina virtual per executar un altre sistema en una finestra d’aquest escriptori: baixa’n una, instal·la-la des d’una ISO o porta-la d’una altra app.",
   "lib.noMatch": "Cap màquina no coincideix amb «{q}».",
@@ -917,5 +916,16 @@
   "cfg.secureBoot": "Arrencada segura",
   "cfg.on": "Activat",
   "cfg.off": "Desactivat",
-  "cfg.setAtCreate": "Triat quan es va crear la màquina."
+  "cfg.setAtCreate": "Triat quan es va crear la màquina.",
+  "apps.enter": "Mode d'aplicacions: cada aplicació de la màquina en una finestra pròpia",
+  "apps.mode": "Mode d'aplicacions",
+  "apps.leave": "Surt del mode d'aplicacions",
+  "apps.menu": "Aplicacions",
+  "apps.needsAgent": "El mode d'aplicacions necessita l'agent de la màquina, connectat",
+  "win.appsNeedsTools": "El mode d'aplicacions necessita LordOS o Windows a la màquina, amb les eines de LordOS",
+  "apps.noApps": "La màquina encara no ha llistat les seves aplicacions",
+  "apps.gone": "Aquesta finestra s'ha tancat a la màquina",
+  "apps.windowTitle": "{title} — {machine}",
+  "apps.controllerHint": "Les aplicacions de la màquina són en finestres pròpies i el seu escriptori està amagat. Esc o Surt del mode d'aplicacions el torna a mostrar.",
+  "agent.st.needsTools": "Calen les eines"
 }

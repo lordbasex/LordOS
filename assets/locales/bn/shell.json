@@ -831,5 +831,6 @@
   "widgets.claude.d": "{d} দি {h} ঘ",
   "widgets.claude.h": "{h} ঘ {m} মি",
   "widgets.claude.m": "{m} মি",
-  "widgets.claude.near": "সীমার কাছে"
+  "widgets.claude.near": "সীমার কাছে",
+  "guestWindowName": "{app} ({machine})"
 }

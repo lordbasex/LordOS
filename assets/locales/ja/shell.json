@@ -824,5 +824,6 @@
   "widgets.claude.d": "{d}日 {h}時間",
   "widgets.claude.h": "{h}時間 {m}分",
   "widgets.claude.m": "{m}分",
-  "widgets.claude.near": "上限に近づいています"
+  "widgets.claude.near": "上限に近づいています",
+  "guestWindowName": "{app}（{machine}）"
 }

@@ -262,8 +262,28 @@ function prettyAppId(appId) {
 
 // The app name of a window, never its title: a LordOS app's name; for a Linux window, the isolated
 // app's package name, its .desktop's short name or its app_id.
+// Icons an app hands for its own windows as pixels: window id → { width, height, data } (RGBA). Machines' apps mode
+// (docs/VIRTUALIZATION.md 7.2): a guest's window shows its app's icon in the Dock, the taskbar and the switcher.
+export const windowPixelIcons = createStore({});
+const pixelIconOf = new Map();
+function guestIcon(w) {
+  let C = pixelIconOf.get(w.id);
+  if (!C) {
+    const id = w.id, name = w.args?.guest?.app || w.title || '?';
+    C = ({ size = 32 }) => {
+      const px = useStore(windowPixelIcons, (m) => m[id] || null);
+      return px ? h(Image, { pixels: px, style: { width: size, height: size } }) : h(LetterIcon, { size, name });
+    };
+    pixelIconOf.set(id, C);
+    if (pixelIconOf.size > 256) pixelIconOf.delete(pixelIconOf.keys().next().value);
+  }
+  return C;
+}
+
 export function windowAppName(w) {
   if (!w) return '';
+  // a guest's window (Machines' apps mode): its app's name as the guest said it, and the machine's
+  if (w.args?.guest) return t('shell.guestWindowName', { app: w.args.guest.app || w.title || '', machine: w.args.guest.machine || '' });
   if (!String(w.id).startsWith('linux#')) return appName(registryApp(w.id));
   const web = webAppOfWindow(w);
   if (web) {
@@ -277,7 +297,8 @@ export function windowAppName(w) {
 }
 
 // Icon of a window: its app's; for a Linux window, its .desktop's if one is found.
-export function windowIcon(w, getApp) {
+export function windowIcon(w, getApp = registryApp) {
+  if (w?.args?.guest) return guestIcon(w);
   const appId = w?.args?.appId;
   if (String(w?.id).startsWith('linux#')) {
     const web = webAppOfWindow(w);

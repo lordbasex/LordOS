@@ -831,5 +831,6 @@
   "widgets.claude.d": "{d} pv {h} h",
   "widgets.claude.h": "{h} h {m} min",
   "widgets.claude.m": "{m} min",
-  "widgets.claude.near": "Lähellä rajaa"
+  "widgets.claude.near": "Lähellä rajaa",
+  "guestWindowName": "{app} ({machine})"
 }

@@ -831,5 +831,6 @@
   "widgets.claude.d": "{d} д {h} ч",
   "widgets.claude.h": "{h} ч {m} мин",
   "widgets.claude.m": "{m} мин",
-  "widgets.claude.near": "Близо до лимит"
+  "widgets.claude.near": "Близо до лимит",
+  "guestWindowName": "{app} ({machine})"
 }

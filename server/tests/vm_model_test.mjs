@@ -326,5 +326,36 @@ eq('copy line empty files', M.copyLine([{ id: 1, name: 'z', state: 'copying', pc
 eq('guest folder', [M.guestFolder('/home/ana/Descargas/x (2).txt'), M.guestFolder('C:\\Users\\Ana\\Downloads\\x.txt'), M.guestFolder('x.txt'), M.guestFolder('/x')], ['/home/ana/Descargas', 'C:\\Users\\Ana\\Downloads', '', '/']);
 eq('follow stuck', [M.followStuck([1920, 1080], [1784, 830], 0, 5000), M.followStuck([1920, 1080], [1784, 830], 0, 3000), M.followStuck([1920, 1080], [1918, 1080], 0, 9000), M.followStuck(null, [1, 1], 0, 9000)], [true, false, false, false]);
 
+// ---- apps mode (7.2) ----
+eq('apps blocker', [M.appsBlocker(null, { agent: true }), M.appsBlocker({ state: 'connected', caps: 32 }, { agent: false }), M.appsBlocker({ state: 'connected', caps: 32 }, { agent: true }),
+  M.appsBlocker({ state: 'connected', caps: 160 }, { agent: true })], ['needsAgent', 'needsAgent', 'needsTools', null]);
+eq('agent lines say apps', agentLines({ state: 'connected', caps: 128 }, { agent: true }).find((x) => x[0] === 'apps')[1], 'works');
+eq('apps guest size', [M.appsGuestSize({ w: 1920, h: 1080 }), M.appsGuestSize({ w: 1367, h: 769 }), M.appsGuestSize({ w: 100, h: 50 }), M.appsGuestSize({ w: 10000, h: 9000 })],
+  [[1920, 1080], [1366, 768], [320, 200], [8192, 8192]]);
+eq('guest scale', [M.guestScale(1920, 1080, { w: 1920, h: 1080 }), M.guestScale(3840, 2160, { w: 1920, h: 1080 }), M.guestScale(1024, 768, { w: 2048, h: 1080 }), M.guestScale(0, 0, { w: 1, h: 1 })], [1, 0.5, 1.40625, 1]);
+const D0 = { x: 1920, y: 0, w: 1920, h: 1080 };
+eq('to host rect', M.toHostRect({ x: 100, y: 50, w: 640, h: 480 }, 0.5, D0), { x: 1970, y: 25, w: 320, h: 240 });
+eq('round trip rect', M.toGuestRect(M.toHostRect({ x: 100, y: 50, w: 640, h: 480 }, 1, D0), 1, D0), { x: 100, y: 50, w: 640, h: 480 });
+eq('crop of', M.cropOf({ x: 10, y: 20, w: 30, h: 40 }), [10, 20, 30, 40]);
+eq('crop point 1:1', M.cropPoint(110, 220, [100, 200, 300, 400], [500, 600, 300, 400], 1920, 1080), [510, 620]);
+eq('crop point scaled', M.cropPoint(250, 400, [100, 200, 300, 400], [500, 600, 600, 800], 1920, 1080), [800, 1000]);
+eq('crop point clamped to the screen', M.cropPoint(399, 599, [100, 200, 300, 400], [1800, 1000, 300, 400], 1920, 1080), [1919, 1079]);
+eq('crop point outside', [M.cropPoint(99, 220, [100, 200, 300, 400], [0, 0, 300, 400], 1920, 1080), M.cropPoint(400, 220, [100, 200, 300, 400], [0, 0, 300, 400], 1920, 1080), M.cropPoint(1, 1, [0, 0, 0, 0], [0, 0, 1, 1], 9, 9)], [null, null, null]);
+eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, h: 9 }), M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 3, y: 0, w: 10, h: 10 }), M.nearRect(null, {})], [true, false, false]);
+eq('popup', [M.isPopup({ owner: 5, topmost: true }), M.isPopup({ owner: 5, topmost: false }), M.isPopup({ owner: 0, topmost: true })], [true, false, false]);
+eq('instance', [M.guestInstance('ab12-cd', 4294967295), M.guestInstance('a/../b', 7)], ['ga-ab12-cd-4294967295', 'ga-ab-7']);
+{
+  const W = (id, x, extra = {}) => ({ id, x, y: 10, w: 300, h: 200, minimized: false, ...extra });
+  const have = new Map([[1, { rect: W(1, 0), minimized: false }], [9, { rect: W(9, 0), minimized: false }], [2, { rect: W(2, 50), minimized: false, asked: W(2, 80) }], [3, { rect: W(3, 0), minimized: false }], [4, { rect: W(4, 0), minimized: true }]]);
+  const p = M.planWindows([W(1, 20), W(9, 1), W(2, 80), W(4, 0), W(5, 0), W(6, 0, { minimized: true }), W(7, 0, { w: 4 }), W(8, 0, { minimized: true })], have);
+  eq('plan open', p.open.map((w) => w.id), [5]);
+  eq('plan close', p.close, [3]);
+  eq('plan follow (not what this side asked, not a pixel of rounding)', p.follow.map((w) => w.id), [1]);
+  eq('plan restore', p.restore.map((w) => w.id), [4]);
+  const q = M.planWindows([W(1, 200, { minimized: true })], new Map([[1, { rect: W(1, 0), minimized: false }]]));
+  eq('plan minimize, no follow', [q.minimize.map((w) => w.id), q.follow.length], [[1], 0]);
+}
+eq('guest apps menu', M.guestAppItems([{ name: 'Zeta', token: 'z' }, { name: 'alpha', token: 'a' }, { name: 'dup', token: 'a' }, { name: '', token: 'x' }, null]).map((a) => a.token), ['a', 'z']);
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

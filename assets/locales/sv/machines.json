@@ -758,7 +758,6 @@
   "dl.resumed": "Fortsatte från de {size} som laddats ner tidigare",
   "as.r.download": "Nedladdning",
   "tb.clipChange": "Ändra i Konfigurera…",
-  "tb.appsLater": "Appläge: kommer i en senare version",
   "win.playHint": "Klicka för att starta den.",
   "first.addHint": "Lägg till en virtuell maskin för att köra ett annat system i ett fönster på det här skrivbordet: ladda ner en, installera den från en ISO eller ta med en från en annan app.",
   "lib.noMatch": "Ingen maskin matchar ”{q}”.",
@@ -917,5 +916,16 @@
   "cfg.secureBoot": "Säker start",
   "cfg.on": "På",
   "cfg.off": "Av",
-  "cfg.setAtCreate": "Valdes när maskinen skapades."
+  "cfg.setAtCreate": "Valdes när maskinen skapades.",
+  "apps.enter": "Appläge: varje app i maskinen i ett eget fönster",
+  "apps.mode": "Appläge",
+  "apps.leave": "Lämna appläget",
+  "apps.menu": "Program",
+  "apps.needsAgent": "Appläget behöver maskinens agent, ansluten",
+  "win.appsNeedsTools": "Appläget behöver LordOS eller Windows i maskinen, med LordOS-verktygen",
+  "apps.noApps": "Maskinen har inte listat sina appar än",
+  "apps.gone": "Det här fönstret stängdes i maskinen",
+  "apps.windowTitle": "{title} — {machine}",
+  "apps.controllerHint": "Maskinens appar ligger i egna fönster och dess skrivbord är dolt. Esc eller Lämna appläget visar det igen.",
+  "agent.st.needsTools": "Behöver verktygen"
 }

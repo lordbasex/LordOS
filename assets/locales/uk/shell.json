@@ -838,5 +838,6 @@
   "widgets.claude.d": "{d} д {h} г",
   "widgets.claude.h": "{h} г {m} хв",
   "widgets.claude.m": "{m} хв",
-  "widgets.claude.near": "Близько до ліміту"
+  "widgets.claude.near": "Близько до ліміту",
+  "guestWindowName": "{app} ({machine})"
 }

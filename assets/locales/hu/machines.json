@@ -758,7 +758,6 @@
   "dl.resumed": "Folytatva a korábban letöltött {size} után",
   "as.r.download": "Letöltés",
   "tb.clipChange": "Módosítás a Beállításban…",
-  "tb.appsLater": "Alkalmazásmód: egy későbbi verzióban érkezik",
   "win.playHint": "Kattintson az indításhoz.",
   "first.addHint": "Adjon hozzá egy virtuális gépet, hogy egy másik rendszert futtasson ennek az asztalnak egy ablakában: töltsön le egyet, telepítse ISO-ról, vagy hozza át egy másik alkalmazásból.",
   "lib.noMatch": "Egyetlen gép sem felel meg ennek: „{q}”.",
@@ -917,5 +916,16 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Bekapcsolva",
   "cfg.off": "Kikapcsolva",
-  "cfg.setAtCreate": "A gép létrehozásakor választva."
+  "cfg.setAtCreate": "A gép létrehozásakor választva.",
+  "apps.enter": "Alkalmazásmód: a gép minden alkalmazása saját ablakban",
+  "apps.mode": "Alkalmazásmód",
+  "apps.leave": "Kilépés az alkalmazásmódból",
+  "apps.menu": "Alkalmazások",
+  "apps.needsAgent": "Az alkalmazásmódhoz a gép csatlakozott ügynöke kell",
+  "win.appsNeedsTools": "Az alkalmazásmódhoz LordOS vagy Windows kell a gépen, a LordOS eszközeivel",
+  "apps.noApps": "A gép még nem sorolta fel az alkalmazásait",
+  "apps.gone": "Ez az ablak bezárult a gépen",
+  "apps.windowTitle": "{title} — {machine}",
+  "apps.controllerHint": "A gép alkalmazásai saját ablakokban vannak, az asztala rejtve van. Az Esc vagy a Kilépés az alkalmazásmódból újra megmutatja.",
+  "agent.st.needsTools": "Eszközök kellenek"
 }

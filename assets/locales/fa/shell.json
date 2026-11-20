@@ -831,5 +831,6 @@
   "widgets.claude.d": "{d} ر {h} س",
   "widgets.claude.h": "{h} س {m} د",
   "widgets.claude.m": "{m} د",
-  "widgets.claude.near": "نزدیک به سقف"
+  "widgets.claude.near": "نزدیک به سقف",
+  "guestWindowName": "{app} ({machine})"
 }

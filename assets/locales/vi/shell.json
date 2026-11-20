@@ -824,5 +824,6 @@
   "widgets.claude.d": "{d} ng {h} g",
   "widgets.claude.h": "{h} g {m} ph",
   "widgets.claude.m": "{m} ph",
-  "widgets.claude.near": "Gần giới hạn"
+  "widgets.claude.near": "Gần giới hạn",
+  "guestWindowName": "{app} ({machine})"
 }
