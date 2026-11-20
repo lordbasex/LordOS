@@ -3,7 +3,7 @@
 import {
   View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
-  Segmented, admin, canDeactivate, deactivateApp, activateApp, webAppEntry,
+  Segmented, admin, canDeactivate, deactivateApp, activateApp, webAppEntry, settings, addListener,
   suggestions, unseenSuggestions, refreshSuggestions, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -344,6 +344,7 @@ function InstalledPage({ query, filter: initial }) {
 // Back returns to the page.
 // a small window (a Lord Workspaces tile): below SIDE_AT the pages and categories hide behind a toolbar button
 const SIDE_AT = 720;
+const SIDE_W = 230, SIDE_MIN = 190, SIDE_MAX = 380;
 const PAGE_GLYPH = { flathub: GLYPH.flathub, suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, webapps: GLYPH.webapps, lordos: GLYPH.lordos };
 
 export default function Store() {
@@ -368,6 +369,18 @@ export default function Store() {
     setPage(p); setSub(c);
   };
   const side = useSidebar(SIDE_AT);
+  // the sidebar's width: dragged at its edge between SIDE_MIN and SIDE_MAX, kept in settings (2026-11-20: long names
+  // such as "Linux apps (Debian)" were cut)
+  const savedW = useStore(settings, (st) => st.storeSideWidth);
+  const [dragW, setDragW] = useState(null);
+  const clampSide = (w) => Math.round(Math.max(SIDE_MIN, Math.min(SIDE_MAX, Number(w) || SIDE_W)));
+  const sideW = clampSide(dragW ?? savedW ?? SIDE_W);
+  const startSide = (e) => {
+    const x0 = e.x, w0 = sideW, rtl = direction() === 'rtl';
+    const at = (m) => clampSide(w0 + (rtl ? x0 - m.x : m.x - x0));
+    const off = [addListener('pointermove', (m) => setDragW(at(m))),
+      addListener('pointerup', (m) => { off.forEach((f) => f()); setDragW(null); settings.set((st) => ({ ...st, storeSideWidth: at(m) })); })];
+  };
   // Each page, search and app opens at the top (#20); back from an app returns to where the list was.
   const scroll = useRef(null);
   const listAt = useRef(null);
@@ -455,8 +468,9 @@ export default function Store() {
     <SidebarItem key={id} icon={glyph} label={label} detail={detail || null} selected={!app && page === id} onClick={() => { go(id); if (side.narrow) side.close(); }} />
   );
   const sidebar = (
-      <View style={{ width: 210, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg }}>
+      <View style={{ width: side.narrow ? undefined : sideW, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg }}>
         <Hairline edge="end" />
+        {side.narrow ? null : <View onMouseDown={startSide} style={{ position: 'absolute', top: 0, bottom: 0, zIndex: 2, ...(direction() === 'rtl' ? { left: -3 } : { right: -3 }), width: 7, cursor: 'ew-resize' }} />}
         <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4 }}>
           <SectionTitle>{tr('store.section.store')}</SectionTitle>
           {item('discover', tr('store.page.discover'), null, PAGE_GLYPH.discover)}
@@ -522,7 +536,7 @@ export default function Store() {
           <View style={{ height: 24 }} />
         </ScrollView>
       </View>
-      {side.narrow && side.shown ? <SidebarOverlay width={210} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
+      {side.narrow && side.shown ? <SidebarOverlay width={sideW} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
     </View>
   );
 }
