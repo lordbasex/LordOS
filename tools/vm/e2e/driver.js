@@ -11,13 +11,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
 // the shell's own calls for a window (minimize, focus, another desktop), as the person's clicks make them
 const wm = {
-  windows: () => windows.get().map((w) => ({ id: w.id, app: w.appId || w.app, title: w.title, x: w.x, y: w.y, w: w.w, h: w.h, minimized: w.minimized, desktop: w.desktop })),
+  windows: () => windows.get().map((w) => ({ id: w.id, app: w.appId || w.app, title: w.title, x: w.x, y: w.y, w: w.w, h: w.h, minimized: w.minimized, desktop: w.desktop, pip: w.pip || null, guest: w.args?.guest || null })),
   minimize: (id) => shellWm.minimize(id),
   toggleMaximize: (id) => shellWm.toggleMaximize(id),
   focus: (id) => shellWm.focus(id),
   moveToDesktop: (id, d) => shellWm.moveToDesktop(id, d),
   createDesktop: () => createDesktop(),
   setActiveDesktop: (d) => setActiveDesktop(d),
+  // a window opened or moved as the app or the person would (apps mode's bench: a machine's window, a guest's window dragged)
+  open: (app, opts) => shellWm.open(app, opts),
+  move: (id, x, y) => shellWm.move(id, x, y),
+  close: (id) => shellWm.close(id),
 };
 
 function start() {
