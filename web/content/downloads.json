@@ -1,7 +1,7 @@
 {
   "format": 1,
   "repo": "lordbasex/LordOS",
-  "generated": "2026-11-20T12:14:59.647Z",
+  "generated": "2026-11-20T13:10:33.009Z",
   "downloads": {
     "iso-amd64": {
       "file": "lordos-live-0.8.9-amd64.iso",
@@ -52,40 +52,40 @@
       "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9-beta"
     },
     "deb-amd64": {
-      "file": "lordos_0.8.9.3_amd64.deb",
-      "url": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.3-beta/lordos_0.8.9.3_amd64.deb",
-      "size": 63200196,
-      "sha256": "981f19e8fe015903615ff1298de64e5a563d175b99c572c841522d1fb65bc446",
-      "version": "0.8.9.3",
-      "release": "v0.8.9.3-beta",
+      "file": "lordos_0.8.9.4_amd64.deb",
+      "url": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.4-beta/lordos_0.8.9.4_amd64.deb",
+      "size": 63561288,
+      "sha256": "e0af8bc8b5a6e6f14639ad79e5dc8a9ca44a6d852a4f2e79e0d47310ba4ecbf9",
+      "version": "0.8.9.4",
+      "release": "v0.8.9.4-beta",
       "prerelease": true,
-      "published": "2026-11-20T12:14:46Z",
-      "sums": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.3-beta/SHA256SUMS",
-      "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.3-beta"
+      "published": "2026-11-20T13:10:27Z",
+      "sums": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.4-beta/SHA256SUMS",
+      "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.4-beta"
     },
     "deb-arm64": {
-      "file": "lordos_0.8.9.3_arm64.deb",
-      "url": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.3-beta/lordos_0.8.9.3_arm64.deb",
-      "size": 60800244,
-      "sha256": "520a6e6453c26509802a8b83dfe9a304038a6e72ba1916283a09c3063bbfb261",
-      "version": "0.8.9.3",
-      "release": "v0.8.9.3-beta",
+      "file": "lordos_0.8.9.4_arm64.deb",
+      "url": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.4-beta/lordos_0.8.9.4_arm64.deb",
+      "size": 60854184,
+      "sha256": "a65e2f18662d0a2c69abc54da6d4faa23bbf2d3236f636cc75c8e90604129ad5",
+      "version": "0.8.9.4",
+      "release": "v0.8.9.4-beta",
       "prerelease": true,
-      "published": "2026-11-20T12:14:46Z",
-      "sums": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.3-beta/SHA256SUMS",
-      "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.3-beta"
+      "published": "2026-11-20T13:10:27Z",
+      "sums": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.4-beta/SHA256SUMS",
+      "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.4-beta"
     },
     "hwdata": {
       "file": "lordos-hwdata_2026.11.06_all.deb",
-      "url": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.3-beta/lordos-hwdata_2026.11.06_all.deb",
+      "url": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.4-beta/lordos-hwdata_2026.11.06_all.deb",
       "size": 2976,
       "sha256": "6f82ace23dd18f553c330a2e983edb3013f75eb46f9a6f14753aa255d39f25b3",
       "version": "2026.11.06",
-      "release": "v0.8.9.3-beta",
+      "release": "v0.8.9.4-beta",
       "prerelease": true,
-      "published": "2026-11-20T12:14:46Z",
-      "sums": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.3-beta/SHA256SUMS",
-      "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.3-beta"
+      "published": "2026-11-20T13:10:27Z",
+      "sums": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.4-beta/SHA256SUMS",
+      "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.4-beta"
     },
     "imager-mac": {
       "file": "lordos_imager_0.8.6_universal.dmg",
@@ -101,27 +101,27 @@
     },
     "imager-win": {
       "file": "lordos_imager_0.8.8.6_x64_setup.exe",
-      "url": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.3-beta/lordos_imager_0.8.8.6_x64_setup.exe",
+      "url": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.4-beta/lordos_imager_0.8.8.6_x64_setup.exe",
       "size": 3232965,
       "sha256": "b66cbabd07ec9b79f728352a8956a45996f2926d97eb6af6f27423b8c70cbea5",
       "version": "0.8.8.6",
-      "release": "v0.8.9.3-beta",
+      "release": "v0.8.9.4-beta",
       "prerelease": true,
-      "published": "2026-11-20T12:14:46Z",
-      "sums": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.3-beta/SHA256SUMS",
-      "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.3-beta"
+      "published": "2026-11-20T13:10:27Z",
+      "sums": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.4-beta/SHA256SUMS",
+      "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.4-beta"
     },
     "imager-linux": {
       "file": "lordos_imager_0.8.8.6_amd64.deb",
-      "url": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.3-beta/lordos_imager_0.8.8.6_amd64.deb",
+      "url": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.4-beta/lordos_imager_0.8.8.6_amd64.deb",
       "size": 4153054,
       "sha256": "bfcaa0a0177c56c4f7ac058e2a013a03d496c4974369472f24b2be058024fe40",
       "version": "0.8.8.6",
-      "release": "v0.8.9.3-beta",
+      "release": "v0.8.9.4-beta",
       "prerelease": true,
-      "published": "2026-11-20T12:14:46Z",
-      "sums": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.3-beta/SHA256SUMS",
-      "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.3-beta"
+      "published": "2026-11-20T13:10:27Z",
+      "sums": "https://github.com/lordbasex/LordOS/releases/download/v0.8.9.4-beta/SHA256SUMS",
+      "page": "https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.4-beta"
     }
   }
 }
