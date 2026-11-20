@@ -833,5 +833,7 @@
   "un.err.winUser": "1 έως 20 γράμματα, ψηφία, κενά, τελείες, - ή _.",
   "un.err.winHost": "1 έως 15 λατινικά γράμματα, ψηφία ή -, όχι μόνο ψηφία.",
   "un.err.tooLong": "Πολύ μεγάλο.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Τέλος",
+  "as.stepOf": "Βήμα {n} από {total}"
 }

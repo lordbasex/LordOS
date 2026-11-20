@@ -833,5 +833,7 @@
   "un.err.winUser": "Herufi, tarakimu, nafasi, nukta, - au _, 1 hadi 20.",
   "un.err.winHost": "Herufi, tarakimu au -, 1 hadi 15, si tarakimu pekee.",
   "un.err.tooLong": "Ni refu mno.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Imekamilika",
+  "as.stepOf": "Hatua {n} kati ya {total}"
 }

@@ -833,5 +833,7 @@
   "un.err.winUser": "1 hingga 20 huruf, angka, spasi, titik, - atau _.",
   "un.err.winHost": "1 hingga 15 huruf, angka atau -, tidak hanya angka.",
   "un.err.tooLong": "Terlalu panjang.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Selesai",
+  "as.stepOf": "Langkah {n} dari {total}"
 }

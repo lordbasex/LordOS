@@ -833,5 +833,7 @@
   "un.err.winUser": "1–20 kirjainta, numeroa, välilyöntiä, pistettä, - tai _.",
   "un.err.winHost": "1–15 kirjainta, numeroa tai -, ei pelkkiä numeroita.",
   "un.err.tooLong": "Liian pitkä.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Valmis",
+  "as.stepOf": "Vaihe {n}/{total}"
 }

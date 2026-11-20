@@ -833,5 +833,7 @@
   "un.err.winUser": "1 hanggang 20 titik, numero, espasyo, tuldok, - o _.",
   "un.err.winHost": "1 hanggang 15 titik, numero o -, hindi puro numero.",
   "un.err.tooLong": "Masyadong mahaba.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Tapos na",
+  "as.stepOf": "Hakbang {n} ng {total}"
 }

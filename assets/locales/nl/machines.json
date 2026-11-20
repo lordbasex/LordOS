@@ -833,5 +833,7 @@
   "un.err.winUser": "1 tot 20 letters, cijfers, spaties, punten, - of _.",
   "un.err.winHost": "1 tot 15 letters, cijfers of -, niet alleen cijfers.",
   "un.err.tooLong": "Te lang.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Gereed",
+  "as.stepOf": "Stap {n} van {total}"
 }

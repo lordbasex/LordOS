@@ -833,5 +833,7 @@
   "un.err.winUser": "英字、数字、スペース、ピリオド、- または _ を 1～20 文字",
   "un.err.winHost": "英字、数字または - を 1～15 文字、数字だけは不可",
   "un.err.tooLong": "長すぎます",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "完了",
+  "as.stepOf": "ステップ {n}/{total}"
 }

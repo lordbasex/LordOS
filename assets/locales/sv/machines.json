@@ -833,5 +833,7 @@
   "un.err.winUser": "1 till 20 bokstäver, siffror, mellanslag, punkter, - eller _.",
   "un.err.winHost": "1 till 15 bokstäver, siffror eller -, inte bara siffror.",
   "un.err.tooLong": "För långt.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Klar",
+  "as.stepOf": "Steg {n} av {total}"
 }

@@ -833,5 +833,7 @@
   "un.err.winUser": "문자, 숫자, 공백, 마침표, - 또는 _로 1~20자",
   "un.err.winHost": "문자, 숫자 또는 -로 1~15자, 숫자만은 불가",
   "un.err.tooLong": "너무 깁니다",
-  "req.row.tpm": "TPM 2.0(Windows 11)"
+  "req.row.tpm": "TPM 2.0(Windows 11)",
+  "cfg.done": "완료",
+  "as.stepOf": "{total}단계 중 {n}단계"
 }

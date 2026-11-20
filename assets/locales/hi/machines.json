@@ -833,5 +833,7 @@
   "un.err.winUser": "1 से 20 अक्षर, अंक, स्पेस, बिंदु, - या _",
   "un.err.winHost": "1 से 15 अक्षर, अंक या -, केवल अंक नहीं",
   "un.err.tooLong": "बहुत लंबा है",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "हो गया",
+  "as.stepOf": "चरण {n} / {total}"
 }

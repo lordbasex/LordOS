@@ -833,5 +833,7 @@
   "un.err.winUser": "D’1 a 20 lletres, dígits, espais, punts, - o _.",
   "un.err.winHost": "D’1 a 15 lletres, dígits o -, no només dígits.",
   "un.err.tooLong": "Massa llarg.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Fet",
+  "as.stepOf": "Pas {n} de {total}"
 }

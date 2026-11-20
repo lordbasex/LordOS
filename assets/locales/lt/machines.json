@@ -833,5 +833,7 @@
   "un.err.winUser": "Nuo 1 iki 20 raidžių, skaitmenų, tarpų, taškų, - arba _.",
   "un.err.winHost": "Nuo 1 iki 15 raidžių, skaitmenų arba -, ne vien skaitmenys.",
   "un.err.tooLong": "Per ilgas.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Atlikta",
+  "as.stepOf": "{n} žingsnis iš {total}"
 }

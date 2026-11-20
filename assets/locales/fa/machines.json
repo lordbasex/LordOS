@@ -833,5 +833,7 @@
   "un.err.winUser": "۱ تا ۲۰ حرف، رقم، فاصله، نقطه، - یا _.",
   "un.err.winHost": "۱ تا ۱۵ حرف لاتین، رقم یا -، نه فقط رقم.",
   "un.err.tooLong": "بیش از حد طولانی است.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "تمام",
+  "as.stepOf": "مرحلهٔ {n} از {total}"
 }

@@ -833,5 +833,7 @@
   "un.err.winUser": "1-dən 20-yə qədər hərf, rəqəm, boşluq, nöqtə, - və ya _.",
   "un.err.winHost": "1-dən 15-ə qədər hərf, rəqəm və ya -, yalnız rəqəm olmamalıdır.",
   "un.err.tooLong": "Çox uzundur.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Hazır",
+  "as.stepOf": "Addım {n}/{total}"
 }

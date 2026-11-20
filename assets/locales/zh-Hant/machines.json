@@ -833,5 +833,7 @@
   "un.err.winUser": "1 到 20 個字母、數字、空格、點、- 或 _",
   "un.err.winHost": "1 到 15 個字母、數字或 -，不能全是數字",
   "un.err.tooLong": "太長了",
-  "req.row.tpm": "TPM 2.0（Windows 11）"
+  "req.row.tpm": "TPM 2.0（Windows 11）",
+  "cfg.done": "完成",
+  "as.stepOf": "第 {n} 步，共 {total} 步"
 }

@@ -833,5 +833,7 @@
   "un.err.winUser": "Da 1 a 20 lettere, cifre, spazi, punti, - o _.",
   "un.err.winHost": "Da 1 a 15 lettere, cifre o -, non solo cifre.",
   "un.err.tooLong": "Troppo lungo.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Fine",
+  "as.stepOf": "Passaggio {n} di {total}"
 }

@@ -833,5 +833,7 @@
   "un.err.winUser": "От 1 до 20 букв, цифр, пробелов, точек, - или _.",
   "un.err.winHost": "От 1 до 15 латинских букв, цифр или -, не только цифры.",
   "un.err.tooLong": "Слишком длинно.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Готово",
+  "as.stepOf": "Шаг {n} из {total}"
 }

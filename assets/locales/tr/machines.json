@@ -833,5 +833,7 @@
   "un.err.winUser": "1 ile 20 arası harf, rakam, boşluk, nokta, - veya _.",
   "un.err.winHost": "1 ile 15 arası harf, rakam veya -, yalnızca rakam olamaz.",
   "un.err.tooLong": "Çok uzun.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Bitti",
+  "as.stepOf": "Adım {n}/{total}"
 }

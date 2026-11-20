@@ -833,5 +833,7 @@
   "un.err.winUser": "১ থেকে ২০টি অক্ষর, অঙ্ক, স্পেস, বিন্দু, - বা _",
   "un.err.winHost": "১ থেকে ১৫টি অক্ষর, অঙ্ক বা -, শুধু অঙ্ক নয়",
   "un.err.tooLong": "অনেক লম্বা",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "সম্পন্ন",
+  "as.stepOf": "ধাপ {n} / {total}"
 }

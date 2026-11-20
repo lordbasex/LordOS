@@ -833,5 +833,7 @@
   "un.err.winUser": "1 đến 20 chữ cái, chữ số, dấu cách, dấu chấm, - hoặc _.",
   "un.err.winHost": "1 đến 15 chữ cái, chữ số hoặc -, không chỉ toàn chữ số.",
   "un.err.tooLong": "Quá dài.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Xong",
+  "as.stepOf": "Bước {n}/{total}"
 }

@@ -833,5 +833,7 @@
   "un.err.winUser": "1–20 betű, számjegy, szóköz, pont, - vagy _.",
   "un.err.winHost": "1–15 betű, számjegy vagy -, nem csak számjegyek.",
   "un.err.tooLong": "Túl hosszú.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "Kész",
+  "as.stepOf": "{n}. lépés / {total}"
 }

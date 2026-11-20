@@ -833,5 +833,7 @@
   "un.err.winUser": "من 1 إلى 20 حرفًا أو رقمًا أو مسافة أو نقطة أو - أو _.",
   "un.err.winHost": "من 1 إلى 15 حرفًا لاتينيًا أو رقمًا أو -، وليس أرقامًا فقط.",
   "un.err.tooLong": "طويل جدًا.",
-  "req.row.tpm": "TPM 2.0 (Windows 11)"
+  "req.row.tpm": "TPM 2.0 (Windows 11)",
+  "cfg.done": "تم",
+  "as.stepOf": "الخطوة {n} من {total}"
 }
