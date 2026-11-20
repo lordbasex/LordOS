@@ -50,6 +50,52 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   column with All and its categories, each with how many apps it has (in a small window they are a row of buttons above
   the list). Debian's cards carry a "Debian" tag and the catalog's own a "Linux app" one, beside Flathub's and the web
   apps'. The pages that opened by name before (from Settings, Search and Lord Workspaces) open the origin's page.
+- **Machines: sound and microphone.** A machine's sound plays on this computer's speakers, and a machine can hear this
+  computer's microphone. lord-vmdisplay copies the guest's sound, with the guest's own mute and volume, into a sealed
+  ring that lord-server plays from its own PipeWire stream named after the machine (60 ms buffer; the helper never runs
+  more than 80 ms ahead and drops rather than waits; it never gets the PipeWire socket). The microphone opens only while
+  the machine's Microphone setting is on, LordOS's microphone permission allows Machines (asked with the system prompt,
+  checked again in C), the guest is recording and the machine runs; otherwise the guest hears silence. A microphone
+  light shows on the bar and in the menu bar. Every machine's sound card is now an HDA speaker-and-microphone codec, so
+  snapshots and saved states keep loading whatever the settings. Configure → Sound and input has sound on/off, a volume
+  and the microphone; the bar gets a mute button and the Devices menu Sound, Microphone and Sound Settings….
+- **Machines: forwarded ports, Bridged and Host-only networks.** Configure → Network has four modes:
+  - **Shared**, as before, now with up to 32 forwarded ports (TCP or UDP, this computer's port 1024–65535 to the
+    machine's), open to "Only this computer" (127.0.0.1, the default) or "The network" (with a warning). passt opens
+    them inside the machine's scope, so LordOS's firewall decides them; a port in use or refused stops the start with
+    its reason.
+  - **Bridged**: the machine joins a wired network of this computer as one more device and gets its address from that
+    network's DHCP. Two new closed admin actions (`vm-net-bridge`, `vm-net-unbridge`, `server/src/vm/vmnet_admin.c`)
+    make and remove a macvtap in bridge mode on a physical wired card checked on the root side (Wi-Fi, bridges, bonds
+    and virtual cards are refused with a reason); its `/dev/tapN` goes to the user and lord-vm hands QEMU only the
+    descriptor. Unused ones are removed when the machine stops and when a session starts or ends. This computer can't
+    reach a bridged guest, and LordOS's firewall doesn't see its traffic; Configure says both.
+  - **Host-only**, with no root: passt binds every socket it opens for the guest to 127.0.0.1 (IPv4 only), so the
+    machine reaches this computer (as 10.0.2.2) and nothing else. It also reaches services listening only on this
+    computer's 127.0.0.1; Configure says so.
+  - **Isolated**, as before.
+- **Machines: 3D graphics for Linux machines.** Configure → Display offers Graphics 2D or 3D, and the Design profile picks
+  3D where the computer can give it. A Linux machine with 3D gets a virgl GPU (`virtio-vga-gl`), drawn with this
+  computer's GPU through Mesa. Guests on the device set of the card in `docs/VIRTUALIZATION.md` 4.3 stay 2D (no stable
+  3D driver exists for them), and so does any machine on arm64 or on a desktop that draws without a GPU; the log says
+  why. QEMU's picture arrives as dmabufs: lord-vmdisplay checks them and passes only the descriptor on, and lord-server
+  imports each with EGL and reads the changed rows back, never waiting on the guest's GPU work. Only such a machine's
+  QEMU may open the GPU's render node (never the primary card node), list `/dev/dri` and read its GPU's sysfs folder.
+  virgl's state can't be saved, so a running 3D machine can't be suspended or snapshotted with its memory.
+- **Machines: files into a machine by dragging them.** Files dragged from Files onto a running machine's window are
+  copied into the Downloads folder of the person signed in to the guest, through the guest agent, with progress under
+  the picture and a notice saying where each landed. lord-server hands lord-vm only a descriptor of the person's file
+  and a name made safe for the guest's file systems; the guest never chooses a path on this computer. On Linux guests
+  root writes only into a fresh private folder and the move into the person's folder runs as that person. When the
+  agent is off, isn't answering or can't write files, the hint says so before the files are let go. Files only go in; a
+  shared folder brings them out. Any answer from the guest agent now counts as its ping, so a long copy no longer makes
+  it look lost.
+- **Machines: full screen and Configure.** lord-vmdisplay logs each size it asks the guest for, the size the guest takes
+  and any refusal; the resolution menu says when the guest kept its size (some guests' display drivers don't follow
+  sizes asked while they run). Configure's boot section shows TPM 2.0 and Secure Boot; only the boot order is still
+  "in a later version".
+- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`;
+  older files load unchanged.
 - **Machines looks like a native virtualization app** (the look of hypervisaur's screenshots, reimplemented: no code or
   images of it are used; `apps/machines/kit.jsx`). The assistant, Configure, Requirements and the Raspberry Pi page open
   as sheets over the window, which stays behind, dimmed. Configure has a glyph beside each section, a header with its
