@@ -65,6 +65,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A Windows 11 machine, or one on compatible devices, starts in its window** (`server/src/vm/lordvm.c`): in that case
+  the window's sound output wasn't declared, and QEMU refused the sound card with "audiodev 'snd0' not found".
 - **The desktop no longer stalls while the Store installs a Flathub app** (`sdk/flathub.js`, `apps/store/flathubpages.js`):
   every line flatpak printed changed the Store's state, which redrew the 60 cards of the Flathub page and filtered and
   sorted the 2 242 apps of the catalog again, several times a second. Progress now reaches the page at most every

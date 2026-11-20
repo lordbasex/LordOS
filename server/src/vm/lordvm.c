@@ -1514,7 +1514,10 @@ static void build_qemu_args(void) {
         if (m->devices != VM_DEV_WINDOWS) { arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5"); }
         if (arm) { arg("-device"); arg("usb-kbd,bus=xhci.0"); }
         arg("-device"); arg("usb-tablet,bus=xhci.0");
-        arg("-display"); arg("dbus,p2p=yes");
+        /* the same sound path as below: the HDA card after this needs its audiodev (a Windows machine in a window
+         * failed to start without it, "audiodev 'snd0' not found") */
+        arg("-audiodev"); arg("dbus,id=snd0,out.frequency=48000,out.channels=2,out.format=s16,in.frequency=48000,in.channels=2,in.format=s16");
+        arg("-display"); arg("dbus,p2p=yes,audiodev=snd0");
     } else if (m->display == VM_DISPLAY_WINDOW) {
         if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); arg("-device"); arg("virtio-keyboard-pci,addr=0x5"); }
         arg("-device"); arg(arm ? "virtio-tablet-pci,addr=0x6" : "virtio-tablet-pci,addr=0x5");
