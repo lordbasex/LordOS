@@ -524,7 +524,10 @@ lord-server ──fd 3, VdMsg──▶ lord-vmdisplay <id> (lordos-vmdisplay-<id
   started with `--keep-running`. lord-vm exits when QEMU has, after the last state.
 - **QEMU** gets `-nodefaults -no-user-config`, `-uuid`, the pinned machine type with `dump-guest-core=off`, `-accel kvm,device=/dev/fdset/1`
   with `-add-fd` (or `tcg,thread=multi,tb-size=256`), `-cpu host` (`max` with TCG), every disk as `-blockdev` JSON with
-  `bootindex=0` on the system disk, an ISO as `scsi-cd` with `bootindex=1`, `virtio-net-pci` on `-netdev stream,addr.type=fd`, `virtio-rng-pci`,
+  `bootindex=0` on the system disk, an ISO as `scsi-cd` with `bootindex=1` (machine.json's `boot_order`, Configure → Boot, numbers the
+  disk, the CD/DVD drive and the network card in the order chosen instead and gives the others no index, which SeaBIOS and OVMF
+  may still try last; `boot_menu` adds
+  `-boot menu=on,splash-time=5000`), `virtio-net-pci` on `-netdev stream,addr.type=fd`, `virtio-rng-pci`,
   `virtio-vga` on amd64 always (3.3) and `virtio-gpu-pci` + `virtio-keyboard-pci` on arm64, `virtio-tablet-pci` with a window,
   `-display dbus,p2p=yes` (or `none`), QMP and the serial port as `-chardev socket,fd=N`, and
   `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny`. Its environment is `LC_ALL=C.UTF-8` only.

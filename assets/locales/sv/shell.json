@@ -468,6 +468,8 @@
   "ws.spine.activities": "Aktiviteter",
   "ws.spine.apps": "Appar",
   "ws.spine.files": "Filer",
+  "ws.spine.store": "Butik",
+  "ws.spine.monitor": "Monitor",
   "ws.spine.control": "Reglage",
   "ws.spine.collapse": "Fäll ihop listen",
   "ws.spine.expand": "Fäll ut listen",

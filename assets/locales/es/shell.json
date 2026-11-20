@@ -468,6 +468,8 @@
   "ws.spine.activities": "Actividades",
   "ws.spine.apps": "Apps",
   "ws.spine.files": "Archivos",
+  "ws.spine.store": "Tienda",
+  "ws.spine.monitor": "Monitor",
   "ws.spine.control": "Controles",
   "ws.spine.collapse": "Contraer la columna",
   "ws.spine.expand": "Expandir la columna",

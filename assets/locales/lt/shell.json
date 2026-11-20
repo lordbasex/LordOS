@@ -475,6 +475,8 @@
   "ws.spine.activities": "Veiklos",
   "ws.spine.apps": "Programėlės",
   "ws.spine.files": "Failai",
+  "ws.spine.store": "Parduotuvė",
+  "ws.spine.monitor": "Stebėjimas",
   "ws.spine.control": "Valdikliai",
   "ws.spine.collapse": "Suskleisti juostą",
   "ws.spine.expand": "Išskleisti juostą",

@@ -681,3 +681,25 @@ export function guestAppItems(apps) {
   const seen = new Set();
   return (apps || []).filter((a) => a && a.token && a.name && !seen.has(a.token) && seen.add(a.token)).sort((a, b) => a.name.localeCompare(b.name));
 }
+
+// Where a machine starts from (Configure → Boot; machine.json's boot_order): "auto" (the system disk, then the CD/DVD
+// drive) or the devices the firmware tries, in order, as lord-vm takes them ("network,disk").
+export const BOOT_DEVS = ['disk', 'cd', 'network'];
+// the order as the list Configure moves rows in: the chosen ones first, then the others (auto: the disk, the CD/DVD, the network)
+export function bootList(order) {
+  const got = typeof order === 'string' && order !== 'auto' ? order.split(',').filter((d, i, a) => BOOT_DEVS.includes(d) && a.indexOf(d) === i) : [];
+  return [...got, ...BOOT_DEVS.filter((d) => !got.includes(d))];
+}
+// a row moved up (by -1) or down (by +1); out of range leaves the list as it was
+export function bootMove(list, i, by) {
+  const j = i + by;
+  if (i < 0 || j < 0 || i >= list.length || j >= list.length) return list;
+  const out = list.slice();
+  [out[i], out[j]] = [out[j], out[i]];
+  return out;
+}
+// the summary's words: null for auto, else the first device's key
+export function bootSummary(order) {
+  if (typeof order !== 'string' || order === 'auto' || !order) return null;
+  return `machines.cfg.bootFirst.${bootList(order)[0]}`;
+}

@@ -1,6 +1,7 @@
 // The Context Spine: the rail at the start of the main display (or of every display, Settings → Desktop & Dock). From
 // the top: the LordOS crown (the system menu: About, Settings, Lock, Log Out, Restart, Shut Down), Activities (the
-// Overview; the activities themselves are the strip's pills), Apps (the search panel with every app), Files, and at the
+// Overview; the activities themselves are the strip's pills), Apps (the search panel with every app), Files, the Store,
+// Monitor, and at the
 // bottom the shortcuts' help (a lifebuoy, ShortcutsHelp.jsx), Settings, the Control Center (the notifications are the
 // status cluster's bell) and the button that collapses the spine to icons (it
 // collapses by itself on narrow displays while its setting is Automatic). It reserves its width in the work area
@@ -11,7 +12,7 @@ import { View, Text, Image, t as tr } from '@lordos/sdk';
 import { memo, useRef, useState } from 'react';
 import { Surface } from './Surface.jsx';
 import { FocusRing } from './BarButton.jsx';
-import { ActivitiesGlyph, AppsGlyph, FolderGlyph, ControlGlyph, Chevron, GearGlyph, LifebuoyGlyph } from '../glyphs.jsx';
+import { ActivitiesGlyph, AppsGlyph, FolderGlyph, ControlGlyph, Chevron, GearGlyph, LifebuoyGlyph, StoreGlyph, MonitorGlyph } from '../glyphs.jsx';
 import { tween, EASE } from '../motion.js';
 
 const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, anchor, small, fid }) {
@@ -35,7 +36,7 @@ const Item = memo(function Item({ t, label, active, expanded, onClick, glyph, an
   );
 });
 
-export const Spine = memo(function Spine({ t, rect, mode, rtl, active, onCrown, onActivities, onApps, onFiles, onControl, onToggle, onSettings, onHelp, controlRef }) {
+export const Spine = memo(function Spine({ t, rect, mode, rtl, active, onCrown, onActivities, onApps, onFiles, onStore, onMonitor, onControl, onToggle, onSettings, onHelp, controlRef }) {
   const expanded = mode === 'expanded';
   return (
     <Surface t={t} radius={18} style={{ boxShadow: t.spineShadow, position: 'absolute', left: rect.x, top: rect.y, width: rect.w, height: rect.h, paddingVertical: 12, alignItems: 'center', gap: 4 }}>
@@ -50,6 +51,10 @@ export const Spine = memo(function Spine({ t, rect, mode, rtl, active, onCrown, 
         glyph={(c) => <AppsGlyph color={c} size={20} />} />
       <Item t={t} expanded={expanded} fid="files" label={tr('shell.ws.spine.files')} active={false} onClick={onFiles}
         glyph={(c) => <FolderGlyph color={c} size={20} />} />
+      <Item t={t} expanded={expanded} fid="store" label={tr('shell.ws.spine.store')} active={false} onClick={onStore}
+        glyph={(c) => <StoreGlyph color={c} size={20} />} />
+      <Item t={t} expanded={expanded} fid="monitor" label={tr('shell.ws.spine.monitor')} active={false} onClick={onMonitor}
+        glyph={(c) => <MonitorGlyph color={c} size={20} />} />
       <View style={{ flex: 1 }} />
       <Item t={t} expanded={expanded} fid="help" label={tr('shell.ws.spine.help')} active={active.help} onClick={onHelp}
         glyph={(c, bg) => <LifebuoyGlyph size={18} color={c} bg={bg} />} />

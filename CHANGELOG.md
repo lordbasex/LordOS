@@ -97,7 +97,37 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   and any refusal; the resolution menu says when the guest kept its size (some guests' display drivers don't follow
   sizes asked while they run). Configure's boot section shows TPM 2.0 and Secure Boot; only the boot order is still
   "in a later version".
-- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`;
+- **Machines: where a machine starts from, and at what size.** Configure → Boot keeps *Automatic* (the system disk,
+  then the CD/DVD drive) or takes a chosen order of the system disk, the CD/DVD drive and the network (PXE), moved with
+  Up and Down, plus *Show the boot menu at start* (the firmware waits 5 seconds for Esc). lord-vm turns the order into
+  QEMU `bootindex` values for UEFI and BIOS machines alike; `lord-vm --set DIR --boot-order auto|disk,cd,network
+  --boot-menu on|off`. Configure → Display has the resolution a machine starts with: *Follows the window* or a fixed
+  size, given to the virtual display as its preferred mode, which every system takes at boot, including those whose
+  display drivers don't follow the window while they run (`lord-vm --set DIR --resolution follow|WxH`). Checked: a
+  machine on the device set of the card in `docs/VIRTUALIZATION.md` 4.3 started at 1920 × 1080 instead of 1280 × 800.
+- **Machines: an off machine's window is black with its Play button**, and the library's card pictures are taken only
+  while the guest's system is up, never its firmware, boot or shutdown screens.
+- **Machines: LordOS guest tools, `lordos-guest-win`** (for the card in `docs/VIRTUALIZATION.md` 4.3; `tools/guest-win/lordos-guest-win.c`, `docs/VIRTUALIZATION.md` 7.1.2). A
+  small user-mode Win32 program built with mingw-w64 and shipped in `/usr/lib/lordos/guest/windows/`. Machines installs
+  it through the guest agent, from the agent's popover ("Install LordOS Tools") or by itself when an unattended install
+  finishes: SHA-256 checked, into `%ProgramFiles%\LordOS` with a protected ACL, started at every sign-in as the person
+  (never a service or SYSTEM), and the signed-in person gets access to the machine's own `org.lordos.agent` port and
+  nothing else. It brings the shared clipboard to these guests (text, HTML sanitized on the host, pictures) and makes
+  their **resolution follow the window**: the display driver keeps a custom mode that follows the window but the system
+  never switched to it, so a machine stayed at its boot size; lord-server now passes the window's size to lord-vm and
+  the tools apply it through the system's display configuration, as virtio-win's own tool does. Measured exact at
+  1784 × 830, 1920 × 1080, 1366 × 768, 1001 × 777 and 2000 × 1100, 0.25–0.5 s after each resize; no driver is patched
+  and secure boot keeps signed drivers. The guest side of apps mode (window list, icons, the programs list, window
+  actions, starting a program only by a token the guest itself listed) is in place, every frame checked to its last
+  byte by new parsers in `vmagent.c`.
+- **The Store doesn't freeze the pointer while browsing** (`apps/store/debian.js`): the package index's answers are kept
+  until the index or the language changes (each walked the whole index on lord-server's thread and built thousands of
+  objects on every render, and the heap grew until the Store was closed), and a category shows 60 cards at a time.
+  The Store's sidebar can be widened by dragging its edge (remembered), and Web apps are named "Web apps (PWA)".
+- **Lord Workspaces: the Store and Monitor on the Context Spine**, under Files, each with its own glyph (a bag, a pulse
+  line), in keyboard focus order too.
+- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
+  `resolution`, `boot_order`, `boot_menu`;
   older files load unchanged.
 - **Machines looks like a native virtualization app** (the look of hypervisaur's screenshots, reimplemented: no code or
   images of it are used; `apps/machines/kit.jsx`). The assistant, Configure, Requirements and the Raspberry Pi page open
@@ -130,6 +160,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the ISO in Downloads under its newer file name (`Windows11_Client_x64_<language>_<build>.iso`).
 - **Machines on compatible devices start in their window** (`server/src/vm/lordvm.c`; the device sets of imported machines
   and of the new card in `docs/VIRTUALIZATION.md` 4.3): the window's sound output wasn't declared for them, and QEMU refused the sound card with "audiodev 'snd0' not found".
+- **Linux and Flathub apps start on a computer with a mount inside the home folder** (`server/src/sec/sandbox.c`): a
+  cloud drive (rclone's FUSE mount under `~/Cloud`) or a disk mounted in a folder made the kernel refuse the read-only
+  bind of the home in the app's user namespace (EINVAL), and no app with a read-only home started ("could not build
+  the app's view"). The home is now bound with what is mounted under it, and each of those mounts is made read-only
+  too. **Flathub apps start when the document portal runs** (`server/src/fpak.c`): `flatpak run` now gets
+  `--no-documents-portal`, since LordOS's view has no `/run/user/<uid>/doc` and bubblewrap stopped there. Found with
+  Whatsie on the maintainer's PC; checked there by launching it through LordOS's launcher.
 - **The desktop no longer stalls while the Store installs a Flathub app** (`sdk/flathub.js`, `apps/store/flathubpages.js`):
   every line flatpak printed changed the Store's state, which redrew the 60 cards of the Flathub page and filtered and
   sorted the 2 242 apps of the catalog again, several times a second. Progress now reaches the page at most every

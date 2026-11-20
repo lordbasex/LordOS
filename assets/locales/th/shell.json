@@ -461,6 +461,8 @@
   "ws.spine.activities": "กิจกรรม",
   "ws.spine.apps": "แอป",
   "ws.spine.files": "ไฟล์",
+  "ws.spine.store": "สโตร์",
+  "ws.spine.monitor": "ตัวตรวจสอบ",
   "ws.spine.control": "ตัวควบคุม",
   "ws.spine.collapse": "ยุบแถบ",
   "ws.spine.expand": "ขยายแถบ",

@@ -21,7 +21,7 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
 #define VM_SCHEMA 6
@@ -60,6 +60,9 @@ enum { VM_RTC_UTC = 0, VM_RTC_LOCAL };
 /* the guest's graphics (schema 5): 2D, a virtio GPU whose picture QEMU draws in shared memory; 3D, virgl (virtio-vga-gl),
  * which opens the host GPU's render node from QEMU's sandbox: Linux guests only (no device set "windows") */
 enum { VM_GFX_2D = 0, VM_GFX_3D };
+/* the boot order (schema 6): the devices the firmware tries, each once; none listed is "auto" */
+enum { VM_BOOT_DISK = 0, VM_BOOT_CD, VM_BOOT_NET, VM_BOOT_DEVS };
+extern const char *const VM_BOOT_NAMES[];  /* "disk", "cd", "network" */
 #define VM_EXTRA_NICS  7            /* cards beyond the first, carried from an import: present with their MAC, not connected */
 #define VM_DATA_DISKS  4            /* disks/data-1.qcow2 ... data-4.qcow2 */
 #define VM_SMBIOS_MAX  64           /* bytes of printable ASCII per SMBIOS string */
@@ -129,6 +132,8 @@ typedef struct {
     int hyperv;                         /* Hyper-V enlightenments, for Windows guests */
     char drivers[VM_PATH_MAX];          /* a second CD/DVD with the guest's drivers (virtio-win), read-only; "" none */
     int graphics;                       /* VM_GFX_*; "graphics": "3d" is written only when chosen (schema 5) */
+    int res_w, res_h;                   /* "resolution": "WxH", the display the guest starts with (its EDID's preferred
+                                         * mode, which every driver reads at boot); 0 x 0: it follows the window (schema 6) */
     /* schema 6: the network's details (6.5) */
     char bridge[VM_IFNAME_MAX + 1];     /* the wired card a bridged machine joins ("" none); kept when the mode changes */
     int n_ports;
@@ -139,6 +144,13 @@ typedef struct {
     int volume;                         /* 0..100, the machine's own stream volume */
     int microphone;                     /* 1: the guest may hear this computer's microphone, once LordOS's microphone
                                          * permission for Machines allows it too (checked by lord-server); 0 silence */
+    /* schema 6: where the machine starts from. n_boot 0 is "auto" (no "boot_order" in the file): the system disk, then
+     * the CD/DVD drive; an empty disk doesn't boot, so a new machine starts from its ISO until a system is installed.
+     * Else the firmware tries boot_order[0..n_boot-1] in that order (QEMU's bootindex); what isn't listed gets no boot
+     * index (SeaBIOS and OVMF may still try it after the listed ones). boot_menu: the firmware waits a few seconds at each start for Esc and its boot menu */
+    int n_boot;
+    int boot_order[VM_BOOT_DEVS];       /* VM_BOOT_*, each at most once */
+    int boot_menu;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -171,6 +183,9 @@ int vm_share_allowed(const char *path, const char *home, const char *user, const
 
 /* a network interface's name as Linux allows it: 1 to 15 of [A-Za-z0-9_.-], not "." or ".." */
 int vm_ifname_valid(const char *s);
+/* a display size a machine may start with: 640x480 to 7680x4320, both even; "WxH" → 0, else -1 */
+int vm_resolution_ok(int w, int h);
+int vm_resolution_parse(const char *s, int *w, int *h);
 /* the forwarded ports' rules: proto, a host port VM_PORT_HOST_MIN..65535, a guest port 1..65535, open; at most
  * VM_PORTS; one rule per protocol and host port; host-only machines open ports to this computer only. 0 ok, else -1 and
  * why in err (English) */
@@ -184,6 +199,14 @@ void vm_port_spec(const VmPort *p, char *out, size_t n);
 int vm_passt_ports(const VmMachine *m, int proto, char out[][48], int max);
 /* the name of a bridged machine's macvtap: "lvm" and the first 12 hex digits of its id (15 characters); -1 for a bad id */
 int vm_bridge_ifname(const char *id, char out[VM_IFNAME_MAX + 1]);
+
+/* the command line's boot order: "auto", or 1 to 3 different names of VM_BOOT_NAMES joined by commas ("network,disk").
+ * Returns how many (0 for auto) with them in order[], or -1 */
+int vm_boot_parse(const char *s, int order[VM_BOOT_DEVS]);
+/* the same as that text: "auto" or "network,disk" (out: at least 24 bytes) */
+void vm_boot_spec(const VmMachine *m, char *out, size_t n);
+/* QEMU's bootindex for each device (VM_BOOT_*), counting from first (1 while an installer's kernel has 0), or -1 for none. Auto: the system disk, then the CD/DVD drive, the network card none */
+void vm_boot_indexes(const VmMachine *m, int first, int idx[VM_BOOT_DEVS]);
 
 /* parses machine.json text; err (optional) gets the reason in English. VM_OK or VM_E_* */
 int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size_t errlen);

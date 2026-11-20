@@ -461,6 +461,8 @@
   "ws.spine.activities": "アクティビティ",
   "ws.spine.apps": "アプリ",
   "ws.spine.files": "ファイル",
+  "ws.spine.store": "ストア",
+  "ws.spine.monitor": "モニタ",
   "ws.spine.control": "コントロール",
   "ws.spine.collapse": "バーを折りたたむ",
   "ws.spine.expand": "バーを広げる",

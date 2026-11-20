@@ -468,6 +468,8 @@
   "ws.spine.activities": "Tevékenységek",
   "ws.spine.apps": "Appok",
   "ws.spine.files": "Fájlok",
+  "ws.spine.store": "Áruház",
+  "ws.spine.monitor": "Figyelő",
   "ws.spine.control": "Vezérlők",
   "ws.spine.collapse": "Sáv összecsukása",
   "ws.spine.expand": "Sáv kinyitása",

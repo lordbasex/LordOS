@@ -289,6 +289,75 @@ static void test_schema(void) {
         vm_machine_defaults(&m, &hh, VM_ARCH_ARM64);
         CHECK(m.sound == 1 && m.volume == 100 && m.microphone == 0);
     }
+    /* schema 6's boot order: a list of 1 to 3 different devices (disk, cd, network), and boot_menu; neither in the file is
+     * auto (the system disk, then the CD/DVD), which is how every older file reads and what a new machine writes */
+    {
+        struct { const char *add; int schema, want, n, o0, o1, o2, menu; } bo[] = {
+            { "\"boot_order\":[\"network\",\"disk\"]", 6, VM_OK, 2, VM_BOOT_NET, VM_BOOT_DISK, -1, 0 },
+            { "\"boot_order\":[\"cd\",\"disk\",\"network\"],\"boot_menu\":true", 6, VM_OK, 3, VM_BOOT_CD, VM_BOOT_DISK, VM_BOOT_NET, 1 },
+            { "\"boot_order\":[\"disk\"]", 6, VM_OK, 1, VM_BOOT_DISK, -1, -1, 0 },
+            { "\"boot_menu\":false", 6, VM_OK, 0, -1, -1, -1, 0 },
+            { "\"boot_order\":[]", 6, VM_E_RANGE, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":[\"disk\",\"disk\"]", 6, VM_E_RANGE, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":[\"disk\",\"cd\",\"network\",\"disk\"]", 6, VM_E_RANGE, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":[\"floppy\"]", 6, VM_E_RANGE, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":[1]", 6, VM_E_RANGE, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":\"auto\"", 6, VM_E_FIELD, 0, 0, 0, 0, 0 },
+            { "\"boot_menu\":\"on\"", 6, VM_E_FIELD, 0, 0, 0, 0, 0 },
+            { "\"boot_order\":[\"network\"]", 5, VM_E_FIELD, 0, 0, 0, 0, 0 },
+            { "\"boot_menu\":true", 5, VM_E_FIELD, 0, 0, 0, 0, 0 },
+        };
+        for (size_t i = 0; i < sizeof bo / sizeof bo[0]; i++) {
+            char t[4096];
+            const char *at = strstr(GOOD, "\"schema\":1");
+            snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, bo[i].schema, (int)(strlen(at) - 10 - 1), at + 10, bo[i].add);
+            int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+            if (r != bo[i].want) fprintf(stderr, "  boot %s: got %d (%s)\n", bo[i].add, r, err);
+            CHECK(r == bo[i].want);
+            if (r != VM_OK) continue;
+            const int want[3] = { bo[i].o0, bo[i].o1, bo[i].o2 };
+            CHECK(m.n_boot == bo[i].n && m.boot_menu == bo[i].menu);
+            for (int k = 0; k < m.n_boot; k++) CHECK(m.boot_order[k] == want[k]);
+            char *jj = vm_machine_json(&m);
+            CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+            CHECK(jj && !strstr(jj, "boot_order") == !m.n_boot && !strstr(jj, "boot_menu") == !m.boot_menu);
+            free(jj);
+        }
+        /* an old file and a new machine: auto, written as nothing */
+        CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && m.n_boot == 0 && m.boot_menu == 0);
+        char *jj = vm_machine_json(&m);
+        CHECK(jj && !strstr(jj, "boot_"));
+        free(jj);
+        /* the command line's text */
+        int o[VM_BOOT_DEVS];
+        CHECK(vm_boot_parse("auto", o) == 0);
+        CHECK(vm_boot_parse("network,disk", o) == 2 && o[0] == VM_BOOT_NET && o[1] == VM_BOOT_DISK);
+        CHECK(vm_boot_parse("disk,cd,network", o) == 3 && o[0] == VM_BOOT_DISK && o[1] == VM_BOOT_CD && o[2] == VM_BOOT_NET);
+        const char *bad[] = { "", ",", "disk,", ",disk", "disk,disk", "disk,cd,network,disk", "Disk", "auto,disk", "dis", "disks", "network disk", NULL };
+        for (int k = 0; bad[k]; k++) CHECK(vm_boot_parse(bad[k], o) == -1);
+        CHECK(vm_boot_parse(NULL, o) == -1);
+        char sp[32];
+        vm_boot_spec(&m, sp, sizeof sp); CHECK(!strcmp(sp, "auto"));
+        m.n_boot = vm_boot_parse("cd,network", m.boot_order);
+        vm_boot_spec(&m, sp, sizeof sp); CHECK(!strcmp(sp, "cd,network"));
+        /* QEMU's bootindex: auto is the disk then the CD (after an installer's kernel at 0: 1 and 2); a chosen order numbers
+         * the listed devices and leaves the others out */
+        int ix[VM_BOOT_DEVS];
+        m.n_boot = 0;
+        vm_boot_indexes(&m, 0, ix); CHECK(ix[VM_BOOT_DISK] == 0 && ix[VM_BOOT_CD] == 1 && ix[VM_BOOT_NET] == -1);
+        vm_boot_indexes(&m, 1, ix); CHECK(ix[VM_BOOT_DISK] == 1 && ix[VM_BOOT_CD] == 2 && ix[VM_BOOT_NET] == -1);
+        m.n_boot = vm_boot_parse("network,disk", m.boot_order);
+        vm_boot_indexes(&m, 0, ix); CHECK(ix[VM_BOOT_NET] == 0 && ix[VM_BOOT_DISK] == 1 && ix[VM_BOOT_CD] == -1);
+        m.n_boot = vm_boot_parse("cd,network,disk", m.boot_order);
+        vm_boot_indexes(&m, 1, ix); CHECK(ix[VM_BOOT_CD] == 1 && ix[VM_BOOT_NET] == 2 && ix[VM_BOOT_DISK] == 3);
+        /* checked after a change too (lord-vm --set) */
+        m.schema = 6; m.n_boot = 2; m.boot_order[0] = VM_BOOT_CD; m.boot_order[1] = VM_BOOT_CD;
+        CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+        m.boot_order[1] = 7;
+        CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+        m.n_boot = 0; m.boot_menu = 2;
+        CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+    }
     /* which folders may be shared (vm_share_allowed): a real folder in home (not home), under /media/<user> or /mnt, nothing
      * hidden, never the library or what holds it */
     {
@@ -1082,6 +1151,21 @@ static void test_apps_mode(void) {
     }
 }
 
+/* the resolution a machine starts with (Configure → Display) */
+static void test_resolution(void) {
+    int w = 0, h = 0;
+    CHECK(!vm_resolution_parse("1920x1080", &w, &h) && w == 1920 && h == 1080);
+    CHECK(!vm_resolution_parse("640x480", &w, &h));
+    CHECK(vm_resolution_parse("1921x1080", &w, &h));          /* odd */
+    CHECK(vm_resolution_parse("639x480", &w, &h));
+    CHECK(vm_resolution_parse("7682x4320", &w, &h));
+    CHECK(vm_resolution_parse("1920X1080", &w, &h));
+    CHECK(vm_resolution_parse("1920x1080 ", &w, &h));
+    CHECK(vm_resolution_parse("x1080", &w, &h));
+    CHECK(vm_resolution_parse("123456x480", &w, &h));
+    CHECK(vm_resolution_parse("", &w, &h));
+}
+
 /* the Windows guest tools (vmagent.h): AGK_DISPLAY and apps mode, every frame parsed to its last byte */
 typedef struct { uint8_t b[4096]; size_t n; } TB;
 static void tb8(TB *t, uint8_t v) { t->b[t->n++] = v; }
@@ -1196,6 +1280,7 @@ static void test_lag(void) {
 }
 
 int main(void) {
+    test_resolution();
     test_lag();
     test_apps_mode();
     test_clipx();

@@ -81,6 +81,8 @@ const H = {
   activities: () => { panel.set(null); toggleOverview(); },
   apps: (e) => { if (e) noteLaunch(e.x, e.y); panel.set((p) => (p?.name === 'search' && p.mode === 'apps' ? null : { name: 'search', mode: 'apps', display: pointerDisplay().id })); },
   files: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay()); launchApp('files'); },
+  store: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay()); launchApp('store'); },
+  monitor: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay()); launchApp('monitor'); },
   control: () => panel.set((p) => (p?.name === 'control' ? null : { name: 'control', display: pointerDisplay().id })),
   notif: () => panel.set((p) => (p?.name === 'notif' ? null : { name: 'notif', display: mainDisplay().id })),
   volume: () => panel.set((p) => (p?.name === 'volume' ? null : { name: 'volume', display: mainDisplay().id })),
@@ -251,6 +253,7 @@ function App() {
         ...(sp ? [
           { id: 'crown', run: () => H.crown(at) },
           { id: 'activities', run: H.activities }, { id: 'apps', run: () => H.apps() }, { id: 'files', run: () => H.files() },
+          { id: 'store', run: () => H.store() }, { id: 'monitor', run: () => H.monitor() },
           { id: 'help', run: H.help }, { id: 'settings', run: H.settings }, { id: 'control', run: H.control },
         ] : []),
         ...(main?.plan.top ? [...desktopList.get().map((id) => ({ id: `pill:${id}`, run: () => switchDesktop(id) })),
@@ -353,7 +356,7 @@ function App() {
         {!ga && <Layer name="dock">
           {plans.map(({ d, plan }) => (plan.spine ? (
             <Spine key={d.id} t={t} rect={plan.spine} mode={plan.mode} rtl={rtl} active={spineActive} controlRef={d.main ? controlRef : undefined}
-              onCrown={H.crown} onActivities={H.activities} onApps={H.apps} onFiles={H.files} onControl={H.control} onToggle={toggleSpine}
+              onCrown={H.crown} onActivities={H.activities} onApps={H.apps} onFiles={H.files} onStore={H.store} onMonitor={H.monitor} onControl={H.control} onToggle={toggleSpine}
               onSettings={H.settings} onHelp={H.help} />
           ) : null))}
           {main?.plan.top ? (

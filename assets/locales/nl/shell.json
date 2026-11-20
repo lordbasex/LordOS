@@ -468,6 +468,8 @@
   "ws.spine.activities": "Activiteiten",
   "ws.spine.apps": "Apps",
   "ws.spine.files": "Bestanden",
+  "ws.spine.store": "Store",
+  "ws.spine.monitor": "Monitor",
   "ws.spine.control": "Bediening",
   "ws.spine.collapse": "Kolom inklappen",
   "ws.spine.expand": "Kolom uitklappen",

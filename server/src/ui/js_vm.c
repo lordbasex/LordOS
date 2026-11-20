@@ -307,6 +307,13 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "firmware", m.firmware == VM_FW_UEFI ? "uefi" : "bios");
             JS_SetPropertyStr(c, o, "tpm", JS_NewBool(c, m.tpm));
             JS_SetPropertyStr(c, o, "secureBoot", JS_NewBool(c, m.secure_boot));
+            {
+                /* where it starts from: "auto" or "network,disk" (vm_boot_spec), and the firmware's boot menu */
+                char bo[32];
+                vm_boot_spec(&m, bo, sizeof bo);
+                set_str(c, o, "bootOrder", bo);
+                JS_SetPropertyStr(c, o, "bootMenu", JS_NewBool(c, m.boot_menu));
+            }
             set_str(c, o, "network", VM_NET_NAMES[m.network]);
             set_str(c, o, "bridge", m.bridge);
             {
@@ -341,6 +348,11 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             /* the windows device set (4.3), and the graphics (6.10): 3D for Linux machines only */
             JS_SetPropertyStr(c, o, "windowsDevices", JS_NewBool(c, m.devices == VM_DEV_WINDOWS));
             set_str(c, o, "graphics", m.graphics == VM_GFX_3D ? "3d" : "2d");
+            {
+                char rs[24] = "follow";
+                if (m.res_w && m.res_h) snprintf(rs, sizeof rs, "%dx%d", m.res_w, m.res_h);
+                set_str(c, o, "resolution", rs);
+            }
             set_str(c, o, "nicModel", VM_NIC_MODELS[m.nic_model]);
             set_int(c, o, "dataDisks", m.n_data);
             {
@@ -780,7 +792,7 @@ static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 }
 
 /* set(dir, { name, vcpus, memoryMb, diskGb, network, bridge, ports: [{ proto, host, guest, open }], iso,
- *            shares: [{ tag, path, writable }] }) → job id: lord-vm --set on a
+ *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu }) → job id: lord-vm --set on a
  * machine that is off (Configure). shares replaces the list ([] empties it); lord-vm decides which folders may be shared */
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -859,6 +871,15 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         if (gs) JS_FreeCString(c, gs);
     }
     JS_FreeValue(c, v);
+    char res[24] = "";
+    v = JS_GetPropertyStr(c, argv[1], "resolution");
+    if (JS_IsString(v)) {
+        const char *rs = JS_ToCString(c, v);
+        int rw, rh;
+        if (rs && (!strcmp(rs, "follow") || !vm_resolution_parse(rs, &rw, &rh))) { snprintf(res, sizeof res, "%s", rs); args[n++] = "--resolution"; args[n++] = res; } else ok = 0;
+        if (rs) JS_FreeCString(c, rs);
+    }
+    JS_FreeValue(c, v);
     char devs[16] = "", nicm[24] = "";
     v = JS_GetPropertyStr(c, argv[1], "devices");
     if (JS_IsString(v)) {
@@ -897,6 +918,20 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
             JS_FreeValue(c, tv); JS_FreeValue(c, pv); JS_FreeValue(c, wv); JS_FreeValue(c, e);
         }
     } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    /* the boot order, checked here as lord-vm checks it (vm_boot_parse) */
+    char boot[32] = "";
+    v = JS_GetPropertyStr(c, argv[1], "bootOrder");
+    if (JS_IsString(v)) {
+        const char *bs = JS_ToCString(c, v);
+        int ord[VM_BOOT_DEVS];
+        if (bs && strlen(bs) < sizeof boot && vm_boot_parse(bs, ord) >= 0) { snprintf(boot, sizeof boot, "%s", bs); args[n++] = "--boot-order"; args[n++] = boot; } else ok = 0;
+        if (bs) JS_FreeCString(c, bs);
+    } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "bootMenu");
+    if (JS_IsBool(v)) { args[n++] = "--boot-menu"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "iso");
     if (JS_IsString(v)) {
