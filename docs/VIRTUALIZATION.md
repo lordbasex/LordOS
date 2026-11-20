@@ -1286,6 +1286,51 @@ Facts to keep in view:
 
 Not feasible: promising this keeps working across future releases of a system we don't control. The switch is marked with the release it was last tested on.
 
+### 4.3.1 Windows 11 on amd64, built (in development, after 0.8.9.4)
+
+Approved on 2026-11-20 ("stage A"): Windows 11 as a card that makes a machine Windows accepts as it is. arm64 (the
+Raspberry Pi 5) is stage C.
+
+**Where Windows comes from.** Never from LordOS: nothing of Microsoft's is hosted, mirrored or activated by us.
+
+| Way | What | Checked with |
+|---|---|---|
+| Your Windows 11 | The multi-edition ISO from Microsoft's page (www.microsoft.com/software-download/windows11). Machines opens the page; the person downloads; Machines finds `Win11_*_x64*.iso` in Downloads when it's whole, or the person chooses it | The SHA-256 Microsoft publishes on that page for each of its 38 languages, pinned in `systems.json` ("isos"); `lord-vm --sha256` hashes the file |
+| Try it for 90 days | Microsoft's Windows 11 Enterprise Evaluation, en-US, es-ES, pt-BR, from Microsoft's server (`software-static.download.prss.microsoft.com`) | The SHA-256 of KB5130867, pinned ("pinned"); the admin helper keeps the file only with it |
+
+Microsoft's consumer page builds 24-hour links behind a check of its own: Machines doesn't imitate it. Microsoft signs
+no list of hashes, so the catalog (part of the signed package) pins them; a new Windows release means a catalog update
+(the hashes of the new build, checked against a download).
+
+**The template** (`lord-vm --create --secure-boot on --tpm on --hyperv on --rtc local --devices windows --drivers ISO`):
+
+- UEFI with secure boot: `OVMF_CODE_4M.secboot.fd` and `OVMF_VARS_4M.ms.fd` (Microsoft's keys enrolled), `smm=on`, the
+  variables writable from SMM only.
+- A TPM 2.0 (CRB): Debian's `swtpm` per machine (AGENTS.md, "Machines' TPM"): a socketpair for its control channel, its
+  state in `disks/tpm`, our jail and its own seccomp, a cgroup leaf. Snapshots keep a copy of the state, clones take it,
+  memory snapshots restore it through QEMU.
+- Hyper-V enlightenments with KVM; the clock in local time; at least 4 GB, 2 vCPUs, 64 GB (Microsoft's VM requirements).
+- Devices (`"windows"`): virtio disk and network for speed; the installer's and the drivers' CD/DVD drives on q35's
+  SATA, which Setup reads with its own drivers; a USB tablet. (With virtio's SCSI CD/DVD, Setup can't read its own disc
+  before it has a driver, nor the disc the driver is on.)
+
+**Drivers.** virtio-win 0.1.271 from the project's own folder (fedorapeople.org), pinned by SHA-256 (the project
+publishes no hash for the ISO). `vmu_prepare_windows` copies the disk's and network's drivers for Windows 11 (every file
+their `.inf` names: `netkvm.inf` needs `netkvmp.exe` too, or Setup stops on 0x80070002) into `$WinPEDriver$` on a 2 MB
+FAT seed disk, a removable USB stick, which Setup loads by itself, answer file or not: no "Load driver" step.
+
+**Install without questions.** `Autounattend.xml` on the same seed disk, Microsoft's documented settings only: the
+disk laid out for UEFI (DiskID 1: the USB seed disk enumerates first), the edition by its image name with the person's
+key, or Microsoft's published KMS client key for it (Home has none and needs theirs), a local administrator account,
+Microsoft's online-account screens hidden, `BypassNRO` (Microsoft's own value; it may remove it), privacy options off
+(`ProtectYourPC` 3), this computer's language, keyboard (`windows.js`) and time zone (CLDR, `windows-zones.json`). At the
+first sign-in the virtio-win guest tools install from their disc; the guest agent's first answer tells `lord-vm` the
+install is done, and it zeroes and removes the seed disk (Setup has no password hash: the password is there in Setup's
+own encoding) and takes both discs out of `machine.json`. The DVD's "Press any key to boot from CD or DVD" gets Enter
+from `lord-vm` in the first seconds of the first start.
+
+**Guided.** Windows' own installer asks everything; the seed disk holds only the drivers.
+
 ### 4.4 Not offered
 
 Guests whose license restricts them to their maker's hardware. Guests needing a real GPU for their desktop on hardware without passthrough.

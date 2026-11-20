@@ -33,7 +33,10 @@ enum { VM_NET_SHARED = 0, VM_NET_ISOLATED };
 enum { VM_CLIP_OFF = 0, VM_CLIP_TO_GUEST, VM_CLIP_FROM_GUEST, VM_CLIP_BOTH };
 /* the disks' and the pointer's devices (6.22): virtio (fast, needs the guest's drivers) or compat, the ones every system has
  * drivers for: SATA (AHCI) disks and CD/DVD, a USB tablet. The network card has its own model (nic_model). */
-enum { VM_DEV_VIRTIO = 0, VM_DEV_COMPAT };
+enum { VM_DEV_VIRTIO = 0, VM_DEV_COMPAT, VM_DEV_WINDOWS };
+/* VM_DEV_WINDOWS (schema 5): virtio disks and network with the CD/DVD drives on SATA and a USB tablet, so Windows Setup
+ * reads its DVD and the virtio-win drivers' with the drivers it has, and loads virtio's from them */
+extern const char *const VM_DEV_NAMES[];   /* "virtio", "compat", "windows" */
 /* network card models: virtio-net-pci and the emulated cards an imported machine may have had */
 enum { VM_NIC_VIRTIO = 0, VM_NIC_E1000E, VM_NIC_E1000, VM_NIC_E1000_82545EM, VM_NIC_E1000_82544GC, VM_NIC_VMXNET3, VM_NIC_RTL8139, VM_NIC_PCNET, VM_NIC_COUNT };
 extern const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1];   /* "virtio", "e1000e", ... (machine.json's names) */
@@ -105,6 +108,7 @@ typedef struct {
     int secure_boot;                    /* UEFI with secure boot and Microsoft's keys enrolled (OVMF .secboot + .ms) */
     int tpm;                            /* a TPM 2.0, served by swtpm; its state in disks/tpm */
     int hyperv;                         /* Hyper-V enlightenments, for Windows guests */
+    char drivers[VM_PATH_MAX];          /* a second CD/DVD with the guest's drivers (virtio-win), read-only; "" none */
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 

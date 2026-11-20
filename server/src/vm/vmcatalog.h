@@ -14,6 +14,7 @@
 #define VMCAT_URL 400
 #define VMCAT_RE  160
 #define VMCAT_FPRS 4
+#define VMCAT_PINS 48
 
 enum { VMCAT_SIG_DETACHED = 1, VMCAT_SIG_CLEAR = 2 };
 
@@ -30,6 +31,11 @@ typedef struct {
     char keys[64];                /* the maker's key file, a plain name in the keys folder */
     char fprs[VMCAT_FPRS][41];    /* the primary keys of that file that may sign (40 hex digits, upper case) */
     int nfprs;
+    /* An entry whose maker signs no list (Windows' evaluation, virtio-win; docs/VIRTUALIZATION.md 4.3) names its files
+     * itself, "pinned": each with its https URL, its SHA-256 (from the maker's page, checked against a download) and its
+     * size. The catalog is part of LordOS's signed package; a pinned file is kept only with that hash. */
+    int npins;
+    struct { char name[96]; char url[VMCAT_URL]; char sha[65]; unsigned long long bytes; } pin[VMCAT_PINS];
 } VmCatEntry;
 
 /* the entry of `id` for `arch` ("amd64", "arm64"): 0, or -1 (not there, or the entry isn't well formed: a folder that
@@ -58,5 +64,8 @@ int vmcat_verify_list(const VmCatEntry *e, const char *keys, size_t keys_len, co
 
 /* 1 if s is 64 hex digits */
 int vmcat_sha_ok(const char *s);
+
+/* a pinned entry's file of that name and SHA-256 (any case): its index, or -1 */
+int vmcat_pin_find(const VmCatEntry *e, const char *name, const char *sha);
 
 #endif

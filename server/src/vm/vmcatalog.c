@@ -77,6 +77,30 @@ int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmC
         const char *sid = str(s, "id");
         if (!sid || strcmp(sid, id)) continue;
         const JVal *a = get(get(s, "arch"), arch);
+        const JVal *pins = get(a, "pinned");
+        if (pins) {
+            /* files named by the catalog itself (vmcatalog.h): no list, no signature of the maker's */
+            if (pins->type != J_ARR) break;
+            int bad = 0;
+            for (const JVal *p = pins->kid; p && !bad; p = p->next) {
+                const char *pn = str(p, "name"), *pu = str(p, "url"), *ps = str(p, "sha256");
+                const JVal *pb = get(p, "bytes");
+                if (e->npins == VMCAT_PINS || !pn || !vmcat_name_ok(pn) || strlen(pn) >= sizeof e->pin[0].name || !pu || strncmp(pu, "https://", 8) ||
+                    strlen(pu) >= sizeof e->pin[0].url || strpbrk(pu, " \"\\<>") || !ps || !vmcat_sha_ok(ps) || !pb || pb->type != J_NUM ||
+                    pb->num < 1 || pb->num > (double)MAX_IMAGE_MB * 1024 * 1024) { bad = 1; break; }
+                for (int k = 0; k < e->npins; k++) if (!strcmp(e->pin[k].name, pn)) bad = 1;
+                int k = e->npins++;
+                snprintf(e->pin[k].name, sizeof e->pin[k].name, "%s", pn);
+                snprintf(e->pin[k].url, sizeof e->pin[k].url, "%s", pu);
+                for (int i = 0; i < 64; i++) e->pin[k].sha[i] = (char)tolower((unsigned char)ps[i]);
+                e->pin[k].sha[64] = 0;
+                e->pin[k].bytes = (unsigned long long)pb->num;
+                if (e->pin[k].bytes > e->max_bytes) e->max_bytes = e->pin[k].bytes;
+            }
+            if (bad || !e->npins) break;
+            rc = 0;
+            break;
+        }
         const char *dir = str(a, "dir"), *fdir = str(a, "fileDir"), *sums = str(a, "sums"), *sre = str(a, "sumsPattern"), *fre = str(a, "file");
         const JVal *mx = get(a, "maxMb");
         if (!a || !dir_ok(dir) || (fdir && !dir_ok(fdir)) || !re_ok(fre) || !mx || mx->type != J_NUM || mx->num < 1 || mx->num > (double)MAX_IMAGE_MB) break;
@@ -125,6 +149,12 @@ static int line_has(const char *l, size_t n, const char *name, const char *sha) 
     if (n == 8 + nl + 4 + 64 && !memcmp(l, "SHA256 (", 8) && !memcmp(l + 8, name, nl) && !memcmp(l + 8 + nl, ") = ", 4) &&
         !strncasecmp(l + 12 + nl, sha, 64)) return 1;
     return 0;
+}
+
+int vmcat_pin_find(const VmCatEntry *e, const char *name, const char *sha) {
+    if (!e || !name || !sha || !vmcat_sha_ok(sha)) return -1;
+    for (int k = 0; k < e->npins; k++) if (!strcmp(e->pin[k].name, name) && !strcasecmp(e->pin[k].sha, sha)) return k;
+    return -1;
 }
 
 int vmcat_sums_has(const char *sums, size_t n, const char *name, const char *sha) {

@@ -204,7 +204,7 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->agent != 0 && m->agent != 1) return fail(err, n, VM_E_RANGE, "agent");
     if (m->clipboard < VM_CLIP_OFF || m->clipboard > VM_CLIP_BOTH) return fail(err, n, VM_E_RANGE, "clipboard");
     if (m->schema < 2 && (m->base[0] || m->agent || m->clipboard)) return fail(err, n, VM_E_FIELD, "base, agent and clipboard need schema 2");
-    if (m->devices != VM_DEV_VIRTIO && m->devices != VM_DEV_COMPAT) return fail(err, n, VM_E_RANGE, "devices");
+    if (m->devices != VM_DEV_VIRTIO && m->devices != VM_DEV_COMPAT && m->devices != VM_DEV_WINDOWS) return fail(err, n, VM_E_RANGE, "devices");
     if (m->nic_model < 0 || m->nic_model >= VM_NIC_COUNT) return fail(err, n, VM_E_RANGE, "nic_model");
     if (m->n_extra_macs < 0 || m->n_extra_macs > VM_EXTRA_NICS) return fail(err, n, VM_E_RANGE, "at most %d extra_nics", VM_EXTRA_NICS);
     for (int i = 0; i < m->n_extra_macs; i++) {
@@ -238,6 +238,9 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
         }
     }
     if (m->schema < 4 && m->n_shares) return fail(err, n, VM_E_FIELD, "shares need schema 4");
+    if (m->drivers[0] && !path_valid(m->drivers)) return fail(err, n, VM_E_RANGE, "drivers must be an absolute path without '..', ',' or control characters");
+    if (m->schema < 5 && (m->devices == VM_DEV_WINDOWS || m->drivers[0])) return fail(err, n, VM_E_FIELD, "the windows devices and drivers need schema 5");
+    if ((m->devices == VM_DEV_WINDOWS || m->drivers[0]) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "the windows devices are for amd64 machines for now");
     if ((m->secure_boot | m->tpm | m->hyperv) & ~1) return fail(err, n, VM_E_RANGE, "secure_boot, tpm and hyperv are true or false");
     if (m->schema < 5 && (m->secure_boot || m->tpm || m->hyperv)) return fail(err, n, VM_E_FIELD, "secure_boot, tpm and hyperv need schema 5");
     if ((m->secure_boot || m->tpm || m->hyperv) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "secure boot, TPM and Hyper-V are for amd64 machines for now");
@@ -279,7 +282,7 @@ static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
-    "shares", "secure_boot", "tpm", "hyperv", NULL,
+    "shares", "secure_boot", "tpm", "hyperv", "drivers", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -314,7 +317,8 @@ static const char *const FWS[] = { "uefi", "bios", NULL };
 static const char *const DISPLAYS[] = { "window", "none", NULL };
 static const char *const NETS[] = { "shared", "isolated", NULL };
 static const char *const CLIPS[] = { "off", "to-guest", "from-guest", "both", NULL };
-static const char *const DEVS[] = { "virtio", "compat", NULL };
+static const char *const DEVS[] = { "virtio", "compat", "windows", NULL };
+const char *const VM_DEV_NAMES[] = { "virtio", "compat", "windows", NULL };
 static const char *const RTCS[] = { "utc", "local", NULL };
 static const char *const SMB_KEYS[] = { "manufacturer", "product", "version", "serial", "sku", "family", NULL };
 
@@ -431,6 +435,7 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
             if (v && v->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "%s must be true or false", B[i]); goto out; }
             *dst[i] = v ? json_bool(o, B[i], 0) : 0;
         }
+        if ((r = get_str(o, "drivers", m->drivers, sizeof m->drivers, 0, err, n))) goto out;
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -500,6 +505,7 @@ char *vm_machine_json(const VmMachine *m) {
         if (m->secure_boot) jb_raw(&b, ",\n  \"secure_boot\": true");
         if (m->tpm) jb_raw(&b, ",\n  \"tpm\": true");
         if (m->hyperv) jb_raw(&b, ",\n  \"hyperv\": true");
+        if (m->drivers[0]) { jb_raw(&b, ",\n  \"drivers\": "); jb_str(&b, m->drivers); }
     }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);

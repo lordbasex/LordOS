@@ -22,12 +22,25 @@ const eq = (name, got, want) => {
 const H = (c) => c.repeat(64);
 
 // ---- the cards ----
-eq('amd64 cards, Debian first', systemsFor(CAT, 'amd64').map((s) => s.id), ['debian', 'ubuntu', 'fedora', 'kali']);
+eq('amd64 cards, Debian first', systemsFor(CAT, 'amd64').map((s) => s.id), ['debian', 'ubuntu', 'fedora', 'kali', 'windows']);
 eq('arm64 cards', systemsFor(CAT, 'arm64').map((s) => s.id), ['debian', 'ubuntu', 'fedora', 'kali']);
 eq('no cards for another arch', systemsFor(CAT, 'riscv64'), []);
 eq('Debian 13', [systemsFor(CAT, 'amd64')[0].name, systemsFor(CAT, 'amd64')[0].release], ['Debian', '13']);
 eq('every entry has its hash source and date', CAT.systems.every((s) => s.hashSource && /^\d{4}-\d\d-\d\d$/.test(s.checked)), true);
-eq('every folder is https', CAT.systems.every((s) => Object.values(s.arch).every((a) => /^https:\/\/[^/]+\/.*\/$/.test(a.dir) && (!a.fileDir || /^https:\/\//.test(a.fileDir)))), true);
+// a pinned entry (Windows' evaluation, virtio-win; vmcatalog.h) names its files itself; every other entry has a folder
+const pinnedOf = (s) => Object.values(s.arch).some((a) => Array.isArray(a.pinned));
+eq('every folder is https', CAT.systems.filter((s) => !pinnedOf(s)).every((s) => Object.values(s.arch).every((a) => /^https:\/\/[^/]+\/.*\/$/.test(a.dir) && (!a.fileDir || /^https:\/\//.test(a.fileDir)))), true);
+for (const s of CAT.systems.filter(pinnedOf)) {
+  const files = Object.values(s.arch).flatMap((a) => a.pinned || []);
+  eq(`${s.id}: pinned files`, [files.length > 0, files.every((f) => /^https:\/\/[^/\s"<>\\]+\/\S+$/.test(f.url) && /^[0-9a-f]{64}$/.test(f.sha256) && Number.isInteger(f.bytes) && f.bytes > 0 &&
+    /^[A-Za-z0-9_+~][A-Za-z0-9._+~-]{0,94}$/.test(f.name)), new Set(files.map((f) => f.name)).size === files.length,
+    typeof s.hashSource === 'string' && typeof s.license === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.checked)], [true, true, true, true]);
+}
+const WIN = CAT.systems.find((s) => s.id === 'windows');
+eq('windows: every language of the page, hashes unique', [WIN.arch.amd64.isos.length >= 38, WIN.arch.amd64.isos.every((i) => /^[a-z]{2}(-Latn)?-[A-Z]{2}$/.test(i.lang) && /^[0-9a-f]{64}$/.test(i.sha256)),
+  new Set(WIN.arch.amd64.isos.map((i) => i.sha256)).size === WIN.arch.amd64.isos.length], [true, true, true]);
+eq('windows: editions with Microsoft\'s KMS client keys, Home without', [WIN.editions.find((e) => e.name === 'Windows 11 Pro').kms, WIN.editions.find((e) => e.name === 'Windows 11 Home').kms,
+  WIN.editions.every((e) => e.kms === '' || /^[A-Z0-9]{5}(-[A-Z0-9]{5}){4}$/.test(e.kms))], ['W269N-WFGWX-YVC9B-4J6C9-T83GX', '', true]);
 eq('Fedora list found in a listing', [systemsFor(CAT, 'amd64')[2].listed, systemsFor(CAT, 'amd64')[0].listed], [true, false]);
 eq('entryOf', [entryOf(CAT, 'debian', 'arm64').sums, entryOf(CAT, 'nothing', 'amd64'), entryOf(CAT, 'debian', 'riscv64')], ['SHA256SUMS', null, null]);
 eq('garbage catalog', systemsFor({ systems: [null, 3, { id: 'x' }] }, 'amd64'), []);
@@ -67,7 +80,7 @@ eq('sizes', [sizeMb(760, 0), sizeMb(760, 2925092864)], [760, 2790]);
 eq('resumed', [resumedOf('vm.downloadResumed from=412000000'), resumedOf('progress download 1 2'), resumedOf(null)], [412000000, 0, 0]);
 
 // ---- the makers' signed lists: every card names its signature, key file and fingerprints ----
-for (const s of CAT.systems) {
+for (const s of CAT.systems.filter((x) => !pinnedOf(x))) {
   eq(`${s.id}: signed`, [['detached', 'clearsigned'].includes(s.signature?.type), /^[a-z0-9-]+\.asc$/.test(s.keys), (s.fingerprints || []).every((f) => /^[0-9A-F]{40}$/.test(f)) && s.fingerprints.length > 0,
     typeof s.keySource === 'string' && typeof s.fingerprintChecked === 'string' && s.fingerprintChecked.includes('https://')], [true, true, true, true]);
   eq(`${s.id}: key file pinned in the package`, fs.existsSync(path.join(here, '../../packaging/keys/machines', s.keys)), true);

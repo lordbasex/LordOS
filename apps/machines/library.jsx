@@ -227,7 +227,7 @@ export function Requirements({ host, onBack, onChanged, archs }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const list = archs || [host.arch];
-  const missing = missingFor(host, list);
+  const missing = missingFor(host, list, { windows: true });
   const have = (pk) => !missing.includes(pk);
   const rows = [
     ['kvm', host.kvm ? 'ready' : host.kvmDevice ? 'notAllowed' : 'off'],
@@ -237,6 +237,7 @@ export function Requirements({ host, onBack, onChanged, archs }) {
     ['disk', have('qemu-utils') ? 'ready' : 'missing'],
     ['network', have('passt') ? 'ready' : 'missing'],
     ['folders', have('virtiofsd') ? 'ready' : 'missing'],
+    ...(list.includes('amd64') ? [['tpm', have('swtpm') ? 'ready' : 'missing']] : []),
   ];
   const install = async () => {
     setBusy(true); setMsg(null);

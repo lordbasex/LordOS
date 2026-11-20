@@ -633,7 +633,8 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     vm_host_probe(&h);
     int arch = h.arch >= 0 ? h.arch : VM_ARCH_AMD64;
     const char *name = NULL, *import = NULL, *iso = NULL, *unatt = NULL;
-    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1, sb = 0, tpm = 0, hv = 0, rtc = -1;
+    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1, sb = 0, tpm = 0, hv = 0, rtc = -1, devs = -1;
+    const char *drivers = NULL;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
@@ -656,6 +657,8 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--tpm")) { tpm = parse_enum(v, "off", "on"); if (tpm < 0) { fprintf(stderr, "lord-vm: --tpm on|off\n"); return 2; } }
         else if (!strcmp(a, "--hyperv")) { hv = parse_enum(v, "off", "on"); if (hv < 0) { fprintf(stderr, "lord-vm: --hyperv on|off\n"); return 2; } }
         else if (!strcmp(a, "--rtc")) { rtc = parse_enum(v, "utc", "local"); if (rtc < 0) { fprintf(stderr, "lord-vm: --rtc utc|local\n"); return 2; } }
+        else if (!strcmp(a, "--devices")) { devs = !strcmp(v, "windows") ? VM_DEV_WINDOWS : parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat|windows\n"); return 2; } }
+        else if (!strcmp(a, "--drivers")) drivers = v;
         else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
     }
     /* an unattended install (vmunattend.h): the spec lord-server wrote (0600, the password only as a hash), read and
@@ -691,6 +694,13 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     /* Windows 11 (4.3): secure boot (UEFI only), a TPM 2.0, Hyper-V enlightenments, the clock in local time */
     m.secure_boot = sb; m.tpm = tpm; m.hyperv = hv;
     if (rtc >= 0) m.rtc = rtc;
+    if (devs >= 0) m.devices = devs;
+    if (m.devices == VM_DEV_WINDOWS) m.nic_model = VM_NIC_VIRTIO;
+    char drvreal[PATH_MAX];
+    if (drivers) {
+        if (!realpath(drivers, drvreal) || !file_exists(drvreal) || strlen(drvreal) >= sizeof m.drivers) { fprintf(stderr, "lord-vm: %s isn't a file\n", drivers); return 1; }
+        memcpy(m.drivers, drvreal, strlen(drvreal) + 1);
+    }
     if (sb && fw == VM_FW_BIOS) { fprintf(stderr, "lord-vm: secure boot needs UEFI\n"); return 2; }
     if (sb) fw = VM_FW_UEFI;
     if (tpm && !file_exists(SWTPM)) { fprintf(stderr, "lord-vm: %s isn't installed (swtpm, for the TPM)\n", SWTPM); return 1; }
@@ -757,7 +767,8 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     if (unatt) {
         char dd[PATH_MAX + 64], why[300];
         snprintf(dd, sizeof dd, "%s/disks", real);
-        if (vmu_prepare(dd, m.iso, &un, m.id, why, sizeof why)) {
+        if (un.kind == VMU_WINDOWS && !m.drivers[0]) { fprintf(stderr, "lord-vm: a Windows install needs --drivers (virtio-win)\n"); unlink(sys); return 2; }
+        if (un.kind == VMU_WINDOWS ? vmu_prepare_windows(dd, m.drivers, &un, why, sizeof why) : vmu_prepare(dd, m.iso, &un, m.id, why, sizeof why)) {
             fprintf(stderr, "lord-vm: the unattended install can't be prepared: %s\n", why);
             unlink(sys);
             snprintf(dd, sizeof dd, "%s/disks/nvram.qcow2", real); unlink(dd);
@@ -803,7 +814,11 @@ static struct {
     int memev_fd;
     long oom0;
     int host_shutdown, poweroff, forced, guest_shutdown, panic, killed;
-    int unattended, install_done;        /* the first start of an unattended install (disks/unattended), and its end */
+    int unattended, install_done;
+    int win_seed;                        /* Windows' seed disk in this start: 1 answers and drivers, 2 drivers only */
+    long long win_key_at;                /* an unattended Windows install's first seconds: Enter for "Press any key to boot
+                                          * from CD or DVD" (Microsoft's DVD asks; a reset inside QEMU doesn't come here) */
+    int win_keys;        /* the first start of an unattended install (disks/unattended), and its end */
     char un_cmd[640];
     long long shut_deadline, kill_deadline;
     Pending pq[MAX_PENDING];
@@ -1421,6 +1436,26 @@ static void build_qemu_args(void) {
             arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,drive=cd,bootindex=%s", bus, bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
         } else { arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,bootindex=%s", bus, bi_cd); S.cd_node[0] = 0; }
+    } else if (m->devices == VM_DEV_WINDOWS) {
+        /* Windows (4.3): virtio disks (Setup loads viostor from the drivers), the CD/DVD drives on q35's own SATA (ide.4
+         * the drivers' disc, ide.5 the installer's), which Setup reads with the drivers it has */
+        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=%s,addr=0x1%s", bi_sys, ser);
+        for (int i = 0; i < m->n_data; i++) {
+            arg("-device"); argf("virtio-blk-pci,id=datadisk%d,drive=data%d,addr=0x%x%s%s", i + 1, i + 1, 0x10 + i, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
+        }
+        if (m->iso[0]) {
+            arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
+            arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
+            arg("-device"); argf("ide-cd,id=cd0,bus=ide.5,drive=cd,bootindex=%s", bi_cd);
+            snprintf(S.cd_node, sizeof S.cd_node, "cd");
+        } else { arg("-device"); argf("ide-cd,id=cd0,bus=ide.5,bootindex=%s", bi_cd); S.cd_node[0] = 0; }
+        /* xHCI for the USB tablet and the seed disk, before either */
+        arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5");
+        if (m->drivers[0]) {
+            arg("-blockdev"); argj(blockdev_file("drv-file", m->drivers, 1));
+            arg("-blockdev"); argj(blockdev_fmt("raw", "drv", "drv-file", 1));
+            arg("-device"); arg("ide-cd,id=cd1,bus=ide.4,drive=drv");
+        }
     } else {
         arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=%s,addr=0x1%s", bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
@@ -1435,6 +1470,13 @@ static void build_qemu_args(void) {
             arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0,drive=cd,bootindex=%s", bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
         } else { arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0,bootindex=%s", bi_cd); S.cd_node[0] = 0; }
+    }
+    if (S.win_seed) {
+        /* Windows' seed disk (vmunattend.h): a removable USB stick, where Setup looks for Autounattend.xml and $WinPEDriver$ */
+        snprintf(p, sizeof p, "%s/unattended/seed.img", S.disks);
+        arg("-blockdev"); argj(blockdev_file("seed-file", p, 1));
+        arg("-blockdev"); argj(blockdev_fmt("raw", "seed", "seed-file", 1));
+        arg("-device"); arg("usb-storage,id=seed0,bus=xhci.0,drive=seed,removable=on");
     }
     if (S.unattended) {
         /* an unattended install's first start (vmunattend.h): the installer's own kernel and initrd with the answers'
@@ -1466,10 +1508,10 @@ static void build_qemu_args(void) {
     arg("-device"); arg("virtio-rng-pci,addr=0x3");
     /* amd64 with -nodefaults needs a display device or its kernel never starts (3.3); arm64's virt has no keyboard */
     if (!arm) { arg("-device"); arg("virtio-vga,id=video0,addr=0x4"); }
-    if (m->display == VM_DISPLAY_WINDOW && m->devices == VM_DEV_COMPAT) {
+    if (m->display == VM_DISPLAY_WINDOW && (m->devices == VM_DEV_COMPAT || m->devices == VM_DEV_WINDOWS)) {
         /* a USB tablet (and keyboard on arm64) on xHCI: drivers every system has */
         if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); }
-        arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5");
+        if (m->devices != VM_DEV_WINDOWS) { arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5"); }
         if (arm) { arg("-device"); arg("usb-kbd,bus=xhci.0"); }
         arg("-device"); arg("usb-tablet,bus=xhci.0");
         arg("-display"); arg("dbus,p2p=yes");
@@ -1563,8 +1605,10 @@ static int start_machine(void) {
         if (disk_plain(p, err, sizeof err)) { fail_start("data disk %d can't be used: %s", i + 1, err); return -1; }
     }
     if (S.m.iso[0] && !file_exists(S.m.iso)) { fail_start("the attached image is missing: %s", S.m.iso); return -1; }
+    if (S.m.drivers[0] && !file_exists(S.m.drivers)) { vlog("note: the drivers disc is gone (%s): the machine starts without it", S.m.drivers); S.m.drivers[0] = 0; }
     S.unattended = 0;
     S.install_done = 0;
+    S.win_seed = 0;
     {
         char cp[PATH_MAX + 64];
         snprintf(cp, sizeof cp, "%s/unattended/cmdline", S.disks);
@@ -1581,6 +1625,18 @@ static int start_machine(void) {
             if (!file_exists(cp)) ok = 0;
             if (ok) { S.unattended = 1; vlog("unattended: this start installs the system (the installer's kernel and the answers)"); }
             else vlog("unattended: disks/unattended is incomplete or the ISO is gone: started as usual");
+        }
+        /* Windows (vmu_prepare_windows): no kernel of its own; the seed disk goes in as a USB stick until the guest
+         * agent's first answer says the install is done */
+        snprintf(cp, sizeof cp, "%s/unattended/windows", S.disks);
+        char wm[16] = "";
+        int wfd = open(cp, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        ssize_t wn = wfd >= 0 ? read(wfd, wm, sizeof wm - 1) : -1;
+        if (wfd >= 0) close(wfd);
+        snprintf(cp, sizeof cp, "%s/unattended/seed.img", S.disks);
+        if (wn > 0 && !S.unattended && file_exists(cp) && S.m.devices == VM_DEV_WINDOWS) {
+            S.win_seed = !strncmp(wm, "guided", 6) ? 2 : 1;
+            vlog("unattended: Windows' seed disk is in (%s)", S.win_seed == 2 ? "the drivers, a guided install" : "the answers and the drivers");
         }
     }
     if (!file_exists(QEMU_BIN_OF(S.m.arch))) { fail_start("%s isn't installed", QEMU_BIN_OF(S.m.arch)); return -1; }
@@ -1654,7 +1710,8 @@ static int start_machine(void) {
         place_fds(fds, nf);
         int stf = 3 + nf - 1;
         fcntl(stf, F_SETFD, FD_CLOEXEC);
-        VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL, S.m.accel == VM_ACCEL_KVM };
+        VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
+                         S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM };
         int mask = vm_jail_qemu(&j);
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
@@ -1719,6 +1776,7 @@ static int start_machine(void) {
     }                   /* the state goes in first (P_VERSION → begin_resume), then cont */
     if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "started paused");
     else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
+    if (S.win_seed == 1 && !S.paused_start) { S.win_key_at = now_ms() + 1500; S.win_keys = 16; }
     return 0;
 }
 
@@ -2389,9 +2447,40 @@ static void ag_broadcast(void) {
     for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
 }
 
+static int qmp_do(const char *cmd, const char *args, int kind, int client, uint32_t seq, int pass_fd, int keep_fd);
+/* Windows' install is done (vmunattend.h): the guest tools Setup's answers installed at the first sign-in answer. The
+ * seed disk (the answers hold the account's password, only encoded) comes out of the machine, is zeroed and removed,
+ * and the installer's and the drivers' discs leave machine.json, so the next start is the installed system's alone. */
+static void windows_install_done(void) {
+    qmp_do("device_del", "{\"id\":\"seed0\"}", P_IGNORE, -1, 0, -1, -1);
+    char p[PATH_MAX + 64];
+    snprintf(p, sizeof p, "%s/unattended/seed.img", S.disks);
+    int fd = open(p, O_WRONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd >= 0) {
+        struct stat st;
+        static const char z[4096];
+        if (!fstat(fd, &st)) for (off_t o = 0; o < st.st_size; o += (off_t)sizeof z) if (write(fd, z, sizeof z) < 0) break;
+        fsync(fd);
+        close(fd);
+    }
+    unlink(p);
+    snprintf(p, sizeof p, "%s/unattended/windows", S.disks);
+    unlink(p);
+    VmMachine m;
+    char err[256];
+    if (!vm_machine_load(S.dir, &m, err, sizeof err)) {
+        m.iso[0] = 0;
+        m.drivers[0] = 0;
+        if (!vm_machine_save(S.dir, &m)) { S.m.iso[0] = 0; S.m.drivers[0] = 0; }
+    }
+    S.win_seed = 0;
+    vlog("unattended: Windows is installed (its guest agent answered): the seed disk is wiped and removed, the discs leave at the next start");
+}
+
 static void ag_set(int state) {
     if (state == S.ag_state) return;
     S.ag_state = state;
+    if (state == VAS_CONNECTED && S.win_seed) windows_install_done();
     set_state(S.state, S.reason, S.code, NULL);         /* run.json says it too: the library's agent light */
     vlog("agent: %s%s%s", state == VAS_CONNECTED ? "connected" : state == VAS_WAITING ? "waiting" : "off", state == VAS_CONNECTED ? ", " : "", state == VAS_CONNECTED ? S.ag_version : "");
     ag_broadcast();
@@ -3253,11 +3342,16 @@ static void loop(void) {
         if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
+        if (S.win_key_at && (next < 0 || S.win_key_at < next)) next = S.win_key_at;
         int to = next < 0 ? -1 : next <= now ? 0 : (int)(next - now);
         if (poll(p, (nfds_t)n, to) < 0 && errno != EINTR) { vlog("poll: %s", strerror(errno)); break; }
         now = now_ms();
         if (S.migq_next && now >= S.migq_next) { S.migq_next = now + 500; qmp_do("query-migrate", NULL, P_MIGQ, -1, 0, -1, -1); }
         if (S.qga_fd >= 0 && S.ag_next && now >= S.ag_next) ag_tick(now);
+        if (S.win_key_at && now >= S.win_key_at) {
+            qmp_do("send-key", "{\"keys\":[{\"type\":\"qcode\",\"data\":\"ret\"}]}", P_IGNORE, -1, 0, -1, -1);
+            S.win_key_at = --S.win_keys > 0 && S.state == VS_RUNNING ? now + 700 : 0;
+        }
         if (S.net_retry_at && now >= S.net_retry_at) net_restart();
         if (S.id_poll_at && now >= S.id_poll_at) { char a[48]; S.id_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.id_pid); qga_do("guest-exec-status", a, AQ_IDSTATUS); }
         host_stop_tick(now);
@@ -3992,7 +4086,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
     printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\"}\n", m.vcpus, m.memory_mb, m.disk_gb,
-           m.network == VM_NET_SHARED ? "shared" : "isolated", m.iso[0] ? "true" : "false", m.agent ? "true" : "false", m.devices ? "compat" : "virtio", VM_NIC_MODELS[m.nic_model]);
+           m.network == VM_NET_SHARED ? "shared" : "isolated", m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices], VM_NIC_MODELS[m.nic_model]);
     rc = 0;
 out:
     close(lock);
@@ -5122,7 +5216,7 @@ static void print_plan(const Imp *I, const VmMachine *n, const VmHost *h, int ok
               (ok ? n->firmware : m->firmware) == VM_FW_UEFI ? "uefi" : "bios", m->secure_boot ? "true" : "false");
     jb_printf(&b, ",\"vcpus\":%d,\"sockets\":%d,\"cores\":%d,\"threads\":%d,\"memory_mb\":%d", m->vcpus, m->sockets, m->cores, m->threads, m->memory_mb);
     if (ok) jb_printf(&b, ",\"vcpus_here\":%d,\"memory_mb_here\":%d,\"devices\":\"%s\",\"nic_model\":\"%s\",\"rtc\":\"%s\",\"uuid_here\":\"%s\"",
-                      n->vcpus, n->memory_mb, n->devices ? "compat" : "virtio", VM_NIC_MODELS[n->nic_model], n->rtc ? "local" : "utc", n->id);
+                      n->vcpus, n->memory_mb, VM_DEV_NAMES[n->devices], VM_NIC_MODELS[n->nic_model], n->rtc ? "local" : "utc", n->id);
     jb_raw(&b, ",\"uuid\":"); jb_str(&b, m->uuid);
     jb_raw(&b, ",\"uuid_how\":"); jb_str(&b, m->uuid_how);
     jb_raw(&b, ",\"smbios\":{\"manufacturer\":"); jb_str(&b, m->sm_manufacturer);
@@ -5470,7 +5564,7 @@ static int cmd_import_machine(const char *src, int argc, char **argv) {
     vlog("import: %s made from %s", final, I.settings[0] ? I.settings : I.bundle);
     printf("{\"imported\":true,\"dir\":");
     print_json_str(final);
-    printf(",\"id\":\"%s\",\"devices\":\"%s\",\"nic_model\":\"%s\",\"mac\":\"%s\"}\n", n.id, n.devices ? "compat" : "virtio", VM_NIC_MODELS[n.nic_model], n.mac);
+    printf(",\"id\":\"%s\",\"devices\":\"%s\",\"nic_model\":\"%s\",\"mac\":\"%s\"}\n", n.id, VM_DEV_NAMES[n.devices], VM_NIC_MODELS[n.nic_model], n.mac);
     rc = 0;
 out:
     tool_progress = NULL;
@@ -5498,12 +5592,45 @@ static int usage(void) {
             "                                        [--firmware uefi|bios] [--vcpus N] [--memory MB]\n"
             "       lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR\n"
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
-            "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n");
+            "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n"
+            "       lord-vm --sha256 FILE   (an ISO's SHA-256, with progress lines)\n");
     return 2;
+}
+
+/* --sha256 FILE: an ISO the person downloaded from its maker's page (Windows, 4.3), hashed to be checked against the
+ * catalog's list for it: {"progress":P} lines (a whole percent at a time), then {"sha256":"…","size":N}. A file only:
+ * no device, no folder. */
+static int cmd_sha256(const char *path) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    struct stat st;
+    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode)) { fprintf(stderr, "lord-vm: %s isn't a file\n", path); if (fd >= 0) close(fd); return 1; }
+    posix_fadvise(fd, 0, 0, POSIX_FADV_SEQUENTIAL);
+    Sha256 s;
+    sha256_init(&s);
+    static uint8_t buf[1 << 20];
+    unsigned long long done = 0;
+    int last = -1;
+    for (;;) {
+        ssize_t r = read(fd, buf, sizeof buf);
+        if (r < 0) { if (errno == EINTR) continue; fprintf(stderr, "lord-vm: reading %s: %s\n", path, strerror(errno)); close(fd); return 1; }
+        if (!r) break;
+        sha256_update(&s, buf, (size_t)r);
+        done += (unsigned long long)r;
+        int pc = st.st_size > 0 ? (int)(done * 100ull / (unsigned long long)st.st_size) : 100;
+        if (pc != last) { last = pc; printf("{\"progress\":%d}\n", pc); fflush(stdout); }
+    }
+    close(fd);
+    uint8_t d[32];
+    char hex[65];
+    sha256_final(&s, d);
+    for (int i = 0; i < 32; i++) snprintf(hex + i * 2, 3, "%02x", d[i]);
+    printf("{\"sha256\":\"%s\",\"size\":%llu}\n", hex, done);
+    return 0;
 }
 
 int main(int argc, char **argv) {
     if (argc < 3) return usage();
+    if (!strcmp(argv[1], "--sha256")) return cmd_sha256(argv[2]);
     const char *cmd = argv[1], *dir = argv[2];
     int rest = argc - 3;
     char **rv = argv + 3;

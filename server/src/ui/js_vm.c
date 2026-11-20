@@ -383,6 +383,45 @@ static void xkb_desc(const char *code, char *out, size_t n) {
 
 /* an unattended install's spec for lord-vm --unattended (vm/vmunattend.h): the object's words as JSON, the password
  * replaced by its SHA-512 crypt hash, in a 0600 file of the runtime folder that lord-vm reads and removes. 0, or -1 */
+/* UTF-8 text → Windows Setup's own encoding of a password in an answer file: base64 of UTF-16LE(text + "Password"). Not a
+ * hash (Setup has none): the seed disk that holds it is wiped when the install is done (lord-vm). 0, or -1 */
+static int win_password(const char *pw, char *out, size_t on) {
+    char t[300];
+    if (snprintf(t, sizeof t, "%sPassword", pw) >= (int)sizeof t) return -1;
+    uint8_t u16[600];
+    size_t n = 0;
+    for (const unsigned char *p = (const unsigned char *)t; *p;) {
+        uint32_t cp;
+        int k = *p < 0x80 ? 1 : (*p >> 5) == 6 ? 2 : (*p >> 4) == 14 ? 3 : (*p >> 3) == 30 ? 4 : 0;
+        if (!k) return -1;
+        cp = k == 1 ? *p : k == 2 ? (*p & 0x1Fu) : k == 3 ? (*p & 0x0Fu) : (*p & 0x07u);
+        for (int i = 1; i < k; i++) { if ((p[i] & 0xC0) != 0x80) return -1; cp = (cp << 6) | (p[i] & 0x3Fu); }
+        p += k;
+        if (cp >= 0x10000) {
+            cp -= 0x10000;
+            uint32_t hi = 0xD800 + (cp >> 10), lo = 0xDC00 + (cp & 0x3FF);
+            if (n + 4 > sizeof u16) return -1;
+            u16[n++] = (uint8_t)hi; u16[n++] = (uint8_t)(hi >> 8); u16[n++] = (uint8_t)lo; u16[n++] = (uint8_t)(lo >> 8);
+        } else {
+            if (n + 2 > sizeof u16) return -1;
+            u16[n++] = (uint8_t)cp; u16[n++] = (uint8_t)(cp >> 8);
+        }
+    }
+    explicit_bzero(t, sizeof t);
+    static const char B[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    size_t o = 0;
+    for (size_t i = 0; i < n; i += 3) {
+        uint32_t v = (uint32_t)u16[i] << 16 | (i + 1 < n ? (uint32_t)u16[i + 1] << 8 : 0) | (i + 2 < n ? u16[i + 2] : 0);
+        if (o + 5 > on) { explicit_bzero(u16, sizeof u16); return -1; }
+        out[o++] = B[v >> 18 & 63]; out[o++] = B[v >> 12 & 63];
+        out[o++] = i + 1 < n ? B[v >> 6 & 63] : '=';
+        out[o++] = i + 2 < n ? B[v & 63] : '=';
+    }
+    out[o] = 0;
+    explicit_bzero(u16, sizeof u16);
+    return 0;
+}
+
 static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char *path, size_t pn) {
     static const char *const keys[] = { "kind", "user", "fullname", "hostname", "timezone", "keymap", "variant", "locale", "release",
                                         "kernel", "initrd", "append", NULL };
@@ -409,11 +448,45 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
         if (km) JS_FreeCString(c, km);
         JS_FreeValue(c, vk);
     }
+    /* Windows (vmunattend.h): its own words; the password in Setup's encoding, and none is allowed */
+    int win = 0;
+    {
+        JSValue vk = JS_GetPropertyStr(c, o, "kind");
+        const char *k = JS_IsString(vk) ? JS_ToCString(c, vk) : NULL;
+        win = k && !strcmp(k, "windows");
+        if (k) JS_FreeCString(c, k);
+        JS_FreeValue(c, vk);
+    }
+    if (win) {
+        static const char *const wk[] = { "edition", "key", "uilang", "inputloc", "wtz", "userloc", NULL };
+        for (int i = 0; wk[i] && ok; i++) {
+            JSValue v = JS_GetPropertyStr(c, o, wk[i]);
+            if (JS_IsString(v)) {
+                const char *sv = JS_ToCString(c, v);
+                char q[200];
+                if (!sv || strlen(sv) > 64 || !json_quote(q, sizeof q, sv)) ok = 0;
+                else n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"%s\":%s", wk[i], q);
+                if (sv) JS_FreeCString(c, sv);
+            }
+            JS_FreeValue(c, v);
+        }
+        JSValue vg = JS_GetPropertyStr(c, o, "guided");
+        if (JS_IsBool(vg)) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"guided\":%s", JS_ToBool(c, vg) ? "true" : "false");
+        JS_FreeValue(c, vg);
+        JSValue vp = JS_GetPropertyStr(c, o, "password");
+        const char *pw = JS_IsString(vp) ? JS_ToCString(c, vp) : NULL;
+        char wp[260] = "";
+        if (pw && pw[0] && (strlen(pw) > 127 || win_password(pw, wp, sizeof wp))) ok = 0;
+        if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
+        JS_FreeValue(c, vp);
+        n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"wpass\":\"%s\"", wp);
+        explicit_bzero(wp, sizeof wp);
+    }
     JSValue vd = JS_GetPropertyStr(c, o, "desktop");
     if (JS_IsBool(vd)) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"desktop\":%s", JS_ToBool(c, vd) ? "true" : "false");
     JS_FreeValue(c, vd);
     /* the password: only its hash leaves here */
-    JSValue vp = JS_GetPropertyStr(c, o, "password");
+    JSValue vp = win ? JS_UNDEFINED : JS_GetPropertyStr(c, o, "password");
     const char *pw = JS_IsString(vp) ? JS_ToCString(c, vp) : NULL;
     char hash[160] = "";
     if (pw && pw[0] && strlen(pw) < 256) {
@@ -426,8 +499,9 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
     }
     if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
     JS_FreeValue(c, vp);
-    if (!hash[0]) ok = 0;
-    n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"hash\":\"%s\"}", hash);
+    if (!win && !hash[0]) ok = 0;
+    if (!win) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"hash\":\"%s\"}", hash);
+    else n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, "}");
     if (!ok || n >= sizeof buf) return -1;
     const char *rt = getenv("XDG_RUNTIME_DIR");
     static unsigned k;
@@ -493,6 +567,17 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     JSValue vu = JS_GetPropertyStr(c, argv[0], "unattended");
     if (ok && JS_IsObject(vu)) { if (!has_iso || unattended_spec(c, vu, arch, spec, sizeof spec)) ok = 0; }
     JS_FreeValue(c, vu);
+    /* a Windows 11 machine (4.3): secure boot, a TPM, Hyper-V, local time, its devices and the drivers' disc */
+    char drv[PATH_MAX] = "";
+    int windows = 0;
+    JSValue vw = JS_GetPropertyStr(c, argv[0], "windows");
+    if (ok && JS_IsObject(vw)) {
+        JSValue vdr = JS_GetPropertyStr(c, vw, "drivers");
+        windows = 1;
+        if (!JS_IsString(vdr) || user_file(c, vdr, drv, sizeof drv) || strcmp(arch, "amd64")) ok = 0;
+        JS_FreeValue(c, vdr);
+    }
+    JS_FreeValue(c, vw);
     int id = 0;
     if (ok) {
         char folder[64], dir[PATH_MAX + 80];
@@ -502,12 +587,17 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         int native = (!strcmp(arch, "amd64") ? VM_ARCH_AMD64 : VM_ARCH_ARM64) == host_arch();
         char sv[16], sm[16], sd[16];
         snprintf(sv, sizeof sv, "%d", vcpus); snprintf(sm, sizeof sm, "%d", mem); snprintf(sd, sizeof sd, "%d", disk);
-        char *args[32] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
+        char *args[48] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
                          "--vcpus", sv, "--memory", sm, "--disk", sd, "--network", isolated ? "isolated" : "shared", has_imp ? "--import" : "--iso", has_imp ? imp : iso, NULL };
         int na = 0;
         while (args[na]) na++;
         if (spec[0]) { args[na++] = "--unattended"; args[na++] = spec; }
         if (share) { args[na++] = "--agent"; args[na++] = "on"; args[na++] = "--clipboard"; args[na++] = "both"; }
+        if (windows) {
+            static char *const W[] = { "--secure-boot", "on", "--tpm", "on", "--hyperv", "on", "--rtc", "local", "--devices", "windows", "--drivers" };
+            for (size_t i = 0; i < sizeof W / sizeof W[0]; i++) args[na++] = W[i];
+            args[na++] = drv;
+        }
         args[na] = NULL;
         int p[2];
         if (!access(dir, F_OK) || pipe2(p, O_CLOEXEC)) ok = 0;
@@ -570,6 +660,16 @@ static int spawn_job(char *const args[], const char *dir) {
     jobs[slot] = (Job){ .used = 1, .fd = p[0], .pid = pid };
     snprintf(jobs[slot].dir, sizeof jobs[slot].dir, "%s", dir);
     return slot + 1;
+}
+
+/* hash(path) → job id: lord-vm --sha256 on a file the person chose or downloaded ({"progress":P} lines, then
+ * {"sha256":…,"size":…}), to check a Windows ISO against the catalog's list (4.3) */
+static JSValue f_hash(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char path[PATH_MAX];
+    if (argc < 1 || !JS_IsString(argv[0]) || user_file(c, argv[0], path, sizeof path)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--sha256", path, NULL };
+    return JS_NewInt32(c, spawn_job(args, ""));
 }
 
 /* (security scan F5) A guest writes to a writable shared folder: never one that is, sits under or holds a path lord.fs
@@ -2480,7 +2580,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
-    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),

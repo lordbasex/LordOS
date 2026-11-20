@@ -97,12 +97,70 @@ static int append_ok(const char *s) {
 
 #define CP(field, key) do { const char *v_ = json_str(r, key); snprintf(u->field, sizeof u->field, "%s", v_ ? v_ : ""); } while (0)
 
+/* ---- Windows (4.3) ---- */
+
+static int chars_of(const char *s, size_t min, size_t max, const char *extra) {
+    size_t n = strlen(s);
+    if (n < min || n > max) return 0;
+    for (size_t i = 0; i < n; i++) if (!isalnum((unsigned char)s[i]) && !strchr(extra, s[i])) return 0;
+    return 1;
+}
+/* a local account: 1 to 20 of letters, digits, space . _ -, not starting or ending with a space or a dot */
+static int wuser_ok(const char *s) {
+    size_t n = strlen(s);
+    return chars_of(s, 1, 20, " ._-") && s[0] != ' ' && s[0] != '.' && s[n - 1] != ' ' && s[n - 1] != '.';
+}
+/* a computer name: 1 to 15 of letters, digits and '-', not only digits */
+static int wcomputer_ok(const char *s) {
+    if (!chars_of(s, 1, 15, "-") || s[0] == '-') return 0;
+    for (const char *c = s; *c; c++) if (!isdigit((unsigned char)*c)) return 1;
+    return 0;
+}
+static int wkey_ok(const char *s) {
+    if (!s[0]) return 1;
+    if (strlen(s) != 29) return 0;
+    for (int i = 0; i < 29; i++) if ((i % 6 == 5) ? s[i] != '-' : !(isupper((unsigned char)s[i]) || isdigit((unsigned char)s[i]))) return 0;
+    return 1;
+}
+static int b64_ok(const char *s) { return !s[0] || chars_of(s, 4, 255, "+/="); }
+
+static int parse_windows(const JVal *r, VmUnattend *u, char *err, size_t errlen) {
+    static const char *const keys[] = { "user", "fullname", "hostname", "wpass", "edition", "key", "uilang", "inputloc", "wtz", "arch", "userloc" };
+    static const size_t caps[] = { 33, 65, 64, 256, 64, 30, 16, 32, 64, 8, 16 };
+    const char *bad = NULL;
+    for (size_t i = 0; i < sizeof keys / sizeof keys[0] && !bad; i++) { const char *v = json_str(r, keys[i]); if (v && strlen(v) >= caps[i]) bad = keys[i]; }
+    CP(user, "user"); CP(fullname, "fullname"); CP(hostname, "hostname"); CP(wpass, "wpass"); CP(edition, "edition"); CP(key, "key");
+    CP(uilang, "uilang"); CP(inputloc, "inputloc"); CP(wtz, "wtz"); CP(arch, "arch"); CP(userloc, "userloc");
+    u->guided = json_bool(r, "guided", 0);
+    if (bad) {}
+    else if (strcmp(u->arch, "amd64") && strcmp(u->arch, "arm64")) bad = "arch";
+    else if (u->guided) {}
+    else if (!wuser_ok(u->user)) bad = "user";
+    else if (!fullname_ok(u->fullname)) bad = "fullname";
+    else if (!wcomputer_ok(u->hostname)) bad = "hostname";
+    else if (!b64_ok(u->wpass)) bad = "wpass";
+    else if (u->edition[0] && !chars_of(u->edition, 1, 63, " ._-()")) bad = "edition";
+    else if (!wkey_ok(u->key)) bad = "key";
+    else if (!chars_of(u->uilang, 2, 15, "-")) bad = "uilang";
+    else if (!chars_of(u->inputloc, 2, 31, ":;-")) bad = "inputloc";
+    else if (u->wtz[0] && !chars_of(u->wtz, 1, 63, " ().+-")) bad = "wtz";
+    else if (u->userloc[0] && !chars_of(u->userloc, 2, 15, "-")) bad = "userloc";
+    if (bad) { snprintf(err, errlen, "the unattended spec's %s isn't valid", bad); explicit_bzero(u, sizeof *u); return -1; }
+    return 0;
+}
+
 int vmu_parse(const char *json, size_t n, VmUnattend *u, char *err, size_t errlen) {
     memset(u, 0, sizeof *u);
     JDoc d;
     if (json_parse(json, n, &d, NULL, 0)) { snprintf(err, errlen, "the unattended spec isn't JSON"); return -1; }
     const JVal *r = d.root;
     const char *k = json_str(r, "kind");
+    if (k && !strcmp(k, "windows")) {
+        u->kind = VMU_WINDOWS;
+        int rc = parse_windows(r, u, err, errlen);
+        json_free(&d);
+        return rc;
+    }
     const char *bad = NULL;
     u->kind = !k ? 0 : !strcmp(k, "preseed") ? VMU_PRESEED : !strcmp(k, "autoinstall") ? VMU_AUTOINSTALL : !strcmp(k, "kickstart") ? VMU_KICKSTART : 0;
     /* the strings must fit their fields: a longer one is refused, not cut */
@@ -230,8 +288,84 @@ static char *kickstart(const VmUnattend *u) {
     return b.p;
 }
 
+/* text for XML: the parser's checks already keep out < > & and quotes; escaped anyway */
+static void xput(Buf *b, const char *s) {
+    for (; *s; s++) {
+        switch (*s) {
+        case '<': bput(b, "&lt;"); break;
+        case '>': bput(b, "&gt;"); break;
+        case '&': bput(b, "&amp;"); break;
+        case '"': bput(b, "&quot;"); break;
+        case '\'': bput(b, "&apos;"); break;
+        default: bput(b, "%c", *s);
+        }
+    }
+}
+
+/* Windows Setup's answer file (Autounattend.xml): Microsoft's documented settings only. The disk is wiped and laid out
+ * for UEFI (EFI, MSR, Windows); the image is picked by its name; a local account, Microsoft's online-account screens
+ * hidden and the network requirement skipped (Microsoft's own BypassNRO value, which it may remove); privacy options
+ * off (ProtectYourPC 3); at the first sign-in the virtio-win guest tools install from their disc (drivers, the guest
+ * agent: its first answer tells lord-vm the install is done). */
+static char *windows_xml(const VmUnattend *u) {
+    Buf b = { 0 };
+    const char *arch = !strcmp(u->arch, "arm64") ? "arm64" : "amd64";
+    const char *comp = "processorArchitecture=\"%s\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\"";
+    char attrs[160];
+    snprintf(attrs, sizeof attrs, comp, arch);
+    bput(&b, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Made by Machines (LordOS) for an unattended install. This disk is wiped when the install is done. -->\n");
+    bput(&b, "<unattend xmlns=\"urn:schemas-microsoft-com:unattend\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\">\n");
+    bput(&b, " <settings pass=\"windowsPE\">\n  <component name=\"Microsoft-Windows-International-Core-WinPE\" %s>\n", attrs);
+    bput(&b, "   <SetupUILanguage><UILanguage>"); xput(&b, u->uilang); bput(&b, "</UILanguage></SetupUILanguage>\n");
+    bput(&b, "   <InputLocale>"); xput(&b, u->inputloc); bput(&b, "</InputLocale>\n");
+    bput(&b, "   <SystemLocale>"); xput(&b, u->uilang); bput(&b, "</SystemLocale>\n   <UILanguage>"); xput(&b, u->uilang);
+    bput(&b, "</UILanguage>\n   <UserLocale>"); xput(&b, u->userloc[0] ? u->userloc : u->uilang); bput(&b, "</UserLocale>\n  </component>\n");
+    bput(&b, "  <component name=\"Microsoft-Windows-Setup\" %s>\n", attrs);
+    /* DiskID 1: the seed disk (a USB stick, with Windows' own driver) is enumerated first, as disk 0; the system disk
+     * (virtio, with the driver from $WinPEDriver$) comes after it. A new machine has no data disks yet. */
+    bput(&b, "   <DiskConfiguration>\n    <Disk wcm:action=\"add\">\n     <DiskID>1</DiskID>\n     <WillWipeDisk>true</WillWipeDisk>\n     <CreatePartitions>\n"
+             "      <CreatePartition wcm:action=\"add\"><Order>1</Order><Type>EFI</Type><Size>300</Size></CreatePartition>\n"
+             "      <CreatePartition wcm:action=\"add\"><Order>2</Order><Type>MSR</Type><Size>16</Size></CreatePartition>\n"
+             "      <CreatePartition wcm:action=\"add\"><Order>3</Order><Type>Primary</Type><Extend>true</Extend></CreatePartition>\n     </CreatePartitions>\n"
+             "     <ModifyPartitions>\n"
+             "      <ModifyPartition wcm:action=\"add\"><Order>1</Order><PartitionID>1</PartitionID><Label>System</Label><Format>FAT32</Format></ModifyPartition>\n"
+             "      <ModifyPartition wcm:action=\"add\"><Order>2</Order><PartitionID>2</PartitionID></ModifyPartition>\n"
+             "      <ModifyPartition wcm:action=\"add\"><Order>3</Order><PartitionID>3</PartitionID><Label>Windows</Label><Letter>C</Letter><Format>NTFS</Format></ModifyPartition>\n"
+             "     </ModifyPartitions>\n    </Disk>\n   </DiskConfiguration>\n");
+    bput(&b, "   <ImageInstall>\n    <OSImage>\n");
+    if (u->edition[0]) { bput(&b, "     <InstallFrom><MetaData wcm:action=\"add\"><Key>/IMAGE/NAME</Key><Value>"); xput(&b, u->edition); bput(&b, "</Value></MetaData></InstallFrom>\n"); }
+    bput(&b, "     <InstallTo><DiskID>1</DiskID><PartitionID>3</PartitionID></InstallTo>\n    </OSImage>\n   </ImageInstall>\n");
+    bput(&b, "   <UserData>\n    <AcceptEula>true</AcceptEula>\n");
+    if (u->key[0]) { bput(&b, "    <ProductKey><Key>"); xput(&b, u->key); bput(&b, "</Key><WillShowUI>OnError</WillShowUI></ProductKey>\n"); }
+    bput(&b, "   </UserData>\n  </component>\n </settings>\n");
+    bput(&b, " <settings pass=\"specialize\">\n  <component name=\"Microsoft-Windows-Shell-Setup\" %s>\n   <ComputerName>", attrs); xput(&b, u->hostname); bput(&b, "</ComputerName>\n");
+    if (u->wtz[0]) { bput(&b, "   <TimeZone>"); xput(&b, u->wtz); bput(&b, "</TimeZone>\n"); }
+    bput(&b, "  </component>\n  <component name=\"Microsoft-Windows-Deployment\" %s>\n   <RunSynchronous>\n", attrs);
+    bput(&b, "    <RunSynchronousCommand wcm:action=\"add\"><Order>1</Order><Path>reg add HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\OOBE /v BypassNRO /t REG_DWORD /d 1 /f</Path></RunSynchronousCommand>\n");
+    bput(&b, "   </RunSynchronous>\n  </component>\n </settings>\n");
+    bput(&b, " <settings pass=\"oobeSystem\">\n  <component name=\"Microsoft-Windows-International-Core\" %s>\n   <InputLocale>", attrs); xput(&b, u->inputloc);
+    bput(&b, "</InputLocale>\n   <SystemLocale>"); xput(&b, u->uilang); bput(&b, "</SystemLocale>\n   <UILanguage>"); xput(&b, u->uilang);
+    bput(&b, "</UILanguage>\n   <UserLocale>"); xput(&b, u->userloc[0] ? u->userloc : u->uilang); bput(&b, "</UserLocale>\n  </component>\n");
+    bput(&b, "  <component name=\"Microsoft-Windows-Shell-Setup\" %s>\n", attrs);
+    bput(&b, "   <OOBE>\n    <HideEULAPage>true</HideEULAPage>\n    <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>\n"
+             "    <HideOnlineAccountScreens>true</HideOnlineAccountScreens>\n    <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>\n    <ProtectYourPC>3</ProtectYourPC>\n   </OOBE>\n");
+    const char *pv = u->wpass[0] ? u->wpass : "", *plain = u->wpass[0] ? "false" : "true";
+    bput(&b, "   <UserAccounts>\n    <LocalAccounts>\n     <LocalAccount wcm:action=\"add\">\n      <Name>"); xput(&b, u->user);
+    bput(&b, "</Name>\n      <DisplayName>"); xput(&b, u->fullname[0] ? u->fullname : u->user);
+    bput(&b, "</DisplayName>\n      <Group>Administrators</Group>\n      <Password><Value>%s</Value><PlainText>%s</PlainText></Password>\n     </LocalAccount>\n    </LocalAccounts>\n   </UserAccounts>\n", pv, plain);
+    bput(&b, "   <AutoLogon>\n    <Enabled>true</Enabled>\n    <LogonCount>1</LogonCount>\n    <Username>"); xput(&b, u->user);
+    bput(&b, "</Username>\n    <Password><Value>%s</Value><PlainText>%s</PlainText></Password>\n   </AutoLogon>\n", pv, plain);
+    bput(&b, "   <FirstLogonCommands>\n    <SynchronousCommand wcm:action=\"add\">\n     <Order>1</Order>\n"
+             "     <CommandLine>cmd /c for %%d in (D E F G H I J K) do if exist %%d:\\virtio-win-guest-tools.exe start /wait %%d:\\virtio-win-guest-tools.exe /install /passive /norestart</CommandLine>\n"
+             "     <Description>virtio-win guest tools</Description>\n    </SynchronousCommand>\n   </FirstLogonCommands>\n");
+    bput(&b, "  </component>\n </settings>\n</unattend>\n");
+    if (b.oom) { if (b.p) { explicit_bzero(b.p, b.cap); free(b.p); } return NULL; }
+    return b.p;
+}
+
 char *vmu_answer(const VmUnattend *u, const char **name) {
     switch (u->kind) {
+    case VMU_WINDOWS: *name = "Autounattend.xml"; return u->guided ? NULL : windows_xml(u);
     case VMU_PRESEED: *name = "preseed.cfg"; return preseed(u);
     case VMU_AUTOINSTALL: *name = "user-data"; return autoinstall(u);
     case VMU_KICKSTART: *name = "ks.cfg"; return kickstart(u);
@@ -279,12 +413,60 @@ static void fat12_set(uint8_t *fat, unsigned n, unsigned v) {
     else { fat[off] = (uint8_t)v; fat[off + 1] = (uint8_t)((fat[off + 1] & 0xF0) | ((v >> 8) & 0x0F)); }
 }
 
+/* one name in a directory table at t (entries e onward, cap of them): its long-name parts, then the short entry with
+ * attr, cluster and size; 0, or -1 when the table is full. The short names are ours (SEED0000…, DIR00000) */
+static int fat_entry(uint8_t *t, int *e, int cap, const char *name, size_t nl, const char *shortname, uint8_t attr, unsigned cl, uint32_t size) {
+    uint8_t sn[11];
+    memcpy(sn, shortname, 11);
+    uint8_t sum = 0;
+    for (int i = 0; i < 11; i++) sum = (uint8_t)(((sum & 1) << 7) + (sum >> 1) + sn[i]);
+    int parts = (int)((nl + 12) / 13);
+    if (*e + parts + 1 > cap) return -1;
+    for (int pidx = parts; pidx >= 1; pidx--) {
+        uint8_t *r = t + 32 * (*e)++;
+        r[0] = (uint8_t)(pidx | (pidx == parts ? 0x40 : 0));
+        r[11] = 0x0F; r[12] = 0; r[13] = sum; le16(r + 26, 0);
+        static const int pos[13] = { 1, 3, 5, 7, 9, 14, 16, 18, 20, 22, 24, 28, 30 };
+        for (int c = 0; c < 13; c++) {
+            size_t idx = (size_t)(pidx - 1) * 13 + (size_t)c;
+            unsigned ch = idx < nl ? (unsigned char)name[idx] : idx == nl ? 0x0000 : 0xFFFF;
+            le16(r + pos[c], ch);
+        }
+    }
+    uint8_t *r = t + 32 * (*e)++;
+    memcpy(r, sn, 11);
+    r[11] = attr;
+    le16(r + 14, 0); le16(r + 16, (unsigned)((46 << 9) | (11 << 5) | 6)); le16(r + 18, (unsigned)((46 << 9) | (11 << 5) | 6));
+    le16(r + 22, 0); le16(r + 24, (unsigned)((46 << 9) | (11 << 5) | 6));
+    le16(r + 26, cl);
+    le32(r + 28, size);
+    return 0;
+}
+
+static int fat_name_ok(const char *name, size_t nl) {
+    if (!nl || nl > 64) return 0;
+    for (size_t i = 0; i < nl; i++) if ((unsigned char)name[i] < 0x21 || (unsigned char)name[i] > 0x7e || strchr("/\\:*?\"<>|", name[i])) return 0;
+    return 1;
+}
+
 int vmu_fat_image(const char *label, const VmuFile *files, int n, uint8_t **img, size_t *len) {
     *img = NULL;
     *len = 0;
     size_t ll = label ? strlen(label) : 0;
-    if (!ll || ll > 11 || n < 0 || n > 8) return -1;
+    if (!ll || ll > 11 || n < 0 || n > 16) return -1;
     for (size_t i = 0; i < ll; i++) if (!(isupper((unsigned char)label[i]) || isdigit((unsigned char)label[i]) || label[i] == '_' || label[i] == '-')) return -1;
+    /* the one folder, if any name has one */
+    const char *dirname = NULL;
+    size_t dl = 0;
+    int indir = 0;
+    for (int f = 0; f < n; f++) {
+        const char *name = files[f].name, *sl = name ? strchr(name, '/') : NULL;
+        if (!name) return -1;
+        if (!sl) { if (!fat_name_ok(name, strlen(name))) return -1; continue; }
+        if (strchr(sl + 1, '/') || !fat_name_ok(sl + 1, strlen(sl + 1)) || !fat_name_ok(name, (size_t)(sl - name))) return -1;
+        if (dirname && (dl != (size_t)(sl - name) || memcmp(dirname, name, dl))) return -1;
+        dirname = name; dl = (size_t)(sl - name); indir++;
+    }
     size_t total = (size_t)FAT_SECTORS * 512;
     uint8_t *d = calloc(1, total);
     if (!d) return -1;
@@ -302,40 +484,35 @@ int vmu_fat_image(const char *label, const VmuFile *files, int n, uint8_t **img,
     int e = 0;
     memset(root, ' ', 11); memcpy(root, label, ll); root[11] = 0x08; e++;
     unsigned next = 2, clusters = FAT_SECTORS - FAT_DATA;
+    /* the folder's own table: "." and "..", then each of its files' long and short entries (at most 3 + 1 each) */
+    uint8_t *dt = NULL;
+    int de = 0, dcap = 0;
+    unsigned dcl = 0;
+    if (indir) {
+        size_t dsec = ((size_t)(2 + indir * 4) * 32 + 511) / 512;
+        if (dsec > clusters) { free(d); return -1; }
+        dcl = next;
+        dt = d + (size_t)(FAT_DATA + dcl - 2) * 512;
+        dcap = (int)(dsec * 16);
+        for (size_t c = 0; c < dsec; c++) fat12_set(fat, (unsigned)(dcl + c), c + 1 == dsec ? 0xFFF : (unsigned)(dcl + c + 1));
+        next += (unsigned)dsec;
+        memset(dt, ' ', 11); dt[0] = '.'; dt[11] = 0x10; le16(dt + 26, dcl);
+        memset(dt + 32, ' ', 11); dt[32] = '.'; dt[33] = '.'; dt[32 + 11] = 0x10; le16(dt + 32 + 26, 0);
+        de = 2;
+        if (fat_entry(root, &e, FAT_ROOT, dirname, dl, "DIR00000   ", 0x10, dcl, 0)) { free(d); return -1; }
+    }
     for (int f = 0; f < n; f++) {
-        const char *name = files[f].name;
-        size_t nl = name ? strlen(name) : 0;
-        if (!nl || nl > 64 || files[f].len > (1u << 20)) { free(d); return -1; }
-        for (size_t i = 0; i < nl; i++) if ((unsigned char)name[i] < 0x21 || (unsigned char)name[i] > 0x7e || strchr("/\\:*?\"<>|", name[i])) { free(d); return -1; }
-        uint8_t sn[11];
-        char tmp[24];
-        snprintf(tmp, sizeof tmp, "SEED%04u   ", (unsigned)f % 10000u);
-        memcpy(sn, tmp, 11);
-        uint8_t sum = 0;
-        for (int i = 0; i < 11; i++) sum = (uint8_t)(((sum & 1) << 7) + (sum >> 1) + sn[i]);
-        int parts = (int)((nl + 12) / 13);
-        if (e + parts + 1 > FAT_ROOT) { free(d); return -1; }
-        for (int pidx = parts; pidx >= 1; pidx--) {
-            uint8_t *r = root + 32 * e++;
-            r[0] = (uint8_t)(pidx | (pidx == parts ? 0x40 : 0));
-            r[11] = 0x0F; r[12] = 0; r[13] = sum; le16(r + 26, 0);
-            static const int pos[13] = { 1, 3, 5, 7, 9, 14, 16, 18, 20, 22, 24, 28, 30 };
-            for (int c = 0; c < 13; c++) {
-                size_t idx = (size_t)(pidx - 1) * 13 + (size_t)c;
-                unsigned ch = idx < nl ? (unsigned char)name[idx] : idx == nl ? 0x0000 : 0xFFFF;
-                le16(r + pos[c], ch);
-            }
-        }
-        uint8_t *r = root + 32 * e++;
-        memcpy(r, sn, 11);
-        r[11] = 0x20;
-        le16(r + 14, 0); le16(r + 16, (unsigned)((46 << 9) | (11 << 5) | 6)); le16(r + 18, (unsigned)((46 << 9) | (11 << 5) | 6));
-        le16(r + 22, 0); le16(r + 24, (unsigned)((46 << 9) | (11 << 5) | 6));
+        const char *name = files[f].name, *sl = strchr(name, '/');
+        const char *base = sl ? sl + 1 : name;
+        if (files[f].len > (1u << 20)) { free(d); return -1; }
         size_t need = (files[f].len + 511) / 512;
-        if (!need) { le16(r + 26, 0); le32(r + 28, 0); continue; }
-        if (next - 2 + need > clusters) { free(d); return -1; }
-        le16(r + 26, next);
-        le32(r + 28, (uint32_t)files[f].len);
+        if (need && next - 2 + need > clusters) { free(d); return -1; }
+        char sn[16];
+        snprintf(sn, sizeof sn, "SEED%04u   ", (unsigned)f % 10000u);
+        int bad = sl ? fat_entry(dt, &de, dcap, base, strlen(base), sn, 0x20, need ? next : 0, (uint32_t)files[f].len)
+                     : fat_entry(root, &e, FAT_ROOT, base, strlen(base), sn, 0x20, need ? next : 0, (uint32_t)files[f].len);
+        if (bad) { free(d); return -1; }
+        if (!need) continue;
         memcpy(d + (size_t)(FAT_DATA + next - 2) * 512, files[f].data, files[f].len);
         for (size_t c = 0; c < need; c++) fat12_set(fat, (unsigned)(next + c), c + 1 == need ? 0xFFF : (unsigned)(next + c + 1));
         next += (unsigned)need;
@@ -574,6 +751,59 @@ int vmu_prepare(const char *disks, const char *iso, const VmUnattend *u, const c
     if (answer) { explicit_bzero(answer, strlen(answer)); free(answer); }
     free(meta);
     free(extra);
+    if (rc) remove_dir(dir);
+    return rc;
+}
+
+/* the drivers Setup needs before Windows has them: the disk's (viostor) and the network's (NetKVM), for Windows 11, with
+ * every file their .inf names (its [SourceDisksFiles]) */
+static const char *const WIN_DRIVERS[][2] = {
+    { "viostor/w11/%s/viostor.inf", "viostor.inf" }, { "viostor/w11/%s/viostor.sys", "viostor.sys" }, { "viostor/w11/%s/viostor.cat", "viostor.cat" },
+    { "NetKVM/w11/%s/netkvm.inf", "netkvm.inf" }, { "NetKVM/w11/%s/netkvm.sys", "netkvm.sys" }, { "NetKVM/w11/%s/netkvm.cat", "netkvm.cat" },
+    { "NetKVM/w11/%s/netkvmp.exe", "netkvmp.exe" },     /* netkvm.inf copies it too: without it Setup stops on 0x80070002 */
+};
+#define WIN_NDRV (sizeof WIN_DRIVERS / sizeof WIN_DRIVERS[0])
+
+int vmu_prepare_windows(const char *disks, const char *drivers_iso, const VmUnattend *u, char *err, size_t errlen) {
+    if (u->kind != VMU_WINDOWS) { snprintf(err, errlen, "not a Windows spec"); return -1; }
+    char dir[4096], p[4200];
+    if (snprintf(dir, sizeof dir, "%s/unattended", disks) >= (int)sizeof dir) { snprintf(err, errlen, "path too long"); return -1; }
+    if (mkdir(dir, 0700) && errno != EEXIST) { snprintf(err, errlen, "can't make %s: %s", dir, strerror(errno)); return -1; }
+    int fd = open(drivers_iso, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) { snprintf(err, errlen, "can't read the drivers' disc: %s", strerror(errno)); remove_dir(dir); return -1; }
+    const char *a = !strcmp(u->arch, "arm64") ? "ARM64" : "amd64";
+    VmuFile f[WIN_NDRV + 1];
+    char *bufs[WIN_NDRV] = { 0 };
+    char names[WIN_NDRV][48];
+    int nf = 0, rc = -1;
+    char *answer = NULL;
+    const char *aname = NULL;
+    uint8_t *img = NULL;
+    size_t il = 0;
+    for (size_t i = 0; i < WIN_NDRV; i++) {
+        char in[96];
+        uint64_t off, size;
+        snprintf(in, sizeof in, WIN_DRIVERS[i][0], a);
+        if (vmu_iso_find(fd, in, &off, &size) || size == 0 || size > (1u << 20)) { snprintf(err, errlen, "the drivers' disc has no %s", in); goto out; }
+        if (!(bufs[i] = malloc((size_t)size)) || rd(fd, off, bufs[i], (size_t)size)) { snprintf(err, errlen, "can't read %s from the drivers' disc", in); goto out; }
+        snprintf(names[i], sizeof names[i], "$WinPEDriver$/%s", WIN_DRIVERS[i][1]);
+        f[nf++] = (VmuFile){ names[i], bufs[i], (size_t)size };
+    }
+    if (!u->guided) {
+        if (!(answer = vmu_answer(u, &aname))) { snprintf(err, errlen, "out of memory"); goto out; }
+        f[nf++] = (VmuFile){ aname, answer, strlen(answer) };
+    }
+    if (vmu_fat_image("LORDOS", f, nf, &img, &il)) { snprintf(err, errlen, "can't make the seed disk"); goto out; }
+    snprintf(p, sizeof p, "%s/seed.img", dir);
+    if (write_file(p, img, il)) { snprintf(err, errlen, "can't write the seed disk: %s", strerror(errno)); goto out; }
+    snprintf(p, sizeof p, "%s/windows", dir);
+    if (write_file(p, u->guided ? "guided\n" : "unattended\n", u->guided ? 7 : 11)) { snprintf(err, errlen, "can't write the seed disk's mark"); goto out; }
+    rc = 0;
+out:
+    close(fd);
+    for (size_t i = 0; i < WIN_NDRV; i++) free(bufs[i]);
+    if (answer) { explicit_bzero(answer, strlen(answer)); free(answer); }
+    if (img) { explicit_bzero(img, il); free(img); }
     if (rc) remove_dir(dir);
     return rc;
 }

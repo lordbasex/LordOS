@@ -69,6 +69,11 @@ eq('request iso', createRequest({ ...good, name: ' X ', source: 'iso', path: '/a
 eq('missing packages', missingFor({ missing: { amd64: 'qemu-system-x86 ovmf qemu-utils', arm64: 'qemu-system-arm qemu-utils' } }, ['amd64', 'arm64']),
   ['qemu-system-x86', 'ovmf', 'qemu-utils', 'qemu-system-arm']);
 eq('nothing missing', missingFor({ missing: { amd64: '' } }, ['amd64']), []);
+eq('Windows by its labels and file names', [systemOf('CCCOMA_X64FRE_ES-ES_DV9').id, systemOf('CENA_X64FREE_ES-ES_DV9').id, systemOf('', 'Win11_26H2_Spanish_x64.iso').id,
+  systemOf('', 'windows-notes.iso').id], ['windows', 'windows', 'windows', 'other']);
+// the TPM (swtpm) only for Windows machines and the requirements page
+eq('swtpm only when a Windows machine asks', [missingFor({ missing: { amd64: 'swtpm passt' } }, ['amd64']), missingFor({ missing: { amd64: 'swtpm passt' } }, ['amd64'], { windows: true })],
+  [['passt'], ['swtpm', 'passt']]);
 
 // ---- picture ----
 const r2 = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v * 100) / 100]));

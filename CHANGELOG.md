@@ -10,6 +10,40 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Windows 11 in Machines, ready as it starts** (`docs/VIRTUALIZATION.md` 4.3, `apps/machines/windows.js`). A new card in
+  the New Machine assistant offers two ways in, both from Microsoft's own servers, with nothing of Microsoft's kept by
+  LordOS:
+  - **Your Windows 11**: the full multi-edition ISO from Microsoft's own download page. Machines opens the page, finds the
+    ISO in Downloads when it's whole (or lets you choose it) and checks it against the SHA-256 Microsoft publishes there
+    for each of its 38 languages, pinned in the catalog (`assets/machines/systems.json`).
+  - **Try it for 90 days**: Microsoft's Windows 11 Enterprise Evaluation (English, Spanish, Portuguese), downloaded by the
+    admin helper from Microsoft's server and kept only with the hash Microsoft publishes for it (KB5130867).
+  - **The machine is a template Windows 11 accepts as it is**: UEFI with secure boot and Microsoft's keys enrolled
+    (Debian's `OVMF_CODE_4M.secboot.fd` and `OVMF_VARS_4M.ms.fd`, variables writable from SMM only), a **TPM 2.0** (Debian's
+    `swtpm`, one per machine, sandboxed; new exception in AGENTS.md), Hyper-V enlightenments, the clock in local time,
+    4 GB, 2 vCPUs and 64 GB at least, virtio disk and network with the CD/DVD drives on SATA and a USB tablet.
+  - **virtio-win drivers** (0.1.271, from the virtio-win project's own server, pinned by SHA-256): Setup loads the disk's
+    and network's drivers by itself from `$WinPEDriver$` on a small seed disk, so no "Load driver" step, in both modes.
+  - **Install without questions** (`Autounattend.xml`, Microsoft's documented settings): your local account and optional
+    password, the computer's name, the edition (Pro, Home, Education, Pro Education, Pro for Workstations) with your key,
+    or Microsoft's own published KMS client key so it installs unactivated, no Microsoft account asked, privacy options
+    off, this computer's language, keyboard and time zone (CLDR's table, `assets/machines/windows-zones.json`), then the
+    virtio-win guest tools at the first sign-in. When their agent first answers, Machines zeroes and removes the seed
+    disk (it held the password in Setup's own encoding) and takes both discs out. Or **Windows' own installer**, guided,
+    with the drivers already there.
+  - Choosing a Windows ISO with "Install from an ISO file" goes the same way.
+- **The TPM's state goes with the machine**: offline snapshots keep a copy of it, reverts put it back, clones take it
+  along, and memory snapshots restore it through QEMU.
+- **Machines downloads files its catalog pins** (`vm-image-get`): an entry whose maker signs no list names each file with
+  its https URL, SHA-256 and size; the helper takes only the id, architecture, name and hash from the app and checks them
+  against the catalog.
+- **The systems' own logos** on the Debian, Fedora and Kali cards, unmodified, with their licenses and trademark notices
+  in `assets/machines/logos/README.md`. Ubuntu keeps Machines' own mark (Canonical asks for written permission), and so
+  does Windows (Microsoft's logo isn't used, nor anything made to look like it).
+- `lord-vm --sha256 FILE` and `lord.vm.hash(path)`: an ISO's SHA-256 with progress, to check the one you downloaded.
+
 ### Fixed
 
 - **Flatpak's Spawn portal compares fd handles as unsigned numbers** (`server/src/fpspawn.c`): a handle of 2³¹ or more read

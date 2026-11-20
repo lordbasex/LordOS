@@ -257,8 +257,39 @@ int main(void) {
         free(img);
     }
     T("fat: a bad label", vmu_fat_image("cidata", f, 1, &img, &il) && vmu_fat_image("TOOLONGLABEL1", f, 1, &img, &il));
-    VmuFile slash = { "a/b", "x", 1 };
-    T("fat: a name with a slash", vmu_fat_image("OEMDRV", &slash, 1, &img, &il));
+    VmuFile slash = { "a/b/c", "x", 1 };
+    T("fat: a name two folders deep", vmu_fat_image("OEMDRV", &slash, 1, &img, &il));
+    VmuFile two[2] = { { "a/b", "x", 1 }, { "c/d", "y", 1 } };
+    T("fat: two folders", vmu_fat_image("OEMDRV", two, 2, &img, &il));
+    VmuFile empty[1] = { { "/b", "x", 1 } };
+    T("fat: a folder with no name", vmu_fat_image("OEMDRV", empty, 1, &img, &il));
+    {
+        /* one folder (Windows' $WinPEDriver$): fsck.fat and mtools read it back */
+        static char sys[70000];
+        for (size_t i = 0; i < sizeof sys; i++) sys[i] = (char)(i * 7);
+        VmuFile wf[3] = { { "Autounattend.xml", "<unattend/>", 11 }, { "$WinPEDriver$/viostor.inf", "inf", 3 }, { "$WinPEDriver$/viostor.sys", sys, sizeof sys } };
+        uint8_t *wi = NULL;
+        size_t wl = 0;
+        T("fat: a folder made", !vmu_fat_image("LORDOS", wf, 3, &wi, &wl));
+        if (wi && !access("/usr/sbin/fsck.fat", X_OK)) {
+            int fd = open("/tmp/vmunattend-dir.img", O_RDWR | O_CREAT | O_TRUNC, 0600);
+            int ok = fd >= 0 && write(fd, wi, wl) == (ssize_t)wl;
+            if (fd >= 0) close(fd);
+            int st = ok ? system("/usr/sbin/fsck.fat -n /tmp/vmunattend-dir.img >/dev/null 2>&1") : -1;
+            T("fat: fsck.fat finds nothing wrong with the folder", ok && WIFEXITED(st) && WEXITSTATUS(st) == 0);
+            if (!access("/usr/bin/mtype", X_OK)) {
+                st = system("MTOOLS_SKIP_CHECK=1 /usr/bin/mcopy -i /tmp/vmunattend-dir.img '::$WinPEDriver$/viostor.sys' /tmp/vmunattend-dir.sys 2>/dev/null");
+                FILE *rf = fopen("/tmp/vmunattend-dir.sys", "rb");
+                static char back[70000 + 16];
+                size_t got = rf ? fread(back, 1, sizeof back, rf) : 0;
+                if (rf) fclose(rf);
+                T("fat: the folder's file reads back (mtools)", got == sizeof sys && !memcmp(back, sys, sizeof sys));
+                unlink("/tmp/vmunattend-dir.sys");
+            } else printf("      mtools isn't installed: skipped\n");
+            unlink("/tmp/vmunattend-dir.img");
+        }
+        free(wi);
+    }
     static char huge[1 << 20 | 1];
     VmuFile hf = { "big", huge, sizeof huge };
     T("fat: a file too large", vmu_fat_image("OEMDRV", &hf, 1, &img, &il));

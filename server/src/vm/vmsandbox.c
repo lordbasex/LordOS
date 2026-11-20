@@ -171,6 +171,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
                 rule(rs, "/dev/kvm", dev, h);
             }
             if (j->iso && j->iso[0] && rule(rs, j->iso, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
+            if (j->drivers && j->drivers[0] && rule(rs, j->drivers, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (j->base && j->base[0] && rule(rs, j->base, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (ok && !syscall(SYS_landlock_restrict_self, rs, 0U)) {
                 mask |= VMS_LANDLOCK_FS;

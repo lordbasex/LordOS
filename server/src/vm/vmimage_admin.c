@@ -175,7 +175,7 @@ void vm_act_image_list(const AdminReq *r, const char *arg, size_t len) {
     char buf[256], *f[3];
     VmCatEntry e;
     int n = split(arg, len, buf, sizeof buf, f, 3);
-    if (n < 2 || entry_of(f[0], f[1], &e)) { admin_err("admin.invalidArgument", NULL); return; }
+    if (n < 2 || entry_of(f[0], f[1], &e) || e.npins) { admin_err("admin.invalidArgument", NULL); return; }   /* pinned: the catalog is the list */
     store_dirs();
     if (n == 2 && e.sums[0]) { get_signed_list(f[0], f[1], &e, e.sums); return; }   /* the list has a fixed name */
     if (n == 3) {                                            /* a name found in the folder's listing (Fedora) */
@@ -199,18 +199,27 @@ void vm_act_image_get(const AdminReq *r, const char *arg, size_t len) {
     char buf[320], *f[4];
     VmCatEntry e;
     int n = split(arg, len, buf, sizeof buf, f, 4);
-    if (n != 4 || entry_of(f[0], f[1], &e) || !vmcat_match(e.file_re, f[2]) || !vmcat_sha_ok(f[3])) { admin_err("admin.invalidArgument", NULL); return; }
+    if (n != 4 || entry_of(f[0], f[1], &e) || !vmcat_sha_ok(f[3])) { admin_err("admin.invalidArgument", NULL); return; }
     char sha[65];
     for (int i = 0; i < 64; i++) sha[i] = (char)tolower((unsigned char)f[3][i]);
     sha[64] = 0;
-    /* the name and hash must be a line of the list this helper fetched for that entry */
-    char lp[160];
-    snprintf(lp, sizeof lp, VM_LISTS "/%s-%s.list", f[0], f[1]);   /* written only after its signature verified */
-    size_t sl = 0;
-    char *sums = read_root_file(lp, VM_LIST_MAX, &sl);
-    int listed = sums && vmcat_sums_has(sums, sl, f[2], sha);
-    free(sums);
-    if (!listed) { admin_err("vm.notListed", NULL); return; }
+    int pin = -1;
+    if (e.npins) {
+        /* a pinned entry (vmcatalog.h): the name and hash must be one of the catalog's own files */
+        pin = vmcat_pin_find(&e, f[2], sha);
+        if (pin < 0) { admin_err("vm.notListed", NULL); return; }
+        e.max_bytes = e.pin[pin].bytes;
+    } else {
+        if (!vmcat_match(e.file_re, f[2])) { admin_err("admin.invalidArgument", NULL); return; }
+        /* the name and hash must be a line of the list this helper fetched for that entry */
+        char lp[160];
+        snprintf(lp, sizeof lp, VM_LISTS "/%s-%s.list", f[0], f[1]);   /* written only after its signature verified */
+        size_t sl = 0;
+        char *sums = read_root_file(lp, VM_LIST_MAX, &sl);
+        int listed = sums && vmcat_sums_has(sums, sl, f[2], sha);
+        free(sums);
+        if (!listed) { admin_err("vm.notListed", NULL); return; }
+    }
     store_dirs();
     char dest[200], lock[200];
     snprintf(dest, sizeof dest, VM_IMAGES "/%s.iso", sha);
@@ -225,7 +234,8 @@ void vm_act_image_get(const AdminReq *r, const char *arg, size_t len) {
     FILE *jf = fopen(jp, "we");
     if (jf) { fprintf(jf, "%d %u %s\n", (int)getpid(), (unsigned)r->uid, sha); fclose(jf); }
     char url[VMCAT_URL + 160];
-    snprintf(url, sizeof url, "%s%s", e.file_dir, f[2]);
+    if (pin >= 0) snprintf(url, sizeof url, "%s", e.pin[pin].url);
+    else snprintf(url, sizeof url, "%s%s", e.file_dir, f[2]);
     write_image_info(sha, f[0], f[1], f[2], 0);
     /* a cut download is kept as <sha256>.iso.part (root's, next to its final name) and continued from there; the hash
      * is over the whole file all the same, and a part that turns out wrong is deleted with it */

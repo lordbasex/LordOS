@@ -20,6 +20,7 @@ typedef struct {
     const char *iso;            /* attached ISO or NULL, read */
     const char *fw_code;        /* UEFI code file or NULL (already under /usr) */
     const char *base;           /* a linked clone's shared base (6.3), read only, or NULL */
+    const char *drivers;        /* a second disc with the guest's drivers (virtio-win), read, or NULL */
     int kvm;                    /* KVM machine: /dev/kvm may be opened again (arm64's -cpu host makes a scratch vCPU
                                  * by path to read the host's features); QEMU holds a KVM descriptor already */
 } VmQemuJail;

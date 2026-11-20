@@ -8,7 +8,9 @@ export function systemsFor(cat, arch) {
   const out = [];
   for (const s of Array.isArray(cat?.systems) ? cat.systems : []) {
     const a = s?.arch?.[arch];
-    if (!a || s.hidden || typeof s.id !== 'string' || typeof a.file !== 'string') continue;
+    // Windows (4.3) has no folder of its own: the person's ISO from Microsoft's page, or the pinned evaluation
+    const win = s?.kind === 'windows' && Array.isArray(a?.isos);
+    if (!a || s.hidden || typeof s.id !== 'string' || (typeof a.file !== 'string' && !win)) continue;
     out.push({ id: s.id, name: String(s.name || s.id), release: String(s.release || ''), approxMb: Number(a.approxMb) || 0, kind: s.kind || 'iso', listed: !a.sums });
   }
   return out;
