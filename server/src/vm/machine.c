@@ -181,6 +181,22 @@ int vm_base_valid(const char *s) {
 static const char *const PROTOS[] = { "tcp", "udp", NULL };
 static const char *const OPENS[] = { "this-computer", "lan", NULL };
 
+int vm_resolution_ok(int w, int h) {
+    return w >= 640 && h >= 480 && w <= 7680 && h <= 4320 && !(w & 1) && !(h & 1);
+}
+
+int vm_resolution_parse(const char *s, int *w, int *h) {
+    int a = 0, b = 0, k = 0;
+    const char *p = s;
+    for (; *p >= '0' && *p <= '9' && k < 5; p++, k++) a = a * 10 + (*p - '0');
+    if (!k || *p != 'x') return -1;
+    p++; k = 0;
+    for (; *p >= '0' && *p <= '9' && k < 5; p++, k++) b = b * 10 + (*p - '0');
+    if (!k || *p || !vm_resolution_ok(a, b)) return -1;
+    *w = a; *h = b;
+    return 0;
+}
+
 int vm_ifname_valid(const char *s) {
     size_t n = s ? strlen(s) : 0;
     if (n < 1 || n > VM_IFNAME_MAX || !strcmp(s, ".") || !strcmp(s, "..")) return 0;
@@ -314,6 +330,7 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if ((m->secure_boot || m->tpm || m->hyperv) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "secure boot, TPM and Hyper-V are for amd64 machines for now");
     if (m->secure_boot && m->firmware != VM_FW_UEFI) return fail(err, n, VM_E_RANGE, "secure boot needs UEFI");
     if (m->graphics != VM_GFX_2D && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "graphics");
+    if ((m->res_w || m->res_h) && !vm_resolution_ok(m->res_w, m->res_h)) return fail(err, n, VM_E_RANGE, "resolution must be 640x480 to 7680x4320, even numbers");
     if (m->schema < 5 && m->graphics) return fail(err, n, VM_E_FIELD, "graphics needs schema 5");
     if (m->graphics == VM_GFX_3D && m->devices == VM_DEV_WINDOWS) return fail(err, n, VM_E_RANGE, "3D graphics are for Linux machines (the windows devices stay 2D)");
     if (m->graphics == VM_GFX_3D && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "3D graphics are for amd64 machines for now");
@@ -357,7 +374,7 @@ static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
-    "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", NULL,
+    "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -538,6 +555,12 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
     }
     if ((r = parse6(o, m, err, n))) goto out;
     {
+        /* schema 6: the display the guest starts with ("WxH"); missing: it follows the window */
+        const JVal *rv = json_get(o, "resolution");
+        m->res_w = m->res_h = 0;
+        if (rv && (rv->type != J_STR || vm_resolution_parse(rv->str, &m->res_w, &m->res_h))) { r = fail(err, n, VM_E_FIELD, "resolution must be \"WxH\""); goto out; }
+    }
+    {
         /* schema 6's keys: missing means sound on at full volume, microphone off */
         const JVal *so = json_get(o, "sound"), *mi = json_get(o, "microphone");
         if ((so && so->type != J_BOOL) || (mi && mi->type != J_BOOL)) { r = fail(err, n, VM_E_FIELD, "sound and microphone must be true or false"); goto out; }
@@ -616,6 +639,7 @@ char *vm_machine_json(const VmMachine *m) {
         if (m->hyperv) jb_raw(&b, ",\n  \"hyperv\": true");
         if (m->drivers[0]) { jb_raw(&b, ",\n  \"drivers\": "); jb_str(&b, m->drivers); }
         if (m->graphics == VM_GFX_3D) jb_raw(&b, ",\n  \"graphics\": \"3d\"");
+        if (m->res_w && m->res_h) { char rs[48]; snprintf(rs, sizeof rs, ",\n  \"resolution\": \"%dx%d\"", m->res_w, m->res_h); jb_raw(&b, rs); }
     }
     if (m->schema >= 6) {
         if (m->bridge[0]) { jb_raw(&b, ",\n  \"bridge\": "); jb_str(&b, m->bridge); }

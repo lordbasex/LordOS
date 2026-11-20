@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Amb la part del mateix QEMU, la màquina pot fer servir fins a {limit}. Com a màxim {max} per a una màquina: un nucli i la memòria de l’escriptori queden per a aquest ordinador.",
   "cfg.resolution": "Resolució",
   "cfg.followsWindow": "Segueix la finestra",
-  "cfg.resolutionNote": "La barra d’eines de la finestra pot triar una resolució fixa.",
   "cfg.graphics": "Gràfics",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Arrencada segura",
   "cfg.on": "Activat",
   "cfg.off": "Desactivat",
-  "cfg.setAtCreate": "Triat quan es va crear la màquina."
+  "cfg.setAtCreate": "Triat quan es va crear la màquina.",
+  "cfg.resolutionFollowNote": "La màquina arrenca amb la mida de la finestra i la segueix mentre el sistema ho permeti. La barra de la finestra encara pot triar una altra mida.",
+  "cfg.resolutionFixedNote": "La màquina arrenca amb aquesta mida: tots els sistemes la prenen en iniciar-se, també els que no segueixen la finestra. La barra de la finestra encara en pot triar una altra mentre funciona."
 }

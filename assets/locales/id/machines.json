@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Termasuk bagian QEMU sendiri, mesin dapat memakai hingga {limit}. Paling banyak {max} untuk satu mesin: satu inti dan memori desktop tetap untuk komputer ini.",
   "cfg.resolution": "Resolusi",
   "cfg.followsWindow": "Mengikuti jendela",
-  "cfg.resolutionNote": "Bilah alat jendela dapat memilih resolusi tetap sebagai gantinya.",
   "cfg.graphics": "Grafis",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Aktif",
   "cfg.off": "Nonaktif",
-  "cfg.setAtCreate": "Dipilih saat mesin dibuat."
+  "cfg.setAtCreate": "Dipilih saat mesin dibuat.",
+  "cfg.resolutionFollowNote": "Mesin dimulai dengan ukuran jendela dan mengikutinya selama sistemnya mengizinkan. Bilah alat jendela tetap bisa memilih ukuran lain.",
+  "cfg.resolutionFixedNote": "Mesin dimulai dengan ukuran ini: setiap sistem memakainya saat dimulai, termasuk yang tidak mengikuti jendela. Bilah alat jendela tetap bisa memilih ukuran lain selama berjalan."
 }

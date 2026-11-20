@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Kể cả phần của QEMU, máy ảo có thể dùng tối đa {limit}. Tối đa {max} cho một máy ảo: một nhân và bộ nhớ của màn hình nền được giữ lại cho máy tính này.",
   "cfg.resolution": "Độ phân giải",
   "cfg.followsWindow": "Theo cửa sổ",
-  "cfg.resolutionNote": "Thanh công cụ của cửa sổ có thể chọn độ phân giải cố định thay thế.",
   "cfg.graphics": "Đồ họa",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Bật",
   "cfg.off": "Tắt",
-  "cfg.setAtCreate": "Đã chọn khi tạo máy ảo."
+  "cfg.setAtCreate": "Đã chọn khi tạo máy ảo.",
+  "cfg.resolutionFollowNote": "Máy khởi động theo kích thước cửa sổ và đi theo nó khi hệ thống cho phép. Thanh công cụ của cửa sổ vẫn có thể chọn kích thước khác.",
+  "cfg.resolutionFixedNote": "Máy khởi động với kích thước này: mọi hệ thống đều nhận nó khi khởi động, kể cả hệ thống không đi theo cửa sổ. Khi đang chạy, thanh công cụ của cửa sổ vẫn có thể chọn kích thước khác."
 }

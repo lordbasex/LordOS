@@ -292,7 +292,6 @@
   "cfg.cpuNote": "A QEMU saját részével együtt a gép legfeljebb {limit} memóriát használhat. Egy gépnek legfeljebb {max}: egy mag és az asztal memóriája ennek a számítógépnek marad.",
   "cfg.resolution": "Felbontás",
   "cfg.followsWindow": "Az ablakot követi",
-  "cfg.resolutionNote": "Az ablak eszköztárán rögzített felbontás is választható.",
   "cfg.graphics": "Grafika",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Bekapcsolva",
   "cfg.off": "Kikapcsolva",
-  "cfg.setAtCreate": "A gép létrehozásakor választva."
+  "cfg.setAtCreate": "A gép létrehozásakor választva.",
+  "cfg.resolutionFollowNote": "A gép az ablak méretével indul, és követi, amíg a rendszere engedi. Az ablak eszköztárán így is választható más méret.",
+  "cfg.resolutionFixedNote": "A gép ezzel a mérettel indul: minden rendszer átveszi induláskor, azok is, amelyek nem követik az ablakot. Futás közben az ablak eszköztárán így is választható más."
 }

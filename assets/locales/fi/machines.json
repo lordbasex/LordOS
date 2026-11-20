@@ -292,7 +292,6 @@
   "cfg.cpuNote": "QEMU:n oma osuus mukaan lukien kone voi käyttää enintään {limit}. Yhdelle koneelle enintään {max}: yksi ydin ja työpöydän muisti jäävät tälle tietokoneelle.",
   "cfg.resolution": "Tarkkuus",
   "cfg.followsWindow": "Seuraa ikkunaa",
-  "cfg.resolutionNote": "Ikkunan työkalupalkista voi valita sen sijaan kiinteän tarkkuuden.",
   "cfg.graphics": "Grafiikka",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Päällä",
   "cfg.off": "Pois päältä",
-  "cfg.setAtCreate": "Valittu, kun kone luotiin."
+  "cfg.setAtCreate": "Valittu, kun kone luotiin.",
+  "cfg.resolutionFollowNote": "Kone käynnistyy ikkunan kokoisena ja seuraa sitä niin kuin järjestelmä sallii. Ikkunan työkalupalkista voi silti valita toisen koon.",
+  "cfg.resolutionFixedNote": "Kone käynnistyy tämän kokoisena: jokainen järjestelmä ottaa sen käynnistyessään, myös ne, jotka eivät seuraa ikkunaa. Ikkunan työkalupalkista voi silti valita toisen koon käytön aikana."
 }

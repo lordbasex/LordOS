@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Con la parte di QEMU stesso, la macchina può usare fino a {limit}. Al massimo {max} per macchina: un core e la memoria della scrivania restano a questo computer.",
   "cfg.resolution": "Risoluzione",
   "cfg.followsWindow": "Segue la finestra",
-  "cfg.resolutionNote": "Dalla barra della finestra si può scegliere una risoluzione fissa.",
   "cfg.graphics": "Grafica",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Avvio protetto",
   "cfg.on": "Attivato",
   "cfg.off": "Disattivato",
-  "cfg.setAtCreate": "Scelto alla creazione della macchina."
+  "cfg.setAtCreate": "Scelto alla creazione della macchina.",
+  "cfg.resolutionFollowNote": "La macchina si avvia con la dimensione della finestra e la segue finché il suo sistema lo consente. La barra della finestra può comunque scegliere un'altra dimensione.",
+  "cfg.resolutionFixedNote": "La macchina si avvia con questa dimensione: ogni sistema la prende all'avvio, anche quelli che non seguono la finestra. La barra della finestra può comunque sceglierne un'altra mentre è in esecuzione."
 }

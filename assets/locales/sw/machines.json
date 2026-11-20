@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Pamoja na sehemu ya QEMU yenyewe mashine inaweza kutumia hadi {limit}. Si zaidi ya {max} kwa mashine moja: kori moja na kumbukumbu ya eneo-kazi zinabaki kwa kompyuta hii.",
   "cfg.resolution": "Ubora wa skrini",
   "cfg.followsWindow": "Hufuata dirisha",
-  "cfg.resolutionNote": "Upau wa zana wa dirisha unaweza kuchagua ubora maalum badala yake.",
   "cfg.graphics": "Michoro",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Imewashwa",
   "cfg.off": "Imezimwa",
-  "cfg.setAtCreate": "Ilichaguliwa mashine ilipotengenezwa."
+  "cfg.setAtCreate": "Ilichaguliwa mashine ilipotengenezwa.",
+  "cfg.resolutionFollowNote": "Mashine inaanza kwa ukubwa wa dirisha na kuufuata kadiri mfumo wake unavyoruhusu. Upau wa zana wa dirisha bado unaweza kuchagua ukubwa mwingine.",
+  "cfg.resolutionFixedNote": "Mashine inaanza kwa ukubwa huu: kila mfumo huuchukua inapoanza, hata isiyofuata dirisha. Upau wa zana wa dirisha bado unaweza kuchagua mwingine ikiendelea kufanya kazi."
 }

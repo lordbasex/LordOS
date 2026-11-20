@@ -129,6 +129,8 @@ typedef struct {
     int hyperv;                         /* Hyper-V enlightenments, for Windows guests */
     char drivers[VM_PATH_MAX];          /* a second CD/DVD with the guest's drivers (virtio-win), read-only; "" none */
     int graphics;                       /* VM_GFX_*; "graphics": "3d" is written only when chosen (schema 5) */
+    int res_w, res_h;                   /* "resolution": "WxH", the display the guest starts with (its EDID's preferred
+                                         * mode, which every driver reads at boot); 0 x 0: it follows the window (schema 6) */
     /* schema 6: the network's details (6.5) */
     char bridge[VM_IFNAME_MAX + 1];     /* the wired card a bridged machine joins ("" none); kept when the mode changes */
     int n_ports;
@@ -171,6 +173,9 @@ int vm_share_allowed(const char *path, const char *home, const char *user, const
 
 /* a network interface's name as Linux allows it: 1 to 15 of [A-Za-z0-9_.-], not "." or ".." */
 int vm_ifname_valid(const char *s);
+/* a display size a machine may start with: 640x480 to 7680x4320, both even; "WxH" → 0, else -1 */
+int vm_resolution_ok(int w, int h);
+int vm_resolution_parse(const char *s, int *w, int *h);
 /* the forwarded ports' rules: proto, a host port VM_PORT_HOST_MIN..65535, a guest port 1..65535, open; at most
  * VM_PORTS; one rule per protocol and host port; host-only machines open ports to this computer only. 0 ok, else -1 and
  * why in err (English) */

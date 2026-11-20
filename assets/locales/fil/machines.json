@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Kasama ang bahagi ng QEMU, maaaring gumamit ang makina ng hanggang {limit}. Hanggang {max} lang para sa isang makina: isang core at ang memory ng desktop ang naiiwan para sa computer na ito.",
   "cfg.resolution": "Resolution",
   "cfg.followsWindow": "Sumusunod sa window",
-  "cfg.resolutionNote": "Maaaring pumili ng nakapirming resolution sa toolbar ng window.",
   "cfg.graphics": "Graphics",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Nakabukas",
   "cfg.off": "Nakapatay",
-  "cfg.setAtCreate": "Pinili nang gawin ang makina."
+  "cfg.setAtCreate": "Pinili nang gawin ang makina.",
+  "cfg.resolutionFollowNote": "Nagsisimula ang makina sa laki ng window at sinusundan ito hangga't pinapayagan ng sistema nito. Puwede pa ring pumili ng ibang laki sa toolbar ng window.",
+  "cfg.resolutionFixedNote": "Nagsisimula ang makina sa laking ito: kinukuha ito ng bawat sistema sa pagsisimula, pati ng mga hindi sumusunod sa window. Puwede pa ring pumili ng iba sa toolbar ng window habang tumatakbo."
 }

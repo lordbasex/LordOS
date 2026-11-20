@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Termasuk bahagian QEMU sendiri, mesin boleh menggunakan sehingga {limit}. Paling banyak {max} untuk satu mesin: satu teras dan memori desktop kekal untuk komputer ini.",
   "cfg.resolution": "Resolusi",
   "cfg.followsWindow": "Mengikut tetingkap",
-  "cfg.resolutionNote": "Bar alat tetingkap boleh memilih resolusi tetap sebagai gantinya.",
   "cfg.graphics": "Grafik",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Hidup",
   "cfg.off": "Mati",
-  "cfg.setAtCreate": "Dipilih semasa mesin dibuat."
+  "cfg.setAtCreate": "Dipilih semasa mesin dibuat.",
+  "cfg.resolutionFollowNote": "Mesin bermula dengan saiz tetingkap dan mengikutinya selagi sistemnya membenarkan. Bar alat tetingkap masih boleh memilih saiz lain.",
+  "cfg.resolutionFixedNote": "Mesin bermula dengan saiz ini: setiap sistem mengambilnya semasa bermula, termasuk yang tidak mengikut tetingkap. Bar alat tetingkap masih boleh memilih saiz lain semasa ia berjalan."
 }

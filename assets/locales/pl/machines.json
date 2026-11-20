@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Wraz z udziałem samego QEMU maszyna może użyć do {limit}. Najwyżej {max} dla jednej maszyny: jeden rdzeń i pamięć pulpitu zostają dla tego komputera.",
   "cfg.resolution": "Rozdzielczość",
   "cfg.followsWindow": "Dopasowana do okna",
-  "cfg.resolutionNote": "Pasek narzędzi okna może zamiast tego wybrać stałą rozdzielczość.",
   "cfg.graphics": "Grafika",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Włączone",
   "cfg.off": "Wyłączone",
-  "cfg.setAtCreate": "Wybrane przy tworzeniu maszyny."
+  "cfg.setAtCreate": "Wybrane przy tworzeniu maszyny.",
+  "cfg.resolutionFollowNote": "Maszyna startuje w rozmiarze okna i podąża za nim, dopóki pozwala na to jej system. Pasek okna nadal może wybrać inny rozmiar.",
+  "cfg.resolutionFixedNote": "Maszyna startuje w tym rozmiarze: każdy system przyjmuje go przy starcie, także te, które nie podążają za oknem. Podczas pracy pasek okna nadal może wybrać inny."
 }

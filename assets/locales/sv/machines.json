@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Inklusive QEMU:s egen andel kan maskinen använda upp till {limit}. Högst {max} för en maskin: en kärna och skrivbordets minne lämnas åt den här datorn.",
   "cfg.resolution": "Upplösning",
   "cfg.followsWindow": "Följer fönstret",
-  "cfg.resolutionNote": "Fönstrets verktygsfält kan i stället välja en fast upplösning.",
   "cfg.graphics": "Grafik",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Säker start",
   "cfg.on": "På",
   "cfg.off": "Av",
-  "cfg.setAtCreate": "Valdes när maskinen skapades."
+  "cfg.setAtCreate": "Valdes när maskinen skapades.",
+  "cfg.resolutionFollowNote": "Maskinen startar i fönstrets storlek och följer det så länge systemet tillåter. Fönstrets verktygsfält kan ändå välja en annan storlek.",
+  "cfg.resolutionFixedNote": "Maskinen startar i den här storleken: varje system tar den vid start, även de som inte följer fönstret. Fönstrets verktygsfält kan ändå välja en annan medan den kör."
 }

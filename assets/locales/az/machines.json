@@ -292,7 +292,6 @@
   "cfg.cpuNote": "QEMU-nun öz payı ilə maşın {limit} qədər istifadə edə bilər. Bir maşın üçün ən çox {max}: bir nüvə və masaüstünün yaddaşı bu kompüterə qalır.",
   "cfg.resolution": "Təsvir ölçüsü",
   "cfg.followsWindow": "Pəncərəyə uyğunlaşır",
-  "cfg.resolutionNote": "Bunun əvəzinə pəncərənin alətlər panelindən sabit təsvir ölçüsü seçmək olar.",
   "cfg.graphics": "Qrafika",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Yanılı",
   "cfg.off": "Sönülü",
-  "cfg.setAtCreate": "Maşın yaradılanda seçilib."
+  "cfg.setAtCreate": "Maşın yaradılanda seçilib.",
+  "cfg.resolutionFollowNote": "Maşın pəncərənin ölçüsü ilə başlayır və sistemi imkan verdikcə onu izləyir. Pəncərənin alət paneli yenə başqa ölçü seçə bilər.",
+  "cfg.resolutionFixedNote": "Maşın bu ölçü ilə başlayır: hər sistem onu başlayanda götürür, pəncərəni izləməyənlər də. Pəncərənin alət paneli işləyərkən yenə başqa ölçü seçə bilər."
 }

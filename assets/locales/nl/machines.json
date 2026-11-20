@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Inclusief het eigen deel van QEMU kan de machine tot {limit} gebruiken. Hooguit {max} voor één machine: één kern en het geheugen van het bureaublad blijven voor deze computer.",
   "cfg.resolution": "Resolutie",
   "cfg.followsWindow": "Volgt het venster",
-  "cfg.resolutionNote": "In de werkbalk van het venster kun je in plaats daarvan een vaste resolutie kiezen.",
   "cfg.graphics": "Graphics",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Aan",
   "cfg.off": "Uit",
-  "cfg.setAtCreate": "Gekozen toen de machine werd gemaakt."
+  "cfg.setAtCreate": "Gekozen toen de machine werd gemaakt.",
+  "cfg.resolutionFollowNote": "De machine start op de grootte van het venster en volgt die zolang het systeem het toelaat. De werkbalk van het venster kan nog steeds een andere grootte kiezen.",
+  "cfg.resolutionFixedNote": "De machine start op deze grootte: elk systeem neemt die over bij het starten, ook systemen die het venster niet volgen. De werkbalk van het venster kan tijdens het draaien nog steeds een andere kiezen."
 }

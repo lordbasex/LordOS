@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Samt dem Anteil von QEMU kann die Maschine bis zu {limit} verwenden. Höchstens {max} für eine Maschine: Ein Kern und der Arbeitsspeicher des Schreibtischs bleiben für diesen Computer.",
   "cfg.resolution": "Auflösung",
   "cfg.followsWindow": "Folgt dem Fenster",
-  "cfg.resolutionNote": "In der Symbolleiste des Fensters kann stattdessen eine feste Auflösung gewählt werden.",
   "cfg.graphics": "Grafik",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "An",
   "cfg.off": "Aus",
-  "cfg.setAtCreate": "Beim Erstellen der Maschine gewählt."
+  "cfg.setAtCreate": "Beim Erstellen der Maschine gewählt.",
+  "cfg.resolutionFollowNote": "Die Maschine startet in Fenstergröße und folgt ihr, soweit ihr System es zulässt. Die Leiste des Fensters kann trotzdem eine andere Größe wählen.",
+  "cfg.resolutionFixedNote": "Die Maschine startet in dieser Größe: Jedes System übernimmt sie beim Start, auch solche, die dem Fenster nicht folgen. Die Leiste des Fensters kann während des Betriebs trotzdem eine andere wählen."
 }

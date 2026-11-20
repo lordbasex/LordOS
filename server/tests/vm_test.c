@@ -965,7 +965,23 @@ static void test_network(void) {
     }
 }
 
+/* the resolution a machine starts with (Configure → Display) */
+static void test_resolution(void) {
+    int w = 0, h = 0;
+    CHECK(!vm_resolution_parse("1920x1080", &w, &h) && w == 1920 && h == 1080);
+    CHECK(!vm_resolution_parse("640x480", &w, &h));
+    CHECK(vm_resolution_parse("1921x1080", &w, &h));          /* odd */
+    CHECK(vm_resolution_parse("639x480", &w, &h));
+    CHECK(vm_resolution_parse("7682x4320", &w, &h));
+    CHECK(vm_resolution_parse("1920X1080", &w, &h));
+    CHECK(vm_resolution_parse("1920x1080 ", &w, &h));
+    CHECK(vm_resolution_parse("x1080", &w, &h));
+    CHECK(vm_resolution_parse("123456x480", &w, &h));
+    CHECK(vm_resolution_parse("", &w, &h));
+}
+
 int main(void) {
+    test_resolution();
     test_clipx();
     test_log_clean();
     test_images();

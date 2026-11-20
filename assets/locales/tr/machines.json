@@ -292,7 +292,6 @@
   "cfg.cpuNote": "QEMU’nun kendi payıyla makine en fazla {limit} kullanabilir. Bir makine için en fazla {max}: bir çekirdek ve masaüstünün belleği bu bilgisayara kalır.",
   "cfg.resolution": "Çözünürlük",
   "cfg.followsWindow": "Pencereyi izler",
-  "cfg.resolutionNote": "Pencerenin araç çubuğundan bunun yerine sabit bir çözünürlük seçilebilir.",
   "cfg.graphics": "Grafikler",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Güvenli Önyükleme",
   "cfg.on": "Açık",
   "cfg.off": "Kapalı",
-  "cfg.setAtCreate": "Makine oluşturulurken seçildi."
+  "cfg.setAtCreate": "Makine oluşturulurken seçildi.",
+  "cfg.resolutionFollowNote": "Makine pencere boyutunda başlar ve sistemi izin verdikçe onu izler. Pencerenin araç çubuğundan yine başka bir boyut seçilebilir.",
+  "cfg.resolutionFixedNote": "Makine bu boyutta başlar: pencereyi izlemeyenler dahil her sistem başlarken bunu alır. Çalışırken pencerenin araç çubuğundan yine başka bir boyut seçilebilir."
 }

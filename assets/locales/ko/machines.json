@@ -292,7 +292,6 @@
   "cfg.cpuNote": "QEMU 자체 몫을 포함해 머신은 최대 {limit}까지 사용할 수 있습니다. 머신 하나에 최대 {max}: 코어 하나와 데스크탑 메모리는 이 컴퓨터용으로 남겨 둡니다.",
   "cfg.resolution": "해상도",
   "cfg.followsWindow": "윈도우에 맞춤",
-  "cfg.resolutionNote": "윈도우의 도구 막대에서 고정 해상도를 선택할 수도 있습니다.",
   "cfg.graphics": "그래픽",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "켜짐",
   "cfg.off": "꺼짐",
-  "cfg.setAtCreate": "머신을 만들 때 선택했습니다."
+  "cfg.setAtCreate": "머신을 만들 때 선택했습니다.",
+  "cfg.resolutionFollowNote": "머신은 창 크기로 시작하고 시스템이 허용하는 한 창을 따라갑니다. 창의 도구 막대에서 다른 크기를 고를 수도 있습니다.",
+  "cfg.resolutionFixedNote": "머신은 이 크기로 시작합니다. 창을 따라가지 않는 시스템도 포함해 모든 시스템이 시작할 때 이 크기를 씁니다. 실행 중에도 창의 도구 막대에서 다른 크기를 고를 수 있습니다."
 }

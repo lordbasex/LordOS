@@ -292,7 +292,6 @@
   "cfg.cpuNote": "連同 QEMU 本身所需，虛擬機器最多可能使用 {limit}。單一虛擬機器最多 {max}：一個核心與桌面所需的記憶體會保留給這部電腦。",
   "cfg.resolution": "解析度",
   "cfg.followsWindow": "隨視窗調整",
-  "cfg.resolutionNote": "也可以從視窗的工具列選擇固定的解析度。",
   "cfg.graphics": "圖形",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "安全開機",
   "cfg.on": "開啟",
   "cfg.off": "關閉",
-  "cfg.setAtCreate": "建立虛擬機器時已選定。"
+  "cfg.setAtCreate": "建立虛擬機器時已選定。",
+  "cfg.resolutionFollowNote": "機器以視窗的大小啟動，並在系統允許時跟隨視窗。視窗的工具列仍可選擇其他大小。",
+  "cfg.resolutionFixedNote": "機器以此大小啟動：每個系統在啟動時都會採用它，包括不跟隨視窗的系統。執行時仍可在視窗的工具列選擇其他大小。"
 }

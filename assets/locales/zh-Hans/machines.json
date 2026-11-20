@@ -292,7 +292,6 @@
   "cfg.cpuNote": "加上 QEMU 自身的占用，虚拟机最多可使用 {limit}。单台虚拟机最多 {max}：要为这台电脑保留一个核心和桌面所需的内存。",
   "cfg.resolution": "分辨率",
   "cfg.followsWindow": "跟随窗口",
-  "cfg.resolutionNote": "也可以在窗口的工具栏中选择固定分辨率。",
   "cfg.graphics": "图形",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "安全启动",
   "cfg.on": "已开启",
   "cfg.off": "已关闭",
-  "cfg.setAtCreate": "创建虚拟机时已选定。"
+  "cfg.setAtCreate": "创建虚拟机时已选定。",
+  "cfg.resolutionFollowNote": "机器以窗口的大小启动，并在系统允许时跟随窗口。窗口的工具栏仍可选择其他大小。",
+  "cfg.resolutionFixedNote": "机器以此大小启动：每个系统在启动时都会采用它，包括不跟随窗口的系统。运行时仍可在窗口的工具栏选择其他大小。"
 }

@@ -292,7 +292,6 @@
   "cfg.cpuNote": "With QEMU's own share the machine may use up to {limit}. At most {max} for one machine: one core and the desktop's memory stay for this computer.",
   "cfg.resolution": "Resolution",
   "cfg.followsWindow": "Follows the window",
-  "cfg.resolutionNote": "The window's toolbar can pick a fixed resolution instead.",
   "cfg.graphics": "Graphics",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "On",
   "cfg.off": "Off",
-  "cfg.setAtCreate": "Chosen when the machine was made."
+  "cfg.setAtCreate": "Chosen when the machine was made.",
+  "cfg.resolutionFollowNote": "The machine starts at the window's size and follows it while its system allows. The window's toolbar can still pick another size.",
+  "cfg.resolutionFixedNote": "The machine starts at this size: every system takes it when it starts, also those that don't follow the window. The window's toolbar can still pick another size while it runs."
 }

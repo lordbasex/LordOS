@@ -292,7 +292,6 @@
   "cfg.cpuNote": "Su QEMU dalimi mašina gali naudoti iki {limit}. Vienai mašinai daugiausia {max}: vienas branduolys ir darbalaukio atmintis lieka šiam kompiuteriui.",
   "cfg.resolution": "Skyra",
   "cfg.followsWindow": "Pagal langą",
-  "cfg.resolutionNote": "Lango įrankių juostoje vietoj to galima pasirinkti fiksuotą skyrą.",
   "cfg.graphics": "Grafika",
   "cfg.graphics2d": "2D",
   "cfg.graphics3d": "3D",
@@ -917,5 +916,7 @@
   "cfg.secureBoot": "Secure Boot",
   "cfg.on": "Įjungta",
   "cfg.off": "Išjungta",
-  "cfg.setAtCreate": "Pasirinkta kuriant mašiną."
+  "cfg.setAtCreate": "Pasirinkta kuriant mašiną.",
+  "cfg.resolutionFollowNote": "Mašina paleidžiama lango dydžio ir seka jį, kol leidžia jos sistema. Lango įrankių juostoje vis tiek galima pasirinkti kitą dydį.",
+  "cfg.resolutionFixedNote": "Mašina paleidžiama šio dydžio: kiekviena sistema jį perima paleidžiama, net ir tos, kurios neseka lango. Veikiant lango įrankių juostoje vis tiek galima pasirinkti kitą."
 }

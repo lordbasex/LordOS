@@ -341,6 +341,11 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             /* the windows device set (4.3), and the graphics (6.10): 3D for Linux machines only */
             JS_SetPropertyStr(c, o, "windowsDevices", JS_NewBool(c, m.devices == VM_DEV_WINDOWS));
             set_str(c, o, "graphics", m.graphics == VM_GFX_3D ? "3d" : "2d");
+            {
+                char rs[24] = "follow";
+                if (m.res_w && m.res_h) snprintf(rs, sizeof rs, "%dx%d", m.res_w, m.res_h);
+                set_str(c, o, "resolution", rs);
+            }
             set_str(c, o, "nicModel", VM_NIC_MODELS[m.nic_model]);
             set_int(c, o, "dataDisks", m.n_data);
             {
@@ -857,6 +862,15 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         const char *gs = JS_ToCString(c, v);
         if (gs && (!strcmp(gs, "2d") || !strcmp(gs, "3d"))) { snprintf(gfx, sizeof gfx, "%s", gs); args[n++] = "--graphics"; args[n++] = gfx; } else ok = 0;
         if (gs) JS_FreeCString(c, gs);
+    }
+    JS_FreeValue(c, v);
+    char res[24] = "";
+    v = JS_GetPropertyStr(c, argv[1], "resolution");
+    if (JS_IsString(v)) {
+        const char *rs = JS_ToCString(c, v);
+        int rw, rh;
+        if (rs && (!strcmp(rs, "follow") || !vm_resolution_parse(rs, &rw, &rh))) { snprintf(res, sizeof res, "%s", rs); args[n++] = "--resolution"; args[n++] = res; } else ok = 0;
+        if (rs) JS_FreeCString(c, rs);
     }
     JS_FreeValue(c, v);
     char devs[16] = "", nicm[24] = "";

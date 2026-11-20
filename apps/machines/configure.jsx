@@ -1,10 +1,10 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. Sections of later phases say so.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary } from './model.js';
+  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, resolutions } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
@@ -143,7 +143,7 @@ export function Configure({ dir, section: section0, onClose }) {
   const running = stateView(m.state).active;
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', shares: m.shares || [],
-    graphics: m.graphics || '2d', ...draft };
+    graphics: m.graphics || '2d', resolution: m.resolution || 'follow', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || []) : val !== (k === 'bridge' ? m.bridge || '' : m[k]));
@@ -176,7 +176,7 @@ export function Configure({ dir, section: section0, onClose }) {
     general: [meta.osName || systemOf(m.name).name, m.arch, prof ? tr(`machines.as.profile.${prof}`) : null].filter(Boolean).join(', '),
     startup: tr(`machines.cfg.close.${closeChoice(meta)}`) + (m.suspended ? `, ${tr('machines.doing.suspended')}` : ''),
     cpu: tr('machines.cfg.sum.cpu', { n: m.vcpus, mem: gb(m.memoryMb) }),
-    display: m.display === 'window' ? tr('machines.cfg.sum.display') + (m.graphics === '3d' ? `, ${tr('machines.cfg.graphics3d')}` : '') : tr('machines.cfg.sum.noDisplay'),
+    display: m.display === 'window' ? (m.resolution && m.resolution !== 'follow' ? m.resolution.replace('x', ' × ') : tr('machines.cfg.sum.display')) + (m.graphics === '3d' ? `, ${tr('machines.cfg.graphics3d')}` : '') : tr('machines.cfg.sum.noDisplay'),
     network: (() => {
       const ns = netSummary(m);
       return [tr(`machines.cfg.net.${ns.mode}`), ns.card || null, ns.ports ? tr('machines.cfg.sum.ports', { n: ns.ports }) : null].filter(Boolean).join(', ');
@@ -268,7 +268,13 @@ export function Configure({ dir, section: section0, onClose }) {
       .filter(Boolean).join(' ');
     pane = <>
     <Group>
-      <Row label={tr('machines.cfg.resolution')} value={tr('machines.cfg.followsWindow')} note={tr('machines.cfg.resolutionNote')} />
+      {/* the size the machine starts with (its EDID's preferred mode): every guest takes it at boot, also those whose
+          drivers don't follow the window while they run */}
+      <Row label={tr('machines.cfg.resolution')} note={[tr(cur.resolution === 'follow' ? 'machines.cfg.resolutionFollowNote' : 'machines.cfg.resolutionFixedNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running}><MenuBtn label={cur.resolution === 'follow' ? tr('machines.cfg.followsWindow') : cur.resolution.replace('x', ' × ')}
+          items={[{ label: tr('machines.cfg.followsWindow'), checked: cur.resolution === 'follow', onClick: () => set({ resolution: 'follow' }) }, '-',
+            ...resolutions(screen.width, screen.height, null).map(([w, h]) => ({ label: `${w} × ${h}`, checked: cur.resolution === `${w}x${h}`, onClick: () => set({ resolution: `${w}x${h}` }) }))]} /></Off>
+      </Row>
       <Row label={tr('machines.cfg.graphics')} last note={note}>
         <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set({ graphics: x })}
           options={[['2d', tr('machines.cfg.graphics2d')], ['3d', tr('machines.cfg.graphics3d'), !!why3d && cur.graphics !== '3d']]} /></Off>
