@@ -68,5 +68,9 @@ int ag_drop_name(const char *in, char *out, size_t cap);
 /* qemu-guest-agent's guest-exec output (out-data) as text for the log or the person: base64-decoded, every byte that
  * isn't printable ASCII or part of valid UTF-8 replaced by '?', line ends as spaces, trimmed; at most cap - 1 bytes. */
 void ag_exec_text(const char *b64, char *out, size_t cap);
+/* the private folder a drop is written into, as the guest's script named it: Linux /var/tmp/lordos-drop.XXXXXXXX
+ * (8 letters or digits); Windows <drive>:\...\Temp\lordos-drop-<32 lowercase hex> (printable ASCII, no "..", no '/').
+ * 1 it is one, 0 not */
+int ag_drop_staging_ok(const char *p, int windows);
 
 #endif

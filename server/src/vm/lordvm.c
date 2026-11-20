@@ -901,7 +901,7 @@ static struct {
     long long fx_poll_at, fx_deadline, fx_told_at;
     off_t fx_off, fx_size;
     size_t fx_chunk;
-    char fx_tmp[64], fx_dest[1024];
+    char fx_tmp[256];                      /* the private folder in the guest the file is written into */
 } S;
 
 static void awake_update(void);
@@ -2745,9 +2745,16 @@ static void ag_install_step(void) {
  *            (named: uutils' chown, Ubuntu 26.04's, leaves the group as it was for "user:") and moves the file,
  *            as that person (runuser), into their Downloads (xdg-user-dir) under a free name; the folder goes.
  *            The file is never written by root into a folder the person owns.
- *   Windows: a PowerShell script finds the signed-in person's Downloads (else the public one) and reserves a free name
- *            there (CreateNew); the file is written into it. The name reaches both scripts as an argument or as base64,
- *            never as script text. */
+ *   Windows: the same shape (2026-11-20 security review: SYSTEM must never open or delete a path in a folder the person
+ *            controls, a link or junction put there between two steps would turn it into SYSTEM writing or deleting any
+ *            file). A fixed script makes %SystemRoot%\Temp\lordos-drop-<random> with a protected ACL (SYSTEM and
+ *            Administrators only) and checks it; the file is written into it. The last script finds the signed-in
+ *            person's Downloads (else the public one), refuses it when it or a folder above it is a reparse point, gives
+ *            the staged file to the person (owner, full control, protected ACL) and moves it there under a free name with
+ *            [IO.File]::Move, which fails on an existing name and never opens or follows the destination. Only the
+ *            private folder is ever deleted. The name reaches every script as an argument or as base64, never as script
+ *            text. What is left: a person who swaps their Downloads for a junction in the instant between the check and
+ *            the move gets a file of their own placed in the junction's target. */
 enum { FX_NONE = 0, FX_PREP, FX_OPEN, FX_WRITE, FX_CLOSE, FX_PLACE };
 #define FX_CHUNK (48 * 1024)
 
@@ -2772,23 +2779,46 @@ static const char FX_PLACE_SH[] =
     "g=$(id -gn \"$u\") && chown -R -- \"$u:$g\" \"$d\" || { rm -rf -- \"$d\"; exit 4; }; "
     "p=$(runuser -u \"$u\" -- /bin/sh -c \"$3\" lordos-drop \"$d/file\" \"$n\"); r=$?; rm -rf -- \"$d\"; "
     "[ \"$r\" -eq 0 ] || exit \"$r\"; printf '%s' \"$p\"";
-/* %s: the name, base64 of its UTF-8. Prints base64 of the reserved path's UTF-8 (no console code page in the way) */
+/* Windows, the private folder: made with its ACL at once (SYSTEM and Administrators, nothing inherited), then checked
+ * (not a reparse point, owned by one of them, no other entry). Prints base64 of its path. No format: not for printf */
 static const char FX_PREP_PS[] =
-    "$ErrorActionPreference='Stop';"
-    "$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
-    "$d=$null;"
+    "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';trap{[Console]::Error.Write($_.Exception.Message);exit 1};"
+    "$d=Join-Path $env:SystemRoot ('Temp\\lordos-drop-'+[guid]::NewGuid().ToString('N'));"
+    "if(Test-Path -LiteralPath $d){throw 'already there'};"
+    "$k='S-1-5-18','S-1-5-32-544';"
+    "$a=New-Object Security.AccessControl.DirectorySecurity;$a.SetAccessRuleProtection($true,$false);"
+    "foreach($x in $k){$a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($x)),'FullControl','ContainerInherit,ObjectInherit','None','Allow')))};"
+    "[IO.Directory]::CreateDirectory($d,$a)|Out-Null;"
+    "if((Get-Item -LiteralPath $d -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'a reparse point'};"
+    "$g=Get-Acl -LiteralPath $d;if($g.GetOwner([Security.Principal.SecurityIdentifier]).Value -notin $k){throw 'not ours'};"
+    "foreach($r in $g.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])){if($r.IdentityReference.Value -notin $k){throw 'not private'}};"
+    "[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($d)))";
+/* Windows, the last step. %s: the private folder, then the name, each base64 of its UTF-8. Prints base64 of the path the
+ * file got; the private folder goes whatever happens */
+static const char FX_PLACE_PS[] =
+    "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';trap{[Console]::Error.Write($_.Exception.Message);exit 1};"
+    "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
+    "try{"
+    "$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));$f=Join-Path $t 'file';$w=$null;$d=$null;"
     "try{$u=(Get-CimInstance Win32_ComputerSystem).UserName;"
-    "if($u){$s=(New-Object Security.Principal.NTAccount($u)).Translate([Security.Principal.SecurityIdentifier]).Value;"
-    "$h=(Get-CimInstance Win32_UserProfile -Filter (\"SID='\"+$s+\"'\")).LocalPath;"
-    "if($h){$d=Join-Path $h 'Downloads'}}}catch{$d=$null};"
-    "if(-not $d -or -not (Test-Path -LiteralPath $d -PathType Container)){$d=Join-Path $env:PUBLIC 'Downloads';"
-    "if(-not (Test-Path -LiteralPath $d)){New-Item -ItemType Directory -Path $d|Out-Null}};"
+    "if($u){$w=(New-Object Security.Principal.NTAccount($u)).Translate([Security.Principal.SecurityIdentifier]);"
+    "$h=(Get-CimInstance Win32_UserProfile -Filter (\"SID='\"+$w.Value+\"'\")).LocalPath;if($h){$d=Join-Path $h 'Downloads'}}}catch{$w=$null;$d=$null};"
+    "if(-not $d -or -not (Test-Path -LiteralPath $d -PathType Container)){$d=Join-Path $env:PUBLIC 'Downloads'};"
+    "if(-not (Test-Path -LiteralPath $d -PathType Container)){throw 'no Downloads folder'};"
+    "if(-not $w){$w=New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')};"
+    "function Chk($p){$q=$p;while($q){if((Get-Item -LiteralPath $q -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw ('a reparse point: '+$q)};$q=Split-Path -Parent $q}};"
+    "$s=New-Object Security.AccessControl.FileSecurity;$s.SetAccessRuleProtection($true,$false);"
+    "foreach($x in @($w,(New-Object Security.Principal.SecurityIdentifier('S-1-5-18')),(New-Object Security.Principal.SecurityIdentifier('S-1-5-32-544')))){$s.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($x,'FullControl','Allow')))};"
+    "[IO.File]::SetAccessControl($f,$s);"
+    /* the owner too: icacls enables the restore privilege SYSTEM holds (.NET's SetOwner doesn't, it stayed Administrators) */
+    "& \"$env:SystemRoot\\System32\\icacls.exe\" $f /setowner ('*'+$w.Value) /q|Out-Null;"
     "$b=[IO.Path]::GetFileNameWithoutExtension($n);$e=[IO.Path]::GetExtension($n);$p=Join-Path $d $n;$i=2;"
-    "while(Test-Path -LiteralPath $p){if($i -gt 999){throw 'no free name'};$p=Join-Path $d ($b+' ('+$i+')'+$e);$i++};"
-    "([IO.File]::Open($p,'CreateNew','Write')).Close();"
-    "[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($p)))";
+    "while($true){Chk $d;try{[IO.File]::Move($f,$p);break}catch{if(-not (Test-Path -LiteralPath $p)){throw};if($i -gt 999){throw 'no free name'};$p=Join-Path $d ($b+' ('+$i+')'+$e);$i++}};"
+    "[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($p)))"
+    "}finally{Remove-Item -LiteralPath $t -Recurse -Force -ErrorAction SilentlyContinue}";
+/* %s: the private folder (checked by ag_drop_staging_ok), base64 */
 static const char FX_DROP_PS[] =
-    "Remove-Item -LiteralPath ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'))) -Force -ErrorAction SilentlyContinue";
+    "Remove-Item -LiteralPath ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'))) -Recurse -Force -ErrorAction SilentlyContinue";
 
 static void fx_next(void);
 
@@ -2845,7 +2875,7 @@ static void fx_reset(void) {
     S.fx_handle = S.fx_pid = 0;
     S.fx_poll_at = S.fx_deadline = 0;
     S.fx_off = S.fx_size = 0;
-    S.fx_tmp[0] = S.fx_dest[0] = 0;
+    S.fx_tmp[0] = 0;
 }
 
 /* the copy failed: what the guest has of it goes (when the agent still answers), the next file starts */
@@ -2854,10 +2884,11 @@ static void fx_fail(int code, const char *why) {
     reply(S.fx.client, S.fx.seq, code, why);
     if (S.qga_up) {
         if (S.fx_handle > 0) { char a[48]; snprintf(a, sizeof a, "{\"handle\":%ld}", S.fx_handle); qga_do("guest-file-close", a, AQ_IGNORE); }
-        if (S.fx_tmp[0]) fx_exec_sh("rm -rf -- \"$1\"", S.fx_tmp, NULL, NULL, AQ_IGNORE);
-        else if (S.fx_dest[0] && S.ag_windows) {
-            char b[1500], ps[sizeof FX_DROP_PS + 1500];
-            if (ag_b64_encode((const uint8_t *)S.fx_dest, strlen(S.fx_dest), b, sizeof b) > 0) { snprintf(ps, sizeof ps, FX_DROP_PS, b); fx_exec_ps(ps, AQ_IGNORE); }
+        /* only ever the private folder, never a path in one of the person's */
+        if (S.fx_tmp[0] && !S.ag_windows) fx_exec_sh("rm -rf -- \"$1\"", S.fx_tmp, NULL, NULL, AQ_IGNORE);
+        else if (S.fx_tmp[0]) {
+            char b[400], ps[sizeof FX_DROP_PS + 400];
+            if (ag_b64_encode((const uint8_t *)S.fx_tmp, strlen(S.fx_tmp), b, sizeof b) > 0) { snprintf(ps, sizeof ps, FX_DROP_PS, b); fx_exec_ps(ps, AQ_IGNORE); }
         }
     }
     fx_reset();
@@ -2926,46 +2957,39 @@ static void fx_next(void) {
     vlog("files: copying %s (%lld bytes) into the guest", S.fx.name, (long long)S.fx_size);
     fx_progress(1);
     int r;
-    if (S.ag_windows) {
-        char b[AG_NAME_MAX / 3 * 4 + 16], ps[sizeof FX_PREP_PS + sizeof b];
-        if (ag_b64_encode((const uint8_t *)S.fx.name, strlen(S.fx.name), b, sizeof b) < 0) { fx_fail(VME_INTERNAL, "internal error"); return; }
-        snprintf(ps, sizeof ps, FX_PREP_PS, b);
-        r = fx_exec_ps(ps, AQ_FXEXEC);
-    } else r = fx_exec_sh(FX_PREP_SH, NULL, NULL, NULL, AQ_FXEXEC);
+    if (S.ag_windows) r = fx_exec_ps(FX_PREP_PS, AQ_FXEXEC);
+    else r = fx_exec_sh(FX_PREP_SH, NULL, NULL, NULL, AQ_FXEXEC);
     if (r) fx_fail(VME_BUSY, "the guest agent is busy");
+}
+
+/* Windows' scripts print base64 of UTF-8 (no console code page in the way): the text, or "" when it isn't sane */
+static void win_text(const char *b64, char *out, size_t cap) {
+    long n = ag_b64_decode(b64, strlen(b64), (uint8_t *)out, cap - 1);
+    out[n > 0 ? n : 0] = 0;
+    if (n <= 0 || !ag_utf8_ok((const uint8_t *)out, (size_t)n)) { out[0] = 0; return; }
+    for (long i = 0; i < n; i++) if ((unsigned char)out[i] < 0x20) { out[0] = 0; return; }
 }
 
 /* guest-exec-status of the step's script has exited: what it printed (out-data, base64) */
 static void fx_exec_done(const JVal *r) {
     int code = (int)json_num(r, "exitcode", -1);
-    char said[sizeof S.fx_dest];
+    char said[1024], txt[1024];
     ag_exec_text(json_str(r, code == 0 ? "out-data" : "err-data"), said, sizeof said);
     if (code != 0) {
         char why[VM_TEXT_MAX];
+        if (S.fx_step == FX_PLACE) S.fx_tmp[0] = 0;          /* the script removed it */
         snprintf(why, sizeof why, "the guest's script failed (%d)%s%.150s", code, said[0] ? ": " : "", said);
         fx_fail(VME_QMP, why);
         return;
     }
-    if (S.fx_step == FX_PREP && !S.ag_windows) {
-        /* only the folder that script makes: /var/tmp/lordos-drop.XXXXXXXX */
-        static const char pre[] = "/var/tmp/lordos-drop.";
-        size_t l = strlen(said), pl = sizeof pre - 1;
-        int good = l == pl + 8 && !strncmp(said, pre, pl);
-        for (size_t i = pl; good && i < l; i++) good = isalnum((unsigned char)said[i]);
-        if (!good) { fx_fail(VME_QMP, "the guest didn't make a private folder"); return; }
+    if (S.ag_windows) { win_text(said, txt, sizeof txt); memcpy(said, txt, sizeof said); }
+    if (S.fx_step == FX_PREP) {
+        /* only the private folder that script makes */
+        if (!ag_drop_staging_ok(said, S.ag_windows)) { fx_fail(VME_QMP, "the guest didn't make a private folder"); return; }
         snprintf(S.fx_tmp, sizeof S.fx_tmp, "%s", said);
         char p[sizeof S.fx_tmp + 8];
-        snprintf(p, sizeof p, "%s/file", S.fx_tmp);
+        snprintf(p, sizeof p, "%s%cfile", S.fx_tmp, S.ag_windows ? '\\' : '/');
         fx_open(p);
-    } else if (S.fx_step == FX_PREP) {
-        /* the path PowerShell reserved, base64 of UTF-8 */
-        uint8_t path[sizeof S.fx_dest];
-        long n = ag_b64_decode(said, strlen(said), path, sizeof path - 1);
-        if (n <= 3 || !ag_utf8_ok(path, (size_t)n)) { fx_fail(VME_QMP, "the guest didn't name a folder"); return; }
-        for (long i = 0; i < n; i++) if (path[i] < 0x20) { fx_fail(VME_QMP, "the guest didn't name a folder"); return; }
-        path[n] = 0;
-        snprintf(S.fx_dest, sizeof S.fx_dest, "%s", (const char *)path);
-        fx_open(S.fx_dest);
     } else if (S.fx_step == FX_PLACE) {
         S.fx_tmp[0] = 0;                                  /* the script removed it */
         fx_done(said[0] ? said : S.fx.name);
@@ -3005,10 +3029,14 @@ static void fx_on_reply(int kind, const JVal *root, const JVal *r, int ok) {
     }
     case AQ_FXCLOSE:
         S.fx_handle = 0;
-        if (S.ag_windows) { fx_done(S.fx_dest); break; }
         S.fx_step = FX_PLACE;
         S.fx_deadline = now_ms() + 120000;
-        if (fx_exec_sh(FX_PLACE_SH, S.fx_tmp, S.fx.name, FX_MOVE_SH, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
+        if (S.ag_windows) {
+            char bt[400], bn[AG_NAME_MAX / 3 * 4 + 16], ps[sizeof FX_PLACE_PS + sizeof bt + sizeof bn];
+            if (ag_b64_encode((const uint8_t *)S.fx_tmp, strlen(S.fx_tmp), bt, sizeof bt) < 0 || ag_b64_encode((const uint8_t *)S.fx.name, strlen(S.fx.name), bn, sizeof bn) < 0) { fx_fail(VME_INTERNAL, "internal error"); break; }
+            snprintf(ps, sizeof ps, FX_PLACE_PS, bt, bn);
+            if (fx_exec_ps(ps, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
+        } else if (fx_exec_sh(FX_PLACE_SH, S.fx_tmp, S.fx.name, FX_MOVE_SH, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
         break;
     }
 }

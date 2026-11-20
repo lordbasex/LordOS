@@ -638,6 +638,17 @@ static void test_drop_names(void) {
     ag_b64_encode((const uint8_t *)"\xc3\xa9\xc3\xa9\xc3\xa9", 6, e, sizeof e);
     ag_exec_text(e, t, 4); CHECK(!strcmp(t, "\xc3\xa9"));                           /* cut on a character */
     ag_exec_text(NULL, t, sizeof t); CHECK(!t[0]);
+    /* the private folders a drop is written into: only the ones the fixed scripts make */
+    CHECK(ag_drop_staging_ok("/var/tmp/lordos-drop.Ab3dE9xZ", 0) && !ag_drop_staging_ok("/var/tmp/lordos-drop.Ab3d", 0));
+    CHECK(!ag_drop_staging_ok("/home/a/lordos-drop.Ab3dE9xZ", 0) && !ag_drop_staging_ok("/var/tmp/lordos-drop.Ab3dE9x/", 0) && !ag_drop_staging_ok(NULL, 0));
+    CHECK(ag_drop_staging_ok("C:\\Windows\\Temp\\lordos-drop-0123456789abcdef0123456789abcdef", 1));
+    CHECK(ag_drop_staging_ok("D:\\WINDOWS\\TEMP\\lordos-drop-0123456789abcdef0123456789abcdef", 1));
+    CHECK(!ag_drop_staging_ok("C:\\Users\\a\\Temp\\..\\lordos-drop-0123456789abcdef0123456789abcdef", 1));
+    CHECK(!ag_drop_staging_ok("C:\\Windows\\Temp\\lordos-drop-0123456789ABCDEF0123456789abcdef", 1));
+    CHECK(!ag_drop_staging_ok("C:\\Windows\\Temp\\lordos-drop-0123456789abcdef0123456789abcde", 1));
+    CHECK(!ag_drop_staging_ok("C:/Windows/Temp/lordos-drop-0123456789abcdef0123456789abcdef", 1));
+    CHECK(!ag_drop_staging_ok("\\\\srv\\Temp\\lordos-drop-0123456789abcdef0123456789abcdef", 1));
+    CHECK(!ag_drop_staging_ok("/var/tmp/lordos-drop.Ab3dE9xZ", 1) && !ag_drop_staging_ok("C:\\Windows\\Temp\\lordos-drop-0123456789abcdef0123456789abcdef", 0));
     ag_exec_text("!!", t, sizeof t); CHECK(!t[0]);
 }
 

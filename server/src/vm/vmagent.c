@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
 int ag_frame_next(const uint8_t *b, size_t n, AgFrame *f) {
     if (n < AG_HEAD) return 0;
@@ -433,4 +434,24 @@ void ag_exec_text(const char *b64, char *out, size_t cap) {
     if (l > cap - 1) l = char_start((const char *)buf + s, cap - 1);
     memcpy(out, buf + s, l);
     out[l] = 0;
+}
+
+int ag_drop_staging_ok(const char *p, int windows) {
+    if (!p) return 0;
+    size_t l = strlen(p);
+    if (!windows) {
+        static const char pre[] = "/var/tmp/lordos-drop.";
+        size_t pl = sizeof pre - 1;
+        if (l != pl + 8 || strncmp(p, pre, pl)) return 0;
+        for (size_t i = pl; i < l; i++) if (!((p[i] >= 'a' && p[i] <= 'z') || (p[i] >= 'A' && p[i] <= 'Z') || (p[i] >= '0' && p[i] <= '9'))) return 0;
+        return 1;
+    }
+    static const char tail[] = "\\Temp\\lordos-drop-";
+    size_t tl = sizeof tail - 1;
+    if (l < 3 + tl + 32 || l > 200 || !((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) || p[1] != ':' || p[2] != '\\') return 0;
+    for (size_t i = 0; i < l; i++) if (p[i] < 0x20 || p[i] > 0x7e || p[i] == '/' || (p[i] == '.' && p[i + 1] == '.')) return 0;
+    const char *t = p + l - 32 - tl;
+    if (strncasecmp(t, tail, tl)) return 0;
+    for (size_t i = l - 32; i < l; i++) if (!((p[i] >= '0' && p[i] <= '9') || (p[i] >= 'a' && p[i] <= 'f'))) return 0;
+    return 1;
 }
