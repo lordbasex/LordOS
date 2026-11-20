@@ -1,11 +1,12 @@
 // dockmodel.js — the Dock's pinned list as plain data, with no runtime or React (so it can be
 // unit tested with node: server/tests/dock_model_test.mjs).
 //
-// A pinned item is a typed id, so the three kinds of app can never collide:
+// A pinned item is a typed id, so the kinds of app can never collide:
 //   "app:<id>"      a LordOS app bundled with the theme (apps/<id>), opened with wm.open
 //   "lpk:<id>"      an installed .lpk package, launched with lord.apps.launchPackage(id)
 //   "desktop:<id>"  a Linux app's .desktop entry, launched with lord.apps.launch(id)
 //   "web:<id>"      an installed web app (docs/WEBAPPS.md), started with lord.webapps.launch(id, its first profile)
+//   "flatpak:<id>"  an installed Flatpak app (docs/FLATPAK.md), launched with lord.apps.launchFlatpak(id)
 // Lists written before 0.8.1 hold untyped ids ("files", "store"); normalizePinned() migrates them.
 //
 // Positions passed to moveItem/pinItem count only the items the Dock shows (isShown): an
@@ -13,7 +14,7 @@
 import { onDesktop } from './desktopmodel.js';
 
 //   "shell:launcher" the theme's app launcher (the only "shell" item): it moves like an app
-export const DOCK_KINDS = ['app', 'lpk', 'desktop', 'shell', 'web'];
+export const DOCK_KINDS = ['app', 'lpk', 'desktop', 'shell', 'web', 'flatpak'];
 export const LAUNCHER = 'shell:launcher';
 // The Dock's rules:
 //   - Files, Settings and the app launcher can't be removed (no «Remove from Dock»; dragging them out
@@ -30,12 +31,15 @@ const APP_RE = /^[a-z][a-z0-9-]{0,39}$/;
 const LPK_RE = /^[a-z][a-z0-9-]{1,39}$/;
 const DESKTOP_RE = /^[A-Za-z0-9_][A-Za-z0-9._-]{0,61}$/;
 const WEB_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;          // webreg_id_ok (server/src/web/webreg.c)
+// fpak_id_ok (server/src/fpak.c): three or more elements, none starting with a digit, '-' only in the last one
+const FLATPAK_RE = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*\.[A-Za-z_][A-Za-z0-9_-]*$/;
 const validKey = {
   app: (k) => APP_RE.test(k),
   shell: (k) => k === 'launcher',
   lpk: (k) => LPK_RE.test(k),
   desktop: (k) => DESKTOP_RE.test(k) && !k.includes('..') && !k.startsWith('lpk-'),
   web: (k) => WEB_RE.test(k),
+  flatpak: (k) => k.length <= 59 && FLATPAK_RE.test(k) && k.split('.').length >= 3,
 };
 
 // "lpk:notes" → { kind: 'lpk', key: 'notes' }; null if it isn't a valid typed id.

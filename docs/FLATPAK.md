@@ -331,8 +331,9 @@ LordOS's generated context options (next sections), the id, and with "Open with"
 it. The `.desktop` export is read only for the name, icon, `MimeType` and `Categories`, never for
 `Exec`. "Open with" follows `launchWith`'s rules (realpath in the home folder or the user's
 mounts, only apps with `MimeType`) and, instead of the document portal, adds
-`--filesystem=<that real path>` so the sandbox sees exactly that file (**Unverified** for single
-files: to test). Desktop actions are not offered in
+`--filesystem=<that real path>` so the sandbox sees exactly that file (**Checked** on VM 127 on
+2026-11-19 for a single file: GNOME's Audio Player, which declares no filesystem, opened from Files' "Open with" saw
+in its home only `Documents/` holding that one file). Desktop actions are not offered in
 phase 1 (their `Exec` lines are app arguments LordOS would have to validate).
 
 **C. Run Flatpak apps from the Store only (no launcher, no Dock).** *Rejected:* the Dock, search
@@ -342,6 +343,14 @@ same exception with a worse user experience.
 **Recommendation: B.** The Dock pins them as a new typed id (`flatpak:<id>`, `sdk/dockmodel.js`),
 and `sdk/wayland.js` maps their windows (Wayland `app_id` is normally the Flatpak id) to the same
 entry. The orphaned-grandchild, log, signal and fd hygiene of `launch()` stays as it is.
+
+**Built on 2026-11-19 (phase 1 step 6):** `flatpak` is a Dock kind (`sdk/dockmodel.js`, the rules of `fpak_id_ok`),
+so "Keep in Dock", dragging from the launcher and session restore take `flatpak:<id>` like `desktop:<id>`. Files' and
+the Terminal's "Open with" list the Flatpak apps whose export declares the type, and `apps_launch_flatpak_with`
+refuses an app whose export has no `MimeType` (as `launchWith` does for Linux apps). Not done in phase 1: Settings →
+Default Apps doesn't offer Flatpak apps (`apps_default_for` reads only Linux apps), and MIME aliases aren't resolved
+for them either (an app that declares `audio/wav` isn't offered for a `.wav`, which the system calls
+`audio/vnd.wave`; the same holds for Linux apps).
 
 ## Problem 3: permissions
 

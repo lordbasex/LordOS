@@ -66,11 +66,14 @@ static int finite_all(const float *v, int n) {
 }
 
 /* A gradient the rasterizer can index safely: a finite transform of sane size and finite stop offsets (a NaN
- * offset or a transform that overflows turns into an index far outside its color table). */
+ * offset or a transform that overflows turns into an index far outside its color table). The focus (fx, fy) is set
+ * by nanosvg only for a radial gradient: a linear one leaves it as malloc gave it (in the long-lived worker, a
+ * previous icon's bytes), so it is read only there. The rasterizer doesn't use it either way. */
 static int paint_ok(const NSVGpaint *pt) {
     if (pt->type != NSVG_PAINT_LINEAR_GRADIENT && pt->type != NSVG_PAINT_RADIAL_GRADIENT) return 1;
     const NSVGgradient *g = pt->gradient;
-    if (!g || g->nstops < 0 || !finite_all(g->xform, 6) || !isfinite(g->fx) || !isfinite(g->fy)) return 0;
+    if (!g || g->nstops < 0 || !finite_all(g->xform, 6)) return 0;
+    if (pt->type == NSVG_PAINT_RADIAL_GRADIENT && (!isfinite(g->fx) || !isfinite(g->fy))) return 0;
     for (int i = 0; i < 6; i++) if (fabsf(g->xform[i]) > 1e6f) return 0;
     for (int i = 0; i < g->nstops; i++) if (!isfinite(g->stops[i].offset)) return 0;
     return 1;

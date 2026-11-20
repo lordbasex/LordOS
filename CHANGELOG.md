@@ -77,8 +77,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   2,240 verified apps with their icons; GNOME Calculator showed "Internet and your local network", installed with the
   GNOME runtime, opened from its page in `app-lordos-fp-org.gnome.Calculator.scope`, and its removal took the runtime
   with it; MarkText was marked not supported; "Update Flathub apps" ran.
+- **Flatpak apps in the Dock and in "Open with"** (in development): the Dock pins a Flatpak app as `flatpak:<id>`
+  (Flatpak's id rules, `sdk/dockmodel.js`), from the launcher's "Keep in Dock" or by dragging; its windows group under
+  that icon, and a session restore opens it again. Files' and the Terminal's "Open with" offer the Flatpak apps whose
+  export declares the file's type (`lord.apps.launchFlatpakWith`), and lord-server refuses one that declares no
+  `MimeType`, as it does for Linux apps. The file is lent to the app alone: checked on VM 127 with GNOME's Audio Player
+  (Decibels, which asks for no files), whose sandbox saw only `~/Documents/tono-prueba.mp3` and nothing else of the
+  home. GNOME Text Editor was pinned from the launcher, opened from the Dock in `app-lordos-fp-org.gnome.TextEditor.scope`
+  under its icon, and opened a text file from Files. Tests: `dock-model-test`, `apps-actions-test`.
 
 ### Fixed
+
+- **Some SVG app icons stayed empty** (Print Editor, and most Flathub apps: their icons use gradients). nanosvg sets a
+  gradient's focus only for a radial gradient; LordOS's check before drawing also read it on a linear one, where it is
+  whatever memory malloc gave back. In lord-media's long-lived worker that was a previous icon's bytes, so a valid icon
+  was refused as too complex at some sizes (the Dock's magnification asks for many) and then stayed empty. The focus is
+  now checked only on radial gradients (the rasterizer doesn't use it). `svgrast-test` reproduces it with reused memory.
 
 - **Some apps were named in the Shavian alphabet.** A `.desktop` key with a language modifier (`Name[en@shaw]`, which
   GNOME apps ship) was read as the plain language (`Name[en]`) and won over the untranslated name, so GNOME

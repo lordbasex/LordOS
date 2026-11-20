@@ -4,6 +4,7 @@
  * tokenizer (quotes, comments, CDATA, "<?" and "<!"). Hostile cases must come back quickly with an error code (or a picture), never crash.
  * build/media-test svg runs the same kind of files through lord-media and its sandbox (test-full). */
 #include "../src/media/helper/lm_svg.h"
+#include "nanosvg.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -212,7 +213,35 @@ static void test_sizes(void) {
     free(big);
 }
 
+/* A linear gradient on memory that held other data: nanosvg sets a gradient's focus (fx, fy) only for a radial one
+ * and leaves it as malloc gave it for a linear one, which the rasterizer never reads. In lord-media's long-lived
+ * worker that memory is a previous icon's, and a check of fx/fy refused real icons (GNOME Text Editor's, Print
+ * Editor's) as too complex at some sizes and not others. Here freed blocks of the gradient's size are filled with
+ * 0xff (NaN) first, so the parser gets them back. */
+static void test_dirty_gradient(void) {
+    static const char *svg =
+        "<svg width=\"128\" height=\"128\" viewBox=\"0 0 128 128\" xmlns=\"http://www.w3.org/2000/svg\">"
+        "<linearGradient id=\"a\" x1=\"0\" x2=\"128\" y1=\"0\" y2=\"0\" gradientUnits=\"userSpaceOnUse\">"
+        "<stop offset=\"0\" stop-color=\"#c0bfbc\"/><stop offset=\"1\" stop-color=\"#ffffff\"/></linearGradient>"
+        "<rect x=\"8\" y=\"8\" width=\"112\" height=\"112\" fill=\"url(#a)\"/></svg>";
+    size_t gsize = sizeof(NSVGgradient) + sizeof(NSVGgradientStop);
+    int ok = 0;
+    for (int round = 0; round < 20; round++) {
+        void *blocks[64];
+        for (int i = 0; i < 64; i++) { blocks[i] = malloc(gsize); if (blocks[i]) memset(blocks[i], 0xff, gsize); }
+        for (int i = 0; i < 64; i++) free(blocks[i]);
+        uint8_t *px = NULL;
+        int w = 0, h = 0;
+        const char *e = lm_svg_raster(svg, strlen(svg), 96 + round * 4, -1, &px, &w, &h);
+        if (!e && px && w > 0 && h > 0) ok++;
+        else printf("  dirty gradient at %d px: %s\n", 96 + round * 4, e ? e : "no picture");
+        free(px);
+    }
+    CHECK(ok == 20, "a linear gradient drawn every time on reused memory (%d of 20)", ok);
+}
+
 int main(void) {
+    test_dirty_gradient();
     test_scan();
     test_differential();
     test_valid();

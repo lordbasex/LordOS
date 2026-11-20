@@ -28,6 +28,13 @@ eq('dockId ok', dockId('lpk', 'notes'), 'lpk:notes');
 // a web app (docs/WEBAPPS.md): the registry's id rule
 eq('parse web', parseDockId('web:notes-online'), { kind: 'web', key: 'notes-online' });
 eq('dockId web', dockId('web', '0chat'), 'web:0chat');
+// Flatpak apps (docs/FLATPAK.md): the rules of fpak_id_ok (server/src/fpak.c)
+eq('parse flatpak', parseDockId('flatpak:org.gnome.Calculator'), { kind: 'flatpak', key: 'org.gnome.Calculator' });
+eq('flatpak: "-" in the last element', parseDockId('flatpak:io.github.my-app'), { kind: 'flatpak', key: 'io.github.my-app' });
+eq('dockId flatpak', dockId('flatpak', 'com.example.App_2'), 'flatpak:com.example.App_2');
+for (const bad of ['flatpak:org.gnome', 'flatpak:org..Calc', 'flatpak:org.gnome.', 'flatpak:.org.gnome.Calc', 'flatpak:org.1gnome.Calc',
+  'flatpak:org.my-x.App', 'flatpak:org.gnome.Calc/x', 'flatpak:org.gnome.Calc ', 'flatpak:../a.b.c', 'flatpak:org.gnome.' + 'x'.repeat(50), 'flatpak:'])
+  eq(`parse rejects ${JSON.stringify(bad)}`, parseDockId(bad), null);
 eq('dockId bad kind', dockId('www', 'x'), null);
 eq('dockId bad key', dockId('desktop', '../x'), null);
 eq('desktop 62 chars ok', parseDockId('desktop:' + 'x'.repeat(62))?.kind, 'desktop');

@@ -148,6 +148,9 @@ function openersOf(e, linuxApps, t) {
   const mimes = mimesOf(e, typeof lord.mime !== 'undefined' && lord.mime.guess ? (n) => lord.mime.guess(n) : null);
   for (const a of linuxApps) {
     if (a.kind === 'linux' && mimes.some((m) => appOpens(a.mimeTypes, m))) all.push({ id: a.id, desktopId: a.desktopId, label: a.name, run: () => lord.apps.launchWith(a.desktopId, e.path) });
+    // a Flatpak app sees only that file (lord.apps.launchFlatpakWith lends it with --filesystem, docs/FLATPAK.md)
+    if (a.kind === 'flatpak' && typeof lord.apps.launchFlatpakWith === 'function' && mimes.some((m) => appOpens(a.mimeTypes, m)))
+      all.push({ id: a.id, label: a.name, run: () => lord.apps.launchFlatpakWith(a.flatpakId, e.path) });
   }
   const { list: out, off } = openersAvailable(all, appsOff());
   // the default app for this type (Settings → Default Apps, ~/.config/mimeapps.list) goes first,

@@ -8,7 +8,7 @@
 //   dock.pin(id, index) · dock.move(id, index) · dock.unpin(id) · dock.reset()
 //
 // Pinned items are typed ids (sdk/dockmodel.js): "app:files", "lpk:<id>", "desktop:<desktop id>",
-// "web:<web app>" and "shell:launcher". The methods also take a plain launcher id ("files", "desktop:firefox").
+// "web:<web app>", "flatpak:<Flatpak id>" and "shell:launcher". The methods also take a plain launcher id ("files", "desktop:firefox").
 // A web app's windows (lordos-web.<app>.<profile>, docs/WEBAPPS.md) group under its "web:<app>" item, whose
 // menu opens its other profiles ("New window: Work").
 // The Trash is always last; Files, Settings and the launcher can't be removed but move like any
@@ -58,16 +58,18 @@ const classify = (id) => { const a = getApp(id); return !a || a.builtin ? null :
 export function dockIdOf(x) {
   if (x && typeof x === 'object') {
     if (x.kind === 'linux') return x.desktopId ? `desktop:${x.desktopId}` : null;
-    if (x.kind === 'web') return toTypedId(x.id);
+    if (x.kind === 'web' || x.kind === 'flatpak') return toTypedId(x.id);
     return toTypedId(x.package ? `lpk:${x.id}` : `app:${x.id}`);
   }
   return toTypedId(String(x ?? ''), classify);
 }
+// The kinds launchApp knows by their typed id ("desktop:firefox", "web:mail", "flatpak:org.gnome.Calculator").
+const OUTSIDE = ['desktop', 'web', 'flatpak'];
 // Typed id → the id launchApp knows ("files", "desktop:firefox"); null for the launcher.
 const launcherKey = (id) => {
   const p = parseDockId(id);
   if (!p || p.kind === 'shell') return null;
-  return p.kind === 'desktop' || p.kind === 'web' ? `${p.kind}:${p.key}` : p.key;
+  return OUTSIDE.includes(p.kind) ? `${p.kind}:${p.key}` : p.key;
 };
 
 // ---- pinned (in ~/.config/lordos/settings.json → dockPinned) ----
@@ -191,9 +193,9 @@ export function useDockEntries(defaults = [], opts = {}) {
   const appFor = (id) => {
     const p = parseDockId(id);
     if (!p) return null;
-    if (p.kind === 'desktop' || p.kind === 'web') return byId.get(`${p.kind}:${p.key}`) || null;
+    if (OUTSIDE.includes(p.kind)) return byId.get(`${p.kind}:${p.key}`) || null;
     const a = byId.get(p.key);
-    if (!a || a.kind === 'linux') return null;
+    if (!a || a.kind === 'linux' || a.kind === 'flatpak') return null;
     return (p.kind === 'lpk') === !!a.package ? a : null;
   };
   const shown = (id) => (id === LAUNCHER ? !!opts.launcher : !!appFor(id));
@@ -249,7 +251,7 @@ export function useDockEntries(defaults = [], opts = {}) {
 export function launchDockItem(id) {
   const p = parseDockId(id);
   if (!p || p.kind === 'shell') return false;
-  if (p.kind === 'desktop' || p.kind === 'web') return launchApp(`${p.kind}:${p.key}`);
+  if (OUTSIDE.includes(p.kind)) return launchApp(`${p.kind}:${p.key}`);
   const a = getApp(p.key);
   if (!a || a.builtin || (p.kind === 'lpk') !== !!a.package) return false;
   return launchApp(p.key);

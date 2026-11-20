@@ -33,6 +33,8 @@ export function openersFor(name, linuxApps) {
   const out = [{ id: '', label: T('terminal.files.openDefault'), run: (path) => openFileWithApps(path, name) }];
   for (const a of linuxApps || []) {
     if (a.kind === 'linux' && mimes.some((m) => appOpens(a.mimeTypes, m))) out.push({ id: a.id, label: a.name, run: (path) => lord.apps.launchWith(a.desktopId, path) });
+    if (a.kind === 'flatpak' && typeof lord.apps.launchFlatpakWith === 'function' && mimes.some((m) => appOpens(a.mimeTypes, m)))
+      out.push({ id: a.id, label: a.name, run: (path) => lord.apps.launchFlatpakWith(a.flatpakId, path) });
   }
   return out;
 }

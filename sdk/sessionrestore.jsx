@@ -198,9 +198,9 @@ function restore(list, active = 0) {
     const p = parseDockId(e.id);
     restoredIds.add(e.id);
     try {
-      // a Linux app (desktop:) or a web app (web:) isn't a LordOS app: it is launched as a Dock click, and its window
-      // takes its saved place, activity and state when it arrives (setLinuxPlacement above)
-      const outside = p.kind === 'desktop' || p.kind === 'web';
+      // a Linux app (desktop:), a web app (web:) or a Flatpak app (flatpak:) isn't a LordOS app: it is launched as a
+      // Dock click, and its window takes its saved place, activity and state when it arrives (setLinuxPlacement above)
+      const outside = p.kind === 'desktop' || p.kind === 'web' || p.kind === 'flatpak';
       const a = outside ? null : getApp(p.key);
       if (a && !a.package && isAppOff(p.key)) {
         // deactivated in Store → Installed (appsoffactions.js): it stays closed, without a notice

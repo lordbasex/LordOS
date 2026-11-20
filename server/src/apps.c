@@ -1180,11 +1180,15 @@ int apps_flatpak_list(const char *lang, const DesktopApp **out) {
 }
 
 
-/* "Open with" for a Flatpak app: launchWith's rules for the path (a real path in the home folder or the user's mounts,
- * a regular file or folder); it is granted with --filesystem=<path> and passed after the id. */
+/* "Open with" for a Flatpak app: launchWith's rules (only an app whose export declares MimeType; a real path in the home
+ * folder or the user's mounts, a regular file or folder); it is granted with --filesystem=<path> and passed after the id. */
 int apps_launch_flatpak_with(const char *id, const char *path) {
     char real[PATH_MAX];
     struct stat st;
+    const DesktopApp *l;
+    int n = apps_flatpak_list(cached_lang[0] ? cached_lang : "en", &l), opens = 0;
+    for (int i = 0; i < n && id; i++) if (!strcmp(l[i].id, id)) opens = l[i].mime[0] != 0;
+    if (!opens) return -1;
     if (!path || !realpath(path, real) || !fsops_allowed(real) || stat(real, &st) || !(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode))) return -1;
     /* never the home folder itself, nor a folder holding a protected one: the grant would reach it whole */
     const char *h = getenv("HOME");

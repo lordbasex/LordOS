@@ -219,6 +219,44 @@ int main(void) {
     CHECK("too small a buffer", apps_system_file("com.example.Zap", sysfile, 10) != 0);
     defaults_set_root(NULL);
 
+    /* "Open with" a Flatpak app (apps_launch_flatpak_with): only an app whose export declares MimeType, as launchWith.
+     * Two installed apps in the user's installation, one with MimeType and one without. Only refusals are checked:
+     * an accepted request would run /usr/bin/flatpak. */
+    {
+        char tree[1600], doc[600];
+        const char *commit = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        const char *fps[][2] = { { "org.example.NoMime", "" }, { "org.example.Opens", "MimeType=text/plain;\n" } };
+        for (int i = 0; i < 2; i++) {
+            snprintf(tree, sizeof tree, "d='%s/.local/share/flatpak'; mkdir -p \"$d/app/%s/x86_64/stable/%s\" \"$d/exports/share/applications\" && "
+                     "ln -sfn x86_64/stable \"$d/app/%s/current\" && ln -sfn %s \"$d/app/%s/x86_64/stable/active\" && "
+                     "printf '[Application]\\nname=%s\\n' > \"$d/app/%s/x86_64/stable/%s/metadata\" && "
+                     "printf '[Desktop Entry]\\nType=Application\\nName=%s\\nExec=nope\\n%s' > \"$d/exports/share/applications/%s.desktop\"",
+                     home, fps[i][0], commit, fps[i][0], commit, fps[i][0], fps[i][0], fps[i][0], commit, fps[i][0], fps[i][1], fps[i][0]);
+            if (system(tree)) {}
+        }
+        const DesktopApp *fl;
+        int nf = apps_flatpak_list("en", &fl), no = -1, yes = -1;
+        for (int i = 0; i < nf; i++) {
+            if (!strcmp(fl[i].id, "org.example.NoMime")) no = i;
+            if (!strcmp(fl[i].id, "org.example.Opens")) yes = i;
+        }
+#if defined(__x86_64__)
+        CHECK("both Flatpak apps are listed", no >= 0 && yes >= 0);
+        CHECK("their MIME types are read", no >= 0 && yes >= 0 && !fl[no].mime[0] && strstr(fl[yes].mime, "text/plain") != NULL);
+#endif
+        snprintf(doc, sizeof doc, "%s/note.txt", home);
+        f = fopen(doc, "w");
+        if (f) { fputs("hi\n", f); fclose(f); }
+        CHECK("Open with a Flatpak app that declares no MimeType is refused", apps_launch_flatpak_with("org.example.NoMime", doc) != 0);
+        CHECK("Open with an app that isn't installed is refused", apps_launch_flatpak_with("org.example.Gone", doc) != 0);
+        CHECK("Open with the home folder itself is refused", apps_launch_flatpak_with("org.example.Opens", home) != 0);
+        snprintf(doc, sizeof doc, "%s/.config/lordos", home);
+        mkdir(doc, 0700);
+        CHECK("Open with a protected folder is refused", apps_launch_flatpak_with("org.example.Opens", doc) != 0);
+        snprintf(doc, sizeof doc, "%s/.config", home);
+        CHECK("Open with a folder holding a protected one is refused", apps_launch_flatpak_with("org.example.Opens", doc) != 0);
+    }
+
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", home);
     if (system(cmd)) {}
