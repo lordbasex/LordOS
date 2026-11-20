@@ -337,18 +337,22 @@ export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math
 // ---- the guest agent (6.17) ----
 
 // lord-vm's capability bits (vmproto.h VAC_*) → the popover's list: what works now, and what doesn't and why
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256 };
+// a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
+// (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
+export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
 export function agentLines(agent, cfg) {
   const caps = agent?.caps || 0, on = agent?.state === 'connected';
   const clip = cfg?.clipboard || 'off';
+  const win = guestWindows(agent);
   return [
     ['shell', 'works'],                                       // the serial console needs no agent
     ['logs', on && caps & AGENT_CAPS.journal ? 'works' : 'needsAgent'],
     ['shutdown', on && caps & AGENT_CAPS.shutdown ? 'works' : 'acpi'],
     ['time', on && caps & AGENT_CAPS.time ? 'works' : 'needsAgent'],
     ['awake', on && caps & AGENT_CAPS.awake ? 'works' : 'needsAgent'],
-    ['clipboard', clip === 'off' ? 'off' : caps & AGENT_CAPS.clipboard ? 'works' : 'needsHelper'],
-    ['resolution', 'works'],
+    ['clipboard', clip === 'off' ? 'off' : caps & AGENT_CAPS.clipboard ? 'works' : win ? 'needsTools' : 'needsHelper'],
+    ['resolution', !win || caps & AGENT_CAPS.display ? 'works' : 'needsTools'],
     ['folders', cfg?.shares?.length ? 'works' : 'none'], ['apps', 'later'],
   ];
 }

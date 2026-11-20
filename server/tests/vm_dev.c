@@ -12,8 +12,13 @@
  *   move X Y            pointer, picture coordinates     click X Y [B]     move, press and release button B (0)
  *   wheel N             N steps (+ up)                   resize W H        ask the guest for a size
  *   rate HZ             copy rate                        release           let go of everything
- *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON
+ *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON | qmpf FILE (a longer command, from a file)
  *   noack 0|1           stop acknowledging frames (tests the 250 ms fallback)
+ *   agent install       the guest agent's Install (VAG_INSTALL: lordos-guest, or the LordOS guest tools on Windows)
+ *   clip-text TEXT | clip-html HTML | clip-png PATH    the host's clipboard for the guest (VM_CLIP); the guest's comes
+ *                       back as "clip" events (a picture is saved as clip-in.png in the current folder)
+ *   apps 0|1 | windows | winact ID N [X Y W H] | launch TOKEN    apps mode (lord-vm --dev-qmp: lord-vm logs what the
+ *                       guest sends: the window list, icons, the program list)
  *   file PATH           copy a file into the guest through its agent (VM_FILE, as a drop on the window does)
  *   wait-frames N [S]   wait until N more frames arrived (at most S seconds, default 30)
  *   sound play [VOL]    the guest's sound through lord-server's own code (media/maudio.c, a PipeWire stream) at VOL
@@ -246,6 +251,7 @@ static void picture_for(int w, int h) {
     out("{\"ev\":\"picture\",\"w\":%d,\"h\":%d}", w, h);
 }
 
+static void clip_got(const VmMsg *m, int fd);
 static void from_vm(void) {
     for (int k = 0; k < VD_POLL_MAX; k++) {
         VmMsg m;
@@ -265,6 +271,7 @@ static void from_vm(void) {
             if ((m.a == VS_RUNNING || m.a == VS_PAUSED) && !display_asked && machine_id[0]) { display_asked = 1; ask(VM_DISPLAY, 0, NULL); }
         } else if (m.type == VM_FILE_PROGRESS) out("{\"ev\":\"file\",\"seq\":%u,\"pct\":%d,\"name\":\"%s\"}", m.seq, m.a, m.text);
         else if (m.type == VM_AGENT_STATE) out("{\"ev\":\"agent\",\"state\":%d,\"caps\":%d}", m.a, m.b);
+        else if (m.type == VM_CLIP_DATA) clip_got(&m, fd);
         else if (m.type == VM_REPLY) out("{\"ev\":\"reply\",\"seq\":%u,\"code\":%d,\"text\":\"%s\"}", m.seq, m.a, m.text);
         else if (m.type == VM_DISPLAY_FD) {
             if (fd < 0) { out("{\"ev\":\"error\",\"what\":\"VM_DISPLAY_FD without a descriptor\"}"); continue; }
@@ -449,6 +456,62 @@ static void save_png(const char *path) {
     out("{\"ok\":%s,\"cmd\":\"png\",\"w\":%d,\"h\":%d,\"lit_pct\":%.2f}", ok ? "true" : "false", pw, ph, 100.0 * lit / ((double)pw * ph));
 }
 
+/* the host's clipboard for the guest, as lord-server sends it (VM_CLIP: a sealed memfd) */
+static void clip_send_host(const void *p, size_t n, int form) {
+    int fd = (int)syscall(SYS_memfd_create, "lordos-vm-clipboard", 3u);
+    VmMsg m = vm_msg(VM_CLIP, ++seq, (int)n, form, 0, 0, NULL);
+    int ok = fd >= 0 && write(fd, p, n) == (ssize_t)n && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) && !vm_send(vm, &m, fd);
+    if (fd >= 0) close(fd);
+    out("{\"ok\":%s,\"cmd\":\"clip\",\"seq\":%u,\"bytes\":%zu}", ok ? "true" : "false", seq, n);
+}
+static void clip_part(uint8_t **b, size_t *n, uint8_t form, const void *d, size_t l) {
+    *b = realloc(*b, *n + 5 + l);
+    (*b)[*n] = form;
+    for (int i = 0; i < 4; i++) (*b)[*n + 1 + i] = (uint8_t)(l >> (8 * i));
+    memcpy(*b + *n + 5, d, l);
+    *n += 5 + l;
+}
+static void clip_png_host(const char *path) {
+    FILE *f = fopen(path, "rb");
+    static uint8_t png[8 << 20];
+    size_t pn = f ? fread(png, 1, sizeof png, f) : 0;
+    if (f) fclose(f);
+    if (!pn) { out("{\"ok\":false,\"cmd\":\"clip-png\"}"); return; }
+    uint8_t *b = NULL;
+    size_t n = 0;
+    clip_part(&b, &n, 3, png, pn);
+    clip_send_host(b, n, VCF_CLIPX);
+    free(b);
+}
+static void clip_html_host(const char *html) {
+    uint8_t *b = NULL;
+    size_t n = 0;
+    clip_part(&b, &n, 1, "rich text", 9);
+    clip_part(&b, &n, 2, html, strlen(html));
+    clip_send_host(b, n, VCF_CLIPX);
+    free(b);
+}
+/* the guest's clipboard (VM_CLIP_DATA): printed (text) or saved as clip-in.png next to the picture files */
+static void clip_got(const VmMsg *m, int fd) {
+    static uint8_t buf[VM_CLIP_MAX];
+    ssize_t n = fd >= 0 ? pread(fd, buf, (size_t)m->a, 0) : -1;
+    if (n != m->a) { out("{\"ev\":\"clip\",\"ok\":false}"); return; }
+    if (m->b == VCF_TEXT) { out("{\"ev\":\"clip\",\"text\":\"%.*s\"}", (int)(n < 300 ? n : 300), (const char *)buf); return; }
+    size_t o = 0;
+    while (o + 5 <= (size_t)n) {
+        uint8_t form = buf[o];
+        size_t l = (size_t)buf[o + 1] | (size_t)buf[o + 2] << 8 | (size_t)buf[o + 3] << 16 | (size_t)buf[o + 4] << 24;
+        if (l > (size_t)n - o - 5) break;
+        const uint8_t *d = buf + o + 5;
+        if (form == 3) {
+            FILE *f = fopen("clip-in.png", "wb");
+            if (f) { fwrite(d, 1, l, f); fclose(f); }
+            out("{\"ev\":\"clip\",\"png\":%zu,\"saved\":\"clip-in.png\"}", l);
+        } else out("{\"ev\":\"clip\",\"%s\":\"%.*s\"}", form == 1 ? "text" : "html", (int)(l < 300 ? l : 300), (const char *)d);
+        o += 5 + l;
+    }
+}
+
 static int handle(char *line) {
     char a1[1024];
     int x, y, b;
@@ -471,7 +534,21 @@ static int handle(char *line) {
         vdsend(VD_MOTION, x, y); vdsend(VD_BUTTON, b, 1); vdsend(VD_BUTTON, b, 0);
         out("{\"ok\":true,\"cmd\":\"click\"}");
     } else if (sscanf(line, "wheel %d", &x) == 1) { VdMsg m = vd_msg(VD_WHEEL, x, 0, 0, 0, 0, 0); if (vd >= 0) vd_send(vd, &m, -1); out("{\"ok\":true,\"cmd\":\"wheel\"}"); }
-    else if (sscanf(line, "resize %d %d", &x, &y) == 2) { vdsend(VD_RESIZE, x, y); out("{\"ok\":true,\"cmd\":\"resize\"}"); }
+    else if (sscanf(line, "resize %d %d", &x, &y) == 2) {
+        /* as lord-server: to lord-vmdisplay (QEMU's ui_info) and to lord-vm (a guest helper that sets its own size) */
+        vdsend(VD_RESIZE, x, y);
+        VmMsg m = vm_msg(VM_DISPLAY_SIZE, ++seq, x, y, 0, 0, NULL);
+        if (vm >= 0) vm_send(vm, &m, -1);
+        out("{\"ok\":true,\"cmd\":\"resize\"}");
+    }
+    else if (!strcmp(line, "agent install")) ask(VM_AGENT, VAG_INSTALL, NULL);
+    else if (sscanf(line, "apps %d", &x) == 1) { snprintf(a1, sizeof a1, "lag-apps %d", x ? 1 : 0); ask(VM_QMP, 0, a1); }
+    else if (!strcmp(line, "windows")) ask(VM_QMP, 0, "lag-apps 1");
+    else if (!strncmp(line, "winact ", 7)) { snprintf(a1, sizeof a1, "lag-winact %.150s", line + 7); ask(VM_QMP, 0, a1); }
+    else if (!strncmp(line, "launch ", 7)) { snprintf(a1, sizeof a1, "lag-launch %.180s", line + 7); ask(VM_QMP, 0, a1); }
+    else if (!strncmp(line, "clip-text ", 10)) clip_send_host(line + 10, strlen(line + 10), VCF_TEXT);
+    else if (!strncmp(line, "clip-png ", 9)) clip_png_host(line + 9);
+    else if (!strncmp(line, "clip-html ", 10)) clip_html_host(line + 10);
     else if (sscanf(line, "rate %d", &x) == 1) { vdsend(VD_RATE, x, 0); out("{\"ok\":true,\"cmd\":\"rate\"}"); }
     else if (sscanf(line, "noack %d", &x) == 1) { noack = x; out("{\"ok\":true,\"cmd\":\"noack\"}"); }
     else if (sscanf(line, "sound play %d", &x) >= 0 && !strncmp(line, "sound play", 10)) {
@@ -513,6 +590,12 @@ static int handle(char *line) {
         VmMsg m = vm_msg(VM_FILE, ++seq, 0, 0, 0, 0, slash ? slash + 1 : line + 5);
         if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"file\"}");
         else out("{\"ok\":true,\"cmd\":\"file\",\"seq\":%u}", seq);
+        if (fd >= 0) close(fd);
+    } else if (!strncmp(line, "qmpf ", 5)) {
+        /* a QMP or guest agent command longer than a message's text, from a file (lord-vm --dev-qmp only) */
+        int fd = open(line + 5, O_RDONLY | O_CLOEXEC);
+        VmMsg m = vm_msg(VM_QMP, ++seq, 0, 0, 0, 0, "file");
+        if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"qmpf\"}");
         if (fd >= 0) close(fd);
     } else if (!strncmp(line, "qmp ", 4)) { snprintf(a1, sizeof a1, "%s", line + 4); ask(VM_QMP, 0, a1); }
     else if (sscanf(line, "wait-frames %d %d", &x, &y) >= 1) {

@@ -2066,7 +2066,11 @@ static JSValue f_release(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 static JSValue f_resize(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
     int w = s ? ival(c, argv[1]) : 0, h = s ? ival(c, argv[2]) : 0;
-    if (s && w >= 320 && h >= 200 && w <= (int)VD_MAX_DIM && h <= (int)VD_MAX_DIM) vdsend(s, VD_RESIZE, w, h);
+    if (s && w >= 320 && h >= 200 && w <= (int)VD_MAX_DIM && h <= (int)VD_MAX_DIM) {
+        vdsend(s, VD_RESIZE, w, h);
+        /* and to lord-vm: a guest whose helper sets its own display's size (Windows) gets it from there */
+        if (s->vm >= 0) { VmMsg m = vm_msg(VM_DISPLAY_SIZE, ++s->seq, w, h, 0, 0, NULL); vm_send(s->vm, &m, -1); }
+    }
     return JS_UNDEFINED;
 }
 static JSValue f_rate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {

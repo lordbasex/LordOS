@@ -8,7 +8,7 @@ import {
   inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand, runs3d, soundOf, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp } from './ui.jsx';
 import { openLogs, openSnapshots } from './library.jsx';
@@ -85,12 +85,12 @@ function AgentPop({ ctl, onClose }) {
         </View>
         {on ? (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-            {/^windows/i.test(g.system || '') ? null
-              : <Pill label={g.install === 1 ? tr('machines.agent.installing') : tr('machines.agent.installHelper')} disabled={g.install === 1} onClick={() => lord.vm.agent(ctl.sid, 'install')} />}
+            <Pill label={g.install === 1 ? tr('machines.agent.installing') : guestWindows(g) ? tr('machines.agent.installTools') : tr('machines.agent.installHelper')}
+              disabled={g.install === 1} onClick={() => lord.vm.agent(ctl.sid, 'install')} />
             <Pill label={tr('machines.agent.timesync')} onClick={() => lord.vm.agent(ctl.sid, 'timesync')} />
           </View>
         ) : null}
-        {g?.install === 2 ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.installed')}</Text> : null}
+        {g?.install === 2 ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{guestWindows(g) ? tr('machines.agent.toolsInstalled') : tr('machines.agent.installed')}</Text> : null}
         {g?.install === 3 ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{g.message}</Text> : null}
       </View>
     </View>
@@ -117,8 +117,9 @@ function Tools({ ctl, floating, compact }) {
   const clipItems = [
     ...['both', 'to-guest', 'from-guest', 'off'].map((x) => ({ label: tr(`machines.cfg.clip.${x}`), checked: clip === x, disabled: true })),
     '-',
-    g?.state === 'connected' && clipOn && !(g.caps & AGENT_CAPS.clipboard) && !/^windows/i.test(g.system || '')
-      ? { label: g.install === 1 ? tr('machines.agent.installing') : tr('machines.agent.installHelper'), disabled: g.install === 1, onClick: () => lord.vm.agent(ctl.sid, 'install') } : null,
+    g?.state === 'connected' && clipOn && !(g.caps & AGENT_CAPS.clipboard)
+      ? { label: g.install === 1 ? tr('machines.agent.installing') : guestWindows(g) ? tr('machines.agent.installTools') : tr('machines.agent.installHelper'),
+          disabled: g.install === 1, onClick: () => lord.vm.agent(ctl.sid, 'install') } : null,
     { label: tr('machines.tb.clipChange'), onClick: () => ctl.configure('sharing') },
   ];
   // shared folders (6.7): each one opens in Files; the mount command for a Linux guest is a click away

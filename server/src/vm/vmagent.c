@@ -455,3 +455,127 @@ int ag_drop_staging_ok(const char *p, int windows) {
     for (size_t i = l - 32; i < l; i++) if (!((p[i] >= '0' && p[i] <= '9') || (p[i] >= 'a' && p[i] <= 'f'))) return 0;
     return 1;
 }
+
+/* ---- the Windows guest tools: the display's size, apps mode (vmagent.h) ---- */
+
+static uint16_t le16(const uint8_t *p) { return (uint16_t)(p[0] | p[1] << 8); }
+static int32_t lei32(const uint8_t *p) { return (int32_t)le32(p); }
+
+int ag_display_parse(const uint8_t *p, size_t n, uint32_t *w, uint32_t *h) {
+    if (!p || n != 8) return -1;
+    uint32_t W = le32(p), H = le32(p + 4);
+    if (W < AG_DISPLAY_MIN_W || H < AG_DISPLAY_MIN_H || W > AG_DISPLAY_MAX || H > AG_DISPLAY_MAX) return -1;
+    if (w) *w = W;
+    if (h) *h = H;
+    return 0;
+}
+
+void ag_display_write(uint8_t o[8], uint32_t w, uint32_t h) {
+    for (int i = 0; i < 4; i++) { o[i] = (uint8_t)(w >> (8 * i)); o[4 + i] = (uint8_t)(h >> (8 * i)); }
+}
+
+int lag_apps_parse(const uint8_t *p, size_t n, int *on) {
+    if (!p || n != 1 || p[0] > 1) return -1;
+    if (on) *on = p[0];
+    return 0;
+}
+
+/* a u16-length string at p[*o]: within n, at most max bytes (min 0 or 1), valid UTF-8 when not empty */
+static int lstr(const uint8_t *p, size_t n, size_t *o, size_t min, size_t max, const uint8_t **s, uint16_t *sn) {
+    if (n - *o < 2) return -1;
+    uint16_t l = le16(p + *o);
+    *o += 2;
+    if (l < min || l > max || l > n - *o) return -1;
+    if (l && !ag_utf8_ok(p + *o, l)) return -1;
+    *s = p + *o;
+    *sn = l;
+    *o += l;
+    return 0;
+}
+
+static int coord_ok(int32_t v) { return v >= -LAG_DIM_MAX && v <= LAG_DIM_MAX; }
+static int size_ok(int32_t v) { return v >= 1 && v <= LAG_DIM_MAX; }
+
+int lag_windows_parse(const uint8_t *p, size_t n, uint32_t *serial, LagWin *out, int max) {
+    if (!p || n < 6) return -1;
+    uint16_t count = le16(p + 4);
+    if (count > LAG_WIN_MAX) return -1;
+    size_t o = 6;
+    int got = 0;
+    for (uint16_t i = 0; i < count; i++) {
+        LagWin w;
+        memset(&w, 0, sizeof w);
+        if (n - o < 24) return -1;
+        w.id = le32(p + o); w.x = lei32(p + o + 4); w.y = lei32(p + o + 8); w.w = lei32(p + o + 12); w.h = lei32(p + o + 16);
+        w.flags = le32(p + o + 20);
+        o += 24;
+        if (!w.id || !coord_ok(w.x) || !coord_ok(w.y) || !size_ok(w.w) || !size_ok(w.h) || (w.flags & ~(uint32_t)LAGW_ALL)) return -1;
+        if (w.flags & LAGW_OWNED) {
+            if (n - o < 4) return -1;
+            w.owner = le32(p + o);
+            o += 4;
+            if (!w.owner || w.owner == w.id) return -1;
+        }
+        if (n - o < 4) return -1;
+        w.pid = le32(p + o);
+        o += 4;
+        if (lstr(p, n, &o, 0, LAG_TITLE_MAX, &w.title, &w.title_n) || lstr(p, n, &o, 0, LAG_APP_MAX, &w.app, &w.app_n)) return -1;
+        for (uint16_t k = 0; k < w.app_n; k++) if (w.app[k] == '/' || w.app[k] == '\\' || w.app[k] == ':') return -1;
+        for (int k = 0; out && k < got && k < max; k++) if (out[k].id == w.id) return -1;       /* each window once */
+        if (got < max && out) out[got] = w;
+        got++;
+    }
+    if (o != n) return -1;
+    if (serial) *serial = le32(p);
+    return got < max ? got : max;
+}
+
+int lag_winicon_parse(const uint8_t *p, size_t n, uint32_t *id, uint16_t *w, uint16_t *h, const uint8_t **rgba) {
+    if (!p || n < 8) return -1;
+    uint32_t i = le32(p);
+    uint16_t W = le16(p + 4), H = le16(p + 6);
+    if (!i || !W || !H || W > LAG_ICON_MAX || H > LAG_ICON_MAX || n != 8 + (size_t)W * H * 4) return -1;
+    if (id) *id = i;
+    if (w) *w = W;
+    if (h) *h = H;
+    if (rgba) *rgba = p + 8;
+    return 0;
+}
+
+int lag_winact_parse(const uint8_t *p, size_t n, LagAct *a) {
+    if (!p || !a || n < 5) return -1;
+    memset(a, 0, sizeof *a);
+    a->id = le32(p);
+    a->action = p[4];
+    if (!a->id || a->action < LAGA_FOCUS || a->action > LAGA_MOVE) return -1;
+    if (a->action != LAGA_MOVE) return n == 5 ? 0 : -1;
+    if (n != 21) return -1;
+    a->x = lei32(p + 5); a->y = lei32(p + 9); a->w = lei32(p + 13); a->h = lei32(p + 17);
+    return coord_ok(a->x) && coord_ok(a->y) && size_ok(a->w) && size_ok(a->h) ? 0 : -1;
+}
+
+int lag_applist_parse(const uint8_t *p, size_t n, LagApp *out, int max) {
+    if (!p || n < 2) return -1;
+    uint16_t count = le16(p);
+    if (count > LAG_APPS_MAX) return -1;
+    size_t o = 2;
+    int got = 0;
+    for (uint16_t i = 0; i < count; i++) {
+        LagApp a;
+        if (lstr(p, n, &o, 1, LAG_NAME_MAX, &a.name, &a.name_n) || lstr(p, n, &o, 1, LAG_TOKEN_MAX, &a.token, &a.token_n)) return -1;
+        if (got < max && out) out[got] = a;
+        got++;
+    }
+    if (o != n) return -1;
+    return got < max ? got : max;
+}
+
+int lag_launch_parse(const uint8_t *p, size_t n, const uint8_t **tok, uint16_t *tok_n) {
+    size_t o = 0;
+    const uint8_t *t;
+    uint16_t tn;
+    if (!p || lstr(p, n, &o, 1, LAG_TOKEN_MAX, &t, &tn) || o != n) return -1;
+    if (tok) *tok = t;
+    if (tok_n) *tok_n = tn;
+    return 0;
+}

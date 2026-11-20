@@ -1687,7 +1687,7 @@ TAG /mnt/TAG`; mounting it by itself through the agent is still to do.
 
 ### 6.8 Clipboard and drag
 
-Clipboard through `org.qemu.Display1.Clipboard` (text, images), direction chosen per VM, **Off for Testing**. Protected windows (`wm.setProtected`) never leak. File drag: into the guest copies through the agent; out copies from the guest. Linux: our `lordos-guest`. virtio-win guests: SPICE agent, `spice-vdagent` with the dbus Clipboard path needs confirming: QEMU's clipboard needs `qemu-vdagent` chardev (**To test**).
+Clipboard through the agent's own channel, `org.lordos.agent` (text, rich text, pictures), direction chosen per VM, **Off for Testing**. Protected windows (`wm.setProtected`) never leak. File drag: into the guest copies through the agent; out copies from the guest. Linux: our `lordos-guest`. virtio-win guests: our `lordos-guest-win` (7.1.2).
 
 If the D-Bus clipboard turns out unworkable on a guest, the clipboard moves to the agent's own channel, `org.lordos.agent`: text, images and files, with the direction chosen for that machine. It's a private data channel inside the machine, so it needs no network, no port and no VNC. WebRTC's data channel solves reaching another computer, and 6.23 uses it there; inside one computer a virtio-serial port does the same job with no encryption layer to carry, since nothing leaves the host.
 
@@ -2006,9 +2006,9 @@ From another computer, a running machine is offered by LordOS's own remote deskt
 | Need | Linux | virtio-win |
 |---|---|---|
 | Time, shutdown, IP, freeze | `qemu-guest-agent` | qemu-ga from virtio-win |
-| Resolution, clipboard | `spice-vdagent` or `lordos-guest` | SPICE agent |
+| Resolution, clipboard | QEMU's display (resolution); `lordos-guest` (clipboard) | `lordos-guest-win`, the LordOS guest tools (7.1.2) |
 | Folders | Kernel | virtiofs driver + WinFsp |
-| Apps mode | `lordos-guest` | our agent, later |
+| Apps mode | `lordos-guest` | `lordos-guest-win`: the guest side is built, the host side is a later stage (7.2) |
 | Install | From guest's repo | Mounted ISO, one run, silent |
 
 Tool updates: Linux through guest's own updates, plus `lordos-guest` in our repository; virtio-win at the pinned version, offered by the app, with a snapshot first.
@@ -2022,7 +2022,7 @@ Copy and paste, drag, resolution and shell are **agents**: ordinary programs in 
 | Linux disk, network, display, 3D | In the guest's kernel and Mesa, nothing to install | No reason to | None |
 | Linux clipboard, resolution, files | `spice-vdagent`, then `lordos-guest` | Yes: `lordos-guest` | Ours, ordinary packaging |
 | virtio-win disk, network, memory, 2D display, folders | The public virtio-win set | No: they are mature and free | Would add risk and nothing else |
-| virtio-win clipboard, resolution | SPICE agent | Yes: `lordos-guest` for virtio-win, user mode | Code signing certificate, to avoid warnings |
+| virtio-win clipboard, resolution | `lordos-guest-win` (7.1.2), user mode, built | Done | A code signing certificate would only spare SmartScreen's warning, which a program qemu-guest-agent installs never meets |
 | virtio-win file copy, shell, logs, Apps mode | Our agent, phase by phase | Yes | Same |
 | virtio-win 3D | None | Only by following or joining the open effort below | Very high |
 
@@ -2030,11 +2030,76 @@ Copy and paste, drag, resolution and shell are **agents**: ordinary programs in 
 
 **Signing our own kernel driver.** A driver loaded by current virtio-win guests needs the system maker's signature: an organization account in its hardware portal, an EV certificate for that account, then attestation signing or, to reach its retail update channel, certification with the hardware lab kit. That is a yearly cost and a legal entity behind it, for every architecture. So own kernel drivers are out of scope unless 3D makes them worth it. Our work goes to the agent, which needs none of this.
 
+### 7.1.2 LordOS guest tools for Windows (`lordos-guest-win`, built 2026-11-20)
+
+One user-mode program, `tools/guest-win/lordos-guest-win.c`: Win32 only, cross-built with mingw-w64 on the build machine
+(`server/mk/vm.mk`; 137 KB, it imports only system DLLs: kernel32, user32, gdi32, shell32, ole32, WindowsCodecs,
+dwmapi, wtsapi32, msvcrt). It is the Windows twin of `lordos-guest`: it holds `org.lordos.agent`
+(`\\.\Global\org.lordos.agent`, vioserial) and speaks `vmagent.h`'s frames. lord-vm checks everything it sends as it
+checks the Linux helper (it is the guest: untrusted); the program checks every frame the host sends with the same
+parsers (`vmagent.c`) and never runs anything the host names.
+
+- **Clipboard** (6.8): text (CF_UNICODETEXT ↔ UTF-8, CRLF ↔ LF), rich text ("HTML Format" ↔ HTML, sanitized by lord-vm
+  as from Linux), pictures (the "PNG" format or CF_DIB/CF_BITMAP ↔ PNG, encoded and decoded with Windows' own WIC
+  codecs). A host clipboard goes on with every form it has at once (text, HTML, PNG and CF_DIB). Changes are seen at
+  once (`AddClipboardFormatListener`), not polled. The machine's direction (machine.json) is enforced in lord-vm.
+- **Resolution follows the window.** viogpudo (the VirtIO GPU display-only driver) builds its mode list once at boot
+  (640×480, 1024×768, the EDID's standard modes) plus one *custom* mode that follows QEMU's display size: QEMU's
+  `ui_info` (lord-vmdisplay's `SetUIInfo`) raises VIRTIO_GPU_EVENT_DISPLAY, the driver rewrites that mode and tells
+  Windows a monitor changed, but nothing in Windows switches to it (virtio-win's own `viogpuap` service does; it isn't
+  part of 0.1.271's guest tools). lord-server now also sends the window's size to lord-vm (`VM_DISPLAY_SIZE`), which
+  passes it to a helper that said "display" (`AGK_DISPLAY`; again after each hello). The helper switches the primary
+  display to it: a listed mode with `ChangeDisplaySettingsExW`, else, as virtio-win's own `viogpuap` does, through the
+  display configuration (`QueryDisplayConfig`, the source mode's size, `SetDisplayConfig` with SDC_ALLOW_CHANGES, saved
+  to Windows' database), which makes Windows ask the driver again and take its custom mode. It tries every 250 ms for
+  4 s (the driver's change may arrive after the helper's request); after 1 s it also asks the driver itself
+  (`D3DKMTEscape` VIOGPU_SET_CUSTOM_RESOLUTION, drivers from 2026 on; 0.1.271 answers STATUS_INVALID_PARAMETER), and at
+  the end it falls back to the largest listed mode that fits. It answers with the size it set. The framebuffer is sized at
+  boot (at least 16 MB, so about 4 million pixels): a size bigger than that waits for the next start. No driver is
+  patched or re-signed (Secure Boot needs Microsoft-signed drivers).
+- **Apps mode, the guest side** (7.2, `LAG_*` in `vmagent.h`): the session's top-level windows (visible, not cloaked,
+  not tool windows; never the taskbar or the desktop) in z-order with id, rectangle, flags, owner, pid, title and
+  program name, sent on change (`SetWinEventHook`, at most 30 a second) and on request; each window's icon once (32×32
+  RGBA); focus, close, minimize, restore and move of a window it listed; the Start menu's own program list
+  (`shell:AppsFolder`: desktop and Store apps), and starting one only by a token the helper itself listed. While apps
+  mode is on the taskbar is set to hide itself, and restored after.
+- **Sessions.** One copy per session (a `Local\` mutex). The port opens once per machine: the copy in the session at
+  the console holds it and lets it go when that session leaves the console (switch user, Remote Desktop) or logs off;
+  the next one takes it within 2 s.
+- **Installed by lord-vm** (Configure's agent popover: "Install LordOS Tools"; and by itself when an unattended
+  install finishes): through qemu-guest-agent, as SYSTEM, the program is written into a private SYSTEM-only folder in
+  `%SystemRoot%\Temp` (the drop's), its SHA-256 checked against what lord-vm sent, copied into `%ProgramFiles%\LordOS`
+  (made or checked: not a reparse point, protected ACL: SYSTEM and Administrators full control, Users read and run),
+  started at every sign-in by `HKLM\...\Run`, and started now in the signed-in person's session by a one-shot scheduled
+  task (their Interactive logon; the task goes at once). vioserial lets only SYSTEM and Administrators open a port: the
+  installer gives Interactive users (IU) read and write on `org.lordos.agent`'s port alone (found by what
+  `\\.\Global\org.lordos.agent` points to; the device's own security property, kept across restarts) and restarts
+  that port. After the install nothing runs as SYSTEM: no service.
+- **Log**: `%LOCALAPPDATA%\LordOS\lordos-guest-win.log`, the person's own, started again past 256 KB.
+
+Measured on 2026-11-20 on a Windows 11 clone of the unattended install (`win-tools.lordvm` from `win-base.lordvm`;
+virtio-win 0.1.271, viogpudo 100.100.104.27100), driven by `lordvm-dev` (`agent install`, `resize`, `png`, `clip-*`,
+`apps`, `winact`, `launch`), not yet inside lord-server's window:
+
+- Install through qemu-guest-agent: 12 to 36 s; the program answers in the same session at once and after a restart
+  (`Run`). Right after the install the port's device has just been restarted and vioserial refuses to keep a read
+  waiting (ERROR_OPERATION_ABORTED) until the machine starts again; the helper then reads by asking every 30 ms.
+- Resolution, each exact in the picture lord-vmdisplay received, 0.25 to 0.5 s after the request: 1784×830,
+  1920×1080, 1366×768, 1001×777, 2000×1100, 1280×800 (before the display-configuration step, sizes Windows hadn't
+  listed fell back to 1280×720 and 800×600).
+- Clipboard both ways: UTF-8 text with ñ, ú, € and an emoji (code points checked in the guest), CRLF to LF; HTML (a
+  `<script>` and an `onclick` taken out by lord-vm); a 97×61 PNG into the guest (CF_DIB pixel checked) and a 123×45
+  picture out of it (PNG pixels checked).
+- Apps mode: 74 programs listed (desktop and Store apps), Notepad and Calculator started by token, the list with
+  titles, programs and focus, 32×32 icons, move to an exact rectangle, focus, minimize, restore and close; an unknown
+  token and an unlisted window ignored; the taskbar hidden while on and back after.
+- Not tested: switching between two people's sessions, Remote Desktop, a machine with a multi-monitor guest.
+
 ### 7.2 Apps mode (seamless)
 
 **Linux guests:** apps speak Wayland to a small compositor proxy in the guest (`lordos-guest`), which forwards surfaces over vsock to the host, as `waypipe` does. On the host each surface is a native LordOS Wayland client, so it's a real window with its own Dock entry. Zero-copy with virtio-gpu cross-domain is the target; a first version copies. Guest X11 apps need the guest's Xwayland. Host keeps no X11.
 
-**virtio-win guests:** no free way exists. Our own agent would enumerate windows and stream regions. Phase 5 at the earliest, and only if real demand exists. Until then Apps mode is off there, and the setting says so.
+**virtio-win guests:** `lordos-guest-win` (7.1.2) sends the guest's window list, icons and program list and takes window actions and launches (`LAG_*` in `vmagent.h`); the host crops each window out of the machine's picture. The host side (a LordOS window per guest window) is being built separately; until it lands Apps mode stays off there.
 
 Each forwarded window carries a thin marker in the frame with the machine's name, so that a person can always tell a guest's window from a host's, and it can't request protected-window status or the host's secure input.
 

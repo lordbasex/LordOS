@@ -1049,8 +1049,122 @@ static void test_resolution(void) {
     CHECK(vm_resolution_parse("", &w, &h));
 }
 
+/* the Windows guest tools (vmagent.h): AGK_DISPLAY and apps mode, every frame parsed to its last byte */
+typedef struct { uint8_t b[4096]; size_t n; } TB;
+static void tb8(TB *t, uint8_t v) { t->b[t->n++] = v; }
+static void tb16(TB *t, uint16_t v) { tb8(t, (uint8_t)v); tb8(t, (uint8_t)(v >> 8)); }
+static void tb32(TB *t, uint32_t v) { tb16(t, (uint16_t)v); tb16(t, (uint16_t)(v >> 16)); }
+static void tbs(TB *t, const char *s) { tb16(t, (uint16_t)strlen(s)); memcpy(t->b + t->n, s, strlen(s)); t->n += strlen(s); }
+static void tbwin(TB *t, uint32_t id, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t flags, uint32_t owner, const char *title, const char *app) {
+    tb32(t, id); tb32(t, (uint32_t)x); tb32(t, (uint32_t)y); tb32(t, (uint32_t)w); tb32(t, (uint32_t)h); tb32(t, flags);
+    if (flags & LAGW_OWNED) tb32(t, owner);
+    tb32(t, 4242); tbs(t, title); tbs(t, app);
+}
+static void test_lag(void) {
+    uint8_t d[8];
+    uint32_t w = 0, h = 0;
+    ag_display_write(d, 1784, 830);
+    CHECK(!ag_display_parse(d, 8, &w, &h) && w == 1784 && h == 830);
+    CHECK(ag_display_parse(d, 7, &w, &h) == -1 && ag_display_parse(NULL, 8, &w, &h) == -1);
+    ag_display_write(d, 319, 600); CHECK(ag_display_parse(d, 8, NULL, NULL) == -1);
+    ag_display_write(d, 800, 199); CHECK(ag_display_parse(d, 8, NULL, NULL) == -1);
+    ag_display_write(d, 8193, 600); CHECK(ag_display_parse(d, 8, NULL, NULL) == -1);
+    ag_display_write(d, 0xffffffffu, 600); CHECK(ag_display_parse(d, 8, NULL, NULL) == -1);
+    ag_display_write(d, 8192, 8192); CHECK(!ag_display_parse(d, 8, NULL, NULL));
+
+    int on = -1;
+    uint8_t one = 1, two = 2;
+    CHECK(!lag_apps_parse(&one, 1, &on) && on == 1 && lag_apps_parse(&two, 1, &on) == -1 && lag_apps_parse(&one, 0, &on) == -1);
+
+    /* LAG_WINDOWS */
+    TB t = { .n = 0 };
+    tb32(&t, 7); tb16(&t, 2);
+    tbwin(&t, 0x10, 0, 0, 800, 600, LAGW_FOCUSED, 0, "Notepad \xe2\x80\x94 a.txt", "notepad.exe");
+    tbwin(&t, 0x20, -8, -8, 300, 200, LAGW_OWNED | LAGW_TOPMOST, 0x10, "", "notepad.exe");
+    LagWin ws[LAG_WIN_MAX];
+    uint32_t serial = 0;
+    CHECK(lag_windows_parse(t.b, t.n, &serial, ws, LAG_WIN_MAX) == 2 && serial == 7);
+    CHECK(ws[0].id == 0x10 && ws[0].w == 800 && ws[0].flags == LAGW_FOCUSED && ws[0].pid == 4242 && ws[0].title_n == 17 && ws[0].app_n == 11);
+    CHECK(ws[1].owner == 0x10 && ws[1].x == -8 && !ws[1].title_n);
+    CHECK(lag_windows_parse(t.b, t.n, NULL, ws, 1) == 1);                                       /* fewer kept, still checked */
+    CHECK(lag_windows_parse(t.b, t.n - 1, NULL, ws, LAG_WIN_MAX) == -1);                       /* short */
+    t.b[t.n++] = 0;
+    CHECK(lag_windows_parse(t.b, t.n, NULL, ws, LAG_WIN_MAX) == -1);                           /* a byte too many */
+    TB e = { .n = 0 }; tb32(&e, 1); tb16(&e, 0);
+    CHECK(lag_windows_parse(e.b, e.n, NULL, ws, LAG_WIN_MAX) == 0);                             /* no windows */
+    struct { uint32_t id; int32_t x, y, w, h; uint32_t f, o; const char *ti, *ap; } bad[] = {
+        { 0, 0, 0, 10, 10, 0, 0, "a", "b" },                        /* id 0 */
+        { 1, 0, 0, 0, 10, 0, 0, "a", "b" },                         /* empty */
+        { 1, 0, 0, 10, LAG_DIM_MAX + 1, 0, 0, "a", "b" },
+        { 1, -LAG_DIM_MAX - 1, 0, 10, 10, 0, 0, "a", "b" },
+        { 1, 0, 0, 10, 10, 16, 0, "a", "b" },                       /* unknown flag */
+        { 1, 0, 0, 10, 10, LAGW_OWNED, 0, "a", "b" },               /* owner 0 */
+        { 1, 0, 0, 10, 10, LAGW_OWNED, 1, "a", "b" },               /* owns itself */
+        { 1, 0, 0, 10, 10, 0, 0, "a\xff", "b" },                    /* not UTF-8 */
+        { 1, 0, 0, 10, 10, 0, 0, "a", "..\\x.exe" },                /* a path */
+        { 1, 0, 0, 10, 10, 0, 0, "a", "C:x.exe" },
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+        TB b = { .n = 0 };
+        tb32(&b, 1); tb16(&b, 1);
+        tbwin(&b, bad[i].id, bad[i].x, bad[i].y, bad[i].w, bad[i].h, bad[i].f, bad[i].o, bad[i].ti, bad[i].ap);
+        CHECK(lag_windows_parse(b.b, b.n, NULL, ws, LAG_WIN_MAX) == -1);
+    }
+    TB dup = { .n = 0 }; tb32(&dup, 1); tb16(&dup, 2);
+    tbwin(&dup, 5, 0, 0, 10, 10, 0, 0, "a", "b"); tbwin(&dup, 5, 0, 0, 10, 10, 0, 0, "a", "b");
+    CHECK(lag_windows_parse(dup.b, dup.n, NULL, ws, LAG_WIN_MAX) == -1);                     /* one window twice */
+    TB many = { .n = 0 }; tb32(&many, 1); tb16(&many, LAG_WIN_MAX + 1);
+    CHECK(lag_windows_parse(many.b, many.n, NULL, ws, LAG_WIN_MAX) == -1);
+    TB *bt = (TB *)malloc(sizeof(TB)); bt->n = 0; tb32(bt, 1); tb16(bt, 1);
+    tb32(bt, 9); tb32(bt, 0); tb32(bt, 0); tb32(bt, 10); tb32(bt, 10); tb32(bt, 0); tb32(bt, 1);
+    tb16(bt, LAG_TITLE_MAX + 1); memset(bt->b + bt->n, 'a', LAG_TITLE_MAX + 1); bt->n += LAG_TITLE_MAX + 1; tbs(bt, "x");
+    CHECK(lag_windows_parse(bt->b, bt->n, NULL, ws, LAG_WIN_MAX) == -1);                     /* title too long */
+    free(bt);
+    TB lie = { .n = 0 }; tb32(&lie, 1); tb16(&lie, 1);
+    tb32(&lie, 9); tb32(&lie, 0); tb32(&lie, 0); tb32(&lie, 10); tb32(&lie, 10); tb32(&lie, 0); tb32(&lie, 1); tb16(&lie, 400); tbs(&lie, "x");
+    CHECK(lag_windows_parse(lie.b, lie.n, NULL, ws, LAG_WIN_MAX) == -1);                     /* a length past the end */
+
+    /* LAG_WINICON */
+    TB ic = { .n = 0 }; tb32(&ic, 0x10); tb16(&ic, 2); tb16(&ic, 2); for (int i = 0; i < 16; i++) tb8(&ic, (uint8_t)i);
+    uint32_t iid = 0; uint16_t iw = 0, ih = 0; const uint8_t *px = NULL;
+    CHECK(!lag_winicon_parse(ic.b, ic.n, &iid, &iw, &ih, &px) && iid == 0x10 && iw == 2 && ih == 2 && px == ic.b + 8);
+    CHECK(lag_winicon_parse(ic.b, ic.n - 1, &iid, &iw, &ih, &px) == -1);
+    ic.b[4] = LAG_ICON_MAX + 1; CHECK(lag_winicon_parse(ic.b, ic.n, &iid, &iw, &ih, &px) == -1);
+    ic.b[4] = 0; CHECK(lag_winicon_parse(ic.b, ic.n, &iid, &iw, &ih, &px) == -1);
+
+    /* LAG_WINACT */
+    LagAct a;
+    TB ac = { .n = 0 }; tb32(&ac, 0x10); tb8(&ac, LAGA_CLOSE);
+    CHECK(!lag_winact_parse(ac.b, ac.n, &a) && a.id == 0x10 && a.action == LAGA_CLOSE);
+    tb8(&ac, 0); CHECK(lag_winact_parse(ac.b, ac.n, &a) == -1);
+    ac.n = 4; tb8(&ac, 6); CHECK(lag_winact_parse(ac.b, ac.n, &a) == -1);
+    ac.n = 4; tb8(&ac, 0); CHECK(lag_winact_parse(ac.b, ac.n, &a) == -1);
+    TB mv = { .n = 0 }; tb32(&mv, 0x10); tb8(&mv, LAGA_MOVE); tb32(&mv, (uint32_t)-5); tb32(&mv, 10); tb32(&mv, 640); tb32(&mv, 480);
+    CHECK(!lag_winact_parse(mv.b, mv.n, &a) && a.x == -5 && a.w == 640 && a.h == 480);
+    CHECK(lag_winact_parse(mv.b, 5, &a) == -1 && lag_winact_parse(mv.b, mv.n - 1, &a) == -1);
+    mv.n = 17; tb32(&mv, 0); CHECK(lag_winact_parse(mv.b, mv.n, &a) == -1);                  /* height 0 */
+    TB z = { .n = 0 }; tb32(&z, 0); tb8(&z, LAGA_FOCUS); CHECK(lag_winact_parse(z.b, z.n, &a) == -1);
+
+    /* LAG_APPLIST, LAG_LAUNCH */
+    TB al = { .n = 0 }; tb16(&al, 2);
+    tbs(&al, "Notepad"); tbs(&al, "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Notepad.lnk");
+    tbs(&al, "Paint"); tbs(&al, "C:\\Users\\a\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Paint.lnk");
+    LagApp ap[4];
+    CHECK(lag_applist_parse(al.b, al.n, ap, 4) == 2 && ap[1].name_n == 5 && !memcmp(ap[1].name, "Paint", 5));
+    CHECK(lag_applist_parse(al.b, al.n - 1, ap, 4) == -1);
+    TB ae = { .n = 0 }; tb16(&ae, 1); tbs(&ae, ""); tbs(&ae, "x"); CHECK(lag_applist_parse(ae.b, ae.n, ap, 4) == -1);    /* no name */
+    TB am = { .n = 0 }; tb16(&am, LAG_APPS_MAX + 1); CHECK(lag_applist_parse(am.b, am.n, ap, 4) == -1);
+    const uint8_t *tok = NULL; uint16_t tn = 0;
+    TB la = { .n = 0 }; tbs(&la, "C:\\x.lnk");
+    CHECK(!lag_launch_parse(la.b, la.n, &tok, &tn) && tn == 8 && !memcmp(tok, "C:\\x.lnk", 8));
+    CHECK(lag_launch_parse(la.b, la.n - 1, &tok, &tn) == -1);
+    TB l0 = { .n = 0 }; tbs(&l0, ""); CHECK(lag_launch_parse(l0.b, l0.n, &tok, &tn) == -1);
+    TB lb = { .n = 0 }; tbs(&lb, "\xc3"); CHECK(lag_launch_parse(lb.b, lb.n, &tok, &tn) == -1);
+}
+
 int main(void) {
     test_resolution();
+    test_lag();
     test_clipx();
     test_log_clean();
     test_images();
