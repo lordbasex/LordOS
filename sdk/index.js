@@ -221,6 +221,9 @@ export { appsOff, isAppOff, useAppsOff } from './appsoff.js';
 export { DEACTIVATABLE, CORE_APPS, canDeactivate, isCoreApp, openersAvailable } from './appsoffmodel.js';
 export { deactivateApp, activateApp, offerActivate } from './appsoffactions.js';
 import { startAppsOff } from './appsoffactions.js';
+// apps mode's guest side: inside a Machines guest, this desktop's windows go to the host one by one (guestwin.js)
+export { guestAppsMode } from './guestwin.js';
+import { startGuestWin } from './guestwin.js';
 export { notifyPrefs, appNotifyPrefs, setAppNotifyPrefs, dndActive, NOTIFY_DEFAULTS } from './notify.js';
 
 // ---- installed themes ----
@@ -283,6 +286,7 @@ export function startShell(element) {
   try { lord.input?.pointerAccent?.(null); } catch (e) { /* older server */ }   // LordOS's black arrow; a theme may tint it (setPointerAccent)
   refreshPackages();                    // after the theme's configureWindows
   startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
+  startGuestWin();                      // inside a Machines guest only: apps mode's endpoint (guestwin.js)
   enableShellLayers();                  // menus, popovers and prompts go to their layer (sdk/layers.js)
   resetShortcuts();                     // the dispatcher exists only in the session (sdk/shortcuts.js)
   reopenAfterThemeSwitch();

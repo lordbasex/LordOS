@@ -32,6 +32,7 @@
 #include "js_lan.h"
 #include "js_rdesk.h"
 #include "js_vm.h"
+#include "js_guestwin.h"
 #include "js_broker.h"
 #include "js_wasm.h"
 #include "../media/svgicon.h"
@@ -570,6 +571,7 @@ static void session_context(void) {
     js_cloud_register(ctx, lord);      /* lord.cloud: Cloud (cloud/, docs/CLOUD.md) */
     js_rdesk_register(ctx, lord);      /* lord.rdesk: the RDP and VNC apps */
     js_vm_register(ctx, lord);         /* lord.vm: Machines (vm/, docs/VIRTUALIZATION.md) */
+    js_guestwin_register(ctx, lord);   /* lord.guestwin: apps mode's guest side, inside a Machines guest (vmagent.h) */
     js_lan_register(ctx, lord);        /* lord.lan: Files → Network (lan/, docs/FILES.md) */
     js_clean_register(ctx, lord);      /* lord.clean: Cleaner (clean/, docs/CLEANER-ARCHITECTURE.md) */
     js_logs_register(ctx, lord);       /* lord.logs: journal and LordOS logs (Logs app) */

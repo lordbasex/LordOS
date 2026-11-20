@@ -21,6 +21,7 @@ import {
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
   switchDesktop, windows as windowsStore, windowTitle, windowIcon, appName, removeDesktopById, renameDesktop, createStore, lordosWallpapers,
   VideoSetup, setDesktopDecor, setStatusPanelPlacer, WidgetPicker, widgetPicker, setPointerAccent,
+  guestAppsMode,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useFirstStartOpen } from '@lordos/sdk';   // (0.8.9) the activity onboarding waits for the first-start desktop chooser
@@ -274,6 +275,8 @@ function App() {
 
   const leaving = useLeaving(all, main?.plan.spine);
   const helpOpen = useStore(shortcutsHelp);
+  // inside a Machines guest in apps mode (sdk/guestwin.js) only the windows are drawn: the host shows them one by one
+  const ga = useStore(guestAppsMode);
   const spineActive = useMemo(() => ({ overview: inOverview, apps: open?.name === 'search' && open.mode === 'apps', control: open?.name === 'control', notif: open?.name === 'notif', help: helpOpen, menu: !!crown }),
     [inOverview, open, crown, helpOpen]);
   const stripRect = useMemo(() => (main?.plan.top ? { ...main.plan.top, w: main.plan.top.w - STATUS_W } : null), [main]);
@@ -313,17 +316,17 @@ function App() {
 
   return (
     <ThemeProvider tokens={t}>
-      <View style={{ width: '100%', height: '100%', backgroundColor: t.mode === 'dark' ? '#0F0D1C' : '#DCD6F2' }}>
+      <View style={{ width: '100%', height: '100%', backgroundColor: ga ? '#000' : t.mode === 'dark' ? '#0F0D1C' : '#DCD6F2' }}>
         {/* the still pictures, or the slideshow's (Settings → Wallpaper; sdk/slideshow.jsx) */}
-        {slideshowPrefs(s).on ? <SlideshowWallpapers list={t.wallpapers} displays={displays} onContextMenu={(e) => deskMenu.set({ x: e.x, y: e.y })} /> : displays.map((d) => (
+        {ga ? null : slideshowPrefs(s).on ? <SlideshowWallpapers list={t.wallpapers} displays={displays} onContextMenu={(e) => deskMenu.set({ x: e.x, y: e.y })} /> : displays.map((d) => (
           <Image key={d.id + ':' + d.x} src={wallpaperSrc(findWallpaper(t.wallpapers, wallpaperIdFor(s, d, t.defaultWallpaper), t.defaultWallpaper), d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)}
             onContextMenu={(e) => deskMenu.set({ x: e.x, y: e.y })}
             style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
         ))}
-        {displays.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
-        <DesktopWidgets layer="below" />
+        {!ga && displays.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
+        {!ga && <DesktopWidgets layer="below" />}
         <WidgetDropTarget />
-        {plans.map(({ d, key, label: dname, plan }) => (
+        {!ga && plans.map(({ d, key, label: dname, plan }) => (
           <GroupFrame key={d.id} t={t} plan={plan} d={d} dkey={key} dname={dname} desk={desktop} meta={deskMeta} multi={plans.length > 1} canMove={canMove}
             onAddWindow={H.addWindow} onAddWidget={H.addWidget} onAddWebApp={H.addWebApp} onEdit={H.edit} showEmpty={!onboarding} />
         ))}
@@ -346,8 +349,8 @@ function App() {
         <SnapFlyout t={t} />
         <WidgetPicker t={t} Panel={Surface} />
         <VideoSetup />
-        <DesktopWidgets layer="above" />
-        <Layer name="dock">
+        {!ga && <DesktopWidgets layer="above" />}
+        {!ga && <Layer name="dock">
           {plans.map(({ d, plan }) => (plan.spine ? (
             <Spine key={d.id} t={t} rect={plan.spine} mode={plan.mode} rtl={rtl} active={spineActive} controlRef={d.main ? controlRef : undefined}
               onCrown={H.crown} onActivities={H.activities} onApps={H.apps} onFiles={H.files} onControl={H.control} onToggle={toggleSpine}
@@ -360,7 +363,7 @@ function App() {
               <StatusCluster t={t} rect={main.plan.top} rtl={rtl} screenW={screen.width} unread={unread} onControl={H.control} onNotif={H.notif} onVolume={H.volume} />
             </>
           ) : null}
-        </Layer>
+        </Layer>}
         {open?.name === 'search' ? (
           <Layer name="overlay"><Search key={panelDisplay.id} t={t} display={panelDisplay} onClose={() => panel.set(null)} isOnChrome={isOnChrome} /></Layer>
         ) : null}
