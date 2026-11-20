@@ -31,6 +31,24 @@ build/lordos-guest: ../tools/guest/lordos-guest.c src/vm/vmagent.c src/vm/vmagen
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c src/vm/vmagent.c
 
+# lordos-guest-win.exe: LordOS guest tools for Windows guests (tools/guest-win), cross-built with mingw-w64
+# (gcc-mingw-w64-x86-64-posix, docs/VM-SETUP.md): Win32 only, libgcc and winpthread linked in, no DLL of ours. Skipped
+# with a note when the compiler isn't there (Machines then can't install the tools into a Windows guest).
+MINGW_CC ?= $(shell command -v x86_64-w64-mingw32-gcc-posix 2>/dev/null || command -v x86_64-w64-mingw32-gcc 2>/dev/null)
+ifneq ($(MINGW_CC),)
+all: build/lordos-guest-win.exe
+build/lordos-guest-win.exe: ../tools/guest-win/lordos-guest-win.c ../tools/guest-win/lordos-guest-win.rc ../tools/guest-win/lordos-guest-win.manifest src/vm/vmagent.c src/vm/vmagent.h
+	@mkdir -p build
+	$(dir $(MINGW_CC))x86_64-w64-mingw32-windres -I ../tools/guest-win ../tools/guest-win/lordos-guest-win.rc -O coff -o build/lordos-guest-win.res
+	$(MINGW_CC) -O2 $(WARN) -std=gnu11 -municode -mwindows -static -static-libgcc -s -o $@ ../tools/guest-win/lordos-guest-win.c src/vm/vmagent.c \
+		build/lordos-guest-win.res -lole32 -luuid -lwindowscodecs -ldwmapi -lwtsapi32 -lshell32 -lgdi32 -luser32
+else
+all: lordos-guest-win-skipped
+lordos-guest-win-skipped:
+	@echo "skipped: lordos-guest-win.exe needs x86_64-w64-mingw32-gcc-posix (gcc-mingw-w64-x86-64-posix)"
+.PHONY: lordos-guest-win-skipped
+endif
+
 VMDISPLAY ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
 ifeq ($(VMDISPLAY),1)
 VMDISPLAY_SRC := src/vm/vmdisplay.c src/sec/sandbox.c src/sec/cgroup.c

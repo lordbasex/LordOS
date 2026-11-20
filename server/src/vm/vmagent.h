@@ -1,8 +1,9 @@
 /* vmagent.h — org.lordos.agent, Machines' own channel into a guest (docs/VIRTUALIZATION.md 6.8, 6.17, 7.1.1), and
  * the bits lord-vm needs to talk to qemu-guest-agent.
  *
- * A virtio-serial port named org.lordos.agent: no network, no port, no VNC; lordos-guest (tools/guest) holds the guest's
- * end as the person signed in at the guest's display. Frames, both ways:
+ * A virtio-serial port named org.lordos.agent: no network, no port, no VNC; lordos-guest (tools/guest), or on Windows
+ * lordos-guest-win (tools/guest-win), holds the guest's end as the person signed in at the guest's display. Frames,
+ * both ways:
  *
  *   u32 length (little endian, of the payload)  u16 kind  u16 channel  payload
  *
@@ -18,7 +19,36 @@
  *                            formatting tags and attributes stay, no scripts, styles that load anything, events or
  *                            links other than http, https and mailto) before anything goes on; lord-server re-encodes
  *                            the picture in lord-media's sandbox.
- * The host never asks the guest to run anything over this channel, and the guest can't ask the host for anything. */
+ *   AGK_DISPLAY host → guest  u32 width, u32 height (little endian; 320..8192 × 200..8192): the size the machine's
+ *                            window wants (capability "display" in the guest's hello; lord-vm sends it only then, and
+ *                            again after each hello). The guest sets that size, or the closest it can, on its primary
+ *                            display. guest → host: the same layout, the size it set (lord-vm logs it).
+ *
+ * Apps mode (docs/VIRTUALIZATION.md 7.2), capability "windows" in the guest's hello (lord-vm then sets LAG_CAP_WINDOWS
+ * in VM_AGENT_STATE b). Everything little endian; every length is checked by the lag_*_parse functions below, which
+ * both sides use on what they receive; a frame that doesn't parse exactly (to its last byte) is ignored whole.
+ *   LAG_APPS     host → guest  u8 on (0 or 1). On: the guest sends LAG_APPLIST and LAG_WINDOWS at once, then
+ *                            LAG_WINDOWS whenever its windows change (at most 30 a second) and LAG_WINICON once per new
+ *                            window, and hides its taskbar. Off: it stops and shows the taskbar again. Sending on again
+ *                            asks for a fresh LAG_APPLIST and LAG_WINDOWS.
+ *   LAG_WINDOWS  guest → host  u32 serial (grows by one per list), u16 count (≤ LAG_WIN_MAX), then per window, top of
+ *                            the z-order first: u32 id, i32 x, i32 y, i32 w, i32 h (the guest's picture's pixels, clipped
+ *                            to its desktop; w, h 1..LAG_DIM_MAX, x, y within ±LAG_DIM_MAX), u32 flags (LAGW_*; nothing
+ *                            else set), [u32 owner id, only with LAGW_OWNED], u32 pid, u16 title length
+ *                            (≤ LAG_TITLE_MAX) + title, u16 app length (≤ LAG_APP_MAX) + the program's file name
+ *                            (no '/', '\' or ':'); both UTF-8. Only visible, not cloaked, not tool windows with a
+ *                            non-empty rectangle; never the taskbar or the desktop.
+ *   LAG_WINICON  guest → host  u32 id, u16 w, u16 h (1..LAG_ICON_MAX), then w × h × 4 bytes of R, G, B, A (straight
+ *                            alpha), rows top first.
+ *   LAG_WINACT   host → guest  u32 id, u8 action (LAGA_*); LAGA_MOVE adds i32 x, i32 y, i32 w, i32 h. The guest acts
+ *                            only on a window that is in the last list it sent.
+ *   LAG_APPLIST  guest → host  u16 count (≤ LAG_APPS_MAX), then per program: u16 name length (1..LAG_NAME_MAX) + name,
+ *                            u16 token length (1..LAG_TOKEN_MAX) + token; both UTF-8. The token is the guest's own
+ *                            (a Start menu shortcut's path): opaque to the host.
+ *   LAG_LAUNCH   host → guest  u16 length (1..LAG_TOKEN_MAX) + a token: the guest starts that program only when the
+ *                            token is, byte for byte, one of its own last LAG_APPLIST; the host never sends a command.
+ * The host never asks the guest to run anything over this channel other than a program the guest itself listed, and
+ * the guest can't ask the host for anything. */
 #ifndef LORD_VM_AGENT_H
 #define LORD_VM_AGENT_H
 
@@ -32,6 +62,49 @@
 #define AG_HEAD 8
 enum { AGK_HELLO = 1, AGK_CLIP = 2, AGK_CLIPX = 3 };
 enum { AGF_TEXT = 1, AGF_HTML = 2, AGF_PNG = 3 };
+enum { AGK_DISPLAY = 4, LAG_APPS = 5, LAG_WINDOWS = 6, LAG_WINICON = 7, LAG_WINACT = 8, LAG_LAUNCH = 9, LAG_APPLIST = 10 };
+
+/* AGK_DISPLAY: 0 a well-formed size (8 bytes, 320..8192 × 200..8192), -1 otherwise */
+#define AG_DISPLAY_MIN_W 320u
+#define AG_DISPLAY_MIN_H 200u
+#define AG_DISPLAY_MAX   8192u
+int ag_display_parse(const uint8_t *p, size_t n, uint32_t *w, uint32_t *h);
+void ag_display_write(uint8_t out[8], uint32_t w, uint32_t h);
+
+/* apps mode: limits, the VM_AGENT_STATE b bit (vmproto.h's VAC_* go up to VAC_DISPLAY, 128), flags, actions */
+#define LAG_CAP_WINDOWS 256u
+#define LAG_WIN_MAX     64
+#define LAG_TITLE_MAX   512
+#define LAG_APP_MAX     256
+#define LAG_ICON_MAX    64
+#define LAG_APPS_MAX    256
+#define LAG_NAME_MAX    256
+#define LAG_TOKEN_MAX   512
+#define LAG_DIM_MAX     16384
+enum { LAGW_FOCUSED = 1, LAGW_MINIMIZED = 2, LAGW_TOPMOST = 4, LAGW_OWNED = 8, LAGW_ALL = 15 };
+enum { LAGA_FOCUS = 1, LAGA_CLOSE = 2, LAGA_MINIMIZE = 3, LAGA_RESTORE = 4, LAGA_MOVE = 5 };
+
+typedef struct {
+    uint32_t id, flags, owner, pid;                 /* owner: 0 unless LAGW_OWNED */
+    int32_t x, y, w, h;
+    const uint8_t *title, *app;                     /* pointers into the payload, not NUL-terminated */
+    uint16_t title_n, app_n;
+} LagWin;
+typedef struct { uint32_t id; uint8_t action; int32_t x, y, w, h; } LagAct;
+typedef struct { const uint8_t *name, *token; uint16_t name_n, token_n; } LagApp;
+
+/* LAG_APPS: 0 ok (*on 0 or 1) */
+int lag_apps_parse(const uint8_t *p, size_t n, int *on);
+/* LAG_WINDOWS: the number of windows (0..max, at most LAG_WIN_MAX) filled into out, or -1 malformed */
+int lag_windows_parse(const uint8_t *p, size_t n, uint32_t *serial, LagWin *out, int max);
+/* LAG_WINICON: 0 ok (*rgba points into the payload: w × h × 4 bytes) */
+int lag_winicon_parse(const uint8_t *p, size_t n, uint32_t *id, uint16_t *w, uint16_t *h, const uint8_t **rgba);
+/* LAG_WINACT: 0 ok */
+int lag_winact_parse(const uint8_t *p, size_t n, LagAct *a);
+/* LAG_APPLIST: the number of programs filled into out (at most max), or -1 malformed */
+int lag_applist_parse(const uint8_t *p, size_t n, LagApp *out, int max);
+/* LAG_LAUNCH: 0 ok (*tok points into the payload) */
+int lag_launch_parse(const uint8_t *p, size_t n, const uint8_t **tok, uint16_t *tok_n);
 
 /* the parts of an AGK_CLIPX payload (pointers into it; NULL/0 for a form that isn't there) */
 typedef struct { const uint8_t *text, *html, *png; uint32_t text_n, html_n, png_n; } AgClip;

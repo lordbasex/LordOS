@@ -188,6 +188,9 @@ eq('storage bar no total', storageBar({}), []);
 eq('agent off lines', agentLines(null, {}).find((l) => l[0] === 'clipboard')[1], 'off');
 eq('agent connected', agentLines({ state: 'connected', caps: 1 | 2 | 16 | 32 }, { clipboard: 'both' }).filter((l) => l[1] === 'works').map((l) => l[0]), ['shell', 'logs', 'shutdown', 'time', 'clipboard', 'resolution']);
 eq('agent helper missing', agentLines({ state: 'connected', caps: 1 }, { clipboard: 'to-guest' }).find((l) => l[0] === 'clipboard')[1], 'needsHelper');
+eq('windows guest without the tools', agentLines({ state: 'connected', caps: 1 | 4 | 8, system: 'Windows 11 Pro' }, { clipboard: 'both' }).filter((l) => ['clipboard', 'resolution'].includes(l[0])).map((l) => l[1]), ['needsTools', 'needsTools']);
+eq('windows guest with the tools', agentLines({ state: 'connected', caps: 1 | 4 | 8 | 32 | 128 | 256, system: 'Windows 11 Pro' }, { clipboard: 'both' }).filter((l) => ['clipboard', 'resolution'].includes(l[0])).map((l) => l[1]), ['works', 'works']);
+eq('linux guest resolution', agentLines({ state: 'connected', caps: 1, system: 'Ubuntu 26.04' }, {}).find((l) => l[0] === 'resolution')[1], 'works');
 eq('agent tone', [agentTone(null, false), agentTone({ state: 'waiting' }, true), agentTone({ state: 'connected' }, true)], ['off', 'pause', 'run']);
 eq('clip ways', [clipTo('both'), clipTo('from-guest'), clipFrom('from-guest'), clipFrom('off')], [true, false, true, false]);
 
