@@ -8,7 +8,7 @@ import {
   inhibitShortcuts, useNarrow, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand } from './model.js';
+import { stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, mountCommand, runs3d } from './model.js';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal } from './ui.jsx';
 import { openLogs, openSnapshots } from './library.jsx';
@@ -399,7 +399,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     const q = stRef.current;
     if (!s || !q || !['running', 'paused', 'starting', 'stopping'].includes(q.state)) return true;
     if (closingRef.current) return false;
-    const how = closeChoice(readMeta(dir));
+    // a machine with 3D can't be suspended (virgl can't be saved): it shuts down instead
+    const how = closeChoice(readMeta(dir)) === 'suspend' && runs3d(q) ? 'shutdown' : closeChoice(readMeta(dir));
     if (how === 'ask' || q.state === 'starting') setAskClose(true); else finish(how);
     return false;
   }), [winId]);
@@ -551,7 +552,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     screenshot: shot,
     power: [
       { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
-      { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy, onClick: () => cmd('suspend') },
+      { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy || runs3d(st), onClick: () => cmd('suspend') },
       { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => cmd('reset') },
       { label: tr('machines.cmd.cad'), disabled: !a.keys, onClick: cad },
       '-',
@@ -573,10 +574,10 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         { label: tr('machines.cmd.cad'), disabled: !a.keys, onClick: cad },
         '-',
         { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
-        { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy, onClick: () => cmd('suspend') },
+        { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy || runs3d(st), onClick: () => cmd('suspend') },
         { label: tr('machines.cmd.poweroff'), disabled: !a.poweroff, onClick: () => cmd('poweroff') },
         '-',
-        { label: tr('machines.snap.takeNow'), disabled: !sid || busy || !(st?.state === 'running' || st?.state === 'paused'), onClick: snapNow },
+        { label: tr('machines.snap.takeNow'), disabled: !sid || busy || runs3d(st) || !(st?.state === 'running' || st?.state === 'paused'), onClick: snapNow },
         { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m0) },
         '-',
         { label: tr('machines.tb.screenshot'), disabled: !a.keys, onClick: shot },
@@ -591,12 +592,12 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   let card = null;
   let failed = null;
   if (err) card = <Card title={tr('machines.win.problem')} text={err} actions={[<Btn key="r" primary label={tr('machines.win.tryAgain')} onClick={() => { setErr(''); begin(); }} />]} />;
-  else if (askClose) card = <Card width={560} title={tr('machines.close.title', { name })} text={tr('machines.close.text')}
+  else if (askClose) card = <Card width={560} title={tr('machines.close.title', { name })} text={tr('machines.close.text') + (runs3d(st) ? ` ${tr('machines.close.no3dSuspend')}` : '')}
     extra={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}><Toggle on={always} onChange={setAlways} /><Text style={{ fontSize: 13, color: p.text }}>{tr('machines.close.always')}</Text></View>} actions={[
     <Btn key="c" label={tr('machines.cancel')} onClick={() => setAskClose(false)} />,
     <Btn key="k" label={tr('machines.close.keep')} onClick={() => { if (always) writeMeta(dir, { onClose: 'keep' }); finish('keep'); }} />,
     <Btn key="s" label={tr('machines.cmd.shutdown')} onClick={() => { if (always) writeMeta(dir, { onClose: 'shutdown' }); finish('shutdown'); }} />,
-    <Btn key="u" primary label={tr('machines.cmd.suspend')} disabled={st?.state === 'starting'} onClick={() => { if (always) writeMeta(dir, { onClose: 'suspend' }); finish('suspend'); }} />,
+    <Btn key="u" primary label={tr('machines.cmd.suspend')} disabled={st?.state === 'starting' || runs3d(st)} onClick={() => { if (always) writeMeta(dir, { onClose: 'suspend' }); finish('suspend'); }} />,
   ]} />;
   else if (job) card = <Card title={tr(`machines.job.${job.kind}`, { name })} text={job.pct >= 0 ? tr('machines.job.pct', { pct: job.pct }) : tr('machines.job.wait')} />;
   else if (closing === 'suspend') card = <Card title={tr('machines.job.suspend', { name })} text={tr('machines.job.wait')} />;

@@ -16,7 +16,7 @@ import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openU
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
 import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor } from './catalog.js';
-import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, PROFILES, profileSize } from './model.js';
+import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, PROFILES, profileSize, gfxFor, no3dReason } from './model.js';
 import { usePal, OsMark, Btn, Bar, gb, bytes } from './ui.jsx';
 import { SheetHeader, Pill, Round, Sym } from './kit.jsx';
 import { writeMeta } from './meta.js';
@@ -89,7 +89,9 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const winPath = windows ? (win?.mode === 'eval' ? evalFile?.name || '' : win?.phase === 'ready' ? win.iso.path : '') : '';
   // a download is checked as the ISO it will be (its file name), and made from the downloaded path
   const d = { name, arch, vcpus: size.vcpus, memoryMb: size.memoryMb, diskGb: size.diskGb, network: size.network, source: source === 'iso' || downloading || windows ? 'iso' : 'import',
-    path: downloading ? (dl?.image?.name || '') : windows ? winPath : path, rootPassword, shareClipboard: shareClip };
+    path: downloading ? (dl?.image?.name || '') : windows ? winPath : path, rootPassword, shareClipboard: shareClip,
+    // Design's 3D (6.10): Linux machines of this computer's architecture, where it can give them
+    graphics: arch === host.arch ? gfxFor(size.gfx, host, windows, arch) : '2d' };
   const v = validateDraft(d, host, names);
   const missing = missingFor(host, [arch], { windows });
   const emulated = arch !== host.arch;
@@ -358,7 +360,8 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
         {r.length < 2 ? <View style={{ flex: 1 }} /> : null}
       </View>
     ))}
-    {size.gfx === '3d' ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.no3d')}</Text> : null}
+    {size.gfx === '3d' && d.graphics !== '3d' ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>
+      {[tr('machines.as.no3d'), tr(`machines.cfg.no3d.${arch !== host.arch ? 'arch' : no3dReason(host, windows, arch) || 'gpu'}`)].join(' ')}</Text> : null}
     {emulated ? <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.emulatedShort')}</Text></View> : null}
   </>;
   }

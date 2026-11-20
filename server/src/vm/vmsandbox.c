@@ -10,7 +10,9 @@
 #include <linux/seccomp.h>
 #include <sched.h>
 #include <stddef.h>
+#include <limits.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -18,6 +20,7 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/sysmacros.h>
 #include <unistd.h>
 
 #if defined(__x86_64__)
@@ -136,6 +139,27 @@ static int qemu_filter(struct sock_filter *f, int cap) {
     return n;
 }
 
+/* 3D graphics (vmsandbox.h): the render node read, write and ioctl; what Mesa reads to know the GPU behind it. A path
+ * that isn't a DRM render node is refused (-1), and nothing is allowed then. */
+static int render_rules(int rs, const char *node, uint64_t h) {
+    struct stat st;
+    if (strncmp(node, "/dev/dri/renderD", 16) || stat(node, &st) || !S_ISCHR(st.st_mode) || major(st.st_rdev) != 226 || minor(st.st_rdev) < 128) return -1;
+    uint64_t dev = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE;
+#ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
+    dev |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
+#endif
+    if (rule(rs, node, dev, h)) return -1;
+    /* libdrm's drmGetDevice2 lists /dev/dri and reads the GPU's PCI folder in sysfs; without either Mesa's EGL doesn't
+     * start (measured 2026-11-20, amdgpu). Listing /dev/dri shows names only: opening card0 or another node is still
+     * refused. The way through /sys/dev/char is a link and needs no rule. */
+    if (rule(rs, "/dev/dri", LANDLOCK_ACCESS_FS_READ_DIR, h)) return -1;
+    char sys[64], real[PATH_MAX];
+    snprintf(sys, sizeof sys, "/sys/dev/char/%u:%u/device", major(st.st_rdev), minor(st.st_rdev));
+    if (!realpath(sys, real) || strncmp(real, "/sys/devices/", 13)) return -1;
+    if (rule(rs, real, LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR, h)) return -1;
+    return 0;
+}
+
 int vm_jail_qemu(const VmQemuJail *j) {
     int mask = 0;
     struct rlimit no = { 0, 0 };
@@ -170,6 +194,9 @@ int vm_jail_qemu(const VmQemuJail *j) {
 #endif
                 rule(rs, "/dev/kvm", dev, h);
             }
+            /* 3D: a render node that doesn't check out gets no rule (QEMU's EGL then fails and it exits); it never costs
+             * the rest of the sandbox */
+            if (j->render && j->render[0]) render_rules(rs, j->render, h);
             if (j->iso && j->iso[0] && rule(rs, j->iso, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (j->drivers && j->drivers[0] && rule(rs, j->drivers, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (j->base && j->base[0] && rule(rs, j->base, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;

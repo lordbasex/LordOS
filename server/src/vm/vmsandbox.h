@@ -6,6 +6,10 @@
  *   - Landlock: read and execute /usr; read /etc/ld.so.cache; read and write only <machine>/disks; read the
  *     attached ISO; read its own /proc/<pid>; /dev/null; /dev/kvm on KVM machines (it arrives as a descriptor, but on
  *     arm64 QEMU also opens it by path to read the host CPU's features). No other file, no other device. ABI 4+: no TCP bind or connect. ABI 6+: no abstract unix sockets or signals outside itself.
+ *     A machine with 3D graphics (VmQemuJail.render: only a Linux machine with graphics "3d") also gets, for
+ *     virglrenderer and Mesa: read, write and (ABI 5+) ioctls on that render node only; list the folder /dev/dri (names
+ *     only); read its GPU's PCI device folder in sysfs (vendor, device, revision, uevent). Never card0 or another
+ *     device: the primary node stays refused. Every other machine gets none of it.
  *   - seccomp, ours: no socket(2) at all (EACCES), no connect, bind, listen or accept (its sockets are the
  *     socketpairs lord-vm passed), no namespaces (unshare, setns, clone with CLONE_NEW*), no mount, ptrace,
  *     process_vm_*, bpf, perf_event_open, keyctl, io_uring, userfaultfd, module or kexec calls, no TIOCSTI.
@@ -23,6 +27,8 @@ typedef struct {
     const char *drivers;        /* a second disc with the guest's drivers (virtio-win), read, or NULL */
     int kvm;                    /* KVM machine: /dev/kvm may be opened again (arm64's -cpu host makes a scratch vCPU
                                  * by path to read the host's features); QEMU holds a KVM descriptor already */
+    const char *render;         /* 3D graphics (6.10, only a Linux machine with graphics "3d"): the GPU's render node,
+                                 * /dev/dri/renderD<N>, never a primary card node; NULL for every other machine */
 } VmQemuJail;
 
 /* In the child, before execve. Returns the VMS_* bits that applied; the caller refuses to exec without

@@ -208,6 +208,12 @@ static void test_schema(void) {
             { "\"tpm\":true", 5, VM_OK }, { "\"secure_boot\":false", 5, VM_OK },
             { "\"tpm\":1", 5, VM_E_FIELD }, { "\"hyperv\":\"yes\"", 5, VM_E_FIELD },
             { "\"tpm\":true", 4, VM_E_FIELD }, { "\"secure_boot\":true", 4, VM_E_FIELD },
+            /* graphics: "2d" or "3d", schema 5, never with the windows devices */
+            { "\"graphics\":\"3d\"", 5, VM_OK }, { "\"graphics\":\"2d\"", 5, VM_OK },
+            { "\"graphics\":\"4d\"", 5, VM_E_RANGE }, { "\"graphics\":3", 5, VM_E_FIELD },
+            { "\"graphics\":\"3d\"", 4, VM_E_FIELD },
+            { "\"graphics\":\"3d\",\"devices\":\"windows\"", 5, VM_E_RANGE },
+            { "\"graphics\":\"2d\",\"devices\":\"windows\"", 5, VM_OK },
         };
         for (size_t i = 0; i < sizeof s5 / sizeof s5[0]; i++) {
             char t[4096];
@@ -233,6 +239,18 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             m.secure_boot = 0; m.tpm = 1;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_OK);
+        }
+        /* a 3D machine's file names it; a 2D one's doesn't (older builds read it unchanged) */
+        {
+            CHECK(vm_machine_parse(amd, strlen(amd), &m, err, sizeof err) == VM_OK);
+            m.schema = 5; m.graphics = VM_GFX_3D;
+            char *jj = vm_machine_json(&m);
+            CHECK(jj && strstr(jj, "\"graphics\": \"3d\"") && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && m2.graphics == VM_GFX_3D);
+            free(jj);
+            m.graphics = VM_GFX_2D;
+            jj = vm_machine_json(&m);
+            CHECK(jj && !strstr(jj, "graphics"));
+            free(jj);
         }
     }
     /* which folders may be shared (vm_share_allowed): a real folder in home (not home), under /media/<user> or /mnt, nothing

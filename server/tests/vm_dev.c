@@ -16,7 +16,11 @@
  *   noack 0|1           stop acknowledging frames (tests the 250 ms fallback)
  *   wait-frames N [S]   wait until N more frames arrived (at most S seconds, default 30)
  *   quit
- * stdout: one JSON line per event or answer. Binaries are looked for next to this one, or in $LORDVM_BIN. */
+ * stdout: one JSON line per event or answer. Binaries are looked for next to this one, or in $LORDVM_BIN.
+ *
+ * 3D machines (VD_DMABUF): built with Mesa (LORD_GPU), it plays lord-server's GPU part too: the dmabuf is imported on
+ * the first render node with EGL and the damaged rows are read back into the picture on each frame, so `png` shows what
+ * the guest drew with virgl. Without Mesa it only counts those frames. */
 #include "vm/vmproto.h"
 
 #include <errno.h>
@@ -35,6 +39,14 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+
+#ifdef LORD_GPU
+#include <gbm.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+#endif
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STBIW_ONLY_PNG
@@ -104,13 +116,112 @@ static void spawn_vmdisplay(int dbus_fd) {
     out("{\"ev\":\"vmdisplay\",\"pid\":%d}", (int)p);
 }
 
+/* ---- 3D: the dmabuf read back with EGL, as lord-server's GPU path does (gpu_tex_read_rows) ---- */
+static struct { int fd, w, h, stride, flip; uint32_t fourcc; uint64_t mod; long reads, fails; } dmab = { .fd = -1 };
+#ifdef LORD_GPU
+static struct { int ok, tried; EGLDisplay dpy; EGLContext ctx; GLuint prog, fbo, rtex, tex; EGLImageKHR img; int iw, ih; } egl;
+static void egl_setup(void) {
+    if (egl.tried) return;
+    egl.tried = 1;
+    int fd = -1;
+    for (int i = 128; i < 192 && fd < 0; i++) { char p[32]; snprintf(p, sizeof p, "/dev/dri/renderD%d", i); fd = open(p, O_RDWR | O_CLOEXEC); }
+    struct gbm_device *g = fd >= 0 ? gbm_create_device(fd) : NULL;
+    PFNEGLGETPLATFORMDISPLAYEXTPROC gpd = (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
+    egl.dpy = g && gpd ? gpd(EGL_PLATFORM_GBM_KHR, g, NULL) : EGL_NO_DISPLAY;
+    EGLint maj, min;
+    if (egl.dpy == EGL_NO_DISPLAY || !eglInitialize(egl.dpy, &maj, &min) || !eglBindAPI(EGL_OPENGL_ES_API)) { out("{\"ev\":\"egl\",\"ok\":false}"); return; }
+    static const EGLint ca[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+    egl.ctx = eglCreateContext(egl.dpy, EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT, ca);
+    if (egl.ctx == EGL_NO_CONTEXT || !eglMakeCurrent(egl.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, egl.ctx)) { out("{\"ev\":\"egl\",\"ok\":false,\"why\":\"context\"}"); return; }
+    static const char *vs = "attribute vec2 p; attribute vec2 t; varying vec2 v; void main() { v = t; gl_Position = vec4(p, 0.0, 1.0); }";
+    static const char *fs = "#extension GL_OES_EGL_image_external : require\nprecision mediump float; varying vec2 v; uniform samplerExternalOES s;"
+                            " void main() { gl_FragColor = vec4(texture2D(s, v).rgb, 1.0); }";
+    GLuint sh[2] = { glCreateShader(GL_VERTEX_SHADER), glCreateShader(GL_FRAGMENT_SHADER) };
+    glShaderSource(sh[0], 1, &vs, NULL); glCompileShader(sh[0]);
+    glShaderSource(sh[1], 1, &fs, NULL); glCompileShader(sh[1]);
+    egl.prog = glCreateProgram();
+    glAttachShader(egl.prog, sh[0]); glAttachShader(egl.prog, sh[1]);
+    glBindAttribLocation(egl.prog, 0, "p"); glBindAttribLocation(egl.prog, 1, "t");
+    glLinkProgram(egl.prog);
+    GLint linked = 0;
+    glGetProgramiv(egl.prog, GL_LINK_STATUS, &linked);
+    egl.ok = linked;
+    out("{\"ev\":\"egl\",\"ok\":%s,\"renderer\":\"%s\"}", linked ? "true" : "false", (const char *)glGetString(GL_RENDERER));
+}
+static void egl_drop_image(void) {
+    if (!egl.ok) return;
+    if (egl.tex) { glDeleteTextures(1, &egl.tex); egl.tex = 0; }
+    if (egl.img) { ((PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress("eglDestroyImageKHR"))(egl.dpy, egl.img); egl.img = NULL; }
+}
+static int egl_import(void) {
+    egl_setup();
+    if (!egl.ok || dmab.fd < 0) return -1;
+    if (egl.img) return 0;
+    EGLint at[32];
+    int n = 0;
+    at[n++] = EGL_WIDTH; at[n++] = dmab.w; at[n++] = EGL_HEIGHT; at[n++] = dmab.h;
+    at[n++] = EGL_LINUX_DRM_FOURCC_EXT; at[n++] = (EGLint)dmab.fourcc;
+    at[n++] = EGL_DMA_BUF_PLANE0_FD_EXT; at[n++] = dmab.fd;
+    at[n++] = EGL_DMA_BUF_PLANE0_OFFSET_EXT; at[n++] = 0;
+    at[n++] = EGL_DMA_BUF_PLANE0_PITCH_EXT; at[n++] = dmab.stride;
+    if (dmab.mod != 0x00ffffffffffffffULL) {
+        at[n++] = EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT; at[n++] = (EGLint)(dmab.mod & 0xffffffff);
+        at[n++] = EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT; at[n++] = (EGLint)(dmab.mod >> 32);
+    }
+    at[n] = EGL_NONE;
+    egl.img = ((PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress("eglCreateImageKHR"))(egl.dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, NULL, at);
+    if (!egl.img) { out("{\"ev\":\"dmabuf_import\",\"ok\":false,\"egl\":\"0x%x\"}", eglGetError()); return -1; }
+    glGenTextures(1, &egl.tex);
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, egl.tex);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    ((PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)eglGetProcAddress("glEGLImageTargetTexture2DOES"))(GL_TEXTURE_EXTERNAL_OES, (GLeglImageOES)egl.img);
+    if (egl.iw != dmab.w || egl.ih != dmab.h) {
+        if (egl.fbo) { glDeleteFramebuffers(1, &egl.fbo); glDeleteTextures(1, &egl.rtex); }
+        glGenTextures(1, &egl.rtex);
+        glBindTexture(GL_TEXTURE_2D, egl.rtex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, dmab.w, dmab.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glGenFramebuffers(1, &egl.fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, egl.fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, egl.rtex, 0);
+        egl.iw = dmab.w; egl.ih = dmab.h;
+    }
+    out("{\"ev\":\"dmabuf_import\",\"ok\":true}");
+    return 0;
+}
+/* rows [y, y + h) of the dmabuf into the picture (B, G, R, X bytes) */
+static int egl_read(int y, int h) {
+    if (egl_import() || !pic || pw != dmab.w || ph != dmab.h) return -1;
+    glBindFramebuffer(GL_FRAMEBUFFER, egl.fbo);
+    glViewport(0, 0, dmab.w, dmab.h);
+    glUseProgram(egl.prog);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, egl.tex);
+    float t0 = dmab.flip ? 1.0f : 0.0f, t1 = dmab.flip ? 0.0f : 1.0f;
+    const GLfloat v[] = { -1, -1, 0, t0,  1, -1, 1, t0,  -1, 1, 0, t1,  1, 1, 1, t1 };
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
+    glEnableVertexAttribArray(0); glEnableVertexAttribArray(1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    uint8_t *rows = pic + (size_t)y * pw * 4;
+    glReadPixels(0, y, dmab.w, h, GL_RGBA, GL_UNSIGNED_BYTE, rows);
+    if (glGetError() != GL_NO_ERROR) return -1;
+    for (size_t i = 0, n = (size_t)pw * h; i < n; i++) { uint8_t r = rows[i * 4]; rows[i * 4] = rows[i * 4 + 2]; rows[i * 4 + 2] = r; }
+    return 0;
+}
+#else
+static void egl_drop_image(void) {}
+static int egl_read(int y, int h) { (void)y; (void)h; return -1; }
+#endif
+
 static void picture_for(int w, int h) {
     if (pic) munmap(pic, plen);
     pic = NULL;
     size_t len = (size_t)w * h * 4;
     int fd = vm_picture_memfd(len);
     if (fd < 0) return;
-    pic = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
+    /* writable: a 3D machine's frames are read back into it here */
+    pic = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (pic == MAP_FAILED) { pic = NULL; close(fd); return; }
     pw = w; ph = h; plen = len;
     VdMsg m = vd_msg(VD_SHM, 0, 0, 0, 0, 0, 0);
@@ -162,7 +273,8 @@ static void from_vd(void) {
         case VD_FRAME:
             if (!vd_rect_inside(&m, pw, ph)) { out("{\"ev\":\"refused\",\"what\":\"frame outside the picture\"}"); break; }
             frames++;
-            if (frames == 1) out("{\"ev\":\"first_frame\",\"w\":%d,\"h\":%d}", pw, ph);
+            if (dmab.fd >= 0) { if (egl_read(m.b, m.d)) dmab.fails++; else dmab.reads++; }
+            if (frames == 1) out("{\"ev\":\"first_frame\",\"w\":%d,\"h\":%d,\"dmabuf\":%s}", pw, ph, dmab.fd >= 0 ? "true" : "false");
             if (!noack) { VdMsg a = vd_msg(VD_FRAME_DONE, 0, 0, 0, 0, m.e, 0); vd_send(vd, &a, -1); }
             break;
         case VD_CURSOR:
@@ -171,8 +283,21 @@ static void from_vd(void) {
             out("{\"ev\":\"cursor\",\"w\":%d,\"h\":%d,\"hot_x\":%d,\"hot_y\":%d}", m.a, m.b, m.c, m.d);
             break;
         case VD_POINTER: break;
+        case VD_DMABUF:
+            egl_drop_image();
+            if (dmab.fd >= 0) close(dmab.fd);
+            dmab.fd = -1;
+            if (m.a && fd >= 0) {
+                dmab.fd = fd; fd = -1;
+                dmab.w = m.a; dmab.h = m.b; dmab.stride = m.c & ~VD_DMABUF_FLIP; dmab.flip = (m.c & VD_DMABUF_FLIP) != 0;
+                dmab.fourcc = (uint32_t)m.d; dmab.mod = (uint64_t)(uint32_t)m.e | (uint64_t)(uint32_t)m.f << 32;
+                out("{\"ev\":\"dmabuf\",\"w\":%d,\"h\":%d,\"stride\":%d,\"flip\":%d,\"fourcc\":\"0x%08x\",\"modifier\":\"0x%016llx\"}", dmab.w, dmab.h,
+                    dmab.stride, dmab.flip, dmab.fourcc, (unsigned long long)dmab.mod);
+            }
+            break;
         case VD_STATE: out("{\"ev\":\"display_state\",\"state\":%d,\"reason\":%d}", m.a, m.b); break;
-        case VD_STATS: out("{\"ev\":\"display_stats\",\"refused\":%d,\"updates\":%d,\"copies\":%d,\"w\":%d,\"h\":%d,\"frame\":%d,\"frames_here\":%ld}", m.a, m.b, m.c, m.d, m.e, m.f, frames); break;
+        case VD_STATS: out("{\"ev\":\"display_stats\",\"refused\":%d,\"updates\":%d,\"copies\":%d,\"w\":%d,\"h\":%d,\"frame\":%d,\"frames_here\":%ld,\"dmabuf_reads\":%ld,\"dmabuf_fails\":%ld}",
+                           m.a, m.b, m.c, m.d, m.e, m.f, frames, dmab.reads, dmab.fails); break;
         }
         if (fd >= 0) close(fd);
     }

@@ -61,6 +61,11 @@ void gpu_set_hooks(void (*lost)(void), void (*changed)(void));
 /* Reads a texture back as premultiplied ARGB pixels (t->w × t->h, rows top to bottom), for the
  * last good frame of a dmabuf window when the GPU goes away. 0 on success. */
 int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h);
+/* Rows [y, y + h) of a texture into px, the texture's own size (t->w × t->h, rows top to bottom), as the B, G, R, X
+ * bytes of x8r8g8b8 (alpha 255), through a framebuffer kept between calls; flip: the texture's first row is the
+ * picture's bottom. For Machines' 3D pictures (js_vm.c, a dmabuf QEMU draws into). 0 on success; -1 without a GPU
+ * context, a stale texture or a GL error. Never waits on anything but the GPU's own work on that texture. */
+int  gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip);
 
 /* One frame: what changed in the UI canvas is uploaded, the layers are drawn and the flip is done.
  * draw_layer(0) = app windows (below the UI), draw_layer(1) = app menus and

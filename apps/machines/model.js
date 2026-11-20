@@ -101,8 +101,23 @@ export function createRequest(d) {
   if (d.source === 'iso') r.iso = d.path; else r.import = d.path;
   if (d.source !== 'iso' && d.rootPassword) r.rootPassword = d.rootPassword;
   if (d.shareClipboard) r.shareClipboard = true;
+  if (d.graphics === '3d') r.graphics = '3d';
   return r;
 }
+
+// 3D graphics (6.10): why a machine can't have them here ('' it can). Machines with the windows device set never do
+// (no stable 3D driver for that system), nor arm64 machines for now; otherwise host.no3d says ("arch", "gpu", "modules",
+// "node")
+export function no3dReason(host, windows, arch = 'amd64') {
+  if (windows) return 'windows';
+  if (arch !== 'amd64') return 'arch';
+  return host ? host.no3d || '' : 'gpu';
+}
+// what a profile's graphics give a machine here: 3D only when it can have them
+export function gfxFor(gfx, host, windows, arch = 'amd64') { return gfx === '3d' && !no3dReason(host, windows, arch) ? '3d' : '2d'; }
+// a running machine with 3D (VM_INFO's VMS_RENDER_NODE): it can't be suspended or keep snapshots with its memory
+export const VMS_RENDER_NODE = 512;
+export function runs3d(st) { return !!st && ((st.sandbox | 0) & VMS_RENDER_NODE) !== 0; }
 
 // the packages Machines still needs for the architectures in use (lord.vm.host().missing), as one list
 // what only some machines need: the TPM (swtpm) for Windows 11 (4.3); asked for when a Windows machine is made, or on
@@ -208,7 +223,8 @@ export function suggestName(sys, version, names = []) {
 }
 
 // Profiles (5.6): only values shown in Configure, scaled to this computer (all but one core at most, memMaxMb), and
-// nothing shared by any of them. Design wants 3D, which comes later: it runs 2D and says so.
+// nothing shared by any of them. Design wants 3D: a Linux machine gets it where this computer can give it (gfxFor),
+// others run 2D and say so.
 export const PROFILES = ['productivity', 'development', 'testing', 'design', 'light'];
 const PROFILE = {
   //            cores (share of host), memory (MB cap, share of RAM), disk GB, network, graphics
