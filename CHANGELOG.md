@@ -153,7 +153,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   A transfer folder belongs to its machine: one left by another machine of the same name, or by a removed machine, is
   kept aside as "<name> (old date)". Downloads through the admin helper now follow GitHub's long redirects. `machine.json`
   goes to schema 7 (`transfer`).
-- `machine.json` schema 6:- `machine.json` schema 6:- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
+- **The desktop answers while it works** (`docs/MAIN-THREAD.md`). lord-server times every JavaScript run on its main
+  thread; a run past 50 ms goes to the session log with what it was, whose window and where (`stall: … ms js …`), native
+  `lord.*` calls past 20 ms and layout or paint past 50 ms are logged by name, and About shows how many pauses the
+  session had. The measurements found a design flaw: the theme's root re-rendered every open app on any setting, window
+  focus or notification, synchronously. Now `AppHost` is memoized, a window's focus is followed only by what reads it,
+  `ThemeProvider` keeps equal tokens, the themes' roots render only for the settings they read (`useTrackedSettings`),
+  the launcher's app list is sorted once and shared, name sorting keeps each name's pieces, and Files draws only what is
+  near the visible part of a big folder. With Store, Settings and Files open, changing a setting went from 161 to 20 ms
+  of frozen pointer and focusing a window from 241 to 31 ms; a folder of 2 220 files opens in 229 ms instead of 1 986 ms.
+  Switches and buttons that start something slow (Settings: displays, users, network and VPN, sharing, network time,
+  Bluetooth, battery, cooling, Flatpak, cloud, web apps; the Store's install, update and remove) flip at once with a
+  spinner and flip back with the error if it fails (SDK: `<Toggle pending>`, `<Button pending|busy>`, `usePending`).
+  Measured on a headless lord-server.
+- `machine.json` schema 6:- `machine.json` schema 6:- `machine.json` schema 6:- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
   `resolution`, `boot_order`, `boot_menu`;
   older files load unchanged.
 - **Machines looks like a native virtualization app** (the look of hypervisaur's screenshots, reimplemented: no code or
