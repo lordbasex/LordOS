@@ -326,5 +326,13 @@ eq('copy line empty files', M.copyLine([{ id: 1, name: 'z', state: 'copying', pc
 eq('guest folder', [M.guestFolder('/home/ana/Descargas/x (2).txt'), M.guestFolder('C:\\Users\\Ana\\Downloads\\x.txt'), M.guestFolder('x.txt'), M.guestFolder('/x')], ['/home/ana/Descargas', 'C:\\Users\\Ana\\Downloads', '', '/']);
 eq('follow stuck', [M.followStuck([1920, 1080], [1784, 830], 0, 5000), M.followStuck([1920, 1080], [1784, 830], 0, 3000), M.followStuck([1920, 1080], [1918, 1080], 0, 9000), M.followStuck(null, [1, 1], 0, 9000)], [true, false, false, false]);
 
+// the boot order (Configure → Boot)
+eq('boot list auto', M.bootList('auto'), ['disk', 'cd', 'network']);
+eq('boot list chosen', M.bootList('network,disk'), ['network', 'disk', 'cd']);
+eq('boot list junk', [M.bootList(undefined), M.bootList('floppy,cd,cd')], [['disk', 'cd', 'network'], ['cd', 'disk', 'network']]);
+eq('boot move', [M.bootMove(['disk', 'cd', 'network'], 2, -1), M.bootMove(['disk', 'cd', 'network'], 0, 1), M.bootMove(['disk', 'cd', 'network'], 0, -1), M.bootMove(['disk', 'cd', 'network'], 2, 1)],
+  [['disk', 'network', 'cd'], ['cd', 'disk', 'network'], ['disk', 'cd', 'network'], ['disk', 'cd', 'network']]);
+eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSummary('network,disk'), M.bootSummary('cd')], [null, null, 'machines.cfg.bootFirst.network', 'machines.cfg.bootFirst.cd']);
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

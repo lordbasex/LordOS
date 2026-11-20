@@ -1574,6 +1574,8 @@ static void build_qemu_args(void) {
         if (any) { arg("-smbios"); arg(t1); }
     }
     if (m->rtc == VM_RTC_LOCAL) { arg("-rtc"); arg("base=localtime"); }
+    /* the firmware's boot menu: SeaBIOS and OVMF wait 5 s at each start for Esc (fw_cfg's etc/boot-menu-wait) */
+    if (m->boot_menu) { arg("-boot"); arg("menu=on,splash-time=5000"); }
     if (uefi) {
         arg("-blockdev"); argj(blockdev_file("fw-code-file", m->firmware_code, 1));
         arg("-blockdev"); argj(blockdev_fmt("raw", "fw-code", "fw-code-file", 1));
@@ -1605,36 +1607,43 @@ static void build_qemu_args(void) {
      * network cards at 0x18 (q35 keeps 0x1f for its own controllers). Serials are letters, digits and "-_." only. */
     char ser[VM_SERIAL_MAX + 16];
     snprintf(ser, sizeof ser, "%s%s", m->disk_serial[0] ? ",serial=" : "", m->disk_serial);
-    /* an unattended install's first start: QEMU gives the installer's kernel (-kernel) boot index 0 */
-    const char *bi_sys = S.unattended ? "1" : "0", *bi_cd = S.unattended ? "2" : "1";
+    /* where the firmware starts from (machine.json's boot_order, vm_boot_indexes): each device's ",bootindex=N", or
+     * nothing for one not listed. An unattended install's first start: QEMU gives the installer's kernel (-kernel)
+     * boot index 0, the rest follow it */
+    int bidx[VM_BOOT_DEVS];
+    vm_boot_indexes(m, S.unattended ? 1 : 0, bidx);
+    char bi_sys[24] = "", bi_cd[24] = "", bi_net[24] = "";
+    if (bidx[VM_BOOT_DISK] >= 0) snprintf(bi_sys, sizeof bi_sys, ",bootindex=%d", bidx[VM_BOOT_DISK]);
+    if (bidx[VM_BOOT_CD] >= 0) snprintf(bi_cd, sizeof bi_cd, ",bootindex=%d", bidx[VM_BOOT_CD]);
+    if (bidx[VM_BOOT_NET] >= 0) snprintf(bi_net, sizeof bi_net, ",bootindex=%d", bidx[VM_BOOT_NET]);
     if (m->devices == VM_DEV_COMPAT) {
         /* devices every system has a driver for (6.22): SATA (AHCI) disks and CD/DVD; q35 has its AHCI built in (ide.0
          * to ide.5), arm64's virt gets one in the system disk's slot */
         const char *bus = arm ? "ahci" : "ide";
         if (arm) { arg("-device"); arg("ich9-ahci,id=ahci,addr=0x1"); }
-        arg("-device"); argf("ide-hd,id=sysdisk,drive=sys,bus=%s.0,bootindex=%s%s", bus, bi_sys, ser);
+        arg("-device"); argf("ide-hd,id=sysdisk,drive=sys,bus=%s.0%s%s", bus, bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
             arg("-device"); argf("ide-hd,id=datadisk%d,drive=data%d,bus=%s.%d%s%s", i + 1, i + 1, bus, i + 1, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
         }
         if (m->iso[0]) {
             arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
             arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
-            arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,drive=cd,bootindex=%s", bus, bi_cd);
+            arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,drive=cd%s", bus, bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
-        } else { arg("-device"); argf("ide-cd,id=cd0,bus=%s.5,bootindex=%s", bus, bi_cd); S.cd_node[0] = 0; }
+        } else { arg("-device"); argf("ide-cd,id=cd0,bus=%s.5%s", bus, bi_cd); S.cd_node[0] = 0; }
     } else if (m->devices == VM_DEV_WINDOWS) {
         /* Windows (4.3): virtio disks (Setup loads viostor from the drivers), the CD/DVD drives on q35's own SATA (ide.4
          * the drivers' disc, ide.5 the installer's), which Setup reads with the drivers it has */
-        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=%s,addr=0x1%s", bi_sys, ser);
+        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys%s,addr=0x1%s", bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
             arg("-device"); argf("virtio-blk-pci,id=datadisk%d,drive=data%d,addr=0x%x%s%s", i + 1, i + 1, 0x10 + i, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
         }
         if (m->iso[0]) {
             arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
             arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
-            arg("-device"); argf("ide-cd,id=cd0,bus=ide.5,drive=cd,bootindex=%s", bi_cd);
+            arg("-device"); argf("ide-cd,id=cd0,bus=ide.5,drive=cd%s", bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
-        } else { arg("-device"); argf("ide-cd,id=cd0,bus=ide.5,bootindex=%s", bi_cd); S.cd_node[0] = 0; }
+        } else { arg("-device"); argf("ide-cd,id=cd0,bus=ide.5%s", bi_cd); S.cd_node[0] = 0; }
         /* xHCI for the USB tablet and the seed disk, before either */
         arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5");
         if (m->drivers[0]) {
@@ -1643,7 +1652,7 @@ static void build_qemu_args(void) {
             arg("-device"); arg("ide-cd,id=cd1,bus=ide.4,drive=drv");
         }
     } else {
-        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys,bootindex=%s,addr=0x1%s", bi_sys, ser);
+        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys%s,addr=0x1%s", bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
             arg("-device"); argf("virtio-blk-pci,id=datadisk%d,drive=data%d,addr=0x%x%s%s", i + 1, i + 1, 0x10 + i, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
         }
@@ -1653,9 +1662,9 @@ static void build_qemu_args(void) {
         if (m->iso[0]) {
             arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
             arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
-            arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0,drive=cd,bootindex=%s", bi_cd);
+            arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0,drive=cd%s", bi_cd);
             snprintf(S.cd_node, sizeof S.cd_node, "cd");
-        } else { arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0,bootindex=%s", bi_cd); S.cd_node[0] = 0; }
+        } else { arg("-device"); argf("scsi-cd,id=cd0,bus=scsi0.0%s", bi_cd); S.cd_node[0] = 0; }
     }
     if (S.win_seed) {
         /* Windows' seed disk (vmunattend.h): a removable USB stick, where Setup looks for Autounattend.xml and $WinPEDriver$ */
@@ -1683,7 +1692,7 @@ static void build_qemu_args(void) {
     if (m->network == VM_NET_BRIDGED) {
         /* the macvtap's device, opened by lord-vm (6.5): the card straight on it; no vhost (QEMU opens no device) */
         arg("-netdev"); arg("tap,id=nic0,fd=6,vhost=off");
-        arg("-device"); argf("%s,netdev=nic0,mac=%s,addr=0x2", NICDEV[m->nic_model], m->mac);
+        arg("-device"); argf("%s,netdev=nic0,mac=%s,addr=0x2%s", NICDEV[m->nic_model], m->mac, bi_net);
     }
     if (m->network == VM_NET_SHARED || m->network == VM_NET_HOSTONLY) {
         /* The card sits on a hub, and passt on another port of it: when passt ends, a new one is put on a new port
@@ -1692,7 +1701,7 @@ static void build_qemu_args(void) {
         arg("-netdev"); arg("hubport,id=nic0,hubid=0");
         arg("-netdev"); arg("stream,id=pst0,addr.type=fd,addr.str=6");
         arg("-netdev"); arg("hubport,id=hp0,hubid=0,netdev=pst0");
-        arg("-device"); argf("%s,netdev=nic0,mac=%s,addr=0x2", NICDEV[m->nic_model], m->mac);
+        arg("-device"); argf("%s,netdev=nic0,mac=%s,addr=0x2%s", NICDEV[m->nic_model], m->mac, bi_net);
     }
     /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces; not connected */
     for (int i = 0; i < m->n_extra_macs; i++) { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
@@ -4627,10 +4636,16 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     VmPort port[VM_PORTS];
     int nport = 0, ports_set = 0;
     const char *bridge = NULL;
+    /* where the machine starts from: --boot-order auto|disk,cd,network (in any order, any of them), --boot-menu on|off.
+     * Allowed while suspended: bootindex and the boot menu are fw_cfg data the saved stream doesn't carry (a state saved
+     * with the disk first loaded with the network first and the menu on, and the guest went on as it was) */
+    int boot[VM_BOOT_DEVS], nboot = -1, bmenu = -1;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
         i++;
+        if (!strcmp(a, "--boot-order")) { nboot = vm_boot_parse(v, boot); if (nboot < 0) { fprintf(stderr, "lord-vm: --boot-order auto, or disk, cd and network in the order wanted (\"network,disk\")\n"); return 2; } continue; }
+        if (!strcmp(a, "--boot-menu")) { bmenu = parse_enum(v, "off", "on"); if (bmenu < 0) { fprintf(stderr, "lord-vm: --boot-menu on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--port")) {
             if (nport >= VM_PORTS) { fprintf(stderr, "lord-vm: at most %d forwarded ports\n", VM_PORTS); return 2; }
             if (vm_port_parse(v, &port[nport])) { fprintf(stderr, "lord-vm: --port tcp|udp:HOST:GUEST[:this-computer|lan], this computer's port %d to 65535\n", VM_PORT_HOST_MIN); return 2; }
@@ -4717,6 +4732,9 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (vol >= 0) m.volume = vol;
     if (mic >= 0) m.microphone = mic;
     if (sound >= 0 || vol >= 0 || mic >= 0) m.schema = VM_SCHEMA;
+    if (nboot >= 0) { m.n_boot = nboot; memcpy(m.boot_order, boot, sizeof boot[0] * (size_t)nboot); }
+    if (bmenu >= 0) m.boot_menu = bmenu;
+    if (m.n_boot || m.boot_menu) m.schema = VM_SCHEMA;
     if (shares_set) {
         const struct passwd *pw = getpwuid(getuid());
         char home[PATH_MAX], lib[PATH_MAX], parent[PATH_MAX];
@@ -4769,9 +4787,11 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
-    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\"}\n", m.vcpus, m.memory_mb, m.disk_gb,
-           VM_NET_NAMES[m.network], m.n_ports, m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices], VM_NIC_MODELS[m.nic_model],
-           m.graphics == VM_GFX_3D ? "3d" : "2d");
+    char bspec[32];
+    vm_boot_spec(&m, bspec, sizeof bspec);
+    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\",\"boot_order\":\"%s\",\"boot_menu\":%s}\n",
+           m.vcpus, m.memory_mb, m.disk_gb, VM_NET_NAMES[m.network], m.n_ports, m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices],
+           VM_NIC_MODELS[m.nic_model], m.graphics == VM_GFX_3D ? "3d" : "2d", bspec, m.boot_menu ? "true" : "false");
     rc = 0;
 out:
     close(lock);
@@ -6267,6 +6287,7 @@ static int usage(void) {
             "                         [--network shared|isolated|bridged|hostonly] [--bridge CARD]   (bridged: a wired card's name)\n"
             "                         [--port tcp|udp:HOST:GUEST[:this-computer|lan] ...] [--ports none]   (forwarded ports, replacing the list)\n"
             "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both] [--graphics 2d|3d]   (also on --create)\n"
+            "                         [--boot-order auto|disk,cd,network (any order, any of them)] [--boot-menu on|off]\n"
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
             "                         [--sound on|off] [--volume 0..100] [--microphone on|off]   (with the machine off; Machines changes them live)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"

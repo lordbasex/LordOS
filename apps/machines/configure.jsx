@@ -1,10 +1,10 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
-// while the machine is off; what the app keeps (system, notes) is saved at once. Sections of later phases say so.
+// while the machine is off; what the app keeps (system, notes) is saved at once.
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary } from './model.js';
+  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, bootList, bootMove, bootSummary } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
@@ -31,10 +31,6 @@ function Row({ label, value, children, last, note }) {
 }
 // a control that can't change now (the machine runs): dimmed and not clickable
 const Off = ({ off, children }) => <View style={{ opacity: off ? 0.45 : 1, pointerEvents: off ? 'none' : 'auto' }}>{children}</View>;
-function Later({ text }) {
-  const p = usePal();
-  return <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.raised }}><Text style={{ fontSize: 13, color: p.dim, textAlign: 'start', lineHeight: 1.5 }}>{text || tr('machines.cfg.later')}</Text></View>;
-}
 
 // Configure → Network (6.5): the mode, the wired card of a bridged machine, the forwarded ports of a shared or host-only
 // one. Everything here needs the machine off; lord-vm checks it all again (machine.c, vm_ports_check).
@@ -143,10 +139,11 @@ export function Configure({ dir, section: section0, onClose }) {
   const running = stateView(m.state).active;
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', shares: m.shares || [],
-    graphics: m.graphics || '2d', ...draft };
+    graphics: m.graphics || '2d', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu, ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
-  const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || []) : val !== (k === 'bridge' ? m.bridge || '' : m[k]));
+  const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -188,7 +185,8 @@ export function Configure({ dir, section: section0, onClose }) {
       m.shares.length === 1 ? tr('machines.cfg.shareSum1') : tr('machines.cfg.shareSum', { n: m.shares.length })].filter(Boolean).join(', ')
       : tr(`machines.cfg.clipSum.${m.clipboard || 'off'}`),
     agent: m.agent ? (m.agentState === 'connected' ? tr('machines.agent.connected') : tr('machines.cfg.agentOn')) : tr('machines.cfg.agentOffSum'),
-    boot: [m.firmware === 'uefi' ? 'UEFI' : 'BIOS', m.tpm ? tr('machines.cfg.tpm') : null, m.firmware === 'uefi' && m.secureBoot ? tr('machines.cfg.secureBoot') : null].filter(Boolean).join(', '),
+    boot: [m.firmware === 'uefi' ? 'UEFI' : 'BIOS', bootSummary(m.bootOrder) ? tr(bootSummary(m.bootOrder)) : null, m.tpm ? tr('machines.cfg.tpm') : null,
+      m.firmware === 'uefi' && m.secureBoot ? tr('machines.cfg.secureBoot') : null].filter(Boolean).join(', '),
     security: tr('machines.cfg.sum.security'),
   };
   const offNote = running ? tr('machines.cfg.needsOff') : null;
@@ -366,9 +364,31 @@ export function Configure({ dir, section: section0, onClose }) {
       {/* TPM 2.0 (swtpm) and Secure Boot: machine.json's tpm and secure_boot, set when the machine is made */}
       <Row label={tr('machines.cfg.tpm')} value={tr(m.tpm ? 'machines.cfg.on' : 'machines.cfg.off')} note={tr('machines.cfg.setAtCreate')} />
       {m.firmware === 'uefi' ? <Row label={tr('machines.cfg.secureBoot')} value={tr(m.secureBoot ? 'machines.cfg.on' : 'machines.cfg.off')} note={tr('machines.cfg.setAtCreate')} /> : null}
-      <Row label={tr('machines.cfg.bootOrder')} value={m.iso ? tr('machines.cfg.bootDiskThenCd') : tr('machines.cfg.bootDisk')} last note={tr('machines.cfg.bootNote')} />
     </Group>
-    <Later text={tr('machines.cfg.laterBoot')} />
+    {/* where it starts from (machine.json's boot_order): automatic, or the devices in the order the firmware tries them */}
+    <Group>
+      <Row label={tr('machines.cfg.bootOrder')} last={cur.bootOrder === 'auto'}
+        value={cur.bootOrder === 'auto' ? (m.iso ? tr('machines.cfg.bootDiskThenCd') : tr('machines.cfg.bootDisk')) : null}
+        note={(cur.bootOrder === 'auto' ? tr('machines.cfg.bootNote') : tr('machines.cfg.bootCustomNote')) + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><Segmented small value={cur.bootOrder === 'auto' ? 'auto' : 'custom'}
+          onChange={(x) => set({ bootOrder: x === 'auto' ? 'auto' : bootList(m.bootOrder !== 'auto' && m.bootOrder ? m.bootOrder : 'auto').join(',') })}
+          options={[['auto', tr('machines.cfg.bootAuto')], ['custom', tr('machines.cfg.bootCustom')]]} /></Off>
+      </Row>
+      {cur.bootOrder === 'auto' ? null : bootList(cur.bootOrder).map((d, i, a) => (
+        <Row key={d} label={`${i + 1}. ${tr(`machines.cfg.bootDev.${d}`)}`} last={i === a.length - 1}
+          note={d === 'network' && m.network === 'isolated' ? tr('machines.cfg.bootNetNone') : null}>
+          <Off off={running}><View style={{ flexDirection: 'row', gap: 8 }}>
+            <Btn label={tr('machines.cfg.bootUp')} disabled={running || i === 0} onClick={() => set({ bootOrder: bootMove(a, i, -1).join(',') })} style={{ height: 28 }} />
+            <Btn label={tr('machines.cfg.bootDown')} disabled={running || i === a.length - 1} onClick={() => set({ bootOrder: bootMove(a, i, 1).join(',') })} style={{ height: 28 }} />
+          </View></Off>
+        </Row>
+      ))}
+    </Group>
+    <Group>
+      <Row label={tr('machines.cfg.bootMenu')} last note={tr('machines.cfg.bootMenuNote') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><Toggle on={cur.bootMenu} onChange={(x) => set({ bootMenu: x })} /></Off>
+      </Row>
+    </Group>
   </>;
   else if (sec === 'security') pane = <Group>
     {['sandbox', 'files', 'network', 'limits', 'display', 'secrets'].map((k, i, a) => {
@@ -378,7 +398,7 @@ export function Configure({ dir, section: section0, onClose }) {
     })}
   </Group>;
 
-  const savable = ['general', 'cpu', 'network', 'disks', 'sharing', 'agent'].includes(sec);
+  const savable = ['general', 'cpu', 'network', 'disks', 'sharing', 'agent', 'boot'].includes(sec);
   const list = (
     <View style={{ width: 250, ...(side.narrow ? { flex: 1 } : null), paddingHorizontal: 10, paddingVertical: 12, gap: 2,
       backgroundColor: p.dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)', borderEndWidth: 1, borderColor: p.line }}>
