@@ -59,6 +59,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **The desktop no longer stalls while the Store installs a Flathub app** (`sdk/flathub.js`, `apps/store/flathubpages.js`):
+  every line flatpak printed changed the Store's state, which redrew the 60 cards of the Flathub page and filtered and
+  sorted the 2 242 apps of the catalog again, several times a second. Progress now reaches the page at most every
+  250 ms and only its progress bar redraws; each card follows only whether its app is installed, the filtered list is
+  kept until the catalog, the search or the switch changes, and each name is folded once when sorting.
 - **Flatpak's Spawn portal compares fd handles as unsigned numbers** (`server/src/fpspawn.c`): a handle of 2³¹ or more read
   as a negative index before. Not reachable in practice, since LordOS's D-Bus client already refuses any message whose fd index
   is past the fds that came with it; fixed as defense in depth after an automated security review.

@@ -126,15 +126,26 @@ async function job(kind, app, steps) {
   if (state.get().job) return false;
   const since = Date.now();
   patch({ job: { kind, id: app ? app.id : '', name: app ? app.name : '', pct: null, line: '' }, msg: null });
+  // flatpak prints many progress lines a second: they are gathered and the state changes at most every 250 ms (each
+  // change redraws the Store's Flathub page; one per line froze the desktop while a big app downloaded)
+  let pend = null, timer = 0;
+  const flush = () => {
+    timer = 0;
+    const p = pend;
+    pend = null;
+    if (p) state.set((s) => (s.job ? { ...s, job: { ...s.job, line: p.line || s.job.line, pct: p.pct == null ? s.job.pct : p.pct } } : s));
+  };
   const onLine = (line) => {
     const pct = M.progressOf(line);
-    state.set((s) => ({ ...s, job: s.job && { ...s.job, line: line.trim().slice(0, 200) || s.job.line, pct: pct == null ? s.job.pct : pct } }));
+    pend = { line: line.trim().slice(0, 200) || pend?.line || '', pct: pct == null ? pend?.pct ?? null : pct };
+    if (!timer) timer = setTimeout(flush, 250);
   };
   let last = { code: 0, lines: [] };
   for (const [name, ref] of steps) {
     last = await run(name, ref, onLine);
     if (last.code !== 0) break;
   }
+  if (timer) { clearTimeout(timer); timer = 0; pend = null; }
   await refreshInstalled();
   refreshApps();
   const ok = last.code === 0;

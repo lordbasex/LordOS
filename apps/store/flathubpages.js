@@ -3,7 +3,7 @@
 // apps unless the setting shows the rest), each app's page with what it declares and what LordOS changes before it is
 // installed, the apps that need Flatpak's sub-sandboxes (Chromium, Electron) marked "not yet supported", and the
 // installed ones with Update and Remove. The jobs and state are sdk/flathub.js's; the logic sdk/flathubmodel.js's.
-import { createElement as h, useEffect, useState } from 'react';
+import { createElement as h, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, Image, Button, GroupBox, Toggle, LetterIcon, useTheme, useStore, useLauncherApps, launchApp, admin, formatBytes, errorText, settings,
   flathubModel as M, typeScale, spacing, t,
@@ -23,7 +23,9 @@ const Header = ({ th, children }) => h(Text, { style: { fontSize: typeScale.body
 
 // The section is shown when this PC can have Flathub and the user turned it on.
 export const useFlathub = () => {
-  useStore(F.state);
+  // redrawn when a job starts or ends, or the catalog or the installed apps change (whether Flatpak is there may
+  // change then), never on a job's progress lines
+  useStore(F.state, (x) => `${x.loaded}|${x.installed.length}|${x.job ? 1 : 0}|${x.busy}|${x.catalog.length}`);
   const p = M.prefsOf(useStore(settings, (st) => st.flathub));
   return { supported: F.supported(), on: p.on && F.available(), prefs: p };
 };
@@ -46,8 +48,8 @@ const catLabel = (a) => {
 const openApp = (id) => launchApp(`flatpak:${id}`);
 
 export function FlathubCard({ a, onOpen }) {
-  const s = useStore(F.state);
-  const installed = s.installed.some((x) => x.id === a.id);
+  // only whether this app is installed: a job's progress doesn't redraw every card
+  const installed = useStore(F.state, (s) => s.installed.some((x) => x.id === a.id));
   return h(Card, {
     icon: h(FlathubIcon, { a, size: 56 }), name: a.name, tag: 'Flathub', kind: [catLabel(a), a.developer].filter(Boolean).join(' · '), summary: a.summary,
     note: a.verified ? '' : t('flathub.unverifiedShort'),
@@ -149,22 +151,26 @@ function InstalledList({ onOpen }) {
 
 export function FlathubPage({ query, onOpen }) {
   const th = useTheme();
-  const s = useStore(F.state);
+  // what the page itself shows; a job's progress is JobProgress's own (it changes several times a second)
+  const catalog = useStore(F.state, (x) => x.catalog);
+  const loaded = useStore(F.state, (x) => x.loaded);
+  const working = useStore(F.state, (x) => !!x.busy || !!x.job);
+  const s = { catalog, loaded };
   const fh = useFlathub();
   const [limit, setLimit] = useState(PAGE);
   useEffect(() => { setLimit(PAGE); }, [query, fh.prefs.showAll]);
   useEffect(() => { if (fh.on) { if (!s.loaded) F.loadCatalog(); F.refreshInstalled(); } }, [fh.on]);
+  const list = useMemo(() => M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll }), [s.catalog, query, fh.prefs.showAll]);
+  const hidden = useMemo(() => (fh.prefs.showAll ? 0 : s.catalog.length - s.catalog.filter((a) => a.verified).length), [s.catalog, fh.prefs.showAll]);
   if (!fh.supported) return h(Line, { th }, t('flathub.notSupported'));
   if (!fh.on) return h(View, null, h(TurnOn));
-  const list = M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll });
-  const hidden = fh.prefs.showAll ? 0 : s.catalog.length - s.catalog.filter((a) => a.verified).length;
   return h(View, null,
     h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.l, textAlign: 'start' } }, t('flathub.subtitle')),
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.l } },
       h(Toggle, { on: fh.prefs.showAll, onChange: (v) => F.setPrefs({ showAll: v }) }),
       h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } },
         fh.prefs.showAll ? t('flathub.showAllOn') : t('flathub.showAllOff', { count: hidden })),
-      h(Button, { small: true, label: t('flathub.refresh'), disabled: !!s.busy || !!s.job, onClick: () => F.loadCatalog({ fetch: true }) }),
+      h(Button, { small: true, label: t('flathub.refresh'), disabled: working, onClick: () => F.loadCatalog({ fetch: true }) }),
       h(Button, { small: true, label: t('flathub.turnOff'), onClick: F.turnOff })),
     h(JobProgress),
     h(InstalledList, { onOpen }),

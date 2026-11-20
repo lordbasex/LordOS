@@ -126,14 +126,11 @@ export function filterCatalog(cat, { query = '', showAll = false, category = nul
     && (!category || String(a.categories || '').split(';').includes(category))
     && (!words.length || words.every((w) => fold(`${a.name} ${a.summary} ${a.developer} ${a.id}`).includes(w))));
   // by name; while searching, the apps whose name starts with the first word come first
+  // each name folded once, not in every comparison (thousands of apps)
   const first = words[0];
-  return out.sort((a, b) => {
-    if (first) {
-      const sa = fold(a.name).startsWith(first) ? 0 : 1, sb = fold(b.name).startsWith(first) ? 0 : 1;
-      if (sa !== sb) return sa - sb;
-    }
-    return fold(a.name) < fold(b.name) ? -1 : fold(a.name) > fold(b.name) ? 1 : 0;
-  });
+  const keyed = out.map((a) => { const n = fold(a.name); return { a, n, s: first && n.startsWith(first) ? 0 : 1 }; });
+  keyed.sort((x, y) => (x.s !== y.s ? x.s - y.s : x.n < y.n ? -1 : x.n > y.n ? 1 : 0));
+  return keyed.map((x) => x.a);
 }
 
 // How many shown apps each category has (the sidebar's counts).
