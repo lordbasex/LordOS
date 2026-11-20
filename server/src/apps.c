@@ -886,6 +886,7 @@ int apps_launch_with(const char *id, const char *path) {
  * (never systemd/ in it: otherwise `flatpak run` has the user manager move it out of the scope). Phase 1: x86-64. */
 
 /* /usr/bin/flatpak root's and not writable by anyone else */
+__attribute__((unused))   /* unused off x86-64: phase 1 launches Flatpak apps only there */
 static int flatpak_binary_ok(void) {
     struct stat st;
     return !lstat(FPAK_FLATPAK, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && !(st.st_mode & 022) && (st.st_mode & 0111);
@@ -1012,6 +1013,7 @@ static void flatpak_x11(FilesPlan *p) {
     }
 }
 
+__attribute__((unused))   /* unused off x86-64: phase 1 launches Flatpak apps only there */
 static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *opened) {
     FilesPlan *p = view_plan(NULL);
     if (!p) return NULL;
