@@ -240,11 +240,12 @@ function Card({ title, text, actions, width = 460, extra }) {
   );
 }
 
-// Off or suspended: the last picture, dimmed, and one round Play in the middle (a player's, 5.3)
-function OffView({ dir, name, title, hint, label, onPlay }) {
+// Off or suspended: one round Play in the middle (a player's, 5.3) on black. Only a suspended machine shows its last
+// picture behind it, dimmed (it resumes to that); an off one doesn't (it was a shutdown or firmware screen, 2026-11-20)
+function OffView({ dir, name, title, hint, label, onPlay, picture }) {
   const [hover, setHover] = useState(false);
   let src = '';
-  try { const st = fs.stat(`${dir}/thumb.png`); src = thumbSrc(dir, st?.mtime || 0); } catch (e) { src = ''; }
+  if (picture) { try { const st = fs.stat(`${dir}/thumb.png`); src = thumbSrc(dir, st?.mtime || 0); } catch (e) { src = ''; } }
   return (
     <View style={{ position: 'absolute', left: 0, right: 0, top: BAR, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0c0c0f' }}>
       {src ? <Image src={src} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, objectFit: 'cover', opacity: 0.35 }} /> : null}
@@ -387,7 +388,10 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       setStuck((x) => (x === stuckNow ? x : stuckNow));
       if (q.filesSeq !== filesSeen.current || (q.ended && filesSeen.current !== -2)) { filesSeen.current = q.ended ? -2 : q.filesSeq; onFiles.current?.(lord.vm.files(sid)); }
       // the card picture in the library, every few seconds while it runs
-      if (q.display === 'up' && q.state === 'running' && now() - z.thumb > THUMB_MS) { z.thumb = now(); lord.vm.snapshot(sid); }
+      // only while the guest's system is up (its agent answers, when it has one): never its firmware, boot or shutdown
+      // screens, which a card would otherwise keep
+      const sysUp = !cfgRef.current?.agent || q.agent?.state === 'connected';
+      if (q.display === 'up' && q.state === 'running' && sysUp && !closingRef.current && now() - z.thumb > THUMB_MS) { z.thumb = now(); lord.vm.snapshot(sid); }
       if (q.ended) {
         lord.vm.close(sid);
         setSid(0);
@@ -491,7 +495,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     wheel.current = rest;
     if (n) lord.vm.wheel(sid, n, 0);
   };
-  const cmd = (c) => { if (sid) { if (c === 'shutdown' && st?.state === 'running') lord.vm.snapshot(sid); lord.vm.cmd(sid, c); } };
+  const cmd = (c) => { if (sid) { if (c === 'shutdown' && st?.state === 'running' && (!cfgRef.current?.agent || st?.agent?.state === 'connected')) lord.vm.snapshot(sid); lord.vm.cmd(sid, c); } };
   const cad = () => {
     if (!sid) return;
     CTRL_ALT_DEL.forEach((k) => lord.vm.key(sid, k, 1));
@@ -662,7 +666,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   else if (!sid && st) {
     if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={() => begin()} onSettings={() => setCfgSheet({})}
       onAnyway={() => begin({ resumeAnyway: true })} onDiscard={() => begin({ discardState: true })} />;
-    else if (v.key === 'suspended') card = <OffView dir={dir} name={name} title={tr('machines.state.suspended')} hint={tr('machines.win.suspendedHint')} label={tr('machines.cmd.resume')} onPlay={() => begin()} />;
+    else if (v.key === 'suspended') card = <OffView picture dir={dir} name={name} title={tr('machines.state.suspended')} hint={tr('machines.win.suspendedHint')} label={tr('machines.cmd.resume')} onPlay={() => begin()} />;
     else card = <OffView dir={dir} name={name} title={tr(`machines.state.${v.key}`)} hint={tr('machines.win.playHint')} label={tr('machines.start')} onPlay={() => begin()} />;
   } else if (!st || st.state === 'starting' || (st.display !== 'up' && st.display !== 'none' && st.display !== 'lost' && (st.state === 'running' || st.state === 'paused'))) {
     card = <Card title={tr('machines.win.starting', { name })} text={tr('machines.win.startingHint')} />;
