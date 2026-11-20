@@ -66,6 +66,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines in full screen keep a menu open under the pointer** (`apps/machines/vmwindow.jsx`): the floating bar hid as
+  soon as the pointer left it to reach a menu's items (the resolution menu went away); it now stays while a menu is open.
+- **One pointer over a machine that draws its own** (`server/src/media/media.c`, `server/src/ui/js_vm.c`): guests on
+  the device set of the new card in `docs/VIRTUALIZATION.md` 4.3 draw their pointer into the picture and hand none over,
+  so LordOS's arrow showed beside it; it's hidden over their picture until the guest hands one over.
+- **The guest agent names the guest's system rightly** (`server/src/vm/lordvm.c`): a build of 22000 or more that still
+  calls itself "10" is shown as 11, and the clipboard helper (a Linux program) is no longer offered to such a guest,
+  where installing it failed on a path that doesn't exist there.
 - **An unattended install from the New Machine assistant no longer stops in the firmware's menu**
   (`server/src/vm/lordvm.c`): the Enters that answer the install disc's "Press any key to boot from CD or DVD" were only
   sent when lord-vm started the machine running, and Machines starts it paused until its window is there, so the

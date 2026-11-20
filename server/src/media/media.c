@@ -381,8 +381,17 @@ void media_src_cursor_visible(int id, int on) {
     cursor_serial++;
 }
 
+void media_src_cursor_guest_draws(int id, int on) {
+    MediaSrc *s = media_src_get(id);
+    if (!s || s->guest_draws == !!on) return;
+    s->guest_draws = !!on;
+    cursor_serial++;
+}
+
 int media_node_cursor(int id, const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *gen) {
     MediaSrc *s = media_src_get(id);
+    /* a guest that draws its own pointer into the picture and never handed one over: no second arrow */
+    if (s && !s->cur_mode && s->guest_draws) { *gen = 0xe0000000u + (cursor_serial & 0x0fffffffu); return 2; }
     /* the guest turned its pointer off (its cursor plane: a text console, or X just quit): the host's arrow, so
      * there's always a pointer to aim with; a fully transparent image is an app hiding it on purpose */
     if (!s || !s->cur_mode || s->cur_off) return 0;

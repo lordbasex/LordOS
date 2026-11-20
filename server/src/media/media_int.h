@@ -58,6 +58,8 @@ typedef struct {
     McurImage cur;              /* as the source sent it, premultiplied and cut */
     int cur_mode;               /* 0 none (the host's arrow), 1 the image, 2 hidden */
     int cur_off;                /* the source said its pointer is hidden right now */
+    int guest_draws;            /* the guest draws its pointer into the picture itself (Windows' display drivers): no
+                                 * host arrow over it until it hands one over (a second arrow beside its own) */
     McurImage cur_shown;        /* cur at cur_shown_f */
     float cur_shown_f;
     uint32_t *mip[8];           /* halvings (large photos) */

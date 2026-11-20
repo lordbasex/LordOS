@@ -857,6 +857,7 @@ static struct {
     long long ag_next, sync_at, ping_at, journal_at, shutdown_at, acpi_at;
     long sync_id;
     char ag_version[48], ag_os[96], jcursor[256];
+    int ag_windows;                      /* the guest said it's Windows (guest-get-osinfo "id": "mswindows") */
     long jpid;                              /* a journalctl running in the guest (guest-exec), 0 none */
     int keep_awake, inhibit_done;
     uint8_t *lag_buf;
@@ -2593,6 +2594,10 @@ static void on_qga_reply(const JVal *root, int ok) {
         for (const unsigned char *q = (const unsigned char *)(n ? n : ""); *q && k + 1 < sizeof clean; q++) if (*q >= 0x20 && *q != 0x7f) clean[k++] = (char)*q;
         clean[k] = 0;
         if (!ag_utf8_ok((const uint8_t *)clean, k)) clean[0] = 0;
+        /* Windows 11 still calls itself "Windows 10 ..." there; its build (kernel-release) is 22000 or more */
+        const char *oid = ok ? json_str(r, "id") : NULL, *rel = ok ? json_str(r, "kernel-release") : NULL;
+        S.ag_windows = oid && !strcmp(oid, "mswindows");
+        if (S.ag_windows && rel && atol(rel) >= 22000 && !strncmp(clean, "Windows 10", 10)) clean[9] = '1';
         snprintf(S.ag_os, sizeof S.ag_os, "%s", clean);
         S.ag_state = -1;
         ag_set(VAS_CONNECTED);
@@ -2965,6 +2970,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (!S.qga_up) { reply(ci, m->seq, VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
         if (m->a == VAG_SHUTDOWN) { qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1); reply(ci, m->seq, VME_OK, ""); return; }
         if (m->a == VAG_TIMESYNC) { ag_timesync(); reply(ci, m->seq, VME_OK, ""); return; }
+        if (S.ag_windows) { reply(ci, m->seq, VME_WRONG_STATE, "lordos-guest is for Linux guests"); return; }
         if (!S.helper || S.helper_handle || !(S.ag_caps & VAC_FILES) || !(S.ag_caps & VAC_EXEC)) { reply(ci, m->seq, VME_WRONG_STATE, S.helper ? "the guest agent can't write files or run commands" : "lordos-guest isn't available for this machine's architecture"); return; }
         S.install_client = ci; S.install_seq = m->seq;
         S.helper_handle = -1;

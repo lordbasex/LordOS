@@ -84,7 +84,8 @@ function AgentPop({ ctl, onClose }) {
         </View>
         {on ? (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-            <Pill label={g.install === 1 ? tr('machines.agent.installing') : tr('machines.agent.installHelper')} disabled={g.install === 1} onClick={() => lord.vm.agent(ctl.sid, 'install')} />
+            {/^windows/i.test(g.system || '') ? null
+              : <Pill label={g.install === 1 ? tr('machines.agent.installing') : tr('machines.agent.installHelper')} disabled={g.install === 1} onClick={() => lord.vm.agent(ctl.sid, 'install')} />}
             <Pill label={tr('machines.agent.timesync')} onClick={() => lord.vm.agent(ctl.sid, 'timesync')} />
           </View>
         ) : null}
@@ -113,7 +114,7 @@ function Tools({ ctl, floating, compact }) {
   const clipItems = [
     ...['both', 'to-guest', 'from-guest', 'off'].map((x) => ({ label: tr(`machines.cfg.clip.${x}`), checked: clip === x, disabled: true })),
     '-',
-    g?.state === 'connected' && clipOn && !(g.caps & AGENT_CAPS.clipboard)
+    g?.state === 'connected' && clipOn && !(g.caps & AGENT_CAPS.clipboard) && !/^windows/i.test(g.system || '')
       ? { label: g.install === 1 ? tr('machines.agent.installing') : tr('machines.agent.installHelper'), disabled: g.install === 1, onClick: () => lord.vm.agent(ctl.sid, 'install') } : null,
     { label: tr('machines.tb.clipChange'), onClick: () => ctl.configure('sharing') },
   ];
@@ -187,12 +188,20 @@ function FloatingBar({ ctl, name }) {
   const p = usePal();
   const [near, setNear] = useState(true);
   const [hint, setHint] = useState(true);
-  useEffect(() => { const a = setTimeout(() => setNear(false), 2500), b = setTimeout(() => setHint(false), 5000); return () => { clearTimeout(a); clearTimeout(b); }; }, []);
+  // the bar stays while one of its menus is open (the pointer leaves it to reach the menu's items, 2026-11-20: the
+  // resolution menu went away under the pointer) and hides once the menu closes with the pointer elsewhere
+  const over = useRef(true);
+  const leave = () => { over.current = false; if (!menus.open) setNear(false); };
+  useEffect(() => {
+    const a = setTimeout(() => { if (!menus.open) setNear(false); over.current = false; }, 2500), b = setTimeout(() => setHint(false), 5000);
+    const c = setInterval(() => { if (!over.current && !menus.open) setNear(false); }, 300);
+    return () => { clearTimeout(a); clearTimeout(b); clearInterval(c); };
+  }, []);
   const v = stateView(ctl.st?.state, ctl.st?.reason);
   return <>
-    <View onMouseEnter={() => setNear(true)} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: near ? 70 : 4, alignItems: 'center' }}>
+    <View onMouseEnter={() => { over.current = true; setNear(true); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: near ? 70 : 4, alignItems: 'center' }}>
       {near ? (
-        <View onMouseLeave={() => setNear(false)} style={{ marginTop: 10, height: 46, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 14, paddingRight: 8,
+        <View onMouseEnter={() => { over.current = true; }} onMouseLeave={leave} style={{ marginTop: 10, height: 46, flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 14, paddingRight: 8,
           borderRadius: 14, backgroundColor: 'rgba(28,28,33,0.94)', boxShadow: '0 10px 28px rgba(0,0,0,0.45)' }}>
           <StateDot tone={v.tone} size={9} />
           <Text style={{ marginLeft: 6, marginRight: 10, fontSize: 13, fontWeight: 700, color: '#f2f2f5' }}>{name}</Text>

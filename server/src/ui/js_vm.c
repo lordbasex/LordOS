@@ -1355,6 +1355,12 @@ static void set_picture(Sess *s, int w, int h) {
     free(m->cache); m->cache = NULL; m->cache_w = m->cache_h = 0;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->xrgb = 1; m->frame_seq++;
     if (!s->media && s->cur) media_src_cursor(m->id, s->cur, s->cur_w, s->cur_h, s->cur_hx, s->cur_hy);
+    if (!s->media) {
+        /* Windows draws its pointer into the picture (no cursor plane with its display drivers): LordOS's arrow
+         * over it was a second one (2026-11-20) */
+        VmMachine vm;
+        if (!vm_machine_load(s->dir, &vm, NULL, 0) && vm.devices == VM_DEV_WINDOWS) media_src_cursor_guest_draws(m->id, 1);
+    }
     s->media = m->id; s->w = w; s->h = h;
     s->ack_pending = 0;
     VdMsg r = vd_msg(VD_SHM, 0, 0, 0, 0, 0, 0);
