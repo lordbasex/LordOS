@@ -139,7 +139,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   lord-server through a private same-user socket made only inside a Machines guest, and the guest's desktop leaves out
   wallpaper, widgets, Dock and bars while apps mode is on. Other Linux systems don't list their windows, so the button
   says apps mode needs LordOS or the guest tools. Not yet seen drawing on a real display.
-- `machine.json` schema 6:- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
+- **Machines: a transfer folder for each machine, fast both ways** (`docs/VIRTUALIZATION.md` 6.7.1). Every new machine has
+  `~/Machines/Transfer/<name>/`, shared into the machine with virtiofs (tag `LordOS`; Configure → Sharing → "Transfer
+  folder", `lord-vm --set DIR --transfer on|off`; existing machines keep their hardware until it's turned on). A Linux
+  machine mounts it by itself at `/mnt/LordOS`, with a `LordOS` folder in each person's home; the machines of the card in
+  4.3 get it as a drive once WinFsp 2.1 is installed ("Set Up the Transfer Folder" downloads the pinned installer, checks
+  its hash and signature in the guest and installs it; done by itself after an unattended install). Files dropped on a
+  machine's window go through it, each in a private folder of its own, and are named in the machine only after their
+  size and SHA-256 match the file dropped: 2 GB reaches an Ubuntu guest's Downloads in 17.6 s and the other card's guest
+  in 25.6 s, against about 75 s through the guest agent, which stays as the fallback. What the machine saves in its
+  LordOS folder or drive appears here at once (2 GB in about 2.5 s). The guests of the card in 4.3 find the drive by a
+  token only LordOS wrote; every account of such a guest can read a dropped file while it passes through (documented).
+  A transfer folder belongs to its machine: one left by another machine of the same name, or by a removed machine, is
+  kept aside as "<name> (old date)". Downloads through the admin helper now follow GitHub's long redirects. `machine.json`
+  goes to schema 7 (`transfer`).
+- `machine.json` schema 6:- `machine.json` schema 6:- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
   `resolution`, `boot_order`, `boot_menu`;
   older files load unchanged.
 - **Machines looks like a native virtualization app** (the look of hypervisaur's screenshots, reimplemented: no code or
