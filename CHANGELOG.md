@@ -10,6 +10,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Flatpak's Spawn portal compares fd handles as unsigned numbers** (`server/src/fpspawn.c`): a handle of 2³¹ or more read
+  as a negative index before. Not reachable in practice, since LordOS's D-Bus client already refuses any message whose fd index
+  is past the fds that came with it; fixed as defense in depth after an automated security review.
+- **No compiler warnings on arm64**: two Flatpak functions that only x86-64 PCs use in phase 1 were reported as unused on the
+  Raspberry Pi build (`server/src/apps.c`).
+
 ## [0.8.9.4-beta] - 2026-11-20
 
 ### Added
