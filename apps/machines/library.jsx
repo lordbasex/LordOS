@@ -9,7 +9,7 @@ import {
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, actionsOf, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines } from './model.js';
+import { stateView, actionsFor, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet } from './kit.jsx';
@@ -238,17 +238,7 @@ export function Requirements({ host, onBack, onChanged, archs }) {
   const [msg, setMsg] = useState(null);
   const list = archs || [host.arch];
   const missing = missingFor(host, list, { windows: true });
-  const have = (pk) => !missing.includes(pk);
-  const rows = [
-    ['kvm', host.kvm ? 'ready' : host.kvmDevice ? 'notAllowed' : 'off'],
-    ...list.map((a) => [`engine.${a}`, have(a === 'amd64' ? 'qemu-system-x86' : 'qemu-system-arm') ? 'ready' : 'missing']),
-    ...list.map((a) => [`firmware.${a}`, have(a === 'amd64' ? 'ovmf' : 'qemu-efi-aarch64') ? 'ready' : 'missing']),
-    ['display', have('qemu-system-modules-opengl') ? 'ready' : 'missing'],
-    ['disk', have('qemu-utils') ? 'ready' : 'missing'],
-    ['network', have('passt') ? 'ready' : 'missing'],
-    ['folders', have('virtiofsd') ? 'ready' : 'missing'],
-    ...(list.includes('amd64') ? [['tpm', have('swtpm') ? 'ready' : 'missing']] : []),
-  ];
+  const rows = reqRows(host, list, missing);
   const install = async () => {
     setBusy(true); setMsg(null);
     // a network that doesn't answer: the engine gives up on its own, but the page never waits more than STALL_MS
@@ -281,16 +271,20 @@ export function Requirements({ host, onBack, onChanged, archs }) {
     <View style={{ flex: 1, paddingHorizontal: 30, paddingVertical: 26, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
       <Text style={{ fontSize: 22, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.req.page')}</Text>
       <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start' }}>{tr('machines.req.for', { arch: list.join(', ') })}</Text>
-      {rows.map(([k, st]) => (
-        <View key={k} style={{ minHeight: 46, paddingHorizontal: 14, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 10, backgroundColor: p.card }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.req.row.${k.split('.')[0]}`, { arch: k.split('.')[1] || '' })}</Text>
-            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.req.use.${k.split('.')[0]}`)}</Text>
-          </View>
-          <Text style={{ fontSize: 12, fontWeight: 700, color: st === 'ready' ? '#8ce8b0' : '#ffc56e' }}>{tr(`machines.req.st.${st}`)}</Text>
+      {/* the rows scroll when they don't fit (Windows' own rows make the list tall); the buttons below always show */}
+      <ScrollView style={{ flex: 1, minHeight: 0 }}>
+        <View style={{ gap: 12 }}>
+          {rows.map(([k, st]) => (
+            <View key={k} style={{ minHeight: 46, paddingHorizontal: 14, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 10, backgroundColor: p.card }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.req.row.${k.split('.')[0]}`, { arch: k.split('.')[1] || '' })}</Text>
+                <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.req.use.${k.split('.')[0]}`)}</Text>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: 700, color: st === 'ready' ? '#8ce8b0' : '#ffc56e' }}>{tr(`machines.req.st.${st}`)}</Text>
+            </View>
+          ))}
         </View>
-      ))}
-      <View style={{ flex: 1 }} />
+      </ScrollView>
       {/* how it's going, in the place of the note under the rows, so the page keeps its height */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {msg ? <Text style={{ flex: 1, fontSize: 13, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text>

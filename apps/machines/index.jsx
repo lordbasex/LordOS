@@ -3,7 +3,8 @@
 // is the Control Center (library.jsx, with the New Machine assistant, Requirements and the Pi page); the same app
 // opened with args.machine is a machine's window, args.configure its Configure window, args.logs its logs, args.guestWin
 // one window of a guest in apps mode (appsmode.jsx).
-import { useAppWindow } from '@lordos/sdk';
+import { useEffect } from 'react';
+import { useAppWindow, addListener, wm, t as tr, registerDockActions, registerDockActivate, registerWindowMenuItems } from '@lordos/sdk';
 import { Library, AppMark } from './library.jsx';
 import { MachineWindow } from './vmwindow.jsx';
 import { Configure } from './configure.jsx';
@@ -14,8 +15,24 @@ import { GuestWindow } from './appsmode.jsx';
 
 export function Icon({ size }) { return <AppMark size={size} />; }
 
+// The library (the window without arguments, id "machines") is always one step away: the first item of the Dock's
+// menu, the first of every Machines window's Window menu (❖0 in a machine's window), and a click on the Dock item when
+// only machines are open
+const LIBRARY_ID = 'machines';
+export const openLibrary = () => wm.open('machines');
+registerDockActions('machines', () => [{ id: 'library', label: 'machines.libraryMenu', args: {} }]);
+registerDockActivate('machines', (e) => {
+  if (e.windows.some((w) => w.id === LIBRARY_ID)) return false;
+  openLibrary();
+  return true;
+});
+registerWindowMenuItems('machines', () => [{ label: tr('machines.libraryMenu'), hint: '❖0', onClick: openLibrary }]);
+
+export const isLibraryKey = (e) => !!e && !!e.meta && !e.ctrl && !e.alt && (e.base || e.key) === '0';
+
 export default function App() {
-  const { args } = useAppWindow();
+  const { args, focused } = useAppWindow();
+  useEffect(() => (focused && args && Object.keys(args).length ? addListener('keydown', (e) => { if (isLibraryKey(e)) { e.preventDefault?.(); openLibrary(); } }) : undefined), [focused]);
   if (args?.guestWin) return <GuestWindow dir={args.guestWin.dir} gid={args.guestWin.gid} />;
   if (args?.machine) return <MachineWindow dir={args.machine} name={args.name || ''} loadvm={args.loadvm || ''} />;
   if (args?.storage) return <Storage />;

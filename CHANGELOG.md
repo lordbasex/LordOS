@@ -206,6 +206,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: the library is always one step away** (`apps/machines/index.jsx`; `sdk/dock.js` `registerDockActivate`,
+  `sdk/windowmenu.js` `registerWindowMenuItems`). With a machine's window open and the library closed there was no way
+  back to it without closing the machine. Now "Machines Library" is the first item of the app's Dock menu and of every
+  Machines window's Window menu (❖0 in a machine's window, which never reaches the guest), and a click on the Dock item
+  while only machines are open opens the library instead of raising a machine. The two SDK hooks are generic (any app
+  can add its own Window menu items or decide its Dock click) and every theme uses them through the shared Dock and
+  Window menu code. In all 35 languages.
+- **Machines: the Requirements sheet fits** (`apps/machines/library.jsx`, `model.js` `reqRows`). With the TPM row the
+  list was taller than the sheet and its buttons were cut off; the rows now scroll inside the sheet with Back and
+  Install Missing always visible. The TPM row showed its raw key ("machines.req.use.tpm"): it now says what swtpm is
+  for, in all 35 languages, and a test checks that every row the page can show has its title and line in English.
 - **Machines: a Clone's computer name, for a guest with the LordOS guest tools, is the one it will use**
   (`apps/machines/clone.jsx`, `model.js` `winNameValid`, `cloneWinName`). The "Name inside the machine" field offered
   a Linux hostname (for example 26 characters) that lord-vm then shortened to a 15-character computer name (first 10 +

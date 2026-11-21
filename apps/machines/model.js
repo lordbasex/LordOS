@@ -123,6 +123,23 @@ export function runs3d(st) { return !!st && ((st.sandbox | 0) & VMS_RENDER_NODE)
 // what only some machines need: the TPM (swtpm) for Windows 11 (4.3); asked for when a Windows machine is made, or on
 // the requirements page, never as a banner for everyone
 const OPTIONAL = ['swtpm'];
+// The Requirements page's rows (library.jsx): [id, status]; each id has machines.req.row.<id> and machines.req.use.<id>
+// (an id "engine.amd64" uses "engine" with { arch })
+export function reqRows(host, list, missing) {
+  const have = (pk) => !missing.includes(pk);
+  return [
+    ['kvm', host.kvm ? 'ready' : host.kvmDevice ? 'notAllowed' : 'off'],
+    ...list.map((a) => [`engine.${a}`, have(a === 'amd64' ? 'qemu-system-x86' : 'qemu-system-arm') ? 'ready' : 'missing']),
+    ...list.map((a) => [`firmware.${a}`, have(a === 'amd64' ? 'ovmf' : 'qemu-efi-aarch64') ? 'ready' : 'missing']),
+    ['display', have('qemu-system-modules-opengl') ? 'ready' : 'missing'],
+    ['disk', have('qemu-utils') ? 'ready' : 'missing'],
+    ['network', have('passt') ? 'ready' : 'missing'],
+    ['folders', have('virtiofsd') ? 'ready' : 'missing'],
+    ...(list.includes('amd64') ? [['tpm', have('swtpm') ? 'ready' : 'missing']] : []),
+  ];
+}
+export const REQ_IDS = ['kvm', 'engine', 'firmware', 'display', 'disk', 'network', 'folders', 'tpm'];
+
 export function missingFor(host, arches, { windows = false } = {}) {
   const out = [];
   for (const a of arches) for (const p of (host?.missing?.[a] || '').split(' ').filter(Boolean)) if (!out.includes(p) && (windows || !OPTIONAL.includes(p))) out.push(p);

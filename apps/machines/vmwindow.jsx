@@ -566,7 +566,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     const kept = new Set();
     const ka = addListener('keydown', (e) => {
       if (!(e.code > 0)) return;
-      if (menus.open > 0 || kept.has(e.code)) { kept.add(e.code); return; }
+      // ❖0 opens the library (index.jsx), never reaches the machine
+      if (menus.open > 0 || kept.has(e.code) || (e.meta && !e.ctrl && !e.alt && (e.base || e.key) === '0')) { kept.add(e.code); return; }
       e.preventDefault?.();                      // Tab goes to the machine, not to the window's buttons (sdk/focus.js)
       lord.vm.key(sid, e.code, 1);
     });

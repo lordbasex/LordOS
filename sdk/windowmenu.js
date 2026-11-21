@@ -17,6 +17,11 @@ import { moveToDesktopItems, desktopSuffix } from './desktops.js';
 import { openOverview } from './overview.jsx';
 import { webInspectItem } from './webapps.js';
 
+// An app's own items at the top of its windows' Window menu (Machines: its library):
+//   registerWindowMenuItems('machines', (window) => [{ label, hint, onClick }])
+const itemProviders = new Map();
+export function registerWindowMenuItems(appId, fn) { itemProviders.set(appId, fn); return () => itemProviders.delete(appId); }
+
 const own = (w) => !(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'));   // not the theme's panels
 
 // the visible app windows of this desktop, the front one last (windows.get() is in stacking order)
@@ -50,7 +55,10 @@ export function moveResizeItems(id) {
 
 export function windowMenuItems(id, { close = true } = {}) {
   const w = id ? wm.get(id) : null;
+  let mine = [];
+  try { mine = (w && itemProviders.get(w.app)?.(w)) || []; } catch (err) { mine = []; }
   const items = [
+    ...(mine.length ? [...mine, '-'] : []),
     { label: t('shell.window.minimize'), hint: '❖M', disabled: !w, onClick: () => wm.minimize(id) },
     { label: t('shell.window.zoom'), disabled: !w, onClick: () => wm.toggleMaximize(id) },
     { label: t('shell.window.fill'), disabled: !w, onClick: () => wm.snap(id, 'max') },
