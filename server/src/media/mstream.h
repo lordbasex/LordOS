@@ -20,6 +20,8 @@ void mstream_want(int codec, int viewers, int audio, unsigned kbps, int fps);
 /* The session's screen changed (the frame stays valid until the next call or mstream_want(…, 0)). */
 /* box: what changed since the last call (x0, y0, x1, y1), or NULL for all of it. */
 void mstream_frame(const uint32_t *px, int stride, int w, int h, const int *box);
+/* The frame given to mstream_frame is about to be freed: nothing reads it until the next mstream_frame. */
+void mstream_frame_gone(void);
 void mstream_keyframe(int codec);
 void mstream_tick(void);
 double mstream_timeout(void);           /* ms until mstream_tick has work, or -1 */

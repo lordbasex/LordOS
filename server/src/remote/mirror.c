@@ -507,6 +507,7 @@ void mirror_stop(void) {
     for (int i = 0; i < MAX_CLIENTS; i++) if (cl[i].fd >= 0) drop(&cl[i]);
     if (lfd >= 0) { close(lfd); unlink(sock_path); }
     lfd = -1;
+    mstream_frame_gone();
     free(fb);
     fb = NULL;
     share_shape(NULL, 0, 0, 0, 0);
@@ -667,7 +668,13 @@ static void cmp_rows(void *ctx, int ty0, int ty1) {
 
 void mirror_frame(const uint32_t *px, int stride, int w, int h, const int *dmg) {
     static double full_at;
-    if (lfd < 0 || !mirror_watchers()) { free(fb); fb = NULL; return; }
+    if (lfd < 0 || !mirror_watchers()) {
+        /* the encoder keeps a pointer to fb (mstream_frame): the next viewer's encoder would read it after free */
+        if (fb) mstream_frame_gone();
+        free(fb);
+        fb = NULL;
+        return;
+    }
     int resized = !fb || w != W || h != H, any = 0;
     int new_size = w != W || h != H;
     if (resized) {
@@ -675,6 +682,7 @@ void mirror_frame(const uint32_t *px, int stride, int w, int h, const int *dmg) 
         H = h;
         TW = (W + TILE - 1) / TILE;
         TH = (H + TILE - 1) / TILE;
+        mstream_frame_gone();
         free(fb);
         fb = malloc((size_t)W * H * 4);
         if (!fb) return;
