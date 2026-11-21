@@ -906,6 +906,9 @@ would remove anything else than those and the packages they pulled in that nothi
 refused. Last, `lord.flatpak.forget()` deletes Flatpak's own folders, `~/.local/share/flatpak` and `~/.cache/flatpak`
 (closed to `lord.fs`, E6), and only once `/usr/bin/flatpak` is gone: never following a link, never into another
 filesystem. The Store's Flathub jobs moved to the SDK for it (`sdk/flathub.js`, was `apps/store/flathub.js`).
+The count is "—" until the installation was listed once, and follows installs made elsewhere (a terminal's
+`flatpak install --user`, a `.flatpakref`): while the page (or the Store's Flathub updates on Installed) shows,
+`watchInstalled` compares the exported apps' ids every 3 s and lists the installation again when they changed.
 
 Checked on VM 127 (`0.8.9.3~ws84` and `ws85`), twice: with nine apps installed, then again after turning Flathub on
 from the Store (which installed `flatpak` again, 6 packages, 11 MB): afterwards no `flatpak` binary, no Flathub

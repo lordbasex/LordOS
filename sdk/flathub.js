@@ -17,10 +17,11 @@ export const available = () => { const a = api(); return !!a && a.available(); }
 export const prefs = () => M.prefsOf(settings.get().flathub);
 export const setPrefs = (p) => settings.set((s) => ({ ...s, flathub: { ...M.prefsOf(s.flathub), ...p } }));
 
-// catalog: the last read (lord.flatpak.catalog()); installed: `flatpak list` ({ id, branch, version }); job: the
+// catalog: the last read (lord.flatpak.catalog()); installed: `flatpak list` ({ id, branch, version }); listed: that
+// list was read at least once (before, its 0 means "not known yet"); job: the
 // running install, removal or update ({ kind, id, name, pct, line }); busy: the catalog or setup step running ('' when
 // none); msg: the last outcome ({ ok, text }).
-export const state = createStore({ catalog: [], loaded: false, installed: [], job: null, busy: '', msg: null });
+export const state = createStore({ catalog: [], loaded: false, installed: [], listed: false, job: null, busy: '', msg: null });
 const patch = (p) => state.set((s) => ({ ...s, ...p }));
 
 // ---- the job pump: lord.flatpak.take() while something runs ----
@@ -103,8 +104,26 @@ locale.subscribe(() => { if (state.get().loaded) loadCatalog(); });
 
 export async function refreshInstalled() {
   const r = await run('list');
-  if (r.code === 0) patch({ installed: M.parseList(r.lines) });
+  if (r.code === 0) patch({ installed: M.parseList(r.lines), listed: true });
   return state.get().installed;
+}
+
+// While a page shows what's installed (Settings → Flatpak, the Store's Installed): an app installed or removed outside
+// the Store (a terminal's `flatpak install --user`, a .flatpakref, another program) is seen within a few seconds. Every
+// 3 s it compares the exported apps' ids (lord.apps.flatpak: the server reads its folders again only when they changed)
+// and lists the installation again only when they did. Returns the function that stops it.
+const exportedIds = () => { try { return lord.apps.flatpak('en').map((a) => a.id).sort().join(' '); } catch (e) { return ''; } };
+export function watchInstalled() {
+  if (!available() || typeof lord.apps?.flatpak !== 'function') return () => {};
+  let last = exportedIds();
+  const id = setInterval(() => {
+    const now = exportedIds();
+    if (now === last) return;
+    last = now;
+    refreshApps();
+    refreshInstalled();
+  }, 3000);
+  return () => clearInterval(id);
 }
 
 // Turning Flathub on, once flatpak is installed: the remote (if it isn't there), the catalog, what is installed.

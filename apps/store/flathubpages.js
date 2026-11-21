@@ -218,6 +218,7 @@ export function FlathubUpdates() {
   const s = useStore(F.state);
   const fh = useFlathub();
   useEffect(() => { if (fh.on) F.refreshInstalled(); }, [fh.on]);
+  useEffect(() => (fh.on ? F.watchInstalled() : undefined), [fh.on]);      // installs made elsewhere show too
   if (!fh.on || !s.installed.length) return null;
   return h(View, { style: box(th) },
     h(Title, { th }, t('flathub.updates.title')),

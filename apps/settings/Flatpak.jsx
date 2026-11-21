@@ -59,6 +59,8 @@ export function FlatpakSettings() {
     const id = setTimeout(() => setSizes({ apps: has && home ? du(`${home}/.local/share/flatpak`) : null, data: home ? du(`${home}/.var/app`) : null }), 0);
     return () => clearTimeout(id);
   }, [has, gen]);
+  // an app installed or removed elsewhere (a terminal, a .flatpakref) changes the count while this page shows
+  useEffect(() => (has ? F.watchInstalled() : undefined), [has]);
   const appsSize = sizes.apps, dataSize = sizes.data;
   const size = (r) => (r ? `${formatBytes(r.size)}${r.complete === false ? '+' : ''}` : '—');
 
@@ -95,7 +97,7 @@ export function FlatpakSettings() {
             <Toggle small pending on={prefs.on} onChange={(on) => F.setPrefs({ on })} />
           </SettingRow>
         ) : null}
-        {has ? <ValueRow label={tr('flathub.settings.apps')} value={String(s.installed.length)} /> : null}
+        {has ? <ValueRow label={tr('flathub.settings.apps')} value={s.listed ? String(s.installed.length) : '—'} /> : null}
         {has ? <ValueRow label={tr('flathub.settings.appsSize')} value={size(appsSize)} /> : null}
         {dataSize && dataSize.size > 0 ? <ValueRow label={tr('flathub.settings.dataSize')} value={size(dataSize)} /> : null}
         <Actions style={{ paddingVertical: spacing.s }}>

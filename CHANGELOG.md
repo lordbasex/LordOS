@@ -225,6 +225,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   second Play was needed. The window now shows Starting (no second Play) until the network is up and then starts the
   machine itself, once, even if it was remounted meanwhile (and not if it was closed); Play on a card asks an open window
   that shows Off to start. `vm_model_test.mjs` covers the phases; not run against the real admin helper here.
+- **Settings → Flatpak counts the Flathub apps installed elsewhere** (`sdk/flathub.js` `watchInstalled`,
+  `apps/settings/Flatpak.jsx`, `apps/store/flathubpages.js`): the count was read once when the page opened, so an app
+  installed outside the Store while it showed (a terminal's `flatpak install --user`, a `.flatpakref`) left it at 0, and
+  it said 0 before the first list came back. It now says "—" until the installation was listed, and while the page (or
+  the Store's Flathub updates) shows, the exported apps are compared every 3 s (cheap: the server reads its folders again
+  only when they changed) and the installation is listed again when they change.
 - **The remote desktop no longer crashes lord-server when a viewer connects after the last one left**
   (`server/src/remote/mirror.c`, `server/src/media/mstream.c`): the mirror freed its copy of the screen while the video
   encoder still held it, and the next viewer's encoder copied from the freed memory. A 1920 × 1080 headless session
