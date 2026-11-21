@@ -460,6 +460,29 @@ export function muteToggle(s) {
   if (audible(c)) return { sound: false };
   return c.volume > 0 ? { sound: true } : { sound: true, volume: 50 };
 }
+// ---- the sound's output and input (6.9, machine.json schema 8) ----
+// What a machine chose, a node.name each ('' the system's default, which follows Settings → Sound): the library's list
+// says soundOut and soundIn, a window's lord.vm.poll says sound.output and sound.input
+export function soundDevs(m) {
+  const str = (x) => (typeof x === 'string' ? x : '');
+  return { output: str(m?.soundOut ?? m?.output), input: str(m?.soundIn ?? m?.input) };
+}
+// One menu's choices: the system's default first (with the device it is now, when known), then every device as
+// Settings → Sound lists it (lord.sound's sinks, or its microphones), the chosen one checked. A chosen device that
+// isn't there (unplugged) stays in the list, checked and marked missing: its sound goes to the default meanwhile.
+// [{ name, label, checked, isDefault?, current?, missing? }]; label null for the default (the app names it)
+export function soundDevChoices(list, chosen) {
+  const devs = (Array.isArray(list) ? list : []).filter((d) => d && typeof d.name === 'string' && d.name);
+  const c = typeof chosen === 'string' ? chosen : '';
+  const def = devs.find((d) => d.default);
+  const out = [{ name: '', label: null, isDefault: true, current: def ? def.description || def.name : '', checked: !c }];
+  for (const d of devs) out.push({ name: d.name, label: d.description || d.name, checked: d.name === c });
+  if (c && !devs.some((d) => d.name === c)) out.push({ name: c, label: c, missing: true, checked: true });
+  return out;
+}
+// the chosen entry of soundDevChoices (what a menu button or summary shows)
+export const soundDevChosen = (list, chosen) => soundDevChoices(list, chosen).find((x) => x.checked);
+
 // lord.vm.poll's sound.mic: 'live' shows the microphone in use (the bar's light and the menu bar's indicator); 'wait'
 // asks LordOS's microphone permission once per window while the guest records
 export const micLive = (snd) => snd?.mic === 'live';

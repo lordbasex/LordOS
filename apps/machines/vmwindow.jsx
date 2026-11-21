@@ -5,14 +5,14 @@
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
   View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath, openFolder,
-  inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, admin, t as tr,
+  inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, admin, t as tr, useSound, microphones,
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
 import { useAppsMode, appsMenuItems, guests } from './appsmode.jsx';
 import { readMeta, writeMeta } from './meta.js';
-import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp } from './ui.jsx';
+import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp, soundDevItems } from './ui.jsx';
 import { openLogs, openSnapshots, playAsks } from './library.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet, Pill } from './kit.jsx';
@@ -25,7 +25,7 @@ const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.install}.${g.transfer}` : '');
-const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}` : '');
+const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}.${x.output}.${x.input}` : '');
 const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
 
@@ -168,8 +168,9 @@ function Tools({ ctl, floating, compact, tiny }) {
     <BarGroup>
       <IconMenuBtn sym="display" label={resLabel} items={res} disabled={!a.keys} on={!follow} />
       <IconMenuBtn sym="eject" label={tr('machines.tb.devices')} items={ctl.devices} />
-      {/* the machine's sound (6.9): a click mutes it or turns it back on; the microphone shows while the guest hears it */}
-      <IconBtn sym={ctl.heard ? 'sound' : 'sound-off'} label={ctl.heard ? tr('machines.tb.mute') : tr('machines.tb.unmute')} onClick={ctl.toggleSound} />
+      {/* the machine's sound (6.9): its menu mutes it or turns it back on and picks the output and input; the microphone
+          shows while the guest hears it */}
+      <IconMenuBtn sym={ctl.heard ? 'sound' : 'sound-off'} label={tr('machines.tb.sound')} items={ctl.soundMenu} />
       {ctl.micLive ? <IconBtn sym="mic" color="#ff9f0a" label={tr('machines.tb.micLive')} onClick={() => ctl.configure('sound')} /> : null}
     </BarGroup>
     {compact ? null : <BarSep />}
@@ -640,6 +641,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   }, [st?.clipIn]);
   // sound and microphone (6.9): what this window's session reports (Configure's changes reach it at once)
   const snd = st?.sound ? { sound: st.sound.on, volume: st.sound.volume, microphone: st.sound.microphone } : soundOf(cfgRef.current);
+  const devs = soundDevs(st?.sound || cfgRef.current);
+  const sndSt = useSound();
   const heard = audible(snd);
   const soundTo = (patch) => { if (has() && !lord.vm.sound(dir, patch)) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.cfg.soundFailed'), body: '', sound: false }); };
   const toggleSound = () => soundTo(muteToggle(snd));
@@ -729,6 +732,18 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const ctl = {
     appsOn, appsBlocked, appsLabel, toggleApps: () => setApps(!appsOn),
     sid, cfg, heard, toggleSound, micLive: micOn,
+    // the speaker's menu: mute, the output and the input (each applied at once, schema 8), the sound settings
+    soundMenu: [
+      { label: heard ? tr('machines.tb.mute') : tr('machines.tb.unmute'), onClick: toggleSound },
+      '-',
+      { label: tr('machines.cfg.soundOutput'), note: true },
+      ...soundDevItems(sndSt.sinks, devs.output, (x) => soundTo({ output: x })),
+      '-',
+      { label: tr('machines.cfg.soundInput'), note: true },
+      ...soundDevItems(microphones(sndSt), devs.input, (x) => soundTo({ input: x })),
+      '-',
+      { label: tr('machines.tb.soundSettings'), onClick: () => setCfgSheet({ section: 'sound' }) },
+    ],
     xfer: { state: xstate, open: xferOpen, setup: xferSetup, windows: !!cfg.windows || /^windows/i.test(st?.agent?.system || '') },
     shell, toggleShell: () => { setShell(!shell); setShellKeys(!shell); },
     rec: !!rec, recTime: `${String(Math.floor(recSecs / 60)).padStart(2, '0')}:${String(recSecs % 60).padStart(2, '0')}`, record,

@@ -1,11 +1,11 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, bootList, bootMove, bootSummary, resolutions } from './model.js';
-import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal } from './ui.jsx';
+  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions } from './model.js';
+import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
 
@@ -109,6 +109,7 @@ export function Configure({ dir, section: section0, onClose }) {
   const [pickShare, setPickShare] = useState(false);
   const [disk, setDisk] = useState(null);
   const [sndDraft, setSndDraft] = useState({});
+  const sndSt = useSound();                          // the outputs and inputs, as Settings → Sound lists them
   const volTimer = useRef(0);
   useEffect(() => () => clearTimeout(volTimer.current), []);
   // a small window: the sections hide behind a button beside the title and open over the pane
@@ -178,7 +179,10 @@ export function Configure({ dir, section: section0, onClose }) {
       const ns = netSummary(m);
       return [tr(`machines.cfg.net.${ns.mode}`), ns.card || null, ns.ports ? tr('machines.cfg.sum.ports', { n: ns.ports }) : null].filter(Boolean).join(', ');
     })(),
-    sound: (() => { const x = soundSummary(m); return `${tr(x.key, { volume: x.volume })}, ${tr(x.mic)}`; })(),
+    sound: (() => {
+      const x = soundSummary(m), out = soundDevs(m).output;
+      return [tr(x.key, { volume: x.volume }), tr(x.mic), out ? soundDevText(soundDevChosen(sndSt.sinks, out), true) : null].filter(Boolean).join(', ');
+    })(),
     disks: tr('machines.cfg.sum.disks', { n: m.diskGb }) + (m.dataDisks ? ` + ${m.dataDisks}` : '') + (m.devices === 'compat' ? `, ${tr('machines.cfg.devCompatShort')}` : '') + (m.iso ? `, ${tr('machines.isoAttached')}` : ''),
     // "Nothing shared" only when neither the clipboard nor a folder is
     sharing: m.shares?.length || m.transfer ? [m.transfer ? tr('machines.cfg.transfer') : null, m.clipboard && m.clipboard !== 'off' ? tr(`machines.cfg.clipSum.${m.clipboard}`) : null,
@@ -283,20 +287,32 @@ export function Configure({ dir, section: section0, onClose }) {
   else if (sec === 'network') pane = <NetworkPane m={m} cur={cur} set={set} running={running} offNote={offNote} host={host} issues={portIssues} />;
   else if (sec === 'sound') {
     // host-side choices (6.9): saved at once, and a running machine's window applies them at once too
-    const snd = { ...soundOf(m), ...sndDraft };
+    const snd = { ...soundOf(m), ...soundDevs(m), ...sndDraft };
+    // the output and input (schema 8): every device Settings → Sound lists, by its name there; applied at once
+    const sinks = sndSt.sinks, mics = microphones(sndSt);
     pane = <>
       <Group>
         <Row label={tr('machines.cfg.sound')} note={tr('machines.cfg.soundNote')}>
           <Toggle on={snd.sound} onChange={(x) => setSound({ sound: x })} />
         </Row>
-        <Row label={tr('machines.cfg.volume')} value={`${snd.volume}%`} last>
+        <Row label={tr('machines.cfg.volume')} value={`${snd.volume}%`}>
           <Off off={!snd.sound}><Slider value={snd.volume} min={0} max={100} step={5} width={340}
             onChange={(x) => volumeTo(Math.round(x / 5) * 5)} /></Off>
         </Row>
+        <Row label={tr('machines.cfg.soundOutput')} last note={tr('machines.cfg.soundOutputNote')}>
+          <View style={{ alignSelf: 'flex-start' }}>
+            <MenuBtn label={soundDevText(soundDevChosen(sinks, snd.output), true)} items={soundDevItems(sinks, snd.output, (x) => setSound({ output: x }))} />
+          </View>
+        </Row>
       </Group>
       <Group>
-        <Row label={tr('machines.cfg.microphone')} last note={tr('machines.cfg.microphoneNote')}>
+        <Row label={tr('machines.cfg.microphone')} note={tr('machines.cfg.microphoneNote')}>
           <Toggle on={snd.microphone} onChange={(x) => setSound({ microphone: x })} />
+        </Row>
+        <Row label={tr('machines.cfg.soundInput')} last note={tr('machines.cfg.soundInputNote')}>
+          <View style={{ alignSelf: 'flex-start' }}>
+            <MenuBtn label={soundDevText(soundDevChosen(mics, snd.input), true)} items={soundDevItems(mics, snd.input, (x) => setSound({ input: x }))} />
+          </View>
         </Row>
       </Group>
       <Group>

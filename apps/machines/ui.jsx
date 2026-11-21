@@ -1,7 +1,7 @@
 // Pieces the Machines windows share: the state dot, the system marks, the three lights, bars, a context menu and the
 // surfaces of the Control Center (docs/VIRTUALIZATION.md, "The app"; the approved mocks, Main and Toolbar).
 import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, t as tr } from '@lordos/sdk';
-import { bridgeArg } from './model.js';
+import { bridgeArg, soundDevChoices } from './model.js';
 import { useEffect, useRef, useState } from 'react';
 
 export const TONE = { run: '#30d158', pause: '#ff9f0a', off: '#8e8e93', busy: '#0a84ff', bad: '#ff453a' };
@@ -292,6 +292,13 @@ export function MenuBtn({ label, items, primary, disabled }) {
     </View>
   );
 }
+
+// The sound's output or input (6.9): an entry of soundDevChoices as text, and a menu's items for one of them (list:
+// lord.sound's sinks, or its microphones; pick(name) with '' for the system's default). short: the default without the
+// device it is now (a button's label, which mustn't grow past its pane)
+export const soundDevText = (x, short) => (!x ? '' : x.isDefault ? (x.current && !short ? tr('machines.cfg.soundDefaultNow', { name: x.current }) : tr('machines.cfg.soundDefault'))
+  : x.missing ? tr('machines.cfg.soundMissing', { name: x.label }) : x.label);
+export const soundDevItems = (list, chosen, pick) => soundDevChoices(list, chosen).map((x) => ({ label: soundDevText(x), checked: x.checked, onClick: () => pick(x.name) }));
 
 // the window's content root, for a menu at a pointer position (PopMenu takes coordinates inside it)
 export const overlayRoot = { current: null };

@@ -314,6 +314,22 @@ eq('mute toggle', [muteToggle({}), muteToggle({ sound: false, volume: 40 }), mut
   [{ sound: false }, { sound: true }, { sound: true, volume: 50 }, { sound: true, volume: 50 }]);
 eq('mic live', [micLive({ mic: 'live' }), micLive({ mic: 'wait' }), micLive(undefined)], [true, false, false]);
 eq('mic ask', [micAsk({ mic: 'wait' }, false), micAsk({ mic: 'wait' }, true), micAsk({ mic: 'off' }, false), micAsk(null, false)], [true, false, false, false]);
+// the sound's output and input (6.9, schema 8)
+eq('devs of an older machine', M.soundDevs({}), { output: '', input: '' });
+eq('devs from the list', M.soundDevs({ soundOut: 'alsa_output.usb', soundIn: 'alsa_input.cam' }), { output: 'alsa_output.usb', input: 'alsa_input.cam' });
+eq('devs from a poll', M.soundDevs({ output: 'a', input: '' }), { output: 'a', input: '' });
+eq('devs not text', M.soundDevs({ soundOut: 3, soundIn: null }), { output: '', input: '' });
+const sinks = [{ name: 'alsa_output.pci', description: 'Built-in Audio Analog Stereo' }, { name: 'alsa_output.usb', description: 'USB Advanced Audio Device Analog Stereo', default: true }, { name: 'raw' }, { description: 'no name' }];
+eq('choices: the default', M.soundDevChoices(sinks, ''), [
+  { name: '', label: null, isDefault: true, current: 'USB Advanced Audio Device Analog Stereo', checked: true },
+  { name: 'alsa_output.pci', label: 'Built-in Audio Analog Stereo', checked: false },
+  { name: 'alsa_output.usb', label: 'USB Advanced Audio Device Analog Stereo', checked: false },
+  { name: 'raw', label: 'raw', checked: false }]);
+eq('choices: one chosen', M.soundDevChoices(sinks, 'alsa_output.pci').filter((x) => x.checked).map((x) => x.name), ['alsa_output.pci']);
+eq('choices: unplugged stays, missing', M.soundDevChoices(sinks, 'alsa_output.gone').slice(-1)[0], { name: 'alsa_output.gone', label: 'alsa_output.gone', missing: true, checked: true });
+eq('choices: unplugged, the default not checked', M.soundDevChoices(sinks, 'alsa_output.gone')[0].checked, false);
+eq('choices: no list', M.soundDevChoices(undefined, 'x'), [{ name: '', label: null, isDefault: true, current: '', checked: false }, { name: 'x', label: 'x', missing: true, checked: true }]);
+eq('chosen', [M.soundDevChosen(sinks, '').isDefault, M.soundDevChosen(sinks, 'alsa_output.usb').label, M.soundDevChosen([], 'y').missing, M.soundDevChosen(sinks, null).isDefault], [true, 'USB Advanced Audio Device Analog Stereo', true, true]);
 // files dropped on the window (the guest agent copies them in)
 const ag = (caps, state = 'connected') => ({ state, caps });
 eq('drop: off', M.dropBlocker({ state: 'stopped' }, true), 'off');

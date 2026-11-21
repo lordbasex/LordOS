@@ -59,6 +59,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   light shows on the bar and in the menu bar. Every machine's sound card is now an HDA speaker-and-microphone codec, so
   snapshots and saved states keep loading whatever the settings. Configure → Sound and input has sound on/off, a volume
   and the microphone; the bar gets a mute button and the Devices menu Sound, Microphone and Sound Settings….
+- **Machines: each machine's own output and input.** Configure → Sound and input has an Output and an Input menu:
+  "System default" (as before: it follows whatever Settings → Sound picks, showing which device that is now) or any
+  output or microphone by the name Settings → Sound gives it (the same `lord.sound` state; the outputs' monitors are not
+  offered as inputs). The machine window's speaker button is now a menu with Mute / Turn Sound On, the outputs and the
+  inputs with a checkmark on the chosen ones, and Sound Settings…, so a machine can be switched without opening
+  Configure. The change applies at once while the machine runs: lord-server's stream connects again to the chosen device
+  with the same ring (`maudio_target` in `server/src/media/maudio.c`, the reconnection `maudio_retry` already did; the
+  stream is created with that device's name, which pipewire-pulse turns into `target.object`), and the microphone's
+  stream moves too when it is open. A chosen device that is unplugged sends the sound to the system's default and the
+  menu shows it as "(not connected)"; lord-server checks at every poll that Settings → Sound still lists it
+  (`snd_device_present`), so plugging it back moves the sound to it again. Saved in `machine.json` **schema 8**:
+  `sound_out` and `sound_in`, a PipeWire node.name each (1 to 96 printable ASCII characters, no spaces or control
+  characters), absent for the default; an older file loads unchanged and is written as schema 8 at its next save, as
+  before. While the machine runs they travel in `VM_SOUND` (`d = 1`, text `OUT\tIN`) to its lord-vm, which writes the
+  file; with it off, `lord-vm --set DIR --sound-out NODE|default --sound-in NODE|default`. `lord.vm.sound(dir, { output,
+  input })`, `lord.vm.list()`'s `soundOut`/`soundIn` and `lord.vm.poll()`'s `sound.output`/`sound.input` carry them.
+  Translated into every language. Tests: `vm-test` (the keys, their limits, the schema rule, the message's text),
+  `vm_model_test.mjs` (the menus' entries, the default with its current device, an unplugged choice). Checked on this
+  computer's PipeWire 1.4.2 with lord-server's own `maudio.c`: a stream moved live between Built-in Audio and a USB
+  output, back to the default (no `target.object`, following the default), and a name that isn't there played on the
+  default; a capture stream moved between the webcam's and the default microphone.
 - **Machines: forwarded ports, Bridged and Host-only networks.** Configure → Network has four modes:
   - **Shared**, as before, now with up to 32 forwarded ports (TCP or UDP, this computer's port 1024–65535 to the
     machine's), open to "Only this computer" (127.0.0.1, the default) or "The network" (with a warning). passt opens
