@@ -112,6 +112,17 @@ For computers with a second AMD or NVIDIA card kept only for machines.
   dedicated card with no monitor attached (Mode B). The IddCx driver must be signed (attestation-signed by Microsoft).
 - Memlock grew to about 200 MB under 3D (47 MB idle); budget a few hundred MB.
 
+### Decisions of 2026-11-21 (maintainer)
+
+- **Intel (Mode A):** the next step is our own GVT-g UEFI GOP option ROM, built from the open i915ovmfPkg source and
+  signed with a LordOS key enrolled in each machine's Secure Boot db (Secure Boot stays on), so the vGPU's own display
+  works and the picture reaches LordOS as a dmabuf. One mechanism for both uses: **exclusive** (the largest mdev type
+  for one machine; a larger iGPU aperture in the firmware exposes larger types) and **shared** (smaller types, one per
+  running machine — rare, but kept). The hybrid/render-only mode stays as the fallback.
+- **AMD/NVIDIA (Mode B), first stage:** full passthrough with the card's own ROM and **its own monitor** — the best,
+  near-native performance. Showing a dedicated card's picture inside LordOS (an IddCx virtual monitor + capture) is
+  done only if people ask to use their usual monitors.
+
 ### Settings → Graphics cards (approved in principle 2026-11-21)
 
 The person never runs a command: a computer with more than one GPU is managed from **Settings → Graphics cards**.
