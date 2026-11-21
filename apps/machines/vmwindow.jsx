@@ -13,6 +13,8 @@ import { installError, startPhase, playStarts, stateView, actionsFor, toPicture,
 import { useAppsMode, appsMenuItems, guests } from './appsmode.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp, soundDevItems } from './ui.jsx';
+// how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it)
+const CLIP_HOLD_MS = 150;
 import { openLogs, openSnapshots, playAsks } from './library.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet, Pill } from './kit.jsx';
@@ -567,7 +569,12 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       if (kept.delete(e.code)) return;
       lord.vm.key(sid, e.code, 0);
     });
-    const kc = addListener('pointerup', (e) => { if (buttons.current.has(e.button)) { buttons.current.delete(e.button); lord.vm.button(sid, e.button, 0); } });
+    const kc = addListener('pointerup', (e) => {
+      if (!buttons.current.has(e.button)) return;
+      buttons.current.delete(e.button);
+      const wait = held.current - Date.now(), b = e.button;
+      if (wait > 0) setTimeout(() => lord.vm.button(sid, b, 0), wait + 10); else lord.vm.button(sid, b, 0);
+    });
     return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); };
   }, [live, focused, sid]);
   // ❖, ⌥Tab and the desktop's other shortcuts go to the machine too, once the person allowed it (asked the first
@@ -576,7 +583,17 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
 
   const at = (e) => (box.current && st?.w ? toPicture(e.x, e.y, lord.getLayout(box.current.id), st.w, st.h) : null);
   const move = (e) => { const q = live && at(e); if (q) lord.vm.motion(sid, q[0], q[1]); };
-  const down = (e) => { if (!live) return; move(e); buttons.current.add(e.button); lord.vm.button(sid, e.button, 1); };
+  // a click that just carried a new clipboard in waits a moment, so the guest has it when the press opens a menu with
+  // Paste (a right-click); its release keeps the order
+  const held = useRef(0);
+  const down = (e, fresh) => {
+    if (!live) return;
+    move(e);
+    buttons.current.add(e.button);
+    const b = e.button, id = sid;
+    if (fresh) { held.current = Date.now() + CLIP_HOLD_MS; setTimeout(() => lord.vm.button(id, b, 1), CLIP_HOLD_MS); }
+    else lord.vm.button(sid, b, 1);
+  };
   const onWheel = (e) => {
     if (!live) return;
     move(e);
@@ -635,11 +652,15 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch }); } }, [sid, st?.state]);
   const clipSent = useRef('');
   // the host's clipboard into the guest (unchanged contents aren't sent again: lord-vm compares a hash)
-  const sendClip = () => {
-    if (!sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined || !(st?.agent?.caps & 32)) return;
-    if (lord.vm.clipboardSendHost) { lord.vm.clipboardSendHost(sid); return; }
+  // Only when the person turns to the machine: its window coming to the front, or a click on its picture (which brings
+  // it there); never on a mere pass of the pointer, so a guest can't read what was copied while it sits in the
+  // background. → true when something new went in
+  const sendClip = (click) => {
+    if (!(focused || click) || !sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined || !(st?.agent?.caps & 32)) return false;
+    if (lord.vm.clipboardSendHost) return !!lord.vm.clipboardSendHost(sid);
     const text = clipboard.get();
-    if (text && text !== clipSent.current && lord.vm.clipboardSend(sid, text)) clipSent.current = text;
+    if (text && text !== clipSent.current && lord.vm.clipboardSend(sid, text)) { clipSent.current = text; return true; }
+    return false;
   };
   const sendClipRef = useRef(sendClip);
   sendClipRef.current = sendClip;
@@ -848,7 +869,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   return (
     <View ref={root} {...drop.props} style={{ flex: 1, backgroundColor: '#000' }}>
       {appsActive ? <AppsController name={name} g={gApps} onLeave={() => setApps(false)} />
-        : <View ref={box} onMouseEnter={() => sendClipRef.current()} onMouseDown={(e) => { setShellKeys(false); sendClipRef.current(); down(e); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
+        : <View ref={box} onMouseDown={(e) => { setShellKeys(false); down(e, sendClipRef.current(true)); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
           {st?.media && st.display === 'up' ? <MediaView media={st.media} style={{ flex: 1 }} /> : null}
         </View>}
       {shell && !full ? (

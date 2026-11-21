@@ -209,8 +209,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Machines: a right-click Paste in a machine has what was just copied on this computer** (`apps/machines/vmwindow.jsx`):
   this computer's clipboard went into the machine only when its window came to the front, so copying with a context
   menu and then right-clicking Paste in the machine found the old clipboard (a keyboard paste worked, after the window's
-  focus). It is now also sent when the pointer comes over the machine's picture and before each click there; contents
-  that didn't change are not sent again.
+  focus). It is now also sent with a click on the machine's picture, and a click that carried a new clipboard reaches
+  the machine 150 ms later, so its Paste menu has it. A pass of the pointer sends nothing (found by the background
+  security review: a machine in the background must not read what was copied); contents that didn't change are not
+  sent again.
 - **Machines: copy and paste with a Linux guest that has no clipboard tool** (`tools/guest/lordos-guest.c`,
   `server/src/vm/lordvm.c`, `vmagent.c`, `vmproto.h`, `server/src/ui/js_vm.c`, `apps/machines/model.js`, `vmwindow.jsx`).
   The clipboard helper reads and writes the guest's clipboard only through `xclip` or `wl-paste`/`wl-copy`, and a stock
