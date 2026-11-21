@@ -273,12 +273,13 @@ function FloatingBar({ ctl, name }) {
 function Card({ title, text, actions, width = 460, extra }) {
   const p = usePal();
   return (
-    <View style={{ position: 'absolute', left: 0, right: 0, top: BAR, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width, padding: 20, gap: 8, borderRadius: 14, backgroundColor: p.bg, border: `1px solid ${p.line}` }}>
+    <View style={{ position: 'absolute', left: 0, right: 0, top: BAR, bottom: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 12 }}>
+      {/* never wider or taller than the window (apps mode's controller is small): its buttons wrap and stay in view */}
+      <View style={{ width: '100%', maxWidth: width, maxHeight: '100%', padding: 20, gap: 8, borderRadius: 14, backgroundColor: p.bg, border: `1px solid ${p.line}` }}>
         <Text style={{ fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
         {text ? <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>{text}</Text> : null}
         {extra}
-        {actions?.length ? <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>{actions}</View> : null}
+        {actions?.length ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>{actions}</View> : null}
       </View>
     </View>
   );
@@ -905,13 +906,19 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     ]);
   }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, cfg.transfer, xstate]);
   // Esc in the controller leaves apps mode (in a guest's window, Esc is the guest's)
-  useEffect(() => (appsActive && focused ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open) setApps(false); }) : undefined), [appsActive, focused]);
+  useEffect(() => (appsActive && focused && !askClose ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open) setApps(false); }) : undefined), [appsActive, focused, askClose]);
+  // Esc on the close question is Cancel (in apps mode too, where it would otherwise leave apps mode behind the card)
+  useEffect(() => (askClose && focused ? addListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault?.(); setAskClose(false); } }) : undefined), [askClose, focused]);
 
   let card = null;
   let failed = null;
   if (err) card = <Card title={tr('machines.win.problem')} text={err} actions={[<Btn key="r" primary label={tr('machines.win.tryAgain')} onClick={() => { setErr(''); begin(); }} />]} />;
   else if (askClose) card = <Card width={560} title={tr('machines.close.title', { name })} text={tr('machines.close.text') + (runs3d(st) ? ` ${tr('machines.close.no3dSuspend')}` : '')}
-    extra={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}><Toggle on={always} onChange={setAlways} /><Text style={{ fontSize: 13, color: p.text }}>{tr('machines.close.always')}</Text></View>} actions={[
+    extra={<View style={{ gap: 8, marginTop: 4 }}>
+      {/* a copy into the machine still going: said here, where the person decides (the copy line itself is hidden under a card) */}
+      {line ? <Text style={{ fontSize: 13, color: TONE.warn || p.text, textAlign: 'start' }}>{tr(line.fast ? 'machines.drop.copyingFast' : 'machines.drop.copying', { name: line.name, pct: line.pct })}</Text> : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Toggle on={always} onChange={setAlways} /><Text style={{ fontSize: 13, color: p.text }}>{tr('machines.close.always')}</Text></View>
+    </View>} actions={[
     <Btn key="c" label={tr('machines.cancel')} onClick={() => setAskClose(false)} />,
     <Btn key="k" label={tr('machines.close.keep')} onClick={() => { if (always) writeMeta(dir, { onClose: 'keep' }); finish('keep'); }} />,
     <Btn key="s" label={tr('machines.cmd.shutdown')} onClick={() => { if (always) writeMeta(dir, { onClose: 'shutdown' }); finish('shutdown'); }} />,
@@ -972,7 +979,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
           </View>
         </View>
       ) : null}
-      {line ? (
+      {line && !card && !failed ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ maxWidth: 560, minWidth: 260, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
             <Text style={{ fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>

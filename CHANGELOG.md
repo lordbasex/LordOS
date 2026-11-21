@@ -206,6 +206,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: the close question fits a small window and Esc cancels it** (`apps/machines/vmwindow.jsx`): in apps mode
+  the controller window is small, so "Close ‹machine›?" was wider than it and its buttons were cut off, with the copy's
+  progress line drawn over them; Esc there left apps mode behind the card instead of cancelling it. Cards now fit the
+  window (buttons wrap), the copy's progress shows inside the close question instead of over it, and Esc is Cancel.
 - **Machines: "Ask before each paste" can't be clicked through or raced** (`apps/machines/clipask.jsx`,
   `server/src/ui/js_vm.c`; found by Claude Security, two LOW). The guest chooses when the bar appears and sees where the
   pointer is, so it could raise the bar under a click already on its way: Paste/Bring now answer only after the bar has
