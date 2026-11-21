@@ -11,7 +11,8 @@ unsigned char *vm_thumb_scale(const uint32_t *px, int w, int h, int maxw, int *o
 /* writes <dir>/<name> (a PNG at most maxw wide, replaced atomically, 0600). 0 written. */
 int vm_png_save(const char *dir, const char *name, const uint32_t *px, int w, int h, int maxw);
 #define vm_thumb_save(dir, px, w, h, maxw) vm_png_save((dir), "thumb.png", (px), (w), (h), (maxw))
-/* the same, scaled here and encoded and written by a thread of its own; -1 when one is still being written. 0 queued */
+/* the same, copied here and scaled, encoded and written by a thread of its own; -1 when one is still being written or
+ * on bad input. 0 queued */
 int vm_thumb_save_async(const char *dir, const uint32_t *px, int w, int h, int maxw);
 
 #endif

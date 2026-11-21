@@ -93,27 +93,35 @@ int vm_png_save(const char *dir, const char *name, const uint32_t *px, int w, in
     return rc;
 }
 
-/* the card's picture off the UI thread: the PNG's encoding took 20 to 50 ms there, every 5 s while a machine's window
- * was open (docs/MAIN-THREAD.md). One write at a time; a picture asked for while one is being written is skipped. */
-typedef struct { char dir[PATH_MAX]; unsigned char *rgb; int w, h; } ThumbJob;
+/* the card's picture off the UI thread: scaling and encoding took 20 to 57 ms there, every 5 s while a machine's window
+ * was open (docs/MAIN-THREAD.md). The picture is copied here (it changes under us) and a thread of its own scales, encodes
+ * and writes it. One write at a time; a picture asked for while one is being written is skipped. */
+typedef struct { char dir[PATH_MAX]; uint32_t *px; int w, h, maxw; } ThumbJob;
 static atomic_int thumb_busy;
 
 static void *thumb_main(void *arg) {
     ThumbJob *j = arg;
-    char tmp[64];
-    snprintf(tmp, sizeof tmp, ".thumb.%ld.bg.tmp", (long)getpid());
-    write_rgb(j->dir, "thumb.png", tmp, j->rgb, j->w, j->h);
-    free(j->rgb);
+    int ow = 0, oh = 0;
+    unsigned char *rgb = vm_thumb_scale(j->px, j->w, j->h, j->maxw, &ow, &oh);
+    if (rgb) {
+        char tmp[64];
+        snprintf(tmp, sizeof tmp, ".thumb.%ld.bg.tmp", (long)getpid());
+        write_rgb(j->dir, "thumb.png", tmp, rgb, ow, oh);
+        free(rgb);
+    }
+    free(j->px);
     free(j);
     atomic_store(&thumb_busy, 0);
     return NULL;
 }
 
 int vm_thumb_save_async(const char *dir, const uint32_t *px, int w, int h, int maxw) {
-    if (!dir || strlen(dir) >= PATH_MAX || atomic_exchange(&thumb_busy, 1)) return -1;
+    if (!dir || !px || w < 1 || h < 1 || maxw < 1 || strlen(dir) >= PATH_MAX || atomic_exchange(&thumb_busy, 1)) return -1;
     ThumbJob *j = calloc(1, sizeof *j);
-    if (j) j->rgb = vm_thumb_scale(px, w, h, maxw, &j->w, &j->h);
-    if (!j || !j->rgb) { free(j); atomic_store(&thumb_busy, 0); return -1; }
+    if (j) j->px = malloc((size_t)w * h * 4);
+    if (!j || !j->px) { free(j); atomic_store(&thumb_busy, 0); return -1; }
+    memcpy(j->px, px, (size_t)w * h * 4);
+    j->w = w; j->h = h; j->maxw = maxw;
     memcpy(j->dir, dir, strlen(dir) + 1);
     pthread_attr_t at;
     pthread_t t;
@@ -121,6 +129,6 @@ int vm_thumb_save_async(const char *dir, const uint32_t *px, int w, int h, int m
     pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
     int e = pthread_create(&t, &at, thumb_main, j);
     pthread_attr_destroy(&at);
-    if (e) { free(j->rgb); free(j); atomic_store(&thumb_busy, 0); return -1; }
+    if (e) { free(j->px); free(j); atomic_store(&thumb_busy, 0); return -1; }
     return 0;
 }

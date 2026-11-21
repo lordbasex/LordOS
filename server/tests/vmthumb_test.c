@@ -57,6 +57,7 @@ int main(void) {
         if (!png_size(path, &pw, &ph) && pw == 2) break;
     }
     CHECK(pw == 2 && ph == 2, "the last picture replaced it (%dx%d)", pw, ph);
+    CHECK(vm_thumb_save_async(dir, px, 0, h, VM_THUMB_W) == -1, "a 0-wide picture is refused");
     CHECK(vm_thumb_save_async("/nonexistent-vmthumb", px, w, h, VM_THUMB_W) == 0, "a missing folder is queued and fails quietly");
     DIR *d = opendir(dir);
     int others = 0;
