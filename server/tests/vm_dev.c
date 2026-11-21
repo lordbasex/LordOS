@@ -765,6 +765,9 @@ int main(int argc, char **argv) {
         int to = kq_h != kq_t ? 12 : frames_target >= 0 ? 50 : 500;
         if ((spk || mic) && to > 10) to = 10;
         poll(p, 4, to);
+        /* PipeWire not there when the stream opened, or gone: tried again every 2 s while the guest plays (js_vm.c) */
+        static long long spk_retry_at;
+        if (spk && guest_out && maudio_failed(spk) && now_ms() >= spk_retry_at) { spk_retry_at = now_ms() + 2000; maudio_retry(spk); }
         if (spk) { maudio_service(spk); spk_look(); }
         mic_feed();
         if (p[0].revents) from_vm();

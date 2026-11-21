@@ -1806,6 +1806,12 @@ Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: a
   lord-server read: past that a piece is dropped, never waited for. lord-server plays the ring from its own PipeWire stream
   (`media/maudio.c`, a 60 ms target buffer; PipeWire granted 50 ms), named after the machine, corked while the guest plays nothing
   (`VD_GUEST_AUDIO`). lord-vmdisplay never gets the PipeWire socket.
+  When PipeWire isn't reachable as the stream opens (a machine window opened early in the session) or goes away, the stream
+  connects again every 2 s while the guest plays (and the microphone's while it's open), with the same ring
+  (`maudio_retry`): the helper is told nothing and what waited in the ring is dropped, not played late. Only the first failure
+  is logged ("media: no PipeWire to play"), then "media: PipeWire is there now (play, after N tries)". **Measured** 2026-11-21
+  with `lordvm-dev` (which does the same) and a private PipeWire with WirePlumber started 20 s after the guest's `speaker-test`
+  began: back after 4 tries, then 192 000 bytes a second taken; and again after that PipeWire was stopped and started.
 - *Microphone.* QEMU asks the `AudioInListener` with `Read` from its main loop and waits, so the helper answers at once: the frames the
   time owes at 48 kHz (at most 100 ms an answer; a paused machine doesn't get a burst after), from lord-server's microphone ring
   (`VD_MIC`) when there is one, else silence, with the guest's own capture mute and level applied. lord-server opens the microphone

@@ -203,6 +203,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   next restart. It runs once. The machine SID isn't changed (sysprep's job; `docs/VIRTUALIZATION.md` says so). Checked on a
   clone of such a machine: after Shut Down and a start, `hostname` gave the new name. `build/vm-test` covers the
   names.
+- **A machine's sound comes back when PipeWire appears late** (`server/src/ui/js_vm.c`, `server/src/media/maudio.c`): a
+  machine window opened before PipeWire was reachable stayed silent ("media: no PipeWire to play", never tried again), and
+  so did one whose PipeWire restarted. The speakers' stream (and the microphone's) now connect again every 2 s while the
+  guest plays, with the same ring, logging only the first failure and the return. Checked with `lordvm-dev` and a private
+  PipeWire started after the guest began playing: back after 4 tries, at the real rate.
 - **The remote desktop no longer crashes lord-server when a viewer connects after the last one left**
   (`server/src/remote/mirror.c`, `server/src/media/mstream.c`): the mirror freed its copy of the screen while the video
   encoder still held it, and the next viewer's encoder copied from the freed memory. A 1920 × 1080 headless session

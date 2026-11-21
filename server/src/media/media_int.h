@@ -137,6 +137,7 @@ void maudio_playing(MAudio *a, int on);
 void maudio_volume(MAudio *a, double v);
 int  maudio_overruns(const MAudio *a);
 int  maudio_failed(const MAudio *a);
+int  maudio_retry(MAudio *a);             /* a failed stream connects again, same ring (0), or -1 it hadn't failed */
 void maudio_latency(MAudio *a, int ms);   /* playback: a lower target buffer (ms), before its first service */
 uint64_t maudio_bytes(const MAudio *a);   /* bytes taken from the ring (playback) or put in it (recording) */
 int  maudio_ring_fd(const MAudio *a);     /* the ring's memfd (still owned by a), to hand a helper again */

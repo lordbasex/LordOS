@@ -32,6 +32,7 @@ struct MAudio {
     int volume_sent;
     uint32_t serial_seen;
     int64_t delta;                  /* ring byte = stream byte + delta */
+    int tries;                      /* connections that failed in a row (maudio_retry): only the first is logged */
     double flush_ms, last_lat_req, last_lat_at;
     char app[64], title[128], role[16], source[256];
 };
@@ -72,10 +73,12 @@ static int start(MAudio *a) {
     a->started = 1;
     int fd = media_pulse_fd();
     if (fd < 0 || lmp_connect(&a->pa, fd, a->app, "org.lordos.Media")) {
-        fprintf(stderr, "media: no PipeWire to %s\n", a->rec ? "record" : "play");
+        if (!a->tries++) fprintf(stderr, "media: no PipeWire to %s\n", a->rec ? "record" : "play");
         a->pa.failed = 1;
         return -1;
     }
+    if (a->tries) fprintf(stderr, "media: PipeWire is there now (%s, after %d tries)\n", a->rec ? "record" : "play", a->tries);
+    a->tries = 0;
     if (a->rec) {
         lmp_record(&a->pa, a->source, AR_RATE, 1, a->title);
         a->pa.on_record = on_mic;
@@ -195,3 +198,24 @@ int maudio_ring_fd(const MAudio *a) { return a ? a->ring_fd : -1; }
 int maudio_overruns(const MAudio *a) { return a && a->ring ? (int)atomic_load(&a->ring->overruns) : 0; }
 void maudio_mic_drain(MAudio *a) { if (a && a->ring && a->rec) atomic_store(&a->ring->rpos, atomic_load(&a->ring->wpos)); }
 int maudio_failed(const MAudio *a) { return !a || a->pa.failed; }
+
+/* A stream whose PipeWire wasn't there (or went away) connects again, with the same ring: whoever writes or reads it
+ * keeps going. Playback drops what waited in the ring meanwhile (it would be heard late) and starts at its next
+ * service; recording starts now. 0 asked again (still failed if PipeWire still isn't there), -1 it wasn't failed. */
+int maudio_retry(MAudio *a) {
+    if (!a || !a->pa.failed) return -1;
+    lmp_close(&a->pa);
+    memset(&a->pa, 0, sizeof a->pa);
+    a->pa.fd = -1;
+    a->volume_sent = 0;
+    a->serial_seen = a->ring ? atomic_load(&a->ring->serial) : 0;
+    if (!a->rec && a->ring) {
+        a->pos = atomic_load(&a->ring->wpos);
+        atomic_store(&a->ring->rpos, a->pos);
+        ar_clock_write(a->ring, 0, 0, 0, 0, 0);
+    }
+    a->delta = (int64_t)a->pos;
+    a->started = 0;
+    if (a->rec) start(a);
+    return 0;
+}

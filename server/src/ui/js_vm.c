@@ -1173,6 +1173,7 @@ typedef struct {
     int spk_sent, mic_sent;             /* the current helper has the speakers' / microphone's ring */
     int mic_wait;                       /* the guest records and the machine allows it, LordOS's permission not (yet) */
     int spk_vol, spk_play;              /* what the speakers' stream was last given */
+    long long snd_retry_at;             /* a stream without PipeWire (not there yet, or gone) tries again then */
     char name[VM_NAME_MAX + 1];
     /* files dropped on the window, on their way into the guest (VM_FILE): 1 copying, 2 done, 3 failed; msg is the
      * guest's path (done) or why not, for the app to show; files() hands finished ones over once */
@@ -1244,9 +1245,28 @@ static int mic_permitted(void) {
 }
 static void vdsend_fd(Sess *s, int type, int a, int fd) { if (s->vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, 0, 0, 0, 0, 0); vd_send(s->vd, &m, fd); } }
 
+static long long mono_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000;
+}
+
+/* PipeWire wasn't reachable when a stream opened (a window opened early in the session) or went away: the stream
+ * connects again every 2 s while the guest plays or records, with the same ring, so the helper needs nothing new */
+static void snd_retry(Sess *s, MediaSrc *ms) {
+    int spk = ms->audio && s->guest_out && maudio_failed(ms->audio), mic = ms->mic && maudio_failed(ms->mic);
+    if (!spk && !mic) { s->snd_retry_at = 0; return; }
+    long long now = mono_ms();
+    if (s->snd_retry_at && now < s->snd_retry_at) return;
+    s->snd_retry_at = now + 2000;
+    if (spk && !maudio_retry(ms->audio)) { s->spk_vol = -1; s->spk_play = -1; }
+    if (mic) maudio_retry(ms->mic);
+}
+
 static void snd_apply(Sess *s) {
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
     int up = s->vd >= 0 && s->vd_up && ms;
+    if (up) snd_retry(s, ms);
     /* the speakers: a stream while the machine's sound is on (60 ms of buffer; the helper keeps at most 80 more) */
     if (up && s->snd_on) {
         if (!ms->audio) {
