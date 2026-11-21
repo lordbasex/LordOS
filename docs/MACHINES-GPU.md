@@ -86,6 +86,32 @@ For computers with a second AMD or NVIDIA card kept only for machines.
 - A variant is passing the whole Intel iGPU (GVT-d, legacy IGD passthrough) with its picture on the motherboard's
   output; with OVMF it is fragile, so Mode A is preferred for an iGPU.
 
+### Mode A — results of the hands-on test (2026-11-21, i9-10900 UHD 630, V5_4, Windows 11, driver 27.20.100.8681)
+
+- **The vGPU works as a GPU:** Intel's driver loads with no code 43 (`PCI\VEN_8086&DEV_9BC5`), `dxdiag` shows D3D12
+  feature level 12_1, a WebGL load ran 20 minutes at 25–46 % 3D use with no hang and no host i915/GVT error. The
+  driver came from the Microsoft Update Catalog (Intel-signed kernel driver, Microsoft WHCP catalog). Windows Update
+  installs 30.0.101.1273 by itself unless driver updates are blocked.
+- **Its own display does not work with stock OVMF:** pipe and DDI come up but the primary plane never does, so QEMU
+  gets no dmabuf. The known fix is a GVT option ROM (VBT/OpRegion for UEFI), today only as unsigned third-party
+  binaries (Secure Boot off). Not used.
+- **A guest reboot crashes the VM** (KVM emulation failure on a GVT-protected page, 3 of 3); a shutdown is clean.
+  `-action reboot=shutdown` plus lord-vm starting the machine again works.
+- **Hybrid / render-only works** with Secure Boot on and no option ROM: the machine keeps its `virtio-vga` (viogpudo)
+  as the visible display and gets the mdev with `display=off`; apps that prefer the high-performance GPU
+  (`HKCU\Software\Microsoft\DirectX\UserGpuPreferences`, `GpuPreference=2;`) render on the Intel GPU and are shown on
+  viogpudo. WebGL aquarium, 1200×700: **17–20 fps on WARP → 41–54 fps on the UHD 630** (about 2.5×). Limits: an app
+  that presents through DirectComposition (Chromium browsers by default) still goes through WARP unless started with
+  `--disable-direct-composition`; dwm itself composes on WARP (viogpudo is display-only), which caps the whole desktop
+  at about 50 fps at that size. The Intel adapter lights an invisible monitor; the guest tools must keep the desktop on
+  viogpudo only (`DisplaySwitch /internal` or SetDisplayConfig). The host sees an i915 hotplug uevent each time that
+  invisible monitor changes; lord-server must ignore hotplugs from a card that isn't driving the desktop.
+- **Next step, the "virtual HDMI cable":** an Indirect Display (IddCx) virtual monitor rendered by the Intel adapter
+  makes dwm and every app compose on the real GPU; the guest tools capture it (Desktop Duplication) and hand frames to
+  the host through shared memory (IVSHMEM), like Looking Glass. That removes the WARP ceiling and works the same for a
+  dedicated card with no monitor attached (Mode B). The IddCx driver must be signed (attestation-signed by Microsoft).
+- Memlock grew to about 200 MB under 3D (47 MB idle); budget a few hundred MB.
+
 ### Settings → Graphics cards (approved in principle 2026-11-21)
 
 The person never runs a command: a computer with more than one GPU is managed from **Settings → Graphics cards**.
