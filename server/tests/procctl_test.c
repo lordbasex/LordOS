@@ -5,6 +5,7 @@
 #define _GNU_SOURCE
 #endif
 #include "../src/monitor/procctl.h"
+#include "../src/monitor/mon.h"
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -38,6 +39,23 @@ int main(void) {
     CHECK(s.start == 123456 && s.vsize == 1000000 && s.rss == 250);
     CHECK(proc_stat_parse("garbage", &s) == -1);
     CHECK(proc_stat_parse("12 (x) S 1 2", &s) == -1);
+
+    /* the app scope from /proc/<pid>/cgroup (mon_scope_parse: the process list carries it, read by the monitor's thread) */
+    {
+        char id[MON_SCOPE_MAX];
+        CHECK(mon_scope_parse("0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-lordos-foot.scope\n", id, sizeof id) == 'd' && !strcmp(id, "foot"));
+        CHECK(mon_scope_parse("0::/user.slice/app-lordos-lpk-org.example.notes.scope\n", id, sizeof id) == 'l' && !strcmp(id, "org.example.notes"));
+        CHECK(mon_scope_parse("0::/user.slice/app-lordos-fp-org.gimp.GIMP.scope\n", id, sizeof id) == 'f' && !strcmp(id, "org.gimp.GIMP"));
+        CHECK(mon_scope_parse("12:cpu:/x\n0::/app-lordos-a.scope", id, sizeof id) == 'd' && !strcmp(id, "a"));
+        CHECK(mon_scope_parse("0::/user.slice/session-2.scope\n", id, sizeof id) == 0 && id[0] == 0);
+        CHECK(mon_scope_parse("0::/app-lordos-.scope\n", id, sizeof id) == 0);
+        CHECK(mon_scope_parse("0::/app-lordos-foot.scope/sub\n", id, sizeof id) == 0);
+        CHECK(mon_scope_parse("", id, sizeof id) == 0);
+        char small[4];
+        CHECK(mon_scope_parse("0::/app-lordos-longname.scope\n", small, sizeof small) == 0);
+        char k = mon_scope_of(getpid(), id, sizeof id);
+        CHECK(k ? id[0] != 0 : id[0] == 0);
+    }
 
     /* the protected list */
     CHECK(STREQ(proc_protect_reason(1, 0, "systemd", "/usr/lib/systemd/systemd", NULL, 999), "init"));

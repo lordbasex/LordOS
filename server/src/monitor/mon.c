@@ -38,6 +38,7 @@
 #define MAX_IF 32
 #define MAX_DISK 32
 #define MAX_PROC 8192
+#define SCOPE_RECHECK_MS 5000
 
 /* ---- utilities ------------------------------------------------------------------------ */
 
@@ -508,7 +509,9 @@ static void sensors_sample(Buf *b) {
 
 /* ---- processes ---------------------------------------------------------------------------- */
 
-typedef struct { int pid; unsigned long long start, ticks; } ProcPrev;
+/* sk, sid: the process's app scope (mon_scope_of), kept while the pid and its start time stay the same; "none" is
+ * looked at again for SCOPE_RECHECK_MS (a companion joins its app's scope a moment after it starts) */
+typedef struct { int pid; char sk; double sat; unsigned long long start, ticks; char sid[MON_SCOPE_MAX]; } ProcPrev;
 static ProcPrev *pprev, *pcur;
 static int npprev;
 static double pprev_t;
@@ -525,6 +528,37 @@ static const char *user_name(unsigned uid) {
     if (!getpwuid_r(uid, &pw, tmp, sizeof tmp, &r) && r) snprintf(users[slot].name, sizeof users[slot].name, "%s", r->pw_name);
     else snprintf(users[slot].name, sizeof users[slot].name, "%u", uid);
     return users[slot].name;
+}
+
+/* The app scope of a cgroup v2 path's leaf (app-lordos-<id>.scope, app-lordos-lpk-<id>.scope, app-lordos-fp-<id>.scope;
+ * docs/FIREWALL.md): 'd', 'l' or 'f' and the id, or 0 */
+char mon_scope_parse(const char *cgroup, char *id, size_t n) {
+    if (n) id[0] = 0;
+    for (const char *line = cgroup; line && *line; line = strchr(line, '\n') ? strchr(line, '\n') + 1 : NULL) {
+        if (strncmp(line, "0::", 3)) continue;
+        size_t ll = strcspn(line, "\n");
+        const char *leaf = line + 3;
+        for (const char *q = line + 3; q < line + ll; q++) if (*q == '/') leaf = q + 1;
+        size_t l = (size_t)(line + ll - leaf);
+        if (l <= 17 || strncmp(leaf, "app-lordos-", 11) || strncmp(leaf + l - 6, ".scope", 6)) return 0;
+        const char *b = leaf + 11;
+        size_t bl = l - 17;
+        char k = 'd';
+        if (bl > 4 && !strncmp(b, "lpk-", 4)) { k = 'l'; b += 4; bl -= 4; }
+        else if (bl > 3 && !strncmp(b, "fp-", 3)) { k = 'f'; b += 3; bl -= 3; }       /* a Flatpak app (docs/FLATPAK.md) */
+        if (bl + 1 > n) return 0;
+        memcpy(id, b, bl);
+        id[bl] = 0;
+        return k;
+    }
+    return 0;
+}
+
+char mon_scope_of(int pid, char *id, size_t n) {
+    char p[64], txt[1024];
+    snprintf(p, sizeof p, "/proc/%d/cgroup", pid);
+    if (n) id[0] = 0;
+    return mon_read_small(p, txt, sizeof txt) > 0 ? mon_scope_parse(txt, id, n) : 0;
 }
 
 static int cmp_pid(const void *a, const void *b) { return ((const ProcPrev *)a)->pid - ((const ProcPrev *)b)->pid; }
@@ -590,11 +624,17 @@ static void procs_scan(Buf *b) {
             exe[k > 0 ? k : 0] = 0;
         }
         double cpu = 0;
-        ProcPrev key = { pid, 0, 0 }, *old = npprev ? bsearch(&key, pprev, (size_t)npprev, sizeof key, cmp_pid) : NULL;
-        if (old && old->start == start && ticks >= old->ticks && dt > 0) cpu = (double)(ticks - old->ticks) / ((double)hz * dt);
-        pcur[n].pid = pid;
-        pcur[n].start = start;
-        pcur[n].ticks = ticks;
+        ProcPrev key = { .pid = pid }, *old = npprev ? bsearch(&key, pprev, (size_t)npprev, sizeof key, cmp_pid) : NULL;
+        if (old && old->start != start) old = NULL;
+        if (old && ticks >= old->ticks && dt > 0) cpu = (double)(ticks - old->ticks) / ((double)hz * dt);
+        ProcPrev *cur = &pcur[n];
+        cur->pid = pid;
+        cur->start = start;
+        cur->ticks = ticks;
+        /* its app scope: read here, in this thread, once per process (lord.monitor.processes used to read every
+         * process's cgroup file on the screen's thread, 20 ms a second with many processes) */
+        if (old && (old->sk || now - old->sat < SCOPE_RECHECK_MS)) { cur->sk = old->sk; cur->sat = old->sat; memcpy(cur->sid, old->sid, sizeof cur->sid); }
+        else { cur->sk = mon_scope_of(pid, cur->sid, sizeof cur->sid); cur->sat = now; }
         n++;
         mon_buf_printf(b, "%s{\"pid\":%d,\"ppid\":%llu,\"uid\":%u,\"user\":", n > 1 ? "," : "", pid, v[0], uid);
         mon_buf_str(b, user_name(uid));
@@ -612,6 +652,8 @@ static void procs_scan(Buf *b) {
         if (prot) mon_buf_str(b, prot); else mon_buf_printf(b, "null");
         unsigned long long rss = v[20] * (unsigned long long)page, pss = uid == me && rss >= PSS_MIN_RSS ? proc_pss(pid) : 0;
         if (pss) mon_buf_printf(b, ",\"pss\":%llu", pss);
+        mon_buf_printf(b, ",\"sk\":\"%s\",\"sid\":", cur->sk == 'd' ? "d" : cur->sk == 'l' ? "l" : cur->sk == 'f' ? "f" : "");
+        mon_buf_str(b, cur->sid);
         mon_buf_printf(b, "}");
     }
     closedir(d);

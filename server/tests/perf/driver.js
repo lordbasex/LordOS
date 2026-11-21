@@ -127,6 +127,26 @@
       for (let i = 0; i < 4; i++) step('wait', () => {});
       end();
     },
+    // Monitor → Processes on screen (the list refreshes once a second): its native call, lord.monitor.processes, was
+    // ~20 ms on the main thread and a third of a session's stall lines (docs/MACHINES-GPU.md, Part 1 step 6)
+    monitorProcs() {
+      begin('Monitor: Processes open');
+      step('close the others', closeAll);
+      step('open', () => sdk.wm.open('monitor'));
+      step('wait', () => {});
+      step('Processes', () => clickText('monitor', sdk.t('monitor.processes')));
+      for (let i = 0; i < 10; i++) step('wait', () => {});
+      end();
+      begin('monitor.processes, timed alone');
+      step('close the others', closeAll);
+      step('start', () => { lord.monitor.start(); lord.monitor.want(true, false, false); });
+      for (let i = 0; i < 6; i++) step('call', () => {
+        const t0 = lord.now();
+        const r = lord.monitor.processes('en');
+        if (r) log({ native: `monitor.processes (${r.list.length})`, ms: +(lord.now() - t0).toFixed(2) });
+      });
+      end();
+    },
     // the maintainer's case: several apps open, then a setting changes and windows are focused in turn
     mixed() {
       // (not Monitor: its charts redraw four times a second and would be in every step; idleMonitor measures it)

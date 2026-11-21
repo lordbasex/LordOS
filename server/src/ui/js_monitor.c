@@ -2,7 +2,7 @@
  *
  * Everything is read-only. Reads of /proc, /sys and sock_diag are done by a dedicated thread
  * (monitor/mon.c) only while someone has called start() and is querying; these functions never
- * touch files (except info() and /proc/<pid>/cgroup of each new process, cached: scope_of), so
+ * touch files (except info() and, for the GPU list, /proc/<pid>/cgroup of each new process, cached: scope_of), so
  * they don't stall the compositor's frame.
  *
  *   start() / stop()            interested-party count (the thread sleeps after 3 s without queries)
@@ -152,42 +152,20 @@ static const DesktopApp *match(const DesktopApp *apps, int n, const char *exe, c
 
 /* The cgroup scope of a process (app-lordos-<id>.scope / app-lordos-lpk-<id>.scope), the same
  * identity the firewall uses in the kernel (docs/FIREWALL.md): this way a curl running inside
- * foot counts as foot. A small /proc read per pid, with a cache of 64 pids. */
+ * foot counts as foot. The process list brings it read by the monitor's thread ("sk", "sid"); for the
+ * GPU's list, a small /proc read per pid, with a cache of 64 pids. */
 static int scope_of(int pid, char *kind, char *id, size_t n) {
-    static struct { int pid; char kind; char id[160]; time_t at; } cache[64];
+    static struct { int pid; char kind; char id[MON_SCOPE_MAX]; time_t at; } cache[64];
     int slot = pid & 63;
     time_t now = time(NULL);
     /* "no scope" is only true for now: a companion joins its app's scope a moment after it starts */
     if (cache[slot].pid == pid && (cache[slot].kind || now - cache[slot].at < 5)) { *kind = cache[slot].kind; snprintf(id, n, "%s", cache[slot].id); return *kind ? 0 : -1; }
-    char path[64], line[512];
-    snprintf(path, sizeof path, "/proc/%d/cgroup", pid);
-    FILE *f = fopen(path, "re");
-    char k = 0, buf[160] = "";
-    if (f) {
-        while (fgets(line, sizeof line, f)) {
-            if (strncmp(line, "0::", 3)) continue;
-            line[strcspn(line, "\n")] = 0;
-            const char *leaf = strrchr(line, '/');
-            leaf = leaf ? leaf + 1 : line + 3;
-            size_t l = strlen(leaf);
-            if (l > 17 && !strncmp(leaf, "app-lordos-", 11) && !strcmp(leaf + l - 6, ".scope") && l - 17 < sizeof buf) {
-                const char *b = leaf + 11;
-                size_t bl = l - 17;
-                if (bl > 4 && !strncmp(b, "lpk-", 4)) { k = 'l'; b += 4; bl -= 4; }
-                else if (bl > 3 && !strncmp(b, "fp-", 3)) { k = 'f'; b += 3; bl -= 3; }    /* a Flatpak app (docs/FLATPAK.md) */
-                else k = 'd';
-                memcpy(buf, b, bl);
-                buf[bl] = 0;
-            }
-        }
-        fclose(f);
-    }
+    char k = mon_scope_of(pid, cache[slot].id, sizeof cache[slot].id);
     cache[slot].pid = pid;
     cache[slot].kind = k;
     cache[slot].at = now;
-    snprintf(cache[slot].id, sizeof cache[slot].id, "%s", buf);
     *kind = k;
-    snprintf(id, n, "%s", buf);
+    snprintf(id, n, "%s", cache[slot].id);
     return k ? 0 : -1;
 }
 
@@ -227,8 +205,17 @@ static JSValue annotate(JSContext *c, JSValue obj, const char *lang) {
             JSValue pv = JS_GetPropertyStr(c, e, "pid");
             JS_ToInt32(c, &pid, pv);
             JS_FreeValue(c, pv);
-            char sk, sid[160];
-            if (pid > 0 && !scope_of(pid, &sk, sid, sizeof sid)) {
+            char sk = 0, sid[MON_SCOPE_MAX];
+            JSValue skv = JS_GetPropertyStr(c, e, "sk");
+            int have = JS_IsString(skv);                /* the process list: read by the monitor's thread */
+            if (have) {
+                char k[4];
+                str_prop(c, e, "sk", k, sizeof k);
+                str_prop(c, e, "sid", sid, sizeof sid);
+                sk = sid[0] && (k[0] == 'd' || k[0] == 'l' || k[0] == 'f') ? k[0] : 0;
+            }
+            JS_FreeValue(c, skv);
+            if (pid > 0 && (have ? sk != 0 : !scope_of(pid, &sk, sid, sizeof sid))) {
                 if (sk == 'l') {
                     char id[200];
                     snprintf(id, sizeof id, "lpk:%s", sid);

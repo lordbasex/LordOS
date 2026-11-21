@@ -6,6 +6,7 @@
 #ifndef LORD_MON_H
 #define LORD_MON_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 /* Assets folder (for assets/monitor/geoip-country.mmdb.xz). */
@@ -42,6 +43,13 @@ char *mon_voltage_json(uint64_t *seq);
  * DRM usage once per second; JS asks for it only while one of those views is on screen. mon_gpu_json: the latest. */
 void mon_want_gpu(int on);
 char *mon_gpu_json(uint64_t *seq);
+/* The app scope a process runs in (app-lordos-<id>.scope and its lpk- and fp- kinds, docs/FIREWALL.md): 'd' (a .desktop
+ * app), 'l' (an isolated app), 'f' (a Flatpak app) or 0 (none), and its id in id. mon_scope_parse reads it from the text
+ * of /proc/<pid>/cgroup; mon_scope_of reads that file. The process list (mon_procs_json) carries each one as "sk" and
+ * "sid", read by the thread. */
+#define MON_SCOPE_MAX 160
+char mon_scope_parse(const char *cgroup, char *id, size_t n);
+char mon_scope_of(int pid, char *id, size_t n);
 /* Fixed data: CPU model, cores, location from the time zone, country database. */
 char *mon_info_json(void);
 
