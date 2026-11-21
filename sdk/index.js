@@ -194,7 +194,7 @@ import { PortalFilePrompt } from './filepicker.jsx';
 import { ScreenCastPrompt } from './screencast.jsx';
 import { VoicePlayer, VoiceSavePrompt } from './voiceplayer.jsx';
 import { LiveSpeechPanel } from './livespeech.jsx';
-export { openFileWithApps, openUrl, revealPath, openCalendarApp } from './sysopen.js';   // opening files/apps for the isolated system apps
+export { openFileWithApps, openUrl, revealPath, openFolder, openCalendarApp } from './sysopen.js';   // opening files/apps for the isolated system apps
 export { books as addressBooks, contacts, displayName as contactName, initials as contactInitials, ContactPhoto } from './contacts.js';
 import { startMail } from './mail.js';
 import { startReminders } from './calendar.js';

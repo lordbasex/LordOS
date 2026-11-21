@@ -1,7 +1,7 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
   portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, bootList, bootMove, bootSummary, resolutions } from './model.js';
@@ -338,7 +338,7 @@ export function Configure({ dir, section: section0, onClose }) {
       <Row label={tr('machines.cfg.transferWhere')} last>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{m.transferPath || ''}</Text>
-          <Btn label={tr('machines.tb.transferOpen')} disabled={!m.transfer} onClick={() => { const x = lord.vm.transferFolder(dir); if (x) revealPath(x); }} style={{ height: 28 }} />
+          <Btn label={tr('machines.tb.transferOpen')} disabled={!m.transfer} onClick={() => { const x = lord.vm.transferFolder(dir); if (x) openFolder(x); }} style={{ height: 28 }} />
         </View>
       </Row>
     </Group>

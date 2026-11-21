@@ -4,7 +4,7 @@
 // (Actions, Devices). In full screen the bar floats at the top edge. When the machine fails to start or stops with an
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
-  View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath,
+  View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath, openFolder,
   inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, admin, t as tr,
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
@@ -139,7 +139,7 @@ function Tools({ ctl, floating, compact }) {
   ];
   const shareItems = [
     ...xferItems,
-    ...shares.map((x) => ({ label: `${x.path.split('/').pop()}  ·  ${x.tag}`, hint: tr(x.writable ? 'machines.tb.shareRw' : 'machines.tb.shareRo'), onClick: () => revealPath(x.path) })),
+    ...shares.map((x) => ({ label: `${x.path.split('/').pop()}  ·  ${x.tag}`, hint: tr(x.writable ? 'machines.tb.shareRw' : 'machines.tb.shareRo'), onClick: () => openFolder(x.path) })),
     ...shares.map((x) => ({ label: tr('machines.tb.shareCopy', { tag: x.tag }), onClick: () => clipboard.set(mountCommand(x.tag)) })),
     shares.length ? '-' : null,
     !shares.length ? { label: tr('machines.tb.sharesNone'), disabled: true } : null,
@@ -619,7 +619,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // the transfer folder (6.7.1): Open Transfer Folder, and for a Windows guest, WinFsp (the admin helper downloads the
   // catalog's pinned installer once; lord-server hands lord-vm only that file from the image store)
   const xstate = transferState(cfg, st);
-  const xferOpen = () => { const p = has() ? lord.vm.transferFolder(dir) : null; if (p) revealPath(p); };
+  const xferOpen = () => { const p = has() ? lord.vm.transferFolder(dir) : null; if (p) openFolder(p); };
   const xferBusy = useRef(false);
   const xferSetup = async () => {
     const s = sidRef.current;

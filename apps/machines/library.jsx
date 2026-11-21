@@ -4,7 +4,7 @@
 // disk. Double-click opens or starts; right-click has the machine's menu. FirstRun, Requirements and the Pi page are
 // the other screens of this window.
 import {
-  View, Text, Image, ScrollView, useAppWindow, useStore, admin, fs, wm, windows, revealPath, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
+  View, Text, Image, ScrollView, useAppWindow, useStore, admin, fs, wm, windows, revealPath, openFolder, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
   Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, MenuButton, SearchField, EmptyState, useNarrow,
   t as tr,
 } from '@lordos/sdk';
@@ -436,7 +436,7 @@ export function Library() {
       { label: tr('machines.cmd.clone'), onClick: () => setCopying(m) },
       { label: tr('machines.cmd.logs'), onClick: () => openLogs(m) },
       { label: tr('machines.cmd.showInFiles'), onClick: () => revealPath(m.dir) },
-      ...(m.transfer ? [{ label: tr('machines.tb.transferOpen'), onClick: () => { const x = lord.vm.transferFolder(m.dir); if (x) revealPath(x); } }] : []),
+      ...(m.transfer ? [{ label: tr('machines.tb.transferOpen'), onClick: () => { const x = lord.vm.transferFolder(m.dir); if (x) openFolder(x); } }] : []),
       m.iso && a.remove && !m.suspended ? { label: tr('machines.eject'), onClick: () => { setError(lord.vm.eject(m.dir) ? '' : tr('machines.ejectFailed', { name: m.name })); refresh(); } } : null,
       m.suspended && a.start ? { label: tr('machines.fail.discardState'), destructive: true, onClick: () => setDiscard(m) } : null,
       '-',
