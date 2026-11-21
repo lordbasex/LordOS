@@ -27,9 +27,9 @@ build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR)
 
 # lordos-guest: the clipboard helper Machines installs in a Linux guest of this computer's architecture (static: it
 # runs on whatever the guest has)
-build/lordos-guest: ../tools/guest/lordos-guest.c src/vm/vmagent.c src/vm/vmagent.h
+build/lordos-guest: ../tools/guest/lordos-guest.c ../tools/guest/x11clip.c ../tools/guest/x11clip.h src/vm/vmagent.c src/vm/vmagent.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c src/vm/vmagent.c
+	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c ../tools/guest/x11clip.c src/vm/vmagent.c
 
 # lordos-guest-win.exe: LordOS guest tools for Windows guests (tools/guest-win), cross-built with mingw-w64
 # (gcc-mingw-w64-x86-64-posix, docs/VM-SETUP.md): Win32 only, libgcc and winpthread linked in, no DLL of ours. Skipped

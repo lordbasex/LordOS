@@ -52,7 +52,15 @@
  *     VM_CLIP       the host's clipboard for the guest: one descriptor, a memfd of a bytes (at most VM_CLIP_MAX); b =
  *                   VCF_TEXT: UTF-8 text; VCF_CLIPX: text, HTML and/or a PNG in AGK_CLIPX's layout (vmagent.h), checked
  *                   and sanitized again here. Sent on only when machine.json's clipboard allows to-guest and
- *                   lordos-guest said hello (as text only to a helper without "clipx")
+ *                   lordos-guest said hello (as text only to a helper without "clipx"). c = 0: pushed as it is (a helper
+ *                   without "clipreq", VAC_CLIP_LAZY unset). c = an offer's generation, d = AGF_*: the answer to the
+ *                   guest's request (VM_CLIP_REQ) for that form of that offer: sent on as AGK_CLIPDATA, and only when
+ *                   that request is waiting
+ *     VM_CLIP_OFFER the host's clipboard on demand (6.8, VAC_CLIP_LAZY): a = the offer's generation (≥ 1, lord-server's
+ *                   counter), b = AGM_* forms it holds, c = AGO_* flags; sent on as AGK_CLIPOFFER, no contents
+ *     VM_CLIP_DENY  no clipboard for the guest: a = the offer's generation and b = the AGF_* form of a waiting request
+ *                   (answered AGK_CLIPDATA refused, or stale with VCD_STALE), or a = 0 and b = 0: the guest's last
+ *                   clipboard was ignored; c = VCD_* why. lord-vm writes it in the machine's log
  *     VM_DISPLAY_SIZE a, b = the machine window's size (320..8192 × 200..8192), sent by lord-server with each VD_RESIZE.
  *                   lord-vm remembers it and passes it to a guest helper that sets its own display's size (AGK_DISPLAY,
  *                   the LordOS guest tools for Windows; again after each hello); others follow QEMU's ui_info → VM_REPLY
@@ -101,6 +109,9 @@
  *     VM_FILE_PROGRESS seq of the VM_FILE; a = percent copied (0..100); b = 1 through the transfer folder, 0 the agent's
  *                   way; text = the file's name as the guest gets it.
  *                   Sent to the client that asked, at most every 250 ms
+ *     VM_CLIP_REQ   a program in the guest pastes: a = the offer's generation, b = AGF_* form (lord-vm checked that it's
+ *                   the last offer's and one of its forms). Sent to every client; one answers with VM_CLIP (c, d) or
+ *                   VM_CLIP_DENY
  *     VM_WINDATA    apps mode: what the guest's helper said, checked (vmagent.h's parsers) and written again by lord-vm:
  *                   a sealed memfd of a bytes (≤ VM_WINDATA_MAX), b = LAG_WINDOWS, LAG_WINICON or LAG_APPLIST, in that
  *                   kind's layout; c = the list of apps' generation (1, 2, ...). lord-server parses it again before use
@@ -187,11 +198,15 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
-    VM_APPS, VM_WINACT, VM_LAUNCH,
-    VM_REQ_LAST = VM_LAUNCH,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY,
+    VM_REQ_LAST = VM_CLIP_DENY,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
-    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA,
+    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ,
 };
+/* VM_CLIP_DENY c: why. BACKGROUND: the machine wasn't in use (its window not in front, nor a few seconds after);
+ * STALE: the host's clipboard changed since that offer, or the offer isn't the last; NONE: that form isn't there now
+ * (or it's a secret); DECLINED: the person said no (ask mode), or didn't answer in time */
+enum { VCD_BACKGROUND = 1, VCD_STALE, VCD_NONE, VCD_DECLINED, VCD_LAST = VCD_DECLINED };
 /* VM_NOTICE a */
 enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VMN_COUNT };
 /* VM_JOB a, b */
@@ -204,9 +219,11 @@ enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
  * VAC_TRANSFER: the guest has the transfer folder (6.7.1) mounted (Linux: /mnt/LordOS; Windows: VirtioFsSvc runs);
  * VAC_XFER_SETUP: a Windows guest that can have it once WinFsp is installed (VAG_TRANSFER);
  * VAC_CLIP_NOTOOL: the guest's helper is there but its clipboard can't work: the guest has no clipboard tool (the hello
- * said "noclip": a Linux guest without xclip or wl-clipboard). VAC_CLIPBOARD is set only when the hello says "clipboard" */
+ * said "noclip": a Linux guest without xclip or wl-clipboard). VAC_CLIPBOARD is set only when the hello says "clipboard";
+ * VAC_CLIP_LAZY: it also said "clipreq": the host's clipboard goes in on demand (VM_CLIP_OFFER), never pushed */
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
-       VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048 };
+       VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048, VAC_CLIP_LAZY = 4096,
+       VAC_ALL = 8191 };
 #define VM_WINDATA_MAX (1u << 20)
 #define VM_CLIP_MAX (11u << 20)
 /* VM_CLIP and VM_CLIP_DATA b: what the memfd holds */
@@ -376,7 +393,10 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600)) &&
                       (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
                       (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_TRANSFER)) &&
-                      (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX))) &&
+                      (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX) &&
+                                              m->c >= 0 && (!m->c || (m->b == VCF_CLIPX && m->d >= 1 && m->d <= 3)))) &&
+                      (m->type != VM_CLIP_OFFER || (m->a > 0 && m->b >= 1 && m->b <= 7 && (m->c == 0 || m->c == 1))) &&
+                      (m->type != VM_CLIP_DENY || (m->a >= 0 && m->c >= 1 && m->c <= VCD_LAST && (m->a ? m->b >= 1 && m->b <= 3 : m->b == 0))) &&
                       (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1) && (m->d == 0 || m->d == 1))) &&
                       (m->type != VM_FILE || m->text[0]) &&
                       (m->type != VM_DISPLAY_SIZE || (m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM)) &&
@@ -390,11 +410,12 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_DISPLAY_FD: return m->a >= 0 && m->b >= 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VM_NOTICE: return m->a > VMN_NONE && m->a < VMN_COUNT;
     case VM_CONSOLE_FD: return 1;
-    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 2048;
+    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b <= VAC_ALL;
     /* b: LAG_WINDOWS (6), LAG_WINICON (7) or LAG_APPLIST (10), vmagent.h; c: LAG_APPLIST's generation (VM_LAUNCH) */
     case VM_WINDATA: return m->a > 0 && (uint32_t)m->a <= VM_WINDATA_MAX && (m->b == 6 || m->b == 7 || m->b == 10) && m->c >= 0;
     case VM_CLIP_DATA: return m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX);
     case VM_FILE_PROGRESS: return m->a >= 0 && m->a <= 100;
+    case VM_CLIP_REQ: return m->a > 0 && m->b >= 1 && m->b <= 3;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }

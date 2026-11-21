@@ -12,10 +12,14 @@ import {
   View, Text, MediaView, addListener, useAppWindow, useStore, createStore, wm, windows, mainDisplay, workArea, windowPixelIcons, windowChrome, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
+import { ClipAskBar } from './clipask.jsx';
 import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps } from './model.js';
 
 // dir → { sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], leave() }
 export const guests = createStore({});
+// dir → the LordOS window id of that machine's guest window in front, if one is: the machine counts as in use then (its
+// clipboard's gate, 6.8)
+export const guestFocus = createStore({});
 // dir → Map gid → { winId, rect (the guest's last), minimized, asked (the rect this side asked for), inset, measured }
 const tracks = new Map();
 const trackOf = (dir) => { let m = tracks.get(dir); if (!m) tracks.set(dir, m = new Map()); return m; };
@@ -54,7 +58,7 @@ function placeOf(x, w, sid, k, d) {
 
 // The machine's window side: turns apps mode on and off in the guest, and keeps the LordOS windows in step with the
 // guest's list. on: the person wants it; ready: the agent says the guest's helper lists its windows.
-export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave }) {
+export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTouch }) {
   const sent = useRef(false);
   const seen = useRef({ w: -1, i: -1, a: -1 });
   // a pause keeps the windows (their pictures stay as they were); stopping, or the agent going, ends it
@@ -66,7 +70,7 @@ export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave }) {
     const [gw, gh] = appsGuestSize(display());
     lord.vm.resize(sid, gw, gh);
     seen.current = { w: -1, i: -1, a: -1 };
-    publish(dir, { sid, name, mid, leave: onLeave, list: [], apps: [] });
+    publish(dir, { sid, name, mid, leave: onLeave, touch: onTouch, list: [], apps: [] });
     return () => {
       if (sent.current) lord.vm.apps(sid, false);
       sent.current = false;
@@ -168,6 +172,12 @@ export function GuestWindow({ dir, gid }) {
       { label: g.name || tr('machines.title'), items: [{ label: tr('machines.apps.leave'), onClick: () => g.leave?.() }] },
     ]);
   }, [g?.apps, g?.name]);
+  // in front: the machine is in use (the clipboard's gate)
+  useEffect(() => {
+    if (!focused) return undefined;
+    guestFocus.set((f) => ({ ...f, [dir]: winId }));
+    return () => guestFocus.set((f) => { if (f[dir] !== winId) return f; const n = { ...f }; delete n[dir]; return n; });
+  }, [focused]);
   // focus: the guest's window comes to the front in the guest too
   useEffect(() => { if (focused && g?.sid && me && !me.focused) lord.vm.winAct(g.sid, gid, 'focus'); }, [focused]);
   // minimized here (the Dock, the window's button) or brought back: the guest does the same
@@ -216,7 +226,8 @@ export function GuestWindow({ dir, gid }) {
   useEffect(() => {
     if (!focused || !g?.sid) return undefined;
     const sid = g.sid;
-    const ka = addListener('keydown', (e) => { if (!(e.code > 0)) return; e.preventDefault?.(); lord.vm.key(sid, e.code, 1); });
+    // while the clipboard's bar asks, the keys are the bar's
+    const ka = addListener('keydown', (e) => { if (!(e.code > 0) || gref.current?.ask) return; e.preventDefault?.(); lord.vm.key(sid, e.code, 1); });
     const kb = addListener('keyup', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 0); });
     const kc = addListener('pointerup', (e) => { if (buttons.current.has(e.button)) { buttons.current.delete(e.button); lord.vm.button(sid, e.button, 0); } });
     return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); };
@@ -225,7 +236,8 @@ export function GuestWindow({ dir, gid }) {
   const move = (e) => { const q = g?.sid && at(e); if (q) lord.vm.motion(g.sid, q[0], q[1]); };
   const down = (e) => {
     if (trackOf(dir).get(gid)?.popup) e.stopPropagation?.();     // a popup's own frame (picture-in-picture) would start a drag
-    if (!g?.sid) return;
+    if (!g?.sid || g.ask) return;     // the clipboard's bar is asking: its clicks are its own
+    g.touch?.();                // a click on the machine: its clipboard's gate opens and the guest gets the offer
     move(e);
     buttons.current.add(e.button);
     lord.vm.button(g.sid, e.button, 1);
@@ -247,6 +259,7 @@ export function GuestWindow({ dir, gid }) {
   return (
     <View ref={box} onMouseDown={down} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, backgroundColor: '#000' }}>
       {g.media ? <MediaView media={g.media} crop={cropOf(me)} style={{ flex: 1 }} /> : null}
+      {focused && g.ask ? <ClipAskBar ask={g.ask} onAnswer={(yes) => g.askAnswer?.(yes)} /> : null}
     </View>
   );
 }

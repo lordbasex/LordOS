@@ -585,6 +585,59 @@ int lag_launch_parse(const uint8_t *p, size_t n, const uint8_t **tok, uint16_t *
 static void lag_wr16(uint8_t *p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }
 static void lag_wr32(uint8_t *p, uint32_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
 
+int ag_offer_parse(const uint8_t *p, size_t n, uint32_t *gen, uint8_t *forms, uint8_t *flags) {
+    if (!p || n != 6) return -1;
+    uint32_t g = le32(p);
+    if (!g || !p[4] || (p[4] & ~AGM_ALL) || (p[5] & ~AGO_ALL)) return -1;
+    if (gen) *gen = g;
+    if (forms) *forms = p[4];
+    if (flags) *flags = p[5];
+    return 0;
+}
+
+void ag_offer_write(uint8_t o[6], uint32_t gen, uint8_t forms, uint8_t flags) {
+    lag_wr32(o, gen);
+    o[4] = forms; o[5] = flags;
+}
+
+int ag_clipreq_parse(const uint8_t *p, size_t n, uint32_t *gen, uint8_t *form) {
+    if (!p || n != 5) return -1;
+    uint32_t g = le32(p);
+    if (!g || p[4] < AGF_TEXT || p[4] > AGF_PNG) return -1;
+    if (gen) *gen = g;
+    if (form) *form = p[4];
+    return 0;
+}
+
+void ag_clipreq_write(uint8_t o[5], uint32_t gen, uint8_t form) {
+    lag_wr32(o, gen);
+    o[4] = form;
+}
+
+int ag_clipdata_parse(const uint8_t *p, size_t n, uint32_t *gen, uint8_t *form, uint8_t *status, const uint8_t **data, uint32_t *dn) {
+    if (!p || n < 6) return -1;
+    uint32_t g = le32(p);
+    uint8_t f = p[4], st = p[5];
+    size_t l = n - 6;
+    if (!g || f < AGF_TEXT || f > AGF_PNG || st > AGD_NONE) return -1;
+    if (st != AGD_OK) { if (l) return -1; }
+    else {
+        if (!l || l > (f == AGF_PNG ? AG_PNG_MAX : AG_TEXT_MAX)) return -1;
+        if (f == AGF_PNG ? ag_png_check(p + 6, l, NULL, NULL) != 0 : !ag_utf8_ok(p + 6, l)) return -1;
+    }
+    if (gen) *gen = g;
+    if (form) *form = f;
+    if (status) *status = st;
+    if (data) *data = st == AGD_OK ? p + 6 : NULL;
+    if (dn) *dn = (uint32_t)l;
+    return 0;
+}
+
+void ag_clipdata_head(uint8_t o[6], uint32_t gen, uint8_t form, uint8_t status) {
+    lag_wr32(o, gen);
+    o[4] = form; o[5] = status;
+}
+
 unsigned ag_hello_caps(const uint8_t *p, size_t n) {
     unsigned caps = 0;
     size_t i = 0;
@@ -597,6 +650,7 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         else if (l == 5 && !memcmp(p + s0, "clipx", 5)) caps |= AG_HELLO_CLIPX;
         else if (l == 7 && !memcmp(p + s0, "windows", 7)) caps |= AG_HELLO_WINDOWS;
         else if (l == 6 && !memcmp(p + s0, "noclip", 6)) caps |= AG_HELLO_NOCLIP;
+        else if (l == 7 && !memcmp(p + s0, "clipreq", 7)) caps |= AG_HELLO_CLIPREQ;
     }
     return caps;
 }

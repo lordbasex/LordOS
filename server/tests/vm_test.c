@@ -65,7 +65,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "9", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "10", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -108,7 +108,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":9,\"whatever\":true}";
+    const char newer[] = "{\"schema\":10,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -365,6 +365,30 @@ static void test_schema(void) {
                 CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
                 free(jj);
             }
+        }
+        /* schema 9: clipboard_ask, true or false, never below schema 9, written only when true */
+        {
+            struct { const char *add; int schema, want, ask; } s9[] = {
+                { "\"clipboard_ask\":true", 9, VM_OK, 1 }, { "\"clipboard_ask\":false", 9, VM_OK, 0 }, { "\"agent\":true", 9, VM_OK, 0 },
+                { "\"clipboard_ask\":1", 9, VM_E_FIELD, 0 }, { "\"clipboard_ask\":\"yes\"", 9, VM_E_FIELD, 0 },
+                { "\"clipboard_ask\":true", 8, VM_E_FIELD, 0 }, { "\"clipboard_ask\":false", 8, VM_OK, 0 },
+            };
+            for (size_t i = 0; i < sizeof s9 / sizeof s9[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s9[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s9[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s9[i].want) fprintf(stderr, "  schema 9 %s (%d): got %d (%s)\n", s9[i].add, s9[i].schema, r, err);
+                CHECK(r == s9[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.clipboard_ask == s9[i].ask);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"clipboard_ask\": true") == s9[i].ask && !strstr(jj, "\"clipboard_ask\": false"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(VM_SCHEMA >= 9);
         }
         /* exactly VM_SOUND_DEV_MAX fits */
         longn[VM_SOUND_DEV_MAX] = 0;
@@ -646,7 +670,9 @@ static void test_messages(void) {
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_FILES | VAC_TRANSFER, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_DISPLAY | (int)LAG_CAP_WINDOWS | VAC_TRANSFER | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
-    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, 2048, 0, 0, "1\tx"); CHECK(!vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_CLIP_NOTOOL, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));       /* "needs xclip" reaches the app */
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_CLIPBOARD | VAC_CLIP_LAZY, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_ALL + 1, 0, 0, "1\tx"); CHECK(!vm_msg_valid(&q, 0));
     q.a = 101; CHECK(!vm_msg_valid(&q, 0));
     q.a = -1; CHECK(!vm_msg_valid(&q, 0));
     char longtext[400];
@@ -1449,7 +1475,90 @@ static void test_lag(void) {
     TB lb = { .n = 0 }; tbs(&lb, "\xc3"); CHECK(lag_launch_parse(lb.b, lb.n, &tok, &tn) == -1);
 }
 
+/* the host's clipboard on demand (6.8): AGK_CLIPOFFER, AGK_CLIPREQ, AGK_CLIPDATA and the control messages around them */
+static void test_clip_on_demand(void) {
+    uint8_t o[6], r[5];
+    uint32_t gen = 0;
+    uint8_t forms = 0, flags = 0, form = 0, status = 9;
+    ag_offer_write(o, 7, AGM_TEXT | AGM_PNG, AGO_ASK);
+    CHECK(!ag_offer_parse(o, 6, &gen, &forms, &flags) && gen == 7 && forms == (AGM_TEXT | AGM_PNG) && flags == AGO_ASK);
+    CHECK(ag_offer_parse(o, 5, NULL, NULL, NULL) == -1 && ag_offer_parse(NULL, 6, NULL, NULL, NULL) == -1);
+    uint8_t big[7]; memcpy(big, o, 6); big[6] = 0; CHECK(ag_offer_parse(big, 7, NULL, NULL, NULL) == -1);      /* a byte too many */
+    ag_offer_write(o, 0, AGM_TEXT, 0); CHECK(ag_offer_parse(o, 6, NULL, NULL, NULL) == -1);                       /* generation 0 */
+    ag_offer_write(o, 1, 0, 0); CHECK(ag_offer_parse(o, 6, NULL, NULL, NULL) == -1);                              /* no form */
+    ag_offer_write(o, 1, 8, 0); CHECK(ag_offer_parse(o, 6, NULL, NULL, NULL) == -1);                              /* unknown form */
+    ag_offer_write(o, 1, AGM_ALL, 2); CHECK(ag_offer_parse(o, 6, NULL, NULL, NULL) == -1);                        /* unknown flag */
+    ag_offer_write(o, 0xffffffffu, AGM_ALL, 0); CHECK(!ag_offer_parse(o, 6, &gen, NULL, NULL) && gen == 0xffffffffu);
+
+    ag_clipreq_write(r, 9, AGF_HTML);
+    CHECK(!ag_clipreq_parse(r, 5, &gen, &form) && gen == 9 && form == AGF_HTML);
+    CHECK(ag_clipreq_parse(r, 4, NULL, NULL) == -1 && ag_clipreq_parse(r, 6, NULL, NULL) == -1);
+    ag_clipreq_write(r, 9, 0); CHECK(ag_clipreq_parse(r, 5, NULL, NULL) == -1);
+    ag_clipreq_write(r, 9, 4); CHECK(ag_clipreq_parse(r, 5, NULL, NULL) == -1);
+    ag_clipreq_write(r, 0, AGF_TEXT); CHECK(ag_clipreq_parse(r, 5, NULL, NULL) == -1);
+
+    uint8_t *d = calloc(1, 6 + AG_PNG_MAX + 1);
+    const uint8_t *data = NULL;
+    uint32_t dn = 0;
+    ag_clipdata_head(d, 3, AGF_TEXT, AGD_OK); memcpy(d + 6, "h\xc3\xa9", 3);
+    CHECK(!ag_clipdata_parse(d, 9, &gen, &form, &status, &data, &dn) && gen == 3 && form == AGF_TEXT && status == AGD_OK && dn == 3 && data == d + 6);
+    CHECK(ag_clipdata_parse(d, 6, NULL, NULL, NULL, NULL, NULL) == -1);                                          /* OK with nothing */
+    CHECK(ag_clipdata_parse(d, 8, NULL, NULL, NULL, NULL, NULL) == -1);                                          /* cut UTF-8 */
+    d[7] = 0; CHECK(ag_clipdata_parse(d, 8, NULL, NULL, NULL, NULL, NULL) == -1);                                /* a NUL */
+    ag_clipdata_head(d, 3, AGF_TEXT, AGD_REFUSED);
+    CHECK(!ag_clipdata_parse(d, 6, NULL, NULL, &status, &data, &dn) && status == AGD_REFUSED && !data && !dn);
+    CHECK(ag_clipdata_parse(d, 7, NULL, NULL, NULL, NULL, NULL) == -1);                                          /* a refusal with data */
+    ag_clipdata_head(d, 3, AGF_TEXT, AGD_NONE + 1); CHECK(ag_clipdata_parse(d, 6, NULL, NULL, NULL, NULL, NULL) == -1);
+    ag_clipdata_head(d, 0, AGF_TEXT, AGD_STALE); CHECK(ag_clipdata_parse(d, 6, NULL, NULL, NULL, NULL, NULL) == -1);
+    ag_clipdata_head(d, 3, 4, AGD_STALE); CHECK(ag_clipdata_parse(d, 6, NULL, NULL, NULL, NULL, NULL) == -1);
+    memset(d + 6, 'a', AG_TEXT_MAX + 1);
+    ag_clipdata_head(d, 3, AGF_HTML, AGD_OK);
+    CHECK(!ag_clipdata_parse(d, 6 + AG_TEXT_MAX, NULL, NULL, NULL, NULL, NULL) && ag_clipdata_parse(d, 7 + AG_TEXT_MAX, NULL, NULL, NULL, NULL, NULL) == -1);
+    static const uint8_t png[33] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R', 0, 0, 0, 2, 0, 0, 0, 3, 8, 6, 0, 0, 0 };
+    ag_clipdata_head(d, 3, AGF_PNG, AGD_OK); memcpy(d + 6, png, sizeof png);
+    CHECK(!ag_clipdata_parse(d, 6 + sizeof png, NULL, &form, NULL, NULL, &dn) && form == AGF_PNG && dn == sizeof png);
+    d[7] = 'X'; CHECK(ag_clipdata_parse(d, 6 + sizeof png, NULL, NULL, NULL, NULL, NULL) == -1);             /* not a PNG */
+    d[7] = 0x89; memcpy(d + 6, png, sizeof png);
+    CHECK(ag_clipdata_parse(d, 6 + AG_PNG_MAX + 1, NULL, NULL, NULL, NULL, NULL) == -1);                       /* too large */
+    free(d);
+    CHECK(ag_hello_caps((const uint8_t *)"w2 clipboard clipx clipreq display windows", 42) == (AG_HELLO_CLIPBOARD | AG_HELLO_CLIPX | AG_HELLO_CLIPREQ | AG_HELLO_WINDOWS));
+    CHECK(!(ag_hello_caps((const uint8_t *)"5 clipboard clipreqx", 20) & AG_HELLO_CLIPREQ));
+
+    /* the control messages */
+    VmMsg m = vm_msg(VM_CLIP_OFFER, 1, 5, AGM_TEXT | AGM_HTML, AGO_ASK, 0, NULL); CHECK(vm_msg_valid(&m, 1) && !vm_msg_valid(&m, 0));
+    m.a = 0; CHECK(!vm_msg_valid(&m, 1));
+    m.a = 5; m.b = 0; CHECK(!vm_msg_valid(&m, 1));
+    m.b = 8; CHECK(!vm_msg_valid(&m, 1));
+    m.b = 1; m.c = 2; CHECK(!vm_msg_valid(&m, 1));
+    m = vm_msg(VM_CLIP_DENY, 1, 5, AGF_PNG, VCD_BACKGROUND, 0, NULL); CHECK(vm_msg_valid(&m, 1));
+    m.c = 0; CHECK(!vm_msg_valid(&m, 1));
+    m.c = VCD_LAST + 1; CHECK(!vm_msg_valid(&m, 1));
+    m.c = VCD_STALE; m.b = 0; CHECK(!vm_msg_valid(&m, 1));                       /* a request without its form */
+    m = vm_msg(VM_CLIP_DENY, 1, 0, 0, VCD_BACKGROUND, 0, NULL); CHECK(vm_msg_valid(&m, 1));      /* the guest's change ignored */
+    m.b = AGF_TEXT; CHECK(!vm_msg_valid(&m, 1));
+    m = vm_msg(VM_CLIP, 1, 10, VCF_CLIPX, 5, AGF_TEXT, NULL); CHECK(vm_msg_valid(&m, 1));          /* an answer */
+    m.d = 0; CHECK(!vm_msg_valid(&m, 1));
+    m.d = AGF_TEXT; m.b = VCF_TEXT; CHECK(!vm_msg_valid(&m, 1));                  /* answers are in AGK_CLIPX's layout */
+    m = vm_msg(VM_CLIP, 1, 10, VCF_TEXT, 0, 0, NULL); CHECK(vm_msg_valid(&m, 1)); /* a push, as before */
+    m.c = -1; CHECK(!vm_msg_valid(&m, 1));
+    m = vm_msg(VM_CLIP_REQ, 0, 5, AGF_PNG, 0, 0, NULL); CHECK(vm_msg_valid(&m, 0) && !vm_msg_valid(&m, 1));
+    m.a = 0; CHECK(!vm_msg_valid(&m, 0));
+    m.a = 5; m.b = 4; CHECK(!vm_msg_valid(&m, 0));
+    /* random bytes never crash the parsers */
+    uint8_t b[64];
+    uint32_t seed = 777;
+    for (int it = 0; it < 50000; it++) {
+        size_t len = (seed = seed * 1103515245 + 12345) % 48;
+        for (size_t i = 0; i < len; i++) b[i] = (uint8_t)((seed = seed * 1103515245 + 12345) >> 16);
+        if (it & 1 && len >= 6) b[5] = (uint8_t)(it % 5);
+        if (!ag_offer_parse(b, len, &gen, &forms, &flags)) CHECK(len == 6 && gen && forms && !(forms & ~AGM_ALL) && !(flags & ~AGO_ALL));
+        if (!ag_clipreq_parse(b, len, &gen, &form)) CHECK(len == 5 && gen && form >= AGF_TEXT && form <= AGF_PNG);
+        if (!ag_clipdata_parse(b, len, &gen, &form, &status, &data, &dn)) CHECK(gen && dn == len - 6 && (status == AGD_OK ? data && dn && ag_utf8_ok(data, dn) : !dn));
+    }
+}
+
 int main(void) {
+    test_clip_on_demand();
     test_resolution();
     test_lag();
     test_apps_mode();

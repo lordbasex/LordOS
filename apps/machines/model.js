@@ -340,7 +340,7 @@ export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math
 // transfer: the guest has the transfer folder (6.7.1) mounted; transferSetup: a Windows guest that gets it once WinFsp is
 // installed (Set Up the Transfer Folder); clipNoTool: the Linux guest's helper runs but the guest has no clipboard tool
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -458,6 +458,85 @@ export function shareTag(name, used = []) {
 export const mountCommand = (tag) => `sudo mkdir -p /mnt/${tag} && sudo mount -t virtiofs ${tag} /mnt/${tag}`;
 // which way the clipboard may go
 export const clipTo = (c) => c === 'both' || c === 'to-guest';
+// The clipboard's gate (6.8): the machine is in use while its window is in front, or, in apps mode, one of its guest's
+// windows; lord-server holds the gate (lord.vm.clipboardGate) with a few seconds' grace after it goes to the background
+export const clipInUse = (sid, focused, guestFocused) => !!sid && !!(focused || guestFocused);
+// A guest that read or set the clipboard while not in use (lord-server refused it: poll's clipBlockedRead and
+// clipBlockedWrite count them) is told to the person once per burst: again only after CLIP_BURST_MS without one, or
+// CLIP_RENOTIFY_MS after the last notice. seen: what was looked at last ({} the first time: the counts are taken as
+// they are, nothing told). → { seen, notify: ['read' | 'write'] }
+export const CLIP_BURST_MS = 30000;
+export const CLIP_RENOTIFY_MS = 300000;
+export function clipBlocked(seen, read, write, now) {
+  const next = { ...(seen || {}) };
+  const notify = [];
+  for (const [k, n] of [['read', read | 0], ['write', write | 0]]) {
+    const at = `${k}At`, told = `${k}Told`;
+    if (next[k] === undefined || n < next[k]) { next[k] = n; continue; }
+    if (n === next[k]) continue;
+    const quiet = next[at] === undefined || now - next[at] >= CLIP_BURST_MS;
+    const stale = next[told] === undefined || now - next[told] >= CLIP_RENOTIFY_MS;
+    if (quiet || stale) { notify.push(k); next[told] = now; }
+    next[at] = now;
+    next[k] = n;
+  }
+  return { seen: next, notify };
+}
+
+// "Ask before each paste" (machine.json clipboard_ask, 6.8): the bar over the machine's picture. Two slots: `in` (a
+// paste into the machine: the guest's request for an offer, { gen }, or, with a helper that can't ask, the host's
+// clipboard about to be pushed, { key }) and `out` (what the machine copied, { seq }); the bar shows `in` first. One
+// answer covers every request of the same offer (a program asking for several forms of one copy is asked once), and
+// the same push again. An `in` not answered in CLIP_ASK_IN_MS (the guest stops waiting) is a no; an `out` is ignored
+// after CLIP_ASK_OUT_MS. Each function returns { state, answer? } where answer is what to tell lord-server at once.
+export const CLIP_ASK_IN_MS = 25000;
+export const CLIP_ASK_OUT_MS = 60000;
+export const clipAskEmpty = () => ({ in: null, out: null, gen: 0, genYes: false, key: '', keyYes: false });
+export function clipAskRequest(st, gen, now) {
+  if (!(gen > 0)) return { state: st };
+  if (st.gen === gen) return { state: st, answer: { gen, yes: st.genYes } };
+  if (st.in?.gen === gen) return { state: st };
+  return { state: { ...st, in: { gen, at: now } } };
+}
+export function clipAskPush(st, key, now) {
+  if (!key) return { state: st };
+  if (st.key === key) return { state: st, answer: { key, yes: st.keyYes } };
+  if (st.in?.key === key) return { state: st };
+  if (st.in?.gen) return { state: st };           // a guest's request is waiting: it goes first
+  return { state: { ...st, in: { key, at: now } } };
+}
+export function clipAskCopied(st, seq, now) {
+  if (!seq || st.out?.seq === seq) return { state: st };
+  return { state: { ...st, out: { seq, at: now } } };
+}
+// the person's answer to the slot shown (the bar's): in first, else out
+export function clipAskAnswer(st, yes) {
+  if (st.in) {
+    const x = st.in, n = { ...st, in: null };
+    if (x.gen) { n.gen = x.gen; n.genYes = !!yes; return { state: n, answer: { gen: x.gen, yes: !!yes } }; }
+    n.key = x.key; n.keyYes = !!yes;
+    return { state: n, answer: { key: x.key, yes: !!yes } };
+  }
+  if (st.out) return { state: { ...st, out: null }, answer: { seq: st.out.seq, yes: !!yes } };
+  return { state: st };
+}
+export function clipAskTick(st, now) {
+  if (st.in && now - st.in.at >= CLIP_ASK_IN_MS) {
+    const r = clipAskAnswer({ ...st, out: null }, false);
+    return { state: { ...r.state, out: st.out }, answer: r.answer };
+  }
+  if (!st.in && st.out && now - st.out.at >= CLIP_ASK_OUT_MS) return { state: { ...st, out: null }, answer: { seq: st.out.seq, yes: false } };
+  return { state: st };
+}
+export const clipAskShown = (st) => (st.in ? (st.in.gen ? 'in' : 'push') : st.out ? 'out' : null);
+// the bar's preview line: a single line of at most max characters (text, or rich text's own text), or the picture's size
+export function clipPreviewLine(pv, max = 80) {
+  if (!pv) return { kind: '', text: '' };
+  if (pv.kind === 'image') return { kind: 'image', w: pv.w | 0, h: pv.h | 0 };
+  const one = String(pv.text || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const cps = [...one];
+  return { kind: pv.kind || 'text', text: cps.length > max ? `${cps.slice(0, max - 1).join('')}…` : one };
+}
 export const clipFrom = (c) => c === 'both' || c === 'from-guest';
 
 // ---- sound and microphone (6.9) ----

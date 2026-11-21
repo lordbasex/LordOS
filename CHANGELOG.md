@@ -382,6 +382,53 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **No compiler warnings on arm64**: two Flatpak functions that only x86-64 PCs use in phase 1 were reported as unused on the
   Raspberry Pi build (`server/src/apps.c`).
 
+### Security
+
+- **Machines: the clipboard goes into and out of a machine only while you use it, and into it only when something
+  there pastes** (`docs/VIRTUALIZATION.md` 6.8; `server/src/vm/vmagent.[ch]`, `lordvm.c`, `ui/js_vm.c`,
+  `apps/machines/vmwindow.jsx`, `appsmode.jsx`, `model.js`, `tools/guest-win`, `tools/guest`). A guest is untrusted
+  (clipboard stealers, address swappers), and until now this computer's clipboard was pushed into a machine whenever
+  its window came to the front, where any program in it could read it later.
+  - **On demand.** The machine now gets an *offer* (which forms there are: text, rich text, picture; a generation
+    number; no contents) when its window comes to the front or is clicked. The guest's helper puts those forms on its
+    clipboard without data and asks for one only when a program there pastes. lord-server answers with the data only
+    while the machine is in use (its window in front, one of its apps mode windows in front, or 3 s after, so a paste
+    right after switching works) and only for the offer that is still this computer's clipboard; anything else gets
+    nothing. lord-vm checks each request first: it parses exactly, is for the last offer and one of its forms, the
+    machine's clipboard goes toward the guest, a window is open on the machine, and the guest asks at most 8 times a
+    second. Refusals go in the machine's log. Secrets are still never offered.
+  - **Guests with `lordos-guest-win`** (w2): the system's delayed rendering (`WM_RENDERFORMAT`), with the offer marked so
+    the guest's clipboard history and cloud clipboard skip it; a paste waits at most 2 s for the answer; leaving
+    empties the clipboard instead of fetching what nobody pasted.
+  - **Linux guests** (lordos-guest 5): the helper owns the X `CLIPBOARD` selection itself, speaking the X11 protocol
+    over the display's own socket with the session's cookie (no Xlib, no new package; `tools/guest/x11clip.c`), so it
+    works on X11 and through Xwayland, which GNOME, KDE and wlroots desktops bridge to their Wayland clipboard; large
+    pictures go as INCR. A guest without an X display and older helpers keep receiving the whole clipboard, at the same
+    moments only (window to the front, a click).
+  - **Guest → this computer, gated.** What a machine copies reaches this computer's clipboard only while the machine is
+    in use; a change in the background is ignored and logged.
+  - **Told once per burst.** A machine that asks for the clipboard or changes it in the background gets a notification:
+    "‹machine› tried to read your clipboard in the background: blocked" / "… tried to change your clipboard in the
+    background: ignored", again only after 30 s without one (or 5 minutes after the last notice). Configure → Sharing's
+    clipboard note says how it works. In all 35 languages.
+  - New agent frames `AGK_CLIPOFFER`, `AGK_CLIPREQ`, `AGK_CLIPDATA` and hello capability `clipreq`, with strict parsers
+    (exact lengths, generation ≥ 1, known forms and flags, UTF-8 or a believable PNG) covered by `vm-test` (cases and
+    50 000 random inputs); `tests/guest_clip_test.sh` drives the Linux helper against Xvfb with `xclip` (TARGETS, a
+    paste, a refusal, a 300 KB INCR picture, one request per form, giving the selection back).
+- **Machines: "Ask before each paste"** (Configure → Sharing → Clipboard trust; `machine.json` schema 9
+  `clipboard_ask`, `lord-vm --set --clipboard-ask on|off`; `apps/machines/clipask.jsx`, `model.js` `clipAsk*`,
+  `ui/js_vm.c` `clipboardAnswer`, `clipboardPreview`). "Trusted" (the default) is the on-demand clipboard above. "Ask"
+  puts a small bar over the machine's picture (over the guest window in front in apps mode) before anything crosses:
+  "Paste into ‹machine›?" with a one-line preview (80 characters of text, rich text's text, or "A picture, W×H") and
+  [Don't paste] [Paste] when a program in the machine pastes, the program waiting up to 25 s for the answer and getting
+  nothing on a no or no answer; one answer covers every form of the same copy. "‹machine› copied" with its preview and
+  [Ignore] [Bring to LordOS] for a copy out of the machine, ignored after a minute. With a guest helper that can't ask,
+  the bar asks before the clipboard is pushed. Esc says no; Enter says yes only on the focused button; while the bar
+  shows nothing typed goes to the machine. Right-to-left aware, in all 35 languages.
+- **Machines: "Needs xclip" reached the app** (`server/src/vm/vmproto.h`): lord-server refused every agent state that
+  carried the "no clipboard tool" bit (2048, at the limit of the check), so the hint and Install's xclip step never
+  showed. The check now allows every known bit.
+
 ## [0.8.9.4-beta] - 2026-11-20
 
 ### Added

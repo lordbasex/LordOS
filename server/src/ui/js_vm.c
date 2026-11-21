@@ -334,6 +334,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "iso", m.iso);
             set_str(c, o, "base", m.base);
             JS_SetPropertyStr(c, o, "agent", JS_NewBool(c, m.agent));
+            JS_SetPropertyStr(c, o, "clipboardAsk", JS_NewBool(c, m.clipboard_ask));
             set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
             set_str(c, o, "mac", m.mac);
             /* sound (6.9): host-side choices */
@@ -807,7 +808,7 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[40 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[48 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -908,6 +909,10 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "transfer");
     if (JS_IsBool(v)) { args[n++] = "--transfer"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "clipboardAsk");
+    if (JS_IsBool(v)) { args[n++] = "--clipboard-ask"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "shares");
@@ -1152,6 +1157,18 @@ typedef struct {
     size_t clip_html_n, clip_png_n;
     uint64_t clip_last;                 /* what went either way last (its main form's hash): not sent back */
     unsigned clip_skip_img;             /* the clipboard picture made from the guest's (wl_clip_image_gen): not sent back */
+    /* the clipboard's gate (6.8): the machine is in use while its window (or one of its apps mode windows) is in front,
+     * and CLIP_GRACE_MS after; only then does the guest get the host's clipboard when it asks, or set the host's.
+     * The app says which (clipboardGate); this side holds it, so a guest can't reach either way in the background */
+    int gate_on, clip_ask;              /* in use now; "ask before each paste" (the app asks the person) */
+    long long gate_until;               /* in use until then (the grace after it went to the background) */
+    uint32_t offer_gen;                 /* the last offer (VM_CLIP_OFFER): generation, forms, the host clipboard's hash */
+    int offer_forms;
+    uint64_t offer_hash;
+    uint32_t ask_gen[4];                /* ask mode: requests waiting for the person, per AGF_* form (0 none) */
+    long long ask_at[4];
+    int ask_seq;                        /* a counter of requests put to the person */
+    int blk_read, blk_write;            /* requests refused, and guest clipboards ignored, while not in use */
     int console_term;                   /* the Shell (6.18): a terminal session on the serial console's stream */
     uint32_t console_seq;
     int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
@@ -1694,6 +1711,72 @@ static void windata(Sess *s, const VmMsg *m, int fd) {
     free(b);
 }
 
+#define CLIP_GRACE_MS 3000
+#define CLIP_ASK_MS 30000
+static int clip_in_use(Sess *s) { return s->gate_on || mono_ms() < s->gate_until; }
+static uint64_t clip_hash(const void *p, size_t n);
+/* this computer's clipboard as the guest may have it: a picture, or text with its rich text when an app gave some;
+ * never a secret (Passwords, password fields). 0 there is one (cx's parts point into the clipboard's own copies; *h its
+ * main form's hash), -1 nothing to give */
+static int host_clip(AgClip *cx, uint64_t *h) {
+    memset(cx, 0, sizeof *cx);
+    if (wl_clip_is_image()) {
+        size_t n = 0;
+        const unsigned char *png = wl_clip_png(&n);
+        if (!png || !n || n > AG_PNG_MAX || wl_clip_image_sensitive()) return -1;
+        cx->png = png; cx->png_n = (uint32_t)n;
+        *h = clip_hash(png, n);
+        return 0;
+    }
+    const char *txt = term_clipboard();
+    size_t tn = txt ? strlen(txt) : 0, hn = 0;
+    if (!tn || tn > AG_TEXT_MAX || term_clipboard_sensitive() || !ag_utf8_ok((const uint8_t *)txt, tn)) return -1;
+    const char *html = wl_clip_html(&hn);
+    cx->text = (const uint8_t *)txt; cx->text_n = (uint32_t)tn;
+    if (html && hn && hn <= AG_TEXT_MAX && ag_utf8_ok((const uint8_t *)html, hn)) { cx->html = (const uint8_t *)html; cx->html_n = (uint32_t)hn; }
+    *h = cx->html ? clip_hash(html, hn) : clip_hash(txt, tn);
+    return 0;
+}
+static int clip_forms(const AgClip *c) { return (c->text ? AGM_TEXT : 0) | (c->html ? AGM_HTML : 0) | (c->png ? AGM_PNG : 0); }
+
+static void clip_deny(Sess *s, uint32_t gen, int form, int why) {
+    VmMsg m = vm_msg(VM_CLIP_DENY, ++s->seq, (int)gen, form, why, 0, NULL);
+    if (s->vm >= 0) vm_send(s->vm, &m, -1);
+}
+
+/* the guest's request for one form of an offer: the data when the offer is still this computer's clipboard; 0 sent */
+static int clip_give(Sess *s, uint32_t gen, int form) {
+    AgClip cx, one;
+    uint64_t h;
+    if (gen != s->offer_gen || host_clip(&cx, &h) || h != s->offer_hash) { clip_deny(s, gen, form, VCD_STALE); return -1; }
+    memset(&one, 0, sizeof one);
+    if (form == AGF_TEXT) { one.text = cx.text; one.text_n = cx.text_n; }
+    else if (form == AGF_HTML) { one.html = cx.html; one.html_n = cx.html_n; }
+    else { one.png = cx.png; one.png_n = cx.png_n; }
+    size_t n = ag_clipx_size(&one);
+    if (!n) { clip_deny(s, gen, form, VCD_NONE); return -1; }
+    uint8_t *buf = malloc(n);
+    int ok = 0;
+    if (buf) {
+        ag_clipx_write(&one, buf);
+        int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+        if (fd >= 0 && write(fd, buf, n) == (ssize_t)n && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+            VmMsg m = vm_msg(VM_CLIP, ++s->seq, (int)n, VCF_CLIPX, (int)gen, form, NULL);
+            ok = !vm_send(s->vm, &m, fd);
+        }
+        if (fd >= 0) close(fd);
+        free(buf);
+    }
+    return ok ? 0 : -1;
+}
+
+/* ask mode: requests the person didn't answer in CLIP_ASK_MS are refused */
+static void clip_ask_expire(Sess *s) {
+    long long now = mono_ms();
+    for (int f = AGF_TEXT; f <= AGF_PNG; f++)
+        if (s->ask_gen[f] && now - s->ask_at[f] > CLIP_ASK_MS) { clip_deny(s, s->ask_gen[f], f, VCD_DECLINED); s->ask_gen[f] = 0; }
+}
+
 static void from_vm(Sess *s) {
     for (int k = 0; k < VD_POLL_MAX && s->vm >= 0; k++) {
         VmMsg m;
@@ -1725,7 +1808,28 @@ static void from_vm(Sess *s) {
             s->ag_state = m.a; s->ag_caps = m.b;
             snprintf(s->ag_text, sizeof s->ag_text, "%s", m.text);
             break;
+        case VM_CLIP_REQ:
+            /* a program in the guest pastes: the host's clipboard only while the machine is in use, and in ask mode
+             * only once the person says yes (clipboardAnswer) */
+            if (!clip_in_use(s)) { s->blk_read++; clip_deny(s, (uint32_t)m.a, m.b, VCD_BACKGROUND); break; }
+            if (s->clip_ask) {
+                if ((uint32_t)m.a != s->offer_gen) { clip_deny(s, (uint32_t)m.a, m.b, VCD_STALE); break; }
+                if (!s->ask_gen[m.b]) s->ask_at[m.b] = mono_ms();
+                s->ask_gen[m.b] = (uint32_t)m.a;
+                s->ask_seq++;
+                break;
+            }
+            clip_give(s, (uint32_t)m.a, m.b);
+            break;
         case VM_CLIP_DATA:
+            /* the guest's clipboard, only while the machine is in use: in the background it's ignored (and lord-vm
+             * logs it), so a guest can't change this computer's clipboard behind the person's back */
+            if (fd >= 0 && !clip_in_use(s)) {
+                s->blk_write++;
+                s->clip_last = 0;           /* the guest's clipboard isn't ours any more: offered again at the next turn */
+                clip_deny(s, 0, 0, VCD_BACKGROUND);
+                break;
+            }
             /* the guest's text: checked sealed and of the size it says, then kept for the app to take */
             if (fd >= 0) {
                 int seals = fcntl(fd, F_GET_SEALS);
@@ -2005,6 +2109,15 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_SetPropertyStr(c, o, "agent", ag);
     }
     set_int(c, o, "clipIn", s->clip_seq);
+    clip_ask_expire(s);
+    set_int(c, o, "clipBlockedRead", s->blk_read);
+    set_int(c, o, "clipBlockedWrite", s->blk_write);
+    set_int(c, o, "clipAskSeq", s->ask_seq);
+    {
+        uint32_t g = 0;
+        for (int f = AGF_TEXT; f <= AGF_PNG; f++) if (s->ask_gen[f]) g = s->ask_gen[f];
+        set_int(c, o, "clipAsk", (int64_t)g);
+    }
     set_str(c, o, "cdMessage", s->cd_msg);
     set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : s->notice == VMN_RECOVERED ? "recovered" : s->notice == VMN_NET_BACK ? "network-back"
                           : s->notice == VMN_IDENTITY ? "identity" : "");
@@ -2708,33 +2821,31 @@ static JSValue f_clip_apply(JSContext *c, JSValueConst t, int argc, JSValueConst
     return JS_NewString(c, "");
 }
 
-/* clipboardSendHost(session) → bool: this computer's clipboard for the guest, as it is now: a picture, or text with its
- * rich text when an app gave some; never a secret (Passwords, password fields). Not sent again if it's what went
- * either way last. lord-vm checks it all again and sends it on only the ways machine.json allows. */
+/* clipboardSendHost(session) → bool: this computer's clipboard for the guest, as it is now (host_clip: never a secret).
+ * Not again if it's what went either way last. A guest helper that takes it on demand (VAC_CLIP_LAZY) gets only an
+ * offer, which forms there are, and asks for one when a program there pastes (VM_CLIP_REQ, answered while the machine
+ * is in use); an older one gets it all at once. lord-vm checks it all again and sends it on only the ways machine.json
+ * allows. The app calls it only when the person turns to the machine (its window to the front, a click on it). */
 static JSValue f_clip_send_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     if (!s || s->vm < 0) return JS_FALSE;
     AgClip cx;
-    memset(&cx, 0, sizeof cx);
     uint64_t h;
-    if (wl_clip_is_image()) {
-        size_t n = 0;
-        const unsigned char *png = wl_clip_png(&n);
-        if (!png || !n || n > AG_PNG_MAX || wl_clip_image_sensitive()) return JS_FALSE;
-        if (wl_clip_image_gen() == s->clip_skip_img) { s->clip_skip_img = 0; s->clip_last = clip_hash(png, n); return JS_FALSE; }
-        cx.png = png; cx.png_n = (uint32_t)n;
-        h = clip_hash(png, n);
-    } else {
-        const char *txt = term_clipboard();
-        size_t tn = strlen(txt), hn = 0;
-        if (!tn || tn > AG_TEXT_MAX || term_clipboard_sensitive()) return JS_FALSE;
-        const char *html = wl_clip_html(&hn);
-        cx.text = (const uint8_t *)txt; cx.text_n = (uint32_t)tn;
-        if (html && hn <= AG_TEXT_MAX) { cx.html = (const uint8_t *)html; cx.html_n = (uint32_t)hn; }
-        h = cx.html ? clip_hash(html, hn) : clip_hash(txt, tn);
-    }
+    if (host_clip(&cx, &h)) return JS_FALSE;
+    if (cx.png && wl_clip_image_gen() == s->clip_skip_img) { s->clip_skip_img = 0; s->clip_last = h; return JS_FALSE; }
     if (h == s->clip_last) return JS_FALSE;
+    if (s->ag_caps & VAC_CLIP_LAZY) {
+        /* a new generation per offer: a request for an older one is refused as stale */
+        s->offer_gen = s->offer_gen >= 0x7ffffff0u ? 1 : s->offer_gen + 1;
+        s->offer_forms = clip_forms(&cx);
+        s->offer_hash = h;
+        for (int f = AGF_TEXT; f <= AGF_PNG; f++) if (s->ask_gen[f]) { clip_deny(s, s->ask_gen[f], f, VCD_STALE); s->ask_gen[f] = 0; }
+        VmMsg m = vm_msg(VM_CLIP_OFFER, ++s->seq, (int)s->offer_gen, s->offer_forms, s->clip_ask ? AGO_ASK : 0, 0, NULL);
+        int ok = !vm_send(s->vm, &m, -1);
+        if (ok) s->clip_last = h;
+        return JS_NewBool(c, ok);
+    }
     size_t n = ag_clipx_size(&cx);
     uint8_t *buf = malloc(n);
     int ok = 0;
@@ -2750,6 +2861,95 @@ static JSValue f_clip_send_host(JSContext *c, JSValueConst t, int argc, JSValueC
     }
     if (ok) s->clip_last = h;
     return JS_NewBool(c, ok);
+}
+
+/* clipboardGate(session, inUse, ask): the app says whether the person is using the machine now (its window, or one of
+ * its apps mode windows, in front; a click on it). Going out of use keeps it open CLIP_GRACE_MS more, so a paste just
+ * after switching works. ask: "ask before each paste" (machine.json clipboard_ask): requests wait for clipboardAnswer */
+static JSValue f_clip_gate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s) return JS_FALSE;
+    int on = JS_ToBool(c, argv[1]);
+    if (s->gate_on && !on) s->gate_until = mono_ms() + CLIP_GRACE_MS;
+    if (on) s->gate_until = 0;
+    s->gate_on = on;
+    if (argc >= 3) s->clip_ask = JS_ToBool(c, argv[2]);
+    return JS_TRUE;
+}
+
+/* clipboardAnswer(session, gen, yes) → bool: the person's answer (ask mode) to the requests waiting for that offer:
+ * every form asked for it at once (a program that asks for several forms of one copy is asked about once) */
+static JSValue f_clip_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
+    uint32_t gen = 0;
+    if (!s || JS_ToUint32(c, &gen, argv[1]) || !gen) return JS_FALSE;
+    int yes = JS_ToBool(c, argv[2]), any = 0;
+    for (int f = AGF_TEXT; f <= AGF_PNG; f++) {
+        if (s->ask_gen[f] != gen) continue;
+        s->ask_gen[f] = 0;
+        any = 1;
+        if (yes) clip_give(s, gen, f); else clip_deny(s, gen, f, VCD_DECLINED);
+    }
+    return JS_NewBool(c, any);
+}
+
+/* a line of text to show the person: the first max characters, control characters and line ends as spaces */
+static JSValue preview_text(JSContext *c, const char *p, size_t n, size_t max) {
+    char out[400];
+    size_t k = 0, chars = 0;
+    for (size_t i = 0; i < n && k + 8 < sizeof out && chars < max; ) {
+        unsigned char ch = (unsigned char)p[i];
+        size_t l = ch < 0x80 ? 1 : (ch >> 5) == 6 ? 2 : (ch >> 4) == 14 ? 3 : 4;
+        if (i + l > n) break;
+        if (ch < 0x20 || ch == 0x7f) { if (k && out[k - 1] != ' ') out[k++] = ' '; i++; continue; }
+        memcpy(out + k, p + i, l);
+        k += l; i += l; chars++;
+    }
+    while (k && out[k - 1] == ' ') k--;
+    out[k] = 0;
+    JSValue v = JS_NewString(c, out);
+    return v;
+}
+
+/* clipboardPreview(session, 'host' | 'guest') → { kind: 'text' | 'html' | 'image', text, w, h, fresh } or null: what a
+ * paste into the machine would give it (this computer's clipboard; never a secret), or what the guest copied last
+ * (waiting for clipboardApply), for the ask mode's bar. fresh: not what went either way last */
+static JSValue f_clip_preview(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 1 ? get(c, argv[0]) : NULL;
+    if (!s) return JS_NULL;
+    const char *which = argc >= 2 ? JS_ToCString(c, argv[1]) : NULL;
+    int guest = which && !strcmp(which, "guest");
+    if (which) JS_FreeCString(c, which);
+    AgClip cx;
+    uint64_t h = 0;
+    char *tmp = NULL;
+    memset(&cx, 0, sizeof cx);
+    if (guest) {
+        if (s->clip_png) { cx.png = s->clip_png; cx.png_n = (uint32_t)s->clip_png_n; }
+        else if (s->clip_html) { cx.html = (const uint8_t *)s->clip_html; cx.html_n = (uint32_t)s->clip_html_n; }
+        if (s->clip_in) { cx.text = (const uint8_t *)s->clip_in; cx.text_n = (uint32_t)strlen(s->clip_in); }
+        if (!cx.png && !cx.html && !cx.text) return JS_NULL;
+    } else if (host_clip(&cx, &h)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    uint32_t w = 0, hh = 0;
+    if (cx.png && !ag_png_check(cx.png, cx.png_n, &w, &hh)) {
+        set_str(c, o, "kind", "image");
+        set_int(c, o, "w", w);
+        set_int(c, o, "h", hh);
+    } else {
+        set_str(c, o, "kind", cx.html ? "html" : "text");
+        if (!cx.text && cx.html) { tmp = html_text((const char *)cx.html, cx.html_n); if (tmp) { cx.text = (const uint8_t *)tmp; cx.text_n = (uint32_t)strlen(tmp); } }
+        JS_SetPropertyStr(c, o, "text", cx.text ? preview_text(c, (const char *)cx.text, cx.text_n, 80) : JS_NewString(c, ""));
+        free(tmp);
+    }
+    JS_SetPropertyStr(c, o, "fresh", JS_NewBool(c, guest || h != s->clip_last));
+    char hx[24];
+    snprintf(hx, sizeof hx, "%016llx", (unsigned long long)h);
+    set_str(c, o, "hash", hx);
+    return o;
 }
 
 /* console(session) → bool: asks lord-vm for the serial console's stream; poll's console is then the terminal session to
@@ -3433,7 +3633,8 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
     JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
-    JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("sendFile", 2, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
+    JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host),
+    JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 2, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
     JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act),

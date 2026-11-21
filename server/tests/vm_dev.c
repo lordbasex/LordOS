@@ -9,6 +9,7 @@
  * stdin, one command per line:
  *   png PATH            write the current picture (and print how much of it isn't black)
  *   type TEXT           type ASCII ("\n" = Enter)        key CODE          one evdev key, press and release
+ *   combo MOD CODE      MOD held while CODE is pressed (29 30: Ctrl+A)
  *   move X Y            pointer, picture coordinates     click X Y [B]     move, press and release button B (0)
  *   wheel N             N steps (+ up)                   resize W H        ask the guest for a size
  *   rate HZ             copy rate                        release           let go of everything
@@ -17,6 +18,10 @@
  *   agent install       the guest agent's Install (VAG_INSTALL: lordos-guest, or the LordOS guest tools on Windows)
  *   clip-text TEXT | clip-html HTML | clip-png PATH    the host's clipboard for the guest (VM_CLIP); the guest's comes
  *                       back as "clip" events (a picture is saved as clip-in.png in the current folder)
+ *   clip-offer TEXT     the host's clipboard on demand (VM_CLIP_OFFER, a helper with "clipreq"): an offer of that text;
+ *                       the guest's requests come as "clipreq" events and are answered as clip-answer says:
+ *   clip-answer give|deny|stale|wait   give the text (default), refuse as lord-server does in the background, as
+ *                       stale, or not at all (the guest's own time limit)
  *   raw-apps 0|1 | raw-winact ID N [X Y W H] | raw-launch TOKEN    apps mode straight to the guest (lord-vm --dev-qmp: lord-vm logs what the
  *                       guest sends: the window list, icons, the program list)
  *   file PATH           copy a file into the guest through its agent (VM_FILE, as a drop on the window does)
@@ -305,6 +310,7 @@ static void windata(const VmMsg *m, int fd) {
 }
 
 static void clip_got(const VmMsg *m, int fd);
+static void clip_req(const VmMsg *m);
 static void from_vm(void) {
     for (int k = 0; k < VD_POLL_MAX; k++) {
         VmMsg m;
@@ -326,6 +332,7 @@ static void from_vm(void) {
         else if (m.type == VM_AGENT_STATE) out("{\"ev\":\"agent\",\"state\":%d,\"caps\":%d}", m.a, m.b);
         else if (m.type == VM_WINDATA) windata(&m, fd);
         else if (m.type == VM_CLIP_DATA) clip_got(&m, fd);
+        else if (m.type == VM_CLIP_REQ) clip_req(&m);
         else if (m.type == VM_REPLY) out("{\"ev\":\"reply\",\"seq\":%u,\"code\":%d,\"text\":\"%s\"}", m.seq, m.a, m.text);
         else if (m.type == VM_DISPLAY_FD) {
             if (fd < 0) { out("{\"ev\":\"error\",\"what\":\"VM_DISPLAY_FD without a descriptor\"}"); continue; }
@@ -545,6 +552,36 @@ static void clip_html_host(const char *html) {
     clip_send_host(b, n, VCF_CLIPX);
     free(b);
 }
+/* the host's clipboard on demand: the offered text, the offer's generation, and how requests are answered */
+static char offer_text[4096];
+static uint32_t offer_gen;
+static int offer_answer;                /* 0 give, 1 deny (background), 2 stale, 3 no answer */
+static void clip_offer(const char *t) {
+    snprintf(offer_text, sizeof offer_text, "%s", t);
+    VmMsg m = vm_msg(VM_CLIP_OFFER, ++seq, (int)++offer_gen, AGM_TEXT, 0, 0, NULL);
+    int ok = !vm_send(vm, &m, -1);
+    out("{\"ok\":%s,\"cmd\":\"clip-offer\",\"gen\":%u}", ok ? "true" : "false", offer_gen);
+}
+static void clip_req(const VmMsg *m) {
+    out("{\"ev\":\"clipreq\",\"gen\":%d,\"form\":%d,\"answer\":%d}", m->a, m->b, offer_answer);
+    if (offer_answer == 3) return;
+    if (offer_answer || m->b != AGF_TEXT || (uint32_t)m->a != offer_gen) {
+        VmMsg d = vm_msg(VM_CLIP_DENY, ++seq, m->a, m->b, offer_answer == 2 || (uint32_t)m->a != offer_gen ? VCD_STALE : offer_answer == 1 ? VCD_BACKGROUND : VCD_NONE, 0, NULL);
+        vm_send(vm, &d, -1);
+        return;
+    }
+    uint8_t *b = NULL;
+    size_t n = 0;
+    clip_part(&b, &n, AGF_TEXT, offer_text, strlen(offer_text));
+    int fd = (int)syscall(SYS_memfd_create, "lordos-vm-clipboard", 3u);
+    if (fd >= 0 && write(fd, b, n) == (ssize_t)n && fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) == 0) {
+        VmMsg c = vm_msg(VM_CLIP, ++seq, (int)n, VCF_CLIPX, m->a, AGF_TEXT, NULL);
+        vm_send(vm, &c, fd);
+    }
+    if (fd >= 0) close(fd);
+    free(b);
+}
+
 /* the guest's clipboard (VM_CLIP_DATA): printed (text) or saved as clip-in.png next to the picture files */
 static void clip_got(const VmMsg *m, int fd) {
     static uint8_t buf[VM_CLIP_MAX];
@@ -581,6 +618,7 @@ static int handle(char *line) {
             if (k & 0x100) kpush(42, 0);
         }
         out("{\"ok\":true,\"cmd\":\"type\"}");
+    } else if (sscanf(line, "combo %d %d", &x, &y) == 2) { kpush(x, 1); kpush(y, 1); kpush(y, 0); kpush(x, 0); out("{\"ok\":true,\"cmd\":\"combo\"}");
     } else if (sscanf(line, "key %d", &x) == 1) { kpush(x, 1); kpush(x, 0); out("{\"ok\":true,\"cmd\":\"key\"}"); }
     else if (sscanf(line, "move %d %d", &x, &y) == 2) { vdsend(VD_MOTION, x, y); out("{\"ok\":true,\"cmd\":\"move\"}"); }
     else if (sscanf(line, "click %d %d %d", &x, &y, &b) >= 2) {
@@ -602,6 +640,12 @@ static int handle(char *line) {
     else if (!strncmp(line, "clip-text ", 10)) clip_send_host(line + 10, strlen(line + 10), VCF_TEXT);
     else if (!strncmp(line, "clip-png ", 9)) clip_png_host(line + 9);
     else if (!strncmp(line, "clip-html ", 10)) clip_html_host(line + 10);
+    else if (!strncmp(line, "clip-offer ", 11)) clip_offer(line + 11);
+    else if (!strncmp(line, "clip-answer ", 12)) {
+        const char *w = line + 12;
+        offer_answer = !strcmp(w, "deny") ? 1 : !strcmp(w, "stale") ? 2 : !strcmp(w, "wait") ? 3 : 0;
+        out("{\"ok\":true,\"cmd\":\"clip-answer\",\"answer\":%d}", offer_answer);
+    }
     else if (sscanf(line, "rate %d", &x) == 1) { vdsend(VD_RATE, x, 0); out("{\"ok\":true,\"cmd\":\"rate\"}"); }
     else if (sscanf(line, "noack %d", &x) == 1) { noack = x; out("{\"ok\":true,\"cmd\":\"noack\"}"); }
     else if (sscanf(line, "sound play %d", &x) >= 0 && !strncmp(line, "sound play", 10)) {

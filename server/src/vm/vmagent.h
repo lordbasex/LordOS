@@ -10,7 +10,7 @@
  * At most AG_FRAME_MAX bytes of payload; anything longer, or a stream that doesn't parse, is dropped whole (the guest
  * is untrusted: lord-vm parses this inside its own sandbox, never lord-server). Kinds a side doesn't know are skipped,
  * so either side can grow.
- *   AGK_HELLO  guest → host  "lordos-guest <version> <capability>…" (text: clipboard, clipx, display, windows, or
+ *   AGK_HELLO  guest → host  "lordos-guest <version> <capability>…" (text: clipboard, clipx, clipreq, display, windows, or
  *                            noclip: a helper whose guest has no clipboard tool, said instead of "clipboard clipx"; a
  *                            helper says hello again when that changes); the host answers with its own hello
  *   AGK_CLIP   both ways     the clipboard's text, UTF-8; only in the directions the machine allows (machine.json)
@@ -21,6 +21,20 @@
  *                            formatting tags and attributes stay, no scripts, styles that load anything, events or
  *                            links other than http, https and mailto) before anything goes on; lord-server re-encodes
  *                            the picture in lord-media's sandbox.
+ *   AGK_CLIPOFFER host → guest  the host's clipboard on demand (capability "clipreq" in both hellos; 6.8): u32 gen
+ *                            (≥ 1, a new one per offer), u8 forms (AGM_*: at least one, nothing else), u8 flags (AGO_*,
+ *                            nothing else); exactly 6 bytes. No contents: the guest puts those forms on its clipboard
+ *                            without data and asks for one only when a program there pastes. Sent only while the person
+ *                            turns to the machine (its window comes to the front, a click on it). An offer replaces the
+ *                            last; the host answers only requests for the last one.
+ *   AGK_CLIPREQ  guest → host  u32 gen, u8 form (AGF_*); exactly 5 bytes: a program pastes that form of that offer.
+ *   AGK_CLIPDATA host → guest  u32 gen, u8 form, u8 status (AGD_*), then, with AGD_OK only, the form's bytes (text and
+ *                            HTML: 1..AG_TEXT_MAX of UTF-8 with no NUL; a PNG: 1..AG_PNG_MAX bytes whose header
+ *                            ag_png_check believes); nothing after any other status. The answer to one request: lord-server
+ *                            gives the data only while the machine is in use (its window in front, or one of its apps
+ *                            mode windows, or a few seconds after), for the offer that is still current, and in "ask"
+ *                            mode only once the person said yes. The guest waits AG_CLIP_WAIT_MS (AG_ASK_WAIT_MS with
+ *                            AGO_ASK) and renders nothing when the answer isn't AGD_OK.
  *   AGK_DISPLAY host → guest  u32 width, u32 height (little endian; 320..8192 × 200..8192): the size the machine's
  *                            window wants (capability "display" in the guest's hello; lord-vm sends it only then, and
  *                            again after each hello). The guest sets that size, or the closest it can, on its primary
@@ -65,6 +79,22 @@
 enum { AGK_HELLO = 1, AGK_CLIP = 2, AGK_CLIPX = 3 };
 enum { AGF_TEXT = 1, AGF_HTML = 2, AGF_PNG = 3 };
 enum { AGK_DISPLAY = 4, LAG_APPS = 5, LAG_WINDOWS = 6, LAG_WINICON = 7, LAG_WINACT = 8, LAG_LAUNCH = 9, LAG_APPLIST = 10 };
+enum { AGK_CLIPOFFER = 11, AGK_CLIPREQ = 12, AGK_CLIPDATA = 13 };
+/* AGK_CLIPOFFER's forms (1 << (AGF_* - 1)) and flags; AGK_CLIPDATA's status */
+enum { AGM_TEXT = 1, AGM_HTML = 2, AGM_PNG = 4, AGM_ALL = 7 };
+enum { AGO_ASK = 1, AGO_ALL = 1 };
+enum { AGD_OK = 0, AGD_REFUSED = 1, AGD_STALE = 2, AGD_NONE = 3 };
+#define AG_CLIP_WAIT_MS 2000u
+#define AG_ASK_WAIT_MS  25000u
+/* AGK_CLIPOFFER: 0 well formed (gen ≥ 1, forms within AGM_ALL and not 0, flags within AGO_ALL) */
+int ag_offer_parse(const uint8_t *p, size_t n, uint32_t *gen, uint8_t *forms, uint8_t *flags);
+void ag_offer_write(uint8_t out[6], uint32_t gen, uint8_t forms, uint8_t flags);
+/* AGK_CLIPREQ: 0 well formed (gen ≥ 1, form AGF_TEXT, AGF_HTML or AGF_PNG) */
+int ag_clipreq_parse(const uint8_t *p, size_t n, uint32_t *gen, uint8_t *form);
+void ag_clipreq_write(uint8_t out[5], uint32_t gen, uint8_t form);
+/* AGK_CLIPDATA: 0 well formed (see above; with AGD_OK *data points into the payload, checked as the form says) */
+int ag_clipdata_parse(const uint8_t *p, size_t n, uint32_t *gen, uint8_t *form, uint8_t *status, const uint8_t **data, uint32_t *dn);
+void ag_clipdata_head(uint8_t out[6], uint32_t gen, uint8_t form, uint8_t status);   /* then the data with AGD_OK */
 
 /* AGK_DISPLAY: 0 a well-formed size (8 bytes, 320..8192 × 200..8192), -1 otherwise */
 #define AG_DISPLAY_MIN_W 320u
@@ -155,7 +185,7 @@ int ag_drop_staging_ok(const char *p, int windows);
  * again, as 0, 0, 1, 1. */
 #define LAG_APPNAME_MAX LAG_APP_MAX
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
-enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8 };
+enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;

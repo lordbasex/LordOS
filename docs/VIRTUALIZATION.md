@@ -493,7 +493,7 @@ compromised QEMU can't change `machine.json` (and through it, what the next star
 
 | File | What |
 |---|---|
-| `machine.json` | The description, schema 1 (`machine.h`; schema 2 added `base`, `agent`, `clipboard`, schema 3 an imported machine's hardware, 6.22; 4 `shares`; 5 `secure_boot`, `tpm`, `hyperv`, `drivers`, `graphics`; 6 the network's modes, `bridge`, `ports`, `resolution`, `sound`, `volume`, `microphone`, `boot_order`, `boot_menu`; 7 `transfer`; 8 `sound_out`, `sound_in`, 6.9): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
+| `machine.json` | The description, schema 1 (`machine.h`; schema 2 added `base`, `agent`, `clipboard`, schema 3 an imported machine's hardware, 6.22; 4 `shares`; 5 `secure_boot`, `tpm`, `hyperv`, `drivers`, `graphics`; 6 the network's modes, `bridge`, `ports`, `resolution`, `sound`, `volume`, `microphone`, `boot_order`, `boot_menu`; 7 `transfer`; 8 `sound_out`, `sound_in`, 6.9; 9 `clipboard_ask`, 6.8): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
 | `disks/system.qcow2` | System disk, made by `qemu-img` at creation (empty, or converted from an image with `--import`) |
 | `disks/nvram.qcow2` | UEFI variables as qcow2, converted from the firmware's template (6.2). arm64 always uses UEFI (`AAVMF_CODE.no-secboot.fd`); amd64 uses UEFI (`OVMF_CODE_4M.fd`) when the `ovmf` package is there and SeaBIOS otherwise, which is what a Pi gets for an emulated amd64 guest |
 | `log/lord-vm.log` | This run: lord-vm's lines, QEMU's and passt's stderr, the command line (credentials named, never their values); 4 MB at most. `lord-vm.1.log` and `lord-vm.2.log` are the two runs before (6.19) |
@@ -1796,6 +1796,47 @@ that names the guest's copy) would bring a 2 GB drop to about 10 s on Linux: not
 ### 6.8 Clipboard and drag
 
 Clipboard through the agent's own channel, `org.lordos.agent` (text, rich text, pictures), direction chosen per VM, **Off for Testing**. Protected windows (`wm.setProtected`) never leak. File drag: into the guest copies through the agent; out copies from the guest. Linux: our `lordos-guest`. virtio-win guests: our `lordos-guest-win` (7.1.2).
+
+**Only while the machine is in use (0.8.9, the guest is untrusted: clipboard stealers, address swappers).** The machine
+counts as in use while its window is in front, or, in apps mode, one of its guest's windows, and for 3 seconds after it
+goes to the background (a paste just after switching still works). lord-server holds that gate (`js_vm.c`,
+`lord.vm.clipboardGate`, set by the app from the window's focus and from a click on the picture); lord-vm can't see the
+windows, so it never decides it.
+
+- **Host → guest, on demand.** When the person turns to the machine (its window comes to the front, a click on it) the
+  guest gets an *offer*: which forms the host's clipboard holds (text, rich text, picture) and a generation number,
+  no contents (`AGK_CLIPOFFER`). The guest's helper puts those forms on its own clipboard without data. Only when a
+  program in the guest pastes does the helper ask for that form (`AGK_CLIPREQ`); lord-vm checks that the request is for
+  the last offer and one of its forms (and at most 8 a second), and lord-server answers with the data
+  (`AGK_CLIPDATA`) only if the machine is in use now and the host's clipboard is still what was offered; otherwise the
+  paste gets nothing. A secret (Passwords, a password field) is never offered.
+  - Windows (`lordos-guest-win` w2): delayed rendering (`SetClipboardData(format, NULL)`, `WM_RENDERFORMAT`), with the
+    offer marked so Windows' clipboard history and cloud clipboard skip it. The helper waits 2 s for the answer. When it
+    exits (`WM_RENDERALLFORMATS`) it empties the clipboard instead of fetching what nobody pasted.
+  - Linux (`lordos-guest` 5): the helper owns the X `CLIPBOARD` selection itself (`tools/guest/x11clip.c`: the X11
+    protocol over the display's Unix socket with the session's MIT-MAGIC-COOKIE-1, no Xlib, no tool), so it works on X11
+    and through Xwayland, which GNOME, KDE and wlroots desktops bridge to the Wayland clipboard. Large data goes as
+    INCR. A guest with no X display (a Wayland session without Xwayland) and older helpers keep the push: the whole
+    clipboard goes in at the same moments the offer would (window to the front, a click), never in the background.
+- **Guest → host, gated.** A guest's clipboard change is put on the host's clipboard only while the machine is in use.
+  A change in the background is ignored and written in the machine's log.
+- A guest that asks for the clipboard, or changes it, while it isn't in use gets a notification once per burst
+  ("‹machine› tried to read your clipboard in the background: blocked"; "… change … ignored").
+
+**Ask before each paste** (Configure → Sharing → Clipboard trust; machine.json schema 9 `"clipboard_ask": true`,
+`lord-vm --set DIR --clipboard-ask on|off`; "Trusted" is the default, the behaviour above). Then, on top of the gate:
+
+- A paste in the machine (a request that passed the gate) waits for the person: a bar over the machine's picture (in apps
+  mode, over the guest window in front) says "Paste into ‹machine›?" with a one-line preview (the first 80 characters of
+  the text, rich text's own text, or "A picture, W×H"; a secret is never offered, so never shown) and [Don't paste]
+  [Paste]. One answer covers every request of the same offer (a program that asks for several forms of one copy is
+  asked once). lord-server holds the requests (`clipboardAnswer`); no answer in 25 s is a no, and the guest's helper
+  waits that long (`AGO_ASK` in the offer) and then gives the program nothing. With a helper that can't ask (the push
+  fallback) the bar asks before the clipboard is pushed, at the same moments.
+- A copy in the machine isn't put on this computer's clipboard at once: the bar says "‹machine› copied" with its preview
+  and [Ignore] [Bring to LordOS]; ignored after 60 s.
+- While the bar shows, the keyboard is the bar's: Esc says no; Enter says yes only on the focused button (Tab reaches
+  them). The bar's logic (slots, the dedupe per offer, the time limits) is `apps/machines/model.js` `clipAsk*`.
 
 If the D-Bus clipboard turns out unworkable on a guest, the clipboard moves to the agent's own channel, `org.lordos.agent`: text, images and files, with the direction chosen for that machine. It's a private data channel inside the machine, so it needs no network, no port and no VNC. WebRTC's data channel solves reaching another computer, and 6.23 uses it there; inside one computer a virtio-serial port does the same job with no encryption layer to carry, since nothing leaves the host.
 

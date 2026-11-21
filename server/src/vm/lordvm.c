@@ -898,6 +898,12 @@ static struct {
     uint8_t *lag_buf;
     size_t lag_n;
     int lag_hello, lag_clipx;               /* lordos-guest said hello; it takes AGK_CLIPX (pictures, rich text) */
+    int lag_clipreq;                        /* it takes the host's clipboard on demand (AGK_CLIPOFFER, 6.8) */
+    uint32_t clip_gen;                      /* the last offer (VM_CLIP_OFFER): its generation and forms */
+    uint8_t clip_forms;
+    struct { uint32_t gen; long long at; } clip_wait[4];    /* a request waiting for lord-server's answer, per AGF_* form */
+    long long clip_rate_at;                 /* the guest's requests: at most CLIP_REQ_RATE a second */
+    int clip_rate_n, clip_rate_said;
     int lag_apps;                           /* apps mode is on in the guest (7.2) */
     LagAppList *lag_applist;                /* the apps the guest listed last: VM_LAUNCH sends back only these tokens */
     int lag_applist_gen;                    /* and its generation (VM_WINDATA c, VM_LAUNCH b) */
@@ -2720,7 +2726,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 /* what org.lordos.agent's helper brings (kept when qemu-guest-agent comes and goes) */
-#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_DISPLAY | (int)LAG_CAP_WINDOWS)
+#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | (int)LAG_CAP_WINDOWS)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS };
@@ -3053,7 +3059,7 @@ static void on_qga_reply(const JVal *root, int ok) {
         xfer_begin();
         /* a machine that resumed from a saved state has a clipboard helper that said hello to the lord-vm before: it
          * is asked to say it again (once; its answer gets the plain hello) */
-        if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
+        if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx clipreq ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
         break;
     }
     case AQ_PING: if (ok) S.ping_at = now_ms(); break;
@@ -4099,6 +4105,53 @@ static int clip_clean(const uint8_t *in, size_t n, uint8_t **out, size_t *on, ch
     return 0;
 }
 
+/* ---- the host's clipboard on demand (6.8): lord-server offers, the guest asks when a program there pastes, lord-server
+ * answers only while the machine is in use (it holds that gate; lord-vm can't see the windows). What lord-vm checks: the
+ * request parses, is for the last offer and one of its forms, the clipboard goes to the guest (machine.json), someone
+ * is there to answer, and the guest doesn't ask more than CLIP_REQ_RATE times a second ---- */
+#define CLIP_REQ_RATE 8
+#define CLIP_WAIT_MS 40000
+static void clip_answer(uint32_t gen, uint8_t form, uint8_t status, const uint8_t *d, uint32_t n) {
+    uint8_t *b = malloc(6 + (size_t)n);
+    if (!b) return;
+    ag_clipdata_head(b, gen, form, status);
+    if (n) memcpy(b + 6, d, n);
+    lag_send(AGK_CLIPDATA, b, 6 + n);
+    free(b);
+}
+
+static int clip_clients(void) { int n = 0; for (int i = 0; i < MAX_CLIENTS; i++) n += S.cl[i].fd >= 0; return n; }
+
+static void clip_request(const AgFrame *f) {
+    static const char *const FORM[4] = { "", "text", "rich text", "picture" };
+    uint32_t gen;
+    uint8_t form;
+    if (ag_clipreq_parse(f->data, f->len, &gen, &form)) { vlog("agent: a clipboard request that doesn't parse: dropped"); return; }
+    long long now = now_ms();
+    if (now - S.clip_rate_at >= 1000) { S.clip_rate_at = now; S.clip_rate_n = 0; S.clip_rate_said = 0; }
+    if (++S.clip_rate_n > CLIP_REQ_RATE) {
+        if (!S.clip_rate_said++) vlog("agent: the guest asks for the clipboard more than %d times a second: refused", CLIP_REQ_RATE);
+        clip_answer(gen, form, AGD_REFUSED, NULL, 0);
+        return;
+    }
+    if (!S.lag_clipreq || !clip_allows(1)) { vlog("agent: the guest asked for the clipboard (%s), which isn't shared toward it: refused", FORM[form]); clip_answer(gen, form, AGD_REFUSED, NULL, 0); return; }
+    if (gen != S.clip_gen) { vlog("agent: the guest asked for an old clipboard (%s, offer %u, the last is %u): refused", FORM[form], gen, S.clip_gen); clip_answer(gen, form, AGD_STALE, NULL, 0); return; }
+    if (!(S.clip_forms & (1u << (form - 1)))) { vlog("agent: the guest asked for the clipboard as %s, which wasn't offered: refused", FORM[form]); clip_answer(gen, form, AGD_NONE, NULL, 0); return; }
+    if (!clip_clients()) { vlog("agent: the guest asked for the clipboard (%s) with no window open on the machine: refused", FORM[form]); clip_answer(gen, form, AGD_REFUSED, NULL, 0); return; }
+    if (S.clip_wait[form].gen == gen && now - S.clip_wait[form].at < CLIP_WAIT_MS) return;     /* asked already: one answer */
+    S.clip_wait[form].gen = gen;
+    S.clip_wait[form].at = now;
+    VmMsg m = vm_msg(VM_CLIP_REQ, 0, (int)gen, form, 0, 0, "");
+    for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
+}
+
+/* lord-server's answer to a waiting request: 1 it was waiting (now answered), 0 not */
+static int clip_waiting(uint32_t gen, int form) {
+    if (form < AGF_TEXT || form > AGF_PNG || !gen || S.clip_wait[form].gen != gen) return 0;
+    S.clip_wait[form].gen = 0;
+    return now_ms() - S.clip_wait[form].at < CLIP_WAIT_MS;
+}
+
 /* ---- apps mode (7.2): the guest's windows, icons and apps, checked here and handed to lord-server ---- */
 static void lag_windows_off(void) {
     S.lag_apps = 0;
@@ -4168,22 +4221,26 @@ static void drain_lag(void) {
                 char *sp = strchr(S.lag_version, ' ');
                 if (sp) *sp = 0;
                 S.lag_clipx = strstr(t + 13, " clipx") != NULL;
+                int lazy = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_CLIPREQ) && S.lag_clipx;
+                if (lazy != S.lag_clipreq) { S.clip_gen = 0; S.clip_forms = 0; memset(S.clip_wait, 0, sizeof S.clip_wait); }
+                S.lag_clipreq = lazy;
                 S.lag_display = strstr(t + 13, " display") != NULL;
                 S.lag_windows = strstr(t + 13, " windows") != NULL;
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
                 unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
                 int clip = (hc & AG_HELLO_CLIPBOARD) != 0, notool = !clip && (hc & AG_HELLO_NOCLIP);
-                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s%s%s%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "",
+                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s%s%s%s%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "",
+                                       S.lag_clipreq ? " (the host's clipboard on demand)" : "",
                                        S.lag_display ? " (sets the display's size)" : "", S.lag_windows ? " (apps mode)" : "",
                                        notool ? " (no clipboard tool in the guest: xclip or wl-clipboard)" : "");
                 else if (notool != !!(S.ag_caps & VAC_CLIP_NOTOOL))
                     vlog("agent: lordos-guest %s", notool ? "has no clipboard tool in the guest any more" : "found a clipboard tool in the guest: the clipboard works");
                 S.lag_hello = 1;
                 if (!S.lag_windows) lag_windows_off();
-                S.ag_caps = (S.ag_caps & ~(VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_DISPLAY | (int)LAG_CAP_WINDOWS)) | (clip ? VAC_CLIPBOARD : 0) |
+                S.ag_caps = (S.ag_caps & ~VAC_LAG) | (clip ? VAC_CLIPBOARD : 0) | (clip && S.lag_clipreq ? VAC_CLIP_LAZY : 0) |
                             (notool ? VAC_CLIP_NOTOOL : 0) | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0);
-                static const char me[] = "lord-vm 2 clipboard clipx";
+                static const char me[] = "lord-vm 2 clipboard clipx clipreq";
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
                 ag_broadcast();
@@ -4210,6 +4267,8 @@ static void drain_lag(void) {
                 if (fd >= 0) close(fd);
             }
             free(clean);
+        } else if (f.kind == AGK_CLIPREQ && S.lag_hello) {
+            clip_request(&f);
         } else if (f.kind == AGK_DISPLAY && S.lag_hello && S.lag_display) {
             uint32_t w, h;
             if (ag_display_parse(f.data, f.len, &w, &h)) vlog("agent: the guest's display size: malformed");
@@ -4408,6 +4467,27 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         ssize_t n = !fstat(fd, &st) && st.st_size == m->a ? pread(fd, buf, (size_t)m->a, 0) : -1;
         close(fd);
         if (n != m->a) { reply(ci, m->seq, VME_BAD_REQUEST, "unreadable"); return; }
+        if (m->c) {
+            /* the answer to the guest's request: that one form, checked and cleaned again, as AGK_CLIPDATA */
+            uint8_t *clean = NULL;
+            size_t cn = 0;
+            char what[64];
+            AgClip c;
+            if (!clip_waiting((uint32_t)m->c, m->d)) { reply(ci, m->seq, VME_WRONG_STATE, "no such request waits"); return; }
+            if (clip_clean(buf, (size_t)n, &clean, &cn, what, sizeof what) || ag_clipx_parse(clean, cn, &c)) {
+                free(clean);
+                clip_answer((uint32_t)m->c, (uint8_t)m->d, AGD_NONE, NULL, 0);
+                reply(ci, m->seq, VME_BAD_REQUEST, what);
+                return;
+            }
+            const uint8_t *d = m->d == AGF_TEXT ? c.text : m->d == AGF_HTML ? c.html : c.png;
+            uint32_t dn = m->d == AGF_TEXT ? c.text_n : m->d == AGF_HTML ? c.html_n : c.png_n;
+            clip_answer((uint32_t)m->c, (uint8_t)m->d, d ? AGD_OK : AGD_NONE, d, d ? dn : 0);
+            if (S.dev_qmp) vlog("agent: the clipboard for the guest's paste: %s", what);
+            free(clean);
+            reply(ci, m->seq, d ? VME_OK : VME_BAD_REQUEST, what);
+            return;
+        }
         if (m->b == VCF_TEXT) {
             if (n > (ssize_t)AG_TEXT_MAX || !ag_utf8_ok(buf, (size_t)n)) { reply(ci, m->seq, VME_BAD_REQUEST, "not text"); return; }
             lag_send(AGK_CLIP, buf, (uint32_t)n);
@@ -4426,6 +4506,29 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         }
         free(clean);
         reply(ci, m->seq, VME_OK, what);
+        return;
+    }
+    case VM_CLIP_OFFER: {
+        if (!clip_allows(1) || !S.lag_hello || !S.lag_clipreq) { reply(ci, m->seq, VME_DENIED, "the guest's helper doesn't take the clipboard on demand, or it isn't shared toward this machine"); return; }
+        uint8_t o[6];
+        S.clip_gen = (uint32_t)m->a;
+        S.clip_forms = (uint8_t)m->b;
+        memset(S.clip_wait, 0, sizeof S.clip_wait);
+        ag_offer_write(o, S.clip_gen, S.clip_forms, (uint8_t)m->c);
+        lag_send(AGK_CLIPOFFER, o, 6);
+        if (S.dev_qmp) vlog("agent: clipboard offer %u (forms %d%s)", S.clip_gen, m->b, m->c ? ", ask" : "");
+        reply(ci, m->seq, VME_OK, "");
+        return;
+    }
+    case VM_CLIP_DENY: {
+        static const char *const WHY[VCD_LAST + 1] = { "", "the machine wasn't in use", "the clipboard changed since", "that form isn't there now",
+                                                     "the person didn't allow it" };
+        if (!m->a) vlog("agent: the guest changed its clipboard while the machine wasn't in use: ignored");
+        else if (clip_waiting((uint32_t)m->a, m->b)) {
+            vlog("agent: the guest asked for the clipboard: refused (%s)", WHY[m->c]);
+            clip_answer((uint32_t)m->a, (uint8_t)m->b, m->c == VCD_STALE ? AGD_STALE : m->c == VCD_NONE ? AGD_NONE : AGD_REFUSED, NULL, 0);
+        }
+        reply(ci, m->seq, VME_OK, "");
         return;
     }
     case VM_APPS: {
@@ -4595,7 +4698,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_display = S.lag_windows = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); ag_broadcast(); }
+            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -5380,9 +5483,10 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         if (hfd >= 0) close(hfd);
         /* and the LordOS guest tools for a Windows guest (x86-64) */
         if (S.m.arch == VM_ARCH_AMD64) {
-            int wfd = open("/usr/lib/lordos/guest/windows/lordos-guest-win.exe", O_RDONLY | O_CLOEXEC);
-            const char *alt = getenv("LORDVM_WINTOOLS");    /* development: a build that isn't installed */
-            if (wfd < 0 && alt && S.dev_qmp) wfd = open(alt, O_RDONLY | O_CLOEXEC);
+            /* development (--dev-qmp only): LORDVM_WINTOOLS names a build that isn't installed, and wins over the installed one */
+            const char *alt = getenv("LORDVM_WINTOOLS");
+            int wfd = alt && S.dev_qmp ? open(alt, O_RDONLY | O_CLOEXEC) : -1;
+            if (wfd < 0) wfd = open("/usr/lib/lordos/guest/windows/lordos-guest-win.exe", O_RDONLY | O_CLOEXEC);
             if (wfd >= 0 && !fstat(wfd, &hs) && hs.st_size > 0 && hs.st_size < (8 << 20) && (S.wtools = malloc((size_t)hs.st_size))) {
                 S.wtools_n = (size_t)hs.st_size;
                 if (pread(wfd, S.wtools, S.wtools_n, 0) != (ssize_t)S.wtools_n) { free(S.wtools); S.wtools = NULL; S.wtools_n = 0; }
@@ -5573,7 +5677,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -5618,6 +5722,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
             continue;
         }
         /* the transfer folder (6.7.1): a device of the machine, so like the shares, never while a state is saved */
+        if (!strcmp(a, "--clipboard-ask")) { cask = parse_enum(v, "off", "on"); if (cask < 0) { fprintf(stderr, "lord-vm: --clipboard-ask on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
             char *end = NULL;
@@ -5688,6 +5793,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (agent >= 0) m.agent = agent;
     if (clip >= 0) m.clipboard = clip;
     if (m.agent || m.clipboard) m.schema = VM_SCHEMA;
+    if (cask >= 0) { m.clipboard_ask = cask; if (cask) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
     if (m.graphics) m.schema = VM_SCHEMA;
     if (res_set) { m.res_w = resw; m.res_h = reshh; if (resw) m.schema = VM_SCHEMA; }
@@ -7257,6 +7363,7 @@ static int usage(void) {
             "                         [--boot-order auto|disk,cd,network (any order, any of them)] [--boot-menu on|off]\n"
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
             "                         [--sound on|off] [--volume 0..100] [--microphone on|off] [--sound-out NODE|default] [--sound-in NODE|default]   (with the machine off; Machines changes them live)\n"
+            "                         [--clipboard-ask on|off]   (ask before each paste into and copy out of the machine)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"

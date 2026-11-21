@@ -8,7 +8,13 @@
  * driver) and speaks the frames of server/src/vm/vmagent.h, as tools/guest/lordos-guest.c does on Linux:
  *   - the clipboard both ways (AGK_CLIP, AGK_CLIPX): text (CF_UNICODETEXT ↔ UTF-8, CRLF ↔ LF), rich text ("HTML
  *     Format" ↔ HTML) and pictures (CF_DIB / the "PNG" format ↔ PNG, through the system's own WIC codecs). lord-vm
- *     decides which way it may go (machine.json "clipboard") and checks what this side sends;
+ *     decides which way it may go (machine.json "clipboard") and checks what this side sends. The host's clipboard
+ *     comes on demand (AGK_CLIPOFFER, "clipreq"): an offer puts its forms on the clipboard without data (delayed
+ *     rendering: SetClipboardData(format, NULL)); only when a program here pastes (WM_RENDERFORMAT) does this side ask
+ *     the host for that form (AGK_CLIPREQ) and wait for the answer (AGK_CLIPDATA, AG_CLIP_WAIT_MS, AG_ASK_WAIT_MS when
+ *     the person is asked). The host answers only while the person uses the machine; anything else renders nothing.
+ *     An offer is marked so that clipboard history and cloud clipboard skip it. Leaving (WM_RENDERALLFORMATS) empties
+ *     the clipboard instead of fetching what nobody pasted;
  *   - the display's size (AGK_DISPLAY): the size the machine's window wants, set on the primary display. The VirtIO
  *     GPU driver (viogpudo) keeps one "custom" mode that follows the host's size (QEMU's ui_info, which lord-vmdisplay
  *     sends) but nothing in Windows applies it: this side switches to it, a listed mode directly, else through the
@@ -45,8 +51,8 @@
 
 #include "../../server/src/vm/vmagent.h"
 
-#define VERSION "w1"
-#define HELLO "lordos-guest " VERSION " clipboard clipx display windows"
+#define VERSION "w2"
+#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows"
 
 enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST };
 enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS };
@@ -126,6 +132,26 @@ static HANDLE port = INVALID_HANDLE_VALUE, reader, stop_ev, wr_ev;
 static volatile LONG reader_gen;
 static int host_hello, host_clipx;
 
+/* the host's answers to this side's clipboard requests (AGK_CLIPDATA): handed over by the reader thread, since the
+ * window's thread waits for them inside WM_RENDERFORMAT */
+static CRITICAL_SECTION ans_cs;
+static HANDLE ans_ev;
+static struct { uint32_t gen; uint8_t form, status; uint8_t *data; uint32_t n; int set; } ans;
+static void ans_take(const uint8_t *p, uint32_t n) {
+    uint32_t gen, dn;
+    uint8_t form, status;
+    const uint8_t *d;
+    if (ag_clipdata_parse(p, n, &gen, &form, &status, &d, &dn)) return;
+    uint8_t *copy = dn ? malloc(dn) : NULL;
+    if (dn && !copy) status = AGD_REFUSED, dn = 0;
+    if (copy) memcpy(copy, d, dn);
+    EnterCriticalSection(&ans_cs);
+    free(ans.data);
+    ans.gen = gen; ans.form = form; ans.status = status; ans.data = copy; ans.n = dn; ans.set = 1;
+    LeaveCriticalSection(&ans_cs);
+    SetEvent(ans_ev);
+}
+
 typedef struct { uint16_t kind; uint32_t len; uint8_t data[]; } Frame;
 
 static DWORD WINAPI reader_main(LPVOID arg) {
@@ -162,7 +188,8 @@ static DWORD WINAPI reader_main(LPVOID arg) {
             int used = ag_frame_next(buf, have, &f);
             if (used < 0 || (!used && have == sizeof buf)) { have = 0; break; }
             if (!used) break;
-            Frame *fr = malloc(sizeof *fr + f.len);
+            Frame *fr = f.kind == AGK_CLIPDATA ? NULL : malloc(sizeof *fr + f.len);
+            if (f.kind == AGK_CLIPDATA) ans_take(f.data, f.len);
             if (fr) {
                 fr->kind = f.kind; fr->len = f.len;
                 memcpy(fr->data, f.data, f.len);
@@ -188,6 +215,7 @@ static void port_close(const char *why) {
     InterlockedIncrement(&reader_gen);
     host_hello = host_clipx = 0;
     apps_stop();
+    SetEvent(ans_ev);                   /* a paste waiting for the host stops waiting */
 }
 
 static int send_frame(uint16_t kind, const uint8_t *p, uint32_t n) {
@@ -440,63 +468,147 @@ static HGLOBAL gdup(const void *p, size_t n) {
 }
 static void set_fmt(UINT f, HGLOBAL g) { if (g && !SetClipboardData(f, g)) GlobalFree(g); }
 
-/* what the host sent, on the clipboard: every form it holds at once */
+/* the clipboard's forms made from what the host gave (each a new HGLOBAL, or NULL) */
+static HGLOBAL mk_text(const uint8_t *p, uint32_t n) {
+    /* LF → CRLF, UTF-16 */
+    uint8_t *t = malloc((size_t)n * 2 + 1);
+    size_t o = 0;
+    for (uint32_t i = 0; t && i < n; i++) { if (p[i] == '\n' && (!i || p[i - 1] != '\r')) t[o++] = '\r'; t[o++] = p[i]; }
+    wchar_t *w = t ? to_utf16(t, o) : NULL;
+    HGLOBAL g = w ? gdup(w, (wcslen(w) + 1) * sizeof *w) : NULL;
+    free(w); free(t);
+    return g;
+}
+static HGLOBAL mk_html(const uint8_t *p, uint32_t n) {
+    static const char pre[] = "<html><body>\r\n<!--StartFragment-->", post[] = "<!--EndFragment-->\r\n</body></html>";
+    char hd[200];
+    int hl = snprintf(hd, sizeof hd, "Version:0.9\r\nStartHTML:%010d\r\nEndHTML:%010d\r\nStartFragment:%010d\r\nEndFragment:%010d\r\n", 0, 0, 0, 0);
+    size_t total = (size_t)hl + sizeof pre - 1 + n + sizeof post - 1;
+    char *b = malloc(total + 1);
+    if (!b) return NULL;
+    int sf = hl + (int)sizeof pre - 1, ef = sf + (int)n;
+    snprintf(b, (size_t)hl + 1, "Version:0.9\r\nStartHTML:%010d\r\nEndHTML:%010d\r\nStartFragment:%010d\r\nEndFragment:%010d\r\n", hl, (int)total, sf, ef);
+    memcpy(b + hl, pre, sizeof pre - 1);
+    memcpy(b + sf, p, n);
+    memcpy(b + ef, post, sizeof post - 1);
+    b[total] = 0;
+    HGLOBAL g = gdup(b, total + 1);
+    free(b);
+    return g;
+}
+/* CF_DIB: a BITMAPINFOHEADER and 32-bit rows, bottom row first */
+static HGLOBAL mk_dib(const uint8_t *p, uint32_t n) {
+    UINT w = 0, hh = 0;
+    uint8_t *px = png_decode(p, n, &w, &hh);
+    if (!px) return NULL;
+    size_t row = (size_t)w * 4, sz = sizeof(BITMAPINFOHEADER) + row * hh;
+    HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE, sz);
+    uint8_t *d = g ? GlobalLock(g) : NULL;
+    if (d) {
+        BITMAPINFOHEADER bh;
+        memset(&bh, 0, sizeof bh);
+        bh.biSize = sizeof bh; bh.biWidth = (LONG)w; bh.biHeight = (LONG)hh; bh.biPlanes = 1; bh.biBitCount = 32; bh.biCompression = BI_RGB;
+        bh.biSizeImage = (DWORD)(row * hh);
+        memcpy(d, &bh, sizeof bh);
+        for (UINT y = 0; y < hh; y++) memcpy(d + sizeof bh + row * (hh - 1 - y), px + row * y, row);
+        GlobalUnlock(g);
+    } else if (g) { GlobalFree(g); g = NULL; }
+    free(px);
+    return g;
+}
+
+/* what the host sent, on the clipboard: every form it holds at once (a host that pushes: no "clipreq") */
 static void clip_put(const AgClip *c) {
     uint64_t h = c->png ? hash(c->png, c->png_n) : c->html ? hash(c->html, c->html_n) : hash(c->text, c->text_n);
     if (h == clip_last) return;
     if (!open_clip()) return;
     EmptyClipboard();
-    if (c->text) {
-        /* LF → CRLF, UTF-16 */
-        uint8_t *t = malloc((size_t)c->text_n * 2 + 1);
-        size_t o = 0;
-        for (uint32_t i = 0; t && i < c->text_n; i++) { if (c->text[i] == '\n' && (!i || c->text[i - 1] != '\r')) t[o++] = '\r'; t[o++] = c->text[i]; }
-        wchar_t *w = t ? to_utf16(t, o) : NULL;
-        if (w) set_fmt(CF_UNICODETEXT, gdup(w, (wcslen(w) + 1) * sizeof *w));
-        free(w); free(t);
-    }
-    if (c->html && cf_html) {
-        static const char pre[] = "<html><body>\r\n<!--StartFragment-->", post[] = "<!--EndFragment-->\r\n</body></html>";
-        char hd[200];
-        int hl = snprintf(hd, sizeof hd, "Version:0.9\r\nStartHTML:%010d\r\nEndHTML:%010d\r\nStartFragment:%010d\r\nEndFragment:%010d\r\n", 0, 0, 0, 0);
-        size_t total = (size_t)hl + sizeof pre - 1 + c->html_n + sizeof post - 1;
-        char *b = malloc(total + 1);
-        if (b) {
-            int sf = hl + (int)sizeof pre - 1, ef = sf + (int)c->html_n;
-            snprintf(b, (size_t)hl + 1, "Version:0.9\r\nStartHTML:%010d\r\nEndHTML:%010d\r\nStartFragment:%010d\r\nEndFragment:%010d\r\n", hl, (int)total, sf, ef);
-            memcpy(b + hl, pre, sizeof pre - 1);
-            memcpy(b + sf, c->html, c->html_n);
-            memcpy(b + ef, post, sizeof post - 1);
-            b[total] = 0;
-            set_fmt(cf_html, gdup(b, total + 1));
-            free(b);
-        }
-    }
+    if (c->text) set_fmt(CF_UNICODETEXT, mk_text(c->text, c->text_n));
+    if (c->html && cf_html) set_fmt(cf_html, mk_html(c->html, c->html_n));
     if (c->png) {
         if (cf_png) set_fmt(cf_png, gdup(c->png, c->png_n));
-        UINT w = 0, hh = 0;
-        uint8_t *px = png_decode(c->png, c->png_n, &w, &hh);
-        if (px) {
-            /* CF_DIB: a BITMAPINFOHEADER and 32-bit rows, bottom row first */
-            size_t row = (size_t)w * 4, sz = sizeof(BITMAPINFOHEADER) + row * hh;
-            HGLOBAL g = GlobalAlloc(GMEM_MOVEABLE, sz);
-            uint8_t *d = g ? GlobalLock(g) : NULL;
-            if (d) {
-                BITMAPINFOHEADER bh;
-                memset(&bh, 0, sizeof bh);
-                bh.biSize = sizeof bh; bh.biWidth = (LONG)w; bh.biHeight = (LONG)hh; bh.biPlanes = 1; bh.biBitCount = 32; bh.biCompression = BI_RGB;
-                bh.biSizeImage = (DWORD)(row * hh);
-                memcpy(d, &bh, sizeof bh);
-                for (UINT y = 0; y < hh; y++) memcpy(d + sizeof bh + row * (hh - 1 - y), px + row * y, row);
-                GlobalUnlock(g);
-                set_fmt(CF_DIB, g);
-            } else if (g) GlobalFree(g);
-            free(px);
-        }
+        set_fmt(CF_DIB, mk_dib(c->png, c->png_n));
     }
     CloseClipboard();
     clip_last = h;
     lg("clipboard from the host:%s%s%s", c->png ? " picture" : "", c->html ? " html" : "", c->text ? " text" : "");
+}
+
+/* ---- the host's clipboard on demand (AGK_CLIPOFFER) ---- */
+static uint32_t offer_gen;          /* the offer this side holds on the clipboard (0 none), its forms and flags */
+static uint8_t offer_forms, offer_flags;
+static struct { int state; uint8_t *data; uint32_t n; } got[4];     /* per AGF_* form: 0 not asked, 1 got, 2 refused */
+
+static void offer_drop(void) {
+    for (int i = 0; i < 4; i++) { free(got[i].data); got[i].data = NULL; got[i].n = 0; got[i].state = 0; }
+    offer_gen = 0;
+}
+
+/* the host's offer on the clipboard: its forms, no data (delayed rendering), marked so that clipboard history, cloud
+ * clipboard and clipboard monitors leave it alone */
+static void clip_offer(uint32_t gen, uint8_t forms, uint8_t flags) {
+    static UINT ex, hist, cloud;
+    if (!ex) ex = RegisterClipboardFormatW(L"ExcludeClipboardContentFromMonitorProcessing");
+    if (!hist) hist = RegisterClipboardFormatW(L"CanIncludeInClipboardHistory");
+    if (!cloud) cloud = RegisterClipboardFormatW(L"CanUploadToCloudClipboard");
+    if (!open_clip()) return;
+    EmptyClipboard();                   /* our own last offer goes (WM_DESTROYCLIPBOARD: offer_drop) */
+    offer_drop();
+    offer_gen = gen; offer_forms = forms; offer_flags = flags;
+    if (forms & AGM_TEXT) SetClipboardData(CF_UNICODETEXT, NULL);
+    if ((forms & AGM_HTML) && cf_html) SetClipboardData(cf_html, NULL);
+    if (forms & AGM_PNG) { if (cf_png) SetClipboardData(cf_png, NULL); SetClipboardData(CF_DIB, NULL); }
+    DWORD zero = 0;
+    if (ex) set_fmt(ex, gdup(&zero, sizeof zero));
+    if (hist) set_fmt(hist, gdup(&zero, sizeof zero));
+    if (cloud) set_fmt(cloud, gdup(&zero, sizeof zero));
+    CloseClipboard();
+    clip_last = 0;
+    lg("clipboard: the host offers%s%s%s (%u)%s", forms & AGM_TEXT ? " text" : "", forms & AGM_HTML ? " html" : "", forms & AGM_PNG ? " picture" : "", gen,
+       flags & AGO_ASK ? ", the person is asked" : "");
+}
+
+/* one form of the offer from the host: asked once per offer, waited for at most AG_CLIP_WAIT_MS (AG_ASK_WAIT_MS while
+ * the person is asked); refused, stale or no answer: nothing (the paste gets nothing) */
+static void fetch(int form) {
+    static const char *const NAME[4] = { "", "text", "html", "picture" };
+    got[form].state = 2;
+    if (!host_hello) return;
+    EnterCriticalSection(&ans_cs);
+    ans.set = 0;
+    LeaveCriticalSection(&ans_cs);
+    ResetEvent(ans_ev);
+    uint8_t rq[5];
+    ag_clipreq_write(rq, offer_gen, (uint8_t)form);
+    if (send_frame(AGK_CLIPREQ, rq, 5)) return;
+    DWORD wait = offer_flags & AGO_ASK ? AG_ASK_WAIT_MS : AG_CLIP_WAIT_MS, t0 = GetTickCount();
+    for (;;) {
+        DWORD spent = GetTickCount() - t0;
+        if (spent >= wait || port == INVALID_HANDLE_VALUE) { lg("clipboard: no answer from the host for the %s", NAME[form]); return; }
+        if (WaitForSingleObject(ans_ev, wait - spent) != WAIT_OBJECT_0) continue;
+        EnterCriticalSection(&ans_cs);
+        int mine = ans.set && ans.gen == offer_gen && ans.form == form;
+        if (mine) {
+            ans.set = 0;
+            if (ans.status == AGD_OK) { got[form].data = ans.data; got[form].n = ans.n; got[form].state = 1; ans.data = NULL; }
+            else lg("clipboard: the host didn't give the %s (%s)", NAME[form], ans.status == AGD_STALE ? "it changed" : ans.status == AGD_NONE ? "not there" : "refused");
+        }
+        ResetEvent(ans_ev);
+        LeaveCriticalSection(&ans_cs);
+        if (mine) return;
+    }
+}
+
+/* WM_RENDERFORMAT: a program pastes one of the offer's forms */
+static void clip_render(UINT fmt) {
+    int form = fmt == CF_UNICODETEXT ? AGF_TEXT : (cf_html && fmt == cf_html) ? AGF_HTML : ((cf_png && fmt == cf_png) || fmt == CF_DIB) ? AGF_PNG : 0;
+    if (!form || !offer_gen) return;
+    if (!got[form].state) fetch(form);
+    if (got[form].state != 1) return;
+    const uint8_t *d = got[form].data;
+    uint32_t n = got[form].n;
+    HGLOBAL g = form == AGF_TEXT ? mk_text(d, n) : form == AGF_HTML ? mk_html(d, n) : fmt == CF_DIB ? mk_dib(d, n) : gdup(d, n);
+    if (g && !SetClipboardData(fmt, g)) GlobalFree(g);
 }
 
 /* ---- the display's size ---- */
@@ -1173,6 +1285,12 @@ static void on_frame(const Frame *f) {
         if (k.text || k.html || k.png) clip_put(&k);
         break;
     }
+    case AGK_CLIPOFFER: {
+        uint32_t gen;
+        uint8_t forms, flags;
+        if (!ag_offer_parse(f->data, f->len, &gen, &forms, &flags)) clip_offer(gen, forms, flags);
+        break;
+    }
     case AGK_DISPLAY: {
         uint32_t w, h;
         if (ag_display_parse(f->data, f->len, &w, &h)) break;
@@ -1207,6 +1325,14 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         if ((LONG)wp == reader_gen) { char w[64]; snprintf(w, sizeof w, "reading failed (error %lu)", (unsigned long)lp); port_close(w); }
         return 0;
     case WM_CLIPBOARDUPDATE: SetTimer(h, T_CLIP, 250, NULL); return 0;
+    case WM_RENDERFORMAT: clip_render((UINT)wp); return 0;
+    case WM_RENDERALLFORMATS:
+        /* this program goes away while its offer is on the clipboard: the offer goes too; nothing is fetched for a
+         * paste nobody made */
+        if (OpenClipboard(h)) { if (GetClipboardOwner() == h) EmptyClipboard(); CloseClipboard(); }
+        offer_drop();
+        return 0;
+    case WM_DESTROYCLIPBOARD: offer_drop(); return 0;
     case WM_TIMER:
         if (wp == T_PORT) {
             if (port != INVALID_HANDLE_VALUE && !console_session()) port_close("another session is at the console");
@@ -1263,6 +1389,8 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
     ProcessIdToSessionId(GetCurrentProcessId(), &my_session);
     stop_ev = CreateEventW(NULL, TRUE, FALSE, NULL);
     wr_ev = CreateEventW(NULL, TRUE, FALSE, NULL);
+    ans_ev = CreateEventW(NULL, TRUE, FALSE, NULL);
+    InitializeCriticalSection(&ans_cs);
     cf_html = RegisterClipboardFormatW(L"HTML Format");
     cf_png = RegisterClipboardFormatW(L"PNG");
     WNDCLASSW wc;

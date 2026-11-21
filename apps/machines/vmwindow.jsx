@@ -9,9 +9,10 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
-import { useAppsMode, appsMenuItems, guests } from './appsmode.jsx';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
+import { useAppsMode, appsMenuItems, guests, guestFocus } from './appsmode.jsx';
 import { readMeta, writeMeta } from './meta.js';
+import { ClipAskBar } from './clipask.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp, soundDevItems } from './ui.jsx';
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it)
 const CLIP_HOLD_MS = 150;
@@ -28,7 +29,7 @@ const THUMB_MS = 5000;
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.install}.${g.transfer}` : '');
 const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}.${x.output}.${x.input}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq'].every((k) => a[k] === b[k])
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
@@ -388,6 +389,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const [shell, setShell] = useWindowState('vm.shell', false);
   const [cfgSheet, setCfgSheet] = useState(null);     // Configure as a sheet over the machine's picture
   const [shellKeys, setShellKeys] = useState(false);
+  // the clipboard's "ask before each paste" bar (model.js clipAsk*): while it shows, the keyboard is the bar's
+  const [askSt, setAskSt] = useState(clipAskEmpty);
+  const askKind = clipAskShown(askSt);
   const shellRef = useRef(null);
   const [rec, setRec] = useWindowState('vm.rec', null);       // { id, at } while the picture is recorded
   const [, tick] = useState(0);
@@ -539,7 +543,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   useEffect(() => { wm.setTitle(winId, windowTitle(name || dir, err ? tr('machines.state.crashed') : tr(`machines.state.${v.key}`))); }, [name, v.key, err]);
 
   // keyboard while in front; everything held is let go of on blur
-  const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing && !askClose && !(shell && shellKeys) && !pickCd && !appsRef.current;
+  const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing && !askClose && !(shell && shellKeys) && !pickCd && !appsRef.current && !askKind;
   // the console's stream, asked for once the pane is open on a running machine
   useEffect(() => { if (shell && sid && !st?.console && (st?.state === 'running' || st?.state === 'paused')) lord.vm.console(sid); }, [shell, sid, st?.state, !!st?.console]);
   useEffect(() => {
@@ -649,32 +653,82 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // guest's picture is re-encoded on this side before any app sees it
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
-  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch }); } }, [sid, st?.state]);
+  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch }); } }, [sid, st?.state]);
   const clipSent = useRef('');
-  // the host's clipboard into the guest (unchanged contents aren't sent again: lord-vm compares a hash)
-  // Only when the person turns to the machine: its window coming to the front, or a click on its picture (which brings
-  // it there); never on a mere pass of the pointer, so a guest can't read what was copied while it sits in the
-  // background. → true when something new went in
+  // The clipboard's gate: in use while this window, or one of the machine's apps mode windows, is in front (and a few
+  // seconds after, held by lord-server). Only then does the guest get the host's clipboard, and only then is its own
+  // taken. Its host → guest half: when the person turns to the machine (the window coming to the front, a click on its
+  // picture, never a mere pass of the pointer) the guest gets an offer (which forms there are, no contents) and asks
+  // for the data when a program there pastes; an older guest helper gets it all at once then. → true when something
+  // new went in
+  const guestFocused = useStore(guestFocus, (f) => !!f[dir]);
+  const inUse = clipInUse(sid, focused, guestFocused);
+  const ask = !!cfg.clipboardAsk;
+  const gate = (on) => { if (sid && lord.vm.clipboardGate) lord.vm.clipboardGate(sid, on, ask); };
+  useEffect(() => { gate(inUse); }, [sid, inUse, ask]);
+  // "Ask before each paste" (machine.json clipboard_ask): the bar's state (model.js clipAsk*) and what each answer does
+  const askRef = useRef(askSt);
+  askRef.current = askSt;
+  const lazy = !!(st?.agent?.caps & AGENT_CAPS.clipLazy);
+  const pushNow = () => (lord.vm.clipboardSendHost ? !!lord.vm.clipboardSendHost(sid) : false);
+  const applyGuest = () => {
+    const kind = lord.vm.clipboardApply ? lord.vm.clipboardApply(sid) : 'text';
+    if (kind !== 'text') return;
+    const text = lord.vm.clipboardTake(sid);
+    if (text) { clipSent.current = text; clipboard.set(text, { origin: 'machines' }); }
+  };
+  const settle = (a) => {
+    if (!a || !sid) return;
+    if (a.gen) lord.vm.clipboardAnswer(sid, a.gen, a.yes);
+    else if (a.key) { if (a.yes) pushNow(); }
+    else if (a.seq && a.yes) applyGuest();
+  };
+  const askStep = (r) => { askRef.current = r.state; setAskSt(r.state); settle(r.answer); };
   const sendClip = (click) => {
-    if (!(focused || click) || !sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined || !(st?.agent?.caps & 32)) return false;
-    if (lord.vm.clipboardSendHost) return !!lord.vm.clipboardSendHost(sid);
+    if (!(inUse || click) || !sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined || !(st?.agent?.caps & AGENT_CAPS.clipboard)) return false;
+    if (click) gate(true);
+    // a helper that can't ask for it gets the clipboard pushed: in ask mode only after the person says yes
+    if (ask && !lazy && lord.vm.clipboardPreview) {
+      const pv = lord.vm.clipboardPreview(sid, 'host');
+      if (pv?.fresh) askStep(clipAskPush(askRef.current, pv.hash, now()));
+      return false;
+    }
+    if (lord.vm.clipboardSendHost) return pushNow();
     const text = clipboard.get();
     if (text && text !== clipSent.current && lord.vm.clipboardSend(sid, text)) { clipSent.current = text; return true; }
     return false;
   };
   const sendClipRef = useRef(sendClip);
   sendClipRef.current = sendClip;
-  useEffect(() => { if (focused) sendClip(); }, [focused, sid, cfg.clipboard, st?.agent?.caps]);
+  useEffect(() => { if (inUse) sendClip(); }, [inUse, sid, cfg.clipboard, st?.agent?.caps]);
   const clipSeen = useRef(0);
   useEffect(() => {
     if (!sid || !st?.clipIn || st.clipIn === clipSeen.current) return;
     clipSeen.current = st.clipIn;
     if (!clipFrom(cfg.clipboard)) return;
-    const kind = lord.vm.clipboardApply ? lord.vm.clipboardApply(sid) : 'text';
-    if (kind !== 'text') return;
-    const text = lord.vm.clipboardTake(sid);
-    if (text) { clipSent.current = text; clipboard.set(text, { origin: 'machines' }); }
+    if (ask) { askStep(clipAskCopied(askRef.current, st.clipIn, now())); return; }
+    applyGuest();
   }, [st?.clipIn]);
+  // a program in the machine pastes (ask mode): lord-server holds the request until the person answers
+  useEffect(() => { if (sid && st?.clipAsk > 0) askStep(clipAskRequest(askRef.current, st.clipAsk, now())); }, [st?.clipAskSeq, st?.clipAsk]);
+  useEffect(() => {
+    if (!askRef.current.in && !askRef.current.out) return undefined;
+    const timer = setInterval(() => askStep(clipAskTick(askRef.current, now())), 1000);
+    return () => clearInterval(timer);
+  }, [askSt]);
+  useEffect(() => { askRef.current = clipAskEmpty(); setAskSt(askRef.current); }, [sid]);
+  const askPreview = askKind && sid && lord.vm.clipboardPreview ? lord.vm.clipboardPreview(sid, askKind === 'out' ? 'guest' : 'host') : null;
+  const askBar = askKind ? { kind: askKind, name, preview: askPreview } : null;
+  const askAnswer = (yes) => askStep(clipAskAnswer(askRef.current, yes));
+  // a guest that reached for the clipboard while it wasn't in use (refused or ignored by lord-server): told once per burst
+  const blocked = useRef({});
+  useEffect(() => {
+    if (!sid || !st) return;
+    const r = clipBlocked(blocked.current, st.clipBlockedRead, st.clipBlockedWrite, now());
+    blocked.current = r.seen;
+    for (const k of r.notify) notify({ app: 'machines', label: tr('machines.title'), title: tr(k === 'read' ? 'machines.clip.blockedRead' : 'machines.clip.blockedWrite', { name }), body: tr('machines.clip.blockedBody'), sound: false });
+  }, [st?.clipBlockedRead, st?.clipBlockedWrite]);
+  useEffect(() => { blocked.current = {}; }, [sid]);
   // sound and microphone (6.9): what this window's session reports (Configure's changes reach it at once)
   const snd = st?.sound ? { sound: st.sound.on, volume: st.sound.volume, microphone: st.sound.microphone } : soundOf(cfgRef.current);
   const devs = soundDevs(st?.sound || cfgRef.current);
@@ -751,7 +805,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     writeMeta(dir, { appsMode: on });
     if (!on) sized.current.last = null;            // the guest takes this window's size again (Follow)
   };
-  const appsActive = useAppsMode({ dir, sid, st, name, mid: m0.id || dir.split('/').pop(), on: appsOn, ready: !appsBlocked, onLeave: () => setApps(false) });
+  const appsActive = useAppsMode({ dir, sid, st, name, mid: m0.id || dir.split('/').pop(), on: appsOn, ready: !appsBlocked, onLeave: () => setApps(false), onTouch: () => sendClipRef.current(true) });
+  // apps mode: the guest window in front shows the bar instead
+  useEffect(() => { if (appsActive) guests.set((g) => (g[dir] ? { ...g, [dir]: { ...g[dir], ask: askBar, askAnswer } } : g)); }, [appsActive, askSt]);
   appsRef.current = appsActive;
   useEffect(() => {
     const w = wm.get(winId);
@@ -895,6 +951,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       ) : null}
       {card}
       {failed}
+      {!card && !failed && !appsActive ? <ClipAskBar ask={askBar} onAnswer={askAnswer} top={(full ? 0 : BAR) + 12} /> : null}
       {!card && !failed && ((noticeOn && noticeText) || cdErr) ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 16, alignItems: 'center' }}>
           <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>

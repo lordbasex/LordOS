@@ -461,5 +461,86 @@ eq('boot move', [M.bootMove(['disk', 'cd', 'network'], 2, -1), M.bootMove(['disk
   [['disk', 'network', 'cd'], ['cd', 'disk', 'network'], ['disk', 'cd', 'network'], ['disk', 'cd', 'network']]);
 eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSummary('network,disk'), M.bootSummary('cd')], [null, null, 'machines.cfg.bootFirst.network', 'machines.cfg.bootFirst.cd']);
 
+// ---- the clipboard's gate and its notices (6.8) ----
+{
+  const { clipInUse, clipBlocked, CLIP_BURST_MS, CLIP_RENOTIFY_MS, AGENT_CAPS } = M;
+  eq('in use: window in front', clipInUse(3, true, false), true);
+  eq('in use: an apps mode window in front', clipInUse(3, false, true), true);
+  eq('not in use: background', clipInUse(3, false, false), false);
+  eq('not in use: no session', clipInUse(0, true, true), false);
+  eq('lazy cap bit', AGENT_CAPS.clipLazy, 4096);
+  let r = clipBlocked({}, 2, 0, 1000);
+  eq('first look: nothing told (old counts)', r.notify, []);
+  r = clipBlocked(r.seen, 3, 0, 2000);
+  eq('a read blocked: told', r.notify, ['read']);
+  r = clipBlocked(r.seen, 9, 0, 5000);
+  eq('more in the same burst: quiet', r.notify, []);
+  r = clipBlocked(r.seen, 10, 0, 5000 + CLIP_BURST_MS - 1);
+  eq('still the burst (each one extends it)', r.notify, []);
+  r = clipBlocked(r.seen, 11, 0, 5000 + 2 * CLIP_BURST_MS);
+  eq('after a quiet spell: told again', r.notify, ['read']);
+  r = clipBlocked(r.seen, 11, 1, 5000 + 2 * CLIP_BURST_MS + 10);
+  eq('a write is its own burst', r.notify, ['write']);
+  let s = r.seen, t = 5000 + 2 * CLIP_BURST_MS, told = 0;
+  for (let k = 1; t < 5000 + 2 * CLIP_BURST_MS + CLIP_RENOTIFY_MS + 20000; k++) { t += 10000; const x = clipBlocked(s, 11 + k, 1, t); s = x.seen; told += x.notify.length; }
+  eq('a steady trickle: told again after the renotify time', told, 1);
+  eq('a new session (counts drop) is a new baseline', clipBlocked({ read: 50, write: 3 }, 0, 0, 1).notify, []);
+  eq('unchanged: quiet', clipBlocked({ read: 1, write: 1 }, 1, 1, 9e9).notify, []);
+}
+
+// ---- "ask before each paste" (6.8, machine.json clipboard_ask) ----
+{
+  const { clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, clipPreviewLine, CLIP_ASK_IN_MS, CLIP_ASK_OUT_MS } = M;
+  let st = clipAskEmpty();
+  eq('ask: nothing shown', clipAskShown(st), null);
+  let r = clipAskRequest(st, 4, 100); st = r.state;
+  eq('ask: a request shows the bar', [clipAskShown(st), r.answer], ['in', undefined]);
+  r = clipAskRequest(st, 4, 200);
+  eq('ask: the same offer again (another form) waits for the same answer', [r.state === st, r.answer], [true, undefined]);
+  r = clipAskAnswer(st, true); st = r.state;
+  eq('ask: yes answers that offer', [r.answer, clipAskShown(st)], [{ gen: 4, yes: true }, null]);
+  r = clipAskRequest(st, 4, 300);
+  eq('ask: a later form of the same offer is answered at once', r.answer, { gen: 4, yes: true });
+  r = clipAskRequest(st, 5, 400); st = r.state;
+  eq('ask: a new offer asks again', [clipAskShown(st), r.answer], ['in', undefined]);
+  r = clipAskTick(st, 400 + CLIP_ASK_IN_MS - 1);
+  eq('ask: not yet timed out', r.answer, undefined);
+  r = clipAskTick(st, 400 + CLIP_ASK_IN_MS); st = r.state;
+  eq('ask: no answer in time is a no', [r.answer, clipAskShown(st)], [{ gen: 5, yes: false }, null]);
+  eq('ask: and that offer stays a no', clipAskRequest(st, 5, 1e6).answer, { gen: 5, yes: false });
+  // out: what the machine copied
+  r = clipAskCopied(st, 9, 1000); st = r.state;
+  eq('ask: a copy out shows the bar', clipAskShown(st), 'out');
+  r = clipAskRequest(st, 6, 1100); st = r.state;
+  eq('ask: a paste in goes first', clipAskShown(st), 'in');
+  r = clipAskAnswer(st, false); st = r.state;
+  eq('ask: no to the paste, the copy out shows next', [r.answer, clipAskShown(st)], [{ gen: 6, yes: false }, 'out']);
+  r = clipAskCopied(st, 10, 1200); st = r.state;
+  eq('ask: a newer copy replaces the older one', st.out.seq, 10);
+  r = clipAskTick(st, 1200 + CLIP_ASK_OUT_MS); st = r.state;
+  eq('ask: a copy out is ignored after a minute', [r.answer, clipAskShown(st)], [{ seq: 10, yes: false }, null]);
+  r = clipAskCopied(st, 11, 2000); st = r.state;
+  r = clipAskAnswer(st, true); st = r.state;
+  eq('ask: bring', r.answer, { seq: 11, yes: true });
+  // push (a helper that can't ask): keyed by the clipboard's hash
+  r = clipAskPush(st, 'abc', 3000); st = r.state;
+  eq('push: asks', clipAskShown(st), 'push');
+  r = clipAskAnswer(st, true); st = r.state;
+  eq('push: yes', r.answer, { key: 'abc', yes: true });
+  eq('push: the same clipboard again is answered at once', clipAskPush(st, 'abc', 4000).answer, { key: 'abc', yes: true });
+  r = clipAskPush(st, 'def', 5000); st = r.state;
+  eq('push: a new one asks', clipAskShown(st), 'push');
+  r = clipAskTick(st, 5000 + CLIP_ASK_IN_MS);
+  eq('push: no answer is a no', r.answer, { key: 'def', yes: false });
+  eq('push: waits behind a request', clipAskPush(clipAskRequest(clipAskEmpty(), 3, 0).state, 'x', 1).state.in, { gen: 3, at: 0 });
+  eq('ask: a request of generation 0 is nothing', clipAskRequest(clipAskEmpty(), 0, 1).state.in, null);
+  // the preview line
+  eq('preview: one line', clipPreviewLine({ kind: 'text', text: 'a\n b\t\tc ' }), { kind: 'text', text: 'a b c' });
+  eq('preview: cut at 80 characters', [...clipPreviewLine({ kind: 'text', text: 'é'.repeat(100) }).text].length, 80);
+  eq('preview: a picture', clipPreviewLine({ kind: 'image', w: 640, h: 480 }), { kind: 'image', w: 640, h: 480 });
+  eq('preview: rich text keeps its kind', clipPreviewLine({ kind: 'html', text: 'Hi' }).kind, 'html');
+  eq('preview: none', clipPreviewLine(null), { kind: '', text: '' });
+}
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

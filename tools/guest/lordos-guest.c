@@ -11,6 +11,13 @@
  * started without a shell. It never runs anything the host names, and the host can't ask it for anything else.
  * Pasting rich text or a picture into the guest offers that one form (the tools hold one type each).
  *
+ * The host's clipboard on demand (6.8, "clipreq" in both hellos): where the guest has an X display (X11, or Xwayland,
+ * which GNOME, KDE and wlroots desktops bridge to the Wayland clipboard), this side owns the X CLIPBOARD itself
+ * (x11clip.c: the X11 protocol, no Xlib, no tool) for the host's offer (AGK_CLIPOFFER: its forms, no data) and asks
+ * the host for a form (AGK_CLIPREQ) only when a program pastes it; it waits AG_CLIP_WAIT_MS (AG_ASK_WAIT_MS when the
+ * person is asked) and gives the program nothing when the answer isn't the data. While the offer is ours the guest's
+ * clipboard isn't read (that would ask the host). Without an X display the host pushes, as before.
+ *
  * Which tool: looked for in PATH at the start, every 30 s and whenever one couldn't be started (installing xclip later
  * starts working without a restart). On GNOME (XDG_CURRENT_DESKTOP) with DISPLAY set, xclip through Xwayland, which
  * Mutter bridges to the Wayland clipboard, and never wl-paste (Mutter has no data-control protocol: wl-clipboard needs
@@ -32,6 +39,7 @@
 #define _GNU_SOURCE
 #endif
 #include "../../server/src/vm/vmagent.h"
+#include "x11clip.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -48,7 +56,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define VERSION "4"
+#define VERSION "5"
 #define PORT "/dev/virtio-ports/org.lordos.agent"
 #define CLIP_MAX AG_TEXT_MAX
 
@@ -253,7 +261,8 @@ static int unix_connect(const char *path) {
 static void say_hello(int fd) {
     char h[96];
     /* "noclip": the helper is there but the guest has no clipboard tool (Machines says what to install) */
-    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s", tool_n ? " clipboard clipx" : " noclip", wfd >= 0 ? " windows" : "");
+    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s", tool_n ? " clipboard clipx" : " noclip", tool_n && xc_fd() >= 0 ? " clipreq" : "",
+             wfd >= 0 ? " windows" : "");
     send_frame(fd, AGK_HELLO, (const uint8_t *)h, (uint32_t)strlen(h));
 }
 
@@ -338,9 +347,13 @@ int main(int argc, char **argv) {
     static char types[4096], last_types[4096];
     size_t have = 0;
     uint64_t last = 0;                  /* the clipboard's main form last sent or set, so it doesn't go back and forth */
-    int fd = -1, host_clipx = 0;
+    int fd = -1, host_clipx = 0, host_clipreq = 0;
+    uint32_t offer_gen = 0;                 /* the host's offer we hold on the X CLIPBOARD, and how long a paste waits */
+    long long offer_wait = AG_CLIP_WAIT_MS;
+    long long asked_at[4] = { 0 };          /* a request to the host per form, waiting since then (0 none) */
     long long next_look = 0, png_look = 0;
     pick_tools();
+    xc_open();
     tool_look_at = now_ms() + 30000;
     for (;;) {
         if (fd < 0) {
@@ -348,7 +361,7 @@ int main(int argc, char **argv) {
             if (fd < 0) { if (once) { perror(port); return 1; } sleep(3); continue; }
             say_hello(fd);
             have = 0;
-            host_clipx = 0;
+            host_clipx = host_clipreq = 0;
         }
         long long now = now_ms();
         /* lord-server's endpoint: tried every 3 s while it isn't there; the hello says "windows" while it is */
@@ -360,9 +373,23 @@ int main(int argc, char **argv) {
         /* the tools again every 30 s, or at once after one couldn't be started; the hello again when that changed */
         if (now >= tool_look_at) {
             tool_look_at = now + 30000;
-            if (pick_tools()) say_hello(fd);
+            int had_x = xc_fd() >= 0;
+            if (xc_fd() < 0) xc_open();
+            if (pick_tools() || had_x != (xc_fd() >= 0)) say_hello(fd);
         }
+        /* a program pastes the host's offer: that form asked of the host, once; no answer in time is a refusal */
+        for (int f; xc_fd() >= 0 && (f = xc_wanted());) {
+            uint8_t rq[5];
+            ag_clipreq_write(rq, offer_gen, (uint8_t)f);
+            if (!offer_gen || send_frame(fd, AGK_CLIPREQ, rq, 5)) xc_supply(f, NULL, 0);
+            else asked_at[f] = now;
+        }
+        for (int f = AGF_TEXT; f <= AGF_PNG; f++)
+            if (asked_at[f] && now - asked_at[f] > offer_wait) { asked_at[f] = 0; xc_supply(f, NULL, 0); fprintf(stderr, "lordos-guest: no answer from the host for a paste\n"); }
+        xc_expire(now, offer_wait + 1000);
         if (now >= next_look && !tool_n) { next_look = now + 1000; if (once) return 0; }
+        /* while the host's offer is ours, the guest's clipboard is the host's: not read (that would ask for it) */
+        if (now >= next_look && xc_owned()) { next_look = now + 1000; if (once) return 0; }
         if (now >= next_look) {
             next_look = now + 1000;
             int sent = 0;
@@ -410,10 +437,14 @@ int main(int argc, char **argv) {
             }
             if (once) return 0;
         }
-        struct pollfd pp[2] = { { fd, POLLIN, 0 }, { wfd, POLLIN, 0 } };
-        int r = poll(pp, wfd >= 0 ? 2 : 1, (int)(next_look - now_ms() > 0 ? next_look - now_ms() : 0));
+        int xfd0 = xc_fd();
+        struct pollfd pp[3] = { { fd, POLLIN, 0 }, { wfd, POLLIN, 0 }, { xfd0, POLLIN, 0 } };
+        long long until = next_look - now_ms();
+        if (until > 250) until = 250;          /* the requests' time limits */
+        int r = poll(pp, 3, (int)(until > 0 ? until : 0));
         if (r < 0 && errno != EINTR) { close(fd); fd = -1; continue; }
         if (r <= 0) continue;
+        if (xfd0 >= 0 && (pp[2].revents & (POLLIN | POLLHUP | POLLERR)) && xc_read() < 0) say_hello(fd);
         if (wfd >= 0 && (pp[1].revents & (POLLIN | POLLHUP | POLLERR))) {
             int w = from_server(fd);
             if (w == -2) { close(fd); fd = -1; continue; }
@@ -432,10 +463,26 @@ int main(int argc, char **argv) {
             if (!used) break;
             if (f.kind == AGK_HELLO) {
                 host_clipx = f.len < 200 && memmem(f.data, f.len, " clipx", 6) != NULL;
+                host_clipreq = f.len < 200 && (ag_hello_caps(f.data, f.len) & AG_HELLO_CLIPREQ);
                 /* a new lord-vm (after a resume) asks once: the hello again */
                 if (f.len < 200 && memmem(f.data, f.len, " ask", 4)) say_hello(fd);
             }
             if (f.kind == LAG_APPS || f.kind == LAG_WINACT || f.kind == LAG_LAUNCH) to_server(&f);
+            uint32_t g;
+            uint8_t forms, flags, form, status;
+            const uint8_t *d;
+            uint32_t dn;
+            if (f.kind == AGK_CLIPOFFER && host_clipreq && !ag_offer_parse(f.data, f.len, &g, &forms, &flags) && !xc_own(forms)) {
+                offer_gen = g;
+                offer_wait = flags & AGO_ASK ? AG_ASK_WAIT_MS : AG_CLIP_WAIT_MS;
+                memset(asked_at, 0, sizeof asked_at);
+                last = 0;
+                snprintf(last_types, sizeof last_types, "%s", "");
+            }
+            if (f.kind == AGK_CLIPDATA && !ag_clipdata_parse(f.data, f.len, &g, &form, &status, &d, &dn) && g == offer_gen && asked_at[form]) {
+                asked_at[form] = 0;
+                xc_supply(form, status == AGD_OK ? d : NULL, status == AGD_OK ? dn : 0);
+            }
             if (f.kind == AGK_CLIP && f.len && ag_utf8_ok(f.data, f.len)) {
                 uint64_t h = hash(f.data, f.len);
                 if (h != last && !clip_write(f.data, f.len)) last = h;

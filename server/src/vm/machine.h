@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 8
+#define VM_SCHEMA 9
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -109,6 +109,7 @@ typedef struct {
     int agent;                          /* the guest agent channels (6.17): qemu-guest-agent and org.lordos.agent; off
                                          * unless turned on (schema 2) */
     int clipboard;                      /* VM_CLIP_*, through org.lordos.agent (schema 2) */
+    int clipboard_ask;                  /* "ask before each paste" into and copy out of the machine (schema 9; false: trusted) */
     /* schema 3: what an imported machine keeps of its source's hardware (6.22) */
     int devices;                        /* VM_DEV_* */
     int nic_model;                      /* VM_NIC_* */

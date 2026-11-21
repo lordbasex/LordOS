@@ -139,7 +139,7 @@ export function Configure({ dir, section: section0, onClose }) {
 
   const running = stateView(m.state).active;
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
-    agent: !!m.agent, clipboard: m.clipboard || 'off', shares: m.shares || [], transfer: !!m.transfer,
+    agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu, ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
@@ -359,10 +359,17 @@ export function Configure({ dir, section: section0, onClose }) {
       </Row>
     </Group>
     <Group>
-      <Row label={tr('machines.cfg.clipboard')} note={tr('machines.cfg.clipboardNote') + (offNote ? ` ${offNote}` : '')} last>
+      <Row label={tr('machines.cfg.clipboard')} note={tr('machines.cfg.clipboardNote') + (offNote ? ` ${offNote}` : '')} last={cur.clipboard === 'off'}>
         <Off off={running}><Segmented small value={cur.clipboard} onChange={(x) => set({ clipboard: x, ...(x !== 'off' ? { agent: true } : {}) })}
           options={['off', 'to-guest', 'from-guest', 'both'].map((k) => [k, tr(`machines.cfg.clip.${k}`)])} /></Off>
       </Row>
+      {/* how far the machine is trusted with it (6.8, machine.json clipboard_ask): on demand while in use, or asked each time */}
+      {cur.clipboard !== 'off' ? (
+        <Row label={tr('machines.cfg.clipTrust')} note={tr('machines.cfg.clipTrustNote') + (offNote ? ` ${offNote}` : '')} last>
+          <Off off={running}><Segmented small value={cur.clipboardAsk ? 'ask' : 'trusted'} onChange={(x) => set({ clipboardAsk: x === 'ask' })}
+            options={['trusted', 'ask'].map((k) => [k, tr(`machines.cfg.clipTrust.${k}`)])} /></Off>
+        </Row>
+      ) : null}
     </Group>
     <Group>
       <Row label={tr('machines.cfg.shares')} note={tr('machines.cfg.sharesNote') + (offNote ? ` ${offNote}` : '')} last={!cur.shares.length}>
