@@ -29,3 +29,10 @@ build/lord-appstream: $(LORD_APPSTREAM_SRC) src/fpakas.h src/fpak.h src/sec/sand
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ $(LORD_APPSTREAM_SRC) -lpthread
 all: build/lord-appstream
+
+# the launcher's view of a home with mounts under it (tests/sandbox_home_mounts_test.c; 77: no user namespaces here)
+test: build/sandbox-home-mounts-test
+build/sandbox-home-mounts-test: tests/sandbox_home_mounts_test.c src/sec/sandbox.c src/sec/cgroup.c src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/sandbox_home_mounts_test.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
+	./$@; r=$$?; [ $$r = 0 ] || [ $$r = 77 ] || { rm -f $@; exit 1; }

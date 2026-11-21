@@ -382,7 +382,13 @@ static int remount_ro_under(const char *dir) {
         }
         mp[o] = 0;
         if (strncmp(mp, dir, n) || mp[n] != '/') continue;
-        if (mount(NULL, mp, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV, NULL)) bad = 1;
+        if (!mount(NULL, mp, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV, NULL)) continue;
+        /* a mount the view can't reach by its path (covered by a later mount on a folder above it, or its folder gone)
+         * isn't the one at that path and the app can't reach it either: nothing to make read-only. Seen with a session
+         * whose home is mounted over a folder that had a cloud drive mounted under it (2026-11-20) */
+        if (errno == ENOENT || errno == ENOTDIR || errno == EACCES) continue;
+        fprintf(stderr, "sandbox: %s, mounted under the home, can't be made read-only (%s)\n", mp, strerror(errno));
+        bad = 1;
     }
     fclose(f);
     return bad ? -1 : 0;
