@@ -237,6 +237,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   guest tools clamp a move to the screen too. Model tests (monitor 2 at x = 2500 → inside 0..1920, a monitor to the
   left, a larger window, a scaled display, 2,000 random places) and checked on a test machine: moves to x = 2500 and
   x = −1500 stayed on its screen.
+- **Machines: the clipboard in apps mode, a click that brings a new copy**: a click on a guest window that carried a new
+  clipboard offer reaches the guest 150 ms later, as on the machine's window, so a right-click's Paste finds it.
+  Checked end to end in apps mode on a test machine: LordOS → Notepad paste (one request, answered) and Notepad's copy
+  back.
 - **Machines: the close question fits a small window and Esc cancels it** (`apps/machines/vmwindow.jsx`): in apps mode
   the controller window is small, so "Close ‹machine›?" was wider than it and its buttons were cut off, with the copy's
   progress line drawn over them; Esc there left apps mode behind the card instead of cancelling it. Cards now fit the

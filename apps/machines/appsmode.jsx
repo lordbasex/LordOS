@@ -15,6 +15,9 @@ import { useEffect, useRef } from 'react';
 import { ClipAskBar } from './clipask.jsx';
 import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps, guestPlace, offsetRect, minimizedByUs } from './model.js';
 
+// how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
+// window (vmwindow.jsx) and its apps mode windows alike
+export const CLIP_HOLD_MS = 150;
 // dir → { sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], leave() }
 export const guests = createStore({});
 // dir → the LordOS window id of that machine's guest window in front, if one is: the machine counts as in use then (its
@@ -161,6 +164,7 @@ export function GuestWindow({ dir, gid }) {
   const box = useRef(null);
   const buttons = useRef(new Set());
   const wheel = useRef(0);
+  const held = useRef(0);          // a press held back for a new clipboard offer: its release waits until after it
   const gref = useRef(g);
   gref.current = g;
   const meRef = useRef(me);
@@ -243,7 +247,12 @@ export function GuestWindow({ dir, gid }) {
     // while the clipboard's bar asks, the keys are the bar's
     const ka = addListener('keydown', (e) => { if (!(e.code > 0) || gref.current?.ask) return; e.preventDefault?.(); lord.vm.key(sid, e.code, 1); });
     const kb = addListener('keyup', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 0); });
-    const kc = addListener('pointerup', (e) => { if (buttons.current.has(e.button)) { buttons.current.delete(e.button); lord.vm.button(sid, e.button, 0); } });
+    const kc = addListener('pointerup', (e) => {
+      if (!buttons.current.has(e.button)) return;
+      buttons.current.delete(e.button);
+      const wait = held.current - Date.now(), b = e.button;
+      if (wait > 0) setTimeout(() => lord.vm.button(sid, b, 0), wait + 10); else lord.vm.button(sid, b, 0);
+    });
     return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); };
   }, [focused, g?.sid]);
   const at = (e) => (box.current && me && g?.gw ? cropPoint(e.x, e.y, lord.getLayout(box.current.id), cropOf(me), g.gw, g.gh) : null);
@@ -251,10 +260,14 @@ export function GuestWindow({ dir, gid }) {
   const down = (e) => {
     if (trackOf(dir).get(gid)?.popup) e.stopPropagation?.();     // a popup's own frame (picture-in-picture) would start a drag
     if (!g?.sid || g.ask) return;     // the clipboard's bar is asking: its clicks are its own
-    g.touch?.();                // a click on the machine: its clipboard's gate opens and the guest gets the offer
+    // a click on the machine: its clipboard's gate opens and the guest gets the offer; a click that just carried a new
+    // clipboard in waits a moment, as on the machine's window, so a right-click's Paste finds it there
+    const fresh = !!g.touch?.();
     move(e);
     buttons.current.add(e.button);
-    lord.vm.button(g.sid, e.button, 1);
+    const sid = g.sid, b = e.button;
+    if (fresh) { held.current = Date.now() + CLIP_HOLD_MS; setTimeout(() => lord.vm.button(sid, b, 1), CLIP_HOLD_MS); }
+    else lord.vm.button(sid, b, 1);
   };
   const onWheel = (e) => {
     if (!g?.sid) return;
