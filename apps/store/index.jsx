@@ -468,7 +468,8 @@ export default function Store() {
     <SidebarItem key={id} icon={glyph} label={label} detail={detail || null} selected={!app && page === id} onClick={() => { go(id); if (side.narrow) side.close(); }} />
   );
   const sidebar = (
-      <View style={{ width: side.narrow ? undefined : sideW, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg }}>
+      // above the column after it: its edge handle reaches 3 px over that column, which would otherwise take the press
+      <View style={{ width: side.narrow ? undefined : sideW, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg, zIndex: side.narrow ? 0 : 1 }}>
         <Hairline edge="end" />
         {side.narrow ? null : <View onMouseDown={startSide} style={{ position: 'absolute', top: 0, bottom: 0, zIndex: 2, ...(direction() === 'rtl' ? { left: -3 } : { right: -3 }), width: 7, cursor: 'ew-resize' }} />}
         <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4 }}>
