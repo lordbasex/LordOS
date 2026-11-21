@@ -206,6 +206,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: a copy into a machine always shows its percentage** (`apps/machines/model.js`, `vmwindow.jsx`): a long file
+  name (an installer image, for one) pushed the percentage past the line's edge, so the copy looked stuck. The name is
+  now shortened in the middle, keeping its end, the line wraps instead of being cut, and a progress bar sits under it.
 - **Machines: a machine's input can't be an output's monitor** (`server/src/ui/js_vm.c`, `server/src/sound/snd.c`; found by
   the commit security review, MEDIUM). The input chosen for a machine is used only when it is a microphone or line input,
   never the monitor of an output (which would hand the guest everything this computer plays under the microphone

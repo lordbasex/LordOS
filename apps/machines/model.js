@@ -382,7 +382,15 @@ export function copyLine(list) {
   const total = going.reduce((a, f) => a + Math.max(0, f.size || 0), 0);
   const pct = total > 0 ? Math.floor(going.reduce((a, f) => a + Math.max(0, f.size || 0) * Math.min(100, Math.max(0, f.pct || 0)), 0) / total)
     : Math.floor(going.reduce((a, f) => a + Math.min(100, Math.max(0, f.pct || 0)), 0) / going.length);
-  return { name: going[0].name, pct: Math.min(99, pct), waiting: going.length - 1, fast: going[0].via === 'transfer' };
+  return { name: midName(going[0].name), pct: Math.min(99, pct), waiting: going.length - 1, fast: going[0].via === 'transfer' };
+}
+// a long file name shortened in the middle, so the copy's percentage after it stays in view and the end of the name
+// (its extension, a version) is kept: at most MAX characters (code points, so no emoji is cut in half)
+export function midName(name, max = 36) {
+  const c = Array.from(String(name || ''));
+  if (c.length <= max) return c.join('');
+  const tail = Math.max(8, Math.floor((max - 1) / 3));
+  return c.slice(0, max - 1 - tail).join('') + '…' + c.slice(c.length - tail).join('');
 }
 
 // ---- the transfer folder (6.7.1): <library>/Transfer/<name>, the guest's LordOS folder or drive ----

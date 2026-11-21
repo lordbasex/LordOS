@@ -879,10 +879,14 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       ) : null}
       {line ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
-          <View style={{ maxWidth: 560, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
-            <Text style={{ fontSize: 13, color: '#f2f2f5', textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+          <View style={{ maxWidth: 560, minWidth: 260, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
+            <Text style={{ fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>
               {tr(line.fast ? 'machines.drop.copyingFast' : 'machines.drop.copying', { name: line.name, pct: line.pct }) + (line.waiting ? ` · ${tr('machines.drop.waiting', { count: line.waiting })}` : '')}
             </Text>
+            {/* the copy's progress as a bar too, so it reads at a glance whatever the language's line says */}
+            <View style={{ marginTop: 6, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.16)', direction: 'ltr' }}>
+              <View style={{ width: `${Math.max(2, line.pct)}%`, height: 4, borderRadius: 2, backgroundColor: TONE.run }} />
+            </View>
           </View>
         </View>
       ) : null}

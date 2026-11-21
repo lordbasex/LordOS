@@ -344,6 +344,11 @@ eq('drop: ok', M.dropBlocker({ state: 'running', agent: ag(1 | 4 | 8) }, true), 
 eq('copy line none', M.copyLine([{ id: 1, state: 'done', pct: 100, size: 5 }]), null);
 eq('copy line by size', M.copyLine([{ id: 7, name: 'b', state: 'copying', pct: 0, size: 300 }, { id: 3, name: 'a', state: 'copying', pct: 50, size: 100 }]), { name: 'a', pct: 12, waiting: 1, fast: false });
 eq('copy line empty files', M.copyLine([{ id: 1, name: 'z', state: 'copying', pct: 100, size: 0 }]), { name: 'z', pct: 99, waiting: 0, fast: false });
+
+// a long name is shortened in the middle so the percentage after it stays in view (the ISO's name hid it)
+eq('mid name short', M.midName('a.iso'), 'a.iso');
+{ const n = M.midName('Windows11_Client_x64_es-mx_26300_9457.iso'); eq('mid name long', [Array.from(n).length <= 36, n.endsWith('9457.iso'), n.includes('…'), n.startsWith('Windows11_')], [true, true, true, true]); }
+eq('mid name in the copy line', M.copyLine([{ id: 1, name: 'x'.repeat(60) + '.iso', state: 'copying', pct: 10, size: 1 }]).name.length <= 36, true);
 eq('guest folder', [M.guestFolder('/home/ana/Descargas/x (2).txt'), M.guestFolder('C:\\Users\\Ana\\Downloads\\x.txt'), M.guestFolder('x.txt'), M.guestFolder('/x')], ['/home/ana/Descargas', 'C:\\Users\\Ana\\Downloads', '', '/']);
 eq('follow stuck', [M.followStuck([1920, 1080], [1784, 830], 0, 5000), M.followStuck([1920, 1080], [1784, 830], 0, 3000), M.followStuck([1920, 1080], [1918, 1080], 0, 9000), M.followStuck(null, [1, 1], 0, 9000)], [true, false, false, false]);
 eq('copy line through the transfer folder', M.copyLine([{ id: 2, name: 'iso', state: 'copying', pct: 40, size: 10, via: 'transfer' }]).fast, true);
