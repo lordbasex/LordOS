@@ -2005,9 +2005,10 @@ static void from_vd(Sess *s) {
     if (frames && ms) {
         ms->frame_seq++;
         int shown = du.c ? media_src_damage_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0) : (media_src_damage(ms), 1);
-        /* apps mode: what changed isn't in any of the guest's windows shown here (or none is): nothing to paint, so
-         * the frame counts as read at once (the helper isn't held 250 ms) */
-        if (s->apps_mode && !shown) ms->painted_seq = ms->frame_seq;
+        /* what changed isn't in the part of the picture shown (zoomed in), or in apps mode in any of the guest's
+         * windows shown here (or none is): nothing to paint, so the frame counts as read at once (the helper isn't
+         * held 250 ms) */
+        if (!shown && (s->apps_mode || ms->node)) ms->painted_seq = ms->frame_seq;
         /* the node it was drawn in went away (the window's tree was made again): one repaint of everything finds
          * the new node, and that paint binds it */
         else if (!ms->node && !media_src_crop_count(ms)) damage_add((Box){ 0, 0, 16384, 16384 });
@@ -2037,6 +2038,46 @@ static void ack(Sess *s) {
     s->ack_pending = 0;
 }
 
+/* ---- lord-server's main loop (main.c): the pictures are read there, not at the app's poll ----
+ * Each display's socket is in the loop's poll(): a frame is taken (from_vd) as soon as lord-vmdisplay sends it and
+ * acknowledged right after the paint that showed it (js_vm_painted, after render()). Before 2026-11-21 both waited
+ * for the Machines app's poll every 16 ms, and the acknowledgement came at the poll after the next one: a guest
+ * drawing 60 frames a second was shown at 31 (docs/MACHINES-GPU.md, Part 1). A 3D picture's dmabuf waiting for its
+ * fence is polled too (it becomes readable when the GPU is done with it). */
+static int vm_poll_sess[2 * MAX_SESS];
+
+int js_vm_pollfds(struct pollfd *p, int max) {
+    int n = 0;
+    for (int i = 0; i < MAX_SESS && n < max; i++) {
+        Sess *s = &sess[i];
+        if (!s->used || s->vd < 0) continue;
+        vm_poll_sess[n] = i;
+        p[n++] = (struct pollfd){ s->vd, POLLIN, 0 };
+        if (s->db_pending && s->db_cur >= 0 && s->db[s->db_cur].fd >= 0 && n < max) {
+            vm_poll_sess[n] = i;
+            p[n++] = (struct pollfd){ s->db[s->db_cur].fd, POLLIN, 0 };
+        }
+    }
+    return n;
+}
+
+void js_vm_dispatch(const struct pollfd *p, int n) {
+    int done[MAX_SESS] = { 0 };
+    for (int k = 0; k < n && k < 2 * MAX_SESS; k++) {
+        int i = vm_poll_sess[k];
+        if (!p[k].revents || done[i]) continue;
+        Sess *s = &sess[i];
+        if (!s->used || s->vd < 0) continue;
+        done[i] = 1;
+        from_vd(s);
+    }
+}
+
+/* after a paint: every frame it showed is acknowledged now, so lord-vmdisplay hands the guest's next one over at once */
+void js_vm_painted(void) {
+    for (int i = 0; i < MAX_SESS; i++) if (sess[i].used && sess[i].ack_pending) ack(&sess[i]);
+}
+
 static void read_err(Sess *s) {
     if (s->err < 0) return;
     char tmp[512];
@@ -2055,10 +2096,9 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     if (!s) return JS_NULL;
-    ack(s);
     from_vm(s);
-    if (s->vd >= 0) from_vd(s);
-    ack(s);
+    /* the picture's frames are read by lord-server's loop (js_vm_dispatch) and acknowledged after each paint
+     * (js_vm_painted); this poll only reports the state */
     read_err(s);
     snd_apply(s);                       /* a permission given or taken since */
     MediaSrc *sm = s->media ? media_src_get(s->media) : NULL;

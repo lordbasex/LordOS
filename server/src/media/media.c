@@ -355,12 +355,33 @@ int media_src_crop_count(MediaSrc *s) {
     return k;
 }
 
+/* The part of a node that shows the picture's pixels x, y, w × h (where its last paint put them, media_paint), in the
+ * node's logical coordinates, one pixel wider on each side for the scaled picture's filter; the whole node when that
+ * paint is unknown, rotated or mirrored, or was of another size. 0 when nothing of it is in the box. */
+static int node_part(const MediaSrc *s, const Node *n, int x, int y, int w, int h, Box *out) {
+    const float *pd = node_padding(n);
+    float bl = node_border(n, EDGE_L), bt = node_border(n, EDGE_T), br = node_border(n, EDGE_R), bb = node_border(n, EDGE_B);
+    float cx = n->ax + pd[EDGE_L] + bl, cy = n->ay + pd[EDGE_T] + bt;
+    float cw = n->w - pd[EDGE_L] - pd[EDGE_R] - bl - br, ch = n->h - pd[EDGE_T] - pd[EDGE_B] - bt - bb;
+    *out = (Box){ floorf(n->ax), floorf(n->ay), ceilf(n->ax + n->w), ceilf(n->ay + n->h) };
+    if (!s->map_ok || s->map_w != s->w || s->map_h != s->h || cw <= 0 || ch <= 0) return 1;
+    float x0 = cx + cw * (s->map_fx + (float)(x - 1) * s->map_kx), x1 = cx + cw * (s->map_fx + (float)(x + w + 1) * s->map_kx);
+    float y0 = cy + ch * (s->map_fy + (float)(y - 1) * s->map_ky), y1 = cy + ch * (s->map_fy + (float)(y + h + 1) * s->map_ky);
+    x0 = fmaxf(floorf(x0) - 1, cx); y0 = fmaxf(floorf(y0) - 1, cy);
+    x1 = fminf(ceilf(x1) + 1, cx + cw); y1 = fminf(ceilf(y1) + 1, cy + ch);
+    if (x1 <= x0 || y1 <= y0) return 0;
+    *out = (Box){ floorf(x0), floorf(y0), ceilf(x1), ceilf(y1) };
+    return 1;
+}
+
 int media_src_damage_rect(MediaSrc *s, int x, int y, int w, int h) {
     int k = 0;
     Node *n = s->node ? node_get(s->node) : NULL;
     if (n && n->type == NODE_MEDIA && n->term == s->id && !n->crop && n->prev_box.x1 > n->prev_box.x0) {
-        damage_add((Box){ floorf(n->ax), floorf(n->ay), ceilf(n->ax + n->w), ceilf(n->ay + n->h) });
-        k++;
+        /* only where the picture changed (Machines: a pointer, a clock), as the crop nodes below: the rest of the
+         * node keeps its pixels (docs/MACHINES-GPU.md, Part 1 step 3) */
+        Box b;
+        if (node_part(s, n, x, y, w, h, &b)) { damage_add(b); k++; }
     } else s->node = 0;
     for (int i = 0; i < MEDIA_CROP_NODES; i++) {
         Node *c = crop_node(s, i);

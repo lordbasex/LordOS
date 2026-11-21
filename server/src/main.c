@@ -79,6 +79,7 @@
 #include "hw/logindlock.h"
 #include "hw/modes.h"
 #include "ui/js_hw.h"
+#include "ui/js_vm.h"
 #include "outputs.h"
 #include "monitor/netrec.h"
 #include "sec/codesig.h"
@@ -3024,6 +3025,7 @@ int main(int argc, char **argv) {
         }
         if (wants && (!all_busy(&s) || ahead) && pace <= 0) {
             render(&s);
+            js_vm_painted();                /* the machines' frames it showed: lord-vmdisplay may send the next ones */
             wants = 0;
             if (s.headless || soft) pace_next += period;
         }
@@ -3045,7 +3047,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[142 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
+        struct pollfd pfd[150 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios, +8 máquinas */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -3095,6 +3097,8 @@ int main(int argc, char **argv) {
         n += nmed;
         int hwbase = n, nhw = hw_pollfds(pfd + n, 8);            /* uevents, the system bus and the session bus clients (src/hw) */
         n += nhw;
+        int vmbase = n, nvm = js_vm_pollfds(pfd + n, 8);         /* Machines: each picture's lord-vmdisplay (ui/js_vm.c) */
+        n += nvm;
         wdog_idle();
         int ready = poll(pfd, n, wait);
         if (ready < 0 && errno != EINTR) { perror("poll"); break; }
@@ -3188,6 +3192,7 @@ int main(int argc, char **argv) {
         if (nabr) brokersrv_audio_dispatch(pfd + abr, nabr);
         if (nmed) media_dispatch(pfd + medbase, nmed);
         if (nhw) hw_dispatch(pfd + hwbase, nhw);
+        if (nvm) js_vm_dispatch(pfd + vmbase, nvm);           /* a machine's frame: damaged now, painted next */
         if (parked_n && s.headless && display_hotplug_seq() != parked_seq) {   /* a monitor may have appeared */
             int f[PARK_MAX], fn = parked_n;
             memcpy(f, parked_fd, sizeof(int) * (size_t)fn);

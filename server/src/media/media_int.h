@@ -56,6 +56,12 @@ typedef struct {
     unsigned cache_seq, cache_gen;
     float cache_box[4];
     float shown_scale;          /* physical pixels per picture pixel at the last paint (the pointer follows it) */
+    /* where the last paint of its node put the picture, as fractions of the node's content box (so the logical and
+     * physical boxes agree): picture pixel (u, v) at (map_fx + u·map_kx, map_fy + v·map_ky). map_ok: neither rotated
+     * nor mirrored, and map_w × map_h is the picture's size then. A new frame damages only where it changed
+     * (media_src_damage_rect) */
+    int map_ok, map_w, map_h;
+    float map_fx, map_fy, map_kx, map_ky;
     /* the source's own pointer (a Machines guest's): drawn instead of the host's over its node */
     McurImage cur;              /* as the source sent it, premultiplied and cut */
     int cur_mode;               /* 0 none (the host's arrow), 1 the image, 2 hidden */
