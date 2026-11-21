@@ -809,7 +809,13 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       else if (!appsRef.current) wm.focus(winId);
     }
     for (const f of notOpened) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.openWith.failed', { machine: name, name: f.name }), body: f.message, sound: false });
-    list = list.filter((f) => !f.open);
+    // files dropped on an apps mode window (appsmode.jsx): its copy line, and how the guest took them
+    if (appsRef.current) guests.set((x) => (x[dir] ? { ...x, [dir]: { ...x[dir], copies: list.filter((f) => f.place && f.state === 'copying') } } : x));
+    const placed = list.filter((f) => f.place && f.state === 'done');
+    if (placed.some((f) => f.placed === 'clipboard')) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.apps.dropPaste', { machine: name }), body: '', sound: false });
+    if (placed.some((f) => f.placed === 'folder')) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.apps.dropFolder', { machine: name }), body: '', sound: false });
+    if (placed.some((f) => f.placed === 'window')) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.apps.dropWindow', { machine: name }), body: '', sound: false });
+    list = list.filter((f) => !f.open && !(f.place && f.state !== 'failed'));
     const done = list.filter((f) => f.state === 'done'), failed = list.filter((f) => f.state === 'failed');
     if (done.length) {
       notify({ app: 'machines', label: tr('machines.title'), title: done.length === 1 ? tr('machines.drop.done', { machine: name }) : tr('machines.drop.doneN', { machine: name, count: done.length }),

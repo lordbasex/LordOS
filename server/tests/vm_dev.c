@@ -26,6 +26,7 @@
  *                       guest sends: the window list, icons, the program list)
  *   file PATH           copy a file into the guest through its agent (VM_FILE, as a drop on the window does)
  *   open PATH           the same, then the guest tools open it there (VM_FILE a = 1, Files' "Open with", 7.3)
+ *   place ID X Y PATH   the same, then the guest tools hand it to the apps mode window ID at X, Y (VM_FILE a = 2, 7.2.1)
  *   transfer [SHA PATH] the transfer folder (VAG_TRANSFER): looked at again; a Windows guest gets WinFsp's installer
  *   wait-frames N [S]   wait until N more frames arrived (at most S seconds, default 30)
  *   sound play [VOL]    the guest's sound through lord-server's own code (media/maudio.c, a PipeWire stream) at VOL
@@ -689,6 +690,17 @@ static int handle(char *line) {
         VmMsg m = vm_msg(VM_FILE, ++seq, op, 0, 0, 0, slash ? slash + 1 : line + 5);
         if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"%s\"}", op ? "open" : "file");
         else out("{\"ok\":true,\"cmd\":\"%s\",\"seq\":%u}", op ? "open" : "file", seq);
+        if (fd >= 0) close(fd);
+    } else if (!strncmp(line, "place ", 6)) {
+        static int batch;
+        unsigned id = 0; int px = 0, py = 0, used = 0;
+        if (sscanf(line + 6, "%u %d %d %n", &id, &px, &py, &used) < 3 || !used) { out("{\"ok\":false,\"cmd\":\"place\"}"); return 0; }
+        const char *path = line + 6 + used, *slash = strrchr(path, '/');
+        int fd = open(path, O_RDONLY | O_CLOEXEC);
+        batch = batch % 32767 + 1;
+        VmMsg m = vm_msg(VM_FILE, ++seq, 2, (int)id, px | py << 16, batch << 16 | 0 << 8 | 1, slash ? slash + 1 : path);
+        if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"place\"}");
+        else out("{\"ok\":true,\"cmd\":\"place\",\"seq\":%u}", seq);
         if (fd >= 0) close(fd);
     } else if (!strncmp(line, "transfer", 8)) {
         char sha[80] = "", path[1024] = "";

@@ -44,6 +44,15 @@
  *                            the system's default handler (a program runs), as the person; the record goes either way.
  *   AGK_OPENED guest → host  the outcome: the 32 hex digits of the token, u8 status (AGOS_*), u32 the system's error code
  *                            (0 with AGOS_OK); exactly 37 bytes. lord-vm logs it and answers the VM_FILE with it.
+ *   AGK_PLACE  host → guest  files dropped on an apps mode window (capability "place"; 7.2.1): the drop's token, size and
+ *                            SHA-256 as AGK_OPEN, then u32 the guest window's id (one of its last LAG_WINDOWS), i32 x,
+ *                            i32 y (the drop point in the guest's screen, 0..LAG_DIM_MAX), u32 batch (≥ 1), u8 index,
+ *                            u8 count (index < count ≤ AG_PLACE_MAX); exactly AG_PLACE_BYTES. The guest checks each file as
+ *                            for AGK_OPEN and, once a batch is all there, hands those files to that window: an Explorer
+ *                            folder window gets them moved into its folder, a window that takes dropped files
+ *                            (WS_EX_ACCEPTFILES) gets WM_DROPFILES, any other gets them on the clipboard as files to paste.
+ *   AGK_PLACED guest → host  per file: the token, u8 status (AGOS_*), u8 how (AGP_*), u32 the system's error code;
+ *                            exactly AG_PLACED_BYTES.
  *   AGK_DISPLAY host → guest  u32 width, u32 height (little endian; 320..8192 × 200..8192): the size the machine's
  *                            window wants (capability "display" in the guest's hello; lord-vm sends it only then, and
  *                            again after each hello). The guest sets that size, or the closest it can, on its primary
@@ -89,7 +98,7 @@
 enum { AGK_HELLO = 1, AGK_CLIP = 2, AGK_CLIPX = 3 };
 enum { AGF_TEXT = 1, AGF_HTML = 2, AGF_PNG = 3 };
 enum { AGK_DISPLAY = 4, LAG_APPS = 5, LAG_WINDOWS = 6, LAG_WINICON = 7, LAG_WINACT = 8, LAG_LAUNCH = 9, LAG_APPLIST = 10 };
-enum { AGK_CLIPOFFER = 11, AGK_CLIPREQ = 12, AGK_CLIPDATA = 13, AGK_OPEN = 14, AGK_OPENED = 15 };
+enum { AGK_CLIPOFFER = 11, AGK_CLIPREQ = 12, AGK_CLIPDATA = 13, AGK_OPEN = 14, AGK_OPENED = 15, AGK_PLACE = 16, AGK_PLACED = 17 };
 /* AGK_CLIPOFFER's forms (1 << (AGF_* - 1)) and flags; AGK_CLIPDATA's status */
 enum { AGM_TEXT = 1, AGM_HTML = 2, AGM_PNG = 4, AGM_ALL = 7 };
 enum { AGO_ASK = 1, AGO_ALL = 1 };
@@ -123,6 +132,19 @@ int ag_open_write(uint8_t out[AG_OPEN_BYTES], const char *token, uint64_t size, 
 /* 0 well formed (exactly AG_OPENED_BYTES, a valid token, a known status, code 0 with AGOS_OK) */
 int ag_opened_parse(const uint8_t *p, size_t n, char token[AG_OPEN_TOKEN + 1], uint8_t *status, uint32_t *code);
 int ag_opened_write(uint8_t out[AG_OPENED_BYTES], const char *token, uint8_t status, uint32_t code);
+
+/* AGK_PLACE and AGK_PLACED (files dropped on an apps mode window). AGP_*: how the guest handed them over */
+#define AG_PLACE_MAX 8
+#define AG_PLACE_BYTES (AG_OPEN_BYTES + 18)
+#define AG_PLACED_BYTES (AG_OPEN_TOKEN + 6)
+enum { AGP_NONE = 0, AGP_FOLDER = 1, AGP_DROPPED = 2, AGP_CLIPBOARD = 3, AGP_LAST = AGP_CLIPBOARD };
+typedef struct { char token[AG_OPEN_TOKEN + 1]; uint64_t size; uint8_t sha[32]; uint32_t win, batch; int32_t x, y; uint8_t index, count; } AgPlace;
+/* 0 well formed: exact length, a valid token, win ≠ 0, x and y 0..LAG_DIM_MAX, batch ≥ 1, index < count ≤ AG_PLACE_MAX */
+int ag_place_parse(const uint8_t *p, size_t n, AgPlace *out);
+int ag_place_write(uint8_t out[AG_PLACE_BYTES], const AgPlace *a);
+/* 0 well formed: exact length, a valid token, a known status and how (AGP_NONE unless AGOS_OK), code 0 with AGOS_OK */
+int ag_placed_parse(const uint8_t *p, size_t n, char token[AG_OPEN_TOKEN + 1], uint8_t *status, uint8_t *how, uint32_t *code);
+int ag_placed_write(uint8_t out[AG_PLACED_BYTES], const char *token, uint8_t status, uint8_t how, uint32_t code);
 
 /* AGK_DISPLAY: 0 a well-formed size (8 bytes, 320..8192 × 200..8192), -1 otherwise */
 #define AG_DISPLAY_MIN_W 320u
@@ -213,7 +235,7 @@ int ag_drop_staging_ok(const char *p, int windows);
  * again, as 0, 0, 1, 1. */
 #define LAG_APPNAME_MAX LAG_APP_MAX
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
-enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16, AG_HELLO_OPEN = 32 };
+enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16, AG_HELLO_OPEN = 32, AG_HELLO_PLACE = 64 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;

@@ -10,10 +10,11 @@
 // the Machines app opened with args.guestWin (index.jsx → GuestWindow), reading what useAppsMode publishes in `guests`.
 import {
   View, Text, MediaView, addListener, useAppWindow, useStore, createStore, wm, windows, mainDisplay, workArea, windowPixelIcons, windowChrome, t as tr,
+  useFilesDrop, FilesDropHint, notify,
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
 import { ClipAskBar } from './clipask.jsx';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps, guestPlace, offsetRect, minimizedByUs } from './model.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps, guestPlace, offsetRect, minimizedByUs, AGENT_CAPS, copyLine, placeBatch } from './model.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
@@ -87,8 +88,8 @@ export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTou
       guests.set((g) => { const n = { ...g }; delete n[dir]; return n; });
     };
   }, [active, sid]);
-  // the picture's size and source can change under it (the guest took the new size)
-  useEffect(() => { if (active) publish(dir, { gw: st.w, gh: st.h, media: st.media, name }); }, [active, st?.w, st?.h, st?.media, name]);
+  // the picture's size and source can change under it (the guest took the new size); caps: what the guest's tools take
+  useEffect(() => { if (active) publish(dir, { gw: st.w, gh: st.h, media: st.media, name, caps: st.agent?.caps || 0 }); }, [active, st?.w, st?.h, st?.media, name, st?.agent?.caps]);
   useEffect(() => {
     if (!active) return;
     if (st.guestAppsSeq !== seen.current.a) { seen.current.a = st.guestAppsSeq; publish(dir, { apps: guestAppItems(lord.vm.guestApps(sid)) }); }
@@ -256,6 +257,29 @@ export function GuestWindow({ dir, gid }) {
     return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); };
   }, [focused, g?.sid]);
   const at = (e) => (box.current && me && g?.gw ? cropPoint(e.x, e.y, lord.getLayout(box.current.id), cropOf(me), g.gw, g.gh) : null);
+  // files dragged from Files onto this window (7.2.1): copied into the machine as any drop (transfer folder or agent's
+  // way, SHA-256 checked), then the guest's tools hand them to this window: into the folder an Explorer window shows,
+  // dropped on a window that takes files, or on the clipboard to paste. Only files, at most AG_PLACE_MAX at once
+  const sent = useRef(new Set());
+  const drop = useFilesDrop({
+    onDrop: ({ files }, how) => {
+      const s = gref.current, w = meRef.current;
+      if (!s?.sid || !w || !files.length) return;
+      if (!(s.caps & AGENT_CAPS.place)) { notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.apps.dropCant'), body: '', sound: false }); return; }
+      const box0 = box.current ? lord.getLayout(box.current.id) : null;
+      const pt = (Number.isFinite(how?.x) && box0 && cropPoint(how.x, how.y, box0, cropOf(w), s.gw, s.gh)) || [w.x + Math.floor(w.w / 2), w.y + Math.floor(w.h / 2)];
+      const plan = placeBatch(files, w.id, pt);
+      if (plan.left) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.apps.dropMany', { count: plan.items.length }), body: '', sound: false });
+      const refused = [];
+      for (const it of plan.items) {
+        const id = lord.vm.sendFile(s.sid, it.path, { place: it.place });
+        if (id) sent.current.add(id); else refused.push(it.path.split('/').pop());
+      }
+      if (refused.length) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.drop.refused', { name: refused.join(', ') }), body: '', sound: false });
+    },
+  });
+  // this window's drops still copying (the machine's window publishes them), as a line at its bottom
+  const line = copyLine((g?.copies || []).filter((f) => sent.current.has(f.id)));
   const move = (e) => { const q = g?.sid && at(e); if (q) lord.vm.motion(g.sid, q[0], q[1]); };
   const down = (e) => {
     if (trackOf(dir).get(gid)?.popup) e.stopPropagation?.();     // a popup's own frame (picture-in-picture) would start a drag
@@ -284,9 +308,18 @@ export function GuestWindow({ dir, gid }) {
     );
   }
   return (
-    <View ref={box} onMouseDown={down} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, backgroundColor: '#000' }}>
+    <View ref={box} {...drop.props} onMouseDown={down} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, backgroundColor: '#000' }}>
       {g.media ? <MediaView media={g.media} crop={cropOf(me)} style={{ flex: 1 }} /> : null}
       {focused && g.ask ? <ClipAskBar ask={g.ask} onAnswer={(yes) => g.askAnswer?.(yes)} /> : null}
+      {line ? (
+        <View style={{ position: 'absolute', left: 8, right: 8, bottom: 8, alignItems: 'center', pointerEvents: 'none' }}>
+          <View style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: 'rgba(28,28,33,0.94)' }}>
+            <Text style={{ fontSize: 12, color: '#f2f2f5', textAlign: 'start' }}>{tr(line.fast ? 'machines.drop.copyingFast' : 'machines.drop.copying', { name: line.name, pct: line.pct })}</Text>
+          </View>
+        </View>
+      ) : null}
+      <FilesDropHint over={drop.over} title={drop.over && (drop.over.files.length ? tr('machines.apps.dropTitle') : tr('machines.drop.none'))}
+        note={drop.over && drop.over.files.length ? tr('machines.apps.dropNote') : ''} />
     </View>
   );
 }

@@ -1208,7 +1208,7 @@ typedef struct {
     char name[VM_NAME_MAX + 1];
     /* files dropped on the window, on their way into the guest (VM_FILE): 1 copying, 2 done, 3 failed; msg is the
      * guest's path (done) or why not, for the app to show; files() hands finished ones over once */
-    struct { uint32_t seq; int state, pct, via, open; long long size; char name[VM_TEXT_MAX], msg[VM_TEXT_MAX]; } fx[16];
+    struct { uint32_t seq; int state, pct, via, open, how; long long size; char name[VM_TEXT_MAX], msg[VM_TEXT_MAX]; } fx[16];
     int fx_changes;
     /* apps mode (7.2): the guest's windows, their icons and its apps, as lord-vm passed them on (VM_WINDATA, parsed
      * again here); seqs count changes for the app; apps_mode: the picture may have no node that shows all of it */
@@ -1670,6 +1670,7 @@ static void drop_creds(Sess *s) { if (s->creds[0]) { unlink(s->creds); s->creds[
 static int fx_reply(Sess *s, const VmMsg *m) {
     for (int i = 0; i < 16; i++) if (s->fx[i].state == 1 && s->fx[i].seq == m->seq) {
         s->fx[i].state = m->a == VME_OK ? 2 : 3;
+        s->fx[i].how = m->a == VME_OK && m->b >= 0 && m->b <= AGP_LAST ? m->b : 0;
         if (m->a == VME_OK) s->fx[i].pct = 100;
         snprintf(s->fx[i].msg, sizeof s->fx[i].msg, "%s", m->text);
         s->fx_changes++;
@@ -2166,29 +2167,45 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     return o;
 }
 
-/* sendFile(session, path[, { open: true }]) → request id (0: refused): a file dropped on the machine's window, copied
+/* sendFile(session, path[, { open: true } | { place: { win, x, y, batch, index, count } }]) → request id (0: refused): a file dropped on the machine's window, copied
  * into the guest's Downloads by lord-vm through the guest agent. The file is opened here, for the person, read-only, and
  * only a regular file; lord-vm gets the descriptor and the name, never a path. With open (Files' "Open with" a machine,
  * docs/VIRTUALIZATION.md 7.3) the guest tools then open that copy in the guest: the path must resolve inside the
  * person's home folder or their mounts (fsops_allowed), is opened without following a last link, and lord-vm refuses
- * it unless the guest's tools said "open". This exists only in the session's JS (never in an --app process or a web
- * view: they have no lord.vm), for Files' menu and Machines.
- * files(session) → [{ id, name, size, pct, state:
- * 'copying'|'done'|'failed', message, via, open }]: the guest's path or why not; finished ones are listed once (poll's filesSeq
+ * it unless the guest's tools said "open". With place (files dropped on an apps mode window, 7.2.1) the same checks,
+ * then the guest tools hand the copy to that window. This exists only in the session's JS (never in an --app process
+ * or a web view: they have no lord.vm), for Files' menu and Machines.
+ * files(session) → [{ id, name, size, pct, state: 'copying'|'done'|'failed', message, via, open, place, placed }]: the guest's path or why not; finished ones are listed once (poll's filesSeq
  * counts changes) */
 static JSValue f_send_file(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
     const char *p = s ? JS_ToCString(c, argv[1]) : NULL;
-    int slot = -1, fd = -1, want_open = 0;
+    int slot = -1, fd = -1, want_open = 0, mode = 0;
+    int32_t pw = 0, pc = 0, pd = 0;
     uint32_t q = 0;
     if (s && argc >= 3 && JS_IsObject(argv[2])) {
         JSValue v = JS_GetPropertyStr(c, argv[2], "open");
         want_open = JS_ToBool(c, v) == 1;
         JS_FreeValue(c, v);
+        mode = want_open ? 1 : 0;
+        /* place: { win, x, y, batch, index, count }: files dropped on an apps mode window (7.2.1), checked again by lord-vm */
+        JSValue pl = JS_GetPropertyStr(c, argv[2], "place");
+        if (JS_IsObject(pl)) {
+            int32_t f[6] = { 0 };
+            static const char *const K[6] = { "win", "x", "y", "batch", "index", "count" };
+            int bad = 0;
+            for (int i = 0; i < 6; i++) { JSValue x = JS_GetPropertyStr(c, pl, K[i]); if (JS_ToInt32(c, &f[i], x)) bad = 1; JS_FreeValue(c, x); }
+            if (!bad && f[0] && f[1] >= 0 && f[1] <= LAG_DIM_MAX && f[2] >= 0 && f[2] <= LAG_DIM_MAX && f[3] >= 1 && f[3] <= 32767 && f[5] >= 1 && f[5] <= AG_PLACE_MAX && f[4] >= 0 && f[4] < f[5]) {
+                mode = 2; want_open = 1;
+                pw = f[0]; pc = f[1] | f[2] << 16; pd = f[3] << 16 | f[4] << 8 | f[5];
+            } else want_open = -1;          /* asked and malformed: refused */
+        }
+        JS_FreeValue(c, pl);
     }
     if (s) for (int i = 0; i < 16; i++) if (!s->fx[i].state) { slot = i; break; }
-    if (want_open && p) {
+    if (want_open < 0) { /* refused below: no descriptor */ }
+    else if (want_open && p) {
         /* opened in the guest: only the person's own files (home, their mounts), the resolved path, no last link */
         char real[PATH_MAX];
         if (p[0] == '/' && slot >= 0 && s->vm >= 0 && realpath(p, real) && fsops_allowed(real))
@@ -2211,10 +2228,10 @@ static JSValue f_send_file(JSContext *c, JSValueConst t, int argc, JSValueConst 
             name[hl + el] = 0;
         }
         if (bl && name[0]) {
-            VmMsg m = vm_msg(VM_FILE, ++s->seq, want_open, 0, 0, 0, name);
+            VmMsg m = vm_msg(VM_FILE, ++s->seq, mode, pw, pc, pd, name);
             if (!vm_send(s->vm, &m, fd)) {
                 q = m.seq;
-                s->fx[slot].seq = q; s->fx[slot].state = 1; s->fx[slot].pct = 0; s->fx[slot].via = 0; s->fx[slot].open = want_open; s->fx[slot].size = (long long)st.st_size;
+                s->fx[slot].seq = q; s->fx[slot].state = 1; s->fx[slot].pct = 0; s->fx[slot].via = 0; s->fx[slot].open = mode; s->fx[slot].how = 0; s->fx[slot].size = (long long)st.st_size;
                 snprintf(s->fx[slot].name, sizeof s->fx[slot].name, "%s", name);
                 s->fx[slot].msg[0] = 0;
                 s->fx_changes++;
@@ -2243,7 +2260,10 @@ static JSValue f_files(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         set_str(c, o, "state", s->fx[i].state == 1 ? "copying" : s->fx[i].state == 2 ? "done" : "failed");
         set_str(c, o, "message", s->fx[i].msg);
         set_str(c, o, "via", s->fx[i].via ? "transfer" : "agent");
-        JS_SetPropertyStr(c, o, "open", JS_NewBool(c, s->fx[i].open));
+        JS_SetPropertyStr(c, o, "open", JS_NewBool(c, s->fx[i].open == 1));
+        /* a drop on an apps mode window: how the guest took it */
+        static const char *const HOW[] = { "", "folder", "window", "clipboard" };
+        if (s->fx[i].open == 2) { JS_SetPropertyStr(c, o, "place", JS_TRUE); set_str(c, o, "placed", HOW[s->fx[i].how]); }
         JS_SetPropertyUint32(c, a, k++, o);
         if (s->fx[i].state != 1) s->fx[i].state = 0;
     }

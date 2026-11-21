@@ -744,7 +744,7 @@ export default function Files() {
       setDrag(null); setDropTarget(null);
       tellOver(null);
       const other = !target && !p.favOnly ? filesDropOf(e.target) : null;
-      if (other) { try { other(p.paths, { alt: !!e.alt }); } catch (err) { console.warn('files drop:', err); } return; }
+      if (other) { try { other(p.paths, { alt: !!e.alt, x: e.x, y: e.y }); } catch (err) { console.warn('files drop:', err); } return; }
       if (target === 'fav:') { p.paths.forEach(addFavorite); return; }
       if (p.favOnly || !target || p.paths.includes(target)) return;      // a mounted volume is never moved
       if (target === 'trash:') { trashRef.current(p.paths); return; }       // (cloud paths are asked about and deleted there)

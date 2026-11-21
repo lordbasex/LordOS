@@ -80,6 +80,11 @@
  *                   "open" (VAC_OPEN); lord-vm makes a random token for the drop, the person's copy step records where
  *                   the file went under it, and once the copy is done lord-vm sends the guest tools AGK_OPEN (the token,
  *                   the size and SHA-256 it measured); the VM_REPLY then waits for AGK_OPENED (or AG_OPEN_WAIT_MS).
+ *                   a = 2: then hand it to an apps mode window (files dropped on it, 7.2.1): b = the guest window's id
+ *                   (one of its last LAG_WINDOWS), c = x | y << 16 (the drop point in the guest's screen, each
+ *                   0..LAG_DIM_MAX), d = batch << 16 | index << 8 | count (batch 1..32767, index < count ≤ 8): only for
+ *                   a guest whose tools said "place" (VAC_PLACE); lord-vm sends AGK_PLACE once the copy is done and the
+ *                   VM_REPLY waits for AGK_PLACED; its b then says how the guest took it (AGP_*).
  *                   VM_FILE_PROGRESS on the way; → VM_REPLY with the file's path in the guest (the guest's words, text only) or why not
  *     VM_SNAPSHOT   a = VSN_TAKE, VSN_REVERT or VSN_DELETE; text = "TAG\tNAME" (take) or "TAG". qcow2 internal
  *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
@@ -225,10 +230,11 @@ enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
  * VAC_CLIP_NOTOOL: the guest's helper is there but its clipboard can't work: the guest has no clipboard tool (the hello
  * said "noclip": a Linux guest without xclip or wl-clipboard). VAC_CLIPBOARD is set only when the hello says "clipboard";
  * VAC_CLIP_LAZY: it also said "clipreq": the host's clipboard goes in on demand (VM_CLIP_OFFER), never pushed;
- * VAC_OPEN: the guest's tools said "open": a dropped file can be opened there (VM_FILE a = 1, AGK_OPEN) */
+ * VAC_OPEN: the guest's tools said "open": a dropped file can be opened there (VM_FILE a = 1, AGK_OPEN);
+ * VAC_PLACE: they said "place": files dropped on an apps mode window go to that window (VM_FILE a = 2, AGK_PLACE) */
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
        VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048, VAC_CLIP_LAZY = 4096, VAC_OPEN = 8192,
-       VAC_ALL = 16383 };
+       VAC_PLACE = 16384, VAC_ALL = 32767 };
 /* how long a VM_FILE with a = 1 waits for the guest tools' AGK_OPENED after the copy (a program may ask for consent) */
 #define AG_OPEN_WAIT_MS 120000
 #define VM_WINDATA_MAX (1u << 20)
@@ -405,7 +411,9 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_CLIP_OFFER || (m->a > 0 && m->b >= 1 && m->b <= 7 && (m->c == 0 || m->c == 1))) &&
                       (m->type != VM_CLIP_DENY || (m->a >= 0 && m->c >= 1 && m->c <= VCD_LAST && (m->a ? m->b >= 1 && m->b <= 3 : m->b == 0))) &&
                       (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1) && (m->d == 0 || m->d == 1))) &&
-                      (m->type != VM_FILE || (m->text[0] && (m->a == 0 || m->a == 1))) &&
+                      (m->type != VM_FILE || (m->text[0] && (m->a == 0 || m->a == 1 ||
+                                              (m->a == 2 && m->b != 0 && m->c >= 0 && (m->c & 0xffff) <= 16384 && (m->c >> 16) <= 16384 &&
+                                               (m->d >> 16) >= 1 && (m->d & 0xff) >= 1 && (m->d & 0xff) <= 8 && ((m->d >> 8) & 0xff) < (m->d & 0xff))))) &&
                       (m->type != VM_DISPLAY_SIZE || (m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM)) &&
                       (m->type != VM_APPS || m->a == 0 || m->a == 1) &&
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&

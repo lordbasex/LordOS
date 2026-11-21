@@ -29,6 +29,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the machine's log). Strict parsers in `vmagent.c` with cases and random-input checks in `vm-test`; the hello word
   `open` becomes `VAC_OPEN` (8192). Linux guests aren't listed (their helper may start only the clipboard tools).
   Verified on a test machine: a `.txt` opened in Notepad and a small test program ran and wrote its marker file.
+- **Machines: files dropped on an apps mode window go to that window** (`docs/VIRTUALIZATION.md` 7.2.1). Dragging files
+  from Files onto one of a guest's windows copies them in as a drop does (verified, with the window's own progress line)
+  and the LordOS guest tools (w4) hand them to that window: into the folder an Explorer window shows (under their own
+  names), dropped on a window that takes files (Notepad opens them), or on the guest's clipboard with "The files are in
+  ‹machine›: paste them with Ctrl+V". At most 8 at once. New frames `AGK_PLACE`/`AGK_PLACED` with strict parsers, cases
+  and random-input checks in `vm-test`; `lord.vm.sendFile(…, { place })`, `VM_FILE` a = 2, `VAC_PLACE`; Files passes the
+  drop point to the app under it (`how.x`, `how.y`); `lordvm-dev place`. lord-vm reads a guest's hello up to 255 bytes
+  (64 cut "open place"). Checked on a test machine with Explorer (a folder, and Home), Notepad and the clipboard.
 - **"Open with" providers in the SDK** (`sdk/openwith.js`, `sdk/openwithmodel.js`, `docs/FILES.md`):
   `registerOpenProvider` / `registerOpenProviders` with `{ id, label, icon?, accepts, suggests?, available?,
   needsStart?, open }`; Files lists `openProvidersFor(file)`, offers `suggestedProviderFor(file)` and keeps
@@ -241,6 +249,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   clipboard offer reaches the guest 150 ms later, as on the machine's window, so a right-click's Paste finds it.
   Checked end to end in apps mode on a test machine: LordOS → Notepad paste (one request, answered) and Notepad's copy
   back.
+
 - **Machines: the close question fits a small window and Esc cancels it** (`apps/machines/vmwindow.jsx`): in apps mode
   the controller window is small, so "Close ‹machine›?" was wider than it and its buttons were cut off, with the copy's
   progress line drawn over them; Esc there left apps mode behind the card instead of cancelling it. Cards now fit the

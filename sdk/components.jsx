@@ -1226,7 +1226,7 @@ export function useWindowState(key, initial) {
 
 // Files dragged from Files onto an app's window (apps/files: a View with onFilesDrop and onFilesOver). accepts(name)
 // and folders say what the app takes (sdk/filedrop.js); onDrop({ files, folders }, how) gets only those, how.alt
-// with ⌥ held. Spread `props` on the window's root View and draw <FilesDropHint> last with `over`, the sort of what is
+// with ⌥ held, how.x and how.y the drop point (screen coordinates) when Files gives it. Spread `props` on the window's root View and draw <FilesDropHint> last with `over`, the sort of what is
 // over the window now ({ files, folders, skipped, alt }) or null.
 export function useFilesDrop({ accepts, folders = false, onDrop }) {
   const [over, setOver] = useState(null);

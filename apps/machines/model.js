@@ -357,7 +357,7 @@ export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math
 // transfer: the guest has the transfer folder (6.7.1) mounted; transferSetup: a Windows guest that gets it once WinFsp is
 // installed (Set Up the Transfer Folder); clipNoTool: the Linux guest's helper runs but the guest has no clipboard tool
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -898,6 +898,17 @@ export function insideWork(r, inset, work) {
   const i = inset || { l: 0, t: 0 };
   const x = Math.max(r.x, Math.round(work.x + (i.l || 0))), y = Math.max(r.y, Math.round(work.y + (i.t || 0)));
   return x === r.x && y === r.y ? null : { ...r, x, y };
+}
+
+// Files dropped on an apps mode window (7.2.1): one batch for the guest's tools (lord.vm.sendFile's place), at most
+// PLACE_MAX files (the rest left out: left), the drop point in the guest's screen. batch ids go 1..32767 and around
+export const PLACE_MAX = 8;
+let placeSeq = 0;
+export function placeBatch(files, win, pt, seq) {
+  const list = (files || []).filter((f) => typeof f === 'string' && f.startsWith('/')).slice(0, PLACE_MAX);
+  const batch = seq || (placeSeq = (placeSeq % 32767) + 1);
+  const x = Math.max(0, Math.min(16384, Math.round(pt?.[0] || 0))), y = Math.max(0, Math.min(16384, Math.round(pt?.[1] || 0)));
+  return { items: list.map((path, index) => ({ path, place: { win, x, y, batch, index, count: list.length } })), left: Math.max(0, (files || []).length - list.length) };
 }
 
 // Two rectangles the same within a few pixels (rounding between the two sides)

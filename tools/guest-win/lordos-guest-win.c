@@ -29,7 +29,10 @@
  *     (%LOCALAPPDATA%\LordOS\open\<token>); this side reads that record once (not a link, at most AG_OPEN_RECORD_MS
  *     old), removes it, checks that the file is a regular file (not a link or reparse point) of the size and SHA-256
  *     the host measured, and opens it with the system's default handler (ShellExecuteEx "open", "openas" when nothing
- *     is associated): a program runs, as the person, like a double click in Explorer. It answers AGK_OPENED.
+ *     is associated): a program runs, as the person, like a double click in Explorer. It answers AGK_OPENED;
+ *   - files dropped on an apps mode window (AGK_PLACE, 7.2.1): each checked the same way; once a drop's batch is all
+ *     there they go to the window they were dropped on, and nowhere else: moved into the folder an Explorer window shows,
+ *     WM_DROPFILES to a window that takes dropped files, or the clipboard (CF_HDROP) for any other, to paste.
  * It never runs anything the host names, and validates every frame (vmagent.c's parsers) before acting on it.
  *
  * The port can be held by one process at a time: the helper of the session at the computer's console takes it and
@@ -51,6 +54,10 @@
 #include <wincodec.h>
 #include <wtsapi32.h>
 #include <bcrypt.h>
+#include <exdisp.h>
+#include <servprov.h>
+#include <shlguid.h>
+#include <oleidl.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,8 +65,8 @@
 
 #include "../../server/src/vm/vmagent.h"
 
-#define VERSION "w3"
-#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open"
+#define VERSION "w4"
+#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place"
 
 enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
 enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS };
@@ -1281,14 +1288,19 @@ static void launch(const uint8_t *tok, uint16_t n) {
     lg("apps: a launch token not in the list: ignored");
 }
 
-/* ---- opening a file the host just sent (AGK_OPEN; see the top) ---- */
-typedef struct { char tok[AG_OPEN_TOKEN + 1]; uint64_t size; uint8_t sha[32]; wchar_t *path; uint8_t status; DWORD code; } OpenJob;
+/* ---- opening a file the host just sent (AGK_OPEN), or handing files dropped on a window to it (AGK_PLACE) ---- */
+typedef struct { char tok[AG_OPEN_TOKEN + 1]; uint64_t size; uint8_t sha[32]; wchar_t *path, *name; uint8_t status; DWORD code; int place; AgPlace pl; } OpenJob;
 static volatile LONG open_busy;     /* jobs on their way (each in its own thread: a consent prompt mustn't stop the rest) */
-#define OPEN_MAX 4
+#define OPEN_MAX 12
 
-static void open_reply(const char *tok, uint8_t st, DWORD code) {
-    uint8_t r[AG_OPENED_BYTES];
-    if (!ag_opened_write(r, tok, st, (uint32_t)code)) send_frame(AGK_OPENED, r, sizeof r);
+static void open_reply(const OpenJob *j, uint8_t st, uint8_t how, DWORD code) {
+    if (j->place) {
+        uint8_t r[AG_PLACED_BYTES];
+        if (!ag_placed_write(r, j->tok, st, st == AGOS_OK ? how : AGP_NONE, (uint32_t)code)) send_frame(AGK_PLACED, r, sizeof r);
+    } else {
+        uint8_t r[AG_OPENED_BYTES];
+        if (!ag_opened_write(r, j->tok, st, (uint32_t)code)) send_frame(AGK_OPENED, r, sizeof r);
+    }
 }
 
 /* SHA-256 of what h reads from its start (the system's own BCrypt); 0 ok */
@@ -1315,22 +1327,27 @@ static int sha256_handle(HANDLE h, uint8_t out[32]) {
     return ok ? 0 : -1;
 }
 
-/* the job's thread: the file checked again (a regular file, not a reparse point, the size and hash sent), then opened */
+/* the file of a job, checked again: a regular file (not a directory, link or reparse point) of the size and SHA-256
+ * the host measured. AGOS_OK or AGOS_CHANGED (j->code: the system's error, if one) */
+static uint8_t verify_file(OpenJob *j) {
+    HANDLE h = CreateFileW(j->path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    if (h == INVALID_HANDLE_VALUE) { j->code = GetLastError(); return AGOS_CHANGED; }
+    BY_HANDLE_FILE_INFORMATION fi;
+    uint8_t d[32], st = AGOS_CHANGED;
+    if (GetFileInformationByHandle(h, &fi) && !(fi.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DEVICE)) &&
+        ((uint64_t)fi.nFileSizeHigh << 32 | fi.nFileSizeLow) == j->size && !sha256_handle(h, d) && !memcmp(d, j->sha, 32))
+        st = AGOS_OK;
+    CloseHandle(h);
+    return st;
+}
+
+/* the job's thread: the file checked, then opened (AGK_OPEN) or only checked (AGK_PLACE: the batch is handed over on
+ * the main thread once all of it is there) */
 static DWORD WINAPI open_main(LPVOID arg) {
     OpenJob *j = arg;
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    j->status = AGOS_CHANGED;
-    HANDLE h = CreateFileW(j->path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-    BY_HANDLE_FILE_INFORMATION fi;
-    if (h == INVALID_HANDLE_VALUE) j->code = GetLastError();
-    else {
-        uint8_t d[32];
-        if (GetFileInformationByHandle(h, &fi) && !(fi.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DEVICE)) &&
-            ((uint64_t)fi.nFileSizeHigh << 32 | fi.nFileSizeLow) == j->size && !sha256_handle(h, d) && !memcmp(d, j->sha, 32))
-            j->status = AGOS_OK;
-        CloseHandle(h);
-    }
-    if (j->status == AGOS_OK) {
+    j->status = verify_file(j);
+    if (j->status == AGOS_OK && !j->place) {
         /* its own folder as the working folder, as a double click in Explorer gives */
         wchar_t dir[MAX_PATH * 2];
         wcsncpy(dir, j->path, MAX_PATH * 2 - 1);
@@ -1353,14 +1370,17 @@ static DWORD WINAPI open_main(LPVOID arg) {
         if (!ok) { j->status = AGOS_FAILED; j->code = err ? err : ERROR_GEN_FAILURE; }
     }
     CoUninitialize();
-    if (!PostMessageW(win, WM_APP_OPENED, 0, (LPARAM)j)) { free(j->path); free(j); InterlockedDecrement(&open_busy); }
+    if (!PostMessageW(win, WM_APP_OPENED, 0, (LPARAM)j)) { free(j->name); free(j->path); free(j); InterlockedDecrement(&open_busy); }
     return 0;
 }
 
-/* AGK_OPEN: the record of that token (see the top), read once and removed; the rest in a thread */
-static void open_begin(const char *tok, uint64_t size, const uint8_t sha[32]) {
+/* the record of a token (see the top): read once and removed; "path|name" in base64, a full path of the person's (drive
+ * or network) and the drop's own name (no folder part), text without control characters, at most AG_OPEN_RECORD_MS
+ * old. The path (malloc'd; *name too, or NULL when the record has none), or NULL */
+static wchar_t *read_record(const char *tok, wchar_t **name) {
+    *name = NULL;
     wchar_t *la = NULL, rec[MAX_PATH];
-    if (FAILED(SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &la))) { open_reply(tok, AGOS_NORECORD, 0); return; }
+    if (FAILED(SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &la))) return NULL;
     _snwprintf(rec, MAX_PATH, L"%ls\\LordOS\\open\\%hs", la, tok);
     rec[MAX_PATH - 1] = 0;
     CoTaskMemFree(la);
@@ -1382,34 +1402,210 @@ static void open_begin(const char *tok, uint64_t size, const uint8_t sha[32]) {
         CloseHandle(h);
         DeleteFileW(rec);
     }
-    uint8_t path8[2048];
-    long pn = good ? ag_b64_decode(b64, got, path8, sizeof path8 - 1) : -1;
-    /* a full path of the person's (drive or network), text without control characters */
-    if (pn < 4 || !lag_text_ok(path8, (size_t)pn) || !((path8[1] == ':' && path8[2] == '\\') || (path8[0] == '\\' && path8[1] == '\\'))) {
-        lg("open: no usable record for %.8s…", tok);
-        open_reply(tok, AGOS_NORECORD, 0);
-        return;
-    }
-    if (InterlockedIncrement(&open_busy) > OPEN_MAX) { InterlockedDecrement(&open_busy); open_reply(tok, AGOS_FAILED, ERROR_BUSY); return; }
+    uint8_t path8[2048], name8[1024];
+    const char *bar = good ? memchr(b64, '|', got) : NULL;
+    long pn = good ? ag_b64_decode(b64, bar ? (size_t)(bar - b64) : got, path8, sizeof path8 - 1) : -1;
+    if (pn < 4 || !lag_text_ok(path8, (size_t)pn) || !((path8[1] == ':' && path8[2] == '\\') || (path8[0] == '\\' && path8[1] == '\\'))) return NULL;
+    long nn = bar ? ag_b64_decode(bar + 1, got - (size_t)(bar + 1 - b64), name8, sizeof name8 - 1) : -1;
+    if (nn > 0 && lag_text_ok(name8, (size_t)nn) && !memchr(name8, '\\', (size_t)nn) && !memchr(name8, '/', (size_t)nn) && !memchr(name8, ':', (size_t)nn) &&
+        !(nn <= 2 && name8[0] == '.' && (nn == 1 || name8[1] == '.'))) *name = to_utf16(name8, (size_t)nn);
+    return to_utf16(path8, (size_t)pn);
+}
+
+/* AGK_OPEN / AGK_PLACE: the record of that token, then the rest in a thread */
+static void open_begin(const char *tok, uint64_t size, const uint8_t sha[32], const AgPlace *pl) {
     OpenJob *j = calloc(1, sizeof *j);
-    wchar_t *w = to_utf16(path8, (size_t)pn);
-    if (!j || !w) { free(j); free(w); InterlockedDecrement(&open_busy); open_reply(tok, AGOS_FAILED, ERROR_OUTOFMEMORY); return; }
+    if (!j) return;
     memcpy(j->tok, tok, sizeof j->tok);
     j->size = size;
     memcpy(j->sha, sha, 32);
-    j->path = w;
+    if (pl) { j->place = 1; j->pl = *pl; }
+    j->path = read_record(tok, &j->name);
+    if (!j->path) { lg("open: no usable record for %.8s…", tok); open_reply(j, AGOS_NORECORD, 0, 0); free(j); return; }
+    if (InterlockedIncrement(&open_busy) > OPEN_MAX) { InterlockedDecrement(&open_busy); open_reply(j, AGOS_FAILED, 0, ERROR_BUSY); free(j->name); free(j->path); free(j); return; }
     HANDLE th = CreateThread(NULL, 0, open_main, j, 0, NULL);
-    if (!th) { free(w); free(j); InterlockedDecrement(&open_busy); open_reply(tok, AGOS_FAILED, GetLastError()); return; }
+    if (!th) { InterlockedDecrement(&open_busy); open_reply(j, AGOS_FAILED, 0, GetLastError()); free(j->name); free(j->path); free(j); return; }
     CloseHandle(th);
+}
+
+/* ---- files dropped on an apps mode window (AGK_PLACE): gathered per batch, then handed to that window ---- */
+typedef struct { uint32_t batch, win; int32_t x, y; uint8_t count, got; DWORD at; OpenJob *f[AG_PLACE_MAX]; } Batch;
+static Batch batches[4];
+
+/* an Explorer window's folder (IShellWindows: the window whose HWND is root, its view's folder), or 0 */
+static int explorer_folder(HWND root, wchar_t out[MAX_PATH]) {
+    wchar_t cls[64];
+    if (!GetClassNameW(root, cls, 64) || wcscmp(cls, L"CabinetWClass")) return 0;
+    IShellWindows *sw = NULL;
+    int found = 0;
+    if (FAILED(CoCreateInstance(&CLSID_ShellWindows, NULL, CLSCTX_ALL, &IID_IShellWindows, (void **)&sw))) return 0;
+    long n = 0;
+    IShellWindows_get_Count(sw, &n);
+    for (long i = 0; i < n && !found; i++) {
+        VARIANT v;
+        VariantInit(&v);
+        V_VT(&v) = VT_I4;
+        V_I4(&v) = i;
+        IDispatch *d = NULL;
+        if (FAILED(IShellWindows_Item(sw, v, &d)) || !d) continue;
+        IWebBrowserApp *wb = NULL;
+        if (SUCCEEDED(IDispatch_QueryInterface(d, &IID_IWebBrowserApp, (void **)&wb))) {
+            SHANDLE_PTR hw = 0;
+            IServiceProvider *sp = NULL;
+            IShellBrowser *sb = NULL;
+            IShellView *sv = NULL;
+            IFolderView *fv = NULL;
+            IPersistFolder2 *pf = NULL;
+            if (SUCCEEDED(IWebBrowserApp_get_HWND(wb, &hw)) && (HWND)hw == root &&
+                SUCCEEDED(IWebBrowserApp_QueryInterface(wb, &IID_IServiceProvider, (void **)&sp)) &&
+                SUCCEEDED(IServiceProvider_QueryService(sp, &SID_STopLevelBrowser, &IID_IShellBrowser, (void **)&sb)) &&
+                SUCCEEDED(IShellBrowser_QueryActiveShellView(sb, &sv)) &&
+                SUCCEEDED(IShellView_QueryInterface(sv, &IID_IFolderView, (void **)&fv)) &&
+                SUCCEEDED(IFolderView_GetFolder(fv, &IID_IPersistFolder2, (void **)&pf))) {
+                PIDLIST_ABSOLUTE pidl = NULL;
+                if (SUCCEEDED(IPersistFolder2_GetCurFolder(pf, &pidl)) && pidl) { found = SHGetPathFromIDListW(pidl, out) && out[0]; CoTaskMemFree(pidl); }
+            }
+            if (pf) IPersistFolder2_Release(pf);
+            if (fv) IFolderView_Release(fv);
+            if (sv) IShellView_Release(sv);
+            if (sb) IShellBrowser_Release(sb);
+            if (sp) IServiceProvider_Release(sp);
+            IWebBrowserApp_Release(wb);
+        }
+        IDispatch_Release(d);
+    }
+    IShellWindows_Release(sw);
+    if (found) {
+        DWORD at = GetFileAttributesW(out);
+        found = at != INVALID_FILE_ATTRIBUTES && (at & FILE_ATTRIBUTE_DIRECTORY) && !(at & FILE_ATTRIBUTE_REPARSE_POINT);
+    }
+    return found;
+}
+
+/* the paths as a DROPFILES block (CF_HDROP, WM_DROPFILES), pt in the target's client coordinates */
+static HGLOBAL hdrop_of(OpenJob **f, int n, POINT pt) {
+    size_t chars = 1;
+    for (int i = 0; i < n; i++) chars += wcslen(f[i]->path) + 1;
+    HGLOBAL g = GlobalAlloc(GHND | GMEM_SHARE, sizeof(DROPFILES) + chars * sizeof(wchar_t));
+    DROPFILES *df = g ? GlobalLock(g) : NULL;
+    if (!df) { if (g) GlobalFree(g); return NULL; }
+    df->pFiles = sizeof(DROPFILES);
+    df->pt = pt;
+    df->fNC = FALSE;
+    df->fWide = TRUE;
+    wchar_t *w = (wchar_t *)((uint8_t *)df + sizeof(DROPFILES));
+    for (int i = 0; i < n; i++) { size_t l = wcslen(f[i]->path) + 1; memcpy(w, f[i]->path, l * sizeof(wchar_t)); w += l; }
+    *w = 0;
+    GlobalUnlock(g);
+    return g;
+}
+
+/* a free name for name in folder ("name (2).ext"…); 0 ok */
+static int free_name(const wchar_t *folder, const wchar_t *name, wchar_t out[MAX_PATH * 2]) {
+    const wchar_t *dot = wcsrchr(name, L'.');
+    size_t bl = dot && dot != name ? (size_t)(dot - name) : wcslen(name);
+    for (int i = 1; i < 1000; i++) {
+        if (i == 1) _snwprintf(out, MAX_PATH * 2, L"%ls\\%ls", folder, name);
+        else _snwprintf(out, MAX_PATH * 2, L"%ls\\%.*ls (%d)%ls", folder, (int)bl, name, i, dot && dot != name ? dot : L"");
+        out[MAX_PATH * 2 - 1] = 0;
+        if (GetFileAttributesW(out) == INVALID_FILE_ATTRIBUTES && GetLastError() == ERROR_FILE_NOT_FOUND) return 0;
+    }
+    return -1;
+}
+
+/* a whole batch (or what came of it): handed to the window it was dropped on, as the person. Only these files, which
+ * arrived through this drop and were checked: an Explorer folder window gets them moved into its folder, a window that
+ * takes dropped files gets WM_DROPFILES, any other the clipboard (CF_HDROP, "copy"), to paste */
+static void batch_deliver(Batch *b) {
+    OpenJob *ok[AG_PLACE_MAX];
+    int n = 0;
+    for (int i = 0; i < b->count; i++) if (b->f[i] && b->f[i]->status == AGOS_OK) ok[n++] = b->f[i];
+    HWND root = (HWND)(LONG_PTR)(LONG)b->win;
+    int known = 0;
+    for (int i = 0; i < listed_n; i++) known |= listed[i] == b->win;
+    uint8_t how = AGP_NONE;
+    DWORD err = 0;
+    if (n && known && IsWindow(root)) {
+        wchar_t folder[MAX_PATH];
+        POINT pt = { b->x, b->y };
+        HWND under = WindowFromPoint(pt);
+        if (!under || GetAncestor(under, GA_ROOT) != root) under = root;
+        if (explorer_folder(root, folder)) {
+            int moved = 0;
+            for (int i = 0; i < n; i++) {
+                /* the name it had on the host (its copy in Downloads may have got " (2)") */
+                const wchar_t *nm = wcsrchr(ok[i]->path, L'\\');
+                wchar_t to[MAX_PATH * 2];
+                if (!nm || free_name(folder, ok[i]->name ? ok[i]->name : nm + 1, to)) continue;
+                if (MoveFileExW(ok[i]->path, to, MOVEFILE_COPY_ALLOWED)) { free(ok[i]->path); ok[i]->path = _wcsdup(to); moved++; }
+                else err = GetLastError();
+            }
+            if (moved) { how = AGP_FOLDER; SHChangeNotify(SHCNE_UPDATEDIR, SHCNF_PATHW, folder, NULL); }
+        }
+        if (!how) {
+            HWND t = under;
+            while (t && !(GetWindowLongW(t, GWL_EXSTYLE) & WS_EX_ACCEPTFILES)) t = t == root ? NULL : GetParent(t);
+            if (t) {
+                POINT cp = pt;
+                ScreenToClient(t, &cp);
+                HGLOBAL g = hdrop_of(ok, n, cp);
+                if (g && PostMessageW(t, WM_DROPFILES, (WPARAM)g, 0)) how = AGP_DROPPED;
+                else if (g) { err = GetLastError(); GlobalFree(g); }
+            }
+        }
+        if (!how && open_clip()) {
+            POINT z = { 0, 0 };
+            HGLOBAL g = hdrop_of(ok, n, z), e = GlobalAlloc(GHND, sizeof(DWORD));
+            if (e) { DWORD *v = GlobalLock(e); *v = DROPEFFECT_COPY; GlobalUnlock(e); }
+            EmptyClipboard();
+            if (g && SetClipboardData(CF_HDROP, g)) { how = AGP_CLIPBOARD; g = NULL; }
+            if (e && SetClipboardData(RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT), e)) e = NULL;
+            CloseClipboard();
+            if (g) GlobalFree(g);
+            if (e) GlobalFree(e);
+        }
+    } else if (n) err = ERROR_INVALID_WINDOW_HANDLE;
+    lg("place: %d of %d files of batch %u to window %08x: %s", n, b->count, b->batch, b->win,
+       how == AGP_FOLDER ? "into its folder" : how == AGP_DROPPED ? "dropped" : how == AGP_CLIPBOARD ? "on the clipboard" : "not handed over");
+    for (int i = 0; i < b->count; i++) {
+        OpenJob *j = b->f[i];
+        if (!j) continue;
+        if (port != INVALID_HANDLE_VALUE && host_hello) {
+            if (j->status != AGOS_OK) open_reply(j, j->status, 0, j->code);
+            else if (how) open_reply(j, AGOS_OK, how, 0);
+            else open_reply(j, AGOS_FAILED, 0, err ? err : ERROR_GEN_FAILURE);
+        }
+        free(j->name);
+        free(j->path);
+        free(j);
+    }
+    memset(b, 0, sizeof *b);
+}
+
+/* a checked file of a batch: kept until the batch is all there */
+static void batch_add(OpenJob *j) {
+    Batch *b = NULL;
+    for (int i = 0; i < 4 && !b; i++) if (batches[i].batch == j->pl.batch && batches[i].win == j->pl.win) b = &batches[i];
+    for (int i = 0; i < 4 && !b; i++) if (!batches[i].batch) { b = &batches[i]; b->batch = j->pl.batch; b->win = j->pl.win; b->count = j->pl.count; b->at = GetTickCount(); }
+    if (!b || j->pl.count != b->count || b->f[j->pl.index]) { open_reply(j, AGOS_FAILED, 0, ERROR_BUSY); free(j->name); free(j->path); free(j); return; }
+    b->x = j->pl.x; b->y = j->pl.y;
+    b->f[j->pl.index] = j;
+    if (++b->got == b->count) batch_deliver(b);
+}
+/* a batch whose other files never came (the host refused or lost them): what is there goes after 10 minutes */
+static void batch_tick(void) {
+    for (int i = 0; i < 4; i++) if (batches[i].batch && GetTickCount() - batches[i].at > AG_OPEN_RECORD_MS) batch_deliver(&batches[i]);
 }
 
 static void open_done(OpenJob *j) {
     InterlockedDecrement(&open_busy);
+    if (j->place) { batch_add(j); return; }
     char *p8 = to_utf8(j->path, -1, NULL);
     if (j->status == AGOS_OK) lg("open: opened %s", p8 ? p8 : "?");
     else lg("open: %s not opened (%s, error %lu)", p8 ? p8 : "?", j->status == AGOS_CHANGED ? "not the file sent" : "the system couldn't open it", (unsigned long)j->code);
     free(p8);
-    if (port != INVALID_HANDLE_VALUE && host_hello) open_reply(j->tok, j->status, j->status == AGOS_OK ? 0 : j->code);
+    if (port != INVALID_HANDLE_VALUE && host_hello) open_reply(j, j->status, 0, j->status == AGOS_OK ? 0 : j->code);
+    free(j->name);
     free(j->path);
     free(j);
 }
@@ -1469,7 +1665,12 @@ static void on_frame(const Frame *f) {
         char tok[AG_OPEN_TOKEN + 1];
         uint64_t size;
         uint8_t sha[32];
-        if (host_hello && !ag_open_parse(f->data, f->len, tok, &size, sha)) open_begin(tok, size, sha);
+        if (host_hello && !ag_open_parse(f->data, f->len, tok, &size, sha)) open_begin(tok, size, sha, NULL);
+        break;
+    }
+    case AGK_PLACE: {
+        AgPlace pl;
+        if (host_hello && apps_on && !ag_place_parse(f->data, f->len, &pl)) open_begin(pl.token, pl.size, pl.sha, &pl);
         break;
     }
     default: break;                 /* kinds this side doesn't know: skipped */
@@ -1501,6 +1702,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         if (wp == T_PORT) {
             if (port != INVALID_HANDLE_VALUE && !console_session()) port_close("another session is at the console");
             port_try_open();
+            batch_tick();
         } else if (wp == T_CLIP) { KillTimer(h, T_CLIP); clip_send(); }
         else if (wp == T_DISP) disp_tick();
         else if (wp == T_APPS && apps_on && apps_dirty) { apps_dirty = 0; send_windows(0); }

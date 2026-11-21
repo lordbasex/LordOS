@@ -1585,6 +1585,38 @@ static void test_open_with(void) {
     ag_opened_write(r, tok, AGOS_CHANGED, 0); r[AG_OPEN_TOKEN] = AGOS_LAST + 1; CHECK(ag_opened_parse(r, sizeof r, NULL, NULL, NULL) == -1);
     ag_opened_write(r, tok, AGOS_CHANGED, 0); CHECK(ag_opened_parse(r, sizeof r - 1, NULL, NULL, NULL) == -1);
     r[0] = 'z'; CHECK(ag_opened_parse(r, sizeof r, NULL, NULL, NULL) == -1);
+    /* AGK_PLACE, AGK_PLACED: files dropped on an apps mode window */
+    AgPlace a, b2;
+    memset(&a, 0, sizeof a);
+    memcpy(a.token, tok, sizeof a.token);
+    a.size = 77; memcpy(a.sha, sha, 32); a.win = 0x30140; a.x = 1919; a.y = 0; a.batch = 9; a.index = 2; a.count = 3;
+    uint8_t pl[AG_PLACE_BYTES + 1];
+    CHECK(!ag_place_write(pl, &a) && !ag_place_parse(pl, AG_PLACE_BYTES, &b2) && b2.win == a.win && b2.x == 1919 && b2.y == 0 && b2.batch == 9 &&
+          b2.index == 2 && b2.count == 3 && b2.size == 77 && !strcmp(b2.token, tok) && !memcmp(b2.sha, sha, 32));
+    CHECK(ag_place_parse(pl, AG_PLACE_BYTES - 1, NULL) == -1 && ag_place_parse(pl, AG_PLACE_BYTES + 1, NULL) == -1);
+    AgPlace bad = a; bad.win = 0; CHECK(ag_place_write(pl, &bad) == -1);
+    bad = a; bad.x = -1; CHECK(ag_place_write(pl, &bad) == -1);
+    bad = a; bad.y = LAG_DIM_MAX + 1; CHECK(ag_place_write(pl, &bad) == -1);
+    bad = a; bad.index = 3; CHECK(ag_place_write(pl, &bad) == -1);
+    bad = a; bad.count = AG_PLACE_MAX + 1; bad.index = 0; CHECK(ag_place_write(pl, &bad) == -1);
+    bad = a; bad.batch = 0; CHECK(ag_place_write(pl, &bad) == -1);
+    ag_place_write(pl, &a); pl[AG_OPEN_BYTES + 4 + 3] = 0x80; CHECK(ag_place_parse(pl, AG_PLACE_BYTES, NULL) == -1);    /* x negative */
+    ag_place_write(pl, &a); pl[AG_OPEN_BYTES + 16] = 5; CHECK(ag_place_parse(pl, AG_PLACE_BYTES, NULL) == -1);           /* index ≥ count */
+    uint8_t pd[AG_PLACED_BYTES], how = 9;
+    CHECK(!ag_placed_write(pd, tok, AGOS_OK, AGP_CLIPBOARD, 0) && !ag_placed_parse(pd, sizeof pd, t, &st, &how, &code) && st == AGOS_OK && how == AGP_CLIPBOARD && !code);
+    CHECK(ag_placed_write(pd, tok, AGOS_OK, AGP_NONE, 0) == -1 && ag_placed_write(pd, tok, AGOS_CHANGED, AGP_FOLDER, 0) == -1);
+    CHECK(!ag_placed_write(pd, tok, AGOS_FAILED, AGP_NONE, 5) && !ag_placed_parse(pd, sizeof pd, NULL, &st, &how, &code) && st == AGOS_FAILED && code == 5);
+    pd[AG_OPEN_TOKEN + 1] = AGP_LAST + 1; CHECK(ag_placed_parse(pd, sizeof pd, NULL, NULL, NULL, NULL) == -1);
+    CHECK(ag_placed_parse(pd, sizeof pd - 1, NULL, NULL, NULL, NULL) == -1);
+    VmMsg pm = vm_msg(VM_FILE, 1, 2, 0x30140, 100 | 200 << 16, 9 << 16 | 1 << 8 | 3, "a.txt"); CHECK(vm_msg_valid(&pm, 1));
+    pm.b = 0; CHECK(!vm_msg_valid(&pm, 1));
+    pm.b = 5; pm.d = 9 << 16 | 3 << 8 | 3; CHECK(!vm_msg_valid(&pm, 1));          /* index ≥ count */
+    pm.d = 9 << 16 | 0 << 8 | 9; CHECK(!vm_msg_valid(&pm, 1));                   /* more than 8 */
+    pm.d = 0 << 16 | 0 << 8 | 1; CHECK(!vm_msg_valid(&pm, 1));                   /* no batch */
+    pm.d = 1 << 16 | 1; pm.c = 16385; CHECK(!vm_msg_valid(&pm, 1));               /* x too far */
+    pm.c = -1; CHECK(!vm_msg_valid(&pm, 1));
+    pm.c = 0; pm.a = 3; CHECK(!vm_msg_valid(&pm, 1));
+    CHECK(ag_hello_caps((const uint8_t *)"w4 open place", 13) == (AG_HELLO_OPEN | AG_HELLO_PLACE));
     /* the hello word */
     CHECK(ag_hello_caps((const uint8_t *)"w3 clipboard open windows", 25) == (AG_HELLO_CLIPBOARD | AG_HELLO_OPEN | AG_HELLO_WINDOWS));
     CHECK(!(ag_hello_caps((const uint8_t *)"w3 opens openx", 14) & AG_HELLO_OPEN));
@@ -1596,17 +1628,22 @@ static void test_open_with(void) {
     m = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_OPEN | VAC_FILES, 0, 0, "w3\twindows"); CHECK(vm_msg_valid(&m, 0));
     m.b = VAC_ALL + 1; CHECK(!vm_msg_valid(&m, 0));
     /* random bytes never crash the parsers, and what they take is exactly what they promise */
-    uint8_t b[96];
+    uint8_t b[128];
     uint32_t seed = 4242;
     for (int it = 0; it < 60000; it++) {
-        size_t len = (seed = seed * 1103515245 + 12345) % 90;
+        size_t len = (seed = seed * 1103515245 + 12345) % 120;
         for (size_t i = 0; i < len; i++) b[i] = (uint8_t)((seed = seed * 1103515245 + 12345) >> 16);
         /* often a valid token in front, so the rest of the parser is reached */
         if (it % 3 && len >= AG_OPEN_TOKEN) for (int i = 0; i < AG_OPEN_TOKEN; i++) b[i] = (uint8_t)"0123456789abcdef"[b[i] & 15];
         if (it % 5 == 0 && len == AG_OPEN_BYTES + 1) len--;
         if (it % 7 == 0 && len >= AG_OPENED_BYTES) { len = AG_OPENED_BYTES; b[AG_OPEN_TOKEN] &= 3; }
+        if (it % 11 == 0 && len >= AG_PLACED_BYTES) { len = AG_PLACED_BYTES; b[AG_OPEN_TOKEN] &= 3; b[AG_OPEN_TOKEN + 1] &= 3; }
+        if (it % 13 == 0 && len >= AG_PLACE_BYTES) { len = AG_PLACE_BYTES; b[AG_OPEN_BYTES + 7] = b[AG_OPEN_BYTES + 11] = 0; b[AG_OPEN_BYTES + 17] = (b[AG_OPEN_BYTES + 17] & 7) + 1; b[AG_OPEN_BYTES + 16] &= 7; }
         if (!ag_open_parse(b, len, t, &size, back)) CHECK(len == AG_OPEN_BYTES && ag_open_token_ok(t, strlen(t)) && strlen(t) == AG_OPEN_TOKEN);
         if (!ag_opened_parse(b, len, t, &st, &code)) CHECK(len == AG_OPENED_BYTES && st <= AGOS_LAST && (st != AGOS_OK || !code) && strlen(t) == AG_OPEN_TOKEN);
+        AgPlace r;
+        if (!ag_place_parse(b, len, &r)) CHECK(len == AG_PLACE_BYTES && r.win && r.x >= 0 && r.y >= 0 && r.x <= LAG_DIM_MAX && r.y <= LAG_DIM_MAX && r.batch && r.index < r.count && r.count <= AG_PLACE_MAX);
+        if (!ag_placed_parse(b, len, t, &st, &how, &code)) CHECK(len == AG_PLACED_BYTES && st <= AGOS_LAST && how <= AGP_LAST && (st == AGOS_OK ? how && !code : !how));
     }
 }
 

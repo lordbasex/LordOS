@@ -2286,6 +2286,14 @@ virtio-win 0.1.271, viogpudo 100.100.104.27100), driven by `lordvm-dev` (`agent 
 
 **Not yet.** Guest apps in the launcher before the machine runs (6.12); a window's own shape (a round or see-through window shows the guest's black around it); the guest's own second screen.
 
+### 7.2.1 Files dropped on an apps mode window
+
+**Built (in development, 2026-11-21).** Files dragged from Files onto one of a guest's windows go to that window, not only to the machine's Downloads: into the folder an Explorer window shows (moved there from Downloads under their own names, " (2)" when taken), dropped on a window that takes dropped files (`WS_EX_ACCEPTFILES`: `WM_DROPFILES` at the drop point; Notepad opens the file), or, for any other window, put on the guest's clipboard as files (`CF_HDROP`, "copy") with a notice: "The files are in ‹machine›: paste them with Ctrl+V". The copy is a normal drop (the transfer folder or the agent's way, size and SHA-256 checked, the window's own progress line), at most 8 files at once (`AG_PLACE_MAX`), folders left out.
+
+**The path.** `GuestWindow` takes the drop (Files now passes the drop point), maps it into the guest's screen (`cropPoint`) and calls `lord.vm.sendFile(session, path, { place: { win, x, y, batch, index, count } })` per file (`placeBatch`). lord-server checks the path as for Open with (home or mounts, resolved, no last link) and passes `VM_FILE` a = 2 with the window, point and batch. lord-vm refuses it unless the tools said `place` (`VAC_PLACE`, 16384) and the window is in the guest's last list; it copies the file with a token, and the person's copy step records the place and the drop's own name under it. Then `AGK_PLACE` (the token, size, SHA-256, window, point, batch, index, count: 90 bytes, `ag_place_parse`) goes to the tools, which check each file as for 7.3, wait for the whole batch (at most 10 minutes) and hand it only to that window, if it is still in their own list, as the person; each file's `AGK_PLACED` (status, how) answers its `VM_FILE`, and lord-vm logs it. Nothing names a host path or a guest path to the guest, and the tools hand on only files that arrived through that drop. **Linux guests:** not offered (see 7.3).
+
+**Checked** on the card's guest (`lordvm-dev place`): Explorer on Documents got the file under its own name; Notepad got `WM_DROPFILES` and opened it; Explorer on Home (not a folder on disk) put it on the clipboard. A move to x = 2500 and to x = −1500 stayed on the guest's 1400 × 1050 screen.
+
 ### 7.3 Open a file in a machine ("Open with", like VMware Fusion)
 
 **Built (in development, 2026-11-21).** In Files, a file's **Open with** lists, after the apps that open it, every machine
@@ -2304,7 +2312,7 @@ start an off machine asks first. Other files just list the machine under Open wi
 **Which machines.** The ones whose tools said `open` in their hello (`AG_HELLO_OPEN`; lord-vm sets `VAC_OPEN`, 8192, in
 `VM_AGENT_STATE`). The machine's window writes that into `app.json` (`opens: 'windows'`) when it sees it, so an off
 machine is listed too (`apps/machines/openwith.js`, tested by `server/tests/vm_openwith_test.mjs`). Today that is
-Windows guests with `lordos-guest-win` w3 or later: install or update the tools from the agent's popover. **Linux
+Windows guests with `lordos-guest-win` w3 or later (w4 also takes files on its windows, 7.2.1): install or update the tools from the agent's popover. **Linux
 guests are not listed:** `lordos-guest` is approved to start only the clipboard tools (`xclip`, `wl-clipboard`) and
 `systemctl --user show-environment`; opening a sent file there would mean `xdg-open` or `gio open` in the person's
 session, with its own rules for executables and launchers, and needs its own review first.

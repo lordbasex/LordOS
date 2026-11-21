@@ -458,6 +458,13 @@ eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, 
     const g = M.guestPlace(r, k, d, 1920, 1080).ask;
     if (!(g.x >= 0 && g.y >= 0 && g.x + g.w <= 1920 && g.y + g.h <= 1080)) { eq(`guest place inside its screen #${i}`, g, 'inside'); break; }
   }
+  // files dropped on an apps mode window (7.2.1)
+  const pb = M.placeBatch(['/h/a.txt', 'rel.txt', '/h/b.png'], 0x30140, [2500.4, -3], 7);
+  eq('a drop: absolute paths, one batch, the point inside the guest screen', pb, { items: [
+    { path: '/h/a.txt', place: { win: 0x30140, x: 2500, y: 0, batch: 7, index: 0, count: 2 } },
+    { path: '/h/b.png', place: { win: 0x30140, x: 2500, y: 0, batch: 7, index: 1, count: 2 } }], left: 1 });
+  const many = M.placeBatch(Array.from({ length: 11 }, (_, i) => `/f${i}`), 5, [1, 1]);
+  eq('at most PLACE_MAX at once', [many.items.length, many.left, many.items[7].place.count, many.items[0].place.batch >= 1], [M.PLACE_MAX, 3, M.PLACE_MAX, true]);
   eq('offsetRect without offset', M.offsetRect({ x: 1, y: 2, w: 3, h: 4 }, null), { x: 1, y: 2, w: 3, h: 4 });
   eq('minimized by our move: restored', [M.minimizedByUs(1000, 2000, false), M.minimizedByUs(1000, 5000, false), M.minimizedByUs(1000, 2000, true), M.minimizedByUs(0, 2000, false)], [true, false, false, false]);
 }
