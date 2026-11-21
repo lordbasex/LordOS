@@ -2154,7 +2154,11 @@ parsers (`vmagent.c`) and never runs anything the host names.
   program name, sent on change (`SetWinEventHook`, at most 30 a second) and on request; each window's icon once (32×32
   RGBA); focus, close, minimize, restore and move of a window it listed; the Start menu's own program list
   (`shell:AppsFolder`: desktop and Store apps), and starting one only by a token the helper itself listed. While apps
-  mode is on the taskbar is set to hide itself, and restored after.
+  mode is on the taskbar is set to hide itself, and restored after. A Store app's window belongs to
+  `ApplicationFrameHost.exe`, which draws the frame of every one of them: the helper reports it with the hosted app's
+  name and icon instead, from its AppUserModelID (the frame's `PKEY_AppUserModel_ID`, else `GetApplicationUserModelId`
+  of the process that owns the `CoreWindow` inside it) looked up in `shell:AppsFolder`, so Calculator and Settings are
+  each their own Dock entry with their real icon. A frame whose app isn't known yet waits up to 3 s before it's listed.
 - **Sessions.** One copy per session (a `Local\` mutex). The port opens once per machine: the copy in the session at
   the console holds it and lets it go when that session leaves the console (switch user, Remote Desktop) or logs off;
   the next one takes it within 2 s.

@@ -34,6 +34,8 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <shobjidl.h>
+#include <propsys.h>
+#include <appmodel.h>
 #include <wincodec.h>
 #include <wtsapi32.h>
 
@@ -691,6 +693,121 @@ static void app_name(DWORD pid, char *out, size_t cap) {
     CloseHandle(p);
 }
 
+/* ---- Store apps: ApplicationFrameHost.exe draws the frame of every Store app's window (Calculator, Settings…) and
+ * the app's own CoreWindow sits inside it, in the app's process. Such a window is reported with the app's name and
+ * icon (from its id, the AppUserModelID, looked up in shell:AppsFolder), so each app is its own Dock entry. ---- */
+static const PROPERTYKEY PK_AUMID = { { 0x9F4C2855, 0x9F79, 0x4B39, { 0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3 } }, 5 };
+enum { AUMID_MAX = 260 };
+
+typedef struct { DWORD host; DWORD pid; } CoreFind;
+static BOOL CALLBACK core_one(HWND h, LPARAM lp) {
+    CoreFind *c = (CoreFind *)lp;
+    wchar_t cls[64];
+    DWORD pid = 0;
+    if (!GetClassNameW(h, cls, 64) || wcscmp(cls, L"Windows.UI.Core.CoreWindow")) return TRUE;
+    GetWindowThreadProcessId(h, &pid);
+    if (!pid || pid == c->host) return TRUE;
+    c->pid = pid;
+    return FALSE;
+}
+
+/* the hosted app's id: the frame's own property (set while the app runs, kept while it's suspended), else the id of
+ * the process that owns the CoreWindow inside it. 0 found */
+static int hosted_aumid(HWND h, DWORD host, wchar_t out[AUMID_MAX]) {
+    out[0] = 0;
+    IPropertyStore *ps = NULL;
+    if (SUCCEEDED(SHGetPropertyStoreForWindow(h, &IID_IPropertyStore, (void **)&ps))) {
+        PROPVARIANT v;
+        PropVariantInit(&v);
+        if (SUCCEEDED(IPropertyStore_GetValue(ps, &PK_AUMID, &v)) && v.vt == VT_LPWSTR && v.pwszVal && wcslen(v.pwszVal) < AUMID_MAX)
+            wcscpy(out, v.pwszVal);
+        PropVariantClear(&v);
+        IPropertyStore_Release(ps);
+    }
+    if (out[0]) return 0;
+    CoreFind c = { host, 0 };
+    EnumChildWindows(h, core_one, (LPARAM)&c);
+    if (!c.pid) return -1;
+    HANDLE p = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, c.pid);
+    if (!p) return -1;
+    UINT32 n = AUMID_MAX;
+    LONG r = GetApplicationUserModelId(p, &n, out);
+    CloseHandle(p);
+    if (r != ERROR_SUCCESS) { out[0] = 0; return -1; }
+    return 0;
+}
+
+/* the app's name as the Start menu shows it, cached by id (the list is made again on every change) */
+typedef struct { wchar_t id[AUMID_MAX]; char name[LAG_APP_MAX + 1]; } AumidName;
+static AumidName aumid_names[16];
+static int aumid_next;
+static int aumid_name(const wchar_t *id, char *out, size_t cap) {
+    for (int i = 0; i < 16; i++) if (aumid_names[i].id[0] && !wcscmp(aumid_names[i].id, id)) { snprintf(out, cap, "%s", aumid_names[i].name); return 0; }
+    wchar_t path[AUMID_MAX + 20];
+    _snwprintf(path, AUMID_MAX + 20, L"shell:AppsFolder\\%ls", id);
+    path[AUMID_MAX + 19] = 0;
+    IShellItem *it = NULL;
+    wchar_t *dn = NULL;
+    char *u = NULL;
+    if (SUCCEEDED(SHCreateItemFromParsingName(path, NULL, &IID_IShellItem, (void **)&it)) && SUCCEEDED(IShellItem_GetDisplayName(it, SIGDN_NORMALDISPLAY, &dn)))
+        u = to_utf8(dn, -1, NULL);
+    if (dn) CoTaskMemFree(dn);
+    if (it) IShellItem_Release(it);
+    if (!u || !*u || strlen(u) > LAG_APP_MAX) { free(u); return -1; }
+    for (char *q = u; *q; q++) if (*q == '/' || *q == ':') *q = '_';
+    AumidName *e = &aumid_names[aumid_next];
+    aumid_next = (aumid_next + 1) % 16;
+    wcscpy(e->id, id);
+    snprintf(e->name, sizeof e->name, "%s", u);
+    snprintf(out, cap, "%s", u);
+    free(u);
+    return 0;
+}
+
+/* the app's icon from its id (the Start menu's own picture, with alpha), 0 drawn */
+static HBITMAP aumid_icon(const wchar_t *id, int size) {
+    wchar_t path[AUMID_MAX + 20];
+    _snwprintf(path, AUMID_MAX + 20, L"shell:AppsFolder\\%ls", id);
+    path[AUMID_MAX + 19] = 0;
+    IShellItemImageFactory *f = NULL;
+    HBITMAP bm = NULL;
+    SIZE sz = { size, size };
+    if (SUCCEEDED(SHCreateItemFromParsingName(path, NULL, &IID_IShellItemImageFactory, (void **)&f))) {
+        if (FAILED(IShellItemImageFactory_GetImage(f, sz, SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK, &bm))) bm = NULL;
+        IShellItemImageFactory_Release(f);
+    }
+    return bm;
+}
+
+/* windows of ApplicationFrameHost whose app isn't known yet (its frame shows before the app is in it): not listed for
+ * a few seconds, so the Dock never gets the host's name; then listed as they are */
+typedef struct { HWND h; DWORD since; } Pending;
+static Pending pending[16];
+static int pending_left;
+static int pending_young(HWND h) {
+    DWORD now = GetTickCount();
+    int free_i = -1;
+    for (int i = 0; i < 16; i++) {
+        if (pending[i].h == h) return now - pending[i].since < 3000;
+        if (!pending[i].h || !IsWindow(pending[i].h)) free_i = i;
+    }
+    if (free_i < 0) return 0;
+    pending[free_i].h = h;
+    pending[free_i].since = now;
+    return 1;
+}
+
+/* the name a window is listed with, and (for a Store app) its id; 1: wait, not listed yet */
+static int window_app(HWND h, DWORD pid, char *app, size_t cap, wchar_t aumid[AUMID_MAX]) {
+    aumid[0] = 0;
+    app_name(pid, app, cap);
+    if (_stricmp(app, "ApplicationFrameHost.exe")) return 0;
+    if (!hosted_aumid(h, pid, aumid) && !aumid_name(aumid, app, cap)) return 0;
+    aumid[0] = 0;
+    if (pending_young(h)) { pending_left = 1; return 1; }
+    return 0;
+}
+
 /* the window's rectangle as seen (without the invisible resize borders), or the restored one for a minimized window */
 static int win_rect(HWND h, RECT *r) {
     if (IsIconic(h)) {
@@ -726,7 +843,8 @@ static BOOL CALLBACK list_one(HWND h, LPARAM lp) {
     int tl = InternalGetWindowText(h, t, 300);
     char *title = tl > 0 ? to_utf8(t, tl, NULL) : NULL;
     char app[300];
-    app_name(pid, app, sizeof app);
+    wchar_t aumid[AUMID_MAX];
+    if (window_app(h, pid, app, sizeof app, aumid)) { free(title); return TRUE; }
     b32(c->b, id); b32(c->b, (uint32_t)k.left); b32(c->b, (uint32_t)k.top); b32(c->b, (uint32_t)w); b32(c->b, (uint32_t)hh); b32(c->b, fl);
     if (fl & LAGW_OWNED) b32(c->b, oid);
     b32(c->b, pid);
@@ -737,14 +855,40 @@ static BOOL CALLBACK list_one(HWND h, LPARAM lp) {
     return TRUE;
 }
 
-static void send_icon(HWND h, uint32_t id) {
+/* an icon, or a picture with alpha (premultiplied, as the shell gives it), drawn into dc at S×S */
+static void draw_icon(HDC dc, HICON ic, HBITMAP bm, int S) {
+    if (ic) { DrawIconEx(dc, 0, 0, ic, S, S, 0, NULL, DI_NORMAL); return; }
+    BITMAP o;
+    HDC src = CreateCompatibleDC(dc);
+    if (!src || !GetObjectW(bm, sizeof o, &o)) { if (src) DeleteDC(src); return; }
+    HGDIOBJ old = SelectObject(src, bm);
+    BLENDFUNCTION bf = { AC_SRC_OVER, 0, 255, AC_SRC_ALPHA };
+    SetStretchBltMode(dc, HALFTONE);
+    GdiAlphaBlend(dc, 0, 0, S, S, src, 0, 0, o.bmWidth, o.bmHeight < 0 ? -o.bmHeight : o.bmHeight, bf);
+    SelectObject(src, old);
+    DeleteDC(src);
+}
+
+/* the window's icon as a LAG_WINICON; 1: not known yet (a Store app's frame without its app), asked again later */
+static int send_icon(HWND h, uint32_t id) {
     HICON ic = NULL;
+    HBITMAP bm = NULL;
     DWORD_PTR r = 0;
-    if (SendMessageTimeoutW(h, WM_GETICON, ICON_BIG, 0, SMTO_ABORTIFHUNG | SMTO_BLOCK, 50, &r) && r) ic = (HICON)r;
-    if (!ic && SendMessageTimeoutW(h, WM_GETICON, ICON_SMALL2, 0, SMTO_ABORTIFHUNG | SMTO_BLOCK, 50, &r) && r) ic = (HICON)r;
-    if (!ic) ic = (HICON)GetClassLongPtrW(h, GCLP_HICON);
-    if (!ic) ic = (HICON)GetClassLongPtrW(h, GCLP_HICONSM);
-    if (!ic) return;
+    DWORD pid = 0;
+    char app[300];
+    wchar_t aumid[AUMID_MAX];
+    GetWindowThreadProcessId(h, &pid);
+    app_name(pid, app, sizeof app);
+    if (!_stricmp(app, "ApplicationFrameHost.exe")) {
+        /* a Store app: the frame's own icon is the host's; the app's comes from its id */
+        if (hosted_aumid(h, pid, aumid) || !(bm = aumid_icon(aumid, 32))) return pending_young(h);
+    } else {
+        if (SendMessageTimeoutW(h, WM_GETICON, ICON_BIG, 0, SMTO_ABORTIFHUNG | SMTO_BLOCK, 50, &r) && r) ic = (HICON)r;
+        if (!ic && SendMessageTimeoutW(h, WM_GETICON, ICON_SMALL2, 0, SMTO_ABORTIFHUNG | SMTO_BLOCK, 50, &r) && r) ic = (HICON)r;
+        if (!ic) ic = (HICON)GetClassLongPtrW(h, GCLP_HICON);
+        if (!ic) ic = (HICON)GetClassLongPtrW(h, GCLP_HICONSM);
+        if (!ic) return 0;
+    }
     /* drawn on black and on white: alpha from the difference, so icons with only a mask come out right too */
     enum { S = 32 };
     BITMAPINFO bi;
@@ -758,9 +902,9 @@ static void send_icon(HWND h, uint32_t id) {
         memset(pb, 0, S * S * 4);
         memset(pw, 0xff, S * S * 4);
         HGDIOBJ old = SelectObject(dc, bb);
-        DrawIconEx(dc, 0, 0, ic, S, S, 0, NULL, DI_NORMAL);
+        draw_icon(dc, ic, bm, S);
         SelectObject(dc, bw);
-        DrawIconEx(dc, 0, 0, ic, S, S, 0, NULL, DI_NORMAL);
+        draw_icon(dc, ic, bm, S);
         SelectObject(dc, old);
         GdiFlush();
         Buf b = { 0 };
@@ -778,6 +922,26 @@ static void send_icon(HWND h, uint32_t id) {
     if (bb) DeleteObject(bb);
     if (bw) DeleteObject(bw);
     if (dc) DeleteDC(dc);
+    if (bm) DeleteObject(bm);
+    return 0;
+}
+
+/* icons: once per listed window (a Store app's frame again until its app is known); the ones gone are forgotten */
+static int icons_left;
+static void send_icons(void) {
+    uint32_t keep[256];
+    int kn = 0;
+    for (int i = 0; i < iconed_n; i++) for (int j = 0; j < listed_n; j++) if (iconed[i] == listed[j]) { keep[kn++] = iconed[i]; break; }
+    memcpy(iconed, keep, sizeof keep);
+    iconed_n = kn;
+    icons_left = 0;
+    for (int j = 0; j < listed_n; j++) {
+        int seen = 0;
+        for (int i = 0; i < iconed_n; i++) if (iconed[i] == listed[j]) seen = 1;
+        if (seen || iconed_n >= 256) continue;
+        if (send_icon((HWND)(LONG_PTR)(LONG)listed[j], listed[j])) icons_left = 1;
+        else iconed[iconed_n++] = listed[j];
+    }
 }
 
 static void send_windows(int force) {
@@ -788,9 +952,15 @@ static void send_windows(int force) {
     c.fg = GetForegroundWindow();
     c.desk.left = GetSystemMetrics(SM_XVIRTUALSCREEN); c.desk.top = GetSystemMetrics(SM_YVIRTUALSCREEN);
     c.desk.right = c.desk.left + GetSystemMetrics(SM_CXVIRTUALSCREEN); c.desk.bottom = c.desk.top + GetSystemMetrics(SM_CYVIRTUALSCREEN);
+    pending_left = 0;
     EnumWindows(list_one, (LPARAM)&c);
+    if (pending_left) apps_dirty = 1;           /* a Store app's frame waits for its app: looked at again */
     if (b.oom) { free(b.p); return; }
-    if (!force && b.n == last_list.n && (!b.n || !memcmp(b.p, last_list.p, b.n))) { free(b.p); return; }
+    if (!force && b.n == last_list.n && (!b.n || !memcmp(b.p, last_list.p, b.n))) {
+        free(b.p);
+        if (icons_left) { send_icons(); if (icons_left) apps_dirty = 1; }
+        return;
+    }
     free(last_list.p);
     last_list = b;
     Buf f = { 0 };
@@ -801,19 +971,8 @@ static void send_windows(int force) {
     free(f.p);
     memcpy(listed, c.ids, sizeof listed);
     listed_n = c.n;
-    /* icons: once per window; the ones gone are forgotten */
-    uint32_t keep[256];
-    int kn = 0;
-    for (int i = 0; i < iconed_n; i++) for (int j = 0; j < c.n; j++) if (iconed[i] == c.ids[j]) { keep[kn++] = iconed[i]; break; }
-    memcpy(iconed, keep, sizeof keep);
-    iconed_n = kn;
-    for (int j = 0; j < c.n; j++) {
-        int seen = 0;
-        for (int i = 0; i < iconed_n; i++) if (iconed[i] == c.ids[j]) seen = 1;
-        if (seen || iconed_n >= 256) continue;
-        iconed[iconed_n++] = c.ids[j];
-        send_icon((HWND)(LONG_PTR)(LONG)c.ids[j], c.ids[j]);
-    }
+    send_icons();
+    if (icons_left) apps_dirty = 1;
 }
 
 static void CALLBACK on_win_event(HWINEVENTHOOK hk, DWORD ev, HWND h, LONG obj, LONG child, DWORD th, DWORD t) {

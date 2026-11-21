@@ -185,6 +185,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Apps mode: each Windows Store app is its own Dock entry, with its icon** (`tools/guest-win/lordos-guest-win.c`): every
+  Store app's window (Calculator, Settings…) belongs to `ApplicationFrameHost.exe`, so they all shared one Dock entry
+  "ApplicationFrameHost.exe (machine)" with a letter for an icon. The guest tools now resolve the app inside the frame
+  (its AppUserModelID, from the frame's property store or the hosted `CoreWindow`'s process) and report the Start menu's
+  name and picture for it. Checked on a Windows 11 guest: Calculator and Settings came as "Calculadora" and
+  "Configuración", each with its own 32 × 32 icon (`lordvm-dev` now saves each icon the guest sends as `icon-<id>.png`).
 - **The remote desktop no longer crashes lord-server when a viewer connects after the last one left**
   (`server/src/remote/mirror.c`, `server/src/media/mstream.c`): the mirror freed its copy of the screen while the video
   encoder still held it, and the next viewer's encoder copied from the freed memory. A 1920 × 1080 headless session

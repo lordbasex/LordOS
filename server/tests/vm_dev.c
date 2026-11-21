@@ -29,7 +29,8 @@
  *                       lord-server's capture stream would), or none
  *   agent install       copies lordos-guest into the guest (VAG_INSTALL, as Install Helper does)
  *   apps on|off         apps mode (VM_APPS): the guest's helper hides its desktop and lists its windows
- *   windows             the guest's last window list (VM_WINDATA); apps-list: its apps
+ *   windows             the guest's last window list (VM_WINDATA); apps-list: its apps; each icon the guest sends is
+ *                       saved as icon-<id>.png in the current folder
  *   winact ID ACTION [X Y W H]   focus | close | minimize | restore | move (VM_WINACT)
  *   launch TOKEN|NAME   one of the guest's apps, by its place in the list (VM_LAUNCH; lord-vm refuses another)
  *   quit
@@ -288,7 +289,14 @@ static void windata(const VmMsg *m, int fd) {
     if (m->b == LAG_WINDOWS) { if (lag_winlist_read(b, (size_t)m->a, &dev_wins)) out("{\"ev\":\"error\",\"what\":\"window list refused\"}"); else print_windows(); }
     else if (m->b == LAG_WINICON) {
         uint32_t id; uint16_t w, h; const uint8_t *px;
-        if (!lag_winicon_parse(b, (size_t)m->a, &id, &w, &h, &px)) { dev_icons++; out("{\"ev\":\"icon\",\"id\":%u,\"w\":%d,\"h\":%d}", id, w, h); }
+        if (!lag_winicon_parse(b, (size_t)m->a, &id, &w, &h, &px)) {
+            /* saved as icon-<id>.png in the current folder, to look at */
+            char f[40];
+            snprintf(f, sizeof f, "icon-%u.png", id);
+            stbi_write_png(f, w, h, 4, px, w * 4);
+            dev_icons++;
+            out("{\"ev\":\"icon\",\"id\":%u,\"w\":%d,\"h\":%d,\"png\":\"%s\"}", id, w, h, f);
+        }
     } else if (m->b == LAG_APPLIST) {
         dev_apps_gen = m->c;
         if (lag_applist_read(b, (size_t)m->a, &dev_apps)) { out("{\"ev\":\"error\",\"what\":\"app list refused\"}"); return; }
