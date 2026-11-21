@@ -338,8 +338,9 @@ export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math
 
 // lord-vm's capability bits (vmproto.h VAC_*) → the popover's list: what works now, and what doesn't and why
 // transfer: the guest has the transfer folder (6.7.1) mounted; transferSetup: a Windows guest that gets it once WinFsp is
-// installed (Set Up the Transfer Folder)
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024 };
+// installed (Set Up the Transfer Folder); clipNoTool: the Linux guest's helper runs but the guest has no clipboard tool
+// (xclip or wl-clipboard: lordos-guest's hello said "noclip")
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -354,11 +355,22 @@ export function agentLines(agent, cfg) {
     ['shutdown', on && caps & AGENT_CAPS.shutdown ? 'works' : 'acpi'],
     ['time', on && caps & AGENT_CAPS.time ? 'works' : 'needsAgent'],
     win ? null : ['awake', on && caps & AGENT_CAPS.awake ? 'works' : 'needsAgent'],
-    ['clipboard', clip === 'off' ? 'off' : caps & AGENT_CAPS.clipboard ? 'works' : win ? 'needsTools' : 'needsHelper'],
+    ['clipboard', clipState(agent, cfg)],
     ['resolution', !win || caps & AGENT_CAPS.display ? 'works' : 'needsTools'],
     ['folders', cfg?.shares?.length || (cfg?.transfer && caps & AGENT_CAPS.transfer) ? 'works' : 'none'], ['apps', appsBlocker(agent, cfg) || 'works'],
   ].filter(Boolean);
 }
+// the clipboard's line: 'off' (Configure), 'works', 'needsXclip' (the helper runs but the guest has no clipboard tool),
+// 'needsTools' (a Windows guest without the LordOS tools), 'needsHelper' (a Linux guest without lordos-guest)
+export function clipState(agent, cfg) {
+  const caps = agent?.caps || 0;
+  if ((cfg?.clipboard || 'off') === 'off') return 'off';
+  if (caps & AGENT_CAPS.clipboard) return 'works';
+  if (caps & AGENT_CAPS.clipNoTool) return 'needsXclip';
+  return guestWindows(agent) ? 'needsTools' : 'needsHelper';
+}
+// the agent's popover says what to install in the guest: connected, the clipboard on, the helper there without a tool
+export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
 export const agentTone = (a, configured) => (!configured ? 'off' : a?.state === 'connected' ? 'run' : 'pause');
 

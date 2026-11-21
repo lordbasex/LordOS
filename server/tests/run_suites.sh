@@ -248,6 +248,13 @@ EOF
         77) skip "guestwin" "build/lord-server, build/lordos-guest and the default theme (make, npm run build)" ;;
         *) bad "guestwin (tests/guestwin_client.c, headless lord-server and lordos-guest, apps mode)" ;;
     esac
+    # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
+    sh tests/guest_clip_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-clip (tests/guest_clip_test.sh, lordos-guest's clipboard tools)" ;;
+        77) skip "guest-clip" "build/lordos-guest and python3" ;;
+        *) bad "guest-clip (tests/guest_clip_test.sh, lordos-guest's clipboard tools)" ;;
+    esac
     # a getter that destroys the node lord.setProp / lord.setStyle are writing (Claude Security, 0.8.9)
     sh tests/js_getter_destroy.sh >"$T/out" 2>&1
     case $? in

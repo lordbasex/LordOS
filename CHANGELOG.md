@@ -206,6 +206,37 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: copy and paste with a Linux guest that has no clipboard tool** (`tools/guest/lordos-guest.c`,
+  `server/src/vm/lordvm.c`, `vmagent.c`, `vmproto.h`, `server/src/ui/js_vm.c`, `apps/machines/model.js`, `vmwindow.jsx`).
+  The clipboard helper reads and writes the guest's clipboard only through `xclip` or `wl-paste`/`wl-copy`, and a stock
+  desktop install ships neither: every run failed in silence, nothing went either way, and the agent's popover still
+  said the clipboard worked (the helper's hello always said "clipboard"). Now:
+  - the helper (version 4) looks for the tools in PATH at the start, every 30 seconds and whenever one couldn't be
+    started, so installing `xclip` later starts working without a restart. It tells the guest's journal once which tool
+    it uses, or "no clipboard tool: install xclip or wl-clipboard". Without one its hello says `noclip` instead of
+    `clipboard clipx`, and again with `clipboard` once a tool appears;
+  - on GNOME with `DISPLAY` set it uses only `xclip`, through Xwayland, whose clipboard Mutter bridges: Mutter has no
+    data-control protocol, so `wl-paste` in the background needs a focus-stealing popup there. Elsewhere it keeps
+    `wl-clipboard` under Wayland first, then `xclip`. When the service starts before the session exported its display,
+    the helper reads `WAYLAND_DISPLAY`, `DISPLAY`, `XAUTHORITY` and `XDG_CURRENT_DESKTOP` from the user's systemd
+    manager (10 tries at most);
+  - lord-vm sets the clipboard capability only when the hello says `clipboard`, and a new `VAC_CLIP_NOTOOL` (2048) when it
+    says `noclip`; the log says when the guest gains or loses its tool. The popover's clipboard line says "Needs xclip"
+    with a hint (install the helper again, which installs it, or `sudo apt install xclip` in the machine), and the bar's
+    clipboard menu says it too, in every language;
+  - Install Clipboard Helper's fixed script also installs `xclip` and `wl-clipboard` through the guest's own package
+    manager (apt-get, dnf, zypper or pacman) when `xclip` is missing. It is best effort: offline or with the package
+    manager locked the helper is still installed and the popover says what is missing. It then restarts the helper in
+    each signed-in desktop session (`systemctl --user -M <user>@`, uids from 1000 with `graphical-session.target`
+    active), so the new version runs at once instead of from the next sign-in;
+  - the button could start the script many times (6 runs in 20 seconds in one guest's journal): lord-vm answered as
+    soon as the script started. It now follows the script with `guest-exec-status` and answers when it ends (10 minutes
+    at most; a failure carries the script's error output), answers `busy` to a second install meanwhile, and gives up
+    with an error when qemu-guest-agent stops answering. lord-server treats a click while an install is on its way as
+    the same request, so the button stays disabled until the end.
+  New test: `server/tests/guest_clip_test.sh` (in `make test`) runs the helper once with stub tools and a socket as its
+  port: no tool gives a `noclip` hello and the journal line; `xclip` alone, `wl-clipboard` alone, GNOME choosing `xclip`
+  over `wl-paste`, and another Wayland desktop choosing `wl-clipboard` first. Not yet tried on a real GNOME guest.
 - **Machines: a copy into a machine always shows its percentage** (`apps/machines/model.js`, `vmwindow.jsx`): a long file
   name (an installer image, for one) pushed the percentage past the line's edge, so the copy looked stuck. The name is
   now shortened in the middle, keeping its end, the line wraps instead of being cut, and a progress bar sits under it.

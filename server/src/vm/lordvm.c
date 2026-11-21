@@ -907,6 +907,9 @@ static struct {
     long helper_handle;
     int install_client;
     uint32_t install_seq;
+    int inst_busy;                          /* VAG_INSTALL on its way, from the request to its answer */
+    long inst_pid;                          /* the install's script in the guest (guest-exec), followed until it ends */
+    long long inst_poll_at, inst_deadline;
     /* a snapshot job (VM_SNAPSHOT): which, its tag and name, who asked; --loadvm TAG at start */
     int snap_kind, snap_client;
     uint32_t snap_seq;
@@ -2717,10 +2720,10 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 /* what org.lordos.agent's helper brings (kept when qemu-guest-agent comes and goes) */
-#define VAC_LAG (VAC_CLIPBOARD | VAC_DISPLAY | (int)LAG_CAP_WINDOWS)
+#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_DISPLAY | (int)LAG_CAP_WINDOWS)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
-       AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS };
+       AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS };
 
 /* A Clone's first start (6.3): one fixed script, run as root by qemu-guest-agent, with the new hostname as its only
  * argument (checked: one DNS label). The machine-id is made again by systemd from the clone's new SMBIOS UUID (the old
@@ -2891,10 +2894,12 @@ static int qga_do(const char *cmd, const char *args, int kind) {
 
 static void fx_fail_all(const char *why);
 static void wi_lost(const char *why);
+static void inst_reply(int code, const char *text);
 static void qga_sync(void) {
     char a[64];
     fx_fail_all("the guest agent started again");
     wi_lost("the guest agent started again");
+    if (S.inst_busy) inst_reply(VME_WRONG_STATE, "the guest agent started again");
     S.agq_n = 0;                        /* nothing sent before is waited for any more */
     S.xfer_pid = 0; S.xfer_poll_at = 0;
     snprintf(a, sizeof a, "{\"id\":%ld}", ++S.sync_id);
@@ -2911,12 +2916,20 @@ static void ag_timesync(void) {
     qga_do("guest-set-time", a, AQ_IGNORE);
 }
 
+/* VAG_INSTALL's answer: once, and the install is no longer busy */
+static void inst_reply(int code, const char *text) {
+    if (S.inst_busy) reply(S.install_client, S.install_seq, code, text);
+    S.inst_busy = 0; S.helper_handle = 0; S.inst_pid = 0; S.inst_poll_at = 0;
+}
+
 static void ag_lost(const char *why) {
     fx_fail_all("qemu-guest-agent stopped answering in the guest");
     wi_lost("qemu-guest-agent stopped answering in the guest");
     if (S.qga_up) vlog("agent: %s", why);
     S.qga_up = 0; S.agq_n = 0; S.jpid = 0; S.inhibit_done = 0;
     S.xfer_pid = 0; S.xfer_poll_at = 0; S.xfer_guest = XG_UNKNOWN;
+    /* an install of lordos-guest on its way: its next step's answer won't come */
+    if (S.inst_busy) inst_reply(VME_WRONG_STATE, "qemu-guest-agent stopped answering in the guest");
     if (S.id_state == 2) { S.id_state = 1; S.id_poll_at = 0; }      /* tried again when the agent is back */
     S.ag_caps &= VAC_LAG;
     ag_set(VAS_WAITING);
@@ -3092,49 +3105,95 @@ static void on_qga_reply(const JVal *root, int ok) {
         break;
     }
     case AQ_FOPEN:
-        if (!ok) { reply(S.install_client, S.install_seq, VME_QMP, qmp_error_desc(root)); S.helper_handle = 0; break; }
+        if (!ok) { inst_reply(VME_QMP, qmp_error_desc(root)); break; }
         S.helper_handle = (long)(r && r->type == J_NUM ? r->num : 0);
         S.helper_off = 0;
         ag_install_step();
         break;
-    case AQ_FWRITE: if (!ok) { reply(S.install_client, S.install_seq, VME_QMP, qmp_error_desc(root)); S.helper_handle = 0; } else ag_install_step(); break;
-    case AQ_FCLOSE: if (ok) ag_install_step(); else { reply(S.install_client, S.install_seq, VME_QMP, qmp_error_desc(root)); S.helper_handle = 0; } break;
-    case AQ_INSTALL: reply(S.install_client, S.install_seq, ok ? VME_OK : VME_QMP, ok ? "installed" : qmp_error_desc(root)); S.helper_handle = 0; vlog("agent: lordos-guest %s", ok ? "installed" : "couldn't be installed"); break;
+    case AQ_FWRITE: if (!ok) { inst_reply(VME_QMP, qmp_error_desc(root)); } else ag_install_step(); break;
+    case AQ_FCLOSE: if (ok) ag_install_step(); else inst_reply(VME_QMP, qmp_error_desc(root)); break;
+    case AQ_INSTALL:
+        /* the script runs (it can take minutes: it installs the clipboard tool through the guest's package manager):
+         * the install stays busy, and the answer waits, until it ends */
+        if (!ok) { inst_reply(VME_QMP, qmp_error_desc(root)); vlog("agent: lordos-guest couldn't be installed"); break; }
+        S.inst_pid = (long)json_num(r, "pid", 0);
+        S.inst_poll_at = now_ms() + 500;
+        S.inst_deadline = now_ms() + 10 * 60 * 1000;
+        break;
+    case AQ_INSTSTATUS: {
+        int exited = ok && json_bool(r, "exited", 0);
+        if (ok && !exited && now_ms() < S.inst_deadline) { S.inst_poll_at = now_ms() + 500; break; }
+        int code = exited ? (int)json_num(r, "exitcode", -1) : -1;
+        if (ok && !exited) {
+            /* lordos-guest is in place (the script's first lines); the package manager still works in the guest */
+            vlog("agent: lordos-guest installed; the clipboard tool's install still runs in the guest after 10 minutes");
+            inst_reply(VME_OK, "installed");
+        } else if (code == 0) {
+            vlog("agent: lordos-guest installed");
+            inst_reply(VME_OK, "installed");
+        } else {
+            char said[200] = "", t[260];
+            const char *b = ok ? json_str(r, "err-data") : NULL;
+            if (b) ag_exec_text(b, said, sizeof said);
+            vlog("agent: lordos-guest couldn't be installed: the script failed (%d): %s", code, said);
+            snprintf(t, sizeof t, "the install script failed (%d)%s%s", code, said[0] ? ": " : "", said);
+            inst_reply(VME_QMP, ok ? t : qmp_error_desc(root));
+        }
+        break;
+    }
     default: break;
     }
 }
 
-/* the steps of VAG_INSTALL: lordos-guest written in 32 KB pieces through guest-file-write, then one fixed script */
+/* the steps of VAG_INSTALL: lordos-guest written in 32 KB pieces through guest-file-write, then one fixed script (no
+ * argument, nothing the host or the person names): the helper, its udev rule and user service; then, best effort and
+ * never failing the install (offline, a locked or unknown package manager), the clipboard tool through the guest's own
+ * package manager when xclip isn't there (xclip and wl-clipboard: apt-get, dnf, zypper or pacman); then the helper
+ * started again in each signed-in desktop session (uid ≥ 1000 with graphical-session.target active), so the new one
+ * runs now instead of at the next sign-in. lordos-guest looks for the tool every 30 s too */
 static const char INSTALL_SH[] =
     "set -e; mv -f /usr/local/bin/.lordos-guest.new /usr/local/bin/lordos-guest; chmod 755 /usr/local/bin/lordos-guest; "
     "printf '%s\\n' 'SUBSYSTEM==\"virtio-ports\", ATTR{name}==\"org.lordos.agent\", TAG+=\"uaccess\"' > /etc/udev/rules.d/71-lordos-guest.rules; "
     "mkdir -p /etc/systemd/user; printf '%s\\n' '[Unit]' 'Description=LordOS Machines clipboard' 'After=graphical-session.target' "
     "'[Service]' 'ExecStart=/usr/local/bin/lordos-guest' 'Restart=on-failure' 'RestartSec=3' '[Install]' 'WantedBy=graphical-session.target' "
     "> /etc/systemd/user/lordos-guest.service; udevadm control --reload || true; udevadm trigger --subsystem-match=virtio-ports || true; "
-    "systemctl --global enable lordos-guest.service || true";
+    "systemctl --global enable lordos-guest.service || true; "
+    "command -v xclip >/dev/null 2>&1 || { "
+      "if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; "
+        "apt-get install -y -q -o DPkg::Lock::Timeout=120 --no-install-recommends xclip wl-clipboard || "
+        "{ apt-get update -q -o DPkg::Lock::Timeout=120 && apt-get install -y -q -o DPkg::Lock::Timeout=120 --no-install-recommends xclip wl-clipboard; }; "
+      "elif command -v dnf >/dev/null 2>&1; then dnf install -y -q xclip wl-clipboard; "
+      "elif command -v zypper >/dev/null 2>&1; then zypper --non-interactive --quiet install xclip wl-clipboard; "
+      "elif command -v pacman >/dev/null 2>&1; then pacman -S --noconfirm --needed xclip wl-clipboard; fi; "
+    "} </dev/null >/dev/null 2>&1 || true; "
+    "for d in /run/user/[0-9]*; do u=${d##*/}; [ \"$u\" -ge 1000 ] 2>/dev/null || continue; n=$(id -nu \"$u\" 2>/dev/null) || continue; "
+      "systemctl --user -M \"$n@\" daemon-reload >/dev/null 2>&1 || continue; "
+      "if systemctl --user -M \"$n@\" -q is-active graphical-session.target 2>/dev/null; then "
+        "systemctl --user -M \"$n@\" restart lordos-guest.service >/dev/null 2>&1 || true; fi; "
+    "done; true";
 static void ag_install_step(void) {
     if (S.helper_off < S.helper_n) {
         size_t n = S.helper_n - S.helper_off < 32768 ? S.helper_n - S.helper_off : 32768;
         static char b64[32768 / 3 * 4 + 64], args[32768 / 3 * 4 + 128];
-        if (ag_b64_encode(S.helper + S.helper_off, n, b64, sizeof b64) < 0) return;
+        if (ag_b64_encode(S.helper + S.helper_off, n, b64, sizeof b64) < 0) { inst_reply(VME_INTERNAL, "the helper couldn't be encoded"); return; }
         snprintf(args, sizeof args, "{\"handle\":%ld,\"buf-b64\":\"%s\"}", S.helper_handle, b64);
         S.helper_off += n;
-        qga_do("guest-file-write", args, AQ_FWRITE);
+        if (qga_do("guest-file-write", args, AQ_FWRITE)) inst_reply(VME_BUSY, "busy");
         return;
     }
     if (S.helper_handle) {
         char a[64];
         snprintf(a, sizeof a, "{\"handle\":%ld}", S.helper_handle);
         S.helper_handle = 0;
-        qga_do("guest-file-close", a, AQ_FCLOSE);
+        if (qga_do("guest-file-close", a, AQ_FCLOSE)) inst_reply(VME_BUSY, "busy");
         return;
     }
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "{\"path\":\"/bin/sh\",\"arg\":[\"-c\",");
     jb_str(&b, INSTALL_SH);
-    jb_raw(&b, "]}");
-    if (!b.oom) qga_do("guest-exec", b.p, AQ_INSTALL);
+    jb_raw(&b, "],\"capture-output\":true}");
+    if (b.oom || qga_do("guest-exec", b.p, AQ_INSTALL)) inst_reply(VME_BUSY, "busy");
     jb_free(&b);
 }
 
@@ -4111,11 +4170,19 @@ static void drain_lag(void) {
                 S.lag_clipx = strstr(t + 13, " clipx") != NULL;
                 S.lag_display = strstr(t + 13, " display") != NULL;
                 S.lag_windows = strstr(t + 13, " windows") != NULL;
-                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s%s%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "",
-                                       S.lag_display ? " (sets the display's size)" : "", S.lag_windows ? " (apps mode)" : "");
+                /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
+                 * again with "clipboard" once one is installed */
+                unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
+                int clip = (hc & AG_HELLO_CLIPBOARD) != 0, notool = !clip && (hc & AG_HELLO_NOCLIP);
+                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s%s%s%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "",
+                                       S.lag_display ? " (sets the display's size)" : "", S.lag_windows ? " (apps mode)" : "",
+                                       notool ? " (no clipboard tool in the guest: xclip or wl-clipboard)" : "");
+                else if (notool != !!(S.ag_caps & VAC_CLIP_NOTOOL))
+                    vlog("agent: lordos-guest %s", notool ? "has no clipboard tool in the guest any more" : "found a clipboard tool in the guest: the clipboard works");
                 S.lag_hello = 1;
                 if (!S.lag_windows) lag_windows_off();
-                S.ag_caps = (S.ag_caps & ~(VAC_DISPLAY | (int)LAG_CAP_WINDOWS)) | VAC_CLIPBOARD | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0);
+                S.ag_caps = (S.ag_caps & ~(VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_DISPLAY | (int)LAG_CAP_WINDOWS)) | (clip ? VAC_CLIPBOARD : 0) |
+                            (notool ? VAC_CLIP_NOTOOL : 0) | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0);
                 static const char me[] = "lord-vm 2 clipboard clipx";
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
@@ -4326,10 +4393,12 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (m->a == VAG_SHUTDOWN) { qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1); reply(ci, m->seq, VME_OK, ""); return; }
         if (m->a == VAG_TIMESYNC) { ag_timesync(); reply(ci, m->seq, VME_OK, ""); return; }
         if (S.ag_windows) { const char *why = NULL; if (wi_begin(ci, m->seq, &why)) reply(ci, m->seq, VME_WRONG_STATE, why); return; }
-        if (!S.helper || S.helper_handle || !(S.ag_caps & VAC_FILES) || !(S.ag_caps & VAC_EXEC)) { reply(ci, m->seq, VME_WRONG_STATE, S.helper ? "the guest agent can't write files or run commands" : "lordos-guest isn't available for this machine's architecture"); return; }
+        if (S.inst_busy || S.helper_handle) { reply(ci, m->seq, VME_BUSY, "busy"); return; }      /* one install at a time */
+        if (!S.helper || !(S.ag_caps & VAC_FILES) || !(S.ag_caps & VAC_EXEC)) { reply(ci, m->seq, VME_WRONG_STATE, S.helper ? "the guest agent can't write files or run commands" : "lordos-guest isn't available for this machine's architecture"); return; }
         S.install_client = ci; S.install_seq = m->seq;
         S.helper_handle = -1;
-        if (qga_do("guest-file-open", "{\"path\":\"/usr/local/bin/.lordos-guest.new\",\"mode\":\"w\"}", AQ_FOPEN)) { S.helper_handle = 0; reply(ci, m->seq, VME_BUSY, "busy"); }
+        S.inst_busy = 1;
+        if (qga_do("guest-file-open", "{\"path\":\"/usr/local/bin/.lordos-guest.new\",\"mode\":\"w\"}", AQ_FOPEN)) inst_reply(VME_BUSY, "busy");
         return;
     case VM_CLIP: {
         if (fd < 0) { reply(ci, m->seq, VME_BAD_REQUEST, "no text"); return; }
@@ -4841,6 +4910,7 @@ static void loop(void) {
         if (S.host_stopping && (next < 0 || now + 500 < next)) next = now + 500;
         if (S.id_poll_at && (next < 0 || S.id_poll_at < next)) next = S.id_poll_at;
         if (S.xfer_poll_at && (next < 0 || S.xfer_poll_at < next)) next = S.xfer_poll_at;
+        if (S.inst_poll_at && (next < 0 || S.inst_poll_at < next)) next = S.inst_poll_at;
         if (S.fx_poll_at && (next < 0 || S.fx_poll_at < next)) next = S.fx_poll_at;
         if (S.wi_poll_at && (next < 0 || S.wi_poll_at < next)) next = S.wi_poll_at;
         if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
@@ -4859,6 +4929,7 @@ static void loop(void) {
         if (S.net_retry_at && now >= S.net_retry_at) net_restart();
         if (S.id_poll_at && now >= S.id_poll_at) { char a[48]; S.id_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.id_pid); qga_do("guest-exec-status", a, AQ_IDSTATUS); }
         if (S.xfer_poll_at && now >= S.xfer_poll_at) { char a[48]; S.xfer_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.xfer_pid); if (qga_do("guest-exec-status", a, AQ_XSTATUS)) S.xfer_poll_at = now + 300; }
+        if (S.inst_poll_at && now >= S.inst_poll_at) { char a[48]; S.inst_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.inst_pid); if (qga_do("guest-exec-status", a, AQ_INSTSTATUS)) S.inst_poll_at = now + 500; }
         fx_tick(now);
         wi_tick(now);
         host_stop_tick(now);

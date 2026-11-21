@@ -202,9 +202,11 @@ enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL, VAG_TRANSFER };
 enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
 /* 256: LAG_CAP_WINDOWS (vmagent.h), the guest's helper does apps mode.
  * VAC_TRANSFER: the guest has the transfer folder (6.7.1) mounted (Linux: /mnt/LordOS; Windows: VirtioFsSvc runs);
- * VAC_XFER_SETUP: a Windows guest that can have it once WinFsp is installed (VAG_TRANSFER) */
+ * VAC_XFER_SETUP: a Windows guest that can have it once WinFsp is installed (VAG_TRANSFER);
+ * VAC_CLIP_NOTOOL: the guest's helper is there but its clipboard can't work: the guest has no clipboard tool (the hello
+ * said "noclip": a Linux guest without xclip or wl-clipboard). VAC_CLIPBOARD is set only when the hello says "clipboard" */
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
-       VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024 };
+       VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048 };
 #define VM_WINDATA_MAX (1u << 20)
 #define VM_CLIP_MAX (11u << 20)
 /* VM_CLIP and VM_CLIP_DATA b: what the memfd holds */

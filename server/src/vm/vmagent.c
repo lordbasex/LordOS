@@ -596,6 +596,7 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         if (l == 9 && !memcmp(p + s0, "clipboard", 9)) caps |= AG_HELLO_CLIPBOARD;
         else if (l == 5 && !memcmp(p + s0, "clipx", 5)) caps |= AG_HELLO_CLIPX;
         else if (l == 7 && !memcmp(p + s0, "windows", 7)) caps |= AG_HELLO_WINDOWS;
+        else if (l == 6 && !memcmp(p + s0, "noclip", 6)) caps |= AG_HELLO_NOCLIP;
     }
     return caps;
 }

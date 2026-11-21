@@ -190,6 +190,15 @@ eq('agent connected', agentLines({ state: 'connected', caps: 1 | 2 | 16 | 32 }, 
 eq('agent helper missing', agentLines({ state: 'connected', caps: 1 }, { clipboard: 'to-guest' }).find((l) => l[0] === 'clipboard')[1], 'needsHelper');
 eq('windows guest without the tools', agentLines({ state: 'connected', caps: 1 | 4 | 8, system: 'Windows 11 Pro' }, { clipboard: 'both' }).filter((l) => ['clipboard', 'resolution'].includes(l[0])).map((l) => l[1]), ['needsTools', 'needsTools']);
 eq('windows guest with the tools', agentLines({ state: 'connected', caps: 1 | 4 | 8 | 32 | 128 | 256, system: 'Windows 11 Pro' }, { clipboard: 'both' }).filter((l) => ['clipboard', 'resolution'].includes(l[0])).map((l) => l[1]), ['works', 'works']);
+// the helper runs but the guest has no clipboard tool (lordos-guest's hello said "noclip": VAC_CLIP_NOTOOL 2048)
+eq('linux guest without xclip', agentLines({ state: 'connected', caps: 1 | 4 | 8 | 2048, system: 'Ubuntu 26.04' }, { clipboard: 'both' }).find((l) => l[0] === 'clipboard')[1], 'needsXclip');
+eq('without xclip but the clipboard off', agentLines({ state: 'connected', caps: 2048 }, { clipboard: 'off' }).find((l) => l[0] === 'clipboard')[1], 'off');
+eq('clipboard works wins over noclip', M.clipState({ caps: 32 | 2048 }, { clipboard: 'both' }), 'works');
+eq('clipNeedsTool: connected, on, no tool', M.clipNeedsTool({ state: 'connected', caps: 2048 }, { clipboard: 'to-guest' }), true);
+eq('clipNeedsTool: not when it works', M.clipNeedsTool({ state: 'connected', caps: 32 }, { clipboard: 'both' }), false);
+eq('clipNeedsTool: not while waiting', M.clipNeedsTool({ state: 'waiting', caps: 2048 }, { clipboard: 'both' }), false);
+eq('clipNeedsTool: not with the clipboard off', M.clipNeedsTool({ state: 'connected', caps: 2048 }, {}), false);
+eq('an old helper without noclip still says install', agentLines({ state: 'connected', caps: 1 }, { clipboard: 'both' }).find((l) => l[0] === 'clipboard')[1], 'needsHelper');
 eq('linux guest resolution', agentLines({ state: 'connected', caps: 1, system: 'Ubuntu 26.04' }, {}).find((l) => l[0] === 'resolution')[1], 'works');
 eq('windows guest: no journal or awake lines (systemd\'s)', agentLines({ state: 'connected', caps: 1 | 2 | 4 | 16 | 64, system: 'Windows 11 Pro' }, {}).map((l) => l[0]).filter((x) => x === 'logs' || x === 'awake'), []);
 eq('linux guest keeps them', agentLines({ state: 'connected', caps: 16 | 64, system: 'Ubuntu 26.04' }, {}).filter((l) => l[0] === 'logs' || l[0] === 'awake').map((l) => l[1]), ['works', 'works']);

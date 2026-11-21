@@ -1221,6 +1221,7 @@ static void test_apps_mode(void) {
     static LagWinList l, l2;
     CHECK(ag_hello_caps((const uint8_t *)"2 clipboard clipx windows", 25) == (AG_HELLO_CLIPBOARD | AG_HELLO_CLIPX | AG_HELLO_WINDOWS));
     CHECK(ag_hello_caps((const uint8_t *)"2 clipboard windowsx", 20) == AG_HELLO_CLIPBOARD && ag_hello_caps((const uint8_t *)"", 0) == 0);
+    CHECK(ag_hello_caps((const uint8_t *)"4 noclip windows", 16) == (AG_HELLO_NOCLIP | AG_HELLO_WINDOWS) && ag_hello_caps((const uint8_t *)"4 noclipx", 9) == 0);
     size_t o = put32(b, 0, 7);
     o = put16(b, o, 2);
     o = win1(b, o, 10, 100, 50, 640, 480, LAGW_FOCUSED, 0, "Notes \xe2\x80\x94 untitled", "notepad.exe");

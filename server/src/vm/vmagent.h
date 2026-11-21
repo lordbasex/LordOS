@@ -10,8 +10,9 @@
  * At most AG_FRAME_MAX bytes of payload; anything longer, or a stream that doesn't parse, is dropped whole (the guest
  * is untrusted: lord-vm parses this inside its own sandbox, never lord-server). Kinds a side doesn't know are skipped,
  * so either side can grow.
- *   AGK_HELLO  guest → host  "lordos-guest <version> <capability>…" (text: clipboard, clipx, windows); the host answers
- *                            with its own hello
+ *   AGK_HELLO  guest → host  "lordos-guest <version> <capability>…" (text: clipboard, clipx, display, windows, or
+ *                            noclip: a helper whose guest has no clipboard tool, said instead of "clipboard clipx"; a
+ *                            helper says hello again when that changes); the host answers with its own hello
  *   AGK_CLIP   both ways     the clipboard's text, UTF-8; only in the directions the machine allows (machine.json)
  *   AGK_CLIPX  both ways     the clipboard in up to three forms at once (capability "clipx" in both hellos): parts of
  *                            u8 form (AGF_TEXT, AGF_HTML, AGF_PNG), u32 length (little endian), bytes; each form at most
@@ -154,7 +155,7 @@ int ag_drop_staging_ok(const char *p, int windows);
  * again, as 0, 0, 1, 1. */
 #define LAG_APPNAME_MAX LAG_APP_MAX
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
-enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4 };
+enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;

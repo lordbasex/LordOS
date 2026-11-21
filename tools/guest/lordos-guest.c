@@ -11,6 +11,14 @@
  * started without a shell. It never runs anything the host names, and the host can't ask it for anything else.
  * Pasting rich text or a picture into the guest offers that one form (the tools hold one type each).
  *
+ * Which tool: looked for in PATH at the start, every 30 s and whenever one couldn't be started (installing xclip later
+ * starts working without a restart). On GNOME (XDG_CURRENT_DESKTOP) with DISPLAY set, xclip through Xwayland, which
+ * Mutter bridges to the Wayland clipboard, and never wl-paste (Mutter has no data-control protocol: wl-clipboard needs
+ * a focus-stealing popup there); elsewhere wl-clipboard under Wayland, then xclip. With neither installed the hello says
+ * "noclip" instead of "clipboard clipx", so Machines says the guest needs xclip, and the journal says so once. Under
+ * systemd the display's variables can arrive after the service started: they're read from the user's manager
+ * (systemctl --user show-environment) while they're missing.
+ *
  * Apps mode (7.2) on a guest that runs LordOS: the guest's own lord-server lists its windows on a local socket of the
  * signed-in person ($XDG_RUNTIME_DIR/lordos-guestwin.sock, server/src/ui/js_guestwin.c). While that socket answers,
  * the hello says "windows" too, and frames are relayed both ways, each checked with vmagent.c's parsers and written
@@ -40,7 +48,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define VERSION "3"
+#define VERSION "4"
 #define PORT "/dev/virtio-ports/org.lordos.agent"
 #define CLIP_MAX AG_TEXT_MAX
 
@@ -90,30 +98,111 @@ static long run(char *const argv[], const uint8_t *in, size_t in_n, uint8_t *out
     int st = 0;
     for (int i = 0; i < 200 && waitpid(pid, &st, WNOHANG) == 0; i++) { struct timespec ts = { 0, 10000000 }; nanosleep(&ts, NULL); }
     if (waitpid(pid, &st, WNOHANG) == 0) { kill(pid, SIGKILL); waitpid(pid, &st, 0); }
-    if (!WIFEXITED(st) || WEXITSTATUS(st)) return out ? -1 : -1;
+    if (WIFEXITED(st) && WEXITSTATUS(st) == 127) return -2;       /* not there (execvp failed): look for the tools again */
+    if (!WIFEXITED(st) || WEXITSTATUS(st)) return -1;
     return got;
 }
 
-static int wayland(void) { return getenv("WAYLAND_DISPLAY") != NULL; }
+/* ---- the clipboard's tools: which ones this guest has, in the order they're tried ---- */
+enum { T_WL = 1, T_XCLIP = 2 };
+static int tools[2], tool_n;            /* tool_n 0: none (the hello says "noclip") */
+static long long tool_look_at;          /* when to look for them again (0: at once) */
+static char tool_said[160];             /* what the journal was told last */
+
+/* an executable file of that name in PATH (as execvp would find it); no shell */
+static int in_path(const char *name) {
+    const char *path = getenv("PATH");
+    if (!path || !*path) path = "/usr/local/bin:/usr/bin:/bin";
+    for (const char *p = path; *p;) {
+        const char *e = strchr(p, ':');
+        size_t l = e ? (size_t)(e - p) : strlen(p);
+        char f[512];
+        struct stat st;
+        size_t nl = strlen(name);
+        if (l && l + nl + 2 <= sizeof f) {
+            memcpy(f, p, l); f[l] = '/'; memcpy(f + l + 1, name, nl + 1);
+            if (!stat(f, &st) && S_ISREG(st.st_mode) && !access(f, X_OK)) return 1;
+        }
+        p += l + (e ? 1 : 0);
+        if (!e) break;
+    }
+    return 0;
+}
+
+static const char *env_set(const char *k) { const char *v = getenv(k); return v && *v ? v : NULL; }
+
+/* the display's variables from the user's systemd manager, while this process doesn't have them (a service started
+ * before the session exported them): at the start and with each look for the tools, 10 times at most. Only these four,
+ * only plain values, never one this process already has */
+static void session_env(void) {
+    static const char *const keys[] = { "WAYLAND_DISPLAY", "DISPLAY", "XAUTHORITY", "XDG_CURRENT_DESKTOP" };
+    static int tries;                   /* a session that never has some of them (X11 alone): asked 10 times at most */
+    int missing = !env_set("WAYLAND_DISPLAY") || !env_set("DISPLAY") || !env_set("XDG_CURRENT_DESKTOP");
+    if (!missing || tries >= 10 || !in_path("systemctl")) return;
+    tries++;
+    static char out[65536];
+    char *a[] = { "systemctl", "--user", "show-environment", NULL };
+    long n = run(a, NULL, 0, (uint8_t *)out, sizeof out - 1);
+    if (n <= 0) return;
+    out[n] = 0;
+    for (char *line = out, *nl; line && *line; line = nl) {
+        nl = strchr(line, '\n');
+        if (nl) *nl++ = 0;
+        char *eq = strchr(line, '=');
+        if (!eq || eq[1] == '$' || strpbrk(eq + 1, "'\"\\")) continue;
+        *eq = 0;
+        for (size_t i = 0; i < sizeof keys / sizeof *keys; i++)
+            if (!strcmp(line, keys[i]) && !env_set(keys[i]) && eq[1]) setenv(keys[i], eq + 1, 1);
+    }
+}
+
+/* looks for the tools; 1 when whether there is one changed (the hello has to be said again) */
+static int pick_tools(void) {
+    int had = tool_n > 0;
+    session_env();
+    int x = in_path("xclip"), w = in_path("wl-paste") && in_path("wl-copy");
+    const char *desk = env_set("XDG_CURRENT_DESKTOP");
+    int gnome = desk && strstr(desk, "GNOME"), wl = env_set("WAYLAND_DISPLAY") != NULL, disp = env_set("DISPLAY") != NULL;
+    tool_n = 0;
+    if (gnome && disp && x) tools[tool_n++] = T_XCLIP;      /* Mutter: Xwayland's CLIPBOARD, never wl-paste */
+    else {
+        if (w && wl) tools[tool_n++] = T_WL;
+        if (x) tools[tool_n++] = T_XCLIP;
+        if (w && !wl) tools[tool_n++] = T_WL;               /* WAYLAND_DISPLAY may come later (session_env) */
+    }
+    char said[sizeof tool_said];
+    if (!tool_n) snprintf(said, sizeof said, "no clipboard tool: install xclip or wl-clipboard (the clipboard is off until one is there)");
+    else snprintf(said, sizeof said, "clipboard through %s%s%s%s", tools[0] == T_XCLIP ? "xclip" : "wl-clipboard",
+                  tools[0] == T_XCLIP ? (gnome && disp ? " (Xwayland, GNOME)" : " (X11)") : " (Wayland)",
+                  tool_n > 1 ? ", then " : "", tool_n > 1 ? (tools[1] == T_XCLIP ? "xclip" : "wl-clipboard") : "");
+    if (strcmp(said, tool_said)) { fprintf(stderr, "lordos-guest: %s\n", said); snprintf(tool_said, sizeof tool_said, "%s", said); }
+    return had != (tool_n > 0);
+}
+
+/* a tool's answer: one that couldn't be started has the tools looked for again at the next turn */
+static long tool_ran(long r) { if (r == -2) { tool_look_at = 0; return -1; } return r; }
 
 /* one form of the clipboard: "text" (UTF-8), "text/html", "image/png" */
 static long clip_read_type(const char *type, uint8_t *out, size_t cap) {
     int text = !strcmp(type, "text");
-    if (wayland()) {
+    long n = -1;
+    for (int i = 0; i < tool_n && n < 0; i++) {
         char *a[] = { "wl-paste", "-n", "-t", text ? "text/plain;charset=utf-8" : (char *)type, NULL };
-        long n = run(a, NULL, 0, out, cap);
-        if (n >= 0) return n;
+        char *x[] = { "xclip", "-o", "-selection", "clipboard", "-t", text ? "UTF8_STRING" : (char *)type, NULL };
+        n = tool_ran(run(tools[i] == T_WL ? a : x, NULL, 0, out, cap));
     }
-    char *x[] = { "xclip", "-o", "-selection", "clipboard", "-t", text ? "UTF8_STRING" : (char *)type, NULL };
-    return run(x, NULL, 0, out, cap);
+    return n;
 }
 static long clip_read(uint8_t *out, size_t cap) { return clip_read_type("text", out, cap); }
 
 /* the types the clipboard offers, one per line (wl-paste -l, or xclip's TARGETS) */
 static long clip_types(char *out, size_t cap) {
     long n = -1;
-    if (wayland()) { char *a[] = { "wl-paste", "-l", NULL }; n = run(a, NULL, 0, (uint8_t *)out, cap - 1); }
-    if (n < 0) { char *x[] = { "xclip", "-o", "-selection", "clipboard", "-t", "TARGETS", NULL }; n = run(x, NULL, 0, (uint8_t *)out, cap - 1); }
+    for (int i = 0; i < tool_n && n < 0; i++) {
+        char *a[] = { "wl-paste", "-l", NULL };
+        char *x[] = { "xclip", "-o", "-selection", "clipboard", "-t", "TARGETS", NULL };
+        n = tool_ran(run(tools[i] == T_WL ? a : x, NULL, 0, (uint8_t *)out, cap - 1));
+    }
     out[n > 0 ? n : 0] = 0;
     return n;
 }
@@ -126,9 +215,12 @@ static int has_type(const char *types, const char *t) {
 
 static int clip_write_type(const char *type, const uint8_t *p, size_t n) {
     int text = !strcmp(type, "text");
-    if (wayland()) { char *a[] = { "wl-copy", "--type", text ? "text/plain;charset=utf-8" : (char *)type, NULL }; if (run(a, p, n, NULL, 0) >= 0) return 0; }
-    char *x[] = { "xclip", "-i", "-selection", "clipboard", "-t", text ? "UTF8_STRING" : (char *)type, NULL };
-    return run(x, p, n, NULL, 0) >= 0 ? 0 : -1;
+    for (int i = 0; i < tool_n; i++) {
+        char *a[] = { "wl-copy", "--type", text ? "text/plain;charset=utf-8" : (char *)type, NULL };
+        char *x[] = { "xclip", "-i", "-selection", "clipboard", "-t", text ? "UTF8_STRING" : (char *)type, NULL };
+        if (tool_ran(run(tools[i] == T_WL ? a : x, p, n, NULL, 0)) >= 0) return 0;
+    }
+    return -1;
 }
 static int clip_write(const uint8_t *p, size_t n) { return clip_write_type("text", p, n); }
 
@@ -160,7 +252,8 @@ static int unix_connect(const char *path) {
 
 static void say_hello(int fd) {
     char h[96];
-    snprintf(h, sizeof h, "lordos-guest " VERSION " clipboard clipx%s", wfd >= 0 ? " windows" : "");
+    /* "noclip": the helper is there but the guest has no clipboard tool (Machines says what to install) */
+    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s", tool_n ? " clipboard clipx" : " noclip", wfd >= 0 ? " windows" : "");
     send_frame(fd, AGK_HELLO, (const uint8_t *)h, (uint32_t)strlen(h));
 }
 
@@ -247,6 +340,8 @@ int main(int argc, char **argv) {
     uint64_t last = 0;                  /* the clipboard's main form last sent or set, so it doesn't go back and forth */
     int fd = -1, host_clipx = 0;
     long long next_look = 0, png_look = 0;
+    pick_tools();
+    tool_look_at = now_ms() + 30000;
     for (;;) {
         if (fd < 0) {
             fd = open_port(port);
@@ -262,6 +357,12 @@ int main(int argc, char **argv) {
             wfd = unix_connect(wpath);
             if (wfd >= 0) { win_n = 0; say_hello(fd); }
         }
+        /* the tools again every 30 s, or at once after one couldn't be started; the hello again when that changed */
+        if (now >= tool_look_at) {
+            tool_look_at = now + 30000;
+            if (pick_tools()) say_hello(fd);
+        }
+        if (now >= next_look && !tool_n) { next_look = now + 1000; if (once) return 0; }
         if (now >= next_look) {
             next_look = now + 1000;
             int sent = 0;

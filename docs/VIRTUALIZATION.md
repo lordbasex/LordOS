@@ -874,12 +874,22 @@ notices, storage, an operation waiting, recoveries, problems; Copy Report), then
 `org.qemu.guest_agent.0` for **qemu-guest-agent** (the guest's package) and `org.lordos.agent` for our own channel. The doc leaves the
 clipboard path open (6.8: QEMU's D-Bus clipboard needs a vdagent in the guest), so the clipboard goes through our channel and **lordos-guest**
 (`tools/guest`, a small static program packaged per architecture), which reads and writes the clipboard with the guest's `wl-paste`/`wl-copy`
-or `xclip`, as the desktop user, and never runs anything the host names; frames per 6.17 with a 1 MiB limit, parsed in lord-vm. Install
-Clipboard Helper copies it in through `guest-file-write` and one fixed script (udev rule, user unit). The agent's light is on the card and
+or `xclip`, as the desktop user, and never runs anything the host names; frames per 6.17 with a 1 MiB limit, parsed in lord-vm. It looks
+for the tools in PATH at the start, every 30 s and whenever one couldn't be started; on GNOME with `DISPLAY` set it uses `xclip` only
+(Mutter bridges Xwayland's CLIPBOARD; it has no data-control protocol, so `wl-paste` in the background needs a focus-stealing popup there),
+elsewhere `wl-paste`/`wl-copy` under Wayland, then `xclip`. With neither installed (a stock desktop ships none) its hello says `noclip`
+instead of `clipboard clipx`: lord-vm sets `VAC_CLIP_NOTOOL` instead of `VAC_CLIPBOARD`, the popover's clipboard line says *Needs xclip*
+with a hint (install the helper again, or `sudo apt install xclip`), and the guest's journal says which tool is used or that none is.
+Install Clipboard Helper copies it in through `guest-file-write` and one fixed script (udev rule, user unit; then, when `xclip` is
+missing, `xclip wl-clipboard` through the guest's own apt-get, dnf, zypper or pacman, best effort and never failing the install offline;
+then the helper restarted in each signed-in desktop session, `systemctl --user -M <user>@`). lord-vm follows the script with
+`guest-exec-status` and answers when it ends (10 minutes at most), so the button stays busy meanwhile; a second click while it runs is
+the same request (lord-server) or `busy` (lord-vm). The agent's light is on the card and
 first on the bar, with a popover of what works now. Seen on VM 125: *Debian GNU/Linux 13 (trixie), agent 10.0.13*, journal in Logs, guest
 kept awake, the helper installed in 60 ms (build VM) and from the popover, and the clipboard both ways (a guest with Xvfb and xclip: text
 copied in the guest was in LordOS's clipboard history; a report copied in LordOS was in the guest's clipboard after the window came to the
-front). Not tried: a guest desktop session starting the helper by itself (the unit waits for `graphical-session.target`), Wayland guests.
+front). Not tried: a guest desktop session starting the helper by itself (the unit waits for `graphical-session.target`), Wayland guests;
+the tool's choice and the `noclip` hello are checked with stub tools only (`tests/guest_clip_test.sh`), not yet on a real GNOME guest.
 
 *Release gates (12).* Scripts in `server/tests/`, each `sh tests/<gate>.sh BUILD_DIR …`, run on the amd64 build VM (**nested**, ext4):
 

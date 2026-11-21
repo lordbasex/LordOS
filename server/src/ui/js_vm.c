@@ -2501,6 +2501,9 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         s->xf_seq = m.seq; s->xf_result = 1; s->xf_msg[0] = 0;
         return JS_TRUE;
     }
+    /* one install at a time: a click while one is on its way (lord-vm answers when the guest's script ended) is the
+     * same request, not another run of the script */
+    if (a == VAG_INSTALL && s->ag_seq) return JS_TRUE;
     int q = ask(s, VM_AGENT, a);
     if (q < 0) return JS_FALSE;
     if (a == VAG_INSTALL) { s->ag_seq = (uint32_t)q; s->ag_result = 1; s->ag_msg[0] = 0; }
