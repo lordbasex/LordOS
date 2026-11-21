@@ -185,6 +185,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: the window of a machine that's starting no longer shows "Something went wrong"** (`apps/machines/model.js`):
+  between the start and the machine's first state, the window read the state of a session that had none yet and failed,
+  then said it couldn't connect. A session without its first state now counts as Starting. Model test added.
 - **Machines: a password manager's secret copied in a machine stays in the machine** (`tools/guest-win/lordos-guest-win.c`,
   `tools/guest/lordos-guest.c`; found by Claude Security, LOW). With guest-to-host clipboard sharing on, a password copied
   from a password manager inside a machine reached the host's clipboard history (kept 30 days) and outlived

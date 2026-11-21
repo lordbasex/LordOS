@@ -639,9 +639,10 @@ export function defaultCard(cards, current) {
 }
 // The machine's window around a start (6.5: a bridged machine's network is made by the admin helper first, which takes a
 // few seconds): 'starting' while a start is on its way (even over an earlier run's state, which would say Off), 'off' with
-// no session and a state, 'starting' with neither yet, else 'session' (the session's own state decides)
+// no session and a state, 'starting' with neither yet or with a session whose first state hasn't come, else 'session'
+// (the session's own state decides)
 export function startPhase(sid, st, starting) {
-  if (!sid && (starting || !st)) return 'starting';
+  if (!st || (!sid && starting)) return 'starting';
   if (!sid) return 'off';
   return 'session';
 }

@@ -397,7 +397,9 @@ eq('install error: empty', M.installError(''), { key: 'other', detail: '' });
   eq('start phase: a new window', M.startPhase(0, null, false), 'starting');
   eq('start phase: bridging over an earlier run', M.startPhase(0, off, true), 'starting');
   eq('start phase: off', M.startPhase(0, off, false), 'off');
-  eq('start phase: running', [M.startPhase(7, { state: 'starting' }, false), M.startPhase(7, null, true)], ['session', 'session']);
+  eq('start phase: running', M.startPhase(7, { state: 'starting' }, false), 'session');
+  // a session whose first state hasn't come yet is still starting (the window read st.state of null and showed its error)
+  eq('start phase: a session before its first state', [M.startPhase(7, null, true), M.startPhase(7, null, false)], ['starting', 'starting']);
   eq('play starts', [M.playStarts(0, false, false), M.playStarts(0, true, false), M.playStarts(5, false, false), M.playStarts(0, false, 'shutdown')], [true, false, false, false]);
 }
 eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, h: 9 }), M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 3, y: 0, w: 10, h: 10 }), M.nearRect(null, {})], [true, false, false]);
