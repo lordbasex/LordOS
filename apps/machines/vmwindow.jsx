@@ -97,6 +97,14 @@ function AgentPop({ ctl, onClose }) {
           </View>
         ) : null}
         {g?.install === 2 ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{guestWindows(g) ? tr('machines.agent.toolsInstalled') : tr('machines.agent.installed')}</Text> : null}
+        {/* the clipboard is off in this machine's description (the default for machines made before 6.8): installing the
+            helper again changes nothing, so say where it's turned on */}
+        {on && (cfg.clipboard || 'off') === 'off' ? (
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.clipOff')}</Text>
+            <View style={{ flexDirection: 'row' }}><Pill label={tr('machines.tb.clipChange')} onClick={() => { onClose(); ctl.configure('sharing'); }} /></View>
+          </View>
+        ) : null}
         {g?.install === 3 ? (() => {
           // lord-vm's words are English: a translated line, and its text only as a detail
           const e = installError(g.message);

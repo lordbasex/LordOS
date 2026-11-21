@@ -187,7 +187,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Bluetooth, battery, cooling, Flatpak, cloud, web apps; the Store's install, update and remove) flip at once with a
   spinner and flip back with the error if it fails (SDK: `<Toggle pending>`, `<Button pending|busy>`, `usePending`).
   Measured on a headless lord-server.
-- `machine.json` schema 6:- `machine.json` schema 6:- `machine.json` schema 6:- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
+- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
   `resolution`, `boot_order`, `boot_menu`;
   older files load unchanged.
 - **Machines looks like a native virtualization app** (the look of hypervisaur's screenshots, reimplemented: no code or
@@ -206,6 +206,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: a machine's input can't be an output's monitor** (`server/src/ui/js_vm.c`, `server/src/sound/snd.c`; found by
+  the commit security review, MEDIUM). The input chosen for a machine is used only when it is a microphone or line input,
+  never the monitor of an output (which would hand the guest everything this computer plays under the microphone
+  permission), and the default is used whenever the sound state isn't known yet (it used to pass the chosen name on).
+- **Machines: the agent's panel says when the clipboard is off** (`apps/machines/vmwindow.jsx`): a machine made before the
+  clipboard setting existed has it off, and the panel only offered to install the helper again, which changed nothing. It
+  now says the clipboard is off and opens Configure → Sharing. The duplicated `agent.st.needsTools` key in every language
+  is gone too.
 - **Machines: Configure's Done keeps changes made in any section** (`apps/machines/configure.jsx`): Done saved the draft
   only when the pane showing at that moment was one that saves, so a choice made in another section was silently dropped
   (Graphics 3D chosen under Display, then Done pressed from Sound, closed without it). Done now saves every change made in

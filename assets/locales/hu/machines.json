@@ -626,10 +626,11 @@
   "agent.installing": "Telepítés…",
   "agent.installHelper": "Vágólap-segédprogram telepítése",
   "agent.installTools": "LordOS-eszközök telepítése",
-  "agent.st.needsTools": "Eszközök telepítése",
+  "agent.st.needsTools": "Eszközök kellenek",
   "agent.toolsInstalled": "A LordOS-eszközök telepítve vannak és futnak a gépen; minden bejelentkezéskor újraindulnak.",
   "agent.timesync": "Óra beállítása",
   "agent.installed": "A vágólap-segédprogram telepítve; a gép következő asztali munkamenetével indul.",
+  "agent.clipOff": "A vágólap ki van kapcsolva ezen a gépen. Kapcsold be a Beállítás → Megosztás alatt, kikapcsolt gépnél.",
   "agent.err.missing": "Ezen a számítógépen nincsenek meg a gép rendszeréhez való eszközök: frissítsd a LordOS-t.",
   "agent.err.busy": "A gép ügynöke foglalt: próbáld újra egy pillanat múlva.",
   "agent.err.noExec": "A gép vendégügynöke nem engedi a fájlok másolását és a programok futtatását.",
@@ -975,7 +976,6 @@
   "apps.gone": "Ez az ablak bezárult a gépen",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "A gép alkalmazásai saját ablakokban vannak, az asztala rejtve van. Az Esc vagy a Kilépés az alkalmazásmódból újra megmutatja.",
-  "agent.st.needsTools": "Eszközök kellenek",
   "cfg.resolutionFollowNote": "A gép az ablak méretével indul, és követi, amíg a rendszere engedi. Az ablak eszköztárán így is választható más méret.",
   "cfg.resolutionFixedNote": "A gép ezzel a mérettel indul: minden rendszer átveszi induláskor, azok is, amelyek nem követik az ablakot. Futás közben az ablak eszköztárán így is választható más."
 }

@@ -626,10 +626,11 @@
   "agent.installing": "Installazione…",
   "agent.installHelper": "Installa aiuto per gli appunti",
   "agent.installTools": "Installa gli strumenti di LordOS",
-  "agent.st.needsTools": "Installa gli strumenti",
+  "agent.st.needsTools": "Servono gli strumenti",
   "agent.toolsInstalled": "Gli strumenti di LordOS sono installati e in esecuzione nella macchina; ripartono a ogni accesso.",
   "agent.timesync": "Regola l’ora",
   "agent.installed": "L’aiuto è installato; parte con la prossima sessione desktop nella macchina.",
+  "agent.clipOff": "Gli appunti sono disattivati in questa macchina. Attivali in Configura → Condivisione, a macchina spenta.",
   "agent.err.missing": "Questo computer non ha gli strumenti per il sistema di questa macchina: aggiorna LordOS.",
   "agent.err.busy": "L'agente della macchina è occupato: riprova tra un momento.",
   "agent.err.noExec": "L'agente guest della macchina non consente di copiare file né di avviare programmi.",
@@ -975,7 +976,6 @@
   "apps.gone": "Questa finestra è stata chiusa nella macchina",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Le app della macchina sono in finestre proprie e la sua scrivania è nascosta. Esc o Esci dalla modalità app la mostra di nuovo.",
-  "agent.st.needsTools": "Servono gli strumenti",
   "cfg.resolutionFollowNote": "La macchina si avvia con la dimensione della finestra e la segue finché il suo sistema lo consente. La barra della finestra può comunque scegliere un'altra dimensione.",
   "cfg.resolutionFixedNote": "La macchina si avvia con questa dimensione: ogni sistema la prende all'avvio, anche quelli che non seguono la finestra. La barra della finestra può comunque sceglierne un'altra mentre è in esecuzione."
 }

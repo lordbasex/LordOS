@@ -626,10 +626,11 @@
   "agent.installing": "Installation…",
   "agent.installHelper": "Installer l’aide du presse-papiers",
   "agent.installTools": "Installer les outils LordOS",
-  "agent.st.needsTools": "Installer les outils",
+  "agent.st.needsTools": "Nécessite les outils",
   "agent.toolsInstalled": "Les outils LordOS sont installés et fonctionnent dans la machine ; ils redémarrent à chaque ouverture de session.",
   "agent.timesync": "Remettre l’heure",
   "agent.installed": "L’aide est installée ; elle démarre avec la prochaine session de bureau dans la machine.",
+  "agent.clipOff": "Le presse-papiers est désactivé sur cette machine. Activez-le dans Configurer → Partage, machine éteinte.",
   "agent.err.missing": "Cet ordinateur n'a pas les outils pour le système de cette machine : mettez LordOS à jour.",
   "agent.err.busy": "L'agent de la machine est occupé : réessayez dans un instant.",
   "agent.err.noExec": "L'agent invité de la machine ne permet ni de copier des fichiers ni de lancer des programmes.",
@@ -975,7 +976,6 @@
   "apps.gone": "Cette fenêtre s'est fermée dans la machine",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Les applications de la machine sont dans leurs propres fenêtres et son bureau est masqué. Échap ou Quitter le mode applications le réaffiche.",
-  "agent.st.needsTools": "Nécessite les outils",
   "cfg.resolutionFollowNote": "La machine démarre à la taille de la fenêtre et la suit tant que son système le permet. La barre de la fenêtre peut toujours choisir une autre taille.",
   "cfg.resolutionFixedNote": "La machine démarre à cette taille : tout système la prend au démarrage, même ceux qui ne suivent pas la fenêtre. La barre de la fenêtre peut toujours en choisir une autre pendant qu'elle tourne."
 }

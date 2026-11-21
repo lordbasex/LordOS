@@ -626,10 +626,11 @@
   "agent.installing": "正在安裝…",
   "agent.installHelper": "安裝剪貼簿輔助程式",
   "agent.installTools": "安裝 LordOS 工具",
-  "agent.st.needsTools": "安裝工具",
+  "agent.st.needsTools": "需要工具",
   "agent.toolsInstalled": "LordOS 工具已在機器中安裝並執行；每次登入時會再次啟動。",
   "agent.timesync": "設定時鐘",
   "agent.installed": "剪貼簿輔助程式已安裝；它會在虛擬機器下次啟動桌面工作階段時啟動。",
+  "agent.clipOff": "此機器的剪貼簿已關閉。請在機器關閉時，於「設定 → 共用」中開啟。",
   "agent.err.missing": "這台電腦沒有適用於此機器系統的工具：請更新 LordOS。",
   "agent.err.busy": "機器的代理程式忙碌中：請稍後再試。",
   "agent.err.noExec": "機器的客體代理程式不允許複製檔案或執行程式。",
@@ -975,7 +976,6 @@
   "apps.gone": "此視窗已在機器中關閉",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "機器的應用程式在各自的視窗中，其桌面已隱藏。按 Esc 或「離開應用程式模式」可再次顯示。",
-  "agent.st.needsTools": "需要工具",
   "cfg.resolutionFollowNote": "機器以視窗的大小啟動，並在系統允許時跟隨視窗。視窗的工具列仍可選擇其他大小。",
   "cfg.resolutionFixedNote": "機器以此大小啟動：每個系統在啟動時都會採用它，包括不跟隨視窗的系統。執行時仍可在視窗的工具列選擇其他大小。"
 }

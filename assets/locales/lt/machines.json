@@ -626,10 +626,11 @@
   "agent.installing": "Diegiama…",
   "agent.installHelper": "Įdiegti iškarpinės pagalbinę programą",
   "agent.installTools": "Įdiegti LordOS įrankius",
-  "agent.st.needsTools": "Įdiekite įrankius",
+  "agent.st.needsTools": "Reikia įrankių",
   "agent.toolsInstalled": "LordOS įrankiai įdiegti ir veikia mašinoje; jie vėl paleidžiami kiekvieną kartą prisijungus.",
   "agent.timesync": "Nustatyti laikrodį",
   "agent.installed": "Iškarpinės pagalbinė programa įdiegta; ji pasileis kitame mašinos darbalaukio seanse.",
+  "agent.clipOff": "Šioje mašinoje iškarpinė išjungta. Įjunkite ją skiltyje Konfigūruoti → Bendrinimas, kai mašina išjungta.",
   "agent.err.missing": "Šiame kompiuteryje nėra įrankių šios mašinos sistemai: atnaujinkite LordOS.",
   "agent.err.busy": "Mašinos agentas užimtas: bandykite dar kartą po akimirkos.",
   "agent.err.noExec": "Mašinos svečio agentas neleidžia kopijuoti failų ar paleisti programų.",
@@ -975,7 +976,6 @@
   "apps.gone": "Šis langas mašinoje užsidarė",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Mašinos programos yra savo languose, o jos darbalaukis paslėptas. Esc arba Išeiti iš programų režimo vėl jį parodo.",
-  "agent.st.needsTools": "Reikia įrankių",
   "cfg.resolutionFollowNote": "Mašina paleidžiama lango dydžio ir seka jį, kol leidžia jos sistema. Lango įrankių juostoje vis tiek galima pasirinkti kitą dydį.",
   "cfg.resolutionFixedNote": "Mašina paleidžiama šio dydžio: kiekviena sistema jį perima paleidžiama, net ir tos, kurios neseka lango. Veikiant lango įrankių juostoje vis tiek galima pasirinkti kitą."
 }

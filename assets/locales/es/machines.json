@@ -626,10 +626,11 @@
   "agent.installing": "Instalando…",
   "agent.installHelper": "Instalar ayudante del portapapeles",
   "agent.installTools": "Instalar herramientas de LordOS",
-  "agent.st.needsTools": "Instalar herramientas",
+  "agent.st.needsTools": "Necesita las herramientas",
   "agent.toolsInstalled": "Las herramientas de LordOS están instaladas y funcionando en la máquina; arrancan de nuevo en cada inicio de sesión.",
   "agent.timesync": "Poner en hora",
   "agent.installed": "El ayudante del portapapeles está instalado; arranca con la próxima sesión de escritorio en la máquina.",
+  "agent.clipOff": "El portapapeles está apagado en esta máquina. Activalo en Configurar → Compartir, con la máquina apagada.",
   "agent.err.missing": "Esta computadora no tiene las herramientas para el sistema de esta máquina: actualizá LordOS.",
   "agent.err.busy": "El agente de la máquina está ocupado: probá de nuevo en un momento.",
   "agent.err.noExec": "El agente invitado de la máquina no permite copiar archivos ni ejecutar programas.",
@@ -975,7 +976,6 @@
   "apps.gone": "Esta ventana se cerró en la máquina",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Las apps de la máquina están en ventanas propias y su escritorio está oculto. Esc o Salir del modo apps lo muestra de nuevo.",
-  "agent.st.needsTools": "Necesita las herramientas",
   "cfg.resolutionFollowNote": "La máquina arranca con el tamaño de la ventana y lo sigue mientras su sistema lo permita. Desde la barra de la ventana igual podés elegir otro tamaño.",
   "cfg.resolutionFixedNote": "La máquina arranca con este tamaño: todo sistema lo toma al iniciar, también los que no siguen a la ventana. Desde la barra de la ventana igual podés elegir otro mientras corre."
 }

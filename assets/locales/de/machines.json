@@ -626,10 +626,11 @@
   "agent.installing": "Wird installiert …",
   "agent.installHelper": "Zwischenablage-Hilfsprogramm installieren",
   "agent.installTools": "LordOS-Werkzeuge installieren",
-  "agent.st.needsTools": "Werkzeuge installieren",
+  "agent.st.needsTools": "Braucht die Werkzeuge",
   "agent.toolsInstalled": "Die LordOS-Werkzeuge sind in der Maschine installiert und laufen; sie starten bei jeder Anmeldung erneut.",
   "agent.timesync": "Uhr stellen",
   "agent.installed": "Das Zwischenablage-Hilfsprogramm ist installiert; es startet mit der nächsten Schreibtischsitzung in der Maschine.",
+  "agent.clipOff": "Die Zwischenablage ist in dieser Maschine aus. Schalte sie unter Konfigurieren → Freigabe ein, bei ausgeschalteter Maschine.",
   "agent.err.missing": "Diesem Computer fehlen die Werkzeuge für das System dieser Maschine: Aktualisiere LordOS.",
   "agent.err.busy": "Der Agent der Maschine ist beschäftigt: Versuche es gleich noch einmal.",
   "agent.err.noExec": "Der Gast-Agent der Maschine erlaubt weder Dateien zu kopieren noch Programme auszuführen.",
@@ -975,7 +976,6 @@
   "apps.gone": "Dieses Fenster wurde in der Maschine geschlossen",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Die Apps der Maschine sind in eigenen Fenstern, ihr Schreibtisch ist ausgeblendet. Esc oder App-Modus verlassen zeigt ihn wieder.",
-  "agent.st.needsTools": "Braucht die Werkzeuge",
   "cfg.resolutionFollowNote": "Die Maschine startet in Fenstergröße und folgt ihr, soweit ihr System es zulässt. Die Leiste des Fensters kann trotzdem eine andere Größe wählen.",
   "cfg.resolutionFixedNote": "Die Maschine startet in dieser Größe: Jedes System übernimmt sie beim Start, auch solche, die dem Fenster nicht folgen. Die Leiste des Fensters kann während des Betriebs trotzdem eine andere wählen."
 }

@@ -626,10 +626,11 @@
   "agent.installing": "Se instalează…",
   "agent.installHelper": "Instalează asistentul de clipboard",
   "agent.installTools": "Instalați instrumentele LordOS",
-  "agent.st.needsTools": "Instalați instrumentele",
+  "agent.st.needsTools": "Necesită instrumentele",
   "agent.toolsInstalled": "Instrumentele LordOS sunt instalate și rulează în mașină; pornesc din nou la fiecare conectare.",
   "agent.timesync": "Setează ceasul",
   "agent.installed": "Asistentul de clipboard este instalat; pornește odată cu următoarea sesiune desktop din mașină.",
+  "agent.clipOff": "Clipboardul este oprit în această mașină. Activează-l din Configurare → Partajare, cu mașina oprită.",
   "agent.err.missing": "Acest computer nu are instrumentele pentru sistemul acestei mașini: actualizează LordOS.",
   "agent.err.busy": "Agentul mașinii este ocupat: încearcă din nou peste o clipă.",
   "agent.err.noExec": "Agentul invitat al mașinii nu permite copierea fișierelor sau rularea programelor.",
@@ -975,7 +976,6 @@
   "apps.gone": "Această fereastră s-a închis în mașină",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Aplicațiile mașinii sunt în ferestre proprii, iar desktopul ei este ascuns. Esc sau Ieși din modul aplicații îl arată din nou.",
-  "agent.st.needsTools": "Necesită instrumentele",
   "cfg.resolutionFollowNote": "Mașina pornește la dimensiunea ferestrei și o urmează cât îi permite sistemul. Bara ferestrei poate alege totuși altă dimensiune.",
   "cfg.resolutionFixedNote": "Mașina pornește la această dimensiune: orice sistem o preia la pornire, chiar și cele care nu urmează fereastra. În timpul rulării, bara ferestrei poate alege totuși alta."
 }

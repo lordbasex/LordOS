@@ -626,10 +626,11 @@
   "agent.installing": "S’està instal·lant…",
   "agent.installHelper": "Instal·la l’ajudant del porta-retalls",
   "agent.installTools": "Instal·la les eines de LordOS",
-  "agent.st.needsTools": "Instal·la les eines",
+  "agent.st.needsTools": "Calen les eines",
   "agent.toolsInstalled": "Les eines de LordOS estan instal·lades i funcionant a la màquina; tornen a arrencar a cada inici de sessió.",
   "agent.timesync": "Ajusta el rellotge",
   "agent.installed": "L’ajudant del porta-retalls està instal·lat; s’inicia amb la propera sessió d’escriptori de la màquina.",
+  "agent.clipOff": "El porta-retalls està desactivat en aquesta màquina. Activa'l a Configura → Compartició, amb la màquina apagada.",
   "agent.err.missing": "Aquest ordinador no té les eines per al sistema d'aquesta màquina: actualitza LordOS.",
   "agent.err.busy": "L'agent de la màquina està ocupat: torna-ho a provar d'aquí a un moment.",
   "agent.err.noExec": "L'agent convidat de la màquina no permet copiar fitxers ni executar programes.",
@@ -975,7 +976,6 @@
   "apps.gone": "Aquesta finestra s'ha tancat a la màquina",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Les aplicacions de la màquina són en finestres pròpies i el seu escriptori està amagat. Esc o Surt del mode d'aplicacions el torna a mostrar.",
-  "agent.st.needsTools": "Calen les eines",
   "cfg.resolutionFollowNote": "La màquina arrenca amb la mida de la finestra i la segueix mentre el sistema ho permeti. La barra de la finestra encara pot triar una altra mida.",
   "cfg.resolutionFixedNote": "La màquina arrenca amb aquesta mida: tots els sistemes la prenen en iniciar-se, també els que no segueixen la finestra. La barra de la finestra encara en pot triar una altra mentre funciona."
 }

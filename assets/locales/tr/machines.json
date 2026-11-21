@@ -626,10 +626,11 @@
   "agent.installing": "Yükleniyor…",
   "agent.installHelper": "Pano Yardımcısını Yükle",
   "agent.installTools": "LordOS Araçlarını Yükle",
-  "agent.st.needsTools": "Araçları yükleyin",
+  "agent.st.needsTools": "Araçlar gerekli",
   "agent.toolsInstalled": "LordOS araçları makinede yüklü ve çalışıyor; her oturum açılışında yeniden başlar.",
   "agent.timesync": "Saati Ayarla",
   "agent.installed": "Pano yardımcısı yüklendi; makinedeki bir sonraki masaüstü oturumuyla başlar.",
+  "agent.clipOff": "Bu makinede pano kapalı. Makine kapalıyken Yapılandır → Paylaşım bölümünden açın.",
   "agent.err.missing": "Bu bilgisayarda bu makinenin sistemi için araçlar yok: LordOS'u güncelleyin.",
   "agent.err.busy": "Makinenin aracısı meşgul: birazdan yeniden deneyin.",
   "agent.err.noExec": "Makinenin konuk aracısı dosya kopyalamaya ve program çalıştırmaya izin vermiyor.",
@@ -975,7 +976,6 @@
   "apps.gone": "Bu pencere makinede kapandı",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Makinenin uygulamaları kendi pencerelerinde ve masaüstü gizli. Esc veya Uygulama Modundan Çık onu yeniden gösterir.",
-  "agent.st.needsTools": "Araçlar gerekli",
   "cfg.resolutionFollowNote": "Makine pencere boyutunda başlar ve sistemi izin verdikçe onu izler. Pencerenin araç çubuğundan yine başka bir boyut seçilebilir.",
   "cfg.resolutionFixedNote": "Makine bu boyutta başlar: pencereyi izlemeyenler dahil her sistem başlarken bunu alır. Çalışırken pencerenin araç çubuğundan yine başka bir boyut seçilebilir."
 }

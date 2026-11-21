@@ -626,10 +626,11 @@
   "agent.installing": "Memasang…",
   "agent.installHelper": "Pasang Pembantu Papan Keratan",
   "agent.installTools": "Pasang Alatan LordOS",
-  "agent.st.needsTools": "Pasang alatan",
+  "agent.st.needsTools": "Perlukan alatan",
   "agent.toolsInstalled": "Alatan LordOS dipasang dan berjalan dalam mesin; ia bermula semula setiap kali log masuk.",
   "agent.timesync": "Tetapkan Jam",
   "agent.installed": "Pembantu papan keratan telah dipasang; ia bermula dengan sesi desktop seterusnya dalam mesin.",
+  "agent.clipOff": "Papan keratan dimatikan dalam mesin ini. Hidupkannya dalam Konfigurasi → Perkongsian, semasa mesin dimatikan.",
   "agent.err.missing": "Komputer ini tiada alat untuk sistem mesin ini: kemas kini LordOS.",
   "agent.err.busy": "Ejen mesin sedang sibuk: cuba lagi sebentar nanti.",
   "agent.err.noExec": "Ejen tetamu mesin tidak membenarkan penyalinan fail atau menjalankan program.",
@@ -975,7 +976,6 @@
   "apps.gone": "Tetingkap ini ditutup dalam mesin",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Aplikasi mesin berada dalam tetingkap sendiri dan desktopnya disembunyikan. Esc atau Keluar Mod Aplikasi menunjukkannya semula.",
-  "agent.st.needsTools": "Perlukan alatan",
   "cfg.resolutionFollowNote": "Mesin bermula dengan saiz tetingkap dan mengikutinya selagi sistemnya membenarkan. Bar alat tetingkap masih boleh memilih saiz lain.",
   "cfg.resolutionFixedNote": "Mesin bermula dengan saiz ini: setiap sistem mengambilnya semasa bermula, termasuk yang tidak mengikut tetingkap. Bar alat tetingkap masih boleh memilih saiz lain semasa ia berjalan."
 }

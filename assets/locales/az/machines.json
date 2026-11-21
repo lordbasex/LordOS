@@ -626,10 +626,11 @@
   "agent.installing": "Quraşdırılır…",
   "agent.installHelper": "Mübadilə buferi köməkçisini quraşdır",
   "agent.installTools": "LordOS alətlərini quraşdırın",
-  "agent.st.needsTools": "Alətləri quraşdırın",
+  "agent.st.needsTools": "Alətlər lazımdır",
   "agent.toolsInstalled": "LordOS alətləri maşında quraşdırılıb və işləyir; hər girişdə yenidən başlayır.",
   "agent.timesync": "Saatı təyin et",
   "agent.installed": "Mübadilə buferi köməkçisi quraşdırıldı; maşındakı növbəti masaüstü seansı ilə başlayır.",
+  "agent.clipOff": "Bu maşında mübadilə buferi söndürülüb. Maşın sönülü ikən Konfiqurasiya → Paylaşma bölməsindən aktiv edin.",
   "agent.err.missing": "Bu kompüterdə bu maşının sistemi üçün alətlər yoxdur: LordOS-u yeniləyin.",
   "agent.err.busy": "Maşının agenti məşğuldur: bir azdan yenidən cəhd edin.",
   "agent.err.noExec": "Maşının qonaq agenti faylları kopyalamağa və proqramları işə salmağa icazə vermir.",
@@ -975,7 +976,6 @@
   "apps.gone": "Bu pəncərə maşında bağlandı",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Maşının tətbiqləri öz pəncərələrindədir, iş masası gizlidir. Esc və ya Tətbiqlər rejimindən çıx onu yenidən göstərir.",
-  "agent.st.needsTools": "Alətlər lazımdır",
   "cfg.resolutionFollowNote": "Maşın pəncərənin ölçüsü ilə başlayır və sistemi imkan verdikcə onu izləyir. Pəncərənin alət paneli yenə başqa ölçü seçə bilər.",
   "cfg.resolutionFixedNote": "Maşın bu ölçü ilə başlayır: hər sistem onu başlayanda götürür, pəncərəni izləməyənlər də. Pəncərənin alət paneli işləyərkən yenə başqa ölçü seçə bilər."
 }

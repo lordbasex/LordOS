@@ -626,10 +626,11 @@
   "agent.installing": "Installerar…",
   "agent.installHelper": "Installera urklippshjälpen",
   "agent.installTools": "Installera LordOS-verktyg",
-  "agent.st.needsTools": "Installera verktyg",
+  "agent.st.needsTools": "Behöver verktygen",
   "agent.toolsInstalled": "LordOS-verktygen är installerade och körs i maskinen; de startar igen vid varje inloggning.",
   "agent.timesync": "Ställ klockan",
   "agent.installed": "Urklippshjälpen är installerad; den startar med nästa skrivbordssession i maskinen.",
+  "agent.clipOff": "Urklipp är avstängt i den här maskinen. Slå på det under Konfigurera → Delning, med maskinen avstängd.",
   "agent.err.missing": "Den här datorn har inte verktygen för den här maskinens system: uppdatera LordOS.",
   "agent.err.busy": "Maskinens agent är upptagen: försök igen om en stund.",
   "agent.err.noExec": "Maskinens gästagent tillåter inte att filer kopieras eller program körs.",
@@ -975,7 +976,6 @@
   "apps.gone": "Det här fönstret stängdes i maskinen",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Maskinens appar ligger i egna fönster och dess skrivbord är dolt. Esc eller Lämna appläget visar det igen.",
-  "agent.st.needsTools": "Behöver verktygen",
   "cfg.resolutionFollowNote": "Maskinen startar i fönstrets storlek och följer det så länge systemet tillåter. Fönstrets verktygsfält kan ändå välja en annan storlek.",
   "cfg.resolutionFixedNote": "Maskinen startar i den här storleken: varje system tar den vid start, även de som inte följer fönstret. Fönstrets verktygsfält kan ändå välja en annan medan den kör."
 }

@@ -626,10 +626,11 @@
   "agent.installing": "Asennetaan…",
   "agent.installHelper": "Asenna leikepöydän apuohjelma",
   "agent.installTools": "Asenna LordOS-työkalut",
-  "agent.st.needsTools": "Asenna työkalut",
+  "agent.st.needsTools": "Tarvitsee työkalut",
   "agent.toolsInstalled": "LordOS-työkalut on asennettu koneeseen ja ne ovat käynnissä; ne käynnistyvät uudelleen jokaisella kirjautumisella.",
   "agent.timesync": "Aseta kello",
   "agent.installed": "Leikepöydän apuohjelma on asennettu; se käynnistyy koneen seuraavan työpöytäistunnon mukana.",
+  "agent.clipOff": "Leikepöytä on pois päältä tässä koneessa. Ota se käyttöön kohdassa Määritä → Jakaminen, kun kone on sammutettu.",
   "agent.err.missing": "Tällä tietokoneella ei ole työkaluja tämän koneen järjestelmälle: päivitä LordOS.",
   "agent.err.busy": "Koneen agentti on varattu: yritä hetken kuluttua uudelleen.",
   "agent.err.noExec": "Koneen vierasagentti ei salli tiedostojen kopioimista eikä ohjelmien suorittamista.",
@@ -975,7 +976,6 @@
   "apps.gone": "Tämä ikkuna suljettiin koneessa",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Koneen sovellukset ovat omissa ikkunoissaan ja sen työpöytä on piilossa. Esc tai Poistu sovellustilasta näyttää sen taas.",
-  "agent.st.needsTools": "Tarvitsee työkalut",
   "cfg.resolutionFollowNote": "Kone käynnistyy ikkunan kokoisena ja seuraa sitä niin kuin järjestelmä sallii. Ikkunan työkalupalkista voi silti valita toisen koon.",
   "cfg.resolutionFixedNote": "Kone käynnistyy tämän kokoisena: jokainen järjestelmä ottaa sen käynnistyessään, myös ne, jotka eivät seuraa ikkunaa. Ikkunan työkalupalkista voi silti valita toisen koon käytön aikana."
 }

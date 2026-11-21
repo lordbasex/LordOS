@@ -626,10 +626,11 @@
   "agent.installing": "Memasang…",
   "agent.installHelper": "Pasang Helper Papan Klip",
   "agent.installTools": "Pasang Alat LordOS",
-  "agent.st.needsTools": "Pasang alat",
+  "agent.st.needsTools": "Perlu alatnya",
   "agent.toolsInstalled": "Alat LordOS terpasang dan berjalan di mesin; alat ini mulai lagi setiap kali masuk.",
   "agent.timesync": "Atur Jam",
   "agent.installed": "Helper papan klip sudah terpasang; akan dimulai pada sesi desktop berikutnya di mesin.",
+  "agent.clipOff": "Papan klip nonaktif di mesin ini. Aktifkan di Konfigurasi → Berbagi, saat mesin mati.",
   "agent.err.missing": "Komputer ini tidak punya alat untuk sistem mesin ini: perbarui LordOS.",
   "agent.err.busy": "Agen mesin sedang sibuk: coba lagi sebentar lagi.",
   "agent.err.noExec": "Agen tamu mesin tidak mengizinkan menyalin file atau menjalankan program.",
@@ -975,7 +976,6 @@
   "apps.gone": "Jendela ini ditutup di dalam mesin",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Aplikasi mesin ada di jendelanya sendiri, dan desktopnya disembunyikan. Esc atau Keluar dari Mode Aplikasi menampilkannya lagi.",
-  "agent.st.needsTools": "Perlu alatnya",
   "cfg.resolutionFollowNote": "Mesin dimulai dengan ukuran jendela dan mengikutinya selama sistemnya mengizinkan. Bilah alat jendela tetap bisa memilih ukuran lain.",
   "cfg.resolutionFixedNote": "Mesin dimulai dengan ukuran ini: setiap sistem memakainya saat dimulai, termasuk yang tidak mengikuti jendela. Bilah alat jendela tetap bisa memilih ukuran lain selama berjalan."
 }

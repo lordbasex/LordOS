@@ -626,10 +626,11 @@
   "agent.installing": "インストール中…",
   "agent.installHelper": "クリップボードヘルパーをインストール",
   "agent.installTools": "LordOS ツールをインストール",
-  "agent.st.needsTools": "ツールをインストール",
+  "agent.st.needsTools": "ツールが必要",
   "agent.toolsInstalled": "LordOS ツールはマシンにインストールされ、動作しています。サインインのたびに再び起動します。",
   "agent.timesync": "時計を合わせる",
   "agent.installed": "クリップボードヘルパーをインストールしました。マシン内の次のデスクトップセッションから起動します。",
+  "agent.clipOff": "このマシンではクリップボードがオフです。マシンを停止した状態で、構成 → 共有 からオンにしてください。",
   "agent.err.missing": "このコンピューターには、このマシンのシステム用のツールがありません。LordOS をアップデートしてください。",
   "agent.err.busy": "マシンのエージェントが処理中です。少し待ってからもう一度お試しください。",
   "agent.err.noExec": "マシンのゲストエージェントがファイルのコピーやプログラムの実行を許可していません。",
@@ -975,7 +976,6 @@
   "apps.gone": "このウインドウはマシン内で閉じられました",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "マシンのアプリは個別のウインドウで表示され、デスクトップは隠れています。Esc または「アプリモードを終了」で再び表示します。",
-  "agent.st.needsTools": "ツールが必要",
   "cfg.resolutionFollowNote": "マシンはウインドウのサイズで起動し、システムが許す限りそれに合わせます。ウインドウのツールバーから別のサイズも選べます。",
   "cfg.resolutionFixedNote": "マシンはこのサイズで起動します。ウインドウに合わせないシステムも含め、どのシステムも起動時にこのサイズになります。実行中もウインドウのツールバーから別のサイズを選べます。"
 }

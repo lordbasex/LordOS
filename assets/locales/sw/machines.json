@@ -626,10 +626,11 @@
   "agent.installing": "Inasakinisha…",
   "agent.installHelper": "Sakinisha Msaidizi wa Ubao wa Kunakili",
   "agent.installTools": "Sakinisha Zana za LordOS",
-  "agent.st.needsTools": "Sakinisha zana",
+  "agent.st.needsTools": "Inahitaji zana",
   "agent.toolsInstalled": "Zana za LordOS zimesakinishwa na zinafanya kazi kwenye mashine; zinaanza tena kila unapoingia.",
   "agent.timesync": "Weka Saa",
   "agent.installed": "Msaidizi wa ubao wa kunakili umesakinishwa; unaanza na kipindi kijacho cha eneo-kazi ndani ya mashine.",
+  "agent.clipOff": "Ubao wa kunakili umezimwa katika mashine hii. Uwashe kwenye Sanidi → Kushiriki, mashine ikiwa imezimwa.",
   "agent.err.missing": "Kompyuta hii haina zana za mfumo wa mashine hii: sasisha LordOS.",
   "agent.err.busy": "Wakala wa mashine yuko na shughuli: jaribu tena baada ya muda mfupi.",
   "agent.err.noExec": "Wakala mgeni wa mashine haruhusu kunakili faili au kuendesha programu.",
@@ -975,7 +976,6 @@
   "apps.gone": "Dirisha hili lilifungwa ndani ya mashine",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Programu za mashine ziko katika madirisha yao, na eneo-kazi lake limefichwa. Esc au Ondoka kwenye Hali ya Programu hulionyesha tena.",
-  "agent.st.needsTools": "Inahitaji zana",
   "cfg.resolutionFollowNote": "Mashine inaanza kwa ukubwa wa dirisha na kuufuata kadiri mfumo wake unavyoruhusu. Upau wa zana wa dirisha bado unaweza kuchagua ukubwa mwingine.",
   "cfg.resolutionFixedNote": "Mashine inaanza kwa ukubwa huu: kila mfumo huuchukua inapoanza, hata isiyofuata dirisha. Upau wa zana wa dirisha bado unaweza kuchagua mwingine ikiendelea kufanya kazi."
 }

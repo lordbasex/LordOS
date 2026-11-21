@@ -626,10 +626,11 @@
   "agent.installing": "正在安装…",
   "agent.installHelper": "安装剪贴板辅助程序",
   "agent.installTools": "安装 LordOS 工具",
-  "agent.st.needsTools": "需安装工具",
+  "agent.st.needsTools": "需要工具",
   "agent.toolsInstalled": "LordOS 工具已在虚拟机中安装并运行；每次登录时会再次启动。",
   "agent.timesync": "校准时钟",
   "agent.installed": "剪贴板辅助程序已安装；它会在虚拟机中下一次桌面会话时启动。",
+  "agent.clipOff": "此机器的剪贴板已关闭。请在机器关闭时，于“配置 → 共享”中开启。",
   "agent.err.missing": "这台计算机没有适用于此机器系统的工具：请更新 LordOS。",
   "agent.err.busy": "机器的代理正忙：请稍后再试。",
   "agent.err.noExec": "机器的客户机代理不允许复制文件或运行程序。",
@@ -975,7 +976,6 @@
   "apps.gone": "此窗口已在机器中关闭",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "机器的应用在各自的窗口中，其桌面已隐藏。按 Esc 或“退出应用模式”可再次显示。",
-  "agent.st.needsTools": "需要工具",
   "cfg.resolutionFollowNote": "机器以窗口的大小启动，并在系统允许时跟随窗口。窗口的工具栏仍可选择其他大小。",
   "cfg.resolutionFixedNote": "机器以此大小启动：每个系统在启动时都会采用它，包括不跟随窗口的系统。运行时仍可在窗口的工具栏选择其他大小。"
 }

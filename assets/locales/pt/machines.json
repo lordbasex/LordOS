@@ -626,10 +626,11 @@
   "agent.installing": "Instalando…",
   "agent.installHelper": "Instalar ajudante da área de transferência",
   "agent.installTools": "Instalar ferramentas do LordOS",
-  "agent.st.needsTools": "Instalar ferramentas",
+  "agent.st.needsTools": "Precisa das ferramentas",
   "agent.toolsInstalled": "As ferramentas do LordOS estão instaladas e funcionando na máquina; iniciam de novo a cada entrada na sessão.",
   "agent.timesync": "Acertar o relógio",
   "agent.installed": "O ajudante está instalado; inicia com a próxima sessão de desktop na máquina.",
+  "agent.clipOff": "A área de transferência está desligada nesta máquina. Ative-a em Configurar → Compartilhar, com a máquina desligada.",
   "agent.err.missing": "Este computador não tem as ferramentas para o sistema desta máquina: atualize o LordOS.",
   "agent.err.busy": "O agente da máquina está ocupado: tente de novo em instantes.",
   "agent.err.noExec": "O agente convidado da máquina não permite copiar arquivos nem executar programas.",
@@ -975,7 +976,6 @@
   "apps.gone": "Esta janela foi fechada na máquina",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Os apps da máquina estão em janelas próprias e a área de trabalho dela está oculta. Esc ou Sair do modo apps mostra de novo.",
-  "agent.st.needsTools": "Precisa das ferramentas",
   "cfg.resolutionFollowNote": "A máquina inicia com o tamanho da janela e o acompanha enquanto o sistema permitir. A barra da janela ainda pode escolher outro tamanho.",
   "cfg.resolutionFixedNote": "A máquina inicia com este tamanho: todo sistema o adota ao iniciar, também os que não acompanham a janela. A barra da janela ainda pode escolher outro enquanto ela roda."
 }

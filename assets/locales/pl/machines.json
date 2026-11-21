@@ -626,10 +626,11 @@
   "agent.installing": "Instalowanie…",
   "agent.installHelper": "Zainstaluj pomocnika schowka",
   "agent.installTools": "Zainstaluj narzędzia LordOS",
-  "agent.st.needsTools": "Zainstaluj narzędzia",
+  "agent.st.needsTools": "Wymaga narzędzi",
   "agent.toolsInstalled": "Narzędzia LordOS są zainstalowane i działają w maszynie; uruchamiają się ponownie przy każdym logowaniu.",
   "agent.timesync": "Ustaw zegar",
   "agent.installed": "Pomocnik schowka jest zainstalowany; uruchomi się z następną sesją pulpitu w maszynie.",
+  "agent.clipOff": "Schowek jest wyłączony w tej maszynie. Włącz go w Konfiguruj → Udostępnianie, gdy maszyna jest wyłączona.",
   "agent.err.missing": "Ten komputer nie ma narzędzi dla systemu tej maszyny: zaktualizuj LordOS.",
   "agent.err.busy": "Agent maszyny jest zajęty: spróbuj ponownie za chwilę.",
   "agent.err.noExec": "Agent gościa maszyny nie pozwala kopiować plików ani uruchamiać programów.",
@@ -975,7 +976,6 @@
   "apps.gone": "To okno zamknęło się w maszynie",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "Aplikacje maszyny są we własnych oknach, a jej pulpit jest ukryty. Esc lub Wyjdź z trybu aplikacji pokazuje go ponownie.",
-  "agent.st.needsTools": "Wymaga narzędzi",
   "cfg.resolutionFollowNote": "Maszyna startuje w rozmiarze okna i podąża za nim, dopóki pozwala na to jej system. Pasek okna nadal może wybrać inny rozmiar.",
   "cfg.resolutionFixedNote": "Maszyna startuje w tym rozmiarze: każdy system przyjmuje go przy starcie, także te, które nie podążają za oknem. Podczas pracy pasek okna nadal może wybrać inny."
 }

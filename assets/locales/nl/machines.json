@@ -626,10 +626,11 @@
   "agent.installing": "Installeren…",
   "agent.installHelper": "Installeer klembordhulp",
   "agent.installTools": "LordOS-hulpmiddelen installeren",
-  "agent.st.needsTools": "Hulpmiddelen installeren",
+  "agent.st.needsTools": "Hulpmiddelen nodig",
   "agent.toolsInstalled": "De LordOS-hulpmiddelen zijn geïnstalleerd en draaien in de machine; ze starten opnieuw bij elke aanmelding.",
   "agent.timesync": "Zet de klok gelijk",
   "agent.installed": "De klembordhulp is geïnstalleerd; hij start met de volgende bureaubladsessie in de machine.",
+  "agent.clipOff": "Het klembord staat uit in deze machine. Zet het aan via Configureren → Delen, met de machine uit.",
   "agent.err.missing": "Deze computer heeft de hulpmiddelen voor het systeem van deze machine niet: werk LordOS bij.",
   "agent.err.busy": "De agent van de machine is bezig: probeer het zo opnieuw.",
   "agent.err.noExec": "De gastagent van de machine staat het kopiëren van bestanden of het starten van programma's niet toe.",
@@ -975,7 +976,6 @@
   "apps.gone": "Dit venster is in de machine gesloten",
   "apps.windowTitle": "{title} — {machine}",
   "apps.controllerHint": "De apps van de machine staan in eigen vensters en het bureaublad is verborgen. Esc of Appmodus verlaten toont het weer.",
-  "agent.st.needsTools": "Hulpmiddelen nodig",
   "cfg.resolutionFollowNote": "De machine start op de grootte van het venster en volgt die zolang het systeem het toelaat. De werkbalk van het venster kan nog steeds een andere grootte kiezen.",
   "cfg.resolutionFixedNote": "De machine start op deze grootte: elk systeem neemt die over bij het starten, ook systemen die het venster niet volgen. De werkbalk van het venster kan tijdens het draaien nog steeds een andere kiezen."
 }
