@@ -143,7 +143,7 @@
       for (let i = 0; i < 6; i++) step('call', () => {
         const t0 = lord.now();
         const r = lord.monitor.processes('en');
-        if (r) log({ native: `monitor.processes (${r.list.length})`, ms: +(lord.now() - t0).toFixed(2) });
+        if (r) log({ native: `monitor.processes (${r.list.length}, ${r.list.filter((p) => p.app).length} with an app, self ${r.list.find((p) => p.self)?.app})`, ms: +(lord.now() - t0).toFixed(2) });
       });
       end();
     },

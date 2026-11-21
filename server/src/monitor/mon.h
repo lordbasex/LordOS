@@ -22,7 +22,22 @@ void mon_want(int procs, int conns, int geo);
 /* Copies (malloc) of the latest JSON, or NULL if there isn't one newer than *seq (which is updated).
  * Requesting a sample keeps the thread alive. */
 char *mon_sample_json(uint64_t *seq);
-char *mon_procs_json(uint64_t *seq);
+/* The process list, built by the thread once per second while wanted, as rows: handed over (not copied) when newer
+ * than *seq, freed by the caller with free() (one block). Its strings are offsets into pool (0 is ""). sk, sid: the
+ * app scope (mon_scope_of below); prot: why it may not be stopped (procctl.c, 0: it may); st: the start time in
+ * ticks (proc_signal's check); start: the same in seconds since boot. */
+typedef struct {
+    int pid, ppid;
+    unsigned uid;
+    int self;                           /* lord-server itself */
+    char state, sk;
+    long long threads;
+    double cpu, start;
+    unsigned long long rss, st, pss;    /* pss: 0 when not read */
+    unsigned user, name, cmd, exe, prot, sid;
+} MonProc;
+typedef struct { double t; long hz; int n; MonProc *rows; char *pool; } MonProcs;
+MonProcs *mon_procs_take(uint64_t *seq);
 char *mon_conns_json(uint64_t *seq);
 /* Get Info (procctl.c): the process whose details the thread builds once per second (pid 0: none)
  * and the latest JSON. start: its start time in ticks, so a reused PID shows as gone. */
@@ -45,8 +60,8 @@ void mon_want_gpu(int on);
 char *mon_gpu_json(uint64_t *seq);
 /* The app scope a process runs in (app-lordos-<id>.scope and its lpk- and fp- kinds, docs/FIREWALL.md): 'd' (a .desktop
  * app), 'l' (an isolated app), 'f' (a Flatpak app) or 0 (none), and its id in id. mon_scope_parse reads it from the text
- * of /proc/<pid>/cgroup; mon_scope_of reads that file. The process list (mon_procs_json) carries each one as "sk" and
- * "sid", read by the thread. */
+ * of /proc/<pid>/cgroup; mon_scope_of reads that file. The process list (mon_procs_take) carries each one, read by the
+ * thread. */
 #define MON_SCOPE_MAX 160
 char mon_scope_parse(const char *cgroup, char *id, size_t n);
 char mon_scope_of(int pid, char *id, size_t n);

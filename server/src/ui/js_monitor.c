@@ -177,13 +177,46 @@ static void str_prop(JSContext *c, JSValueConst o, const char *key, char *out, s
     JS_FreeValue(c, v);
 }
 
-/* Adds app, appName and appIcon to each element of obj.list. */
+/* The apps a list is matched against: the .desktop ones, and the Flatpak ones once a process in such a scope is seen */
+typedef struct { const char *lang; const DesktopApp *apps, *fps; int napps, nfps; } AppSet;
+
+/* Sets app, appName and appIcon on e: LordOS itself; the app scope's (an isolated app, a Flatpak app, a .desktop
+ * app even when its file isn't found); else the .desktop app whose program is the executable, argv[0] or the name. */
+static void app_props(JSContext *c, JSValue e, AppSet *as, int is_self, char sk, const char *sid, const char *exe, const char *cmd, const char *name) {
+    if (is_self) { JS_SetPropertyStr(c, e, "app", JS_NewString(c, "lordos")); return; }
+    char id[200];
+    const DesktopApp *a = NULL;
+    if (sk == 'l') { snprintf(id, sizeof id, "lpk:%s", sid); JS_SetPropertyStr(c, e, "app", JS_NewString(c, id)); return; }
+    if (sk == 'f') {                                /* every process of a Flatpak app: bubblewrap, its proxy, the app */
+        if (as->nfps < 0) as->nfps = apps_flatpak_list(as->lang, &as->fps);
+        snprintf(id, sizeof id, "flatpak:%s", sid);
+        JS_SetPropertyStr(c, e, "app", JS_NewString(c, id));
+        for (int k = 0; k < as->nfps; k++)
+            if (!strcmp(as->fps[k].id, sid)) {
+                JS_SetPropertyStr(c, e, "appName", JS_NewString(c, as->fps[k].name));
+                JS_SetPropertyStr(c, e, "appIcon", JS_NewString(c, as->fps[k].icon));
+                break;
+            }
+        return;
+    }
+    if (sk == 'd') {
+        for (int k = 0; k < as->napps && !a; k++) if (!strcmp(as->apps[k].id, sid)) a = &as->apps[k];
+        if (!a) { snprintf(id, sizeof id, "desktop:%s", sid); JS_SetPropertyStr(c, e, "app", JS_NewString(c, id)); return; }   /* the scope wins */
+    }
+    if (!a) a = match(as->apps, as->napps, exe, cmd, name);
+    if (a) {
+        snprintf(id, sizeof id, "desktop:%s", a->id);
+        JS_SetPropertyStr(c, e, "app", JS_NewString(c, id));
+        JS_SetPropertyStr(c, e, "appName", JS_NewString(c, a->name));
+        JS_SetPropertyStr(c, e, "appIcon", JS_NewString(c, a->icon));
+    }
+}
+
+/* Adds app, appName and appIcon to each element of obj.list (the GPU's list, from JSON). */
 static JSValue annotate(JSContext *c, JSValue obj, const char *lang) {
     if (!JS_IsObject(obj)) return obj;
-    const DesktopApp *apps = NULL;
-    int napps = apps_list(lang, &apps);
-    const DesktopApp *fps = NULL;
-    int nfps = -1;                                  /* the Flatpak apps, read when a process in such a scope is seen */
+    AppSet as = { .lang = lang, .nfps = -1 };
+    as.napps = apps_list(lang, &as.apps);
     JSValue list = JS_GetPropertyStr(c, obj, "list");
     uint32_t len = 0;
     JSValue lv = JS_GetPropertyStr(c, list, "length");
@@ -194,78 +227,77 @@ static JSValue annotate(JSContext *c, JSValue obj, const char *lang) {
         JSValue self = JS_GetPropertyStr(c, e, "self");
         int is_self = JS_ToBool(c, self) > 0;
         JS_FreeValue(c, self);
-        if (is_self) JS_SetPropertyStr(c, e, "app", JS_NewString(c, "lordos"));
-        else {
-            char exe[4096], cmd[256], name[64];
-            str_prop(c, e, "exe", exe, sizeof exe);
-            str_prop(c, e, "cmd", cmd, sizeof cmd);
-            str_prop(c, e, "name", name, sizeof name);
-            const DesktopApp *a = NULL;
-            int32_t pid = 0;
-            JSValue pv = JS_GetPropertyStr(c, e, "pid");
-            JS_ToInt32(c, &pid, pv);
-            JS_FreeValue(c, pv);
-            char sk = 0, sid[MON_SCOPE_MAX];
-            JSValue skv = JS_GetPropertyStr(c, e, "sk");
-            int have = JS_IsString(skv);                /* the process list: read by the monitor's thread */
-            if (have) {
-                char k[4];
-                str_prop(c, e, "sk", k, sizeof k);
-                str_prop(c, e, "sid", sid, sizeof sid);
-                sk = sid[0] && (k[0] == 'd' || k[0] == 'l' || k[0] == 'f') ? k[0] : 0;
-            }
-            JS_FreeValue(c, skv);
-            if (pid > 0 && (have ? sk != 0 : !scope_of(pid, &sk, sid, sizeof sid))) {
-                if (sk == 'l') {
-                    char id[200];
-                    snprintf(id, sizeof id, "lpk:%s", sid);
-                    JS_SetPropertyStr(c, e, "app", JS_NewString(c, id));
-                    JS_FreeValue(c, e);
-                    continue;
-                }
-                if (sk == 'f') {                        /* every process of a Flatpak app: bubblewrap, its proxy, the app */
-                    if (nfps < 0) nfps = apps_flatpak_list(lang, &fps);
-                    char id[200];
-                    snprintf(id, sizeof id, "flatpak:%s", sid);
-                    JS_SetPropertyStr(c, e, "app", JS_NewString(c, id));
-                    for (int k = 0; k < nfps; k++)
-                        if (!strcmp(fps[k].id, sid)) {
-                            JS_SetPropertyStr(c, e, "appName", JS_NewString(c, fps[k].name));
-                            JS_SetPropertyStr(c, e, "appIcon", JS_NewString(c, fps[k].icon));
-                            break;
-                        }
-                    JS_FreeValue(c, e);
-                    continue;
-                }
-                for (int k = 0; k < napps && !a; k++) if (!strcmp(apps[k].id, sid)) a = &apps[k];
-                if (!a) {                               /* the scope wins even if the .desktop is not found */
-                    char id[200];
-                    snprintf(id, sizeof id, "desktop:%s", sid);
-                    JS_SetPropertyStr(c, e, "app", JS_NewString(c, id));
-                    JS_FreeValue(c, e);
-                    continue;
-                }
-            }
-            if (!a) a = match(apps, napps, exe, cmd, name);
-            if (a) {
-                char id[200];
-                snprintf(id, sizeof id, "desktop:%s", a->id);
-                JS_SetPropertyStr(c, e, "app", JS_NewString(c, id));
-                JS_SetPropertyStr(c, e, "appName", JS_NewString(c, a->name));
-                JS_SetPropertyStr(c, e, "appIcon", JS_NewString(c, a->icon));
-            }
-        }
+        char exe[4096], cmd[256], name[64], sk = 0, sid[MON_SCOPE_MAX] = "";
+        str_prop(c, e, "exe", exe, sizeof exe);
+        str_prop(c, e, "cmd", cmd, sizeof cmd);
+        str_prop(c, e, "name", name, sizeof name);
+        int32_t pid = 0;
+        JSValue pv = JS_GetPropertyStr(c, e, "pid");
+        JS_ToInt32(c, &pid, pv);
+        JS_FreeValue(c, pv);
+        if (!is_self && pid > 0 && scope_of(pid, &sk, sid, sizeof sid)) sk = 0;
+        app_props(c, e, &as, is_self, sk, sid, exe, cmd, name);
         JS_FreeValue(c, e);
     }
     JS_FreeValue(c, list);
     return obj;
 }
 
+/* { t, total, hz, list: [{ pid, ppid, uid, user, name, cmd, exe, state, threads, cpu, rss, start, st, self, prot, pss?,
+ * app?, appName?, appIcon? }] } made straight from the thread's rows (MonProcs), each key's atom made once */
+enum { PK_PID, PK_PPID, PK_UID, PK_USER, PK_NAME, PK_CMD, PK_EXE, PK_STATE, PK_THREADS, PK_CPU, PK_RSS, PK_START, PK_ST,
+       PK_SELF, PK_PROT, PK_PSS, PK_N };
+static const char *const PK_NAMES[PK_N] = { "pid", "ppid", "uid", "user", "name", "cmd", "exe", "state", "threads", "cpu", "rss",
+                                            "start", "st", "self", "prot", "pss" };
+
 static JSValue f_processes(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char lang[16];
     if (arg_lang(c, argc, argv, lang, sizeof lang)) return JS_EXCEPTION;
-    return annotate(c, parse(c, mon_procs_json(&seq_procs), "<monitor.processes>"), lang);
+    MonProcs *pl = mon_procs_take(&seq_procs);
+    if (!pl) return JS_NULL;
+    AppSet as = { .lang = lang, .nfps = -1 };
+    as.napps = apps_list(lang, &as.apps);
+    JSAtom k[PK_N];
+    for (int i = 0; i < PK_N; i++) k[i] = JS_NewAtom(c, PK_NAMES[i]);
+    JSValue o = JS_NewObject(c), list = JS_NewArray(c);
+    /* a user's name, the same string for each of their processes */
+    struct { unsigned off; JSValue v; } users[16];
+    int nu = 0;
+    for (int i = 0; i < pl->n; i++) {
+        const MonProc *r = &pl->rows[i];
+        const char *P = pl->pool;
+        JSValue e = JS_NewObject(c), u = JS_UNDEFINED;
+        for (int j = 0; j < nu; j++) if (users[j].off == r->user) u = JS_DupValue(c, users[j].v);
+        if (JS_IsUndefined(u)) { u = JS_NewString(c, P + r->user); if (nu < 16) { users[nu].off = r->user; users[nu++].v = JS_DupValue(c, u); } }
+        char st[2] = { r->state, 0 };
+        JS_DefinePropertyValue(c, e, k[PK_PID], JS_NewInt32(c, r->pid), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_PPID], JS_NewInt32(c, r->ppid), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_UID], JS_NewUint32(c, r->uid), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_USER], u, JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_NAME], JS_NewString(c, P + r->name), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_CMD], JS_NewString(c, P + r->cmd), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_EXE], JS_NewString(c, P + r->exe), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_STATE], JS_NewString(c, st), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_THREADS], JS_NewInt64(c, r->threads), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_CPU], JS_NewFloat64(c, r->cpu), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_RSS], JS_NewFloat64(c, (double)r->rss), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_START], JS_NewFloat64(c, round(r->start)), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_ST], JS_NewFloat64(c, (double)r->st), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_SELF], JS_NewBool(c, r->self), JS_PROP_C_W_E);
+        JS_DefinePropertyValue(c, e, k[PK_PROT], r->prot ? JS_NewString(c, P + r->prot) : JS_NULL, JS_PROP_C_W_E);
+        if (r->pss) JS_DefinePropertyValue(c, e, k[PK_PSS], JS_NewFloat64(c, (double)r->pss), JS_PROP_C_W_E);
+        app_props(c, e, &as, r->self, r->sk, P + r->sid, P + r->exe, P + r->cmd, P + r->name);
+        JS_SetPropertyUint32(c, list, (uint32_t)i, e);
+    }
+    for (int j = 0; j < nu; j++) JS_FreeValue(c, users[j].v);
+    for (int i = 0; i < PK_N; i++) JS_FreeAtom(c, k[i]);
+    JS_SetPropertyStr(c, o, "t", JS_NewFloat64(c, round(pl->t)));
+    JS_SetPropertyStr(c, o, "list", list);
+    JS_SetPropertyStr(c, o, "total", JS_NewInt32(c, pl->n));
+    JS_SetPropertyStr(c, o, "hz", JS_NewInt64(c, pl->hz));
+    free(pl);
+    return o;
 }
 
 static JSValue f_want_gpu(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
