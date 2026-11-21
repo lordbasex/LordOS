@@ -634,13 +634,16 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const [cfg, setCfg] = useState({});
   useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch }); } }, [sid, st?.state]);
   const clipSent = useRef('');
-  useEffect(() => {
-    if (!focused || !sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined) return;
-    if (!(st?.agent?.caps & 32)) return;
+  // the host's clipboard into the guest (unchanged contents aren't sent again: lord-vm compares a hash)
+  const sendClip = () => {
+    if (!sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined || !(st?.agent?.caps & 32)) return;
     if (lord.vm.clipboardSendHost) { lord.vm.clipboardSendHost(sid); return; }
     const text = clipboard.get();
     if (text && text !== clipSent.current && lord.vm.clipboardSend(sid, text)) clipSent.current = text;
-  }, [focused, sid, cfg.clipboard, st?.agent?.caps]);
+  };
+  const sendClipRef = useRef(sendClip);
+  sendClipRef.current = sendClip;
+  useEffect(() => { if (focused) sendClip(); }, [focused, sid, cfg.clipboard, st?.agent?.caps]);
   const clipSeen = useRef(0);
   useEffect(() => {
     if (!sid || !st?.clipIn || st.clipIn === clipSeen.current) return;
@@ -845,7 +848,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   return (
     <View ref={root} {...drop.props} style={{ flex: 1, backgroundColor: '#000' }}>
       {appsActive ? <AppsController name={name} g={gApps} onLeave={() => setApps(false)} />
-        : <View ref={box} onMouseDown={(e) => { setShellKeys(false); down(e); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
+        : <View ref={box} onMouseEnter={() => sendClipRef.current()} onMouseDown={(e) => { setShellKeys(false); sendClipRef.current(); down(e); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
           {st?.media && st.display === 'up' ? <MediaView media={st.media} style={{ flex: 1 }} /> : null}
         </View>}
       {shell && !full ? (
