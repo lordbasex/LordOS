@@ -686,6 +686,17 @@ export function cropPoint(px, py, box, crop, gw, gh) {
 // then goes back to where the guest's window is, or it would show the guest's picture squeezed into the wrong size.
 export const guestKept = (asked, askedAt, got, now, wait = 1500) => !!asked && !!got && !nearRect(asked, got) && now - askedAt >= wait;
 
+// Apps mode: where a guest window's picture (r, this computer's coordinates) goes so its LordOS frame (inset: the
+// theme's chrome around the content) starts inside the work area (work: { x, y, w, h }), never under the menu bar or
+// a bar at the start side; null when it fits as it is. The guest is then asked to move its window there too, so the
+// window still shows its own part of the picture 1:1.
+export function insideWork(r, inset, work) {
+  if (!r || !work) return null;
+  const i = inset || { l: 0, t: 0 };
+  const x = Math.max(r.x, Math.round(work.x + (i.l || 0))), y = Math.max(r.y, Math.round(work.y + (i.t || 0)));
+  return x === r.x && y === r.y ? null : { ...r, x, y };
+}
+
 // Two rectangles the same within a few pixels (rounding between the two sides)
 export const nearRect = (a, b, tol = 2) => !!a && !!b && Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol && Math.abs(a.w - b.w) <= tol && Math.abs(a.h - b.h) <= tol;
 

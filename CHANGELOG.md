@@ -191,6 +191,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (its AppUserModelID, from the frame's property store or the hosted `CoreWindow`'s process) and report the Start menu's
   name and picture for it. Checked on a Windows 11 guest: Calculator and Settings came as "Calculadora" and
   "Configuración", each with its own 32 × 32 icon (`lordvm-dev` now saves each icon the guest sends as `icon-<id>.png`).
+- **Apps mode keeps a guest's window below the menu bar** (`apps/machines/appsmode.jsx`, `model.js` `insideWork`): a guest
+  window near the top of the guest's screen (Calculator opens at y = −10) got its LordOS title bar under the menu bar,
+  out of reach. It now opens, and follows the guest, just inside the work area, and the guest is asked to move its window
+  to the same place, so the picture stays the guest's window 1:1. `vm_model_test.mjs` covers it.
 - **The remote desktop no longer crashes lord-server when a viewer connects after the last one left**
   (`server/src/remote/mirror.c`, `server/src/media/mstream.c`): the mirror freed its copy of the screen while the video
   encoder still held it, and the next viewer's encoder copied from the freed memory. A 1920 × 1080 headless session

@@ -369,6 +369,19 @@ eq('crop point 1:1', M.cropPoint(110, 220, [100, 200, 300, 400], [500, 600, 300,
 eq('crop point scaled', M.cropPoint(250, 400, [100, 200, 300, 400], [500, 600, 600, 800], 1920, 1080), [800, 1000]);
 eq('crop point clamped to the screen', M.cropPoint(399, 599, [100, 200, 300, 400], [1800, 1000, 300, 400], 1920, 1080), [1919, 1079]);
 eq('crop point outside', [M.cropPoint(99, 220, [100, 200, 300, 400], [0, 0, 300, 400], 1920, 1080), M.cropPoint(400, 220, [100, 200, 300, 400], [0, 0, 300, 400], 1920, 1080), M.cropPoint(1, 1, [0, 0, 0, 0], [0, 0, 1, 1], 9, 9)], [null, null, null]);
+{
+  // a guest window above the menu bar (Calculator at y = -10 on a 1:1 guest; 28 px menu bar, 32 px title bar): moved
+  // below it, x kept; one that fits stays; the start side's bar too
+  const work = { x: 0, y: 28, w: 1920, h: 1052 }, inset = { l: 1, t: 32, r: 1, b: 1 };
+  eq('inside work: under the menu bar', M.insideWork({ x: 47, y: -10, w: 320, h: 500 }, inset, work), { x: 47, y: 60, w: 320, h: 500 });
+  eq('inside work: fits', M.insideWork({ x: 47, y: 60, w: 320, h: 500 }, inset, work), null);
+  eq('inside work: a left bar', M.insideWork({ x: 10, y: 200, w: 320, h: 500 }, { l: 0, t: 30 }, { x: 64, y: 0, w: 1856, h: 1080 }), { x: 64, y: 200, w: 320, h: 500 });
+  eq('inside work: no inset, no area', [M.insideWork({ x: 0, y: 0, w: 5, h: 5 }, null, { x: 0, y: 0, w: 9, h: 9 }), M.insideWork({ x: 0, y: 0, w: 5, h: 5 }, null, null)], [null, null]);
+  // the place asked of the guest is where the LordOS window shows: the crop stays 1:1 once the guest moves there
+  const d = { x: 0, y: 0, w: 1920, h: 1080 }, k = M.guestScale(1920, 1080, d);
+  const to = M.insideWork(M.toHostRect({ x: 47, y: -10, w: 320, h: 500 }, k, d), inset, work);
+  eq('inside work: the guest asked', M.toGuestRect(to, k, d), { x: 47, y: 60, w: 320, h: 500 });
+}
 eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, h: 9 }), M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 3, y: 0, w: 10, h: 10 }), M.nearRect(null, {})], [true, false, false]);
 // the guest didn't take the place asked of its window (its minimum size): after a while the LordOS window goes back
 {

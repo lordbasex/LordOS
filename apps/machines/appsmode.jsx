@@ -9,10 +9,10 @@
 // The machine's own window (vmwindow.jsx) holds the session and polls it: useAppsMode runs there. Each guest window is
 // the Machines app opened with args.guestWin (index.jsx → GuestWindow), reading what useAppsMode publishes in `guests`.
 import {
-  View, Text, MediaView, addListener, useAppWindow, useStore, createStore, wm, windows, mainDisplay, windowPixelIcons, windowChrome, t as tr,
+  View, Text, MediaView, addListener, useAppWindow, useStore, createStore, wm, windows, mainDisplay, workArea, windowPixelIcons, windowChrome, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps } from './model.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps } from './model.js';
 
 // dir → { sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], leave() }
 export const guests = createStore({});
@@ -24,10 +24,32 @@ const display = () => { const d = mainDisplay(); return { x: d?.x || 0, y: d?.y 
 
 // the frame of a LordOS window whose content (the guest's part) should be at r: the theme's chrome around it, learned
 // from the window itself once it's measured (inset), or the theme's declared size until then
-function frameAround(r, inset) {
+function insetOf(inset) {
   const c = windowChrome() || {};
-  const i = inset || { l: (c.w || 0) / 2, t: (c.h || 0) - (c.w || 0) / 2, r: (c.w || 0) / 2, b: (c.w || 0) / 2 };
+  return inset || { l: (c.w || 0) / 2, t: (c.h || 0) - (c.w || 0) / 2, r: (c.w || 0) / 2, b: (c.w || 0) / 2 };
+}
+function frameAround(r, inset) {
+  const i = insetOf(inset);
   return { x: Math.round(r.x - i.l), y: Math.round(r.y - i.t), w: Math.round(r.w + i.l + i.r), h: Math.round(r.h + i.t + i.b) };
+}
+
+// Where a guest window's picture goes here (x: its track): the guest's own place, or, when its LordOS frame would be
+// under the menu bar (a window near the guest's top edge), just below it; the guest is asked to move its window there
+// as well (once per place), so the crop stays the guest's window 1:1. A guest that keeps it where it was still shows
+// right: the crop is always its rectangle.
+function placeOf(x, w, sid, k, d) {
+  const r = toHostRect(w, k, d);
+  if (x.popup) return r;
+  const fix = insideWork(r, insetOf(x.inset), workArea());
+  if (!fix) return r;
+  const g = toGuestRect(fix, k, d);
+  if (sid && !(x.workAsk && nearRect(x.workAsk, g))) {
+    x.workAsk = g;
+    x.asked = g;
+    x.askedAt = Date.now();
+    lord.vm.winAct(sid, w.id, 'move', g.x, g.y, g.w, g.h);
+  }
+  return fix;
 }
 
 // The machine's window side: turns apps mode on and off in the guest, and keeps the LordOS windows in step with the
@@ -87,20 +109,22 @@ function sync(dir, sid, mid, name, list, gw, gh) {
   // bottom first, so the guest's front window ends up in front here too
   for (const w of [...plan.open].reverse()) {
     const instance = guestInstance(mid, w.id);
-    const r = toHostRect(w, k, d);
     const popup = isPopup(w);
+    const x = { gid: w.id, winId: 0, rect: w, minimized: false, asked: null, inset: popup ? { l: 0, t: 0, r: 0, b: 0 } : null, popup };
+    const r = placeOf(x, w, sid, k, d);
     const args = { guestWin: { dir, gid: w.id }, guest: { machine: name, mid, app: w.app || w.title, key: (w.app || '').toLowerCase() || String(w.id) } };
     const winId = popup ? wm.open('machines', { instance, frame: r, pip: r, args: { ...args, notice: true } })
       : wm.open('machines', { instance, frame: frameAround(r), args });
     if (!winId) continue;
-    have.set(w.id, { gid: w.id, winId, rect: w, minimized: false, asked: null, inset: popup ? { l: 0, t: 0, r: 0, b: 0 } : null, popup });
+    x.winId = winId;
+    have.set(w.id, x);
   }
   for (const w of plan.minimize) { const x = have.get(w.id); if (x) { x.minimized = true; wm.minimize(x.winId); } }
   for (const w of plan.restore) { const x = have.get(w.id); if (x) { x.minimized = false; wm.focus(x.winId); } }
   for (const w of plan.follow) {
     const x = have.get(w.id);
     if (!x) continue;
-    const r = toHostRect(w, k, d);
+    const r = placeOf(x, w, sid, k, d);
     if (x.popup) wm.setPip(x.winId, r); else wm.setFrame(x.winId, frameAround(r, x.inset));
     x.followed = r;
   }
@@ -163,15 +187,16 @@ export function GuestWindow({ dir, gid }) {
       if (!(lw > 0) || !(lh > 0)) return;
       const d = display(), k = guestScale(s.gw, s.gh, d);
       const here = { x: lx, y: ly, w: lw, h: lh };
-      const want = toHostRect(w, k, d);
       if (!x.inset && !x.popup) {
         // first look: the theme's chrome around the content, then the content put where the guest's window is
         const f = wm.get(winId);
         if (!f) return;
         x.inset = { l: lx - f.x, t: ly - f.y, r: f.x + f.w - (lx + lw), b: f.y + f.h - (ly + lh) };
-        if (!nearRect(here, want)) wm.setFrame(winId, frameAround(want, x.inset));
+        const at = placeOf(x, w, s.sid, k, d);
+        if (!nearRect(here, at)) wm.setFrame(winId, frameAround(at, x.inset));
         return;
       }
+      const want = placeOf(x, w, s.sid, k, d);
       if (!lastBox || !nearRect(here, lastBox, 0)) { lastBox = here; stableAt = Date.now(); return; }
       if (Date.now() - stableAt < 120) return;
       if (nearRect(here, want) || (x.followed && nearRect(here, x.followed))) return;
