@@ -2754,10 +2754,18 @@ static JSValue f_clip_send(JSContext *c, JSValueConst t, int argc, JSValueConst 
     if (txt) JS_FreeCString(c, txt);
     return JS_NewBool(c, ok);
 }
+/* an answer bound to what was shown: clipboardApply/clipboardTake(session, seq) refuse when the guest's clipboard has
+ * changed since the copy numbered seq (ask mode: the person said yes to that preview, not to whatever came after) */
+static int clip_seq_ok(JSContext *c, Sess *s, int argc, JSValueConst *argv) {
+    if (argc < 2 || JS_IsUndefined(argv[1])) return 1;
+    int32_t seq = 0;
+    return !JS_ToInt32(c, &seq, argv[1]) && seq == s->clip_seq;
+}
+
 static JSValue f_clip_take(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     Sess *s = get(c, argv[0]);
-    return s && s->clip_in ? JS_NewString(c, s->clip_in) : JS_NewString(c, "");
+    return s && s->clip_in && clip_seq_ok(c, s, argc, argv) ? JS_NewString(c, s->clip_in) : JS_NewString(c, "");
 }
 
 static uint64_t clip_hash(const void *p, size_t n) {
@@ -2792,9 +2800,9 @@ static char *html_text(const char *h, size_t n) {
  * app) and arrives a moment later; rich text goes with its text (wl_clip_set_html); plain text is left to the app
  * (clipboard.set, which keeps the history's ways). */
 static JSValue f_clip_apply(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     Sess *s = get(c, argv[0]);
-    if (!s) return JS_NewString(c, "");
+    if (!s || !clip_seq_ok(c, s, argc, argv)) return JS_NewString(c, "");
     if (s->clip_png) {
         const char *rt = getenv("XDG_RUNTIME_DIR");
         char dir[PATH_MAX], dst[PATH_MAX + 64], tmp[PATH_MAX + 64];
@@ -3641,8 +3649,8 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
-    JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
-    JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host),
+    JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 2, f_clip_take),
+    JS_CFUNC_DEF("clipboardApply", 2, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host),
     JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 2, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),

@@ -668,28 +668,34 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const inUse = clipInUse(sid, focused, guestFocused);
   const ask = !!cfg.clipboardAsk;
   const gate = (on) => { if (sid && lord.vm.clipboardGate) lord.vm.clipboardGate(sid, on, ask); };
+  const inUseRef = useRef(inUse);
+  inUseRef.current = inUse;
   useEffect(() => { gate(inUse); }, [sid, inUse, ask]);
+  // a click opens the gate for that moment only: on, then back to the window's real state at once, which leaves
+  // lord-server's grace (CLIP_GRACE_MS) and nothing longer when the window isn't in front
+  const touchGate = () => { gate(true); gate(inUseRef.current); };
   // "Ask before each paste" (machine.json clipboard_ask): the bar's state (model.js clipAsk*) and what each answer does
   const askRef = useRef(askSt);
   askRef.current = askSt;
   const lazy = !!(st?.agent?.caps & AGENT_CAPS.clipLazy);
   const pushNow = () => (lord.vm.clipboardSendHost ? !!lord.vm.clipboardSendHost(sid) : false);
-  const applyGuest = () => {
-    const kind = lord.vm.clipboardApply ? lord.vm.clipboardApply(sid) : 'text';
+  // seq (ask mode): the copy the person said yes to; lord-server refuses if the guest's clipboard changed since
+  const applyGuest = (seq) => {
+    const kind = lord.vm.clipboardApply ? lord.vm.clipboardApply(sid, seq) : 'text';
     if (kind !== 'text') return;
-    const text = lord.vm.clipboardTake(sid);
+    const text = lord.vm.clipboardTake(sid, seq);
     if (text) { clipSent.current = text; clipboard.set(text, { origin: 'machines' }); }
   };
   const settle = (a) => {
     if (!a || !sid) return;
     if (a.gen) lord.vm.clipboardAnswer(sid, a.gen, a.yes);
-    else if (a.key) { if (a.yes) pushNow(); }
-    else if (a.seq && a.yes) applyGuest();
+    else if (a.key) { if (a.yes && lord.vm.clipboardPreview(sid, 'host')?.hash === a.key) pushNow(); }   // only what was shown
+    else if (a.seq && a.yes) applyGuest(a.seq);
   };
   const askStep = (r) => { askRef.current = r.state; setAskSt(r.state); settle(r.answer); };
   const sendClip = (click) => {
     if (!(inUse || click) || !sid || !clipTo(cfg.clipboard) || st?.agent?.state === undefined || !(st?.agent?.caps & AGENT_CAPS.clipboard)) return false;
-    if (click) gate(true);
+    if (click) touchGate();
     // a helper that can't ask for it gets the clipboard pushed: in ask mode only after the person says yes
     if (ask && !lazy && lord.vm.clipboardPreview) {
       const pv = lord.vm.clipboardPreview(sid, 'host');

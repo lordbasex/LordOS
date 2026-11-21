@@ -206,6 +206,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: "Ask before each paste" pastes only what it showed, and a click opens the clipboard for a moment only**
+  (`apps/machines/vmwindow.jsx`, `server/src/ui/js_vm.c`; found by the commit security review, two MEDIUM). A yes to
+  the bar's preview applied whatever the machine had copied by then, so a guest could swap the contents after the
+  preview: `clipboardApply`/`clipboardTake` now take the copy's number and refuse a later one, and a yes to push this
+  computer's clipboard checks it is still the one previewed. A click on a machine whose window wasn't in front opened
+  the clipboard's gate until the window's state next changed; it now opens it for the grace period only.
 - **Machines: the library is always one step away** (`apps/machines/index.jsx`; `sdk/dock.js` `registerDockActivate`,
   `sdk/windowmenu.js` `registerWindowMenuItems`). With a machine's window open and the library closed there was no way
   back to it without closing the machine. Now "Machines Library" is the first item of the app's Dock menu and of every
