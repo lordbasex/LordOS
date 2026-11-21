@@ -4,7 +4,7 @@
 // disk. Double-click opens or starts; right-click has the machine's menu. FirstRun, Requirements and the Pi page are
 // the other screens of this window.
 import {
-  View, Text, Image, ScrollView, useAppWindow, useStore, admin, fs, wm, windows, revealPath, openFolder, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
+  View, Text, Image, ScrollView, useAppWindow, useStore, createStore, admin, fs, wm, windows, revealPath, openFolder, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
   Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, MenuButton, SearchField, EmptyState, useNarrow,
   t as tr,
 } from '@lordos/sdk';
@@ -20,13 +20,17 @@ import { CloneSheet } from './clone.jsx';
 const winIdOf = (m) => `machines#vm-${m.id || m.folder}`;
 // how long the Requirements page waits for a word from the package engine before it says the network isn't answering
 const STALL_MS = 90000;
-// opens (or brings forward) the machine's window; a new one gets the guest's usual size and the middle of the screen
+// Play asked of a window that's already open (dir → a counter): it starts its machine when it's off (vmwindow.jsx)
+export const playAsks = createStore({});
+// opens (or brings forward) the machine's window; a new one gets the guest's usual size and the middle of the screen and
+// starts the machine itself; one already open is asked to (Play on a card while its window shows Off)
 export function openMachine(m, opts) {
   const instance = `vm-${m.id || m.folder}`;
   const id = `machines#${instance}`;
   const fresh = !windows.get().some((w) => w.id === id);
   wm.open('machines', { instance, args: { machine: m.dir, name: m.name, ...(opts?.loadvm ? { loadvm: opts.loadvm } : {}) } });
   if (fresh) { wm.resize(id, 1024, 768 + 48); wm.center(id); }
+  else playAsks.set((x) => ({ ...x, [m.dir]: (x[m.dir] || 0) + 1 }));
   return id;
 }
 export function openConfigure(m, section) {

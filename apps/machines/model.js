@@ -637,6 +637,18 @@ export function defaultCard(cards, current) {
   if (current && wired.some((c) => c.name === current)) return current;
   return (wired.find((c) => c.up) || wired[0])?.name || '';
 }
+// The machine's window around a start (6.5: a bridged machine's network is made by the admin helper first, which takes a
+// few seconds): 'starting' while a start is on its way (even over an earlier run's state, which would say Off), 'off' with
+// no session and a state, 'starting' with neither yet, else 'session' (the session's own state decides)
+export function startPhase(sid, st, starting) {
+  if (!sid && (starting || !st)) return 'starting';
+  if (!sid) return 'off';
+  return 'session';
+}
+// a Play that reaches the window (its own button, or the library's while the window is open) starts the machine only when
+// the window has no session, no start on its way and isn't closing
+export const playStarts = (sid, starting, closing) => !sid && !starting && !closing;
+
 // vm-net-bridge's argument (vm_admin.h): "<id> <card> <mac>"
 export const bridgeArg = (m) => (m?.id && m?.bridge && m?.mac ? `${m.id} ${m.bridge} ${m.mac}` : '');
 // the summary line of Configure's Network section

@@ -9,11 +9,11 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipTo, clipFrom, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
 import { useAppsMode, appsMenuItems, guests } from './appsmode.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp } from './ui.jsx';
-import { openLogs, openSnapshots } from './library.jsx';
+import { openLogs, openSnapshots, playAsks } from './library.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet, Pill } from './kit.jsx';
 
@@ -341,6 +341,9 @@ function AppsController({ name, g, onLeave }) {
   );
 }
 
+// machines whose bridged network the admin helper is making now (dir): one start at a time, whatever remounts
+const bridging = new Set();
+
 export function MachineWindow({ dir, name: name0, loadvm }) {
   const p = usePal();
   const { id: winId, focused } = useAppWindow();
@@ -348,6 +351,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const [sid, setSid] = useWindowState('vm.sid', 0);
   const [st, setSt] = useWindowState('vm.state', null);
   const [err, setErr] = useWindowState('vm.err', '');
+  // a start on its way: a bridged machine's network is made by the admin helper first (6.5), shown as Starting
+  const [starting, setStarting] = useWindowState('vm.starting', false);
   const [closing, setClosing] = useWindowState('vm.closing', false);   // false, 'shutdown' or 'suspend'
   const [askClose, setAskClose] = useWindowState('vm.ask', false);
   const [always, setAlways] = useState(false);
@@ -390,7 +395,17 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   followRef.current = follow;
   overlayRoot.current = root.current;
 
+  // the start itself, from the current render (the admin helper's answer may come after a remount)
+  const startNow = useRef(null);
+  startNow.current = (active, opts) => {
+    setStarting(false);
+    const id = active ? lord.vm.attach(dir) : lord.vm.start(dir, opts || {});
+    if (!id) { setErr(active ? tr('machines.win.cantAttach') : vmRefusal(tr('machines.win.cantStart'))); return; }
+    sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0, asked: null, askedAt: 0 };
+    setErr(''); setSt(null); setSid(id);
+  };
   const begin = (opts) => {
+    if (starting || bridging.has(dir)) return;
     if (!has()) { setErr(tr('machines.noBackend')); return; }
     const m = lord.vm.list().find((x) => x.dir === dir);
     if (!m) { setErr(tr('machines.win.gone')); return; }
@@ -401,16 +416,24 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       const b = budgetCheck(lord.vm.list(), m, lord.vm.host());
       if (!b.ok) { setErr(tr('machines.win.noMemory', { need: b.need, free: b.free })); return; }
     }
-    const go = () => {
-      const id = active ? lord.vm.attach(dir) : lord.vm.start(dir, opts || {});
-      if (!id) { setErr(active ? tr('machines.win.cantAttach') : vmRefusal(tr('machines.win.cantStart'))); return; }
-      sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0, asked: null, askedAt: 0 };
-      setErr(''); setSt(null); setSid(id);
-    };
-    // a bridged machine's network first (6.5)
-    if (!active && m.network === 'bridged') bridgeUp(m).then(go, (e) => setErr(tr('machines.win.bridgeFailed', { why: e.message })));
-    else go();
+    // a bridged machine's network first (6.5): Starting meanwhile, then the start, once
+    if (!active && m.network === 'bridged') {
+      bridging.add(dir);
+      setErr('');
+      setStarting(true);
+      // a window closed meanwhile doesn't start its machine after all
+      bridgeUp(m).then(() => { bridging.delete(dir); if (windows.get().some((w) => w.id === winId)) startNow.current(false, opts); },
+        (e) => { bridging.delete(dir); setStarting(false); setErr(tr('machines.win.bridgeFailed', { why: e.message })); });
+    } else startNow.current(active, opts);
   };
+  // Play on the library's card while this window is open: the machine starts if it's off here
+  const asked = useStore(playAsks, (x) => x[dir] || 0);
+  const askedSeen = useRef(asked);
+  useEffect(() => {
+    if (asked === askedSeen.current) return;
+    askedSeen.current = asked;
+    if (playStarts(sid, starting || bridging.has(dir), closing) && !askClose) { setErr(''); begin(); }
+  }, [asked]);
   // a window opened to go back to a snapshot (with memory, the machine off) starts from it
   useEffect(() => { if (!sid && !st && !err) begin(loadvm ? { loadvm } : undefined); }, []);
   const stRef = useRef(st);
@@ -495,8 +518,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     : st.notice === 'network-back' ? tr('machines.win.netBack', { s: (Math.max(0, st.noticeCode || 0) / 1000).toFixed(1) })
     : st.notice === 'identity' ? tr(st.noticeCode === 1 ? 'machines.win.identityName' : 'machines.win.identityDone')
     : /reconnecting/.test(st.noticeText || '') ? tr('machines.win.netReconnecting') : tr('machines.win.netLost');
-  const v = stateView(st?.state, st?.reason);
-  const a = actionsFor(sid ? st?.state : 'stopped');
+  const v = startPhase(sid, st, starting) === 'starting' && st ? stateView('starting') : stateView(st?.state, st?.reason);
+  const a0 = actionsFor(sid ? st?.state : 'stopped');
+  const a = starting && !sid ? { ...a0, start: false } : a0;     // no second Play while the network is being made
   useEffect(() => { wm.setTitle(winId, windowTitle(name || dir, err ? tr('machines.state.crashed') : tr(`machines.state.${v.key}`))); }, [name, v.key, err]);
 
   // keyboard while in front; everything held is let go of on blur
@@ -779,12 +803,12 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   else if (job) card = <Card title={tr(`machines.job.${job.kind}`, { name })} text={job.pct >= 0 ? tr('machines.job.pct', { pct: job.pct }) : tr('machines.job.wait')} />;
   else if (closing === 'suspend') card = <Card title={tr('machines.job.suspend', { name })} text={tr('machines.job.wait')} />;
   else if (closing) card = <Card title={tr('machines.win.shuttingDown', { name })} text={tr('machines.win.shuttingDownHint')} actions={[<Btn key="f" danger label={tr('machines.cmd.poweroff')} onClick={() => cmd('poweroff')} />]} />;
-  else if (!sid && st) {
+  else if (startPhase(sid, st, starting) === 'off') {
     if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={() => begin()} onSettings={() => setCfgSheet({})}
       onAnyway={() => begin({ resumeAnyway: true })} onDiscard={() => begin({ discardState: true })} />;
     else if (v.key === 'suspended') card = <OffView picture dir={dir} name={name} title={tr('machines.state.suspended')} hint={tr('machines.win.suspendedHint')} label={tr('machines.cmd.resume')} onPlay={() => begin()} />;
     else card = <OffView dir={dir} name={name} title={tr(`machines.state.${v.key}`)} hint={tr('machines.win.playHint')} label={tr('machines.start')} onPlay={() => begin()} />;
-  } else if (!st || st.state === 'starting' || (st.display !== 'up' && st.display !== 'none' && st.display !== 'lost' && (st.state === 'running' || st.state === 'paused'))) {
+  } else if (startPhase(sid, st, starting) === 'starting' || st.state === 'starting' || (st.display !== 'up' && st.display !== 'none' && st.display !== 'lost' && (st.state === 'running' || st.state === 'paused'))) {
     card = <Card title={tr('machines.win.starting', { name })} text={tr('machines.win.startingHint')} />;
   } else if (st.display === 'lost') {
     card = <Card title={tr('machines.win.lost')} text={tr('machines.win.lostHint')} actions={[<Btn key="d" primary label={tr('machines.win.reconnect')} onClick={() => lord.vm.cmd(sid, 'display')} />]} />;

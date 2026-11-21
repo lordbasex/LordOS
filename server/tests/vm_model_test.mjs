@@ -391,6 +391,15 @@ eq('install error: gone', [M.installError('qemu-guest-agent stopped answering in
 eq('install error: script', M.installError("the guest's script failed (1): Access is denied"), { key: 'failed', detail: "the guest's script failed (1): Access is denied" });
 eq('install error: other', M.installError('qemu-guest-agent: Guest agent command failed'), { key: 'other', detail: 'qemu-guest-agent: Guest agent command failed' });
 eq('install error: empty', M.installError(''), { key: 'other', detail: '' });
+// a bridged start: Starting while the admin helper makes the network, never the earlier run's Off; one Play at a time
+{
+  const off = { state: 'stopped', reason: 'guest-shutdown' };
+  eq('start phase: a new window', M.startPhase(0, null, false), 'starting');
+  eq('start phase: bridging over an earlier run', M.startPhase(0, off, true), 'starting');
+  eq('start phase: off', M.startPhase(0, off, false), 'off');
+  eq('start phase: running', [M.startPhase(7, { state: 'starting' }, false), M.startPhase(7, null, true)], ['session', 'session']);
+  eq('play starts', [M.playStarts(0, false, false), M.playStarts(0, true, false), M.playStarts(5, false, false), M.playStarts(0, false, 'shutdown')], [true, false, false, false]);
+}
 eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, h: 9 }), M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 3, y: 0, w: 10, h: 10 }), M.nearRect(null, {})], [true, false, false]);
 // the guest didn't take the place asked of its window (its minimum size): after a while the LordOS window goes back
 {

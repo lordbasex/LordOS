@@ -219,6 +219,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   slow, no private folder, the agent gone, the script failed) are now translated lines (`machines.agent.err.*`, all 35
   languages), with lord-vm's text only as a detail when it adds something (a script's output, qemu-guest-agent's
   error). `vm_model_test.mjs` covers the mapping.
+- **A bridged machine starts with one Play, showing Starting while its network is made** (`apps/machines/vmwindow.jsx`,
+  `library.jsx`, `model.js` `startPhase`, `playStarts`): while the admin helper made the macvtap the window kept the
+  earlier run's Off (title and Play included), and Play on the library's card only brought an open window forward, so a
+  second Play was needed. The window now shows Starting (no second Play) until the network is up and then starts the
+  machine itself, once, even if it was remounted meanwhile (and not if it was closed); Play on a card asks an open window
+  that shows Off to start. `vm_model_test.mjs` covers the phases; not run against the real admin helper here.
 - **The remote desktop no longer crashes lord-server when a viewer connects after the last one left**
   (`server/src/remote/mirror.c`, `server/src/media/mstream.c`): the mirror freed its copy of the screen while the video
   encoder still held it, and the next viewer's encoder copied from the freed memory. A 1920 × 1080 headless session
