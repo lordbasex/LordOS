@@ -110,8 +110,9 @@
  *                   text = the machine's id. Sent once QEMU runs, so it can follow the first VM_STATEs
  *                   (starting, paused); lord-server asks for the display once it has both.
  *     VM_DISPLAY_FD seq of the VM_DISPLAY; the descriptor; a = console width, b = height if known (else 0)
- *     VM_AGENT_STATE a = VAS_* (off, waiting, connected), b = VAC_* and LAG_CAP_WINDOWS (what works now), text = "version\tsystem" as
- *                   the guest reported them (untrusted, shown as text only). Sent on each change and after VM_STATUS
+ *     VM_AGENT_STATE a = VAS_* (off, waiting, connected), b = VAC_* and LAG_CAP_WINDOWS (what works now), text = "version\tsystem\ttools" as
+ *                   the guest reported them (untrusted, shown as text only; tools: the LordOS tools' version from their
+ *                   hello, letters, digits and . - _ only, empty until they said it). Sent on each change and after VM_STATUS
  *     VM_CLIP_DATA  the guest's clipboard (machine.json allows from-guest): a sealed memfd of a bytes; b = VCF_TEXT
  *                   (UTF-8) or VCF_CLIPX (AGK_CLIPX's layout, every part already checked: UTF-8 text, sanitized HTML,
  *                   a PNG whose header is sane; lord-server still re-encodes the picture before it's used)

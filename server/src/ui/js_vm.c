@@ -2112,7 +2112,12 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         char ver[64] = "";
         snprintf(ver, sizeof ver, "%.*s", tab ? (int)(tab - s->ag_text) : 0, s->ag_text);
         set_str(c, ag, "version", ver);
-        set_str(c, ag, "system", tab ? tab + 1 : "");
+        /* "version\tsystem\ttools" (vmproto.h): the tools' version is the LordOS tools' hello, "" before it */
+        const char *tab2 = tab ? strchr(tab + 1, '\t') : NULL;
+        char sys[VM_TEXT_MAX] = "";
+        if (tab) snprintf(sys, sizeof sys, "%.*s", tab2 ? (int)(tab2 - tab - 1) : (int)strlen(tab + 1), tab + 1);
+        set_str(c, ag, "system", sys);
+        set_str(c, ag, "tools", tab2 ? tab2 + 1 : "");
         set_int(c, ag, "install", s->ag_result);
         set_str(c, ag, "message", s->ag_msg);
         set_int(c, ag, "transfer", s->xf_result);

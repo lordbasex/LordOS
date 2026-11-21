@@ -6,7 +6,7 @@
 import { useEffect } from 'react';
 import { useAppWindow, addListener, wm, t as tr, registerDockActions, registerDockActivate, registerWindowMenuItems, registerOpenProviders } from '@lordos/sdk';
 import { Library, AppMark, openInMachine } from './library.jsx';
-import { openMachines } from './openwith.js';
+import { openMachines, windowsNeedsTools } from './openwith.js';
 import { readMeta } from './meta.js';
 import { isForeignProgram } from '../../sdk/filekinds.js';
 import { MachineWindow } from './vmwindow.jsx';
@@ -38,7 +38,7 @@ registerOpenProviders('machines', () => {
   if (typeof lord === 'undefined' || !lord.vm || typeof lord.vm.list !== 'function') return [];
   let list = [];
   try { list = lord.vm.list() || []; } catch (e) { list = []; }
-  return openMachines(list, readMeta).map((m) => ({
+  const out = openMachines(list, readMeta).map((m) => ({
     id: `machine:${m.id}`,
     label: m.opens === 'windows' ? tr('machines.win.openWith', { name: m.name }) : tr('machines.openWith.machine', { name: m.name }),
     accepts: (f) => !!f && !f.dir && typeof f.path === 'string' && f.path.startsWith('/'),
@@ -46,6 +46,10 @@ registerOpenProviders('machines', () => {
     needsStart: () => !m.active,
     open: (f) => openInMachine(m, f.path),
   }));
+  // a Windows machine whose tools are too old to open files (or not there yet): Files says so under Open with, for a
+  // Windows program, instead of showing nothing
+  if (windowsNeedsTools(list, readMeta)) out.push({ id: 'machines:tools', hint: (f) => (isForeignProgram(f) ? tr('machines.win.openWithUpdate') : '') });
+  return out;
 });
 
 export const isLibraryKey = (e) => !!e && !!e.meta && !e.ctrl && !e.alt && (e.base || e.key) === '0';

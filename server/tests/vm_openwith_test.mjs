@@ -1,6 +1,6 @@
 // vm_openwith_test.mjs — apps/machines/openwith.js: a machine in Files' "Open with" (docs/VIRTUALIZATION.md 7.3).
 // node server/tests/vm_openwith_test.mjs
-import { opensOf, openMachines, openStep, withAsk, withoutAsks, askStale, OPEN_QUEUE, OPEN_WAIT_MS } from '../../apps/machines/openwith.js';
+import { opensOf, openMachines, windowsNeedsTools, openStep, withAsk, withoutAsks, askStale, OPEN_QUEUE, OPEN_WAIT_MS } from '../../apps/machines/openwith.js';
 import { AGENT_CAPS } from '../../apps/machines/model.js';
 
 let pass = 0, fail = 0;
@@ -26,6 +26,14 @@ const list = [
 const meta = { '/m/a.lordvm': { opens: 'windows' }, '/m/b.lordvm': {}, '/m/c.lordvm': { opens: false }, '/m/d.lordvm': { opens: 'windows' }, '/m/e.lordvm': { opens: 'windows' } };
 eq('listed: tools that open files, readable', openMachines(list, (d) => meta[d]).map((m) => [m.id, m.opens, m.active]), [['a', 'windows', false], ['e', 'windows', true]]);
 eq('a broken app.json lists nothing', openMachines(list, () => { throw new Error('x'); }), []);
+
+const wl = [{ dir: '/w/a', state: 'stopped' }, { dir: '/w/b', state: 'running' }, { dir: '/w/c', state: 'stopped', error: 'newer' }];
+eq('hint: a Windows machine with old tools', windowsNeedsTools(wl, (d) => ({ '/w/a': { os: 'windows', opens: false }, '/w/b': { os: 'debian' } })[d]), true);
+eq('hint: a Windows machine whose tools never spoke', windowsNeedsTools(wl, (d) => ({ '/w/a': { os: 'windows' } })[d]), true);
+eq('hint: none when one opens files', windowsNeedsTools(wl, (d) => ({ '/w/a': { os: 'windows' }, '/w/b': { os: 'windows', opens: 'windows' } })[d]), false);
+eq('hint: none without a Windows machine', windowsNeedsTools(wl, (d) => ({ '/w/a': { os: 'debian', opens: false } })[d]), false);
+eq('hint: an unreadable one doesn\'t count', windowsNeedsTools(wl, (d) => ({ '/w/c': { os: 'windows' } })[d]), false);
+eq('hint: a broken app.json counts as none', windowsNeedsTools(wl, () => { throw new Error('x'); }), false);
 
 eq('step: no session → start', [openStep(0, null), openStep(3, { ended: true, state: 'stopped' })], ['start', 'start']);
 eq('step: paused → resume', openStep(3, { state: 'paused' }), 'resume');

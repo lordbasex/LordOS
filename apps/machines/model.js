@@ -388,6 +388,19 @@ export function clipState(agent, cfg) {
 }
 // the agent's popover says what to install in the guest: connected, the clipboard on, the helper there without a tool
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
+// The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
+// vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
+export const TOOLS_SHIPPED = { windows: 'w4', linux: '5' };
+const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
+// the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
+// "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
+export function toolsOutdated(agent, shipped = TOOLS_SHIPPED) {
+  if (agent?.state !== 'connected') return false;
+  const have = toolsVer(agent.tools);
+  if (!have) return false;
+  const want = toolsVer(have[1] ? shipped?.windows : shipped?.linux);
+  return !!want && want[1] === have[1] && Number(have[2]) < Number(want[2]);
+}
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
 export const agentTone = (a, configured) => (!configured ? 'off' : a?.state === 'connected' ? 'run' : 'pause');
 

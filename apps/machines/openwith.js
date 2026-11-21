@@ -30,6 +30,20 @@ export function openMachines(list, metaOf) {
   return out;
 }
 
+// Files' hint under Open with for a Windows program no machine opens yet: there is a Windows machine (app.json os), but
+// none of them has tools that said they open files (older tools, or not installed yet), so the person updates them
+export function windowsNeedsTools(list, metaOf) {
+  let win = false;
+  for (const m of list || []) {
+    if (!m || !m.dir || unreadableOf(m)) continue;
+    let meta = {};
+    try { meta = metaOf(m.dir) || {}; } catch (e) { meta = {}; }
+    if (meta.opens === 'windows') return false;
+    if (meta.os === 'windows') win = true;
+  }
+  return win;
+}
+
 // what a window with files to open does now (st: lord.vm.poll's state): 'start' (no session), 'resume' (paused),
 // 'wait' (starting, or the tools aren't there yet), 'send' (copy and open), 'cant' (the tools connected but can't open)
 export function openStep(sid, st) {

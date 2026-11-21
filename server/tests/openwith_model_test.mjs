@@ -1,6 +1,6 @@
 // openwith_model_test.mjs — sdk/openwithmodel.js: "Open with" providers (docs/FILES.md, "Open with").
 // node server/tests/openwith_model_test.mjs
-import { extKey, providersFor, suggestedFor, defaultFor, withDefault, OPEN_DEFAULTS_MAX } from '../../sdk/openwithmodel.js';
+import { extKey, providersFor, hintsFor, suggestedFor, defaultFor, withDefault, OPEN_DEFAULTS_MAX } from '../../sdk/openwithmodel.js';
 
 let pass = 0, fail = 0;
 function eq(name, got, want) {
@@ -35,5 +35,12 @@ eq('a bad extension changes nothing else', withDefault({ msi: 'wine' }, '../x', 
 let many = {};
 for (let i = 0; i < OPEN_DEFAULTS_MAX + 5; i++) many = withDefault(many, `e${i}`, 'p');
 eq('at most OPEN_DEFAULTS_MAX kept, the newest', [Object.keys(many).length, 'e0' in many, `e${OPEN_DEFAULTS_MAX + 4}` in many], [OPEN_DEFAULTS_MAX, false, true]);
+const tip = { id: 'machines:tools', hint: (f) => (isExe(f) ? 'update the tools' : '') };
+eq('hint: no provider opens it', hintsFor([tip, m2, tip], exe), ['update the tools']);
+eq('hint: none when a provider opens it', hintsFor([tip, m1], exe), []);
+eq('hint: nothing to say for this file', hintsFor([tip], docx), []);
+eq('hint: broken or odd ones skipped', hintsFor([{ id: 'b', hint: () => { throw new Error('x'); } }, { id: 'n', hint: () => 5 }, { hint: () => 'no id' }, tip], exe), ['update the tools']);
+eq('hint: folders, apps and the Trash: none', [hintsFor([tip], { name: 'd.exe', dir: true }), hintsFor([tip], { ...exe, trash: true })], [[], []]);
+eq('a hint is no provider', [providersFor([tip], exe), suggestedFor([tip], exe)], [[], null]);
 console.log(`openwith-model-test: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

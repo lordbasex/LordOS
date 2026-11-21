@@ -4,6 +4,8 @@
 // A provider is something other than an installed app that can open a file: today a machine in Machines whose guest
 // tools open files ("Windows 11 Pro (…)"); later LordBridge or a Wine runner, through the same shape:
 //   { id, label, icon?, accepts(file), suggests?(file), available?(), needsStart?(), open(file) }
+// or a hint, which opens nothing: { id, hint(file) } → why no provider opens this file yet, and what to do ("No machine
+// can open it yet: update the LordOS tools…"), '' when it has nothing to say. Files shows it, disabled, under Open with.
 // file is Files' entry ({ name, path, dir, … }). accepts: it can open this file (listed in Open with); suggests: it is
 // the natural handler when no app here opens the file (a program for another system); available: it can be used now
 // at all (a machine that still exists); needsStart: using it starts something first (an off machine), so a double
@@ -43,6 +45,20 @@ export function providersFor(list, file) {
 // the one that suggests itself for a file no app here opens (the first), or null
 export function suggestedFor(list, file) {
   return providersFor(list, file).find((p) => call(p.suggests, file) === true) || null;
+}
+
+// what to say when no provider opens this file yet: [text], each hint's id once; [] when one opens it
+export function hintsFor(list, file) {
+  if (!file || file.dir || file.app || file.trash || providersFor(list, file).length) return [];
+  const seen = new Set(), out = [];
+  for (const p of list || []) {
+    if (!p || typeof p.id !== 'string' || !p.id || typeof p.hint !== 'function' || seen.has(p.id)) continue;
+    const s = call(p.hint, file);
+    if (typeof s !== 'string' || !s) continue;
+    seen.add(p.id);
+    out.push(s);
+  }
+  return out;
 }
 
 // the person's choice for this file's extension, when that provider still opens it; else null

@@ -237,6 +237,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: older LordOS tools in a machine are said, and Files explains a missing "Open with"** (`docs/FILES.md`,
+  `docs/VIRTUALIZATION.md` 7.3). A machine still running the first guest tools (hello `w1`) never appeared in
+  Files' Open with for a `.exe` (only tools that say `open`, `w3` and later, are listed), and nothing said why: the right
+  click on WinBox.exe had no Open with at all. Now lord-vm passes the tools' own version from their hello to lord-server
+  (`VM_AGENT_STATE` text `version\tsystem\ttools`, letters, digits and `. - _` only; `lord.vm.poll().agent.tools`).
+  Machines compares it with the tools this LordOS ships (`TOOLS_SHIPPED`: `w4` for `tools/guest-win`, `5` for
+  `tools/guest`, checked against their `VERSION` by `vm-model-test`; `toolsOutdated`): the agent's popover says "A newer
+  version of the LordOS tools is available" and its install button reads "Update LordOS Tools", and the bar's agent
+  button gets a small blue dot. "Open with" providers can now be hints (`{ id, hint(file) }`, `openHintsFor`): while
+  there is a machine whose app.json `os` is `windows` and none whose tools open files (`windowsNeedsTools`), Files' menu for a
+  `.exe`, `.msi`, `.bat`, `.cmd`, `.lnk`, `.com`, `.msix` or `.appx` shows Open with with a dim note (`machines.win.openWithUpdate`:
+  no machine can open it yet, update the LordOS tools in the machine, from its agent button), and a double click says
+  the same; with no such machine nothing changes. Context menus take a wrapping `{ note }` row. In all 35
+  languages. Tests: `vm-model-test`, `vm-openwith-test`, `openwith-model-test`.
 - **Machines: an apps mode window moved to another monitor no longer closes** (`docs/VIRTUALIZATION.md` 7.2). The
   guest was asked to move its window to the LordOS window's place, off its own one screen (x ≥ the main display's width,
   or negative); the guest hid it, stopped listing it, and its LordOS window closed. The place asked of the guest is now

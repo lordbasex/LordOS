@@ -5,13 +5,14 @@
 //   registerOpenProviders(source, list)     a set that changes (Machines: one per machine whose guest tools open
 //                                           files); list() is asked each time a menu is built → unregister()
 //   openProvidersFor(file)                  [provider] that open this file now
+//   openHintsFor(file)                      [text]: why none opens it yet (a hint provider: { id, hint(file) })
 //   suggestedProviderFor(file)              the one to offer when no app here opens it (a program for another system)
 //   defaultProviderFor(file)                the person's "Always open .ext files with …", or null
 //   setDefaultProvider(file, id | null)     kept in settings (openWithDefaults, per extension)
 //
 // Only the session's own code registers providers (themes and native apps): an isolated app has no way in.
 import { settings } from './settings.js';
-import { providersFor, suggestedFor, defaultFor, withDefault, extKey } from './openwithmodel.js';
+import { providersFor, hintsFor, suggestedFor, defaultFor, withDefault, extKey } from './openwithmodel.js';
 
 const sources = new Map();          // source id → () => [provider]
 
@@ -39,6 +40,7 @@ function all() {
 
 const choices = () => settings.get().openWithDefaults || {};
 export const openProvidersFor = (file) => providersFor(all(), file);
+export const openHintsFor = (file) => hintsFor(all(), file);
 export const suggestedProviderFor = (file) => suggestedFor(all(), file);
 export const defaultProviderFor = (file) => defaultFor(choices(), all(), file);
 export function setDefaultProvider(file, id) {

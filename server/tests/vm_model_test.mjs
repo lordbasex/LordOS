@@ -604,5 +604,25 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('library menu key', typeof en.libraryMenu, 'string');
 }
 
+// ---- the LordOS tools: older than the ones shipped (the popover's Update, the bar's dot) ----
+{
+  const fsm = await import('node:fs');
+  const verIn = (f) => (/#define VERSION "([^"]+)"/.exec(fsm.readFileSync(path.join(here, '../..', f), 'utf8')) || [])[1];
+  eq('shipped Windows tools = lordos-guest-win.c VERSION', M.TOOLS_SHIPPED.windows, verIn('tools/guest-win/lordos-guest-win.c'));
+  eq('shipped Linux helper = lordos-guest.c VERSION', M.TOOLS_SHIPPED.linux, verIn('tools/guest/lordos-guest.c'));
+  const on = (tools) => ({ state: 'connected', caps: 0, tools });
+  const S = { windows: 'w4', linux: '5' };
+  eq('Windows tools w1 < w4: outdated', M.toolsOutdated(on('w1'), S), true);
+  eq('Windows tools w3 < w4: outdated', M.toolsOutdated(on('w3'), S), true);
+  eq('Windows tools w4: current', M.toolsOutdated(on('w4'), S), false);
+  eq('Windows tools w10 (newer): not outdated', M.toolsOutdated(on('w10'), S), false);
+  eq('Linux helper 4 < 5: outdated', M.toolsOutdated(on('4'), S), true);
+  eq('Linux helper 5: current', M.toolsOutdated(on('5'), S), false);
+  eq('no hello yet: nothing to say', M.toolsOutdated(on(''), S), false);
+  eq('unknown format: nothing to say', [M.toolsOutdated(on('x7'), S), M.toolsOutdated(on('w4.1'), S), M.toolsOutdated(on('w'), S)], [false, false, false]);
+  eq('not connected: nothing to say', [M.toolsOutdated({ state: 'waiting', tools: 'w1' }, S), M.toolsOutdated(null, S)], [false, false]);
+  eq('the default is what ships', M.toolsOutdated(on('w1')), true);
+}
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

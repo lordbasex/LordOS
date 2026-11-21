@@ -9,7 +9,7 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { ClipAskBar } from './clipask.jsx';
@@ -26,7 +26,7 @@ const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.n
 const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
-const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.install}.${g.transfer}` : '');
+const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.tools}.${g.install}.${g.transfer}` : '');
 const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}.${x.output}.${x.input}` : '');
 const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
@@ -39,9 +39,11 @@ function AgentButton({ ctl }) {
   // off while the machine is: nothing to wait for
   const tone = ctl.a.start ? 'off' : agentTone(g, cfg.agent);
   const label = !cfg.agent ? tr('machines.agent.off') : g?.state === 'connected' ? tr('machines.agent.connected') : ctl.a.start ? tr('machines.agent.idle') : tr('machines.agent.waiting');
+  // the guest's LordOS tools are older than the ones this LordOS ships: a dot, and Update in the popover
+  const old = toolsOutdated(g);
   return (
     <View ref={ref}>
-      <IconBtn sym="agent" badge={TONE[tone]} label={label} on={open} onClick={() => setOpen(!open)} />
+      <IconBtn sym="agent" badge={TONE[tone]} dot={old ? '#0a84ff' : null} label={old ? `${label} · ${tr('machines.agent.toolsUpdate')}` : label} on={open} onClick={() => setOpen(!open)} />
       {open ? (
         <Overlay anchor={ref}>
           <View style={{ position: 'absolute', top: 30, left: -12, width: 340 }}>
@@ -63,6 +65,7 @@ function AgentPop({ ctl, onClose }) {
     return () => { menus.open--; a(); b(); };
   }, []);
   const on = g?.state === 'connected';
+  const old = toolsOutdated(g);
   const lines = agentLines(g, cfg);
   const tone = ctl.a.start ? 'off' : agentTone(g, cfg.agent);
   const bg = p.dark ? '#34343c' : '#fbfbfd';
@@ -89,9 +92,10 @@ function AgentPop({ ctl, onClose }) {
             </View>
           ))}
         </View>
+        {old && g.install !== 1 && g.install !== 2 ? <Text style={{ fontSize: 12, lineHeight: 1.45, fontWeight: 600, color: '#0a84ff', textAlign: 'start' }}>{tr('machines.agent.toolsUpdate')}</Text> : null}
         {on ? (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-            <Pill label={g.install === 1 ? tr('machines.agent.installing') : guestWindows(g) ? tr('machines.agent.installTools') : tr('machines.agent.installHelper')}
+            <Pill label={g.install === 1 ? tr('machines.agent.installing') : old ? tr('machines.agent.updateTools') : guestWindows(g) ? tr('machines.agent.installTools') : tr('machines.agent.installHelper')}
               disabled={g.install === 1} onClick={() => lord.vm.agent(ctl.sid, 'install')} />
             <Pill label={tr('machines.agent.timesync')} onClick={() => lord.vm.agent(ctl.sid, 'timesync')} />
             {ctl.xfer.state === 'setup' || ctl.xfer.state === 'settingUp'

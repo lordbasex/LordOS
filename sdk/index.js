@@ -216,7 +216,7 @@ export { displayNumbers, snapDisplay, resolveDrop, placementOk as displayPlaceme
 // Fans and cooling (lord-fand, docs/FANS.md): Settings → Cooling and Monitor → Cooling
 export { useFan, fanStatus, fanHistory, fanCase, fanControl, refreshFan, coolingVariant, heatColor, CoolingArt, GpuArt, FanCurveChart, formatTemp, FAN_HISTORY } from './cooling.jsx';
 export { DEFAULT_CATEGORIES, defaultFor, defaultInfo, setDefaultFor, resetDefaultFor, candidatesFor, defaultOpenerId, nativeOf } from './defaults.js';
-export { registerOpenProvider, registerOpenProviders, openProvidersFor, suggestedProviderFor, defaultProviderFor, setDefaultProvider, openExtOf } from './openwith.js';   // "Open with" providers (machines; later LordBridge, Wine)
+export { registerOpenProvider, registerOpenProviders, openProvidersFor, openHintsFor, suggestedProviderFor, defaultProviderFor, setDefaultProvider, openExtOf } from './openwith.js';   // "Open with" providers (machines; later LordBridge, Wine)
 // deactivated built-in apps (Store → Installed; docs/PACKAGES.md, "Deactivating LordOS apps")
 export { appsOff, isAppOff, useAppsOff } from './appsoff.js';
 export { DEACTIVATABLE, CORE_APPS, canDeactivate, isCoreApp, openersAvailable } from './appsoffmodel.js';

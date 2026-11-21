@@ -2857,9 +2857,18 @@ static void xfer_reply(int kind, const JVal *root, const JVal *r, int ok) {
     xfer_set(g);
 }
 
+/* VM_AGENT_STATE's text: the guest agent's version, its system and the LordOS tools' version from their hello (empty
+ * until they said it; only letters, digits, '.', '-' and '_' pass, so the tab stays the separator) */
+static void ag_state_text(char *t, size_t n) {
+    const char *v = S.lag_hello ? S.lag_version : "";
+    for (const char *c = v; *c; c++)
+        if (!((*c >= '0' && *c <= '9') || (*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || *c == '.' || *c == '-' || *c == '_')) { v = ""; break; }
+    snprintf(t, n, "%s\t%s\t%s", S.ag_version, S.ag_os, v);
+}
+
 static void ag_broadcast(void) {
-    char t[160];
-    snprintf(t, sizeof t, "%s\t%s", S.ag_version, S.ag_os);
+    char t[VM_TEXT_MAX];
+    ag_state_text(t, sizeof t);
     VmMsg m = vm_msg(VM_AGENT_STATE, 0, S.ag_state, S.ag_caps, 0, 0, t);
     for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
 }
@@ -4443,7 +4452,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         send_to(ci, &i, -1);
         send_to(ci, &s, -1);
         if (S.notice) { VmMsg n = vm_msg(VM_NOTICE, m->seq, S.notice, S.notice_code, 0, 0, S.notice_text); send_to(ci, &n, -1); }
-        if (S.m.agent) { char t[160]; snprintf(t, sizeof t, "%s\t%s", S.ag_version, S.ag_os); VmMsg a = vm_msg(VM_AGENT_STATE, m->seq, S.ag_state, S.ag_caps, 0, 0, t); send_to(ci, &a, -1); }
+        if (S.m.agent) { char t[VM_TEXT_MAX]; ag_state_text(t, sizeof t); VmMsg a = vm_msg(VM_AGENT_STATE, m->seq, S.ag_state, S.ag_caps, 0, 0, t); send_to(ci, &a, -1); }
         return;
     }
     case VM_PAUSE:

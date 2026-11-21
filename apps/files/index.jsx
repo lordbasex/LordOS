@@ -8,7 +8,7 @@ import {
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl, Layer, shellLayers,
   wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText, useSidebar, SidebarToggle, SidebarOverlay,
-  ConfirmDialog, Checkbox, setDefaultProvider, openExtOf,
+  ConfirmDialog, Checkbox, setDefaultProvider, openExtOf, openHintsFor,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -778,6 +778,9 @@ export default function Files() {
           archive.extract(e.arc.file, `${dir}/${name}`, { only: list.map((x) => x.arc.inner) }).then((r) => { bump(); setMsg(tr('docs.extracted', { name, count: r.files })); }).catch((err) => setMsg(tr('docs.extractError', { name, error: err.message }))); } }];
     }
     const openers = openersFor(e, launcherApps, tr);
+    // no provider opens it yet but one says why (a Windows program, a Windows machine with older LordOS tools): a note
+    // at the end of Open with, so the menu doesn't just leave it out
+    const hints = e.dir ? [] : openHintsFor(e);
     // the apps, then the providers (a machine…); the person's "Always open .ext files with …" one can be forgotten here
     const openWithItems = (f, list) => {
       const items = [];
@@ -786,6 +789,7 @@ export default function Files() {
         items.push({ label: o.label, onClick: o.run });
       });
       if (list.some((o) => o.provider && o.isDefault)) items.push('-', { label: tr('files.openWith.forget', { ext: openExtOf(f.name) }), onClick: () => setDefaultProvider(f, null) });
+      hints.forEach((h, i) => { if (items.length && !i) items.push('-'); items.push({ note: h }); });
       return items;
     };
     // where Compress and New Folder with Selection put what they make: next to the item (a deeper column's own folder,
@@ -794,7 +798,7 @@ export default function Files() {
     return [
       { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(list) },
       ...(e.dir ? [prefs.favoriteFolders.some((f) => f.path === e.path) ? { label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(e.path) } : { label: tr('files.fav.add'), onClick: () => addFavorite(e.path) }, { label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal(e.path) }] : []),
-      ...(!e.dir && openers.length ? [{ label: tr('files.menu.openWith'), submenu: openWithItems(e, openers) }] : []),
+      ...(!e.dir && (openers.length || hints.length) ? [{ label: tr('files.menu.openWith'), submenu: openWithItems(e, openers) }] : []),
       ...(() => { const ci = cloudMenuItems(list, cf, { onShare: setSharing, onMsg: setMsg }); return ci.length ? ['-', ...ci] : []; })(),
       '-',
       { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(paths), disabled: readOnly && !roWhy },

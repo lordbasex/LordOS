@@ -126,7 +126,7 @@ export function Btn({ label, onClick, primary, disabled, big, link, danger, styl
 // A toolbar button with a glyph (or a drawn icon) and its name as the tooltip (the mock "Session": agent, shell, logs,
 // screenshot, record, pause, power)
 // sym: a glyph of assets/machines/symbols (kit.jsx's Sym), tinted like the text
-export function IconBtn({ glyph, icon, sym, label, onClick, disabled, on, danger, color, size = 14, badge }) {
+export function IconBtn({ glyph, icon, sym, label, onClick, disabled, on, danger, color, size = 14, badge, dot }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   const fg = on || danger ? '#fff' : color || p.text;
@@ -138,6 +138,9 @@ export function IconBtn({ glyph, icon, sym, label, onClick, disabled, on, danger
       {sym ? <Image src={`svg:40:${hex}:asset:machines/symbols/${sym}-symbolic.svg`} style={{ width: 18, height: 18 }} />
         : icon ? icon(fg) : <Text style={{ fontSize: size, fontWeight: 700, color: fg }}>{glyph}</Text>}
       {badge ? <View style={{ position: 'absolute', right: 7, bottom: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: badge,
+        border: `1.5px solid ${p.dark ? '#2b2b31' : '#f2f2f4'}` }} /> : null}
+      {/* something to do here (the agent's: newer LordOS tools to install), at the top corner */}
+      {dot ? <View style={{ position: 'absolute', right: 6, top: 3, width: 7, height: 7, borderRadius: 4, backgroundColor: dot,
         border: `1.5px solid ${p.dark ? '#2b2b31' : '#f2f2f4'}` }} /> : null}
     </View>
   );

@@ -1,7 +1,7 @@
 // ops.js — what the Files windows share: the file clipboard, copy jobs in progress, color tags
 // and opening files with the right app.
 import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard, appsOff, openersAvailable, offerActivate,
-  openProvidersFor, suggestedProviderFor, defaultProviderFor } from '@lordos/sdk';
+  openProvidersFor, suggestedProviderFor, defaultProviderFor, openHintsFor } from '@lordos/sdk';
 import { kindOf, mimesOf, appOpens, isTextual, isImage, isProgram, isForeignProgram } from './kinds.js';
 import { pasteFrom, offerable } from './clipfiles.js';
 import { createJobQueue } from './jobqueue.js';
@@ -199,6 +199,7 @@ export function openEntry(e, ctx) {
   if (isImage(e) && !apps.some((o) => o.id !== 'editor')) { ctx.quickLook(e); return; }    // no viewer: Quick Preview
   if (apps.length) apps[0].run();
   else if (isProgram(e) && ctx.say) ctx.say(ctx.t('files.programNoOpener', { name: e.name }));  // not TextEdit (#159)
-  else if (isForeignProgram(e) && ctx.say) ctx.say(ctx.t('files.foreignProgramNoOpener', { name: e.name }));
+  // a provider says why none opens it yet (a Windows machine whose LordOS tools are too old): that, else the general line
+  else if (isForeignProgram(e) && ctx.say) ctx.say(openHintsFor(e)[0] || ctx.t('files.foreignProgramNoOpener', { name: e.name }));
   else ctx.quickLook(e);
 }
