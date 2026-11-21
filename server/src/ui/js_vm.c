@@ -2844,7 +2844,7 @@ static JSValue f_clip_apply(JSContext *c, JSValueConst t, int argc, JSValueConst
  * is in use); an older one gets it all at once. lord-vm checks it all again and sends it on only the ways machine.json
  * allows. The app calls it only when the person turns to the machine (its window to the front, a click on it). */
 static JSValue f_clip_send_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     Sess *s = get(c, argv[0]);
     if (!s || s->vm < 0) return JS_FALSE;
     AgClip cx;
@@ -2852,6 +2852,17 @@ static JSValue f_clip_send_host(JSContext *c, JSValueConst t, int argc, JSValueC
     if (host_clip(&cx, &h)) return JS_FALSE;
     if (cx.png && wl_clip_image_gen() == s->clip_skip_img) { s->clip_skip_img = 0; s->clip_last = h; return JS_FALSE; }
     if (h == s->clip_last) return JS_FALSE;
+    /* ask mode is enforced here too: a full push (a helper that can't ask for the data) needs the hash the person
+     * approved (clipboardSendHost(session, approvedHash)), and it must still be this computer's clipboard. A guest that
+     * flips its on-demand capability can't turn an offer into a push the person never saw */
+    if (s->clip_ask && !(s->ag_caps & VAC_CLIP_LAZY)) {
+        char hx[24];
+        snprintf(hx, sizeof hx, "%016llx", (unsigned long long)h);
+        const char *ap = argc >= 2 && JS_IsString(argv[1]) ? JS_ToCString(c, argv[1]) : NULL;
+        int approved = ap && !strcmp(ap, hx);
+        if (ap) JS_FreeCString(c, ap);
+        if (!approved) return JS_FALSE;
+    }
     if (s->ag_caps & VAC_CLIP_LAZY) {
         /* a new generation per offer: a request for an older one is refused as stale */
         s->offer_gen = s->offer_gen >= 0x7ffffff0u ? 1 : s->offer_gen + 1;
@@ -3650,7 +3661,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
     JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 2, f_clip_take),
-    JS_CFUNC_DEF("clipboardApply", 2, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host),
+    JS_CFUNC_DEF("clipboardApply", 2, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 2, f_clip_send_host),
     JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 2, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),

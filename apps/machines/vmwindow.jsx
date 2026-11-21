@@ -678,7 +678,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const askRef = useRef(askSt);
   askRef.current = askSt;
   const lazy = !!(st?.agent?.caps & AGENT_CAPS.clipLazy);
-  const pushNow = () => (lord.vm.clipboardSendHost ? !!lord.vm.clipboardSendHost(sid) : false);
+  // approved: the preview's hash the person said yes to (ask mode; lord-server refuses a push without it there)
+  const pushNow = (approved) => (lord.vm.clipboardSendHost ? !!lord.vm.clipboardSendHost(sid, approved) : false);
   // seq (ask mode): the copy the person said yes to; lord-server refuses if the guest's clipboard changed since
   const applyGuest = (seq) => {
     const kind = lord.vm.clipboardApply ? lord.vm.clipboardApply(sid, seq) : 'text';
@@ -689,7 +690,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const settle = (a) => {
     if (!a || !sid) return;
     if (a.gen) lord.vm.clipboardAnswer(sid, a.gen, a.yes);
-    else if (a.key) { if (a.yes && lord.vm.clipboardPreview(sid, 'host')?.hash === a.key) pushNow(); }   // only what was shown
+    else if (a.key) { if (a.yes) pushNow(a.key); }   // only what was shown: lord-server checks the hash
     else if (a.seq && a.yes) applyGuest(a.seq);
   };
   const askStep = (r) => { askRef.current = r.state; setAskSt(r.state); settle(r.answer); };

@@ -206,6 +206,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: "Ask before each paste" can't be clicked through or raced** (`apps/machines/clipask.jsx`,
+  `server/src/ui/js_vm.c`; found by Claude Security, two LOW). The guest chooses when the bar appears and sees where the
+  pointer is, so it could raise the bar under a click already on its way: Paste/Bring now answer only after the bar has
+  been in view for 0.7 s and only to a press that started after that (Don't paste/Ignore and Esc work at once). And a
+  guest flipping its on-demand capability could turn an offer into a full push nobody approved: in ask mode lord-server
+  now refuses a full push unless it carries the hash of the preview the person said yes to.
 - **Machines: "Ask before each paste" pastes only what it showed, and a click opens the clipboard for a moment only**
   (`apps/machines/vmwindow.jsx`, `server/src/ui/js_vm.c`; found by the commit security review, two MEDIUM). A yes to
   the bar's preview applied whatever the machine had copied by then, so a guest could swap the contents after the
