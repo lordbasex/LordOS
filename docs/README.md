@@ -105,6 +105,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [CLEANER-ROADMAP.md](CLEANER-ROADMAP.md) | The state of each Cleaner feature |
 | [DISK-HEALTH.md](DISK-HEALTH.md) | Disk life: how much life each disk has left; a design, not built |
 | [VIRTUALIZATION.md](VIRTUALIZATION.md) | Machines, the virtualization app: design and status (the MVP shipped in 0.8.8.5) |
+| [MACHINES-GPU.md](MACHINES-GPU.md) | Machines: plan for a smoother picture and a real GPU for a machine (Intel GVT-g, full passthrough) |
 | [GO-LINK.md](GO-LINK.md) | go-link Desk on LordOS and the public screen-sharing API: design, API since 0.8.8, status in the document |
 | [FLATPAK.md](FLATPAK.md) | Flatpak and Flathub: a design review, not planned for any release |
 
