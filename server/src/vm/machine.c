@@ -317,6 +317,27 @@ int vm_ifname_valid(const char *s) {
     return 1;
 }
 
+int vm_sound_dev_valid(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (n < 1 || n > VM_SOUND_DEV_MAX) return 0;
+    for (size_t i = 0; i < n; i++) if ((unsigned char)s[i] < 0x21 || (unsigned char)s[i] > 0x7e) return 0;
+    return 1;
+}
+
+int vm_sound_devs_parse(const char *text, char *out, size_t on, char *in, size_t inn) {
+    const char *tab = text ? strchr(text, '\t') : NULL;
+    if (!tab || strchr(tab + 1, '\t')) return -1;
+    size_t lo = (size_t)(tab - text), li = strlen(tab + 1);
+    if (lo >= on || li >= inn || lo > VM_SOUND_DEV_MAX || li > VM_SOUND_DEV_MAX) return -1;
+    char a[VM_SOUND_DEV_MAX + 1], b[VM_SOUND_DEV_MAX + 1];
+    memcpy(a, text, lo); a[lo] = 0;
+    memcpy(b, tab + 1, li); b[li] = 0;
+    if ((a[0] && !vm_sound_dev_valid(a)) || (b[0] && !vm_sound_dev_valid(b))) return -1;
+    memcpy(out, a, lo + 1);
+    memcpy(in, b, li + 1);
+    return 0;
+}
+
 int vm_ports_check(const VmPort *p, int cnt, int network, char *err, size_t n) {
     if (cnt < 0 || cnt > VM_PORTS) return fail(err, n, -1, "at most %d forwarded ports", VM_PORTS);
     for (int i = 0; i < cnt; i++) {
@@ -453,6 +474,9 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
         for (int k = 0; k < i; k++) if (m->boot_order[i] == m->boot_order[k]) return fail(err, n, VM_E_RANGE, "boot_order: the same device twice");
     }
     if (m->schema < 6 && (m->n_boot || m->boot_menu)) return fail(err, n, VM_E_FIELD, "boot_order and boot_menu need schema 6");
+    if ((m->sound_out[0] && !vm_sound_dev_valid(m->sound_out)) || (m->sound_in[0] && !vm_sound_dev_valid(m->sound_in)))
+        return fail(err, n, VM_E_RANGE, "sound_out and sound_in are a sound device's name: up to %d printable characters, no spaces", VM_SOUND_DEV_MAX);
+    if (m->schema < 8 && (m->sound_out[0] || m->sound_in[0])) return fail(err, n, VM_E_FIELD, "sound_out and sound_in need schema 8");
     if (m->transfer & ~1) return fail(err, n, VM_E_RANGE, "transfer is true or false");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
     for (int i = 0; m->transfer && i < m->n_shares; i++)
@@ -495,7 +519,7 @@ static const char *const KEYS[] = {
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
-    "boot_order", "boot_menu", "transfer", NULL,
+    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -739,6 +763,8 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *t = json_get(o, "transfer");
         if (t && t->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "transfer must be true or false"); goto out; }
         m->transfer = t ? json_bool(o, "transfer", 0) : 0;
+        /* schema 8: missing (or "") means the system's default output and input */
+        if ((r = get_str(o, "sound_out", m->sound_out, sizeof m->sound_out, 0, err, n)) || (r = get_str(o, "sound_in", m->sound_in, sizeof m->sound_in, 0, err, n))) goto out;
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -829,6 +855,8 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 6 && m->boot_menu) jb_raw(&b, ",\n  \"boot_menu\": true");
     if (m->schema >= 6) jb_printf(&b, ",\n  \"sound\": %s,\n  \"volume\": %d,\n  \"microphone\": %s", m->sound ? "true" : "false", m->volume, m->microphone ? "true" : "false");
     if (m->schema >= 7) jb_printf(&b, ",\n  \"transfer\": %s", m->transfer ? "true" : "false");
+    if (m->schema >= 8 && m->sound_out[0]) { jb_raw(&b, ",\n  \"sound_out\": "); jb_str(&b, m->sound_out); }
+    if (m->schema >= 8 && m->sound_in[0]) { jb_raw(&b, ",\n  \"sound_in\": "); jb_str(&b, m->sound_in); }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);
     jb_raw(&b, "\n}\n");

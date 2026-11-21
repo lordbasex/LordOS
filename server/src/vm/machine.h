@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 7
+#define VM_SCHEMA 8
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -68,6 +68,7 @@ extern const char *const VM_BOOT_NAMES[];  /* "disk", "cd", "network" */
 #define VM_SMBIOS_MAX  64           /* bytes of printable ASCII per SMBIOS string */
 #define VM_SERIAL_MAX  20           /* a disk's serial: ATA's 20 characters */
 #define VM_SHARES      4            /* shared folders (6.7), each a vhost-user-fs device on PCI slots 0xb to 0xe */
+#define VM_SOUND_DEV_MAX 96         /* sound_out, sound_in: a node.name; two fit one VM_SOUND message (6.9) */
 #define VM_XFER_TAG    "LordOS"     /* the transfer folder's mount tag (6.7.1); its device is on slot 0xf */
 #define VM_XFER_DIR    "Transfer"   /* <library>/Transfer/<machine folder's name without .lordvm>: the transfer folders */
 #define VM_TAG_MAX     32           /* a share's mount tag: letters, digits, '-', '_' (virtio-fs allows 36 bytes) */
@@ -156,6 +157,10 @@ typedef struct {
     /* schema 7: the transfer folder (6.7.1), <library>/Transfer/<name>, shared writable under the tag VM_XFER_TAG. On for
      * new machines; a file without it reads as off, so a machine made before keeps its hardware (and its saved states) */
     int transfer;
+    /* schema 8: the output the guest's sound plays on and the input its microphone hears (6.9), each a PipeWire node.name
+     * (vm_sound_dev_valid); "" (or no key) the system's default, which follows what Settings → Sound picks. A device that
+     * isn't there when used falls back to the default (lord-server), it isn't an error */
+    char sound_out[VM_SOUND_DEV_MAX + 1], sound_in[VM_SOUND_DEV_MAX + 1];
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -199,6 +204,11 @@ int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char
  * was none of this machine's, -1 it couldn't be moved */
 int vm_transfer_aside(const char *dir, const char *id, char *moved, size_t mn);
 
+/* a sound device's name as machine.json keeps it (sound_out, sound_in): 1 to VM_SOUND_DEV_MAX printable ASCII characters
+ * other than space (a PipeWire node.name such as "alsa_output.pci-0000_00_1f.3.analog-stereo"); 1 valid */
+int vm_sound_dev_valid(const char *s);
+/* VM_SOUND's text "OUT\tIN" (each "" for the default, or valid as above) into out and in; 0 ok, -1 refused (both kept) */
+int vm_sound_devs_parse(const char *text, char *out, size_t on, char *in, size_t inn);
 /* a network interface's name as Linux allows it: 1 to 15 of [A-Za-z0-9_.-], not "." or ".." */
 int vm_ifname_valid(const char *s);
 /* a display size a machine may start with: 640x480 to 7680x4320, both even; "WxH" → 0, else -1 */

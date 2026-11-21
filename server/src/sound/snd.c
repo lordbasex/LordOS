@@ -899,6 +899,11 @@ static int dev_exists(int kind, const char *name, uint32_t index) {
     return 0;
 }
 
+int snd_device_present(int kind, const char *name) {
+    if (!S.connected || (kind != SND_SINK && kind != SND_SOURCE) || !name || !*name) return -1;
+    return dev_exists(kind, name, 0);
+}
+
 int snd_set_default(int kind, const char *name) {
     if (!S.connected || (kind != SND_SINK && kind != SND_SOURCE) || !dev_exists(kind, name, 0)) return -1;
     uint32_t c = kind == SND_SINK ? PA_CMD_SET_DEFAULT_SINK : PA_CMD_SET_DEFAULT_SOURCE;

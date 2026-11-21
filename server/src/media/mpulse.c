@@ -196,8 +196,9 @@ static void channel_map(TsOut *t, int ch) {
     ts_cmap(t, (uint8_t)ch, pos);
 }
 
-int lmp_playback(LmPulse *p, int rate, int ch, const char *media_name, const char *role) {
+int lmp_playback(LmPulse *p, int rate, int ch, const char *media_name, const char *role, const char *sink) {
     p->want = 1;
+    snprintf(p->sink, sizeof p->sink, "%s", sink ? sink : "");
     p->rate = rate;
     p->channels = ch;
     p->frame_bytes = (uint32_t)ch * 2;
@@ -214,8 +215,8 @@ static int send_playback(LmPulse *p) {
     uint32_t tag = begin(p, &t, PA_CMD_CREATE_PLAYBACK_STREAM);
     ts_ss(&t, PA_SAMPLE_S16LE, (uint8_t)ch, (uint32_t)rate);
     channel_map(&t, ch);
-    ts_u32(&t, PA_INVALID_INDEX);                    /* the default output */
-    ts_str(&t, NULL);
+    ts_u32(&t, PA_INVALID_INDEX);
+    ts_str(&t, p->sink[0] ? p->sink : NULL);         /* an output by its name (node.name), or the default one */
     ts_u32(&t, 0xffffffffu);                         /* maxlength */
     ts_bool(&t, 1);                                  /* corked: starts when there's data */
     uint32_t bps = (uint32_t)rate * p->frame_bytes;

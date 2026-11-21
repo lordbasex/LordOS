@@ -493,7 +493,7 @@ compromised QEMU can't change `machine.json` (and through it, what the next star
 
 | File | What |
 |---|---|
-| `machine.json` | The description, schema 1 (`machine.h`; schema 2 added `base`, `agent`, `clipboard`, schema 3 an imported machine's hardware, 6.22): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
+| `machine.json` | The description, schema 1 (`machine.h`; schema 2 added `base`, `agent`, `clipboard`, schema 3 an imported machine's hardware, 6.22; 4 `shares`; 5 `secure_boot`, `tpm`, `hyperv`, `drivers`, `graphics`; 6 the network's modes, `bridge`, `ports`, `resolution`, `sound`, `volume`, `microphone`, `boot_order`, `boot_menu`; 7 `transfer`; 8 `sound_out`, `sound_in`, 6.9): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
 | `disks/system.qcow2` | System disk, made by `qemu-img` at creation (empty, or converted from an image with `--import`) |
 | `disks/nvram.qcow2` | UEFI variables as qcow2, converted from the firmware's template (6.2). arm64 always uses UEFI (`AAVMF_CODE.no-secboot.fd`); amd64 uses UEFI (`OVMF_CODE_4M.fd`) when the `ovmf` package is there and SeaBIOS otherwise, which is what a Pi gets for an emulated amd64 guest |
 | `log/lord-vm.log` | This run: lord-vm's lines, QEMU's and passt's stderr, the command line (credentials named, never their values); 4 MB at most. `lord-vm.1.log` and `lord-vm.2.log` are the two runs before (6.19) |
@@ -1822,6 +1822,19 @@ Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: a
 - *Settings.* machine.json schema 6: `sound` (true), `volume` (0..100, 100), `microphone` (false); an older file reads as those. They
   are host-side and change while the machine runs: through `VM_SOUND` to its lord-vm, which writes the file (it holds the lock), or
   `lord-vm --set --sound --volume --microphone` with it off. Configure → Sound and input has them; the bar's speaker mutes and unmutes.
+- *Output and input (schema 8).* `sound_out` and `sound_in`: the output the guest's sound plays on and the input its microphone
+  hears, each a PipeWire `node.name` (1 to 96 printable ASCII characters, no spaces: `vm_sound_dev_valid`), absent for the system's
+  default, which follows Settings → Sound. Configure → Sound and input offers "System default" and every output and microphone
+  Settings → Sound lists (the same `lord.sound` state, by its description); the window's speaker button is a menu with mute, the
+  outputs and the inputs. Changed while running through `VM_SOUND` (`d = 1`, text `OUT\tIN`, `vm_sound_devs_parse`), or
+  `lord-vm --set DIR --sound-out NODE|default --sound-in NODE|default` with it off. lord-server applies them at once: the stream
+  connects again to that device with the same ring (`maudio_target`, as `maudio_retry`), created with the device's name, which
+  pipewire-pulse turns into `target.object`; "default" connects without one, so the stream follows the default. At every poll
+  lord-server uses the chosen device only while its sound client lists it (`snd_device_present`): unplugged, the stream goes to
+  the default (the menu says "not connected"); plugged back, it moves there again. **Measured** 2026-11-21 on PipeWire 1.4.2 with
+  `maudio.c` and a silent stream: moved live between two outputs (`pw-dump`: linked to each, `target.object` set), back to the
+  default (no `target.object`), a name that isn't there played on the default, and a capture stream moved between two microphones.
+  *Not checked:* the menus on screen and a running guest's sound while it moves.
 - *Checked (**Measured**, 2026-11-20, amd64, a clone of an Ubuntu 26.04 guest, with `lordvm-dev`, which plays lord-server's part with
   lord-server's own `maudio.c` and a PipeWire stream at volume 0):* GNOME's screen reader at the login screen and `speaker-test`
   reached the stream at the real rate (192 000 bytes a second), every byte the helper wrote was taken (0 dropped), the ring stayed

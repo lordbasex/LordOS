@@ -34,6 +34,7 @@
 #include "../sec/json.h"
 #include "../sec/perms.h"
 #include "../sec/restrict.h"
+#include "../sound/snd.h"
 #include "ui.h"
 #include "../term/term.h"
 #include "../fsops.h"
@@ -339,6 +340,8 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             JS_SetPropertyStr(c, o, "sound", JS_NewBool(c, m.sound));
             set_int(c, o, "volume", m.volume);
             JS_SetPropertyStr(c, o, "microphone", JS_NewBool(c, m.microphone));
+            set_str(c, o, "soundOut", m.sound_out);
+            set_str(c, o, "soundIn", m.sound_in);
             {
                 /* a Clone whose guest is still to get its own hostname and machine-id (6.3) */
                 char idh[VM_HOSTNAME_MAX + 1] = "";
@@ -1169,6 +1172,7 @@ typedef struct {
      * speakers' stream and the microphone's belong to the picture's media source (m->audio, m->mic), so lord-server's
      * loop serves them; their rings go to lord-vmdisplay (VD_AUDIO_OUT, VD_MIC) */
     int snd_on, snd_vol, mic_allowed;
+    char snd_out[VM_SOUND_DEV_MAX + 1], snd_in[VM_SOUND_DEV_MAX + 1];   /* the output and input chosen ("" the default) */
     int guest_out, guest_in;
     int spk_sent, mic_sent;             /* the current helper has the speakers' / microphone's ring */
     int mic_wait;                       /* the guest records and the machine allows it, LordOS's permission not (yet) */
@@ -1227,7 +1231,11 @@ static void init_sess(Sess *s, const char *dir) {
     for (int i = 0; i < 4; i++) s->db[i].fd = -1;
     snprintf(s->dir, sizeof s->dir, "%s", dir);
     VmMachine m;
-    if (!vm_machine_load(dir, &m, NULL, 0)) { s->snd_on = m.sound; s->snd_vol = m.volume; s->mic_allowed = m.microphone; snprintf(s->name, sizeof s->name, "%s", m.name); }
+    if (!vm_machine_load(dir, &m, NULL, 0)) {
+        s->snd_on = m.sound; s->snd_vol = m.volume; s->mic_allowed = m.microphone; snprintf(s->name, sizeof s->name, "%s", m.name);
+        memcpy(s->snd_out, m.sound_out, sizeof s->snd_out);
+        memcpy(s->snd_in, m.sound_in, sizeof s->snd_in);
+    }
     else { s->snd_on = 1; s->snd_vol = 100; }
 }
 
@@ -1263,6 +1271,11 @@ static void snd_retry(Sess *s, MediaSrc *ms) {
     if (mic) maudio_retry(ms->mic);
 }
 
+/* the device a stream uses: the one chosen while Settings → Sound lists it (or while that isn't known), else the
+ * default; checked at every poll, so a device unplugged sends the stream to the default and one plugged back in takes
+ * it again (maudio_target moves a live stream only when this changes) */
+static const char *snd_target(int kind, const char *chosen) { return chosen[0] && snd_device_present(kind, chosen) != 0 ? chosen : ""; }
+
 static void snd_apply(Sess *s) {
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
     int up = s->vd >= 0 && s->vd_up && ms;
@@ -1278,6 +1291,7 @@ static void snd_apply(Sess *s) {
             s->spk_play = -1;
         }
         if (ms->audio) {
+            maudio_target(ms->audio, snd_target(SND_SINK, s->snd_out));     /* chosen in Configure or the bar: moved now */
             if (!s->spk_sent) { vdsend_fd(s, VD_AUDIO_OUT, 1, maudio_ring_fd(ms->audio)); s->spk_sent = 1; }
             if (s->spk_vol != s->snd_vol) { s->spk_vol = s->snd_vol; maudio_volume(ms->audio, s->snd_vol / 100.0); }
             if (s->spk_play != s->guest_out) { s->spk_play = s->guest_out; maudio_playing(ms->audio, s->guest_out); }
@@ -1294,9 +1308,9 @@ static void snd_apply(Sess *s) {
     if (perm) {
         if (!ms->mic) {
             int ring = -1;
-            ms->mic = maudio_open(1, "Machines", s->name[0] ? s->name : "Machine", "", &ring);
+            ms->mic = maudio_open(1, "Machines", s->name[0] ? s->name : "Machine", snd_target(SND_SOURCE, s->snd_in), &ring);
             s->mic_sent = 0;
-        }
+        } else maudio_target(ms->mic, snd_target(SND_SOURCE, s->snd_in));
         if (ms->mic && !s->mic_sent) { vdsend_fd(s, VD_MIC, 1, maudio_ring_fd(ms->mic)); s->mic_sent = 1; }
     } else if (ms && ms->mic) {
         if (s->mic_sent) vdsend(s, VD_MIC, 0, 0);
@@ -2006,6 +2020,8 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_SetPropertyStr(c, so, "on", JS_NewBool(c, s->snd_on));
         set_int(c, so, "volume", s->snd_vol);
         JS_SetPropertyStr(c, so, "microphone", JS_NewBool(c, s->mic_allowed));
+        set_str(c, so, "output", s->snd_out);
+        set_str(c, so, "input", s->snd_in);
         JS_SetPropertyStr(c, so, "playing", JS_NewBool(c, s->guest_out));
         JS_SetPropertyStr(c, so, "recording", JS_NewBool(c, s->guest_in));
         set_str(c, so, "mic", sm && sm->mic && s->mic_sent ? "live" : s->mic_wait ? "wait" : "off");
@@ -2236,7 +2252,21 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     return JS_UNDEFINED;
 }
 
-/* sound(dir, { sound, volume, microphone }) → { live, job }: the machine's sound choices (6.9). A machine whose window is
+/* one of sound()'s device names: "" (the default) or a node.name as machine.json keeps it; 0 ok (out set or kept), -1 refused */
+static int snd_dev_arg(JSContext *c, JSValueConst o, const char *key, char *out, size_t n) {
+    JSValue v = JS_GetPropertyStr(c, o, key);
+    int r = 0;
+    if (JS_IsString(v)) {
+        const char *x = JS_ToCString(c, v);
+        if (x && (!*x || vm_sound_dev_valid(x)) && strlen(x) < n) snprintf(out, n, "%s", x); else r = -1;
+        if (x) JS_FreeCString(c, x);
+    } else if (!JS_IsUndefined(v)) r = -1;
+    JS_FreeValue(c, v);
+    return r;
+}
+
+/* sound(dir, { sound, volume, microphone, output, input }) → { live, job }: the machine's sound choices (6.9); output and
+ * input are a sound device's node.name (as lord.sound's state lists them) or "" for the system's default. A machine whose window is
  * here gets them now (this side plays and records) and its lord-vm writes machine.json (VM_SOUND); one running without
  * a window gets VM_SOUND through its runtime socket; one that is off gets lord-vm --set (job). null when refused. */
 static JSValue f_sound(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -2245,6 +2275,11 @@ static JSValue f_sound(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     VmMachine m;
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir) || vm_machine_load(dir, &m, NULL, 0)) return JS_NULL;
     int so = m.sound, vo = m.volume, mi = m.microphone, ok = 1;
+    char out[VM_SOUND_DEV_MAX + 1], in[VM_SOUND_DEV_MAX + 1], devs[2 * VM_SOUND_DEV_MAX + 2];
+    memcpy(out, m.sound_out, sizeof out);
+    memcpy(in, m.sound_in, sizeof in);
+    if (snd_dev_arg(c, argv[1], "output", out, sizeof out) || snd_dev_arg(c, argv[1], "input", in, sizeof in)) return JS_NULL;
+    snprintf(devs, sizeof devs, "%s\t%s", out, in);
     JSValue v = JS_GetPropertyStr(c, argv[1], "sound");
     if (JS_IsBool(v)) so = JS_ToBool(c, v); else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
@@ -2259,9 +2294,11 @@ static JSValue f_sound(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     for (int i = 0; i < MAX_SESS; i++) {
         Sess *s = &sess[i];
         if (!s->used || s->vm < 0 || s->ended || strcmp(s->dir, dir)) continue;
-        VmMsg q = vm_msg(VM_SOUND, ++s->seq, so, vo, mi, 0, NULL);
+        VmMsg q = vm_msg(VM_SOUND, ++s->seq, so, vo, mi, 1, devs);
         if (vm_send(s->vm, &q, -1)) continue;
         s->snd_on = so; s->snd_vol = vo; s->mic_allowed = mi;
+        memcpy(s->snd_out, out, sizeof s->snd_out);
+        memcpy(s->snd_in, in, sizeof s->snd_in);
         snd_apply(s);
         live = 1;
     }
@@ -2274,7 +2311,7 @@ static JSValue f_sound(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         struct sockaddr_un a = { .sun_family = AF_UNIX };
         if (fd >= 0) memcpy(a.sun_path, path, strlen(path) + 1);
         if (fd >= 0 && !connect(fd, (struct sockaddr *)&a, sizeof a)) {
-            VmMsg q = vm_msg(VM_SOUND, 1, so, vo, mi, 0, NULL);
+            VmMsg q = vm_msg(VM_SOUND, 1, so, vo, mi, 1, devs);
             if (!vm_send(fd, &q, -1)) {
                 for (int k = 0; k < 8; k++) {
                     struct pollfd pf = { fd, POLLIN, 0 };
@@ -2292,7 +2329,8 @@ static JSValue f_sound(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     if (!live) {
         char sv[8];
         snprintf(sv, sizeof sv, "%d", vo);
-        char *args[] = { "lord-vm", "--set", dir, "--sound", so ? "on" : "off", "--volume", sv, "--microphone", mi ? "on" : "off", NULL };
+        char *args[] = { "lord-vm", "--set", dir, "--sound", so ? "on" : "off", "--volume", sv, "--microphone", mi ? "on" : "off",
+                         "--sound-out", out[0] ? out : "default", "--sound-in", in[0] ? in : "default", NULL };
         job = spawn_job(args, dir);
         if (!job) return JS_NULL;
     }

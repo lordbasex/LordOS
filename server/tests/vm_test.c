@@ -65,7 +65,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "8", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "9", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -332,6 +332,56 @@ static void test_schema(void) {
         CHECK(vm_transfer_path("/home/u/Machines/a.lordvm", xp, 20) < 0);                /* doesn't fit */
         CHECK(vm_transfer_path(NULL, xp, sizeof xp) < 0);
         /* a person's share can't be the transfer folder: it's inside the library */
+    }
+    /* schema 8 (the sound's output and input, 6.9): a node.name each, printable without spaces, at most VM_SOUND_DEV_MAX;
+     * "" or no key is the default; never below schema 8; written only when chosen */
+    {
+        char longn[VM_SOUND_DEV_MAX + 2], add[400];
+        memset(longn, 'a', sizeof longn - 1); longn[sizeof longn - 1] = 0;          /* one too many */
+        struct { const char *add; int schema, want; const char *out, *in; } s8[] = {
+            { "\"sound_out\":\"alsa_output.pci-0000_00_1f.3.analog-stereo\"", 8, VM_OK, "alsa_output.pci-0000_00_1f.3.analog-stereo", "" },
+            { "\"sound_in\":\"bluez_input.AA_BB_CC_DD_EE_FF.0\"", 8, VM_OK, "", "bluez_input.AA_BB_CC_DD_EE_FF.0" },
+            { "\"sound_out\":\"\",\"sound_in\":\"\"", 8, VM_OK, "", "" },
+            { "\"sound_out\":\"a b\"", 8, VM_E_RANGE, "", "" }, { "\"sound_in\":\"a\\tb\"", 8, VM_E_RANGE, "", "" },
+            { "\"sound_out\":\"a\\u0001\"", 8, VM_E_RANGE, "", "" }, { "\"sound_out\":\"caf\u00e9\"", 8, VM_E_RANGE, "", "" },
+            { "\"sound_out\":1", 8, VM_E_FIELD, "", "" }, { "\"sound_in\":true", 8, VM_E_FIELD, "", "" },
+            { "\"sound_out\":\"x\"", 7, VM_E_FIELD, "", "" }, { "\"sound_in\":\"x\"", 7, VM_E_FIELD, "", "" },
+            { "\"sound_out\":\"\"", 7, VM_OK, "", "" },      /* the default it means anyway */
+            { add, 8, VM_E_RANGE, "", "" },
+        };
+        snprintf(add, sizeof add, "\"sound_out\":\"%s\"", longn);
+        for (size_t i = 0; i < sizeof s8 / sizeof s8[0]; i++) {
+            char t[4096];
+            const char *at = strstr(GOOD, "\"schema\":1");
+            snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s8[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s8[i].add);
+            int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+            if (r != s8[i].want) fprintf(stderr, "  schema 8 %s (%d): got %d (%s)\n", s8[i].add, s8[i].schema, r, err);
+            CHECK(r == s8[i].want);
+            if (r == VM_OK) {
+                CHECK(!strcmp(m.sound_out, s8[i].out) && !strcmp(m.sound_in, s8[i].in));
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !strstr(jj, "\"sound_out\": \"\"") && !strstr(jj, "\"sound_in\": \"\"") && (!*s8[i].out || strstr(jj, s8[i].out)) && (!*s8[i].in || strstr(jj, s8[i].in)));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+        }
+        /* exactly VM_SOUND_DEV_MAX fits */
+        longn[VM_SOUND_DEV_MAX] = 0;
+        CHECK(vm_sound_dev_valid(longn) && !vm_sound_dev_valid("") && !vm_sound_dev_valid(NULL) && !vm_sound_dev_valid("a\nb"));
+        CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.sound_out[0] && !m.sound_in[0]);
+        /* VM_SOUND's text "OUT\tIN" */
+        char o[VM_SOUND_DEV_MAX + 1] = "keep", in[VM_SOUND_DEV_MAX + 1] = "keep";
+        CHECK(vm_sound_devs_parse("alsa_output.x\talsa_input.y", o, sizeof o, in, sizeof in) == 0 && !strcmp(o, "alsa_output.x") && !strcmp(in, "alsa_input.y"));
+        CHECK(vm_sound_devs_parse("\t", o, sizeof o, in, sizeof in) == 0 && !o[0] && !in[0]);
+        strcpy(o, "keep"); strcpy(in, "keep");
+        CHECK(vm_sound_devs_parse("", o, sizeof o, in, sizeof in) < 0 && vm_sound_devs_parse("a\tb\tc", o, sizeof o, in, sizeof in) < 0);
+        CHECK(vm_sound_devs_parse("a b\tc", o, sizeof o, in, sizeof in) < 0 && vm_sound_devs_parse(NULL, o, sizeof o, in, sizeof in) < 0);
+        CHECK(vm_sound_devs_parse("a\tb", o, 1, in, sizeof in) < 0 && !strcmp(o, "keep") && !strcmp(in, "keep"));
+        char t2[2 * VM_SOUND_DEV_MAX + 4];
+        snprintf(t2, sizeof t2, "x\t%sa", longn);                                  /* the input one too long */
+        CHECK(vm_sound_devs_parse(t2, o, sizeof o, in, sizeof in) < 0 && !strcmp(in, "keep"));
+        CHECK(strlen(t2) < VM_TEXT_MAX + VM_SOUND_DEV_MAX && 2 * VM_SOUND_DEV_MAX + 1 < VM_TEXT_MAX);   /* both fit one message */
     }
     /* the transfer folder is tied to its machine (vm_transfer_claim): an owner record beside it with the machine's id; a
      * folder of that name that's another machine's, or nobody's and not empty, moves aside, never deleted; the Trash moves
@@ -637,6 +687,8 @@ static void test_messages(void) {
     q.b = -1; CHECK(!vm_msg_valid(&q, 1));
     q.b = 0; q.a = 2; CHECK(!vm_msg_valid(&q, 1));
     q.a = 0; q.c = 2; CHECK(!vm_msg_valid(&q, 1));
+    q.c = 0; q.d = 1; CHECK(vm_msg_valid(&q, 1));
+    q.d = 2; CHECK(!vm_msg_valid(&q, 1));
     /* the speakers' ring keeps at most VD_AUDIO_AHEAD_MS ahead of the reader (15 360 bytes at 80 ms), and a broken reader
      * cursor counts as full */
     CHECK(vd_audio_fits(0, 0, 1u << 18, 15360) && !vd_audio_fits(0, 0, 1u << 18, 15364));

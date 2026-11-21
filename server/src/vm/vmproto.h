@@ -74,7 +74,9 @@
  *                   memory (QMP snapshot-save, snapshot-load, snapshot-delete jobs), under operation.json; the entry
  *                   in snapshots.json is written last (6.2). VM_JOB reports it; → VM_REPLY when it's done
  *     VM_SOUND      machine.json's sound choices while the machine runs (lord-vm holds the lock, so it writes the file):
- *                   a = sound (1 plays on this computer, 0 muted), b = volume 0..100, c = microphone (1 allowed, 0 not).
+ *                   a = sound (1 plays on this computer, 0 muted), b = volume 0..100, c = microphone (1 allowed, 0 not);
+ *                   d = 1: text = "OUT\tIN", the output and input (machine.json sound_out, sound_in: a node.name each, or
+ *                   empty for the default; vm_sound_dev_valid), d = 0: they stay as they are.
  *                   They change nothing in QEMU: lord-server applies them itself (6.9) → VM_REPLY
  *     VM_APPS       apps mode (7.2): a = 1 on, 0 off; sent on to the guest's helper (LAG_APPS) only when the machine's
  *                   agent is on and the helper said "windows" (LAG_CAP_WINDOWS) → VM_REPLY
@@ -373,7 +375,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
                       (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_TRANSFER)) &&
                       (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX))) &&
-                      (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1))) &&
+                      (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1) && (m->d == 0 || m->d == 1))) &&
                       (m->type != VM_FILE || m->text[0]) &&
                       (m->type != VM_DISPLAY_SIZE || (m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM)) &&
                       (m->type != VM_APPS || m->a == 0 || m->a == 1) &&

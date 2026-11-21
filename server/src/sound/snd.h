@@ -25,6 +25,8 @@ int snd_set_volume(int kind, uint32_t index, const double *v, int n);   /* 1.0 =
 int snd_set_level(int kind, uint32_t index, double level);              /* the highest ends up at level, keeping the balance */
 int snd_set_mute(int kind, uint32_t index, int mute);
 int snd_set_default(int kind, const char *name);                        /* SND_SINK or SND_SOURCE */
+/* is the output (SND_SINK) or input (SND_SOURCE) of that name there now: 1 yes, 0 no, -1 not known (not connected) */
+int snd_device_present(int kind, const char *name);
 int snd_set_port(int kind, uint32_t index, const char *port);           /* SND_SINK or SND_SOURCE */
 int snd_move(int kind, uint32_t index, uint32_t device);                /* SND_INPUT → output, SND_OUTPUT → input */
 int snd_set_profile(uint32_t card, const char *profile);                /* a Bluetooth card's profile (state "cards") */

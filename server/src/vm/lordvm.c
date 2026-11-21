@@ -4402,11 +4402,16 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
          * lock, so it writes the file */
         VmMachine nm = S.m;
         nm.sound = m->a; nm.volume = m->b; nm.microphone = m->c;
+        if (m->d == 1 && vm_sound_devs_parse(m->text, nm.sound_out, sizeof nm.sound_out, nm.sound_in, sizeof nm.sound_in)) {
+            reply(ci, m->seq, VME_BAD_REQUEST, "not a sound device's name");
+            return;
+        }
         nm.schema = VM_SCHEMA;
         vm_now_iso(nm.updated);
         if (vm_machine_check(&nm, NULL, 0) || vm_machine_save(S.dir, &nm)) { reply(ci, m->seq, VME_INTERNAL, "can't write machine.json"); return; }
         S.m = nm;
-        vlog("sound: %s, volume %d, microphone %s", nm.sound ? "on" : "muted", nm.volume, nm.microphone ? "allowed" : "off");
+        vlog("sound: %s, volume %d, microphone %s, output %s, input %s", nm.sound ? "on" : "muted", nm.volume, nm.microphone ? "allowed" : "off",
+             nm.sound_out[0] ? nm.sound_out : "default", nm.sound_in[0] ? nm.sound_in : "default");
         reply(ci, m->seq, VME_OK, "");
         return;
     }
@@ -5511,6 +5516,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
      * Allowed while suspended: bootindex and the boot menu are fw_cfg data the saved stream doesn't carry (a state saved
      * with the disk first loaded with the network first and the menu on, and the guest went on as it was) */
     int boot[VM_BOOT_DEVS], nboot = -1, bmenu = -1;
+    /* the sound's output and input (6.9): --sound-out, --sound-in NODE|default */
+    const char *sout = NULL, *sin = NULL;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
@@ -5534,6 +5541,11 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         /* sound (6.9): host-side choices, also while suspended (the guest's hardware doesn't change) */
         if (!strcmp(a, "--sound")) { sound = parse_enum(v, "off", "on"); if (sound < 0) { fprintf(stderr, "lord-vm: --sound on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--microphone")) { mic = parse_enum(v, "off", "on"); if (mic < 0) { fprintf(stderr, "lord-vm: --microphone on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--sound-out") || !strcmp(a, "--sound-in")) {
+            if (!v || (strcmp(v, "default") && !vm_sound_dev_valid(v))) { fprintf(stderr, "lord-vm: %s NODE|default (a sound device's node.name)\n", a); return 2; }
+            if (!strcmp(a, "--sound-out")) sout = v; else sin = v;
+            continue;
+        }
         /* the transfer folder (6.7.1): a device of the machine, so like the shares, never while a state is saved */
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
@@ -5612,6 +5624,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (vol >= 0) m.volume = vol;
     if (mic >= 0) m.microphone = mic;
     if (sound >= 0 || vol >= 0 || mic >= 0) m.schema = VM_SCHEMA;
+    if (sout) { snprintf(m.sound_out, sizeof m.sound_out, "%s", strcmp(sout, "default") ? sout : ""); m.schema = VM_SCHEMA; }
+    if (sin) { snprintf(m.sound_in, sizeof m.sound_in, "%s", strcmp(sin, "default") ? sin : ""); m.schema = VM_SCHEMA; }
     if (xfer >= 0) { m.transfer = xfer; m.schema = VM_SCHEMA; }
     if (nboot >= 0) { m.n_boot = nboot; memcpy(m.boot_order, boot, sizeof boot[0] * (size_t)nboot); }
     if (bmenu >= 0) m.boot_menu = bmenu;
@@ -7171,7 +7185,7 @@ static int usage(void) {
             "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both] [--graphics 2d|3d]   (also on --create)\n"
             "                         [--boot-order auto|disk,cd,network (any order, any of them)] [--boot-menu on|off]\n"
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
-            "                         [--sound on|off] [--volume 0..100] [--microphone on|off]   (with the machine off; Machines changes them live)\n"
+            "                         [--sound on|off] [--volume 0..100] [--microphone on|off] [--sound-out NODE|default] [--sound-in NODE|default]   (with the machine off; Machines changes them live)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"
