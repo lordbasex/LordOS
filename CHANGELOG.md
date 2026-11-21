@@ -208,6 +208,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   so did one whose PipeWire restarted. The speakers' stream (and the microphone's) now connect again every 2 s while the
   guest plays, with the same ring, logging only the first failure and the return. Checked with `lordvm-dev` and a private
   PipeWire started after the guest began playing: back after 4 tries, at the real rate.
+- **The machine window's menus show their information lines whole** (`apps/machines/ui.jsx`, `vmwindow.jsx`): in the
+  Folders menu the transfer folder's line ("In the machine: a drive in This PC, usually Z:") and "No folder is shared with
+  this machine" were cut at the menu's edge, and so were long items in other languages. Information lines are now notes
+  that wrap under the items' text column (start-aligned, right to left too), and every item's text wraps instead of
+  running out of the menu; the resolution menu's notes use the same rows.
 - **The remote desktop no longer crashes lord-server when a viewer connects after the last one left**
   (`server/src/remote/mirror.c`, `server/src/media/mstream.c`): the mirror freed its copy of the screen while the video
   encoder still held it, and the next viewer's encoder copied from the freed memory. A 1920 × 1080 headless session

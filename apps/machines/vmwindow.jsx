@@ -112,9 +112,9 @@ function Tools({ ctl, floating, compact, tiny }) {
     ...resolutions(screen.width, screen.height, st?.w ? [st.w, st.h] : null).map(([w, h]) => ({ label: `${w} × ${h}`, checked: !follow && st?.w === w && st?.h === h, disabled: !a.keys, onClick: () => ctl.fixed(w, h) })),
     '-',
     { label: tr('machines.tb.follow'), checked: follow, onClick: () => ctl.setFollow(true) },
-    { label: tr('machines.tb.sizesNote'), disabled: true },
+    { label: tr('machines.tb.sizesNote'), note: true },
     // the guest kept its size after Follow asked for another (its display driver doesn't follow): said, not hidden
-    follow && ctl.stuck && st?.w ? { label: tr('machines.tb.followStuck', { w: st.w, h: st.h }), disabled: true } : null,
+    follow && ctl.stuck && st?.w ? { label: tr('machines.tb.followStuck', { w: st.w, h: st.h }), note: true } : null,
   ];
   const g = st?.agent;
   const clip = cfg?.clipboard || 'off';
@@ -135,7 +135,7 @@ function Tools({ ctl, floating, compact, tiny }) {
   const xferItems = !cfg?.transfer ? [{ label: tr('machines.tb.transferOff'), onClick: () => ctl.configure('sharing') }, '-'] : [
     { label: tr('machines.tb.transferOpen'), onClick: xf.open },
     { label: xf.state === 'ready' ? (xf.windows ? tr('machines.win.transferDrive') : tr('machines.tb.transferLinux'))
-      : xf.state === 'setup' ? tr('machines.tb.transferNeedsSetup') : xf.state === 'settingUp' ? tr('machines.tb.transferSettingUp') : tr('machines.tb.transferWaiting'), disabled: true },
+      : xf.state === 'setup' ? tr('machines.tb.transferNeedsSetup') : xf.state === 'settingUp' ? tr('machines.tb.transferSettingUp') : tr('machines.tb.transferWaiting'), note: true },
     xf.state === 'setup' ? { label: tr('machines.tb.transferSetup'), onClick: xf.setup } : null,
     '-',
   ];
@@ -144,7 +144,7 @@ function Tools({ ctl, floating, compact, tiny }) {
     ...shares.map((x) => ({ label: `${x.path.split('/').pop()}  ·  ${x.tag}`, hint: tr(x.writable ? 'machines.tb.shareRw' : 'machines.tb.shareRo'), onClick: () => openFolder(x.path) })),
     ...shares.map((x) => ({ label: tr('machines.tb.shareCopy', { tag: x.tag }), onClick: () => clipboard.set(mountCommand(x.tag)) })),
     shares.length ? '-' : null,
-    !shares.length ? { label: tr('machines.tb.sharesNone'), disabled: true } : null,
+    !shares.length ? { label: tr('machines.tb.sharesNone'), note: true } : null,
     { label: shares.length ? tr('machines.tb.shareChange') : tr('machines.tb.shareAdd'), onClick: () => ctl.configure('sharing') },
   ];
   const resLabel = st?.w ? `${tr('machines.tb.resolution')}: ${st.w} × ${st.h}` : tr('machines.tb.resolution');

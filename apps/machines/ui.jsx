@@ -217,7 +217,8 @@ export const icons = {
   ),
 };
 
-// A menu at a point of the window (right-click on a card) or under a button; items as MenuButton's
+// A menu at a point of the window (right-click on a card) or under a button; items as MenuButton's, plus { note: true,
+// label } for a line of information that wraps
 // How many menus are open: while one is, a machine's window keeps the keyboard for the menu (Esc closes it and never
 // reaches the guest).
 export const menus = { open: 0 };
@@ -246,12 +247,22 @@ export function PopMenu({ x, y, items, onClose, width = 220 }) {
 function MenuItem({ it, onClose }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
+  // an information row (note: true): wrapped over as many lines as it needs, under the items' text column, never a
+  // target; long words of any language and right-to-left text keep to the menu's width
+  if (it.note) {
+    return (
+      <View style={{ paddingVertical: 4, paddingHorizontal: 10, flexDirection: 'row', gap: 6 }}>
+        <View style={{ width: 12 }} />
+        <Text style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'start', color: p.dim }}>{it.label}</Text>
+      </View>
+    );
+  }
   const lit = hover && !it.disabled;
   return (
     <View onClick={() => { if (it.disabled) return; onClose(); it.onClick?.(); }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ minHeight: 30, paddingHorizontal: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: lit ? p.accent : 'transparent', opacity: it.disabled ? 0.4 : 1 }}>
       <Text style={{ width: 12, fontSize: 11, color: lit ? '#fff' : p.text }}>{it.checked ? '✓' : ''}</Text>
-      <Text style={{ flex: 1, fontSize: 13, whiteSpace: 'nowrap', color: lit ? '#fff' : it.destructive ? '#ff453a' : p.text }}>{it.label}</Text>
+      <Text style={{ flex: 1, fontSize: 13, paddingVertical: 6, textAlign: 'start', color: lit ? '#fff' : it.destructive ? '#ff453a' : p.text }}>{it.label}</Text>
       {it.hint ? <Text style={{ fontSize: 11, color: lit ? '#e6f1ff' : p.dim }}>{it.hint}</Text> : null}
     </View>
   );
