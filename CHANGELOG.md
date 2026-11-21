@@ -185,6 +185,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: Configure's Done keeps changes made in any section** (`apps/machines/configure.jsx`): Done saved the draft
+  only when the pane showing at that moment was one that saves, so a choice made in another section was silently dropped
+  (Graphics 3D chosen under Display, then Done pressed from Sound, closed without it). Done now saves every change made in
+  any section; with the machine running and changes that need it off, it shows the running banner instead of closing, and
+  the pane's Cancel/Save footer shows whenever there are unsaved changes.
 - **Machines: the window of a machine that's starting no longer shows "Something went wrong"** (`apps/machines/model.js`):
   between the start and the machine's first state, the window read the state of a session that had none yet and failed,
   then said it couldn't connect. A session without its first state now counts as Starting. Model test added.

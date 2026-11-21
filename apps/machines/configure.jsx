@@ -427,7 +427,14 @@ export function Configure({ dir, section: section0, onClose }) {
       </ScrollView>
     </View>
   );
-  const done = () => { if (dirty && savable && !running && !netBad) { setClosing(true); save(); } else if (!netBad || !dirty) onClose(); };
+  // Done keeps every change made in any section: the draft holds only fields lord-vm --set writes, whichever pane is
+  // showing when Done is pressed (it used to close without saving unless the pane itself was a saving one)
+  const done = () => {
+    if (!dirty) { onClose(); return; }
+    if (netBad) return;
+    if (running) { setMsg({ ok: false, text: tr('machines.cfg.runningBanner') }); return; }
+    setClosing(true); save();
+  };
   return (
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: onClose ? 'transparent' : p.bg }}>
       {side.narrow ? null : list}
@@ -446,7 +453,7 @@ export function Configure({ dir, section: section0, onClose }) {
             <Pill label={tr('machines.cancel')} disabled={!!job} onClick={() => { setDraft({}); setMsg(null); onClose(); }} />
             <Pill primary label={tr('machines.cfg.done')} disabled={!!job || (dirty && netBad)} onClick={done} />
           </View>
-        ) : savable ? (
+        ) : savable || dirty ? (
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
             <Pill label={tr('machines.cancel')} disabled={!dirty || !!job} onClick={() => { setDraft({}); setMsg(null); }} />
             <Pill primary label={tr('machines.cfg.save')} disabled={!dirty || running || !!job || netBad} onClick={() => save()} />
