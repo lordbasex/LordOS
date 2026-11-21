@@ -1,0 +1,50 @@
+## @file
+#  LordOS GVT-g GOP driver (UEFI driver, shipped as a PCI option ROM).
+#
+#  Copyright (c) 2026 iPERFEX and the LordOS contributors
+#  SPDX-License-Identifier: MIT
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = GvtGopDxe
+  FILE_GUID                      = e16ed665-10ab-4856-b625-a678d8bb3b4f
+  MODULE_TYPE                    = UEFI_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = GvtGopEntryPoint
+  PCI_VENDOR_ID                  = 0x8086
+  PCI_CLASS_CODE                 = 0x030000
+
+[Sources]
+  GvtRegs.h
+  GvtGop.h
+  Driver.c
+  Display.c
+  Edid.c
+  Gop.c
+  OpRegion.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  GvtGopPkg/GvtGopPkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  CacheMaintenanceLib
+  DebugLib
+  DevicePathLib
+  FrameBufferBltLib
+  IoLib
+  MemoryAllocationLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiLib
+
+[Protocols]
+  gEfiPciIoProtocolGuid                 ## TO_START
+  gEfiDevicePathProtocolGuid            ## TO_START BY_START
+  gEfiGraphicsOutputProtocolGuid        ## BY_START
+  gEfiEdidDiscoveredProtocolGuid        ## BY_START
+  gEfiEdidActiveProtocolGuid            ## BY_START

@@ -114,11 +114,12 @@ For computers with a second AMD or NVIDIA card kept only for machines.
 
 ### Decisions of 2026-11-21 (maintainer)
 
-- **Intel (Mode A):** the next step is our own GVT-g UEFI GOP option ROM, built from the open i915ovmfPkg source and
-  signed with a LordOS key enrolled in each machine's Secure Boot db (Secure Boot stays on), so the vGPU's own display
-  works and the picture reaches LordOS as a dmabuf. One mechanism for both uses: **exclusive** (the largest mdev type
-  for one machine; a larger iGPU aperture in the firmware exposes larger types) and **shared** (smaller types, one per
-  running machine — rare, but kept). The hybrid/render-only mode stays as the fallback.
+- **Intel (Mode A):** the next step is our own GVT-g UEFI GOP option ROM (now built: LordOS's own driver, below, as
+  i915ovmfPkg has no license), signed with a LordOS key enrolled in each machine's Secure Boot db (Secure Boot stays
+  on), so the vGPU's own display works and the picture reaches LordOS as a dmabuf. One mechanism for both uses:
+  **exclusive** (the largest mdev type for one machine; a larger iGPU aperture in the firmware exposes larger types) and
+  **shared** (smaller types, one per running machine — rare, but kept). The hybrid/render-only mode stays as the
+  fallback.
 - **AMD/NVIDIA (Mode B), first stage:** full passthrough with the card's own ROM and **its own monitor** — the best,
   near-native performance. Showing a dedicated card's picture inside LordOS (an IddCx virtual monitor + capture) is
   done only if people ask to use their usual monitors.
@@ -144,13 +145,59 @@ For computers with a second AMD or NVIDIA card kept only for machines.
   with it our signed ROM (sbsign + a test db certificate enrolled with `virt-fw-vars --add-db`) runs and an unsigned
   one is refused — and QEMU's unsigned iPXE ROMs would be refused too. Enrolling a db certificate on an existing
   machine changes PCR7 (BitLocker recovery), so it belongs at machine creation.
-- **Blocker before shipping:** i915ovmfPkg and the project it was forked from carry **no license**; the upstream is
-  archived (2023). Shipping needs a license grant from its authors, or our own GOP driver written from the public
-  i915 documentation.
+- **License:** i915ovmfPkg and the project it was forked from carry **no license** (the upstream is archived, 2023), so
+  it can't ship. It was used only for this measurement; LordOS's own driver (next section) replaces it with the same
+  results.
 - **What LordOS needs besides Mode A's list above:** accept Y-tiled modifiers and cache dmabuf imports (GVT hands a
   new dmabuf on each flip), expect refused messages during resizes, QEMU's 30 ms display poll caps the picture at
   ~33 fps (raise it), ignore i915 hotplugs from a machine start, and choose the signing model (stock OVMF + the
   ROM's integrity from our signed package, or our own OVMF with policy 0x04 plus signed NIC ROMs).
+
+### Our own GVT-g GOP driver (2026-11-21)
+
+LordOS's own UEFI GOP option ROM for GVT-g vGPUs, `firmware/gvt-gop` (MIT), written from public, licensed sources
+only: the MIT-licensed Linux i915 and GVT-g files, QEMU's `igd-assign.txt` and `fw_cfg.rst`, the UEFI specification and
+EDK2, VESA EDID/CVT/DisplayPort (the list, file by file, is in `firmware/gvt-gop/NOTICE.md`). No i915ovmfPkg code was
+read. Built by `tools/firmware/build-gvt-gop.sh` against `edk2-stable202502` (tarball hash and commit checked), X64
+RELEASE and DEBUG, reproducible (the same bytes from two work folders). Not wired into lord-vm yet.
+
+- **What it does:** binds only to a gen9 Intel display controller whose PVINFO page says GVT-g; copies the vGPU's
+  OpRegion from fw_cfg `etc/igd-opregion` to ACPI NVS below 4 GB and writes ASLS (0xFC); reads the EDID over
+  I2C-over-AUX on the DDI GVT-g wired the monitor to (D); lists the preferred detailed timing plus the EDID's other
+  modes no larger than it and at least 1024×768 (QEMU's EDID gives 1920×1080, 1680×1050, 1440×900, 1280×1024,
+  1280×960, 1024×768); maps a reserved-memory framebuffer into the GGTT at the start of the guest's aperture range;
+  programs power wells, DPLL1 (HBR2), the DDI, DP link training, transcoder A and plane A (linear XRGB8888); installs
+  GOP and EDID Discovered/Active. 2,197 lines with the build files (about 1,600 of C without blank and comment
+  lines); the RELEASE driver is 13,952 bytes, the compressed ROM 8,704 bytes.
+- **Results** (same computer, Windows image and driver as above, the old ROM measured again the same afternoon):
+
+| | i915ovmfPkg (test only) | LordOS GVT-g GOP |
+|---|---|---|
+| License | none | MIT |
+| UEFI screen | 1280×720, fixed | the EDID's preferred mode, 1920×1080; SetMode works for all 6 listed modes (each one a linear `XR24` dmabuf of the right size and stride) |
+| Plane lit after QEMU starts | 0.81–0.84 s | 0.84–0.86 s |
+| Time the ROM spends on the display | 46–49 ms | 38–40 ms |
+| ROM size | 52,224 bytes | 8,704 bytes |
+| Windows desktop on the vGPU | 1920×1080 at 74 Hz | 1920×1080 at 74 Hz; resizes to 1280×800 and back follow the EDID |
+| WebGL aquarium, vsync | 75 fps | 75 fps |
+| WebGL aquarium, uncapped | 333–410 fps | 314–432 fps (iGPU 767–1033 MHz) |
+| Long run at 96–100 % guest 3D | ~23 min, ~20,000 frames per run, 0 failures | 21 min, 53,392 frames read by lord-vmdisplay, 0 failures, no host kernel message, no hotplug uevent |
+| Guest restart, `-action reboot=shutdown` | clean exit | clean exit in ~8 s, the next start boots (75 fps) |
+| Secure Boot | on; policy 0x04: signed runs, unsigned refused | on (`Confirm-SecureBootUEFI` True); with the policy-0x04 OVMF the signed ROM runs, the unsigned one is refused |
+
+- **Same as with the old ROM:** dmabufs are `XR24` stride 7680 linear (UEFI) then `I915_FORMAT_MOD_Y_TILED` (Windows);
+  two i915 `add` uevents on card0 per machine start; the only host kernel line is `gvt: vgpu 1: fail to find ppgtt
+  instance` when Windows hibernates or resets (also seen in a run where the ROM was refused); the desktop stays on the
+  RX 580.
+- **Two behaviours to plan for in lord-vm** (the first comes with any GOP ROM that reserves a framebuffer, the second
+  happens with either ROM):
+  - The first boot after adding the vGPU to an existing NVRAM resets once: the framebuffer grows OVMF's reserved
+    memory bin (`MemoryTypeInformation`, 0x401 → 0xA24 pages) and OVMF restarts; with `-action reboot=shutdown` that
+    is an exit, so lord-vm starts the machine again. No reset with a fresh OVMF NVRAM or on later boots.
+  - The Windows image hibernates on an ACPI power-off (QMP `SUSPEND_DISK`). A session resumed from hibernation ran
+    the aquarium at 13–17 fps with the iGPU held at 350 MHz — with either ROM; cold boots and restarts ran at 75 fps.
+    lord-vm should turn off hibernation/Fast Startup in the guest tools or shut down without it, and the minimum iGPU
+    frequency action above still matters.
 
 ### Settings → Graphics cards (approved in principle 2026-11-21)
 
@@ -182,3 +229,6 @@ Mode B later.
 - Intel GVT support table; intel/gvt-linux "GVTg_Setup_Guide"; Arch wiki "Intel GVT-g"; NixOS wiki "IGVT-g"; Proxmox
   forum on GVT-g Windows drivers; Linux v6.12 `drivers/gpu/drm/i915/intel_gvt.c` (`is_supported_device` accepts
   Comet Lake).
+- For LordOS's own GVT-g GOP driver: `firmware/gvt-gop/NOTICE.md` (Linux v6.12.57 i915/GVT-g files, MIT; QEMU
+  `docs/igd-assign.txt` and `docs/specs/fw_cfg.rst`; UEFI 2.10; EDK2 edk2-stable202502; VESA E-EDID 1.4, CVT 1.2, DMT,
+  DisplayPort 1.2).

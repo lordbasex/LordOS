@@ -1974,3 +1974,5 @@ python3-virt-firmware` (nasm 2.16.03-1, acpica-tools 20250404-1, sbsigntool 0.9.
 24.11-2, which pulled in python3-pefile). GVT-g itself was turned on by the maintainer with
 `/etc/modprobe.d/i915-gvt.conf` (`options i915 enable_gvt=1 enable_guc=0`) and `/etc/modules-load.d/kvmgt.conf`
 (`kvmgt`), then `update-initramfs -u`; the iGPU was enabled in the firmware ("iGPU Multi-Monitor").
+LordOS's own GVT-g GOP driver (`tools/firmware/build-gvt-gop.sh`, 2026-11-21) needs nothing new: nasm, gcc,
+uuid-dev, python3, curl and git were already there; the tests used the same sbsigntool and python3-virt-firmware.

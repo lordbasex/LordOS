@@ -12,6 +12,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Machines: LordOS's own UEFI GOP option ROM for Intel GVT-g vGPUs, in development** (`firmware/gvt-gop`,
+  `tools/firmware/build-gvt-gop.sh`, `docs/MACHINES-GPU.md` "Our own GVT-g GOP driver"). An EDK2 UEFI driver, MIT,
+  written from public, licensed sources only (MIT-licensed Linux i915/GVT-g files, QEMU's IGD and fw_cfg documents,
+  UEFI/EDK2, VESA; listed file by file in `firmware/gvt-gop/NOTICE.md`), replacing the unlicensed i915ovmfPkg that the
+  earlier test used. It binds only to a gen9 Intel display controller whose PVINFO page says GVT-g, hands the vGPU's
+  OpRegion to the OS (fw_cfg `etc/igd-opregion` → ACPI NVS → ASLS), reads the virtual monitor's EDID over
+  I2C-over-AUX, lights pipe A and DDI D at the EDID's preferred mode with a linear XRGB8888 framebuffer in the GGTT
+  (within the PVINFO ballooning range), and installs GOP (every listed mode settable) and the EDID protocols. The
+  build script fetches `edk2-stable202502` (tarball SHA-256 and commit checked), builds X64 RELEASE and DEBUG
+  reproducibly and wraps them with EfiRom (RELEASE ROM 8,704 bytes). Tested on the maintainer's computer (UHD 630 vGPU
+  `i915-GVTg_V5_4`, the test guest with Intel's driver 27.20.100.8681, stock Secure Boot OVMF): UEFI at 1920×1080 on
+  the vGPU's own display, the guest's desktop at 1920×1080 74 Hz with resizes following the EDID, WebGL aquarium 75
+  fps with vsync and 314–432 fps uncapped (the old ROM: 75 and 333–410 the same day), 21 minutes at 99 % guest 3D with
+  53,392 dmabuf frames and 0 read failures, a clean guest restart, Secure Boot on, and with a policy-0x04 OVMF a
+  test-signed ROM runs while an unsigned one is refused. Not wired into lord-vm yet.
 - **Files: "Open with" a machine, like VMware Fusion** (`docs/VIRTUALIZATION.md` 7.3, `docs/FILES.md`). A file's Open with
   lists, after the apps, each machine whose LordOS guest tools open files ("‹name› (…)", for the guests of the card in
   `docs/VIRTUALIZATION.md` 4.3 with `lordos-guest-win` w3). Choosing one opens the machine's window, starts the machine
