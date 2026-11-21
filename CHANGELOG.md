@@ -185,6 +185,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: a password manager's secret copied in a machine stays in the machine** (`tools/guest-win/lordos-guest-win.c`,
+  `tools/guest/lordos-guest.c`; found by Claude Security, LOW). With guest-to-host clipboard sharing on, a password copied
+  from a password manager inside a machine reached the host's clipboard history (kept 30 days) and outlived
+  the manager's own clearing. The guest tools now leave such a copy alone. The guest tools for the new card's guests check for the marks those
+  managers set ("ExcludeClipboardContentFromMonitorProcessing", "Clipboard Viewer Ignore", "CanIncludeInClipboardHistory"
+  holding 0). The Linux guest tool checks for `x-kde-passwordManagerHint`. Checked with a stub clipboard on Linux (the secret
+  is not sent; ordinary text still is); the other guest tools are built but not yet run in a guest.
 - **Apps mode: each Store app of the new card's guests is its own Dock entry, with its icon** (`tools/guest-win/lordos-guest-win.c`): every
   Store app's window (Calculator, Settings…) belongs to `ApplicationFrameHost.exe`, so they all shared one Dock entry
   "ApplicationFrameHost.exe (machine)" with a letter for an icon. The guest tools now resolve the app inside the frame

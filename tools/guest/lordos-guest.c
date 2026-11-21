@@ -265,7 +265,11 @@ int main(int argc, char **argv) {
         if (now >= next_look) {
             next_look = now + 1000;
             int sent = 0;
-            if (host_clipx && clip_types(types, sizeof types) > 0) {
+            long tl = clip_types(types, sizeof types);
+            /* a password manager's secret (KeePassXC, KDE: x-kde-passwordManagerHint) never leaves the guest, so it can't
+             * reach the host's clipboard history or outlive the manager's own clearing */
+            if (tl > 0 && has_type(types, "x-kde-passwordManagerHint")) sent = 1;
+            else if (host_clipx && tl > 0) {
                 int types_changed = strcmp(types, last_types) != 0;
                 snprintf(last_types, sizeof last_types, "%s", types);
                 AgClip c;

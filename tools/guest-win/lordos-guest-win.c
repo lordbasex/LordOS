@@ -385,8 +385,29 @@ static uint8_t *clip_text(size_t *out_n) {
     return out;
 }
 
+/* A password manager marks a secret it copies so that clipboard monitors and history skip it (KeePass, 1Password,
+ * Bitwarden): "ExcludeClipboardContentFromMonitorProcessing", "Clipboard Viewer Ignore", or "CanIncludeInClipboardHistory"
+ * holding a DWORD 0. Such a copy never leaves the guest, so it can't reach the host's clipboard history or outlive the
+ * manager's own clearing. Called with the clipboard open. */
+static int clip_secret(void) {
+    static UINT ex, ign, hist;
+    if (!ex) ex = RegisterClipboardFormatW(L"ExcludeClipboardContentFromMonitorProcessing");
+    if (!ign) ign = RegisterClipboardFormatW(L"Clipboard Viewer Ignore");
+    if (!hist) hist = RegisterClipboardFormatW(L"CanIncludeInClipboardHistory");
+    if ((ex && IsClipboardFormatAvailable(ex)) || (ign && IsClipboardFormatAvailable(ign))) return 1;
+    if (hist && IsClipboardFormatAvailable(hist)) {
+        HANDLE g = GetClipboardData(hist);
+        const DWORD *d = g && GlobalSize(g) >= sizeof(DWORD) ? GlobalLock(g) : NULL;
+        int no = d && *d == 0;
+        if (d) GlobalUnlock(g);
+        if (no) return 1;
+    }
+    return 0;
+}
+
 static void clip_send(void) {
     if (!host_hello || GetClipboardOwner() == win || !open_clip()) return;
+    if (clip_secret()) { CloseClipboard(); lg("clipboard: a password manager's secret stays in the machine"); return; }
     size_t tn = 0, hn = 0, pn = 0;
     uint8_t *png = host_clipx ? clip_png(&pn) : NULL;
     uint8_t *html = host_clipx && !png ? clip_html(&hn) : NULL;
