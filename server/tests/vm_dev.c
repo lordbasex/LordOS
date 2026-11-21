@@ -29,6 +29,11 @@
  *   place ID X Y PATH   the same, then the guest tools hand it to the apps mode window ID at X, Y (VM_FILE a = 2, 7.2.1)
  *   transfer [SHA PATH] the transfer folder (VAG_TRANSFER): looked at again; a Windows guest gets WinFsp's installer
  *   wait-frames N [S]   wait until N more frames arrived (at most S seconds, default 30)
+ *   lat N X0 Y0 X1 Y1   the pointer moved N times between two points, 200 ms apart: the time from each move to the next
+ *                       frame and to the guest's next pointer position (VD_POINTER), median, 90th percentile and most
+ *                       (docs/MACHINES-GPU.md: a guest that draws its pointer answers a move with a frame; with a
+ *                       hardware pointer it answers with a position and no frame)
+ *   fps S               frames that arrived in the next S seconds, a second at a time
  *   sound play [VOL]    the guest's sound through lord-server's own code (media/maudio.c, a PipeWire stream) at VOL
  *                       percent (default 0: the stream runs and nothing is heard); sound off: no speakers' ring
  *   sound-stats         bytes the stream took from the ring, the loudest sample in them, the guest's streams
@@ -41,6 +46,8 @@
  *   winact ID ACTION [X Y W H]   focus | close | minimize | restore | move (VM_WINACT)
  *   launch TOKEN|NAME   one of the guest's apps, by its place in the list (VM_LAUNCH; lord-vm refuses another)
  *   quit
+ * LORDVM_DEV_CURSOR_PNG=FILE: each pointer shape the guest hands over (VD_CURSOR) is saved there.
+ * LORDVM_DEV_NODISPLAY=1 with attach: only the control channel (lord-server shows the picture; this one sends commands).
  * stdout: one JSON line per event or answer. Binaries are looked for next to this one, or in $LORDVM_BIN.
  *
  * 3D machines (VD_DMABUF): built with Mesa (LORD_GPU), it plays lord-server's GPU part too: the dmabuf is imported on
@@ -89,6 +96,8 @@ static uint8_t *pic;
 static int pw, ph;
 static size_t plen;
 static long frames, frames_target = -1;
+static struct { int left, x[2], y[2], k, waiting_f, waiting_p; long long t0, next; int nf, np; double f[512], p[512]; } lat;
+static struct { int left; long long next; long base; } fpsm;
 static long long frames_deadline;
 static uint32_t seq = 100;
 static int vm_state = -1;
@@ -361,6 +370,7 @@ static void from_vd(void) {
         case VD_FRAME:
             if (!vd_rect_inside(&m, pw, ph)) { out("{\"ev\":\"refused\",\"what\":\"frame outside the picture\"}"); break; }
             frames++;
+            if (lat.waiting_f) { lat.waiting_f = 0; if (lat.nf < 512) lat.f[lat.nf++] = (double)(now_ms() - lat.t0); }
             if (dmab.fd >= 0) { if (egl_read(m.b, m.d)) dmab.fails++; else dmab.reads++; }
             if (frames == 1) out("{\"ev\":\"first_frame\",\"w\":%d,\"h\":%d,\"dmabuf\":%s}", pw, ph, dmab.fd >= 0 ? "true" : "false");
             if (!noack) { VdMsg a = vd_msg(VD_FRAME_DONE, 0, 0, 0, 0, m.e, 0); vd_send(vd, &a, -1); }
@@ -368,9 +378,22 @@ static void from_vd(void) {
         case VD_CURSOR:
             if (fd < 0 || vm_cursor_check(fd, m.a, m.b)) { out("{\"ev\":\"refused\",\"what\":\"cursor memfd\"}"); break; }
             cursor_w = m.a; cursor_h = m.b;
+            if (getenv("LORDVM_DEV_CURSOR_PNG")) {
+                /* the shape the guest handed over (BGRA, premultiplied), over a checkerboard, for a look at it */
+                uint8_t *cp = mmap(NULL, (size_t)m.a * m.b * 4, PROT_READ, MAP_SHARED, fd, 0), *rgb = malloc((size_t)m.a * m.b * 3);
+                if (cp != MAP_FAILED && rgb) {
+                    for (int i = 0; i < m.a * m.b; i++) {
+                        int bg = ((i % m.a) / 4 + (i / m.a) / 4) % 2 ? 200 : 120, a = cp[i * 4 + 3];
+                        for (int k = 0; k < 3; k++) rgb[i * 3 + k] = (uint8_t)(cp[i * 4 + 2 - k] + bg * (255 - a) / 255);
+                    }
+                    stbi_write_png(getenv("LORDVM_DEV_CURSOR_PNG"), m.a, m.b, 3, rgb, m.a * 3);
+                }
+                if (cp != MAP_FAILED) munmap(cp, (size_t)m.a * m.b * 4);
+                free(rgb);
+            }
             out("{\"ev\":\"cursor\",\"w\":%d,\"h\":%d,\"hot_x\":%d,\"hot_y\":%d}", m.a, m.b, m.c, m.d);
             break;
-        case VD_POINTER: break;
+        case VD_POINTER: if (lat.waiting_p) { lat.waiting_p = 0; if (lat.np < 512) lat.p[lat.np++] = (double)(now_ms() - lat.t0); } break;
         case VD_DMABUF:
             egl_drop_image();
             if (dmab.fd >= 0) close(dmab.fd);
@@ -605,6 +628,32 @@ static void clip_got(const VmMsg *m, int fd) {
     }
 }
 
+static int cmp_d(const void *a, const void *b) { double x = *(const double *)a, y = *(const double *)b; return x < y ? -1 : x > y; }
+static void lat_stats(const char *what, double *v, int n, int asked) {
+    qsort(v, (size_t)n, sizeof *v, cmp_d);
+    out("{\"ev\":\"lat\",\"to\":\"%s\",\"moves\":%d,\"answered\":%d,\"median_ms\":%.0f,\"p90_ms\":%.0f,\"max_ms\":%.0f}", what, asked, n,
+        n ? v[n / 2] : -1, n ? v[(n * 9) / 10 < n ? (n * 9) / 10 : n - 1] : -1, n ? v[n - 1] : -1);
+}
+/* lat: one move every 200 ms; a frame or a position that hasn't come by then is not counted */
+static void lat_pump(void) {
+    static int asked;
+    if (!lat.left && !lat.waiting_f && !lat.waiting_p) return;
+    long long now = now_ms();
+    if (now < lat.next) return;
+    if (!lat.left) {
+        lat.waiting_f = lat.waiting_p = 0;
+        lat_stats("frame", lat.f, lat.nf, asked);
+        lat_stats("pointer", lat.p, lat.np, asked);
+        out("{\"ok\":true,\"cmd\":\"lat\"}");
+        asked = 0;
+        return;
+    }
+    lat.k ^= 1;
+    vdsend(VD_MOTION, lat.x[lat.k], lat.y[lat.k]);
+    lat.t0 = now; lat.next = now + 200; lat.waiting_f = lat.waiting_p = 1;
+    lat.left--; asked++;
+}
+
 static int handle(char *line) {
     char a1[1024];
     int x, y, b;
@@ -738,6 +787,11 @@ static int handle(char *line) {
         VmMsg m = vm_msg(VM_LAUNCH, ++seq, at, dev_apps_gen > 0 ? dev_apps_gen : 1, 0, 0, NULL);
         vm_send(vm, &m, -1);
     }
+    else if (!strncmp(line, "lat ", 4)) {
+        memset(&lat, 0, sizeof lat);
+        if (sscanf(line + 4, "%d %d %d %d %d", &lat.left, &lat.x[0], &lat.y[0], &lat.x[1], &lat.y[1]) != 5 || lat.left < 1 || lat.left > 500) { lat.left = 0; out("{\"ok\":false,\"cmd\":\"lat\"}"); }
+        else lat.next = now_ms();
+    } else if (sscanf(line, "fps %d", &x) == 1 && x > 0) { fpsm.left = x; fpsm.base = frames; fpsm.next = now_ms() + 1000; }
     else if (sscanf(line, "wait-frames %d %d", &x, &y) >= 1) {
         if (sscanf(line, "wait-frames %d %d", &x, &y) < 2) y = 30;
         frames_target = frames + x;
@@ -778,6 +832,7 @@ int main(int argc, char **argv) {
         vm = connect_runtime(argv[2]);
         if (vm < 0) { out("{\"ev\":\"error\",\"what\":\"not running\"}"); return 3; }
         ask(VM_STATUS, 0, NULL);
+        if (getenv("LORDVM_DEV_NODISPLAY")) display_asked = 1;      /* lord-server shows it: commands only */
     } else {
         int sv[2];
         if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return 1;
@@ -816,11 +871,18 @@ int main(int argc, char **argv) {
             out("{\"ok\":%s,\"cmd\":\"wait-frames\",\"frames\":%ld}", frames >= frames_target ? "true" : "false", frames);
             frames_target = -1;
         }
+        lat_pump();
+        if (fpsm.left && now_ms() >= fpsm.next) {
+            out("{\"ev\":\"fps\",\"frames\":%ld}", frames - fpsm.base);
+            fpsm.base = frames; fpsm.next += 1000;
+            if (!--fpsm.left) out("{\"ok\":true,\"cmd\":\"fps\"}");
+        }
         if (vm < 0 && vd < 0) break;
         short aev = 0;
         int afd = spk ? maudio_pollfd(spk, &aev) : -1;
         struct pollfd p[4] = { { vm, POLLIN, 0 }, { vd, POLLIN, 0 }, { stdin_open ? 0 : -1, POLLIN, 0 }, { afd, aev, 0 } };
         int to = kq_h != kq_t ? 12 : frames_target >= 0 ? 50 : 500;
+        if (lat.left || lat.waiting_f || lat.waiting_p || fpsm.left) to = 1;
         if ((spk || mic) && to > 10) to = 10;
         poll(p, 4, to);
         /* PipeWire not there when the stream opened, or gone: tried again every 2 s while the guest plays (js_vm.c) */

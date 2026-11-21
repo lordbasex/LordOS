@@ -737,6 +737,7 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         else if (l == 7 && !memcmp(p + s0, "clipreq", 7)) caps |= AG_HELLO_CLIPREQ;
         else if (l == 4 && !memcmp(p + s0, "open", 4)) caps |= AG_HELLO_OPEN;
         else if (l == 5 && !memcmp(p + s0, "place", 5)) caps |= AG_HELLO_PLACE;
+        else if (l == 7 && !memcmp(p + s0, "pointer", 7)) caps |= AG_HELLO_POINTER;
     }
     return caps;
 }

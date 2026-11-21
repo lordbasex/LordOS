@@ -841,6 +841,9 @@ static struct {
     int xfer_on, xfer_dfd, xfer_guest;
     char xfer_path[PATH_MAX];
     long xfer_pid;
+    long ptr_pid;                           /* the pointer's script (PTR_PS): its guest-exec pid, -1 asked; done this run */
+    long long ptr_poll_at;
+    int ptr_done, lag_pointer;
     long long xfer_poll_at;
     pid_t tpm;                              /* the TPM (Windows 11): swtpm, and QEMU's end of its control socket */
     int tpm_q;
@@ -2742,7 +2745,8 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
 #define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | VAC_PLACE | (int)LAG_CAP_WINDOWS)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
-       AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS };
+       AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS,
+       AQ_PEXEC, AQ_PSTATUS };
 
 /* A Clone's first start (6.3): one fixed script, run as root by qemu-guest-agent, with the new hostname as its only
  * argument (checked: one DNS label). The machine-id is made again by systemd from the clone's new SMBIOS UUID (the old
@@ -2857,6 +2861,48 @@ static void xfer_reply(int kind, const JVal *root, const JVal *r, int ok) {
     xfer_set(g);
 }
 
+/* ---- a Windows guest's pointer (docs/VIRTUALIZATION.md 7.1.2; docs/MACHINES-GPU.md, Part 1 step 2) ----
+ * viogpudo, virtio-win's display driver, draws the pointer into the picture unless its HWCursor value is 1 (upstream's
+ * default is 0): each pointer move is then a round trip through the guest before it shows (35 ms median, 97 ms at
+ * worst, measured). With HWCursor 1 it hands the pointer's shape over (QEMU's CursorDefine, VD_CURSOR) and lord-server
+ * draws it where the host's pointer is. Once per run, when the LordOS tools say "pointer" in their hello (they run, so
+ * the person installed them), one fixed script run as SYSTEM by qemu-guest-agent sets HWCursor on the driver key of
+ * every present VioGpuDod display adapter to the machine's choice (machine.json "pointer": 1 unless "guest") and
+ * restarts only an adapter whose value changed (pnputil /restart-device, a second's flicker). It takes nothing from
+ * the guest, the person or JS but that 0 or 1. It prints "<adapters> <restarted>". %d: 0 or 1 */
+static const char PTR_PS[] =
+    "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';trap{[Console]::Error.Write($_.Exception.Message);exit 1};"
+    "$w=%d;$n=0;$c=0;"
+    "foreach($d in @(Get-PnpDevice -PresentOnly -Class Display -ErrorAction SilentlyContinue)){"
+    "if($d.Service -ne 'VioGpuDod'){continue};"
+    "$k=(Get-PnpDeviceProperty -InstanceId $d.InstanceId -KeyName DEVPKEY_Device_Driver).Data;"
+    "if($k -notmatch '^\\{4d36e968-e325-11ce-bfc1-08002be10318\\}\\\\\\d{4}$'){continue};$n++;"
+    "$p='HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\'+$k;"
+    "$v=(Get-ItemProperty -LiteralPath $p -Name HWCursor -ErrorAction SilentlyContinue).HWCursor;"
+    "if($v -ne $w){Set-ItemProperty -LiteralPath $p -Name HWCursor -Value $w -Type DWord;pnputil.exe /restart-device $d.InstanceId|Out-Null;$c++}};"
+    "[Console]::Out.Write([string]$n+' '+[string]$c)";
+
+static void ptr_begin(void) {
+    if (S.ptr_done || !S.ag_windows || !S.lag_pointer || !S.qga_up || !(S.ag_caps & VAC_EXEC) || S.ptr_pid || S.ptr_poll_at) return;
+    char ps[sizeof PTR_PS + 8];
+    snprintf(ps, sizeof ps, PTR_PS, S.m.pointer_guest ? 0 : 1);
+    if (fx_exec_ps(ps, AQ_PEXEC)) { vlog("pointer: the guest agent is busy: tried again when the tools say hello"); return; }
+    S.ptr_pid = -1;
+}
+static void ptr_reply(int kind, const JVal *root, const JVal *r, int ok) {
+    if (!ok) { S.ptr_pid = 0; S.ptr_poll_at = 0; S.ptr_done = 1; vlog("pointer: qemu-guest-agent: %s", qmp_error_desc(root)); return; }
+    if (kind == AQ_PEXEC) { S.ptr_pid = (long)json_num(r, "pid", 0); S.ptr_poll_at = now_ms() + 300; return; }
+    if (!json_bool(r, "exited", 0)) { S.ptr_poll_at = now_ms() + 300; return; }
+    S.ptr_poll_at = 0; S.ptr_pid = 0; S.ptr_done = 1;
+    int code = (int)json_num(r, "exitcode", -1), n = 0, c = 0;
+    char said[200];
+    ag_exec_text(json_str(r, code == 0 ? "out-data" : "err-data"), said, sizeof said);
+    if (code != 0 || sscanf(said, "%d %d", &n, &c) != 2) vlog("pointer: the guest's script failed (%d): %.150s", code, said);
+    else if (!n) vlog("pointer: the guest has no VirtIO GPU display adapter (viogpudo): its pointer stays as it is");
+    else vlog("pointer: %s draws it (viogpudo HWCursor %d on %d adapter%s%s)", S.m.pointer_guest ? "the guest" : "LordOS", S.m.pointer_guest ? 0 : 1,
+              n, n == 1 ? "" : "s", c ? ", restarted to take it" : ", already so");
+}
+
 /* VM_AGENT_STATE's text: the guest agent's version, its system and the LordOS tools' version from their hello (empty
  * until they said it; only letters, digits, '.', '-' and '_' pass, so the tab stays the separator) */
 static void ag_state_text(char *t, size_t n) {
@@ -2930,6 +2976,7 @@ static void qga_sync(void) {
     if (S.inst_busy) inst_reply(VME_WRONG_STATE, "the guest agent started again");
     S.agq_n = 0;                        /* nothing sent before is waited for any more */
     S.xfer_pid = 0; S.xfer_poll_at = 0;
+    S.ptr_pid = 0; S.ptr_poll_at = 0;
     snprintf(a, sizeof a, "{\"id\":%ld}", ++S.sync_id);
     qga_do("guest-sync", a, AQ_SYNC);
     S.sync_at = now_ms();
@@ -2956,6 +3003,7 @@ static void ag_lost(const char *why) {
     if (S.qga_up) vlog("agent: %s", why);
     S.qga_up = 0; S.agq_n = 0; S.jpid = 0; S.inhibit_done = 0;
     S.xfer_pid = 0; S.xfer_poll_at = 0; S.xfer_guest = XG_UNKNOWN;
+    S.ptr_pid = 0; S.ptr_poll_at = 0;
     /* an install of lordos-guest on its way: its next step's answer won't come */
     if (S.inst_busy) inst_reply(VME_WRONG_STATE, "qemu-guest-agent stopped answering in the guest");
     if (S.id_state == 2) { S.id_state = 1; S.id_poll_at = 0; }      /* tried again when the agent is back */
@@ -2998,6 +3046,7 @@ static void on_qga_reply(const JVal *root, int ok) {
     switch (kind) {
     case AQ_FXEXEC: case AQ_FXSTATUS: case AQ_FXOPEN: case AQ_FXWRITE: case AQ_FXCLOSE: fx_on_reply(kind, root, r, ok); break;
     case AQ_XEXEC: case AQ_XSTATUS: xfer_reply(kind, root, r, ok); break;
+    case AQ_PEXEC: case AQ_PSTATUS: ptr_reply(kind, root, r, ok); break;
     case AQ_WIEXEC: case AQ_WISTATUS: case AQ_WIOPEN: case AQ_WIWRITE: case AQ_WICLOSE: wi_on_reply(kind, root, r, ok); break;
     case AQ_DEVRAW: {
         /* --dev-qmp: a qemu-guest-agent command for the tests; a pid, or what a guest-exec printed */
@@ -3079,6 +3128,7 @@ static void on_qga_reply(const JVal *root, int ok) {
             if (wi_begin(-1, 0, &why)) vlog("agent: the LordOS guest tools for Windows weren't installed: %s", why);
         }
         xfer_begin();
+        ptr_begin();
         /* a machine that resumed from a saved state has a clipboard helper that said hello to the lord-vm before: it
          * is asked to say it again (once; its answer gets the plain hello) */
         if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx clipreq ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
@@ -4348,6 +4398,7 @@ static void drain_lag(void) {
                 S.lag_windows = strstr(t + 13, " windows") != NULL;
                 S.lag_open = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_OPEN) != 0;
                 S.lag_place = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_PLACE) != 0;
+                S.lag_pointer = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_POINTER) != 0;
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
                 unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
@@ -4369,6 +4420,7 @@ static void drain_lag(void) {
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
                 ag_broadcast();
+                ptr_begin();                    /* the tools say "pointer": the display driver's pointer, once per run */
             }
         } else if (f.kind == AGK_CLIP && S.lag_hello && clip_allows(0) && f.len && ag_utf8_ok(f.data, f.len)) {
             int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
@@ -4838,7 +4890,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -5153,6 +5205,7 @@ static void loop(void) {
         if (S.host_stopping && (next < 0 || now + 500 < next)) next = now + 500;
         if (S.id_poll_at && (next < 0 || S.id_poll_at < next)) next = S.id_poll_at;
         if (S.xfer_poll_at && (next < 0 || S.xfer_poll_at < next)) next = S.xfer_poll_at;
+        if (S.ptr_poll_at && (next < 0 || S.ptr_poll_at < next)) next = S.ptr_poll_at;
         if (S.inst_poll_at && (next < 0 || S.inst_poll_at < next)) next = S.inst_poll_at;
         if (S.fx_poll_at && (next < 0 || S.fx_poll_at < next)) next = S.fx_poll_at;
         if (S.wi_poll_at && (next < 0 || S.wi_poll_at < next)) next = S.wi_poll_at;
@@ -5172,6 +5225,7 @@ static void loop(void) {
         if (S.net_retry_at && now >= S.net_retry_at) net_restart();
         if (S.id_poll_at && now >= S.id_poll_at) { char a[48]; S.id_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.id_pid); qga_do("guest-exec-status", a, AQ_IDSTATUS); }
         if (S.xfer_poll_at && now >= S.xfer_poll_at) { char a[48]; S.xfer_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.xfer_pid); if (qga_do("guest-exec-status", a, AQ_XSTATUS)) S.xfer_poll_at = now + 300; }
+        if (S.ptr_poll_at && now >= S.ptr_poll_at) { char a[48]; S.ptr_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.ptr_pid); if (qga_do("guest-exec-status", a, AQ_PSTATUS)) S.ptr_poll_at = now + 300; }
         if (S.inst_poll_at && now >= S.inst_poll_at) { char a[48]; S.inst_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.inst_pid); if (qga_do("guest-exec-status", a, AQ_INSTSTATUS)) S.inst_poll_at = now + 500; }
         fx_tick(now);
         open_tick(now);
@@ -5818,7 +5872,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -5864,6 +5918,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         }
         /* the transfer folder (6.7.1): a device of the machine, so like the shares, never while a state is saved */
         if (!strcmp(a, "--clipboard-ask")) { cask = parse_enum(v, "off", "on"); if (cask < 0) { fprintf(stderr, "lord-vm: --clipboard-ask on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
             char *end = NULL;
@@ -5935,6 +5990,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (clip >= 0) m.clipboard = clip;
     if (m.agent || m.clipboard) m.schema = VM_SCHEMA;
     if (cask >= 0) { m.clipboard_ask = cask; if (cask) m.schema = VM_SCHEMA; }
+    if (ptr >= 0) { m.pointer_guest = ptr; if (ptr) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
     if (m.graphics) m.schema = VM_SCHEMA;
     if (res_set) { m.res_w = resw; m.res_h = reshh; if (resw) m.schema = VM_SCHEMA; }
@@ -7505,6 +7561,7 @@ static int usage(void) {
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
             "                         [--sound on|off] [--volume 0..100] [--microphone on|off] [--sound-out NODE|default] [--sound-in NODE|default]   (with the machine off; Machines changes them live)\n"
             "                         [--clipboard-ask on|off]   (ask before each paste into and copy out of the machine)\n"
+            "                         [--pointer lordos|guest]   (who draws a Windows guest's pointer: LordOS, or its display driver)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"

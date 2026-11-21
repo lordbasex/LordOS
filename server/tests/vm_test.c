@@ -65,7 +65,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "10", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "11", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -108,7 +108,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":10,\"whatever\":true}";
+    const char newer[] = "{\"schema\":11,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -389,6 +389,30 @@ static void test_schema(void) {
                 free(jj);
             }
             CHECK(VM_SCHEMA >= 9);
+        }
+        /* schema 10: pointer, "lordos" (the default, never written) or "guest", never below schema 10 */
+        {
+            struct { const char *add; int schema, want, guest; } s10[] = {
+                { "\"pointer\":\"guest\"", 10, VM_OK, 1 }, { "\"pointer\":\"lordos\"", 10, VM_OK, 0 }, { "\"agent\":true", 10, VM_OK, 0 },
+                { "\"pointer\":\"host\"", 10, VM_E_RANGE, 0 }, { "\"pointer\":1", 10, VM_E_FIELD, 0 }, { "\"pointer\":true", 10, VM_E_FIELD, 0 },
+                { "\"pointer\":\"guest\"", 9, VM_E_FIELD, 0 }, { "\"pointer\":\"lordos\"", 9, VM_OK, 0 },
+            };
+            for (size_t i = 0; i < sizeof s10 / sizeof s10[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s10[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s10[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s10[i].want) fprintf(stderr, "  schema 10 %s (%d): got %d (%s)\n", s10[i].add, s10[i].schema, r, err);
+                CHECK(r == s10[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.pointer_guest == s10[i].guest);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"pointer\": \"guest\"") == s10[i].guest && !strstr(jj, "\"lordos\""));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(VM_SCHEMA >= 10);
         }
         /* exactly VM_SOUND_DEV_MAX fits */
         longn[VM_SOUND_DEV_MAX] = 0;
@@ -1617,6 +1641,8 @@ static void test_open_with(void) {
     pm.c = -1; CHECK(!vm_msg_valid(&pm, 1));
     pm.c = 0; pm.a = 3; CHECK(!vm_msg_valid(&pm, 1));
     CHECK(ag_hello_caps((const uint8_t *)"w4 open place", 13) == (AG_HELLO_OPEN | AG_HELLO_PLACE));
+    CHECK(ag_hello_caps((const uint8_t *)"w5 open place pointer", 21) == (AG_HELLO_OPEN | AG_HELLO_PLACE | AG_HELLO_POINTER));
+    CHECK(ag_hello_caps((const uint8_t *)"w5 pointers", 11) == 0);
     /* the hello word */
     CHECK(ag_hello_caps((const uint8_t *)"w3 clipboard open windows", 25) == (AG_HELLO_CLIPBOARD | AG_HELLO_OPEN | AG_HELLO_WINDOWS));
     CHECK(!(ag_hello_caps((const uint8_t *)"w3 opens openx", 14) & AG_HELLO_OPEN));

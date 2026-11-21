@@ -336,6 +336,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "base", m.base);
             JS_SetPropertyStr(c, o, "agent", JS_NewBool(c, m.agent));
             JS_SetPropertyStr(c, o, "clipboardAsk", JS_NewBool(c, m.clipboard_ask));
+            set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
             set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
             set_str(c, o, "mac", m.mac);
             /* sound (6.9): host-side choices */
@@ -803,13 +804,13 @@ static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 }
 
 /* set(dir, { name, vcpus, memoryMb, diskGb, network, bridge, ports: [{ proto, host, guest, open }], iso,
- *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu }) → job id: lord-vm --set on a
+ *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu, pointer: "lordos"|"guest" }) → job id: lord-vm --set on a
  * machine that is off (Configure). shares replaces the list ([] empties it); lord-vm decides which folders may be shared */
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[48 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[52 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -915,6 +916,13 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "clipboardAsk");
     if (JS_IsBool(v)) { args[n++] = "--clipboard-ask"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "pointer");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && (!strcmp(s, "lordos") || !strcmp(s, "guest"))) { args[n++] = "--pointer"; args[n++] = !strcmp(s, "guest") ? "guest" : "lordos"; } else ok = 0;
+        if (s) JS_FreeCString(c, s);
+    } else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "shares");
     if (JS_IsArray(c, v)) {
@@ -1145,6 +1153,10 @@ typedef struct {
     char errtail[400];
     char creds[PATH_MAX];               /* the first-boot settings file, removed once lord-vm read it */
     uint8_t *cur;                       /* the guest's pointer (VD_CURSOR) until there's a picture to give it to */
+    int windows;                        /* a Windows guest: its display driver draws the pointer into the picture until
+                                         * it hands one over (viogpudo's HWCursor, 7.1.2) */
+    int ptr_guest;                      /* machine.json "pointer": "guest": a shape QEMU still holds from before (a saved
+                                         * state's) isn't drawn over the guest's own */
     int cur_w, cur_h, cur_hx, cur_hy;
     int job_kind, job_status, job_pct;  /* the last VM_JOB (suspend, resume, snapshots) */
     char job_text[VM_TEXT_MAX];
@@ -1260,6 +1272,8 @@ static void init_sess(Sess *s, const char *dir) {
     VmMachine m;
     if (!vm_machine_load(dir, &m, NULL, 0)) {
         s->snd_on = m.sound; s->snd_vol = m.volume; s->mic_allowed = m.microphone; snprintf(s->name, sizeof s->name, "%s", m.name);
+        s->windows = m.devices == VM_DEV_WINDOWS;
+        s->ptr_guest = s->windows && m.pointer_guest;
         memcpy(s->snd_out, m.sound_out, sizeof s->snd_out);
         memcpy(s->snd_in, m.sound_in, sizeof s->snd_in);
     }
@@ -1661,7 +1675,7 @@ static void drop_display(Sess *s, int close_helper) {
     snd_apply(s);
     /* the next helper gets the guest's pointer again from QEMU; until then, the host's */
     free(s->cur); s->cur = NULL;
-    if (s->media) media_src_cursor(s->media, NULL, 0, 0, 0, 0);
+    if (s->media) { media_src_cursor(s->media, NULL, 0, 0, 0, 0); if (s->windows) media_src_cursor_guest_draws(s->media, 1); }
 }
 
 static void drop_creds(Sess *s) { if (s->creds[0]) { unlink(s->creds); s->creds[0] = 0; } }
@@ -1925,12 +1939,9 @@ static void set_picture(Sess *s, int w, int h) {
     free(m->cache); m->cache = NULL; m->cache_w = m->cache_h = 0;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->xrgb = 1; m->frame_seq++;
     if (!s->media && s->cur) media_src_cursor(m->id, s->cur, s->cur_w, s->cur_h, s->cur_hx, s->cur_hy);
-    if (!s->media) {
-        /* Windows draws its pointer into the picture (no cursor plane with its display drivers): LordOS's arrow
-         * over it was a second one (2026-11-20) */
-        VmMachine vm;
-        if (!vm_machine_load(s->dir, &vm, NULL, 0) && vm.devices == VM_DEV_WINDOWS) media_src_cursor_guest_draws(m->id, 1);
-    }
+    /* Windows' display driver draws its pointer into the picture unless it was told to hand it over (HWCursor 1,
+     * 7.1.2): until a shape comes (VD_CURSOR), LordOS's arrow over it would be a second one (2026-11-20) */
+    if (!s->media && s->windows && !s->cur) media_src_cursor_guest_draws(m->id, 1);
     s->media = m->id; s->w = w; s->h = h;
     s->ack_pending = 0;
     VdMsg r = vd_msg(VD_SHM, 0, 0, 0, 0, 0, 0);
@@ -1951,6 +1962,9 @@ static void guest_cursor(Sess *s, int fd, int w, int h, int hx, int hy) {
     free(s->cur);
     s->cur = copy; s->cur_w = w; s->cur_h = h; s->cur_hx = hx; s->cur_hy = hy;
     if (s->media) media_src_cursor(s->media, copy, w, h, hx, hy);
+    /* the guest hands its pointer over (a Windows guest with viogpudo's HWCursor 1): LordOS draws it from now on,
+     * where the host's pointer is, with no round trip through the guest */
+    if (s->media) media_src_cursor_guest_draws(s->media, 0);
 }
 
 static void from_vd(Sess *s) {
@@ -1986,7 +2000,7 @@ static void from_vd(Sess *s) {
         case VD_DMABUF: db_take(s, &m, fd); fd = -1; break;
         case VD_CURSOR:
             /* the guest's pointer: shown instead of the host's over the picture (main.c, media_node_cursor) */
-            if (fd >= 0 && !vm_cursor_check(fd, m.a, m.b)) guest_cursor(s, fd, m.a, m.b, m.c, m.d);
+            if (fd >= 0 && !s->ptr_guest && !vm_cursor_check(fd, m.a, m.b)) guest_cursor(s, fd, m.a, m.b, m.c, m.d);
             break;
         case VD_POINTER:
             /* where the guest puts it doesn't matter (the host's pointer drives an absolute tablet); whether it shows does */

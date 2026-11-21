@@ -140,11 +140,12 @@ export function Configure({ dir, section: section0, onClose }) {
   const running = stateView(m.state).active;
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
-    graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu, ...draft };
+    graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
+    pointer: m.pointer || 'lordos', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -277,10 +278,16 @@ export function Configure({ dir, section: section0, onClose }) {
           items={[{ label: tr('machines.cfg.followsWindow'), checked: cur.resolution === 'follow', onClick: () => set({ resolution: 'follow' }) }, '-',
             ...resolutions(screen.width, screen.height, null).map(([w, h]) => ({ label: `${w} × ${h}`, checked: cur.resolution === `${w}x${h}`, onClick: () => set({ resolution: `${w}x${h}` }) }))]} /></Off>
       </Row>
-      <Row label={tr('machines.cfg.graphics')} last note={note}>
+      <Row label={tr('machines.cfg.graphics')} last={!m.windowsDevices} note={note}>
         <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set({ graphics: x })}
           options={[['2d', tr('machines.cfg.graphics2d')], ['3d', tr('machines.cfg.graphics3d'), !!why3d && cur.graphics !== '3d']]} /></Off>
       </Row>
+      {/* who draws a Windows guest's pointer (7.1.2): LordOS, from the shape the guest hands over (no round trip through
+          the guest for each move), or its display driver, into the picture; applied by the guest tools at the next start */}
+      {m.windowsDevices ? <Row label={tr('machines.cfg.pointer')} last note={[tr('machines.cfg.pointerNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running}><Segmented small value={cur.pointer} onChange={(x) => set({ pointer: x })}
+          options={[['lordos', tr('machines.cfg.pointerLordos')], ['guest', tr('machines.cfg.pointerGuest')]]} /></Off>
+      </Row> : null}
     </Group>
   </>;
   }

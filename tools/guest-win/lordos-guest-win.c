@@ -65,8 +65,10 @@
 
 #include "../../server/src/vm/vmagent.h"
 
-#define VERSION "w4"
-#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place"
+/* w5 (2026-11-21): "pointer": lord-vm may set the display driver's hardware pointer (viogpudo's HWCursor) through
+ * qemu-guest-agent once these tools run (docs/VIRTUALIZATION.md 7.1.2); this program itself doesn't touch it */
+#define VERSION "w5"
+#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer"
 
 enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
 enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS };

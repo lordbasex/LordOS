@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 9
+#define VM_SCHEMA 10
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -162,6 +162,10 @@ typedef struct {
      * (vm_sound_dev_valid); "" (or no key) the system's default, which follows what Settings → Sound picks. A device that
      * isn't there when used falls back to the default (lord-server), it isn't an error */
     char sound_out[VM_SOUND_DEV_MAX + 1], sound_in[VM_SOUND_DEV_MAX + 1];
+    /* schema 10: who draws a Windows guest's pointer (docs/VIRTUALIZATION.md 7.1.2): "pointer": "guest" its display driver,
+     * into the picture (viogpudo's HWCursor 0, upstream's default); missing or "lordos": LordOS, from the shape the guest
+     * hands over (HWCursor 1, set by lord-vm through the guest tools' agent when they say "pointer") */
+    int pointer_guest;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 

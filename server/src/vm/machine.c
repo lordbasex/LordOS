@@ -480,6 +480,8 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->transfer & ~1) return fail(err, n, VM_E_RANGE, "transfer is true or false");
     if (m->clipboard_ask & ~1) return fail(err, n, VM_E_RANGE, "clipboard_ask is true or false");
     if (m->schema < 9 && m->clipboard_ask) return fail(err, n, VM_E_FIELD, "clipboard_ask needs schema 9");
+    if (m->pointer_guest & ~1) return fail(err, n, VM_E_RANGE, "pointer is lordos or guest");
+    if (m->schema < 10 && m->pointer_guest) return fail(err, n, VM_E_FIELD, "pointer needs schema 10");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
     for (int i = 0; m->transfer && i < m->n_shares; i++)
         if (!strcmp(m->share_tag[i], VM_XFER_TAG)) return fail(err, n, VM_E_RANGE, "shares: the tag " VM_XFER_TAG " is the transfer folder's");
@@ -521,7 +523,7 @@ static const char *const KEYS[] = {
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
-    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", NULL,
+    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -771,6 +773,11 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *ca = json_get(o, "clipboard_ask");
         if (ca && ca->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "clipboard_ask must be true or false"); goto out; }
         m->clipboard_ask = ca ? json_bool(o, "clipboard_ask", 0) : 0;
+        /* schema 10: missing means LordOS draws a Windows guest's pointer */
+        char ptr[16];
+        if ((r = get_str(o, "pointer", ptr, sizeof ptr, 0, err, n))) goto out;
+        if (ptr[0] && strcmp(ptr, "lordos") && strcmp(ptr, "guest")) { r = fail(err, n, VM_E_RANGE, "pointer is lordos or guest"); goto out; }
+        m->pointer_guest = !strcmp(ptr, "guest");
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -862,6 +869,7 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 6) jb_printf(&b, ",\n  \"sound\": %s,\n  \"volume\": %d,\n  \"microphone\": %s", m->sound ? "true" : "false", m->volume, m->microphone ? "true" : "false");
     if (m->schema >= 7) jb_printf(&b, ",\n  \"transfer\": %s", m->transfer ? "true" : "false");
     if (m->schema >= 9 && m->clipboard_ask) jb_raw(&b, ",\n  \"clipboard_ask\": true");
+    if (m->schema >= 10 && m->pointer_guest) jb_raw(&b, ",\n  \"pointer\": \"guest\"");
     if (m->schema >= 8 && m->sound_out[0]) { jb_raw(&b, ",\n  \"sound_out\": "); jb_str(&b, m->sound_out); }
     if (m->schema >= 8 && m->sound_in[0]) { jb_raw(&b, ",\n  \"sound_in\": "); jb_str(&b, m->sound_in); }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
