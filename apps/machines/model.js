@@ -349,14 +349,15 @@ export function agentLines(agent, cfg) {
   const win = guestWindows(agent);
   return [
     ['shell', 'works'],                                       // the serial console needs no agent
-    ['logs', on && caps & AGENT_CAPS.journal ? 'works' : 'needsAgent'],
+    // the journal and keeping the guest awake are systemd's (journalctl, systemd-inhibit): not lines of a Windows guest
+    win ? null : ['logs', on && caps & AGENT_CAPS.journal ? 'works' : 'needsAgent'],
     ['shutdown', on && caps & AGENT_CAPS.shutdown ? 'works' : 'acpi'],
     ['time', on && caps & AGENT_CAPS.time ? 'works' : 'needsAgent'],
-    ['awake', on && caps & AGENT_CAPS.awake ? 'works' : 'needsAgent'],
+    win ? null : ['awake', on && caps & AGENT_CAPS.awake ? 'works' : 'needsAgent'],
     ['clipboard', clip === 'off' ? 'off' : caps & AGENT_CAPS.clipboard ? 'works' : win ? 'needsTools' : 'needsHelper'],
     ['resolution', !win || caps & AGENT_CAPS.display ? 'works' : 'needsTools'],
     ['folders', cfg?.shares?.length || (cfg?.transfer && caps & AGENT_CAPS.transfer) ? 'works' : 'none'], ['apps', appsBlocker(agent, cfg) || 'works'],
-  ];
+  ].filter(Boolean);
 }
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
 export const agentTone = (a, configured) => (!configured ? 'off' : a?.state === 'connected' ? 'run' : 'pause');
@@ -679,6 +680,11 @@ export function cropPoint(px, py, box, crop, gw, gh) {
   const x = Math.floor(crop[0] + lx * crop[2] / box[2]), y = Math.floor(crop[1] + ly * crop[3] / box[3]);
   return [Math.max(0, Math.min(gw - 1, x)), Math.max(0, Math.min(gh - 1, y))];
 }
+
+// Apps mode: a place asked of a guest's window (lord.vm.winAct move) that the guest didn't take, and won't: its window
+// is still elsewhere (a smaller size than its minimum, a maximized window) a while after the ask. The LordOS window
+// then goes back to where the guest's window is, or it would show the guest's picture squeezed into the wrong size.
+export const guestKept = (asked, askedAt, got, now, wait = 1500) => !!asked && !!got && !nearRect(asked, got) && now - askedAt >= wait;
 
 // Two rectangles the same within a few pixels (rounding between the two sides)
 export const nearRect = (a, b, tol = 2) => !!a && !!b && Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol && Math.abs(a.w - b.w) <= tol && Math.abs(a.h - b.h) <= tol;

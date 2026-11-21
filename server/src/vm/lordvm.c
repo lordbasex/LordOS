@@ -2995,10 +2995,12 @@ static void on_qga_reply(const JVal *root, int ok) {
         const char *oid = ok ? json_str(r, "id") : NULL, *rel = ok ? json_str(r, "kernel-release") : NULL;
         S.ag_windows = oid && !strcmp(oid, "mswindows");
         if (S.ag_windows && rel && atol(rel) >= 22000 && !strncmp(clean, "Windows 10", 10)) clean[9] = '1';
+        /* the journal (journalctl) and keeping the guest awake (systemd-inhibit) are a Linux guest's: not claimed for Windows */
+        if (S.ag_windows) S.ag_caps &= ~(VAC_JOURNAL | VAC_AWAKE);
         snprintf(S.ag_os, sizeof S.ag_os, "%s", clean);
         S.ag_state = -1;
         ag_set(VAS_CONNECTED);
-        if (S.keep_awake && (S.ag_caps & VAC_EXEC) && !S.inhibit_done) {
+        if (S.keep_awake && (S.ag_caps & VAC_EXEC) && !S.ag_windows && !S.inhibit_done) {
             S.inhibit_done = 1;
             qga_do("guest-exec", "{\"path\":\"systemd-inhibit\",\"arg\":[\"--what=sleep:idle\",\"--who=LordOS Machines\","
                    "\"--why=The machine is kept awake while it runs\",\"--mode=block\",\"sleep\",\"infinity\"]}", AQ_INHIBIT);

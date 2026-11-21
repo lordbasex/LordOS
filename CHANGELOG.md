@@ -185,6 +185,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Configure → Display saves its choices** (`apps/machines/configure.jsx`): the start resolution and 2D/3D picked there
+  were dropped when Done was pressed (the section wasn't one that saves); a machine set to 1920 × 1080 now starts at
+  1920 × 1080 (checked with a machine of the new card, `docs/VIRTUALIZATION.md` 4.3).
+- **The agent of a guest without systemd lists only what it does** (`server/src/vm/lordvm.c`, `apps/machines/model.js`):
+  on the new card's guests (`docs/VIRTUALIZATION.md` 4.3) the popover said "Logs: the system's journal" and "Kept awake
+  while it runs" worked, which are systemd's (`journalctl`, `systemd-inhibit`); lord-vm no longer claims or tries them
+  there, and the popover leaves those lines out.
+- **The machine's bar fits a narrow window** (`apps/machines/vmwindow.jsx`): between about 640 and 850 px wide (and
+  below 620) power, Configure and full screen went past the window's edge; the bar is compact up to 880 px, and the
+  smallest windows leave out the shell, logs, screenshot and record group (logs and screenshot are in Actions).
+- **Apps mode follows a guest window that keeps its own size** (`apps/machines/appsmode.jsx`, `model.js` `guestKept`):
+  a window made smaller than the guest allows (Calculator, Paint) stayed small here with the guest's picture squeezed
+  into it; 1.5 s after an unanswered move it goes back to the guest window's real size.
 - **Machines in full screen keep a menu open under the pointer** (`apps/machines/vmwindow.jsx`): the floating bar hid as
   soon as the pointer left it to reach a menu's items (the resolution menu went away); it now stays while a menu is open.
 - **One pointer over a machine that draws its own** (`server/src/media/media.c`, `server/src/ui/js_vm.c`): guests on

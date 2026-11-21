@@ -12,7 +12,7 @@ import {
   View, Text, MediaView, addListener, useAppWindow, useStore, createStore, wm, windows, mainDisplay, windowPixelIcons, windowChrome, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps } from './model.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps } from './model.js';
 
 // dir → { sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], leave() }
 export const guests = createStore({});
@@ -176,8 +176,13 @@ export function GuestWindow({ dir, gid }) {
       if (Date.now() - stableAt < 120) return;
       if (nearRect(here, want) || (x.followed && nearRect(here, x.followed))) return;
       const r = toGuestRect(here, k, d);
-      if (x.asked && nearRect(r, x.asked)) return;
+      if (x.asked && nearRect(r, x.asked)) {
+        // asked already; the guest kept its window where it was (its minimum size, maximized): back to where it is
+        if (guestKept(x.asked, x.askedAt, w, Date.now())) { x.asked = null; x.followed = want; wm.setFrame(winId, frameAround(want, x.inset)); }
+        return;
+      }
       x.asked = r;
+      x.askedAt = Date.now();
       lord.vm.winAct(s.sid, gid, 'move', r.x, r.y, r.w, r.h);
     }, 50);
     return () => clearInterval(timer);

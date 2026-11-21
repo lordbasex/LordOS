@@ -18,6 +18,8 @@ import { Configure } from './configure.jsx';
 import { Sheet, Pill } from './kit.jsx';
 
 const BAR = 48;
+// the window widths the machine's bar needs: all of it with the name and state, and compact (5.3)
+const TOOLS_WIDE = 880, TOOLS_COMPACT = 620;
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
 const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
@@ -103,7 +105,7 @@ function AgentPop({ ctl, onClose }) {
 
 // The bar, in groups (5.3): the agent and what it brings (clipboard, folders, apps) | the guest's display and devices |
 // shell, logs, screenshot, record | pause and power | configure and full screen. Icons, each named in its tooltip.
-function Tools({ ctl, floating, compact }) {
+function Tools({ ctl, floating, compact, tiny }) {
   const { st, a, follow, cfg } = ctl;
   // the mock "Toolbar": sizes that fit this display, then Follow the window (5.3)
   const res = [
@@ -164,13 +166,15 @@ function Tools({ ctl, floating, compact }) {
       {ctl.micLive ? <IconBtn sym="mic" color="#ff9f0a" label={tr('machines.tb.micLive')} onClick={() => ctl.configure('sound')} /> : null}
     </BarGroup>
     {compact ? null : <BarSep />}
-    <BarGroup>
+    {/* the smallest windows: shell, logs, screenshot and record leave the bar (logs and screenshot are in Actions),
+        unless a recording runs, so power, Configure and full screen still fit */}
+    {tiny && !ctl.rec ? null : <BarGroup>
       {!floating ? <IconBtn sym="terminal" label={tr('machines.tb.shell')} on={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} /> : null}
       <IconBtn sym="logs" label={tr('machines.cmd.logs')} onClick={ctl.logs} />
       <IconBtn sym="snapshot" label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} />
       {ctl.rec ? <IconBtn sym="stop" danger label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} />
         : <IconBtn sym="record" color="#ff453a" label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} />}
-    </BarGroup>
+    </BarGroup>}
     {ctl.rec ? <Text style={{ fontSize: 12, fontWeight: 600, color: '#ff6b6b', marginLeft: 4 }}>{ctl.recTime}</Text> : null}
     {compact ? null : <BarSep />}
     <BarGroup>
@@ -191,15 +195,17 @@ function Header({ ctl, name }) {
   const p = usePal();
   const v = stateView(ctl.st?.state, ctl.st?.reason);
   // a small window: the name and state are in the window's title already; the tools lose their separators and the
-  // placeholder for apps, so they still fit on the bar
-  const compact = useNarrow();
+  // placeholder for apps, so they still fit on the bar (the whole bar takes about 850 px with a short name, the
+  // compact one about 610: below that the shell, logs, screenshot and record group goes too)
+  const compact = useNarrow(TOOLS_WIDE);
+  const tiny = useNarrow(TOOLS_COMPACT);
   return (
     <View style={{ height: BAR, flexDirection: 'row', alignItems: 'center', gap: compact ? 4 : 6, paddingHorizontal: compact ? 8 : 12, backgroundColor: p.raised }}>
       <StateDot tone={v.tone} size={9} />
       {compact ? null : <Text style={{ marginLeft: 4, fontSize: 13, fontWeight: 700, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: 260 }}>{name}</Text>}
       {compact ? null : <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap' }}>{tr(`machines.state.${v.key}`)}</Text>}
       <View style={{ flex: 1 }} />
-      <Tools ctl={ctl} compact={compact} />
+      <Tools ctl={ctl} compact={compact} tiny={tiny} />
     </View>
   );
 }

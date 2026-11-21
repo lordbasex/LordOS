@@ -416,7 +416,7 @@ export function Configure({ dir, section: section0, onClose }) {
     })}
   </Group>;
 
-  const savable = ['general', 'cpu', 'network', 'disks', 'sharing', 'agent', 'boot'].includes(sec);
+  const savable = ['general', 'cpu', 'display', 'network', 'disks', 'sharing', 'agent', 'boot'].includes(sec);
   const list = (
     <View style={{ width: 250, ...(side.narrow ? { flex: 1 } : null), paddingHorizontal: 10, paddingVertical: 12, gap: 2,
       backgroundColor: p.dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)', borderEndWidth: 1, borderColor: p.line }}>

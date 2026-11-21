@@ -191,6 +191,8 @@ eq('agent helper missing', agentLines({ state: 'connected', caps: 1 }, { clipboa
 eq('windows guest without the tools', agentLines({ state: 'connected', caps: 1 | 4 | 8, system: 'Windows 11 Pro' }, { clipboard: 'both' }).filter((l) => ['clipboard', 'resolution'].includes(l[0])).map((l) => l[1]), ['needsTools', 'needsTools']);
 eq('windows guest with the tools', agentLines({ state: 'connected', caps: 1 | 4 | 8 | 32 | 128 | 256, system: 'Windows 11 Pro' }, { clipboard: 'both' }).filter((l) => ['clipboard', 'resolution'].includes(l[0])).map((l) => l[1]), ['works', 'works']);
 eq('linux guest resolution', agentLines({ state: 'connected', caps: 1, system: 'Ubuntu 26.04' }, {}).find((l) => l[0] === 'resolution')[1], 'works');
+eq('windows guest: no journal or awake lines (systemd\'s)', agentLines({ state: 'connected', caps: 1 | 2 | 4 | 16 | 64, system: 'Windows 11 Pro' }, {}).map((l) => l[0]).filter((x) => x === 'logs' || x === 'awake'), []);
+eq('linux guest keeps them', agentLines({ state: 'connected', caps: 16 | 64, system: 'Ubuntu 26.04' }, {}).filter((l) => l[0] === 'logs' || l[0] === 'awake').map((l) => l[1]), ['works', 'works']);
 eq('agent tone', [agentTone(null, false), agentTone({ state: 'waiting' }, true), agentTone({ state: 'connected' }, true)], ['off', 'pause', 'run']);
 eq('clip ways', [clipTo('both'), clipTo('from-guest'), clipFrom('from-guest'), clipFrom('off')], [true, false, true, false]);
 
@@ -368,6 +370,12 @@ eq('crop point scaled', M.cropPoint(250, 400, [100, 200, 300, 400], [500, 600, 6
 eq('crop point clamped to the screen', M.cropPoint(399, 599, [100, 200, 300, 400], [1800, 1000, 300, 400], 1920, 1080), [1919, 1079]);
 eq('crop point outside', [M.cropPoint(99, 220, [100, 200, 300, 400], [0, 0, 300, 400], 1920, 1080), M.cropPoint(400, 220, [100, 200, 300, 400], [0, 0, 300, 400], 1920, 1080), M.cropPoint(1, 1, [0, 0, 0, 0], [0, 0, 1, 1], 9, 9)], [null, null, null]);
 eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, h: 9 }), M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 3, y: 0, w: 10, h: 10 }), M.nearRect(null, {})], [true, false, false]);
+// the guest didn't take the place asked of its window (its minimum size): after a while the LordOS window goes back
+{
+  const asked = { x: 401, y: 321, w: 900, h: 379 }, got = { x: 401, y: 321, w: 900, h: 493 };
+  eq('guest kept its size', [M.guestKept(asked, 1000, got, 1400), M.guestKept(asked, 1000, got, 2600), M.guestKept(asked, 1000, { ...asked, w: 901 }, 9000),
+    M.guestKept(null, 0, got, 9000), M.guestKept(asked, 0, null, 9000)], [false, true, false, false, false]);
+}
 eq('popup', [M.isPopup({ owner: 5, topmost: true }), M.isPopup({ owner: 5, topmost: false }), M.isPopup({ owner: 0, topmost: true })], [true, false, false]);
 eq('instance', [M.guestInstance('ab12-cd', 4294967295), M.guestInstance('a/../b', 7)], ['ga-ab12-cd-4294967295', 'ga-ab-7']);
 {
