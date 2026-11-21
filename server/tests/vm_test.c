@@ -973,6 +973,16 @@ static void test_clipx(void) {
     vm_hostname_from_name("Debian 13 (test) ", hn, sizeof hn); CHECK(!strcmp(hn, "debian-13-test"));
     vm_hostname_from_name("Ñandú", hn, sizeof hn); CHECK(!strcmp(hn, "and"));
     vm_hostname_from_name("--", hn, sizeof hn); CHECK(!strcmp(hn, "machine"));
+    /* Windows computer names (NetBIOS: at most 15, not only digits) */
+    char wn[VM_WINNAME_MAX + 1];
+    CHECK(vm_winname_valid("WIN-BASE-CLONE") && vm_winname_valid("a1") && !vm_winname_valid("123") && !vm_winname_valid("-a") &&
+          !vm_winname_valid("a.b") && !vm_winname_valid("") && !vm_winname_valid("abcdefghijklmnop") && !vm_winname_valid("a b"));
+    CHECK(!vm_winname_from_host("win-base-clone", "908312a6-6bbe", wn) && !strcmp(wn, "win-base-clone"));
+    CHECK(!vm_winname_from_host("windows-11-pro-clone", "908312a6-6bbe", wn) && !strcmp(wn, "windows-11-9083"));
+    CHECK(!vm_winname_from_host("my-long----name-clone", "c0ffee00", wn) && !strcmp(wn, "my-long-c0ff"));
+    CHECK(vm_winname_from_host("1234", "x", wn) && !wn[0]);                         /* only digits */
+    CHECK(vm_winname_from_host("Bad;name", "x", wn) && !wn[0]);                     /* not a hostname */
+    CHECK(vm_winname_from_host("12345678901234567", "", wn) && !wn[0]);               /* long digits, no id: none */
 }
 
 

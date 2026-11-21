@@ -925,6 +925,7 @@ static struct {
     /* a Clone's first start (6.3): the guest gets its own hostname and machine-id through the agent (identity.json) */
     char id_hostname[64];
     int id_state;                           /* 0 none, 1 pending, 2 running in the guest, 3 done */
+    char id_winname[16];                    /* a Windows guest's: the computer name it was given */
     long id_pid;
     long long id_poll_at;
     /* files dropped on the window (VM_FILE): the one being copied and the ones waiting (see fx_next) */
@@ -2737,10 +2738,35 @@ static const char IDENTITY_SH[] =
     "systemctl try-restart ssh.service >/dev/null 2>&1 || true; echo ssh-keys new; fi; "
     "echo \"hostname $(hostname) machine-id $(cat /etc/machine-id)\"";
 
+/* The same for a Windows guest: one fixed PowerShell script, run as SYSTEM by qemu-guest-agent, with the computer name
+ * (vm_winname_from_host: NetBIOS rules, checked here and again in the script) in base64 as its only data. It renames
+ * the computer without restarting it: Windows uses the new name from its next restart, which the person chooses. The
+ * machine SID isn't changed (that's sysprep's job; docs/VIRTUALIZATION.md 6.3). It prints the name Windows will use. */
+static const char IDENTITY_PS[] =
+    "$ErrorActionPreference='Stop';"
+    "$h=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
+    "if($h -notmatch '^[A-Za-z0-9][A-Za-z0-9-]{0,14}$' -or $h -match '^[0-9]+$'){throw 'not a computer name'};"
+    "$k='HKLM:\\SYSTEM\\CurrentControlSet\\Control\\ComputerName\\ComputerName';"
+    "if((Get-ItemProperty -LiteralPath $k).ComputerName -ne $h){Rename-Computer -NewName $h -Force -WarningAction SilentlyContinue};"
+    "'computer name '+(Get-ItemProperty -LiteralPath $k).ComputerName+' from the next restart (now '+$env:COMPUTERNAME+')'";
+
 static int qga_do(const char *cmd, const char *args, int kind);
+static int fx_exec_ps(const char *script, int kind);
 static void lag_send(uint16_t kind, const uint8_t *data, uint32_t n);
 static void id_begin(void) {
     if (S.id_state != 1 || !(S.ag_caps & VAC_EXEC)) return;
+    if (S.ag_windows) {
+        char wn[VM_WINNAME_MAX + 1], b64[32], ps[sizeof IDENTITY_PS + 32];
+        if (vm_winname_from_host(S.id_hostname, S.m.id, wn) || ag_b64_encode((const uint8_t *)wn, strlen(wn), b64, sizeof b64) <= 0) {
+            S.id_state = 3;
+            vlog("identity: %s can't be a Windows computer name: the copy keeps its name", S.id_hostname);
+            return;
+        }
+        snprintf(S.id_winname, sizeof S.id_winname, "%s", wn);
+        snprintf(ps, sizeof ps, IDENTITY_PS, b64);
+        if (!fx_exec_ps(ps, AQ_IDEXEC)) { S.id_state = 2; vlog("identity: giving the guest its own computer name (%s)", wn); }
+        return;
+    }
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "{\"path\":\"/bin/sh\",\"arg\":[\"-c\",");
@@ -3059,7 +3085,8 @@ static void on_qga_reply(const JVal *root, int ok) {
             vm_identity_done(S.dir);
             vlog("identity: done: %s", said);
             char t[160];
-            snprintf(t, sizeof t, "this copy now has its own identity: hostname %s, a new machine-id", S.id_hostname);
+            if (S.ag_windows) snprintf(t, sizeof t, "this copy is named %s from its next restart", S.id_winname);
+            else snprintf(t, sizeof t, "this copy now has its own identity: hostname %s, a new machine-id", S.id_hostname);
             notice_all(VMN_IDENTITY, 0, t);
         } else { S.id_state = 1; vlog("identity: the script failed (%d): %s", code, said); }
         break;

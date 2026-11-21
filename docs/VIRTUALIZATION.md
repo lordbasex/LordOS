@@ -946,6 +946,15 @@ app, measured on the build VM, and on the Pi 5 below.
   credential can't replace an existing `/etc/hostname` or machine-id). Seen on VM 125: original `testbox`, machine-id
   `6393cf9c…8da0` = product_uuid `6393cf9c-…-8da0`, MAC `…:86:37:84`; its clone `test-box-clone`, `516e4286…1df8` = `516e4286-…-1df8`, MAC
   `…:aa:58:a9`, SSH key fingerprint changed; both running side by side. The script ran 0.9 s after the agent answered.
+  **A Windows clone** (the agent says `mswindows`) gets one fixed PowerShell script as SYSTEM instead: `Rename-Computer -NewName
+  <name> -Force`, without restarting it; Windows takes the new name at its next restart, which the person chooses (Machines' Shut
+  Down and a start is enough). The name follows NetBIOS rules (`vm_winname_from_host`, checked in lord-vm and again in the script:
+  1 to 15 letters, digits and `-`, not only digits): the clone's hostname when it fits, else its first 10 characters, `-` and 4 hex
+  digits of the new id (`windows-11-pro-prueba-clone` → `windows-11-71fe`). It runs once (`identity.json` goes). The machine SID is
+  **not** changed: that's sysprep's job (`sysprep /generalize` before cloning), and two clones on one domain need it; the sheet's
+  identity covers the name only. Seen 2026-11-21 on a clone of a Windows 11 Pro machine: the script ran 3 s after the agent
+  answered ("computer name WINDOWS-11-71FE from the next restart (now WIN-PRUEBA)"), and after Shut Down and a start `hostname`
+  said `windows-11-71fe`; no identity line at that second start.
 - *Host shutdown, restart and logout (6.1).* lord-vm holds a logind *delay* inhibitor (`shutdown`) while it runs. PrepareForShutdown, a
   SIGTERM (the session's units stopping) or lord-server going away without Keep Running starts a suspend to disk; if it isn't done in
   30 s, or can't be, the machine is shut down (ACPI, 30 s), then turned off. QEMU is started with SIGTERM, SIGINT and SIGHUP blocked, so
@@ -1561,7 +1570,7 @@ qcow2 internal snapshots, with RAM optional. Timeline view with names, notes, th
 
 Two kinds, named for what they do:
 
-- **Clone:** can run beside the original. It gets a new MAC and, through the agent, a new `machine-id` and hostname, which avoids the usual trap of two VMs receiving one DHCP address. Virtio-win guests keep their computer name unless changed.
+- **Clone:** can run beside the original. It gets a new MAC and, through the agent, a new `machine-id` and hostname, which avoids the usual trap of two VMs receiving one DHCP address. A Windows guest gets a new computer name the same way (from its next restart); its machine SID stays (sysprep's job).
 - **Duplicate:** an exact copy with the same identity, the only kind that can resume a suspended session.
 
 A **linked clone runs alongside its original and takes only what changed**:

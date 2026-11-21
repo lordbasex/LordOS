@@ -60,6 +60,12 @@ int vm_snaps_find(const VmSnap *s, int n, const char *tag);       /* index or -1
 #define VM_HOSTNAME_MAX 63
 int vm_hostname_valid(const char *s);                               /* one DNS label: a-z 0-9 '-', not at the ends */
 void vm_hostname_from_name(const char *name, char *out, size_t n); /* "Debian 13" → "debian-13" ("machine" if empty) */
+/* a Windows computer name (NetBIOS rules): 1 to 15 letters, digits and '-', not at the start, not only digits */
+#define VM_WINNAME_MAX 15
+int vm_winname_valid(const char *s);
+/* a clone's hostname (one DNS label) as a Windows computer name: as it is when it fits, else its first 10 characters,
+ * '-' and 4 hex digits of the machine's id (so two long names that start alike stay apart); 0, -1 if none can be made */
+int vm_winname_from_host(const char *host, const char *id, char out[VM_WINNAME_MAX + 1]);
 int vm_identity_write(const char *dir, const char *hostname);       /* 0 ok */
 int vm_identity_read(const char *dir, char *hostname, size_t n);    /* 0 there is one, -1 none or unreadable */
 void vm_identity_done(const char *dir);

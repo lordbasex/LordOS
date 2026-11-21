@@ -195,6 +195,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   window near the top of the guest's screen (Calculator opens at y = −10) got its LordOS title bar under the menu bar,
   out of reach. It now opens, and follows the guest, just inside the work area, and the guest is asked to move its window
   to the same place, so the picture stays the guest's window 1:1. `vm_model_test.mjs` covers it.
+- **A Windows clone gets its own computer name** (`server/src/vm/lordvm.c`, `vmops.c`): lord-vm ran its `/bin/sh` identity
+  script on a cloned Windows guest, which failed at every start ("qemu-guest-agent couldn't run the script"), so the copy
+  kept the original's name. A Windows guest now gets one fixed PowerShell script as SYSTEM: `Rename-Computer` to a name
+  checked on both sides against NetBIOS rules (at most 15 letters, digits and `-`, not only digits; a longer hostname
+  becomes its first 10 characters and 4 hex digits of the new id), with no forced restart: Windows uses it from its next
+  restart. It runs once. The machine SID isn't changed (sysprep's job; `docs/VIRTUALIZATION.md` says so). Checked on a
+  clone of a Windows 11 machine: after Shut Down and a start, `hostname` gave the new name. `build/vm-test` covers the
+  names.
 - **The remote desktop no longer crashes lord-server when a viewer connects after the last one left**
   (`server/src/remote/mirror.c`, `server/src/media/mstream.c`): the mirror freed its copy of the screen while the video
   encoder still held it, and the next viewer's encoder copied from the freed memory. A 1920 × 1080 headless session
