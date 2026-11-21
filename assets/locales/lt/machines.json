@@ -412,6 +412,7 @@
   "job.wait": "Tai užtruks akimirką.",
   "win.recovered": "Praėjusį kartą nutraukta operacija buvo užbaigta arba atšaukta paleidžiant šią mašiną. Mašinos žurnalas nurodo, kuri.",
   "win.identityDone": "Ši kopija dabar turi savo tapatybę: naują pavadinimą ir machine-id viduje.",
+  "win.identityName": "Ši kopija gaus savo kompiuterio vardą kito paleidimo iš naujo metu.",
   "discard.title": "Atmesti „{name}“ įrašytą seansą?",
   "discard.detail": "Tai, kas joje buvo atidaryta, bus prarasta, kaip dingus elektrai. Kitas paleidimas vyks iš jos disko.",
   "cfg.close.ask": "Klausti",

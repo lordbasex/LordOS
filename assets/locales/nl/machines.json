@@ -412,6 +412,7 @@
   "job.wait": "Dit duurt even.",
   "win.recovered": "Een handeling die de vorige keer werd onderbroken, is bij het starten van deze machine afgemaakt of teruggedraaid. Het logboek van de machine vertelt welke.",
   "win.identityDone": "Deze kopie heeft nu een eigen identiteit: een nieuwe naam en machine-id erin.",
+  "win.identityName": "Deze kopie krijgt bij de volgende herstart een eigen computernaam.",
   "discard.title": "Bewaarde sessie van {name} verwerpen?",
   "discard.detail": "Wat erin open was gaat verloren, zoals na een stroomstoring. De volgende start gebeurt vanaf de schijf.",
   "cfg.close.ask": "Vraag",

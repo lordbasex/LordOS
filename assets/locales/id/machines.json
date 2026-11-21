@@ -412,6 +412,7 @@
   "job.wait": "Ini butuh waktu sebentar.",
   "win.recovered": "Operasi yang terputus terakhir kali telah diselesaikan atau dibatalkan saat mesin ini dimulai. Log mesin menjelaskan yang mana.",
   "win.identityDone": "Salinan ini kini memiliki identitas sendiri: nama dan machine-id baru di dalamnya.",
+  "win.identityName": "Salinan ini mendapat nama komputernya sendiri saat dimulai ulang berikutnya.",
   "discard.title": "Buang sesi tersimpan {name}?",
   "discard.detail": "Apa yang terbuka di dalamnya akan hilang, seperti setelah listrik padam. Mulai berikutnya akan boot dari disknya.",
   "cfg.close.ask": "Tanyakan",

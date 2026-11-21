@@ -412,6 +412,7 @@
   "job.wait": "Việc này mất một lúc.",
   "win.recovered": "Một thao tác bị gián đoạn lần trước đã được hoàn tất hoặc hoàn tác khi máy ảo này khởi động. Nhật ký máy ảo cho biết thao tác nào.",
   "win.identityDone": "Bản sao này giờ đã có danh tính riêng: tên và machine-id mới bên trong.",
+  "win.identityName": "Bản sao này nhận tên máy tính riêng ở lần khởi động lại tiếp theo.",
   "discard.title": "Bỏ phiên đã lưu của {name}?",
   "discard.detail": "Những gì đang mở trong đó sẽ mất, như khi bị mất điện. Lần khởi động tới sẽ khởi động từ đĩa.",
   "cfg.close.ask": "Hỏi",

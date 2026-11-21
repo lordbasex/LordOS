@@ -412,6 +412,7 @@
   "job.wait": "Bu biraz zaman alır.",
   "win.recovered": "Geçen sefer yarıda kesilen bir işlem, bu makine başlarken tamamlandı ya da geri alındı. Hangisi olduğunu makine günlüğü söylüyor.",
   "win.identityDone": "Bu kopyanın artık kendi kimliği var: içinde yeni bir ad ve machine-id.",
+  "win.identityName": "Bu kopya bir sonraki yeniden başlatmada kendi bilgisayar adını alır.",
   "discard.title": "{name} için kaydedilmiş oturum atılsın mı?",
   "discard.detail": "İçinde açık olanlar, bir elektrik kesintisinden sonraki gibi kaybolur. Bir sonraki başlatma diskinden önyüklenir.",
   "cfg.close.ask": "Sor",

@@ -412,6 +412,7 @@
   "job.wait": "Esto tarda un momento.",
   "win.recovered": "Una operación que quedó interrumpida la última vez se terminó o se deshizo al iniciar esta máquina. El registro de la máquina dice cuál.",
   "win.identityDone": "Esta copia ya tiene su propia identidad: un nombre y un machine-id nuevos adentro.",
+  "win.identityName": "Esta copia toma su propio nombre de equipo en el próximo reinicio.",
   "discard.title": "¿Descartar la sesión guardada de {name}?",
   "discard.detail": "Lo que estaba abierto se pierde, como tras un corte de luz. El próximo inicio arranca desde su disco.",
   "cfg.close.ask": "Preguntar",

@@ -412,6 +412,7 @@
   "job.wait": "这需要一点时间。",
   "win.recovered": "上次被中断的操作已在此虚拟机启动时完成或撤销。虚拟机日志说明了是哪一种。",
   "win.identityDone": "此副本现在有了自己的身份：其中有新的名称和 machine-id。",
+  "win.identityName": "此副本将在下次重启时使用自己的计算机名。",
   "discard.title": "要放弃 {name} 保存的会话吗？",
   "discard.detail": "其中打开的内容会丢失，如同断电一样。下次启动时会从其磁盘引导。",
   "cfg.close.ask": "询问",

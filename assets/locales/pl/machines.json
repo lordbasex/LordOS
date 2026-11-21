@@ -412,6 +412,7 @@
   "job.wait": "To chwilę potrwa.",
   "win.recovered": "Operacja przerwana ostatnim razem została dokończona lub cofnięta przy uruchomieniu tej maszyny. Dziennik maszyny mówi która.",
   "win.identityDone": "Ta kopia ma teraz własną tożsamość: nową nazwę i machine-id w środku.",
+  "win.identityName": "Ta kopia otrzyma własną nazwę komputera przy następnym ponownym uruchomieniu.",
   "discard.title": "Odrzucić zapisaną sesję maszyny {name}?",
   "discard.detail": "To, co było w niej otwarte, zostanie utracone, jak po zaniku zasilania. Następne uruchomienie wystartuje z dysku.",
   "cfg.close.ask": "Pytaj",

@@ -412,6 +412,7 @@
   "job.wait": "這需要一點時間。",
   "win.recovered": "上次中斷的操作已在此虛擬機器啟動時完成或還原。虛擬機器記錄說明了是哪一個。",
   "win.identityDone": "這份副本現在擁有自己的識別資訊：其中有新的名稱與 machine-id。",
+  "win.identityName": "此副本將在下次重新啟動時使用自己的電腦名稱。",
   "discard.title": "要捨棄 {name} 已儲存的工作階段嗎？",
   "discard.detail": "其中開啟的內容會遺失，就像斷電一樣。下次啟動時會從其磁碟開機。",
   "cfg.close.ask": "詢問",

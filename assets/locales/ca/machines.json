@@ -412,6 +412,7 @@
   "job.wait": "Això triga una mica.",
   "win.recovered": "Una operació que es va interrompre l’última vegada s’ha completat o desfet en iniciar aquesta màquina. El registre de la màquina diu quina.",
   "win.identityDone": "Ara aquesta còpia té la seva pròpia identitat: un nom i un machine-id nous a dins.",
+  "win.identityName": "Aquesta còpia agafa el seu propi nom d'ordinador en el proper reinici.",
   "discard.title": "Vols descartar la sessió desada de {name}?",
   "discard.detail": "El que hi havia obert es perd, com després d’una apagada elèctrica. El proper inici arrencarà des del disc.",
   "cfg.close.ask": "Pregunta",

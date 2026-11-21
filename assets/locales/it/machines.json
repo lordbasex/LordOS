@@ -412,6 +412,7 @@
   "job.wait": "Ci vuole un momento.",
   "win.recovered": "Un’operazione interrotta l’ultima volta è stata completata o annullata all’avvio di questa macchina. Il registro della macchina dice quale.",
   "win.identityDone": "Questa copia ora ha una propria identità: un nuovo nome e un nuovo machine-id al suo interno.",
+  "win.identityName": "Questa copia prende il proprio nome computer al prossimo riavvio.",
   "discard.title": "Scartare la sessione salvata di {name}?",
   "discard.detail": "Ciò che era aperto va perso, come dopo un’interruzione di corrente. Il prossimo avvio parte dal suo disco.",
   "cfg.close.ask": "Chiedi",

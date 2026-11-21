@@ -412,6 +412,7 @@
   "job.wait": "Bu bir az vaxt aparır.",
   "win.recovered": "Ötən dəfə yarımçıq qalan əməliyyat bu maşın başlayanda tamamlandı və ya geri qaytarıldı. Hansı olduğu maşın jurnalındadır.",
   "win.identityDone": "Bu nüsxənin artıq öz kimliyi var: içində yeni ad və machine-id.",
+  "win.identityName": "Bu nüsxə növbəti yenidən başladılmada öz kompüter adını alacaq.",
   "discard.title": "{name} maşınının saxlanılmış seansı atılsın?",
   "discard.detail": "Orada açıq olanlar elektrik kəsilməsindən sonrakı kimi itir. Növbəti başlanğıc diskdən yüklənir.",
   "cfg.close.ask": "Soruş",

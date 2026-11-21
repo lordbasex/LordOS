@@ -412,6 +412,7 @@
   "job.wait": "Durează puțin.",
   "win.recovered": "O operație întreruptă data trecută a fost finalizată sau anulată când a pornit această mașină. Jurnalul mașinii spune care.",
   "win.identityDone": "Această copie are acum propria identitate: un nume nou și un machine-id nou în interior.",
+  "win.identityName": "Această copie primește propriul nume de computer la următoarea repornire.",
   "discard.title": "Renunțați la sesiunea salvată pentru {name}?",
   "discard.detail": "Ce era deschis în ea se pierde, ca după o pană de curent. Următoarea pornire se face de pe disc.",
   "cfg.close.ask": "Întreabă",

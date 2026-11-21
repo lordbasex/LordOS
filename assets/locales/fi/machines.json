@@ -412,6 +412,7 @@
   "job.wait": "Tämä kestää hetken.",
   "win.recovered": "Viime kerralla keskeytynyt toiminto viimeisteltiin tai peruttiin, kun tämä kone käynnistyi. Koneen loki kertoo kumpi.",
   "win.identityDone": "Tällä kopiolla on nyt oma identiteetti: uusi nimi ja machine-id sen sisällä.",
+  "win.identityName": "Tämä kopio saa oman tietokonenimensä seuraavassa uudelleenkäynnistyksessä.",
   "discard.title": "Hylätäänkö koneen {name} tallennettu istunto?",
   "discard.detail": "Mitä siinä oli auki, menetetään kuten sähkökatkossa. Seuraava käynnistys tapahtuu sen levyltä.",
   "cfg.close.ask": "Kysy",

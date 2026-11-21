@@ -412,6 +412,7 @@
   "job.wait": "This takes a moment.",
   "win.recovered": "An operation that was interrupted the last time was finished or undone when this machine started. The machine log says which.",
   "win.identityDone": "This copy has its own identity now: a new name and machine-id inside it.",
+  "win.identityName": "This copy takes its own computer name at its next restart.",
   "discard.title": "Discard {name}’s saved session?",
   "discard.detail": "What was open in it is lost, as after a power cut. The next start boots from its disk.",
   "cfg.close.ask": "Ask",

@@ -412,6 +412,7 @@
   "job.wait": "Ez eltart egy pillanatig.",
   "win.recovered": "Egy legutóbb megszakadt művelet befejeződött vagy visszavonódott, amikor ez a gép elindult. A gépnapló megmondja, melyik.",
   "win.identityDone": "Ennek a másolatnak most saját identitása van: új név és machine-id a belsejében.",
+  "win.identityName": "Ez a másolat a következő újraindításkor saját számítógépnevet kap.",
   "discard.title": "Elveti {name} mentett munkamenetét?",
   "discard.detail": "Ami benne nyitva volt, elvész, mint egy áramszünet után. A következő indítás a lemezéről indul.",
   "cfg.close.ask": "Kérdezzen",

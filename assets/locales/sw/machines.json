@@ -412,6 +412,7 @@
   "job.wait": "Hii inachukua muda kidogo.",
   "win.recovered": "Operesheni iliyokatizwa mara ya mwisho ilikamilishwa au kutenduliwa mashine hii ilipowaka. Kumbukumbu ya mashine inaeleza ipi.",
   "win.identityDone": "Nakala hii sasa ina utambulisho wake: jina jipya na machine-id ndani yake.",
+  "win.identityName": "Nakala hii inachukua jina lake la kompyuta katika uanzishaji upya unaofuata.",
   "discard.title": "Tupa kipindi kilichohifadhiwa cha {name}?",
   "discard.detail": "Kilichokuwa wazi ndani yake kinapotea, kama baada ya umeme kukatika. Uwashaji ujao utaanza kutoka diski yake.",
   "cfg.close.ask": "Uliza",

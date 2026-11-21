@@ -412,6 +412,7 @@
   "job.wait": "Sandali lang ito.",
   "win.recovered": "Ang operasyong naantala noong huling beses ay natapos o binawi nang magsimula ang makinang ito. Sinasabi ng log ng makina kung alin.",
   "win.identityDone": "May sariling pagkakakilanlan na ang kopyang ito: bagong pangalan at machine-id sa loob nito.",
+  "win.identityName": "Makukuha ng kopyang ito ang sarili nitong pangalan ng computer sa susunod na restart.",
   "discard.title": "Itapon ang na-save na session ng {name}?",
   "discard.detail": "Mawawala ang nakabukas dito, gaya ng pagkawala ng kuryente. Magbo-boot mula sa disk nito ang susunod na pagsisimula.",
   "cfg.close.ask": "Magtanong",

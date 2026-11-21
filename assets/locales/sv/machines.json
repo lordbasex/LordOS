@@ -412,6 +412,7 @@
   "job.wait": "Det tar en stund.",
   "win.recovered": "En åtgärd som avbröts förra gången slutfördes eller ångrades när maskinen startade. Maskinloggen visar vilken.",
   "win.identityDone": "Den här kopian har nu en egen identitet: ett nytt namn och machine-id i den.",
+  "win.identityName": "Den här kopian får ett eget datornamn vid nästa omstart.",
   "discard.title": "Kasta den sparade sessionen för {name}?",
   "discard.detail": "Det som var öppet i den går förlorat, som efter ett strömavbrott. Nästa start sker från disken.",
   "cfg.close.ask": "Fråga",

@@ -412,6 +412,7 @@
   "job.wait": "Cela prend un instant.",
   "win.recovered": "Une opération interrompue la dernière fois a été terminée ou annulée au démarrage de cette machine. Le journal de la machine dit laquelle.",
   "win.identityDone": "Cette copie a maintenant sa propre identité : un nouveau nom et un nouveau machine-id à l'intérieur.",
+  "win.identityName": "Cette copie prend son propre nom d'ordinateur au prochain redémarrage.",
   "discard.title": "Supprimer la session enregistrée de {name} ?",
   "discard.detail": "Ce qui y était ouvert est perdu, comme après une coupure de courant. Le prochain démarrage part de son disque.",
   "cfg.close.ask": "Demander",

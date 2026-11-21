@@ -412,6 +412,7 @@
   "job.wait": "잠시 걸립니다.",
   "win.recovered": "지난번에 중단된 작업이 이 머신이 시작될 때 완료되거나 취소되었습니다. 어느 쪽인지는 머신 로그에 있습니다.",
   "win.identityDone": "이제 이 사본은 고유한 ID를 가집니다. 내부에 새 이름과 machine-id가 있습니다.",
+  "win.identityName": "이 복사본은 다음 재시작 때 자체 컴퓨터 이름을 갖습니다.",
   "discard.title": "{name}의 저장된 세션을 버릴까요?",
   "discard.detail": "열려 있던 내용은 정전 후처럼 사라집니다. 다음 시작은 디스크에서 부팅합니다.",
   "cfg.close.ask": "묻기",

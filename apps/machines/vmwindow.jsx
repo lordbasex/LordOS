@@ -486,7 +486,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const noticeOn = !!st?.notice && st.noticeSeq !== noticeGone;
   const noticeText = !st?.notice ? '' : st.notice === 'recovered' ? tr('machines.win.recovered')
     : st.notice === 'network-back' ? tr('machines.win.netBack', { s: (Math.max(0, st.noticeCode || 0) / 1000).toFixed(1) })
-    : st.notice === 'identity' ? tr('machines.win.identityDone')
+    : st.notice === 'identity' ? tr(st.noticeCode === 1 ? 'machines.win.identityName' : 'machines.win.identityDone')
     : /reconnecting/.test(st.noticeText || '') ? tr('machines.win.netReconnecting') : tr('machines.win.netLost');
   const v = stateView(st?.state, st?.reason);
   const a = actionsFor(sid ? st?.state : 'stopped');

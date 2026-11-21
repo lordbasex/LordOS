@@ -108,7 +108,8 @@
  *                   the machine runs, a new one is being attached, or, after 5 in a minute, the machine has no network
  *                   until it starts again; VMN_NET_BACK: a new passt is attached, b = milliseconds without network;
  *                   VMN_RECOVERED: an interrupted operation was finished or rolled back at this start; VMN_IDENTITY: a
- *                   Clone's guest got its own hostname and machine-id), b = detail number (a signal or exit status),
+ *                   Clone's guest got its own hostname and machine-id; b = 1: a Windows guest's computer name, from its next
+ *                   restart), b = detail number (a signal or exit status),
  *                   text = detail.
  *                   Sent to every client, and again to one that connects later (VM_STATUS)
  *

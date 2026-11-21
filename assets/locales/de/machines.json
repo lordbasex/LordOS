@@ -412,6 +412,7 @@
   "job.wait": "Das dauert einen Moment.",
   "win.recovered": "Ein beim letzten Mal unterbrochener Vorgang wurde beim Start dieser Maschine abgeschlossen oder rückgängig gemacht. Das Protokoll der Maschine nennt, welcher.",
   "win.identityDone": "Diese Kopie hat jetzt eine eigene Identität: einen neuen Namen und eine neue machine-id darin.",
+  "win.identityName": "Diese Kopie erhält beim nächsten Neustart einen eigenen Computernamen.",
   "discard.title": "Gespeicherte Sitzung von {name} verwerfen?",
   "discard.detail": "Was darin geöffnet war, geht verloren, wie nach einem Stromausfall. Der nächste Start bootet von ihrem Datenträger.",
   "cfg.close.ask": "Fragen",

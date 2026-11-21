@@ -412,6 +412,7 @@
   "job.wait": "Ini mengambil sedikit masa.",
   "win.recovered": "Operasi yang terganggu pada kali terakhir telah diselesaikan atau dibuat asal apabila mesin ini dimulakan. Log mesin menyatakan yang mana.",
   "win.identityDone": "Salinan ini kini mempunyai identitinya sendiri: nama dan machine-id baharu di dalamnya.",
+  "win.identityName": "Salinan ini mengambil nama komputernya sendiri pada mula semula seterusnya.",
   "discard.title": "Buang sesi {name} yang disimpan?",
   "discard.detail": "Apa yang dibuka di dalamnya akan hilang, seperti selepas bekalan elektrik terputus. Permulaan seterusnya akan but daripada cakeranya.",
   "cfg.close.ask": "Tanya",

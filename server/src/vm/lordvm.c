@@ -3087,7 +3087,7 @@ static void on_qga_reply(const JVal *root, int ok) {
             char t[160];
             if (S.ag_windows) snprintf(t, sizeof t, "this copy is named %s from its next restart", S.id_winname);
             else snprintf(t, sizeof t, "this copy now has its own identity: hostname %s, a new machine-id", S.id_hostname);
-            notice_all(VMN_IDENTITY, 0, t);
+            notice_all(VMN_IDENTITY, S.ag_windows ? 1 : 0, t);    /* 1: a computer name, from the next restart */
         } else { S.id_state = 1; vlog("identity: the script failed (%d): %s", code, said); }
         break;
     }
