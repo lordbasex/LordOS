@@ -646,6 +646,26 @@ export function netSummary(m) {
     lan: usesPorts(n) && n !== 'hostonly' && (m.ports || []).some((r) => r.open === 'lan') };
 }
 
+// Why the guest tools or the clipboard helper weren't installed (VAG_INSTALL's answer, lord-vm's English words): the
+// translated line's key under machines.agent.err, and lord-vm's own text as a detail when it says more than the key
+const INSTALL_ERRORS = [
+  [/aren't on this computer|isn't available for this machine's architecture/, 'missing'],
+  [/^busy$|agent is busy/, 'busy'],
+  [/can't write files or run commands/, 'noExec'],
+  [/took too long/, 'timeout'],
+  [/didn't make a private folder|didn't open the file/, 'noFolder'],
+  [/started again|stopped answering/, 'gone'],
+  [/script failed/, 'failed'],
+];
+export function installError(msg) {
+  const text = String(msg || '').trim();
+  const hit = INSTALL_ERRORS.find(([re]) => re.test(text));
+  const key = hit ? hit[1] : 'other';
+  // the words that add something: a script's output, qemu-guest-agent's error, anything not known
+  const detail = key === 'failed' || key === 'other' ? text : '';
+  return { key, detail };
+}
+
 // ---- apps mode (docs/VIRTUALIZATION.md 7.2): each window of the guest as its own LordOS window ----
 
 // Why apps mode can't be turned on now, or null: 'needsAgent' (the machine's agent is off or not connected), 'needsTools'

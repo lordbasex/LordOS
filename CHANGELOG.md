@@ -213,6 +213,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   this machine" were cut at the menu's edge, and so were long items in other languages. Information lines are now notes
   that wrap under the items' text column (start-aligned, right to left too), and every item's text wraps instead of
   running out of the menu; the resolution menu's notes use the same rows.
+- **Installing the guest tools says what went wrong in the person's language** (`apps/machines/vmwindow.jsx`, `model.js`
+  `installError`): the agent popover showed lord-vm's English error as it came ("the guest agent can't write files or run
+  commands"). Its known errors (tools missing on this computer, the agent busy, no file copies or programs allowed, too
+  slow, no private folder, the agent gone, the script failed) are now translated lines (`machines.agent.err.*`, all 35
+  languages), with lord-vm's text only as a detail when it adds something (a script's output, qemu-guest-agent's
+  error). `vm_model_test.mjs` covers the mapping.
 - **The remote desktop no longer crashes lord-server when a viewer connects after the last one left**
   (`server/src/remote/mirror.c`, `server/src/media/mstream.c`): the mirror freed its copy of the screen while the video
   encoder still held it, and the next viewer's encoder copied from the freed memory. A 1920 × 1080 headless session

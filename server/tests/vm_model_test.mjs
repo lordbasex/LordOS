@@ -382,6 +382,15 @@ eq('crop point outside', [M.cropPoint(99, 220, [100, 200, 300, 400], [0, 0, 300,
   const to = M.insideWork(M.toHostRect({ x: 47, y: -10, w: 320, h: 500 }, k, d), inset, work);
   eq('inside work: the guest asked', M.toGuestRect(to, k, d), { x: 47, y: 60, w: 320, h: 500 });
 }
+// the guest tools' install errors: lord-vm's words → a translated line, its text kept only as a detail
+eq('install error: missing', M.installError("the LordOS guest tools for Windows aren't on this computer"), { key: 'missing', detail: '' });
+eq('install error: busy', [M.installError('busy').key, M.installError('the guest agent is busy').key], ['busy', 'busy']);
+eq('install error: no exec', M.installError("the guest agent can't write files or run commands").key, 'noExec');
+eq('install error: timeout', M.installError("the guest's script took too long").key, 'timeout');
+eq('install error: gone', [M.installError('qemu-guest-agent stopped answering in the guest').key, M.installError('the guest agent started again').key], ['gone', 'gone']);
+eq('install error: script', M.installError("the guest's script failed (1): Access is denied"), { key: 'failed', detail: "the guest's script failed (1): Access is denied" });
+eq('install error: other', M.installError('qemu-guest-agent: Guest agent command failed'), { key: 'other', detail: 'qemu-guest-agent: Guest agent command failed' });
+eq('install error: empty', M.installError(''), { key: 'other', detail: '' });
 eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, h: 9 }), M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 3, y: 0, w: 10, h: 10 }), M.nearRect(null, {})], [true, false, false]);
 // the guest didn't take the place asked of its window (its minimum size): after a while the LordOS window goes back
 {
