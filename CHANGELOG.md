@@ -185,6 +185,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **The remote desktop no longer crashes lord-server when a viewer connects after the last one left**
+  (`server/src/remote/mirror.c`, `server/src/media/mstream.c`): the mirror freed its copy of the screen while the video
+  encoder still held it, and the next viewer's encoder copied from the freed memory. A 1920 × 1080 headless session
+  drawing with nobody watching crashed on every third viewer (SIGSEGV in a paint thread); with a monitor the same read
+  happened whenever a viewer connected after the last one left. The encoder now drops the pointer before every free.
+- **Linux and Flathub apps start with a covered mount under the home** (`server/src/sec/sandbox.c`): the read-only view of
+  the home made every mount under it read-only from `/proc/self/mountinfo`, which also lists mounts no path reaches (one
+  covered by a later mount on a folder above it); that remount failed with ENOENT and no app started ("could not build
+  the app's view"). Such a mount is skipped, since the app can't reach it either; any other failure still stops the
+  launch, now with the mount and the reason in the app's log. `build/sandbox-home-mounts-test` covers it. Found with
+  Whatsie launched from the launcher in a session with a tmpfs and a bind mount in the home.
+- **Machines' window no longer pauses the desktop every 5 s** (`server/src/vm/vmthumb.c`): the card's picture was scaled,
+  PNG-encoded and written on the main thread at each snapshot (20 to 57 ms, `stall: call vm.snapshot` in
+  compositor.log). A thread of its own does it now from a copy; none of those stalls in a minute of a running machine.
+  `build/vmthumb-test` covers it.
+- **Open Transfer Folder opens the machine's own folder** (`apps/machines/`, `sdk/sysopen.js`): it showed
+  `~/Machines/Transfer`, every machine's folder, one level up. The library's menu, Configure → Sharing and the machine
+  window's folder menu (the transfer folder and each shared folder) open the folder itself (`openFolder`).
+- **The Store's sidebar edge drags from both sides of the line** (`apps/store/index.jsx`): the column after the sidebar
+  took presses on the outer half of the drag handle.
 - **Configure → Display saves its choices** (`apps/machines/configure.jsx`): the start resolution and 2D/3D picked there
   were dropped when Done was pressed (the section wasn't one that saves); a machine set to 1920 × 1080 now starts at
   1920 × 1080 (checked with a machine of the new card, `docs/VIRTUALIZATION.md` 4.3).
