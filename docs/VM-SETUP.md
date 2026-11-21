@@ -1965,3 +1965,12 @@ mounted for the call).
 against a private X server. Installed on the development computer (Debian 13, the maintainer's LordOS desktop):
 `sudo apt-get install -y --no-install-recommends xvfb xclip` (xvfb 2:21.1.16-1.3+deb13u4, xclip 0.13-4). Without them
 the suite prints "skipped: needs Xvfb and xclip".
+
+## Step — Intel GVT-g option ROM tests on the development computer (2026-11-21)
+
+For the hands-on tests in `MACHINES-GPU.md` (building i915ovmfPkg against EDK2, signing it, enrolling a db certificate
+in a machine's NVRAM): `sudo apt-get install -y --no-install-recommends nasm acpica-tools sbsigntool
+python3-virt-firmware` (nasm 2.16.03-1, acpica-tools 20250404-1, sbsigntool 0.9.4-3.2+deb13u1, python3-virt-firmware
+24.11-2, which pulled in python3-pefile). GVT-g itself was turned on by the maintainer with
+`/etc/modprobe.d/i915-gvt.conf` (`options i915 enable_gvt=1 enable_guc=0`) and `/etc/modules-load.d/kvmgt.conf`
+(`kvmgt`), then `update-initramfs -u`; the iGPU was enabled in the firmware ("iGPU Multi-Monitor").

@@ -123,6 +123,35 @@ For computers with a second AMD or NVIDIA card kept only for machines.
   near-native performance. Showing a dedicated card's picture inside LordOS (an IddCx virtual monitor + capture) is
   done only if people ask to use their usual monitors.
 
+### Mode A — our own option ROM, hands-on (2026-11-21)
+
+- **It works.** The open i915ovmfPkg GOP driver (patmagauran/i915ovmfPkg 2841e8e, built against edk2-stable202502
+  with a small build patch for gcc 14) wrapped with `EfiRom`, given as `romfile=` to
+  `vfio-pci-nohotplug,sysfsdev=…,display=on,x-igd-opregion=on,xres=1920,yres=1080`: the UEFI screen and the Windows
+  desktop come out of the vGPU itself, Windows reads the EDID (1920×1080; a resize to 1280×800 follows at once), dwm
+  and the apps compose on the Intel GPU (the only adapter), and QEMU hands lord-vmdisplay `ScanoutDMABUF` frames:
+  `XR24`, stride 7680, modifier `I915_FORMAT_MOD_Y_TILED` (the ROM's own boot screen is linear `XR24`). EGL import on
+  the Intel render node worked every frame.
+- **WebGL aquarium (500 fish, 1200×700):** 17–20 fps on WARP → 41–54 hybrid → **75 fps held at the 74 Hz refresh**,
+  **356–410 fps uncapped** (iGPU 800–1150 MHz). One first session stayed at 11–16 fps with the iGPU stuck at 350 MHz
+  (i915 RPS up-threshold 95 %, the GPU at ~74 %): a minimum iGPU frequency while a GVT machine runs is worth a closed
+  admin action.
+- **Stability:** about 23 minutes at 96–100 % guest 3D, one guest restart (with `-action reboot=shutdown`, a clean exit
+  and a fresh start), about 20 000 frames per run with 0 failures, no host i915/GVT/VFIO/KVM messages, two i915 hotplug
+  uevents per machine start (no storm).
+- **Secure Boot:** stayed on (`Confirm-SecureBootUEFI` → True). Debian's stock OVMF runs option ROMs without checking
+  signatures (`PcdOptionRomImageVerificationPolicy` 0x00), so signing only matters with an OVMF built with policy 0x04:
+  with it our signed ROM (sbsign + a test db certificate enrolled with `virt-fw-vars --add-db`) runs and an unsigned
+  one is refused — and QEMU's unsigned iPXE ROMs would be refused too. Enrolling a db certificate on an existing
+  machine changes PCR7 (BitLocker recovery), so it belongs at machine creation.
+- **Blocker before shipping:** i915ovmfPkg and the project it was forked from carry **no license**; the upstream is
+  archived (2023). Shipping needs a license grant from its authors, or our own GOP driver written from the public
+  i915 documentation.
+- **What LordOS needs besides Mode A's list above:** accept Y-tiled modifiers and cache dmabuf imports (GVT hands a
+  new dmabuf on each flip), expect refused messages during resizes, QEMU's 30 ms display poll caps the picture at
+  ~33 fps (raise it), ignore i915 hotplugs from a machine start, and choose the signing model (stock OVMF + the
+  ROM's integrity from our signed package, or our own OVMF with policy 0x04 plus signed NIC ROMs).
+
 ### Settings → Graphics cards (approved in principle 2026-11-21)
 
 The person never runs a command: a computer with more than one GPU is managed from **Settings → Graphics cards**.
