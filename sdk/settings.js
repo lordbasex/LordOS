@@ -53,6 +53,7 @@ const DEFAULTS = {
   webAppPrefs: {},            // 0.8.8.8, Settings → Web apps: per app { badge, dockPerProfile } (webappsmodel.js webPrefs); new key, no migration
   appsOffKept: null,         // what deactivating changed, to put back on Activate: { backupInterval } (appsoffactions.js)
   flathub: null,              // 0.8.9.3, Store → Flathub: { on, showAll, appstreamAt } (flathubmodel.js prefsOf); new key, no migration
+  openWithDefaults: {},       // 0.8.9.5, Files: "Always open .exe files with …" per extension → an "Open with" provider's id (sdk/openwith.js); new key, no migration
   storeSideWidth: null,       // 0.8.9.5, the Store's sidebar width (dragged at its edge; null: the default); new key, no migration
   cloudColors: {},            // 0.8.8.10 (#184), Settings → Cloud: a color chosen per account id (cloudmodel.js accountColor); new key, no migration
   themeOptions: {},           // 0.8.9, a theme's own choices from its theme.json "options", by theme id (thememeta.js); new key, no migration

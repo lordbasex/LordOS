@@ -2282,6 +2282,60 @@ virtio-win 0.1.271, viogpudo 100.100.104.27100), driven by `lordvm-dev` (`agent 
 
 **Not yet.** Guest apps in the launcher before the machine runs (6.12); a window's own shape (a round or see-through window shows the guest's black around it); more than one display.
 
+### 7.3 Open a file in a machine ("Open with", like VMware Fusion)
+
+**Built (in development, 2026-11-21).** In Files, a file's **Open with** lists, after the apps that open it, every machine
+whose guest tools open files: "Windows 11 Pro pepe (Windows)". Choosing one opens the machine's window, which starts the
+machine if it's off (a bridged network goes through the same `bridgeUp` first) or resumes it if it's paused or suspended,
+waits for the guest tools to connect (after the guest's sign-in), copies the file in as a drop on the window does (the
+transfer folder when the guest has it mounted, else the agent's way into a private folder; the same progress line), and
+asks the tools to open it with the guest's default handler, as the signed-in person: a document opens in its app, and a
+program (`.exe`, `.msi`, `.bat`, `.cmd`, `.lnk`…) runs, which is the point (MikroTik's `winbox.exe` straight from
+Downloads). Then the machine goes into apps mode (7.2) when the guest has it, so the program comes up as its own LordOS
+window in the Dock; otherwise the machine's window comes to the front. A program for another system that no app here
+opens is offered to such a machine on a double click, with **Always open .exe files with ‹machine›** (kept per extension,
+settings `openWithDefaults`; the Open with menu then has **Ask Each Time for .exe Files**); a double click that would
+start an off machine asks first. Other files just list the machine under Open with.
+
+**Which machines.** The ones whose tools said `open` in their hello (`AG_HELLO_OPEN`; lord-vm sets `VAC_OPEN`, 8192, in
+`VM_AGENT_STATE`). The machine's window writes that into `app.json` (`opens: 'windows'`) when it sees it, so an off
+machine is listed too (`apps/machines/openwith.js`, tested by `server/tests/vm_openwith_test.mjs`). Today that is
+Windows guests with `lordos-guest-win` w3 or later: install or update the tools from the agent's popover. **Linux
+guests are not listed:** `lordos-guest` is approved to start only the clipboard tools (`xclip`, `wl-clipboard`) and
+`systemctl --user show-environment`; opening a sent file there would mean `xdg-open` or `gio open` in the person's
+session, with its own rules for executables and launchers, and needs its own review first.
+
+**The path, and what is checked where.**
+1. Files → the provider's `open(file)` → `openInMachine` (Machines): the path waits in the app (`openAsks`) until the
+   window's session runs and the tools say `open`.
+2. `lord.vm.sendFile(session, path, { open: true })` (`js_vm.c`): the path is resolved (`realpath`) and must be in the
+   person's home folder or their mounts (`fsops_allowed`); it is opened read-only, without following a last link, and
+   only a regular file goes on, as a descriptor and a name (`VM_FILE` with a = 1). `lord.vm` exists only in the
+   session's JS: an `.lpk` app (`--app`, the broker has no `vm`) or a web page can't reach it.
+3. lord-vm refuses it unless the guest is a Windows guest whose tools said `open`; it makes a random 128-bit token for
+   the drop and copies the file exactly as any drop (6.7.1, 6.21). On the agent's way it hashes what it writes (SHA-256,
+   in order); on the transfer folder's way it has the hash of its copy. The person's own copy step (the one-shot
+   scheduled task that already runs **as the signed-in person**, `FX_COPY_PS`) puts the file in their Downloads under a
+   free name and, only for these drops, writes where it went (base64) into `%LOCALAPPDATA%\LordOS\open\<token>`.
+4. Once that step reports, lord-vm sends the tools `AGK_OPEN`: the token, the size and the SHA-256, exactly 72 bytes
+   (`ag_open_parse`). No path and no command go to the guest.
+5. `lordos-guest-win` (the person's own process) reads that record once and removes it: not a link or reparse point, at
+   most 10 minutes old (`AG_OPEN_RECORD_MS`), a full path of text. In a thread of its own it opens the file (not a
+   directory, link or reparse point), checks its size and SHA-256 against the host's, and calls
+   `ShellExecuteEx("open")` on it (`"openas"`, Windows' own chooser, when nothing is associated). It answers
+   `AGK_OPENED` (token, status `AGOS_*`, the system's error), and lord-vm writes it in the machine's log and answers the
+   `VM_FILE` with it (`AG_OPEN_WAIT_MS`, 2 minutes, at most: a program may ask for consent first).
+A program opened this way runs with the person's rights in the guest, as a double click in Explorer would; nothing runs
+as SYSTEM, and nothing on this computer runs or opens the file.
+
+**Open with, for other providers (LordBridge, Wine).** The menu is generic: `sdk/openwith.js` keeps providers
+(`registerOpenProvider(p)` or `registerOpenProviders(source, () => [p])`), each `{ id, label, icon?, accepts(file),
+suggests?(file), available?(), needsStart?(), open(file) }` (`sdk/openwithmodel.js`, tested by
+`server/tests/openwith_model_test.mjs`). Files lists `openProvidersFor(file)` after the apps, offers
+`suggestedProviderFor(file)` when no app opens a file, and keeps "Always open .ext files with …" through
+`setDefaultProvider`. Machines registers one provider per eligible machine; a runner for programs of another system
+will register itself the same way, with no change to Files.
+
 ## 8. Privacy and security model
 
 - **Machines itself** makes no connection, except downloads the person starts: choosing a download card reads that one maker's checksum list, and Create downloads the image (3.9, "The Linux download cards"). The catalog is a file in the signed package, read with no connection. No telemetry.

@@ -17,7 +17,8 @@
  *   resize(id, w, h) · rate(id, hz) · close(id)
  *   log(dir) → the end of the machine's lord-vm.log (what failed)
  *   cdrom(id, path | null) → a disc into (or out of) a running machine's drive; poll's cd / cdMessage say how it went
- *   sendFile(id, path) → request id: a dropped file into the guest's Downloads (guest agent); files(id) → how they went */
+ *   sendFile(id, path[, { open }]) → request id: a dropped file into the guest's Downloads (guest agent); with open, the
+ *             guest tools then open it there (Files' "Open with", 7.3); files(id) → how they went */
 #include "js_vm.h"
 #include "../media/media_int.h"
 #include "../media/aring.h"
@@ -1207,7 +1208,7 @@ typedef struct {
     char name[VM_NAME_MAX + 1];
     /* files dropped on the window, on their way into the guest (VM_FILE): 1 copying, 2 done, 3 failed; msg is the
      * guest's path (done) or why not, for the app to show; files() hands finished ones over once */
-    struct { uint32_t seq; int state, pct, via; long long size; char name[VM_TEXT_MAX], msg[VM_TEXT_MAX]; } fx[16];
+    struct { uint32_t seq; int state, pct, via, open; long long size; char name[VM_TEXT_MAX], msg[VM_TEXT_MAX]; } fx[16];
     int fx_changes;
     /* apps mode (7.2): the guest's windows, their icons and its apps, as lord-vm passed them on (VM_WINDATA, parsed
      * again here); seqs count changes for the app; apps_mode: the picture may have no node that shows all of it */
@@ -2165,19 +2166,34 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     return o;
 }
 
-/* sendFile(session, path) → request id (0: refused): a file dropped on the machine's window, copied into the guest's
- * Downloads by lord-vm through the guest agent. The file is opened here, for the person, read-only, and only a regular
- * file; lord-vm gets the descriptor and the name, never a path. files(session) → [{ id, name, size, pct, state:
- * 'copying'|'done'|'failed', message }]: the guest's path or why not; finished ones are listed once (poll's filesSeq
+/* sendFile(session, path[, { open: true }]) → request id (0: refused): a file dropped on the machine's window, copied
+ * into the guest's Downloads by lord-vm through the guest agent. The file is opened here, for the person, read-only, and
+ * only a regular file; lord-vm gets the descriptor and the name, never a path. With open (Files' "Open with" a machine,
+ * docs/VIRTUALIZATION.md 7.3) the guest tools then open that copy in the guest: the path must resolve inside the
+ * person's home folder or their mounts (fsops_allowed), is opened without following a last link, and lord-vm refuses
+ * it unless the guest's tools said "open". This exists only in the session's JS (never in an --app process or a web
+ * view: they have no lord.vm), for Files' menu and Machines.
+ * files(session) → [{ id, name, size, pct, state:
+ * 'copying'|'done'|'failed', message, via, open }]: the guest's path or why not; finished ones are listed once (poll's filesSeq
  * counts changes) */
 static JSValue f_send_file(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
     const char *p = s ? JS_ToCString(c, argv[1]) : NULL;
-    int slot = -1, fd = -1;
+    int slot = -1, fd = -1, want_open = 0;
     uint32_t q = 0;
+    if (s && argc >= 3 && JS_IsObject(argv[2])) {
+        JSValue v = JS_GetPropertyStr(c, argv[2], "open");
+        want_open = JS_ToBool(c, v) == 1;
+        JS_FreeValue(c, v);
+    }
     if (s) for (int i = 0; i < 16; i++) if (!s->fx[i].state) { slot = i; break; }
-    if (p && p[0] == '/' && slot >= 0 && s->vm >= 0) fd = open(p, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NONBLOCK);
+    if (want_open && p) {
+        /* opened in the guest: only the person's own files (home, their mounts), the resolved path, no last link */
+        char real[PATH_MAX];
+        if (p[0] == '/' && slot >= 0 && s->vm >= 0 && realpath(p, real) && fsops_allowed(real))
+            fd = open(real, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NONBLOCK | O_NOFOLLOW);
+    } else if (p && p[0] == '/' && slot >= 0 && s->vm >= 0) fd = open(p, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NONBLOCK);
     struct stat st;
     if (fd >= 0 && !fstat(fd, &st) && S_ISREG(st.st_mode)) {
         /* the name, at most VM_TEXT_MAX - 1 bytes: a long one keeps its start (on a character) and its extension;
@@ -2195,10 +2211,10 @@ static JSValue f_send_file(JSContext *c, JSValueConst t, int argc, JSValueConst 
             name[hl + el] = 0;
         }
         if (bl && name[0]) {
-            VmMsg m = vm_msg(VM_FILE, ++s->seq, 0, 0, 0, 0, name);
+            VmMsg m = vm_msg(VM_FILE, ++s->seq, want_open, 0, 0, 0, name);
             if (!vm_send(s->vm, &m, fd)) {
                 q = m.seq;
-                s->fx[slot].seq = q; s->fx[slot].state = 1; s->fx[slot].pct = 0; s->fx[slot].via = 0; s->fx[slot].size = (long long)st.st_size;
+                s->fx[slot].seq = q; s->fx[slot].state = 1; s->fx[slot].pct = 0; s->fx[slot].via = 0; s->fx[slot].open = want_open; s->fx[slot].size = (long long)st.st_size;
                 snprintf(s->fx[slot].name, sizeof s->fx[slot].name, "%s", name);
                 s->fx[slot].msg[0] = 0;
                 s->fx_changes++;
@@ -2227,6 +2243,7 @@ static JSValue f_files(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         set_str(c, o, "state", s->fx[i].state == 1 ? "copying" : s->fx[i].state == 2 ? "done" : "failed");
         set_str(c, o, "message", s->fx[i].msg);
         set_str(c, o, "via", s->fx[i].via ? "transfer" : "agent");
+        JS_SetPropertyStr(c, o, "open", JS_NewBool(c, s->fx[i].open));
         JS_SetPropertyUint32(c, a, k++, o);
         if (s->fx[i].state != 1) s->fx[i].state = 0;
     }
@@ -3662,7 +3679,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
     JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 2, f_clip_take),
     JS_CFUNC_DEF("clipboardApply", 2, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 2, f_clip_send_host),
-    JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 2, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
+    JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 3, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
     JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act),

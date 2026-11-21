@@ -9,14 +9,15 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus } from './appsmode.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { ClipAskBar } from './clipask.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp, soundDevItems } from './ui.jsx';
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it)
 const CLIP_HOLD_MS = 150;
-import { openLogs, openSnapshots, playAsks } from './library.jsx';
+import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
+import { opensOf, openStep, withoutAsks, askStale } from './openwith.js';
 import { Configure } from './configure.jsx';
 import { Sheet, Pill } from './kit.jsx';
 
@@ -377,6 +378,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // apps mode (7.2): the person's choice, kept per machine (app.json), on once the guest's helper lists its windows
   const [appsOn, setAppsOn] = useWindowState('vm.apps', () => !!readMeta(dir).appsMode);
   const appsRef = useRef(false);
+  const appsBlockedRef = useRef(null);
   const preApps = useRef(null);
   const [log, setLog] = useState('');
   const [name, setName] = useState(name0);
@@ -801,6 +803,15 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   onFiles.current = (list) => {
     if (!Array.isArray(list)) return;
     setCopies(list.filter((f) => f.state === 'copying'));
+    // files opened from Files' "Open with": the program's window comes up as its own (apps mode), or this one in front
+    const opened = list.filter((f) => f.open && f.state === 'done'), notOpened = list.filter((f) => f.open && f.state === 'failed');
+    for (const f of [...opened, ...notOpened]) opening.current.delete(f.id);
+    if (opened.length) {
+      if (!appsBlockedRef.current && !appsRef.current) setApps(true);
+      else if (!appsRef.current) wm.focus(winId);
+    }
+    for (const f of notOpened) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.openWith.failed', { machine: name, name: f.name }), body: f.message, sound: false });
+    list = list.filter((f) => !f.open);
     const done = list.filter((f) => f.state === 'done'), failed = list.filter((f) => f.state === 'failed');
     if (done.length) {
       notify({ app: 'machines', label: tr('machines.title'), title: done.length === 1 ? tr('machines.drop.done', { machine: name }) : tr('machines.drop.doneN', { machine: name, count: done.length }),
@@ -809,8 +820,45 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     for (const f of failed) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.drop.failed', { machine: name, name: f.name }), body: f.message, sound: false });
   };
   const line = copyLine(copies);
+  // Files' "Open with" this machine (7.3; openwith.js): the files asked for wait here until the machine runs and its
+  // guest tools can open them, then go in as drops with { open }; once one is open, apps mode (when the guest has it)
+  const asks = useStore(openAsks, (x) => x[dir] || null);
+  const opening = useRef(new Map());          // request id → the file's name
+  const step = asks ? openStep(sid, st) : null;
+  useEffect(() => {
+    if (!asks) return;
+    if (step === 'resume') { lord.vm.cmd(sid, 'resume'); return; }
+    // 'start': openInMachine opened this window (a new one starts its machine) or asked it to (playAsks)
+    if (step === 'cant') {
+      openAsks.set((x) => withoutAsks(x, dir));
+      for (const a of asks) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.openWith.failed', { machine: name, name: a.path.split('/').pop() }), body: tr('machines.openWith.cant'), sound: false });
+      return;
+    }
+    if (step !== 'send') return;
+    openAsks.set((x) => withoutAsks(x, dir));
+    for (const a of asks) {
+      const id = lord.vm.sendFile(sid, a.path, { open: true });
+      if (id) opening.current.set(id, a.path.split('/').pop());
+      else notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.openWith.failed', { machine: name, name: a.path.split('/').pop() }), body: tr('machines.openWith.refused'), sound: false });
+    }
+  }, [asks, step, sid]);
+  // the tools never came (no one signed in, or they aren't installed after all): said, and forgotten
+  useEffect(() => {
+    if (!asks) return undefined;
+    const t2 = setInterval(() => {
+      const now = Date.now();
+      if (!asks.some((a) => askStale(a, now))) return;
+      openAsks.set((x) => withoutAsks(x, dir));
+      for (const a of asks) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.openWith.failed', { machine: name, name: a.path.split('/').pop() }), body: tr('machines.openWith.noTools'), sound: false });
+    }, 5000);
+    return () => clearInterval(t2);
+  }, [asks]);
+  // the machine's tools said whether they open files: kept, so Files lists it while it's off too
+  const opensNow = opensOf(st?.agent);
+  useEffect(() => { if (opensNow !== undefined && (readMeta(dir).opens ?? false) !== opensNow) writeMeta(dir, { opens: opensNow }); }, [opensNow]);
   // apps mode (7.2): the guest's windows as LordOS windows (appsmode.jsx); this window becomes a small controller
   const appsBlocked = appsBlocker(st?.agent, cfg);
+  appsBlockedRef.current = appsBlocked;
   const setApps = (on) => {
     setAppsOn(on);
     writeMeta(dir, { appsMode: on });
@@ -976,6 +1024,15 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
             {cdErr ? <Btn label={tr('machines.ok')} onClick={() => setCdErr('')} style={{ height: 28 }} />
               : ['network-back', 'identity'].includes(st.notice) ? <Btn label={tr('machines.ok')} onClick={() => setNoticeGone(st.noticeSeq)} style={{ height: 28 }} />
               : <Btn label={tr('machines.cmd.logs')} onClick={() => openLogs(m0)} style={{ height: 28 }} />}
+          </View>
+        </View>
+      ) : null}
+      {asks && !line && !card && !failed ? (
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
+          <View style={{ maxWidth: 560, minWidth: 260, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
+            <Text style={{ fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>
+              {tr(step === 'wait' && st?.state === 'running' ? 'machines.openWith.waitTools' : 'machines.openWith.waitStart', { name: midName(asks[0].path.split('/').pop()), count: asks.length })}
+            </Text>
           </View>
         </View>
       ) : null}

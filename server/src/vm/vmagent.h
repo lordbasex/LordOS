@@ -35,6 +35,15 @@
  *                            mode windows, or a few seconds after), for the offer that is still current, and in "ask"
  *                            mode only once the person said yes. The guest waits AG_CLIP_WAIT_MS (AG_ASK_WAIT_MS with
  *                            AGO_ASK) and renders nothing when the answer isn't AGD_OK.
+ *   AGK_OPEN   host → guest  open a file the host just dropped into the guest (capability "open" in the guest's hello;
+ *                            Files' "Open with", docs/VIRTUALIZATION.md 7.3): 32 lowercase hex digits (a token lord-vm
+ *                            made for that drop), u64 size (little endian), 32 bytes of SHA-256; exactly 72 bytes. No
+ *                            path: the person's own copy step in the guest (the drop's script, run as that person) wrote
+ *                            where it put the file under that token (%LOCALAPPDATA%\LordOS\open\<token>); the guest opens
+ *                            only that file, only when the record is fresh and the file's size and SHA-256 are these, with
+ *                            the system's default handler (a program runs), as the person; the record goes either way.
+ *   AGK_OPENED guest → host  the outcome: the 32 hex digits of the token, u8 status (AGOS_*), u32 the system's error code
+ *                            (0 with AGOS_OK); exactly 37 bytes. lord-vm logs it and answers the VM_FILE with it.
  *   AGK_DISPLAY host → guest  u32 width, u32 height (little endian; 320..8192 × 200..8192): the size the machine's
  *                            window wants (capability "display" in the guest's hello; lord-vm sends it only then, and
  *                            again after each hello). The guest sets that size, or the closest it can, on its primary
@@ -63,8 +72,9 @@
  *                            (a Start menu shortcut's path): opaque to the host.
  *   LAG_LAUNCH   host → guest  u16 length (1..LAG_TOKEN_MAX) + a token: the guest starts that program only when the
  *                            token is, byte for byte, one of its own last LAG_APPLIST; the host never sends a command.
- * The host never asks the guest to run anything over this channel other than a program the guest itself listed, and
- * the guest can't ask the host for anything. */
+ * The host never asks the guest to run anything over this channel other than a program the guest itself listed, or
+ * (AGK_OPEN) the one file the person just sent it from Files, by a token, never by a path or command; the guest can't
+ * ask the host for anything. */
 #ifndef LORD_VM_AGENT_H
 #define LORD_VM_AGENT_H
 
@@ -79,7 +89,7 @@
 enum { AGK_HELLO = 1, AGK_CLIP = 2, AGK_CLIPX = 3 };
 enum { AGF_TEXT = 1, AGF_HTML = 2, AGF_PNG = 3 };
 enum { AGK_DISPLAY = 4, LAG_APPS = 5, LAG_WINDOWS = 6, LAG_WINICON = 7, LAG_WINACT = 8, LAG_LAUNCH = 9, LAG_APPLIST = 10 };
-enum { AGK_CLIPOFFER = 11, AGK_CLIPREQ = 12, AGK_CLIPDATA = 13 };
+enum { AGK_CLIPOFFER = 11, AGK_CLIPREQ = 12, AGK_CLIPDATA = 13, AGK_OPEN = 14, AGK_OPENED = 15 };
 /* AGK_CLIPOFFER's forms (1 << (AGF_* - 1)) and flags; AGK_CLIPDATA's status */
 enum { AGM_TEXT = 1, AGM_HTML = 2, AGM_PNG = 4, AGM_ALL = 7 };
 enum { AGO_ASK = 1, AGO_ALL = 1 };
@@ -95,6 +105,24 @@ void ag_clipreq_write(uint8_t out[5], uint32_t gen, uint8_t form);
 /* AGK_CLIPDATA: 0 well formed (see above; with AGD_OK *data points into the payload, checked as the form says) */
 int ag_clipdata_parse(const uint8_t *p, size_t n, uint32_t *gen, uint8_t *form, uint8_t *status, const uint8_t **data, uint32_t *dn);
 void ag_clipdata_head(uint8_t out[6], uint32_t gen, uint8_t form, uint8_t status);   /* then the data with AGD_OK */
+
+/* AGK_OPEN and AGK_OPENED (Files' "Open with" a machine). The token: AG_OPEN_TOKEN lowercase hex digits. AGOS_*:
+ * opened; no fresh record of that token (or it doesn't name a file); the file isn't the one sent (size, hash, a link);
+ * the system couldn't open it (code: its error) */
+#define AG_OPEN_TOKEN 32
+#define AG_OPEN_BYTES (AG_OPEN_TOKEN + 8 + 32)
+#define AG_OPENED_BYTES (AG_OPEN_TOKEN + 5)
+#define AG_OPEN_RECORD_MS 600000u          /* a record older than this is refused (and removed) */
+enum { AGOS_OK = 0, AGOS_NORECORD = 1, AGOS_CHANGED = 2, AGOS_FAILED = 3, AGOS_LAST = AGOS_FAILED };
+/* 1 when t is AG_OPEN_TOKEN lowercase hex digits (n bytes, no NUL needed) */
+int ag_open_token_ok(const char *t, size_t n);
+/* 0 well formed (exactly AG_OPEN_BYTES, a valid token); token gets AG_OPEN_TOKEN + 1 bytes (NUL-terminated) */
+int ag_open_parse(const uint8_t *p, size_t n, char token[AG_OPEN_TOKEN + 1], uint64_t *size, uint8_t sha[32]);
+/* 0 written (AG_OPEN_BYTES), -1 the token isn't one */
+int ag_open_write(uint8_t out[AG_OPEN_BYTES], const char *token, uint64_t size, const uint8_t sha[32]);
+/* 0 well formed (exactly AG_OPENED_BYTES, a valid token, a known status, code 0 with AGOS_OK) */
+int ag_opened_parse(const uint8_t *p, size_t n, char token[AG_OPEN_TOKEN + 1], uint8_t *status, uint32_t *code);
+int ag_opened_write(uint8_t out[AG_OPENED_BYTES], const char *token, uint8_t status, uint32_t code);
 
 /* AGK_DISPLAY: 0 a well-formed size (8 bytes, 320..8192 × 200..8192), -1 otherwise */
 #define AG_DISPLAY_MIN_W 320u
@@ -185,7 +213,7 @@ int ag_drop_staging_ok(const char *p, int windows);
  * again, as 0, 0, 1, 1. */
 #define LAG_APPNAME_MAX LAG_APP_MAX
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
-enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16 };
+enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16, AG_HELLO_OPEN = 32 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;

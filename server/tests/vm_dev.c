@@ -25,6 +25,7 @@
  *   raw-apps 0|1 | raw-winact ID N [X Y W H] | raw-launch TOKEN    apps mode straight to the guest (lord-vm --dev-qmp: lord-vm logs what the
  *                       guest sends: the window list, icons, the program list)
  *   file PATH           copy a file into the guest through its agent (VM_FILE, as a drop on the window does)
+ *   open PATH           the same, then the guest tools open it there (VM_FILE a = 1, Files' "Open with", 7.3)
  *   transfer [SHA PATH] the transfer folder (VAG_TRANSFER): looked at again; a Windows guest gets WinFsp's installer
  *   wait-frames N [S]   wait until N more frames arrived (at most S seconds, default 30)
  *   sound play [VOL]    the guest's sound through lord-server's own code (media/maudio.c, a PipeWire stream) at VOL
@@ -681,12 +682,13 @@ static int handle(char *line) {
     else if (!strcmp(line, "reset")) ask(VM_RESET, 0, NULL);
     else if (!strncmp(line, "shutdown", 8)) ask(VM_SHUTDOWN, atoi(line + 8), NULL);
     else if (!strcmp(line, "poweroff")) ask(VM_POWEROFF, 0, NULL);
-    else if (!strncmp(line, "file ", 5)) {
+    else if (!strncmp(line, "file ", 5) || !strncmp(line, "open ", 5)) {
+        int op = line[0] == 'o';
         int fd = open(line + 5, O_RDONLY | O_CLOEXEC);
         const char *slash = strrchr(line + 5, '/');
-        VmMsg m = vm_msg(VM_FILE, ++seq, 0, 0, 0, 0, slash ? slash + 1 : line + 5);
-        if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"file\"}");
-        else out("{\"ok\":true,\"cmd\":\"file\",\"seq\":%u}", seq);
+        VmMsg m = vm_msg(VM_FILE, ++seq, op, 0, 0, 0, slash ? slash + 1 : line + 5);
+        if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"%s\"}", op ? "open" : "file");
+        else out("{\"ok\":true,\"cmd\":\"%s\",\"seq\":%u}", op ? "open" : "file", seq);
         if (fd >= 0) close(fd);
     } else if (!strncmp(line, "transfer", 8)) {
         char sha[80] = "", path[1024] = "";

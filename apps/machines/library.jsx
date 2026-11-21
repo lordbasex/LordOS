@@ -16,6 +16,7 @@ import { Sheet } from './kit.jsx';
 import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, StateDot, markColors, overlayRoot, vmRefusal, bridgeUp } from './ui.jsx';
 import { readMeta } from './meta.js';
 import { CloneSheet } from './clone.jsx';
+import { withAsk } from './openwith.js';
 
 const winIdOf = (m) => `machines#vm-${m.id || m.folder}`;
 // how long the Requirements page waits for a word from the package engine before it says the network isn't answering
@@ -32,6 +33,16 @@ export function openMachine(m, opts) {
   if (fresh) { wm.resize(id, 1024, 768 + 48); wm.center(id); }
   else playAsks.set((x) => ({ ...x, [m.dir]: (x[m.dir] || 0) + 1 }));
   return id;
+}
+// files sent from Files' "Open with" (openwith.js): dir → [{ id, path, at }], taken by the machine's window once its
+// guest tools can open them
+export const openAsks = createStore({});
+let askSeq = 0;
+export function openInMachine(m, path) {
+  if (typeof path !== 'string' || !path.startsWith('/')) return false;
+  openAsks.set((x) => withAsk(x, m.dir, path, ++askSeq, Date.now()));
+  openMachine(m);
+  return true;
 }
 export function openConfigure(m, section) {
   const instance = `cfg-${m.id || m.folder}`;

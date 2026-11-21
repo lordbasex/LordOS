@@ -638,6 +638,49 @@ void ag_clipdata_head(uint8_t o[6], uint32_t gen, uint8_t form, uint8_t status) 
     o[4] = form; o[5] = status;
 }
 
+/* ---- AGK_OPEN, AGK_OPENED ---- */
+int ag_open_token_ok(const char *t, size_t n) {
+    if (!t || n != AG_OPEN_TOKEN) return 0;
+    for (size_t i = 0; i < n; i++) if (!((t[i] >= '0' && t[i] <= '9') || (t[i] >= 'a' && t[i] <= 'f'))) return 0;
+    return 1;
+}
+
+int ag_open_parse(const uint8_t *p, size_t n, char token[AG_OPEN_TOKEN + 1], uint64_t *size, uint8_t sha[32]) {
+    if (!p || n != AG_OPEN_BYTES || !ag_open_token_ok((const char *)p, AG_OPEN_TOKEN)) return -1;
+    if (token) { memcpy(token, p, AG_OPEN_TOKEN); token[AG_OPEN_TOKEN] = 0; }
+    if (size) *size = (uint64_t)le32(p + AG_OPEN_TOKEN) | (uint64_t)le32(p + AG_OPEN_TOKEN + 4) << 32;
+    if (sha) memcpy(sha, p + AG_OPEN_TOKEN + 8, 32);
+    return 0;
+}
+
+int ag_open_write(uint8_t out[AG_OPEN_BYTES], const char *token, uint64_t size, const uint8_t sha[32]) {
+    if (!token || strlen(token) != AG_OPEN_TOKEN || !ag_open_token_ok(token, AG_OPEN_TOKEN) || !sha) return -1;
+    memcpy(out, token, AG_OPEN_TOKEN);
+    lag_wr32(out + AG_OPEN_TOKEN, (uint32_t)size);
+    lag_wr32(out + AG_OPEN_TOKEN + 4, (uint32_t)(size >> 32));
+    memcpy(out + AG_OPEN_TOKEN + 8, sha, 32);
+    return 0;
+}
+
+int ag_opened_parse(const uint8_t *p, size_t n, char token[AG_OPEN_TOKEN + 1], uint8_t *status, uint32_t *code) {
+    if (!p || n != AG_OPENED_BYTES || !ag_open_token_ok((const char *)p, AG_OPEN_TOKEN)) return -1;
+    uint8_t st = p[AG_OPEN_TOKEN];
+    uint32_t c = le32(p + AG_OPEN_TOKEN + 1);
+    if (st > AGOS_LAST || (st == AGOS_OK && c)) return -1;
+    if (token) { memcpy(token, p, AG_OPEN_TOKEN); token[AG_OPEN_TOKEN] = 0; }
+    if (status) *status = st;
+    if (code) *code = c;
+    return 0;
+}
+
+int ag_opened_write(uint8_t out[AG_OPENED_BYTES], const char *token, uint8_t status, uint32_t code) {
+    if (!token || strlen(token) != AG_OPEN_TOKEN || !ag_open_token_ok(token, AG_OPEN_TOKEN) || status > AGOS_LAST) return -1;
+    memcpy(out, token, AG_OPEN_TOKEN);
+    out[AG_OPEN_TOKEN] = status;
+    lag_wr32(out + AG_OPEN_TOKEN + 1, status == AGOS_OK ? 0 : code);
+    return 0;
+}
+
 unsigned ag_hello_caps(const uint8_t *p, size_t n) {
     unsigned caps = 0;
     size_t i = 0;
@@ -651,6 +694,7 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         else if (l == 7 && !memcmp(p + s0, "windows", 7)) caps |= AG_HELLO_WINDOWS;
         else if (l == 6 && !memcmp(p + s0, "noclip", 6)) caps |= AG_HELLO_NOCLIP;
         else if (l == 7 && !memcmp(p + s0, "clipreq", 7)) caps |= AG_HELLO_CLIPREQ;
+        else if (l == 4 && !memcmp(p + s0, "open", 4)) caps |= AG_HELLO_OPEN;
     }
     return caps;
 }

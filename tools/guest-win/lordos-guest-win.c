@@ -23,7 +23,13 @@
  *     VIOGPU_SET_CUSTOM_RESOLUTION), and falls back to the largest listed mode that fits;
  *   - apps mode (LAG_*): the list of the session's windows, their icons, focus / close / minimize / restore / move
  *     of a listed window, and starting a program from the Start menu's own list (shell:AppsFolder) only by a token
- *     this side gave.
+ *     this side gave;
+ *   - opening a file the person sent from Files' "Open with" (AGK_OPEN, docs/VIRTUALIZATION.md 7.3): the host names a
+ *     token, never a path. The drop's copy step, run as this same person, wrote where it put the file under that token
+ *     (%LOCALAPPDATA%\LordOS\open\<token>); this side reads that record once (not a link, at most AG_OPEN_RECORD_MS
+ *     old), removes it, checks that the file is a regular file (not a link or reparse point) of the size and SHA-256
+ *     the host measured, and opens it with the system's default handler (ShellExecuteEx "open", "openas" when nothing
+ *     is associated): a program runs, as the person, like a double click in Explorer. It answers AGK_OPENED.
  * It never runs anything the host names, and validates every frame (vmagent.c's parsers) before acting on it.
  *
  * The port can be held by one process at a time: the helper of the session at the computer's console takes it and
@@ -44,6 +50,7 @@
 #include <appmodel.h>
 #include <wincodec.h>
 #include <wtsapi32.h>
+#include <bcrypt.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,10 +58,10 @@
 
 #include "../../server/src/vm/vmagent.h"
 
-#define VERSION "w2"
-#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows"
+#define VERSION "w3"
+#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open"
 
-enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST };
+enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
 enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS };
 
 static HWND win;
@@ -1258,6 +1265,139 @@ static void launch(const uint8_t *tok, uint16_t n) {
     lg("apps: a launch token not in the list: ignored");
 }
 
+/* ---- opening a file the host just sent (AGK_OPEN; see the top) ---- */
+typedef struct { char tok[AG_OPEN_TOKEN + 1]; uint64_t size; uint8_t sha[32]; wchar_t *path; uint8_t status; DWORD code; } OpenJob;
+static volatile LONG open_busy;     /* jobs on their way (each in its own thread: a consent prompt mustn't stop the rest) */
+#define OPEN_MAX 4
+
+static void open_reply(const char *tok, uint8_t st, DWORD code) {
+    uint8_t r[AG_OPENED_BYTES];
+    if (!ag_opened_write(r, tok, st, (uint32_t)code)) send_frame(AGK_OPENED, r, sizeof r);
+}
+
+/* SHA-256 of what h reads from its start (the system's own BCrypt); 0 ok */
+static int sha256_handle(HANDLE h, uint8_t out[32]) {
+    BCRYPT_ALG_HANDLE alg = NULL;
+    BCRYPT_HASH_HANDLE hh = NULL;
+    int ok = 0;
+    uint8_t *buf = malloc(1 << 20);
+    if (!buf) return -1;
+    if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0) < 0) { free(buf); return -1; }
+    if (BCryptCreateHash(alg, &hh, NULL, 0, NULL, 0, 0) >= 0) {
+        ok = 1;
+        for (;;) {
+            DWORD got = 0;
+            if (!ReadFile(h, buf, 1 << 20, &got, NULL)) { ok = 0; break; }
+            if (!got) break;
+            if (BCryptHashData(hh, buf, got, 0) < 0) { ok = 0; break; }
+        }
+        if (ok && BCryptFinishHash(hh, out, 32, 0) < 0) ok = 0;
+        BCryptDestroyHash(hh);
+    }
+    BCryptCloseAlgorithmProvider(alg, 0);
+    free(buf);
+    return ok ? 0 : -1;
+}
+
+/* the job's thread: the file checked again (a regular file, not a reparse point, the size and hash sent), then opened */
+static DWORD WINAPI open_main(LPVOID arg) {
+    OpenJob *j = arg;
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    j->status = AGOS_CHANGED;
+    HANDLE h = CreateFileW(j->path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    BY_HANDLE_FILE_INFORMATION fi;
+    if (h == INVALID_HANDLE_VALUE) j->code = GetLastError();
+    else {
+        uint8_t d[32];
+        if (GetFileInformationByHandle(h, &fi) && !(fi.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DEVICE)) &&
+            ((uint64_t)fi.nFileSizeHigh << 32 | fi.nFileSizeLow) == j->size && !sha256_handle(h, d) && !memcmp(d, j->sha, 32))
+            j->status = AGOS_OK;
+        CloseHandle(h);
+    }
+    if (j->status == AGOS_OK) {
+        /* its own folder as the working folder, as a double click in Explorer gives */
+        wchar_t dir[MAX_PATH * 2];
+        wcsncpy(dir, j->path, MAX_PATH * 2 - 1);
+        dir[MAX_PATH * 2 - 1] = 0;
+        wchar_t *sl = wcsrchr(dir, L'\\');
+        if (sl) *sl = 0;
+        AllowSetForegroundWindow(ASFW_ANY);
+        SHELLEXECUTEINFOW e;
+        memset(&e, 0, sizeof e);
+        e.cbSize = sizeof e;
+        e.fMask = SEE_MASK_NOASYNC;
+        e.lpVerb = L"open";
+        e.lpFile = j->path;
+        e.lpDirectory = sl ? dir : NULL;
+        e.nShow = SW_SHOWNORMAL;
+        BOOL ok = ShellExecuteExW(&e);
+        DWORD err = ok ? 0 : GetLastError();
+        /* a type nothing opens: the system's own "How do you want to open this file?" */
+        if (!ok && (err == ERROR_NO_ASSOCIATION || err == SE_ERR_NOASSOC)) { e.lpVerb = L"openas"; ok = ShellExecuteExW(&e); err = ok ? 0 : GetLastError(); }
+        if (!ok) { j->status = AGOS_FAILED; j->code = err ? err : ERROR_GEN_FAILURE; }
+    }
+    CoUninitialize();
+    if (!PostMessageW(win, WM_APP_OPENED, 0, (LPARAM)j)) { free(j->path); free(j); InterlockedDecrement(&open_busy); }
+    return 0;
+}
+
+/* AGK_OPEN: the record of that token (see the top), read once and removed; the rest in a thread */
+static void open_begin(const char *tok, uint64_t size, const uint8_t sha[32]) {
+    wchar_t *la = NULL, rec[MAX_PATH];
+    if (FAILED(SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &la))) { open_reply(tok, AGOS_NORECORD, 0); return; }
+    _snwprintf(rec, MAX_PATH, L"%ls\\LordOS\\open\\%hs", la, tok);
+    rec[MAX_PATH - 1] = 0;
+    CoTaskMemFree(la);
+    char b64[4096];
+    DWORD got = 0;
+    int good = 0;
+    HANDLE h = CreateFileW(rec, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+    if (h != INVALID_HANDLE_VALUE) {
+        BY_HANDLE_FILE_INFORMATION fi;
+        FILETIME now;
+        GetSystemTimeAsFileTime(&now);
+        uint64_t tn = (uint64_t)now.dwHighDateTime << 32 | now.dwLowDateTime;
+        if (GetFileInformationByHandle(h, &fi) && !(fi.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) &&
+            !fi.nFileSizeHigh && fi.nFileSizeLow > 0 && fi.nFileSizeLow < sizeof b64) {
+            uint64_t t0 = (uint64_t)fi.ftLastWriteTime.dwHighDateTime << 32 | fi.ftLastWriteTime.dwLowDateTime;
+            /* FILETIME counts 100 ns */
+            good = tn >= t0 && (tn - t0) / 10000 <= AG_OPEN_RECORD_MS && ReadFile(h, b64, fi.nFileSizeLow, &got, NULL) && got == fi.nFileSizeLow;
+        }
+        CloseHandle(h);
+        DeleteFileW(rec);
+    }
+    uint8_t path8[2048];
+    long pn = good ? ag_b64_decode(b64, got, path8, sizeof path8 - 1) : -1;
+    /* a full path of the person's (drive or network), text without control characters */
+    if (pn < 4 || !lag_text_ok(path8, (size_t)pn) || !((path8[1] == ':' && path8[2] == '\\') || (path8[0] == '\\' && path8[1] == '\\'))) {
+        lg("open: no usable record for %.8s…", tok);
+        open_reply(tok, AGOS_NORECORD, 0);
+        return;
+    }
+    if (InterlockedIncrement(&open_busy) > OPEN_MAX) { InterlockedDecrement(&open_busy); open_reply(tok, AGOS_FAILED, ERROR_BUSY); return; }
+    OpenJob *j = calloc(1, sizeof *j);
+    wchar_t *w = to_utf16(path8, (size_t)pn);
+    if (!j || !w) { free(j); free(w); InterlockedDecrement(&open_busy); open_reply(tok, AGOS_FAILED, ERROR_OUTOFMEMORY); return; }
+    memcpy(j->tok, tok, sizeof j->tok);
+    j->size = size;
+    memcpy(j->sha, sha, 32);
+    j->path = w;
+    HANDLE th = CreateThread(NULL, 0, open_main, j, 0, NULL);
+    if (!th) { free(w); free(j); InterlockedDecrement(&open_busy); open_reply(tok, AGOS_FAILED, GetLastError()); return; }
+    CloseHandle(th);
+}
+
+static void open_done(OpenJob *j) {
+    InterlockedDecrement(&open_busy);
+    char *p8 = to_utf8(j->path, -1, NULL);
+    if (j->status == AGOS_OK) lg("open: opened %s", p8 ? p8 : "?");
+    else lg("open: %s not opened (%s, error %lu)", p8 ? p8 : "?", j->status == AGOS_CHANGED ? "not the file sent" : "the system couldn't open it", (unsigned long)j->code);
+    free(p8);
+    if (port != INVALID_HANDLE_VALUE && host_hello) open_reply(j->tok, j->status, j->status == AGOS_OK ? 0 : j->code);
+    free(j->path);
+    free(j);
+}
+
 /* ---- frames from the host ---- */
 static void on_frame(const Frame *f) {
     switch (f->kind) {
@@ -1309,6 +1449,13 @@ static void on_frame(const Frame *f) {
     }
     case LAG_WINACT: { LagAct a; if (apps_on && !lag_winact_parse(f->data, f->len, &a)) win_act(&a); break; }
     case LAG_LAUNCH: { const uint8_t *t; uint16_t n; if (apps_on && !lag_launch_parse(f->data, f->len, &t, &n)) launch(t, n); break; }
+    case AGK_OPEN: {
+        char tok[AG_OPEN_TOKEN + 1];
+        uint64_t size;
+        uint8_t sha[32];
+        if (host_hello && !ag_open_parse(f->data, f->len, tok, &size, sha)) open_begin(tok, size, sha);
+        break;
+    }
     default: break;                 /* kinds this side doesn't know: skipped */
     }
 }
@@ -1321,6 +1468,7 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         free(f);
         return 0;
     }
+    case WM_APP_OPENED: open_done((OpenJob *)lp); return 0;
     case WM_APP_LOST:
         if ((LONG)wp == reader_gen) { char w[64]; snprintf(w, sizeof w, "reading failed (error %lu)", (unsigned long)lp); port_close(w); }
         return 0;

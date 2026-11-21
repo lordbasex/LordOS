@@ -809,7 +809,11 @@ typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 #define FX_QUEUE 8
 /* kind: a drop (FXK_DROP) or WinFsp's installer for the transfer folder (FXK_WINFSP, VAG_TRANSFER: sha is its hash) */
 enum { FXK_DROP = 0, FXK_WINFSP };
-typedef struct { int fd, client, kind; uint32_t seq; char name[AG_NAME_MAX + 1], sha[65]; } FxReq;
+/* open: Files' "Open with" a machine (VM_FILE a = 1, 7.3): once copied, the guest tools open it (AGK_OPEN) */
+typedef struct { int fd, client, kind, open; uint32_t seq; char name[AG_NAME_MAX + 1], sha[65]; } FxReq;
+/* drops copied and handed to the guest tools to open, waiting for their AGK_OPENED: the token, who asked, until when */
+#define OP_MAX 4
+typedef struct { char tok[AG_OPEN_TOKEN + 1], name[AG_NAME_MAX + 1], where[VM_TEXT_MAX]; int client; uint32_t seq; long long until; } OpWait;
 
 /* each guest-file-write carries FX_CHUNK bytes (base64 in JSON) and FX_DEPTH of them are on their way at once: one at a
  * time, each waiting for its answer, an 8.7 GB file went at about 26 MB/s (2026-11-20) */
@@ -965,6 +969,12 @@ static struct {
     /* the guest's display (AGK_DISPLAY): the size the window wants last, sent to a helper with "display" */
     int lag_display, lag_windows;
     uint32_t disp_w, disp_h;
+    /* "Open with" a machine (7.3): the helper said "open"; the drop's token and its hash on the agent's way (the
+     * transfer folder's way has fx_dig); the drops waiting for the guest tools' answer */
+    int lag_open;
+    char fx_otok[AG_OPEN_TOKEN + 1];
+    Sha256 fx_hs;
+    OpWait opw[OP_MAX];
 } S;
 
 /* what the guest said of the transfer folder */
@@ -2726,7 +2736,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 /* what org.lordos.agent's helper brings (kept when qemu-guest-agent comes and goes) */
-#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | (int)LAG_CAP_WINDOWS)
+#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | (int)LAG_CAP_WINDOWS)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS };
@@ -3316,13 +3326,15 @@ static const char FX_PREP_PS[] =
     "[Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($d)))";
 /* Windows, as the person (the scheduled task's script). %s: the private folder, the name (each base64 of its UTF-8), then
  * for the transfer folder's way the file's size and SHA-256 ("" and "" the agent's way: the file is in the private
- * folder). The transfer folder's file is the one SYSTEM found by lord-vm's token (the private folder's "src"), checked
+ * folder), then the open token ("" unless Files asked to open it, 7.3: lord-vm's 32 hex digits; the path the copy got
+ * is written, base64, into %LOCALAPPDATA%\LordOS\open\<token>, the person's own folder, where only the guest tools,
+ * also the person, read it once). The transfer folder's file is the one SYSTEM found by lord-vm's token (the private folder's "src"), checked
  * not to be a reparse point, copied and hashed into a hidden file in Downloads that gets its name only when size and
  * hash are lord-vm's. Writes "ok:" + base64 of the path the copy got, or "err:" + why, into the result file */
 static const char FX_COPY_PS[] =
     "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
     "$t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));$n=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'));"
-    "$z='%s';$h='%s';"
+    "$z='%s';$h='%s';$ot='%s';"
     "$r=Join-Path $t 'out';$p=$null;$o=$null;$w=$null;$hs=$null;"
     "function Say($x){$y=[IO.File]::Open($r,'Open','Write');$b=[Text.Encoding]::UTF8.GetBytes($x);$y.SetLength(0);$y.Write($b,0,$b.Length);$y.Close()};"
     "try{"
@@ -3341,6 +3353,9 @@ static const char FX_COPY_PS[] =
     "$b=[IO.Path]::GetFileNameWithoutExtension($n);$e=[IO.Path]::GetExtension($n);$q=Join-Path $d $n;$i=2;"
     "while(-not $p){if(-not (Test-Path -LiteralPath $q)){try{[IO.File]::Move($w,$q);$p=$q;$w=$null;continue}catch{if(-not (Test-Path -LiteralPath $q)){throw}}};"
     "if($i -gt 999){throw 'no free name'};$q=Join-Path $d ($b+' ('+$i+')'+$e);$i++};"
+    "if($ot){$od=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'LordOS\\open';[IO.Directory]::CreateDirectory($od)|Out-Null;"
+    "if((Get-Item -LiteralPath $od -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'a reparse point for the open record'};"
+    "[IO.File]::WriteAllText((Join-Path $od $ot),[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($p)))};"
     "Say('ok:'+[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($p)))"
     "}catch{if($o){$o.Close()};if($w){Remove-Item -LiteralPath $w -Force -ErrorAction SilentlyContinue};Say('err:'+$_.Exception.Message+' (at '+$_.InvocationInfo.OffsetInLine+')')}";
 /* Windows, the last step, as SYSTEM. %s: the private folder (base64 of UTF-8), then FX_COPY_PS (base64 of UTF-16LE),
@@ -3505,6 +3520,7 @@ static void fx_fail(int code, const char *why) {
     fx_next();
 }
 
+static int open_ask(const char *where);
 static void fx_done(const char *where) {
     S.fx_step = FX_NONE;
     S.fx_off = S.fx_size;
@@ -3512,9 +3528,68 @@ static void fx_done(const char *where) {
     send_to(S.fx.client, &m, -1);
     long long ms = now_ms() - S.fx_t0;
     vlog("files: %s copied into the guest (%lld bytes, %lld ms, %s): %s", S.fx.name, (long long)S.fx_size, ms, S.fx_via ? "the transfer folder's way" : "the agent's way", where);
-    reply(S.fx.client, S.fx.seq, VME_OK, where);
+    /* Files' "Open with" (7.3): the guest tools open it; the answer waits for theirs */
+    if (S.fx.kind != FXK_DROP || !S.fx.open) reply(S.fx.client, S.fx.seq, VME_OK, where);
+    else if (open_ask(where)) reply(S.fx.client, S.fx.seq, VME_WRONG_STATE, "the guest tools aren't connected: the file is in the guest's Downloads");
     fx_reset();
     fx_next();
+}
+
+/* ---- Files' "Open with" a machine (docs/VIRTUALIZATION.md 7.3) ----
+ * The drop above, then AGK_OPEN to the guest tools: the token the person's copy step recorded the file's place under,
+ * the size and SHA-256 lord-vm measured (the transfer folder's copy, or what it wrote through the agent). No path and no
+ * command go to the guest; the guest tools open only the file of that record, as the person. 0 asked (the VM_REPLY waits
+ * for AGK_OPENED), -1 not (the guest tools went, or too many wait) */
+static int open_ask(const char *where) {
+    if (S.lag_fd < 0 || !S.lag_hello || !S.lag_open || !S.ag_windows) { vlog("files: %s wasn't opened: the guest tools aren't connected", S.fx.name); return -1; }
+    int k = -1;
+    for (int i = 0; i < OP_MAX; i++) if (!S.opw[i].tok[0]) { k = i; break; }
+    if (k < 0) { vlog("files: %s wasn't opened: too many files wait to be opened", S.fx.name); return -1; }
+    uint8_t d[32], f[AG_OPEN_BYTES];
+    if (S.fx_via) memcpy(d, S.fx_dig, 32);
+    else sha256_final(&S.fx_hs, d);
+    uint64_t size = (uint64_t)(S.fx_via ? S.fx_size : S.fx_sent);
+    if (ag_open_write(f, S.fx_otok, size, d)) return -1;
+    OpWait *o = &S.opw[k];
+    memcpy(o->tok, S.fx_otok, sizeof o->tok);
+    snprintf(o->name, sizeof o->name, "%s", S.fx.name);
+    snprintf(o->where, sizeof o->where, "%s", where);
+    o->client = S.fx.client; o->seq = S.fx.seq; o->until = now_ms() + AG_OPEN_WAIT_MS;
+    lag_send(AGK_OPEN, f, sizeof f);
+    vlog("files: asked the guest tools to open %s (token %.8s…)", S.fx.name, S.fx_otok);
+    return 0;
+}
+
+/* the guest tools' answer (AGK_OPENED), or none in time (o NULL-safe: status < 0 means "no answer") */
+static void open_end(OpWait *o, int status, uint32_t code) {
+    static const char *const WHY[] = { "", "the guest tools found no record of the file (or it was too old)", "the file in the guest isn't the one sent",
+                                       "the guest couldn't open it" };
+    char t[VM_TEXT_MAX];
+    if (status == AGOS_OK) {
+        vlog("files: the guest tools opened %s", o->name);
+        reply(o->client, o->seq, VME_OK, o->where);
+    } else {
+        if (status < 0) snprintf(t, sizeof t, "the guest tools didn't answer");
+        else if (status == AGOS_FAILED) snprintf(t, sizeof t, "%s (error %u)", WHY[status], code);
+        else snprintf(t, sizeof t, "%s", WHY[status]);
+        vlog("files: %s wasn't opened: %s", o->name, t);
+        reply(o->client, o->seq, VME_QMP, t);
+    }
+    memset(o, 0, sizeof *o);
+}
+static void open_tick(long long now) {
+    for (int i = 0; i < OP_MAX; i++) if (S.opw[i].tok[0] && now > S.opw[i].until) open_end(&S.opw[i], -1, 0);
+}
+static void open_all_end(void) {
+    for (int i = 0; i < OP_MAX; i++) if (S.opw[i].tok[0]) open_end(&S.opw[i], -1, 0);
+}
+static void open_answer(const AgFrame *f) {
+    char tok[AG_OPEN_TOKEN + 1];
+    uint8_t st;
+    uint32_t code;
+    if (ag_opened_parse(f->data, f->len, tok, &st, &code)) { vlog("agent: an open answer that doesn't parse: dropped"); return; }
+    for (int i = 0; i < OP_MAX; i++) if (S.opw[i].tok[0] && !strcmp(S.opw[i].tok, tok)) { open_end(&S.opw[i], st, code); return; }
+    vlog("agent: an open answer for no file this side asked about: ignored");
 }
 
 /* every file that waits, and the one being copied, refused (the agent went, the machine stops) */
@@ -3532,6 +3607,7 @@ static void fx_write_next(void) {
         ssize_t n = pread(S.fx.fd, buf, sizeof buf, S.fx_sent);
         if (n < 0) { fx_fail(VME_INTERNAL, "the file couldn't be read"); return; }
         if (n == 0) { S.fx_eof = 1; break; }
+        sha256_update(&S.fx_hs, buf, (size_t)n);         /* in order: what the guest gets, for AGK_OPEN */
         if (ag_b64_encode(buf, (size_t)n, b64, sizeof b64) < 0) { fx_fail(VME_INTERNAL, "internal error"); return; }
         snprintf(args, sizeof args, "{\"handle\":%ld,\"buf-b64\":\"%s\"}", S.fx_handle, b64);
         if (qga_do("guest-file-write", args, AQ_FXWRITE)) { fx_fail(VME_BUSY, "the guest agent is busy"); return; }
@@ -3547,6 +3623,7 @@ static void fx_write_next(void) {
 }
 
 static void fx_open(const char *path) {
+    sha256_init(&S.fx_hs);
     JBuf j;
     jb_init(&j);
     jb_raw(&j, "{\"path\":");
@@ -3690,7 +3767,14 @@ static void fx_next(void) {
     S.fx_t0 = now_ms();
     S.fx_step = FX_PREP;
     S.fx_deadline = now_ms() + 120000;
+    S.fx_otok[0] = 0;
+    sha256_init(&S.fx_hs);
     if (!S.qga_up) { fx_fail(VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
+    if (S.fx.open) {
+        uint8_t r[AG_OPEN_TOKEN / 2];
+        if (getrandom(r, sizeof r, 0) != (ssize_t)sizeof r) { fx_fail(VME_INTERNAL, "no random token"); return; }
+        for (size_t i = 0; i < sizeof r; i++) snprintf(S.fx_otok + i * 2, 3, "%02x", r[i]);
+    }
     if (S.fx.kind == FXK_DROP && xfer_ready()) {
         S.fx_via = 1;
         S.fx_step = FX_NONE;
@@ -3800,11 +3884,11 @@ static void fx_place(void) {
         snprintf(ps, sizeof ps, XFER_WINFSP_PS, bt, S.fx.sha);
         if (fx_exec_ps(ps, AQ_FXEXEC)) fx_fail(VME_BUSY, "the guest agent is busy");
     } else if (S.ag_windows) {
-        char bn[AG_NAME_MAX / 3 * 4 + 16], bs[80] = "", sz[24] = "", copy[sizeof FX_COPY_PS + 2 * sizeof bt + 160];
+        char bn[AG_NAME_MAX / 3 * 4 + 16], bs[80] = "", sz[24] = "", copy[sizeof FX_COPY_PS + 2 * sizeof bt + 200];
         if (ag_b64_encode((const uint8_t *)S.fx.name, strlen(S.fx.name), bn, sizeof bn) < 0 ||
             (S.fx_via && ag_b64_encode((const uint8_t *)S.fx_stage, strlen(S.fx_stage), bs, sizeof bs) < 0)) { fx_fail(VME_INTERNAL, "internal error"); return; }
         if (S.fx_via) snprintf(sz, sizeof sz, "%lld", (long long)S.fx_size);
-        snprintf(copy, sizeof copy, FX_COPY_PS, bt, bn, sz, S.fx_via ? S.fx_sha : "");
+        snprintf(copy, sizeof copy, FX_COPY_PS, bt, bn, sz, S.fx_via ? S.fx_sha : "", S.fx.open ? S.fx_otok : "");
         char *enc = ps_encode(copy);
         size_t pn = sizeof FX_PLACE_PS + sizeof bt + sizeof bs + sizeof S.fx_token + (enc ? strlen(enc) : 0);
         char *ps = enc ? malloc(pn) : NULL;
@@ -4226,20 +4310,24 @@ static void drain_lag(void) {
                 S.lag_clipreq = lazy;
                 S.lag_display = strstr(t + 13, " display") != NULL;
                 S.lag_windows = strstr(t + 13, " windows") != NULL;
+                S.lag_open = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_OPEN) != 0;
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
                 unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
                 int clip = (hc & AG_HELLO_CLIPBOARD) != 0, notool = !clip && (hc & AG_HELLO_NOCLIP);
-                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s%s%s%s%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "",
+                if (!S.lag_hello) vlog("agent: lordos-guest %s said hello%s%s%s%s%s%s", S.lag_version, S.lag_clipx ? " (pictures and rich text too)" : "",
                                        S.lag_clipreq ? " (the host's clipboard on demand)" : "",
                                        S.lag_display ? " (sets the display's size)" : "", S.lag_windows ? " (apps mode)" : "",
+                                       S.lag_open ? " (opens files sent to it)" : "",
                                        notool ? " (no clipboard tool in the guest: xclip or wl-clipboard)" : "");
                 else if (notool != !!(S.ag_caps & VAC_CLIP_NOTOOL))
                     vlog("agent: lordos-guest %s", notool ? "has no clipboard tool in the guest any more" : "found a clipboard tool in the guest: the clipboard works");
                 S.lag_hello = 1;
                 if (!S.lag_windows) lag_windows_off();
                 S.ag_caps = (S.ag_caps & ~VAC_LAG) | (clip ? VAC_CLIPBOARD : 0) | (clip && S.lag_clipreq ? VAC_CLIP_LAZY : 0) |
-                            (notool ? VAC_CLIP_NOTOOL : 0) | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0);
+                            (notool ? VAC_CLIP_NOTOOL : 0) | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0) |
+                            (S.lag_open && S.ag_windows ? VAC_OPEN : 0);
+                if (!S.lag_open) open_all_end();
                 static const char me[] = "lord-vm 2 clipboard clipx clipreq";
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
@@ -4275,6 +4363,8 @@ static void drain_lag(void) {
             else vlog("agent: the guest's display is %ux%u%s", w, h, w == S.disp_w && h == S.disp_h ? "" : " (not the size asked for)");
         } else if ((f.kind == LAG_WINDOWS || f.kind == LAG_WINICON || f.kind == LAG_APPLIST) && S.lag_hello && S.lag_windows) {
             lag_windata(&f);
+        } else if (f.kind == AGK_OPENED && S.lag_hello && S.lag_open) {
+            open_answer(&f);
         }
         /* other kinds: skipped, so either side can grow */
         memmove(S.lag_buf, S.lag_buf + k, S.lag_n - (size_t)k);
@@ -4600,11 +4690,14 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
             else if (!S.qga_up) no = "qemu-guest-agent isn't answering in the guest";
             else if (!(S.ag_caps & VAC_FILES) || !(S.ag_caps & VAC_EXEC)) no = "the guest agent can't write files or run commands";
             else if (S.fxq_n >= FX_QUEUE) { code = VME_BUSY; no = "too many files are waiting"; }
+            /* "Open with" (7.3): only a guest whose tools open files (they said "open"; on Windows the copy step records
+             * the file's place for them) */
+            else if (m->a == 1 && (!S.ag_windows || !S.lag_hello || !S.lag_open)) no = "the guest tools can't open files in this machine";
         }
         if (no) { if (fd >= 0) close(fd); reply(ci, m->seq, code, no); return; }
         FxReq *q = &S.fxq[S.fxq_n++];
         memset(q, 0, sizeof *q);
-        q->fd = fd; q->client = ci; q->seq = m->seq; q->kind = FXK_DROP;
+        q->fd = fd; q->client = ci; q->seq = m->seq; q->kind = FXK_DROP; q->open = m->a == 1;
         memcpy(q->name, nm, sizeof q->name);
         fx_next();
         return;
@@ -4698,7 +4791,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); ag_broadcast(); }
+            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -5034,6 +5127,7 @@ static void loop(void) {
         if (S.xfer_poll_at && now >= S.xfer_poll_at) { char a[48]; S.xfer_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.xfer_pid); if (qga_do("guest-exec-status", a, AQ_XSTATUS)) S.xfer_poll_at = now + 300; }
         if (S.inst_poll_at && now >= S.inst_poll_at) { char a[48]; S.inst_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.inst_pid); if (qga_do("guest-exec-status", a, AQ_INSTSTATUS)) S.inst_poll_at = now + 500; }
         fx_tick(now);
+        open_tick(now);
         wi_tick(now);
         host_stop_tick(now);
         if (S.shut_deadline && now >= S.shut_deadline) {

@@ -1,5 +1,5 @@
 // meta.js — what the app keeps about a machine that lord-vm doesn't need: the system it runs (for the card's mark and
-// name), notes, what closing its window does (onClose), whether it opens in apps mode (appsMode) and whether it keeps this computer awake (keepAwake, read by
+// name), notes, whether its guest tools open files (opens: Files' "Open with", openwith.js), what closing its window does (onClose), whether it opens in apps mode (appsMode) and whether it keeps this computer awake (keepAwake, read by
 // lord.vm.awake too). <machine>/app.json, written by the app as the person; machine.json stays lord-vm's alone.
 import { fs } from '@lordos/sdk';
 
@@ -24,6 +24,8 @@ export function readMeta(dir) {
       if (typeof j.cloneOf === 'string' && /^[0-9a-f-]{36}$/.test(j.cloneOf)) meta.cloneOf = j.cloneOf;
       if (typeof j.importedFrom === 'string') meta.importedFrom = j.importedFrom.slice(0, 1024);
       if (typeof j.transferSetup === 'boolean') meta.transferSetup = j.transferSetup;   // set up the transfer folder once (Windows)
+      // its guest tools open files sent from Files' "Open with" (7.3): 'windows' (the system they said), or false
+      if (j.opens === 'windows' || j.opens === 'other' || j.opens === false) meta.opens = j.opens;
     }
   } catch (e) { meta = {}; }
   cache.set(dir, { mtime: st?.mtime, meta });

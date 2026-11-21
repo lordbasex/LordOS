@@ -12,6 +12,29 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Files: "Open with" a machine, like VMware Fusion** (`docs/VIRTUALIZATION.md` 7.3, `docs/FILES.md`). A file's Open with
+  lists, after the apps, each machine whose LordOS guest tools open files ("‹name› (…)", for the guests of the card in
+  `docs/VIRTUALIZATION.md` 4.3 with `lordos-guest-win` w3). Choosing one opens the machine's window, starts the machine
+  if it's off (a bridged one through the admin helper first) or resumes it, waits for the tools, copies the file in as a
+  drop does (the transfer folder or the agent's way, SHA-256 checked, the same progress line) and has the tools open it
+  in the guest with its default handler as the signed-in person: a document opens in its app, a program (`.exe`,
+  `.msi`, `.bat`, `.cmd`, `.lnk`…) runs; then apps mode turns on so the program is its own LordOS window, or the machine
+  comes to the front. A double click on a program for another system that no app here opens offers the machine, with
+  "Always open .exe files with ‹machine›" (settings `openWithDefaults`, per extension; "Ask Each Time for .exe Files" in
+  the menu undoes it); an off machine is started only after asking. Such programs are no longer offered to the Text
+  Editor. Security: `lord.vm.sendFile(…, { open: true })` takes only a path inside the home folder or the person's mounts
+  (resolved, no last link, a descriptor to lord-vm); lord-vm sends the tools a new frame, `AGK_OPEN`, with a random token,
+  the size and the SHA-256 it measured, never a path; the person's own copy step records where the file went under that
+  token, and the tools open only the file of a fresh record whose size and hash match, answering `AGK_OPENED` (logged in
+  the machine's log). Strict parsers in `vmagent.c` with cases and random-input checks in `vm-test`; the hello word
+  `open` becomes `VAC_OPEN` (8192). Linux guests aren't listed (their helper may start only the clipboard tools).
+  Verified on a test machine: a `.txt` opened in Notepad and a small test program ran and wrote its marker file.
+- **"Open with" providers in the SDK** (`sdk/openwith.js`, `sdk/openwithmodel.js`, `docs/FILES.md`):
+  `registerOpenProvider` / `registerOpenProviders` with `{ id, label, icon?, accepts, suggests?, available?,
+  needsStart?, open }`; Files lists `openProvidersFor(file)`, offers `suggestedProviderFor(file)` and keeps
+  `setDefaultProvider`. Machines registers one per eligible machine; other runners can register the same way. Tests:
+  `openwith-model-test`, `vm-openwith-test`.
+
 - **Windows 11 in Machines, ready as it starts** (`docs/VIRTUALIZATION.md` 4.3, `apps/machines/windows.js`). A new card in
   the New Machine assistant offers two ways in, both from Microsoft's own servers, with nothing of Microsoft's kept by
   LordOS:

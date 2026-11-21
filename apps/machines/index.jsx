@@ -4,8 +4,11 @@
 // opened with args.machine is a machine's window, args.configure its Configure window, args.logs its logs, args.guestWin
 // one window of a guest in apps mode (appsmode.jsx).
 import { useEffect } from 'react';
-import { useAppWindow, addListener, wm, t as tr, registerDockActions, registerDockActivate, registerWindowMenuItems } from '@lordos/sdk';
-import { Library, AppMark } from './library.jsx';
+import { useAppWindow, addListener, wm, t as tr, registerDockActions, registerDockActivate, registerWindowMenuItems, registerOpenProviders } from '@lordos/sdk';
+import { Library, AppMark, openInMachine } from './library.jsx';
+import { openMachines } from './openwith.js';
+import { readMeta } from './meta.js';
+import { isForeignProgram } from '../../sdk/filekinds.js';
 import { MachineWindow } from './vmwindow.jsx';
 import { Configure } from './configure.jsx';
 import { Logs } from './logs.jsx';
@@ -27,6 +30,23 @@ registerDockActivate('machines', (e) => {
   return true;
 });
 registerWindowMenuItems('machines', () => [{ label: tr('machines.libraryMenu'), hint: '❖0', onClick: openLibrary }]);
+
+// Files' "Open with" (docs/VIRTUALIZATION.md 7.3; sdk/openwith.js): one entry per machine whose guest tools open files,
+// "‹name› (Windows)"; the natural handler of a program for another system (.exe, .msi…) when no app here opens it. An off
+// or suspended machine is started (a double click asks first: needsStart); the file is copied in and opened there.
+registerOpenProviders('machines', () => {
+  if (typeof lord === 'undefined' || !lord.vm || typeof lord.vm.list !== 'function') return [];
+  let list = [];
+  try { list = lord.vm.list() || []; } catch (e) { list = []; }
+  return openMachines(list, readMeta).map((m) => ({
+    id: `machine:${m.id}`,
+    label: m.opens === 'windows' ? tr('machines.win.openWith', { name: m.name }) : tr('machines.openWith.machine', { name: m.name }),
+    accepts: (f) => !!f && !f.dir && typeof f.path === 'string' && f.path.startsWith('/'),
+    suggests: (f) => m.opens === 'windows' && isForeignProgram(f),
+    needsStart: () => !m.active,
+    open: (f) => openInMachine(m, f.path),
+  }));
+});
 
 export const isLibraryKey = (e) => !!e && !!e.meta && !e.ctrl && !e.alt && (e.base || e.key) === '0';
 

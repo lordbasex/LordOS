@@ -1557,7 +1557,61 @@ static void test_clip_on_demand(void) {
     }
 }
 
+/* Files' "Open with" a machine (docs/VIRTUALIZATION.md 7.3): AGK_OPEN, AGK_OPENED, the hello word, VM_FILE a = 1 */
+static void test_open_with(void) {
+    static const char tok[] = "0123456789abcdef0123456789abcdef";
+    uint8_t sha[32], o[AG_OPEN_BYTES], back[32];
+    for (int i = 0; i < 32; i++) sha[i] = (uint8_t)(i * 7 + 1);
+    char t[AG_OPEN_TOKEN + 1];
+    uint64_t size = 0;
+    CHECK(!ag_open_write(o, tok, 0x123456789aull, sha));
+    CHECK(!ag_open_parse(o, AG_OPEN_BYTES, t, &size, back) && !strcmp(t, tok) && size == 0x123456789aull && !memcmp(back, sha, 32));
+    CHECK(ag_open_parse(o, AG_OPEN_BYTES - 1, NULL, NULL, NULL) == -1 && ag_open_parse(NULL, AG_OPEN_BYTES, NULL, NULL, NULL) == -1);
+    uint8_t big[AG_OPEN_BYTES + 1]; memcpy(big, o, AG_OPEN_BYTES); big[AG_OPEN_BYTES] = 0;
+    CHECK(ag_open_parse(big, sizeof big, NULL, NULL, NULL) == -1);                                     /* a byte too many */
+    o[3] = 'A'; CHECK(ag_open_parse(o, AG_OPEN_BYTES, NULL, NULL, NULL) == -1);                        /* upper case */
+    o[3] = '/'; CHECK(ag_open_parse(o, AG_OPEN_BYTES, NULL, NULL, NULL) == -1);                        /* a path character */
+    o[3] = 0; CHECK(ag_open_parse(o, AG_OPEN_BYTES, NULL, NULL, NULL) == -1);                          /* a NUL */
+    CHECK(ag_open_write(o, "0123", 1, sha) == -1 && ag_open_write(o, "..\\x\\456789abcdef0123456789abcdef", 1, sha) == -1);
+    CHECK(ag_open_write(o, tok, 1, NULL) == -1);
+    CHECK(ag_open_token_ok(tok, 32) && !ag_open_token_ok(tok, 31) && !ag_open_token_ok("0123456789abcdef0123456789abcdeg", 32));
+    uint8_t r[AG_OPENED_BYTES], st = 9;
+    uint32_t code = 9;
+    CHECK(!ag_opened_write(r, tok, AGOS_OK, 0) && !ag_opened_parse(r, sizeof r, t, &st, &code) && !strcmp(t, tok) && st == AGOS_OK && code == 0);
+    CHECK(!ag_opened_write(r, tok, AGOS_FAILED, 1155) && !ag_opened_parse(r, sizeof r, NULL, &st, &code) && st == AGOS_FAILED && code == 1155);
+    CHECK(!ag_opened_write(r, tok, AGOS_OK, 5) && !ag_opened_parse(r, sizeof r, NULL, NULL, &code) && code == 0);   /* OK carries no code */
+    r[AG_OPEN_TOKEN + 1] = 5; CHECK(ag_opened_parse(r, sizeof r, NULL, NULL, NULL) == -1);            /* OK with a code */
+    CHECK(ag_opened_write(r, tok, AGOS_LAST + 1, 0) == -1);
+    ag_opened_write(r, tok, AGOS_CHANGED, 0); r[AG_OPEN_TOKEN] = AGOS_LAST + 1; CHECK(ag_opened_parse(r, sizeof r, NULL, NULL, NULL) == -1);
+    ag_opened_write(r, tok, AGOS_CHANGED, 0); CHECK(ag_opened_parse(r, sizeof r - 1, NULL, NULL, NULL) == -1);
+    r[0] = 'z'; CHECK(ag_opened_parse(r, sizeof r, NULL, NULL, NULL) == -1);
+    /* the hello word */
+    CHECK(ag_hello_caps((const uint8_t *)"w3 clipboard open windows", 25) == (AG_HELLO_CLIPBOARD | AG_HELLO_OPEN | AG_HELLO_WINDOWS));
+    CHECK(!(ag_hello_caps((const uint8_t *)"w3 opens openx", 14) & AG_HELLO_OPEN));
+    /* VM_FILE: a is 0 (a drop) or 1 (open it there) */
+    VmMsg m = vm_msg(VM_FILE, 1, 1, 0, 0, 0, "winbox.exe"); CHECK(vm_msg_valid(&m, 1));
+    m.a = 0; CHECK(vm_msg_valid(&m, 1));
+    m.a = 2; CHECK(!vm_msg_valid(&m, 1));
+    m.a = -1; CHECK(!vm_msg_valid(&m, 1));
+    m = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_OPEN | VAC_FILES, 0, 0, "w3\twindows"); CHECK(vm_msg_valid(&m, 0));
+    m.b = VAC_ALL + 1; CHECK(!vm_msg_valid(&m, 0));
+    /* random bytes never crash the parsers, and what they take is exactly what they promise */
+    uint8_t b[96];
+    uint32_t seed = 4242;
+    for (int it = 0; it < 60000; it++) {
+        size_t len = (seed = seed * 1103515245 + 12345) % 90;
+        for (size_t i = 0; i < len; i++) b[i] = (uint8_t)((seed = seed * 1103515245 + 12345) >> 16);
+        /* often a valid token in front, so the rest of the parser is reached */
+        if (it % 3 && len >= AG_OPEN_TOKEN) for (int i = 0; i < AG_OPEN_TOKEN; i++) b[i] = (uint8_t)"0123456789abcdef"[b[i] & 15];
+        if (it % 5 == 0 && len == AG_OPEN_BYTES + 1) len--;
+        if (it % 7 == 0 && len >= AG_OPENED_BYTES) { len = AG_OPENED_BYTES; b[AG_OPEN_TOKEN] &= 3; }
+        if (!ag_open_parse(b, len, t, &size, back)) CHECK(len == AG_OPEN_BYTES && ag_open_token_ok(t, strlen(t)) && strlen(t) == AG_OPEN_TOKEN);
+        if (!ag_opened_parse(b, len, t, &st, &code)) CHECK(len == AG_OPENED_BYTES && st <= AGOS_LAST && (st != AGOS_OK || !code) && strlen(t) == AG_OPEN_TOKEN);
+    }
+}
+
 int main(void) {
+    test_open_with();
     test_clip_on_demand();
     test_resolution();
     test_lag();
