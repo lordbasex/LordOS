@@ -610,6 +610,17 @@ export function hostnameFrom(name) {
   return base || 'machine';
 }
 export const cloneHostname = (name) => `${hostnameFrom(name).slice(0, 57).replace(/-+$/, '')}-clone`;
+// A Windows guest's computer name (NetBIOS, as lord-vm's vm_winname_valid): at most 15, and also a valid hostname here
+// (lord-vm takes it as the Clone's hostname and passes it on unchanged when it fits), not only digits. The Clone's
+// default fits: the machine's name cut to 9, then "-clone"
+export const WIN_NAME_MAX = 15;
+export const winNameValid = (h) => hostnameValid(h) && h.length <= WIN_NAME_MAX && /[a-z-]/.test(h);
+export const cloneWinName = (name) => `${hostnameFrom(name).slice(0, WIN_NAME_MAX - 6).replace(/-+$/, '')}-clone`;
+// A machine whose machine.json this LordOS can't read (lord.vm.list's error): "newer" (a newer LordOS wrote it) or
+// "invalid"; its numbers aren't known and it can't start
+export const unreadableOf = (m) => (m?.error === 'newer' || m?.error === 'invalid' ? m.error : null);
+export const actionsOf = (m) => (unreadableOf(m) ? { ...actionsFor(m.state), start: false } : actionsFor(m?.state));
+export const isWindowsMachine = (m) => !!m && (!!m.windowsDevices || m.devices === 'windows');
 
 export function cloneMethod(info, kind, fromSnapshot = false) {
   if (kind === 'clone' && info?.suspended) return 'blocked';

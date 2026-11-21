@@ -542,5 +542,24 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('preview: none', clipPreviewLine(null), { kind: '', text: '' });
 }
 
+// ---- a Windows Clone's computer name; a machine whose description can't be read; a linked clone's disk ----
+{
+  const { winNameValid, cloneWinName, isWindowsMachine, unreadableOf, actionsOf, WIN_NAME_MAX } = M;
+  eq('win name: the default fits', cloneWinName('Windows 11 Pro prueba pepe'), 'windows-1-clone');
+  eq('win name: default valid', winNameValid(cloneWinName('Windows 11 Pro prueba pepe')), true);
+  eq('win name: a short name', cloneWinName('Win'), 'win-clone');
+  eq('win name: digits only name', winNameValid(cloneWinName('12345')), true);
+  eq('win name: max', WIN_NAME_MAX, 15);
+  eq('win name: 15 ok, 16 not', [winNameValid('abcdefghijklmno'), winNameValid('abcdefghijklmnop')], [true, false]);
+  eq('win name: only digits refused', winNameValid('12345'), false);
+  eq('win name: dash first/last refused', [winNameValid('-pc'), winNameValid('pc-')], [false, false]);
+  eq('win name: other characters refused', [winNameValid('pc_1'), winNameValid('pc 1'), winNameValid('')], [false, false, false]);
+  eq('win name: letters, digits, dashes', winNameValid('win-11-a'), true);
+  eq('windows machine', [isWindowsMachine({ windowsDevices: true }), isWindowsMachine({ devices: 'windows' }), isWindowsMachine({ devices: 'virtio' }), isWindowsMachine(null)], [true, true, false, false]);
+  eq('unreadable', [unreadableOf({ error: 'newer' }), unreadableOf({ error: 'invalid' }), unreadableOf({ error: '' }), unreadableOf(undefined)], ['newer', 'invalid', null, null]);
+  eq('unreadable: no start', actionsOf({ state: 'stopped', error: 'newer' }).start, false);
+  eq('readable: start', actionsOf({ state: 'stopped', error: '' }).start, M.actionsFor('stopped').start);
+}
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

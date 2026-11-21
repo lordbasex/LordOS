@@ -6,7 +6,7 @@ import { View, Text, TextInput, Toggle, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { usePal, Btn, Sheet } from './ui.jsx';
 import { Sym } from './kit.jsx';
-import { cloneMethod, cloneHostname, hostnameValid } from './model.js';
+import { cloneMethod, cloneHostname, hostnameValid, cloneWinName, winNameValid, isWindowsMachine, WIN_NAME_MAX } from './model.js';
 import { writeMeta } from './meta.js';
 
 function Kind({ on, icon, title, text, foot, onClick }) {
@@ -38,9 +38,11 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
   const [fail, setFail] = useState('');
   // the Clone's own identity inside the guest (6.3): a hostname, a new machine-id and SSH keys at its first start
   const [keepId, setKeepId] = useState(false);
-  const [host, setHost] = useState(() => cloneHostname(m.name));
+  // a Windows guest takes it as its computer name (NetBIOS, at most 15): the field asks for one that is used as it is
+  const win = isWindowsMachine(m);
+  const [host, setHost] = useState(() => (win ? cloneWinName(m.name) : cloneHostname(m.name)));
   const isClone = fromSnapshot || kind === 'clone';
-  const hostBad = isClone && !keepId && !hostnameValid(host);
+  const hostBad = isClone && !keepId && !(win ? winNameValid(host) : hostnameValid(host));
   const how = cloneMethod(info, fromSnapshot ? 'clone' : kind, !!fromSnapshot);
   useEffect(() => {
     if (!job) return undefined;
@@ -90,11 +92,12 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
           {!keepId ? (
             <View style={{ gap: 4 }}>
               <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.clone.hostname')}</Text>
-              <TextInput value={host} onChange={(x) => setHost(x.trim().toLowerCase())} />
+              <TextInput value={host} onChange={(x) => setHost(win ? x.trim().toLowerCase().slice(0, WIN_NAME_MAX) : x.trim().toLowerCase())} />
             </View>
           ) : null}
           <Text style={{ fontSize: 12, lineHeight: 1.45, color: hostBad ? '#ff453a' : p.dim, textAlign: 'start' }}>
-            {hostBad ? tr('machines.clone.hostnameBad') : keepId ? tr('machines.clone.keepIdentityNote') : m.agent ? tr('machines.clone.identityAgent') : tr('machines.clone.identityNoAgent')}
+            {hostBad ? tr(win ? 'machines.clone.winNameBad' : 'machines.clone.hostnameBad') : keepId ? tr('machines.clone.keepIdentityNote')
+              : win ? tr('machines.win.cloneIdentity') : m.agent ? tr('machines.clone.identityAgent') : tr('machines.clone.identityNoAgent')}
           </Text>
         </View>
       ) : null}

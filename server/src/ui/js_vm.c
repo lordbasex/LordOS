@@ -1002,6 +1002,15 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (!stat(p, &st)) disk += (double)st.st_blocks * 512;
     }
     JS_SetPropertyStr(c, o, "diskBytes", JS_NewFloat64(c, disk));
+    {
+        /* a linked clone's frozen base (<library>/.shared/, machine.json "base"): shared with its siblings, so shown
+         * beside the machine's own size, never added to it */
+        static VmMachine bm;
+        char berr[128];
+        struct stat st;
+        if (!vm_machine_load(dir, &bm, berr, sizeof berr) && bm.base[0] && vm_base_valid(bm.base) && !stat(bm.base, &st) && S_ISREG(st.st_mode))
+            JS_SetPropertyStr(c, o, "baseBytes", JS_NewFloat64(c, (double)st.st_blocks * 512));
+    }
     snprintf(p, sizeof p, "%s/run.json", dir);
     char buf[2048];
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);

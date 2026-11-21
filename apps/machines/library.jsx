@@ -9,7 +9,7 @@ import {
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines } from './model.js';
+import { stateView, actionsFor, actionsOf, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet } from './kit.jsx';
@@ -78,7 +78,8 @@ function Card({ m, u, sel, onSelect, onMenu, windowed }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   const v = stateView(m.state, m.reason);
-  const a = actionsFor(m.state);
+  const a = actionsOf(m);
+  const bad = unreadableOf(m);
   const meta = m.meta || {};
   const sys = meta.os ? { id: meta.os, name: meta.osName || '' } : systemOf(m.name);
   const [c1, c2] = markColors(sys.id);
@@ -86,7 +87,7 @@ function Card({ m, u, sel, onSelect, onMenu, windowed }) {
   const on = v.active;
   const emulated = m.accel === 'tcg';
   const system = [sys.name || tr('machines.card.system'), m.arch, emulated ? tr('machines.emulatedLower') : null].filter(Boolean).join(', ');
-  const doing = tr(`machines.doing.${doingOf(m, windowed)}`);
+  const doing = bad ? tr(`machines.unreadable.${bad}`) : tr(`machines.doing.${doingOf(m, windowed)}`);
   const go = () => (a.open || a.start ? openMachine(m) : null);
   return (
     <View onClick={onSelect} onDoubleClick={go} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
@@ -98,7 +99,7 @@ function Card({ m, u, sel, onSelect, onMenu, windowed }) {
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}><OsMark id={sys.id} size={56} /></View>
         )}
         <View style={{ position: 'absolute', left: 10, top: 10, paddingHorizontal: 9, height: 20, borderRadius: 10, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.62)' }}>
-          <Text style={{ fontSize: 12, fontWeight: 600, color: v.why ? '#ff9a9a' : '#f2f2f5' }}>{doing}</Text>
+          <Text style={{ fontSize: 12, fontWeight: 600, color: v.why || bad ? '#ff9a9a' : '#f2f2f5' }}>{doing}</Text>
         </View>
         <View style={{ position: 'absolute', right: 10, top: 10 }}><Lights power={on} agent={on && m.agentState === 'connected'} disk={!!u?.disk} /></View>
         {hover && (a.start || a.open) ? (
@@ -115,6 +116,7 @@ function Card({ m, u, sel, onSelect, onMenu, windowed }) {
           <Text style={{ flex: 1, fontSize: 14, fontWeight: 700, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{m.name}</Text>
           <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap' }}>{system}</Text>
         </View>
+        {bad ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.unreadable.${bad}`)}</Text> : (
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.card.cpu', { v: on && u?.cpu != null ? `${Math.round(u.cpu)} %` : '—' })}</Text>
@@ -126,9 +128,10 @@ function Card({ m, u, sel, onSelect, onMenu, windowed }) {
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={{ fontSize: 12, fontWeight: 700, color: p.text }}>{m.diskBytes != null ? bytes(m.diskBytes) : '—'}</Text>
-            <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.card.onDisk')}</Text>
+            {/* a linked clone: its own changes, and the frozen base it shares with its siblings */}
+            <Text style={{ fontSize: 12, color: p.dim }}>{m.baseBytes > 0 ? tr('machines.card.ownShared', { shared: bytes(m.baseBytes) }) : tr('machines.card.onDisk')}</Text>
           </View>
-        </View>
+        </View>)}
       </View>
     </View>
   );
@@ -139,7 +142,8 @@ function ListRow({ m, u, sel, onSelect, onMenu, windowed }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   const v = stateView(m.state, m.reason);
-  const a = actionsFor(m.state);
+  const a = actionsOf(m);
+  const bad = unreadableOf(m);
   const sys = m.meta?.os ? { id: m.meta.os, name: m.meta.osName || '' } : systemOf(m.name);
   const src = thumbSrc(m.dir, m.thumbTime);
   const on = v.active;
@@ -160,7 +164,7 @@ function ListRow({ m, u, sel, onSelect, onMenu, windowed }) {
       </View>
       <View style={{ width: narrow ? 100 : 130, flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
         <StateDot tone={v.tone} />
-        <Text style={{ fontSize: 12, color: v.why ? '#ff9a9a' : p.text, whiteSpace: 'nowrap' }}>{tr(`machines.doing.${doingOf(m, windowed)}`)}</Text>
+        <Text style={{ fontSize: 12, color: v.why || bad ? '#ff9a9a' : p.text, whiteSpace: 'nowrap' }}>{bad ? tr(`machines.unreadable.${bad}`) : tr(`machines.doing.${doingOf(m, windowed)}`)}</Text>
       </View>
       {narrow ? null : cell(on && u?.cpu != null ? `${Math.round(u.cpu)} %` : '—', 56)}
       {narrow ? null : cell(on && u?.memBytes ? `${gib(u.memBytes)} GB` : gb(m.memoryMb), 70)}
@@ -385,6 +389,7 @@ export function Library() {
     for (const m of ms) {
       const s = lord.vm.stats(m.dir) || {};
       m.diskBytes = s.diskBytes;
+      m.baseBytes = s.baseBytes || 0;
       try { const st = fs.stat(`${m.dir}/thumb.png`); m.thumbTime = st?.mtime || 0; } catch (e) { m.thumbTime = 0; }
       m.meta = readMeta(m.dir);
       const u = usage(prev.current[m.dir], s, m.vcpus);
@@ -422,7 +427,7 @@ export function Library() {
     refresh();
   };
   const menuFor = (m) => {
-    const a = actionsFor(m.state);
+    const a = actionsOf(m);
     const stop = (how) => lord.vm.stop(m.dir, how);
     return [
       a.start ? { label: tr('machines.start'), onClick: () => openMachine(m) } : { label: tr('machines.open'), disabled: !a.open, onClick: () => openMachine(m) },

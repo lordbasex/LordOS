@@ -206,6 +206,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: a Clone's computer name, for a guest with the LordOS guest tools, is the one it will use**
+  (`apps/machines/clone.jsx`, `model.js` `winNameValid`, `cloneWinName`). The "Name inside the machine" field offered
+  a Linux hostname (for example 26 characters) that lord-vm then shortened to a 15-character computer name (first 10 +
+  "-" + 4 hex), so the name shown wasn't the one used. For a machine with the `windows` devices the default is now a
+  valid computer name (the machine's name cut to 9, then "-clone"), the field takes at most 15 letters, digits and
+  dashes and not only digits (lord-vm's own rule), and the note says what happens: the guest tools give the copy this
+  computer name, used from the guest's next restart, and its SID doesn't change. Linux machines are unchanged.
+- **Machines: a linked clone's card shows the frozen base it shares** (`ui/js_vm.c` `stats` `baseBytes`,
+  `apps/machines/library.jsx`). After a linked clone, both the original and the clone showed about 1 MB "on disk",
+  since only their own overlays were counted and the frozen base in `<library>/.shared/` was counted nowhere on the
+  cards. The card now shows the machine's own size with "own · 19 GB shared" under it; sorting by disk still uses the
+  own size.
+- **Machines: a machine whose description this LordOS can't read** (`apps/machines/library.jsx`, `vmwindow.jsx`,
+  `model.js` `unreadableOf`, `actionsOf`; `ui.jsx` `gb`, `bytes`). A `machine.json` written by a newer LordOS (a newer
+  schema) or damaged showed "undefined MB" in the list and its window tried to start it. The card and the list now say
+  "Needs a newer LordOS" or "Its description can't be read" instead of numbers, Start is disabled with that reason, and
+  the machine's window explains it without trying to start; sizes never print "undefined".
+
 - **Machines: a right-click Paste in a machine has what was just copied on this computer** (`apps/machines/vmwindow.jsx`):
   this computer's clipboard went into the machine only when its window came to the front, so copying with a context
   menu and then right-clicking Paste in the machine found the old clipboard (a keyboard paste worked, after the window's

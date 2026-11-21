@@ -9,7 +9,7 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus } from './appsmode.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { ClipAskBar } from './clipask.jsx';
@@ -428,6 +428,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (!has()) { setErr(tr('machines.noBackend')); return; }
     const m = lord.vm.list().find((x) => x.dir === dir);
     if (!m) { setErr(tr('machines.win.gone')); return; }
+    // a description this LordOS can't read (a newer one wrote it, or it's damaged): never started
+    if (unreadableOf(m) && !stateView(m.state, m.reason).active) { setName(m.name); setErr(tr(`machines.unreadable.${unreadableOf(m)}Hint`, { name: m.name })); return; }
     setName(m.name); setIso(m.iso || '');
     setLog('');
     const active = stateView(m.state, m.reason).active;
