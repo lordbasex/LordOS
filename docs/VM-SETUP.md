@@ -1958,3 +1958,10 @@ through an overlay), the same helpers' build packages for aarch64 were added, so
 `lord-ocr`, `lord-tts` and `lord-screencast` like the packages: `sudo chroot /var/tmp/lordos-arm64-br apt-get install -y
 --no-install-recommends libpipewire-0.3-dev libtesseract-dev cmake glslc libvulkan-dev spirv-headers` (with `/proc`
 mounted for the call).
+
+## Step — Machines' clipboard tests on the development computer (2026-11-21)
+
+`server/tests/guest_clip_test.sh` drives the Linux guest helper (`tools/guest/lordos-guest.c`, `tools/guest/x11clip.c`)
+against a private X server. Installed on the development computer (Debian 13, the maintainer's LordOS desktop):
+`sudo apt-get install -y --no-install-recommends xvfb xclip` (xvfb 2:21.1.16-1.3+deb13u4, xclip 0.13-4). Without them
+the suite prints "skipped: needs Xvfb and xclip".
