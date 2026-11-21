@@ -2280,7 +2280,9 @@ virtio-win 0.1.271, viogpudo 100.100.104.27100), driven by `lordvm-dev` (`agent 
 
 **The work area.** The guest's screen is laid over the whole display, so a guest window near its top edge would put its LordOS title bar under the menu bar (a Store app opens at y = −10). Such a window opens, and follows the guest, just below the menu bar (or a bar at the start side), and the guest is asked to move its window there too (`insideWork` in `model.js`, once per place): the window keeps showing its own part of the picture 1:1, and if the guest keeps it where it was the crop is still its rectangle.
 
-**Not yet.** Guest apps in the launcher before the machine runs (6.12); a window's own shape (a round or see-through window shows the guest's black around it); more than one display.
+**More than one display (fixed 2026-11-21).** The guest has one screen, laid over the main display, but its LordOS windows can go anywhere: a window dragged to another monitor (x past the main display, or negative for one to its left) used to ask the guest to move its window off its own screen, where Windows hid it, its list stopped naming it and the LordOS window closed. Now the place asked of the guest is always inside its screen (`guestPlace` in `model.js`: the size kept as far as it fits, the position clamped), and the LordOS window keeps where it was put: it remembers how far it is from the guest's window (`off`) and follows the guest's moves by that much; its menus go with it. A guest window that the guest minimized right after such a move is restored, not minimized here too (`minimizedByUs`). The tools clamp a move to the monitor too (w4), so an older host can't push a window away either. Sizes go through the main display's scale, whatever the monitor's own scale.
+
+**Not yet.** Guest apps in the launcher before the machine runs (6.12); a window's own shape (a round or see-through window shows the guest's black around it); the guest's own second screen.
 
 ### 7.3 Open a file in a machine ("Open with", like VMware Fusion)
 

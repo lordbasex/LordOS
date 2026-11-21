@@ -13,14 +13,15 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
 import { ClipAskBar } from './clipask.jsx';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps } from './model.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps, guestPlace, offsetRect, minimizedByUs } from './model.js';
 
 // dir → { sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], leave() }
 export const guests = createStore({});
 // dir → the LordOS window id of that machine's guest window in front, if one is: the machine counts as in use then (its
 // clipboard's gate, 6.8)
 export const guestFocus = createStore({});
-// dir → Map gid → { winId, rect (the guest's last), minimized, asked (the rect this side asked for), inset, measured }
+// dir → Map gid → { winId, rect (the guest's last), minimized, asked (the rect this side asked for), inset, measured, off (where
+// the LordOS window is, from the guest's window mapped here: another monitor, model.js guestPlace) }
 const tracks = new Map();
 const trackOf = (dir) => { let m = tracks.get(dir); if (!m) tracks.set(dir, m = new Map()); return m; };
 const publish = (dir, patch) => guests.set((g) => ({ ...g, [dir]: { ...(g[dir] || {}), ...patch } }));
@@ -41,9 +42,11 @@ function frameAround(r, inset) {
 // under the menu bar (a window near the guest's top edge), just below it; the guest is asked to move its window there
 // as well (once per place), so the crop stays the guest's window 1:1. A guest that keeps it where it was still shows
 // right: the crop is always its rectangle.
-function placeOf(x, w, sid, k, d) {
-  const r = toHostRect(w, k, d);
-  if (x.popup) return r;
+function placeOf(x, w, sid, k, d, have) {
+  // a window the person put elsewhere (another monitor) keeps its distance from the guest's; a menu goes with its owner
+  const off = x.popup ? have?.get(w.owner)?.off : x.off;
+  const r = offsetRect(toHostRect(w, k, d), off);
+  if (x.popup || off) return r;
   const fix = insideWork(r, insetOf(x.inset), workArea());
   if (!fix) return r;
   const g = toGuestRect(fix, k, d);
@@ -115,7 +118,7 @@ function sync(dir, sid, mid, name, list, gw, gh) {
     const instance = guestInstance(mid, w.id);
     const popup = isPopup(w);
     const x = { gid: w.id, winId: 0, rect: w, minimized: false, asked: null, inset: popup ? { l: 0, t: 0, r: 0, b: 0 } : null, popup };
-    const r = placeOf(x, w, sid, k, d);
+    const r = placeOf(x, w, sid, k, d, have);
     const args = { guestWin: { dir, gid: w.id }, guest: { machine: name, mid, app: w.app || w.title, key: (w.app || '').toLowerCase() || String(w.id) } };
     const winId = popup ? wm.open('machines', { instance, frame: r, pip: r, args: { ...args, notice: true } })
       : wm.open('machines', { instance, frame: frameAround(r), args });
@@ -123,12 +126,19 @@ function sync(dir, sid, mid, name, list, gw, gh) {
     x.winId = winId;
     have.set(w.id, x);
   }
-  for (const w of plan.minimize) { const x = have.get(w.id); if (x) { x.minimized = true; wm.minimize(x.winId); } }
+  for (const w of plan.minimize) {
+    const x = have.get(w.id);
+    if (!x) continue;
+    // the guest hid it right after a move this side asked for: brought back there, not minimized here
+    if (minimizedByUs(x.askedAt, Date.now(), !!wm.get(x.winId)?.minimized)) { lord.vm.winAct(sid, w.id, 'restore'); continue; }
+    x.minimized = true;
+    wm.minimize(x.winId);
+  }
   for (const w of plan.restore) { const x = have.get(w.id); if (x) { x.minimized = false; wm.focus(x.winId); } }
   for (const w of plan.follow) {
     const x = have.get(w.id);
     if (!x) continue;
-    const r = placeOf(x, w, sid, k, d);
+    const r = placeOf(x, w, sid, k, d, have);
     if (x.popup) wm.setPip(x.winId, r); else wm.setFrame(x.winId, frameAround(r, x.inset));
     x.followed = r;
   }
@@ -202,20 +212,24 @@ export function GuestWindow({ dir, gid }) {
         const f = wm.get(winId);
         if (!f) return;
         x.inset = { l: lx - f.x, t: ly - f.y, r: f.x + f.w - (lx + lw), b: f.y + f.h - (ly + lh) };
-        const at = placeOf(x, w, s.sid, k, d);
+        const at = placeOf(x, w, s.sid, k, d, trackOf(dir));
         if (!nearRect(here, at)) wm.setFrame(winId, frameAround(at, x.inset));
         return;
       }
-      const want = placeOf(x, w, s.sid, k, d);
+      const want = placeOf(x, w, s.sid, k, d, trackOf(dir));
       if (!lastBox || !nearRect(here, lastBox, 0)) { lastBox = here; stableAt = Date.now(); return; }
       if (Date.now() - stableAt < 120) return;
       if (nearRect(here, want) || (x.followed && nearRect(here, x.followed))) return;
-      const r = toGuestRect(here, k, d);
+      // never a place outside the guest's one screen (another monitor, HiDPI or not): the guest's window stays inside it,
+      // and this window keeps where it was put (model.js guestPlace)
+      const { ask: r, off } = guestPlace(here, k, d, s.gw, s.gh);
+      x.off = off;
       if (x.asked && nearRect(r, x.asked)) {
         // asked already; the guest kept its window where it was (its minimum size, maximized): back to where it is
-        if (guestKept(x.asked, x.askedAt, w, Date.now())) { x.asked = null; x.followed = want; wm.setFrame(winId, frameAround(want, x.inset)); }
+        if (guestKept(x.asked, x.askedAt, w, Date.now())) { x.asked = null; x.off = null; x.followed = toHostRect(w, k, d); wm.setFrame(winId, frameAround(x.followed, x.inset)); }
         return;
       }
+      if (nearRect(r, w)) { x.followed = here; return; }      // the guest's window is there already (clamped): nothing to ask
       x.asked = r;
       x.askedAt = Date.now();
       lord.vm.winAct(s.sid, gid, 'move', r.x, r.y, r.w, r.h);

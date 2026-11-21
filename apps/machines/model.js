@@ -851,6 +851,26 @@ export function guestScale(gw, gh, d) {
 export const toHostRect = (r, k, d) => ({ x: Math.round(d.x + r.x * k), y: Math.round(d.y + r.y * k), w: Math.max(1, Math.round(r.w * k)), h: Math.max(1, Math.round(r.h * k)) });
 export const toGuestRect = (r, k, d) => ({ x: Math.round((r.x - d.x) / k), y: Math.round((r.y - d.y) / k), w: Math.max(1, Math.round(r.w / k)), h: Math.max(1, Math.round(r.h / k)) });
 
+// Apps mode with more than one display: the guest has one screen (gw × gh) laid over the main display d, but its LordOS
+// windows can be anywhere, another monitor included (x ≥ the main display's width, or negative). A guest window asked
+// to go outside its own screen is clamped, hidden or dropped from its list by the guest (Windows), and its LordOS window
+// closed. So the place asked of the guest (ask) is always inside its screen, its size kept as far as it fits, and the
+// LordOS window keeps where the person put it: off is how far it is from where the guest's window maps (0, 0 when it
+// is over the guest's screen); the window then shows, and follows, the guest's window moved by off.
+export function guestPlace(here, k, d, gw, gh) {
+  const r = toGuestRect(here, k, d);
+  const w = Math.max(1, Math.min(r.w, gw || r.w)), h = Math.max(1, Math.min(r.h, gh || r.h));
+  const x = gw > 0 ? Math.max(0, Math.min(gw - w, r.x)) : r.x, y = gh > 0 ? Math.max(0, Math.min(gh - h, r.y)) : r.y;
+  const ask = { x, y, w, h };
+  const back = toHostRect(ask, k, d);
+  const off = { x: here.x - back.x, y: here.y - back.y };
+  return { ask, off: Math.abs(off.x) <= 2 && Math.abs(off.y) <= 2 ? null : off };
+}
+export const offsetRect = (r, off) => (r && off && (off.x || off.y) ? { ...r, x: r.x + off.x, y: r.y + off.y } : r);
+// a guest window that went minimized right after this side moved it (the guest hid a window it thought off its screen):
+// restored, not minimized here too
+export const minimizedByUs = (askedAt, now, hostMinimized, wait = 3000) => !hostMinimized && !!askedAt && now - askedAt < wait;
+
 // the part of the guest's picture a window shows (<MediaView crop>)
 export const cropOf = (w) => [w.x, w.y, w.w, w.h];
 

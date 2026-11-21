@@ -1244,8 +1244,24 @@ static void win_act(const LagAct *a) {
         if (SUCCEEDED(DwmGetWindowAttribute(h, DWMWA_EXTENDED_FRAME_BOUNDS, &f, sizeof f)) && GetWindowRect(h, &w)) {
             dl = f.left - w.left; dt = f.top - w.top; dr = w.right - f.right; db = w.bottom - f.bottom;
         }
+        /* never outside the screen: a window put off it is hidden or dropped from the list (the host clamps too; this
+         * side keeps it so with an older host, apps mode on several host displays) */
+        int x = a->x, y = a->y, ww = a->w, wh = a->h;
+        RECT want = { x, y, x + ww, y + wh };
+        MONITORINFO mi;
+        mi.cbSize = sizeof mi;
+        if (GetMonitorInfoW(MonitorFromRect(&want, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+            RECT m = mi.rcMonitor;
+            if (ww > m.right - m.left) ww = m.right - m.left;
+            if (wh > m.bottom - m.top) wh = m.bottom - m.top;
+            if (x < m.left) x = m.left;
+            if (y < m.top) y = m.top;
+            if (x + ww > m.right) x = m.right - ww;
+            if (y + wh > m.bottom) y = m.bottom - wh;
+            if (x != a->x || y != a->y) lg("apps: a move to %d,%d kept on the screen at %d,%d", a->x, a->y, x, y);
+        }
         if (IsZoomed(h)) ShowWindow(h, SW_RESTORE);
-        SetWindowPos(h, NULL, a->x - dl, a->y - dt, a->w + dl + dr, a->h + dt + db, SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+        SetWindowPos(h, NULL, x - dl, y - dt, ww + dl + dr, wh + dt + db, SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
         break;
     }
     }

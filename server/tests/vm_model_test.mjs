@@ -438,6 +438,29 @@ eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, 
   const asked = { x: 401, y: 321, w: 900, h: 379 }, got = { x: 401, y: 321, w: 900, h: 493 };
   eq('guest kept its size', [M.guestKept(asked, 1000, got, 1400), M.guestKept(asked, 1000, got, 2600), M.guestKept(asked, 1000, { ...asked, w: 901 }, 9000),
     M.guestKept(null, 0, got, 9000), M.guestKept(asked, 0, null, 9000)], [false, true, false, false, false]);
+{
+  // apps mode on several displays (a window dragged to monitor 2 closed: the guest was asked to move off its screen)
+  const d = { x: 0, y: 0, w: 1920, h: 1080 }, k = M.guestScale(1920, 1080, d);
+  const p2 = M.guestPlace({ x: 2500, y: 200, w: 800, h: 600 }, k, d, 1920, 1080);
+  eq('monitor 2 (x 2500): the guest stays on its screen', p2.ask, { x: 1120, y: 200, w: 800, h: 600 });
+  eq('monitor 2: the window keeps its place (offset)', [p2.off, M.offsetRect(M.toHostRect(p2.ask, k, d), p2.off)], [{ x: 1380, y: 0 }, { x: 2500, y: 200, w: 800, h: 600 }]);
+  const left = M.guestPlace({ x: -1500, y: -40, w: 700, h: 500 }, k, d, 1920, 1080);
+  eq('a monitor to the left (negative x, above)', [left.ask, left.off], [{ x: 0, y: 0, w: 700, h: 500 }, { x: -1500, y: -40 }]);
+  const big = M.guestPlace({ x: 2000, y: 0, w: 2560, h: 1400 }, k, d, 1920, 1080);
+  eq('larger than the guest screen: its size', big.ask, { x: 0, y: 0, w: 1920, h: 1080 });
+  eq('on the guest screen: no offset', M.guestPlace({ x: 100, y: 100, w: 640, h: 480 }, k, d, 1920, 1080), { ask: { x: 100, y: 100, w: 640, h: 480 }, off: null });
+  // a main display with a scale (the guest's screen half its logical size on a 2× display, k = 2)
+  const d2 = { x: 0, y: 0, w: 1920, h: 1080 }, k2 = M.guestScale(960, 540, d2);
+  const h2 = M.guestPlace({ x: 3000, y: 100, w: 400, h: 300 }, k2, d2, 960, 540);
+  eq('scaled: inside 0..960', [h2.ask.x >= 0, h2.ask.x + h2.ask.w <= 960, h2.ask.w, h2.ask.h], [true, true, 200, 150]);
+  for (let i = 0; i < 2000; i++) {
+    const r = { x: Math.round(Math.sin(i) * 6000), y: Math.round(Math.cos(i * 3) * 3000), w: 50 + (i * 37) % 3000, h: 40 + (i * 53) % 2000 };
+    const g = M.guestPlace(r, k, d, 1920, 1080).ask;
+    if (!(g.x >= 0 && g.y >= 0 && g.x + g.w <= 1920 && g.y + g.h <= 1080)) { eq(`guest place inside its screen #${i}`, g, 'inside'); break; }
+  }
+  eq('offsetRect without offset', M.offsetRect({ x: 1, y: 2, w: 3, h: 4 }, null), { x: 1, y: 2, w: 3, h: 4 });
+  eq('minimized by our move: restored', [M.minimizedByUs(1000, 2000, false), M.minimizedByUs(1000, 5000, false), M.minimizedByUs(1000, 2000, true), M.minimizedByUs(0, 2000, false)], [true, false, false, false]);
+}
 }
 eq('popup', [M.isPopup({ owner: 5, topmost: true }), M.isPopup({ owner: 5, topmost: false }), M.isPopup({ owner: 0, topmost: true })], [true, false, false]);
 eq('instance', [M.guestInstance('ab12-cd', 4294967295), M.guestInstance('a/../b', 7)], ['ga-ab12-cd-4294967295', 'ga-ab-7']);

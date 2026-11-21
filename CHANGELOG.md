@@ -229,6 +229,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: an apps mode window moved to another monitor no longer closes** (`docs/VIRTUALIZATION.md` 7.2). The
+  guest was asked to move its window to the LordOS window's place, off its own one screen (x ≥ the main display's width,
+  or negative); the guest hid it, stopped listing it, and its LordOS window closed. The place asked of the guest is now
+  always inside its screen (`guestPlace`, size kept as far as it fits) and the LordOS window stays where it was put,
+  following the guest's moves at that distance; a window the guest minimized right after such a move is restored; the
+  guest tools clamp a move to the screen too. Model tests (monitor 2 at x = 2500 → inside 0..1920, a monitor to the
+  left, a larger window, a scaled display, 2,000 random places) and checked on a test machine: moves to x = 2500 and
+  x = −1500 stayed on its screen.
 - **Machines: the close question fits a small window and Esc cancels it** (`apps/machines/vmwindow.jsx`): in apps mode
   the controller window is small, so "Close ‹machine›?" was wider than it and its buttons were cut off, with the copy's
   progress line drawn over them; Esc there left apps mode behind the card instead of cancelling it. Cards now fit the
