@@ -1274,7 +1274,14 @@ static void snd_retry(Sess *s, MediaSrc *ms) {
 /* the device a stream uses: the one chosen while Settings → Sound lists it (or while that isn't known), else the
  * default; checked at every poll, so a device unplugged sends the stream to the default and one plugged back in takes
  * it again (maudio_target moves a live stream only when this changes) */
-static const char *snd_target(int kind, const char *chosen) { return chosen[0] && snd_device_present(kind, chosen) != 0 ? chosen : ""; }
+/* the chosen device while it is listed now, else "" (the default); fails closed: an unknown sound state means the
+ * default, and an input must be a microphone, never an output's monitor (the microphone permission doesn't cover
+ * what this computer plays) */
+static const char *snd_target(int kind, const char *chosen) {
+    if (!chosen[0] || snd_device_present(kind, chosen) != 1) return "";
+    if (kind == SND_SOURCE && !snd_source_is_input(chosen)) return "";
+    return chosen;
+}
 
 static void snd_apply(Sess *s) {
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
