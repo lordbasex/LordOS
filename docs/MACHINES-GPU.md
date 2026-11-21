@@ -86,7 +86,28 @@ For computers with a second AMD or NVIDIA card kept only for machines.
 - A variant is passing the whole Intel iGPU (GVT-d, legacy IGD passthrough) with its picture on the motherboard's
   output; with OVMF it is fragile, so Mode A is preferred for an iGPU.
 
-**Order:** Part 1 steps 1–3 → Mode A's feasibility test → Mode A's review and integration → Part 1 steps 4–6 →
+### Settings → Graphics cards (approved in principle 2026-11-21)
+
+The person never runs a command: a computer with more than one GPU is managed from **Settings → Graphics cards**.
+
+- Every GPU is listed with what uses it. The one driving the desktop is fixed and never offered for anything else.
+- A GPU nobody uses is suggested: "You have a graphics card that isn't used. Use it for Machines or for AI?"
+- Roles for a spare GPU: **Unused** · **Machines: shared** (Mode A, Intel GVT-g where the hardware allows it) ·
+  **Machines: dedicated** (Mode B, the whole card for one machine) · **AI** (local models use this card instead of the
+  desktop's; second stage: which stack each vendor needs — Vulkan, ROCm, CUDA — and which LordOS AI features use it).
+  A role the hardware can't take is shown disabled with the reason. Each role says what it gains and what it costs
+  (for example: a machine with a GPU can't be suspended).
+- Changing a role needs a restart, said plainly; "Unused" always undoes it.
+- Underneath: closed `admin.c` actions (for review and an AGENTS.md entry before they're built), e.g.
+  `gpu-role <pci address> <unused|machines-shared|machines-dedicated|ai>`. Root validates the address against the GPUs
+  it detects itself, refuses the desktop's GPU, writes only fixed files (`/etc/modprobe.d/lordos-gpu.conf`,
+  `/etc/modules-load.d/lordos-gpu.conf`, the vfio-pci binding for a dedicated card) and runs `update-initramfs`; no
+  free-form options. The mdev create/remove and `/dev/vfio` access for a running machine are separate closed actions
+  (Mode A above).
+- Order: Mode A's feasibility test by hand on the maintainer's computer first (the three fixed lines this action will
+  write, run once by the maintainer), then this Settings page, which takes over that configuration.
+
+**Order:** Part 1 steps 1–3 → Mode A's feasibility test → Settings → Graphics cards and Mode A's review and integration → Part 1 steps 4–6 →
 Mode B later.
 
 ## Sources
