@@ -2353,7 +2353,7 @@ static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     if (!m || !m->px || m->w < 1 || m->h < 1) return JS_FALSE;
-    return JS_NewBool(c, !vm_thumb_save(s->dir, m->px, m->w, m->h, VM_THUMB_W));
+    return JS_NewBool(c, !vm_thumb_save_async(s->dir, m->px, m->w, m->h, VM_THUMB_W));
 }
 
 /* screenshot(session) → the file's path, or "": the guest's picture at its size, in ~/Pictures/Screenshots as

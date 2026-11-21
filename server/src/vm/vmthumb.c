@@ -17,6 +17,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,25 +64,63 @@ static void put(void *ud, void *data, int n) {
     }
 }
 
-int vm_png_save(const char *dir, const char *name, const uint32_t *px, int w, int h, int maxw) {
-    int ow = 0, oh = 0;
-    unsigned char *rgb = vm_thumb_scale(px, w, h, maxw, &ow, &oh);
-    if (!rgb) return -1;
+/* an RGB picture as <dir>/<name>, replaced atomically; tmp: the temporary file's name in dir */
+static int write_rgb(const char *dir, const char *name, const char *tmp, const unsigned char *rgb, int ow, int oh) {
     int dfd = open(dir, O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-    if (dfd < 0) { free(rgb); return -1; }
-    char tmp[64];
-    snprintf(tmp, sizeof tmp, ".thumb.%ld.tmp", (long)getpid());
+    if (dfd < 0) return -1;
     int rc = -1;
     int fd = openat(dfd, tmp, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0600);
     if (fd >= 0) {
         Out o = { fd, 0 };
-        stbi_write_png_compression_level = 3;          /* a quick write: it runs on the UI thread */
-        int ok = stbi_write_png_to_func(put, &o, ow, oh, 3, rgb, ow * 3);
+        stbi_write_png_compression_level = 3;          /* a quick write */
+        int ok = stbi_write_png_to_func(put, &o, ow, oh, 3, (void *)rgb, ow * 3);
         if (close(fd)) o.failed = 1;
         if (ok && !o.failed && !renameat(dfd, tmp, dfd, name)) rc = 0;
         else unlinkat(dfd, tmp, 0);
     }
     close(dfd);
+    return rc;
+}
+
+int vm_png_save(const char *dir, const char *name, const uint32_t *px, int w, int h, int maxw) {
+    int ow = 0, oh = 0;
+    unsigned char *rgb = vm_thumb_scale(px, w, h, maxw, &ow, &oh);
+    if (!rgb) return -1;
+    char tmp[64];
+    snprintf(tmp, sizeof tmp, ".thumb.%ld.tmp", (long)getpid());
+    int rc = write_rgb(dir, name, tmp, rgb, ow, oh);
     free(rgb);
     return rc;
+}
+
+/* the card's picture off the UI thread: the PNG's encoding took 20 to 50 ms there, every 5 s while a machine's window
+ * was open (docs/MAIN-THREAD.md). One write at a time; a picture asked for while one is being written is skipped. */
+typedef struct { char dir[PATH_MAX]; unsigned char *rgb; int w, h; } ThumbJob;
+static atomic_int thumb_busy;
+
+static void *thumb_main(void *arg) {
+    ThumbJob *j = arg;
+    char tmp[64];
+    snprintf(tmp, sizeof tmp, ".thumb.%ld.bg.tmp", (long)getpid());
+    write_rgb(j->dir, "thumb.png", tmp, j->rgb, j->w, j->h);
+    free(j->rgb);
+    free(j);
+    atomic_store(&thumb_busy, 0);
+    return NULL;
+}
+
+int vm_thumb_save_async(const char *dir, const uint32_t *px, int w, int h, int maxw) {
+    if (!dir || strlen(dir) >= PATH_MAX || atomic_exchange(&thumb_busy, 1)) return -1;
+    ThumbJob *j = calloc(1, sizeof *j);
+    if (j) j->rgb = vm_thumb_scale(px, w, h, maxw, &j->w, &j->h);
+    if (!j || !j->rgb) { free(j); atomic_store(&thumb_busy, 0); return -1; }
+    memcpy(j->dir, dir, strlen(dir) + 1);
+    pthread_attr_t at;
+    pthread_t t;
+    pthread_attr_init(&at);
+    pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+    int e = pthread_create(&t, &at, thumb_main, j);
+    pthread_attr_destroy(&at);
+    if (e) { free(j->rgb); free(j); atomic_store(&thumb_busy, 0); return -1; }
+    return 0;
 }
