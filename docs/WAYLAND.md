@@ -1319,6 +1319,13 @@ frame. `tests/wlperf_headless.sh` checks each part against a headless lord-serve
   the flip of the window's display, with that display's time, vblank count and refresh (`wl_presented(key, …)`; a window
   on no known display follows the main one); a headless lord-server now answers it at the end of each frame (it never
   did: `wlperf-client frames 3` got 0 of 180 answered, now 180). `WlOutput.key` is main.c's index of each display.
+- **New content reaches only its displays (GPU path).** An app's new buffer is only a texture: no UI damage, but the
+  displays showing it must present again. `main.c` marked every GPU display (`wl_new`) for any app's frame, so a video on
+  one display made all three compose. Now `wl_new_content()` gives the displays it is on: the window's box and the
+  displays it was on at the last frame (`surf_keys`, `outpick_keys`), the one a fullscreen window covers, the drag icon's
+  and a menu's box; a window last drawn inside a transform (the Overview, the minimize effect) or not placed yet still
+  marks every display. `engine-test`'s damage suites (`test_damage_fuzz`, `test_damage_pipeline`) pass unchanged, and
+  `build/outpick-test` checks the keys of a box (one display, two, mirrored, none).
 
 ## Pending
 

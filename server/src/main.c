@@ -2261,8 +2261,10 @@ static int render_frame(Server *s) {
      * GPU display must still present it: before 0.8.1 nothing was flipped until some other part of
      * the screen changed (the clock, the cursor...), so typing in Chromium or Firefox showed up to a
      * second late and Chromium logged "buggy presentation feedback" (docs/TROUBLESHOOTING.md). */
-    if (wl_new_content() && gpu_active())
-        for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].gpu >= 0) s->out[i].wl_new = 1;
+    /* Only the displays the window is on (0.8.9.5): a video on one display made every display compose again. */
+    unsigned wlk = wl_new_content();
+    if (wlk && gpu_active())
+        for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].gpu >= 0 && (wlk >> i & 1)) s->out[i].wl_new = 1;
     /* a machine's new frame in the texture its window draws (media_src_present): only the displays it is on */
     float mx0, my0, mx1, my1;
     if (media_present_take(&mx0, &my0, &mx1, &my1) && gpu_active())

@@ -451,6 +451,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A Linux app's new frame composes only the displays it is on, in development** (Wayland audit item 3, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). On the GPU path any app's new buffer made
+  every display compose and flip again; a video or a terminal on one monitor kept all of them busy. Now only the
+  displays the window (or its menu, the drag icon, a fullscreen app's display) is on present it; a window in the
+  Overview or not yet placed still marks every display.
+
 - **Linux apps' frame callbacks and presentation feedback follow their own display, in development** (Wayland audit
   item 2, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every window's frame
   callbacks went with any display's frame, so with displays of different refresh rates an app was paced by the fastest

@@ -173,6 +173,7 @@ struct Surf {
     int bscale, p_bscale;
     struct wl_resource *frac;
     unsigned outmask;
+    int tf_drawn;                   /* last drawn inside a transformed node (the Overview): it may be on any display */
     int fslot;                      /* its main display (output slot, outpick_main; -1 none): its frames and presentation follow it */
     int pref_scale;
     int logged_ratio;               /* buffer px per logical px ×100, last logged (docs/DISPLAYS.md) */
@@ -225,6 +226,7 @@ static Draw draws[2][128];
 static int ndraws[2];
 static int need_frame;              /* an app changed its content: must present */
 static int frames_held;             /* frame callbacks wait for their own display's frame (wl_frame_done) */
+static unsigned new_keys;           /* the displays (WlOutput.key bits) new content must reach: wl_new_content */
 static Dmabuf *to_release[64];      /* replaced: released after the next frame */
 static int nrelease;
 
@@ -402,6 +404,13 @@ int wl_content_take(float *x0, float *y0, float *x1, float *y1) {
     return 1;
 }
 
+static unsigned box_keys(float x0, float y0, float x1, float y1);
+static unsigned surf_keys(Surf *top);
+
+/* GPU path: new content of a window, a menu or the drag icon is only a texture: the displays it is on present again
+ * (wl_new_content), not every display (main.c marked them all). */
+static void new_on(unsigned keys) { need_frame = 1; new_keys |= keys; }
+
 static void damage_node(Surf *s) {
     Surf *top = s;
     while (top->parent && top->role != R_TOPLEVEL) top = top->parent;
@@ -411,7 +420,7 @@ static void damage_node(Surf *s) {
         else content_note(tn->prev_box);
     }
     /* GPU path: if only the content changed, presenting again is enough */
-    if (gpu_active() && (top->role == R_POPUP || top == fs_surf || hole_sig(s) == s->hole_sig)) { need_frame = 1; return; }
+    if (gpu_active() && (top->role == R_POPUP || top == fs_surf || hole_sig(s) == s->hole_sig)) { new_on(surf_keys(top)); return; }
     Node *n = top->node ? node_get(top->node) : NULL;
     if (n && n->prev_box.x1 > n->prev_box.x0) damage_add(n->prev_box);
     ui.dirty = 1;
@@ -457,7 +466,7 @@ static int origin(Surf *s, float *x, float *y) {
 
 static void popup_box_damage(Surf *s) {
     float x, y;
-    if (gpu_active()) { need_frame = 1; return; }          /* menus go above the UI */
+    if (gpu_active()) { new_on(surf_keys(s)); return; }    /* menus go above the UI */
     if (s->lw > 0 && origin(s, &x, &y)) damage_add((Box){ x - 2, y - 2, x + s->lw + 2, y + s->lh + 2 });
     ui.dirty = 1;
 }
@@ -1290,6 +1299,26 @@ static int slot_key(int slot) {
     OutPickSlot p[OUT_MAX];
     pick_slots(p);
     return outpick_key(p, OUT_MAX, slot);
+}
+
+static unsigned box_keys(float x0, float y0, float x1, float y1) {
+    OutPickSlot p[OUT_MAX];
+    pick_slots(p);
+    return outpick_keys(p, OUT_MAX, x0, y0, x1, y1);
+}
+/* The displays a window (or a menu) is on: its box now, and the displays it was on at the last frame (enter/leave);
+ * fullscreen, the one it covers; drawn in the Overview or another transform, or nowhere known yet, every display. */
+static unsigned surf_keys(Surf *top) {
+    if (top == fs_surf) return fs_slot < 0 ? OUTPICK_ALL : slot_key(fs_slot) < 0 ? OUTPICK_ALL : 1u << slot_key(fs_slot);
+    if (top->tf_drawn) return OUTPICK_ALL;
+    float x, y;
+    if (!origin(top, &x, &y) || top->lw <= 0) return OUTPICK_ALL;
+    unsigned k = box_keys(x + (float)top->gx, y + (float)top->gy, x + (float)(top->gx + (top->gw > 0 ? top->gw : top->lw)),
+                          y + (float)(top->gy + (top->gh > 0 ? top->gh : top->lh)));
+    if (k == OUTPICK_ALL) return k;
+    for (int i = 0; i < OUT_MAX; i++)
+        if (top->outmask >> i & 1) { int key = slot_key(i); if (key < 0) return OUTPICK_ALL; k |= 1u << key; }
+    return k;
 }
 
 void wl_set_outputs(const WlOutput *list, int n, int main) {
@@ -3059,6 +3088,8 @@ static uint32_t *capture_readback(const Surf *s) {
 static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip) {
     uint32_t *tmp;
     if (gpu_active() && !paint_capture_mode) {          /* in a screenshot they are always copied */
+        Surf *tt = toplevel_of(s);
+        if (tt) tt->tf_drawn = tfv.on;
         if (tfv.on) {
             if (s->content && !tfv.skip && ntf_holes < TF_HOLES && ndraws[0] < 128) {
                 float X = x * tfv.sx + tfv.tx, Y = y * tfv.sy + tfv.ty, W = s->lw * tfv.sx, H = s->lh * tfv.sy;
@@ -3346,7 +3377,11 @@ void wl_paint_fullscreen(Canvas *out) {
 
 int wl_fullscreen_active(void) { return fs_surf && fs_surf->content; }
 int wl_wants_frame(void) { return need_frame || frames_held; }
-int wl_new_content(void) { return need_frame; }
+unsigned wl_new_content(void) {
+    unsigned k = need_frame ? new_keys : 0;
+    new_keys = 0;
+    return k;
+}
 
 /* Direct scanout: the fullscreen window has a dmabuf the size of the output, there are no
  * menus on top and the cursor does not need to be drawn (cursor plane or hidden). */
@@ -3627,7 +3662,7 @@ static void dnd_icon_damage(void) {
     float x, y;
     Surf *icon = dnd_icon_at(&x, &y);
     if (!icon) return;
-    if (gpu_active()) { need_frame = 1; return; }          /* above the UI, like the menus */
+    if (gpu_active()) { new_on(box_keys(x, y, x + icon->lw, y + icon->lh)); return; }   /* above the UI, like the menus */
     damage_add((Box){ x - 2, y - 2, x + icon->lw + 2, y + icon->lh + 2 });
     ui.dirty = 1;
 }
@@ -4905,7 +4940,7 @@ static void wl_gpu_changed(void) {
         s->tex_dirty = 1;
         if (s->node) damage_node(s);
     }
-    need_frame = 1;
+    new_on(OUTPICK_ALL);
     ui.dirty = 1;
     damage_add((Box){ 0, 0, ui.width, ui.height });
     GpuFormat f[256];

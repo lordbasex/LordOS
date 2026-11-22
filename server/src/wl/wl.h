@@ -117,7 +117,9 @@ int  wl_content_take(float *x0, float *y0, float *x1, float *y1);
 void wl_fullscreen_allow(int on);           /* 0 while the sharing indicator must stay on screen */
 int  wl_try_scanout(int cursor_free);       /* GPU path: 1 if fullscreen went straight to the card */
 int  wl_wants_frame(void);                  /* an app changed its content, or frame callbacks wait for their display */
-int  wl_new_content(void);                  /* an app changed its content: the GPU displays must present */
+/* the displays (WlOutput.key bits, OUTPICK_ALL for every one) where an app's new content must be presented, 0 if none;
+ * taken once (the next call says only what is newer) */
+unsigned wl_new_content(void);
 /* display `key`'s flip finished (wp_presentation): the feedback of the windows on it (-1: every window, no monitor);
  * main_key: the main display, whose flips answer the windows on no known display */
 void wl_presented(int key, int main_key, uint64_t ns, unsigned seq, unsigned refresh_ns);
