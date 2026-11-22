@@ -86,6 +86,7 @@
 #include "../cursor.h"
 #include "ptrlock.h"
 #include "outpick.h"
+#include "wlcolor.h"
 #include "buftf.h"
 #include "idlenotify.h"
 #include "ext-idle-notify-v1-protocol.h"
@@ -805,12 +806,39 @@ static void bind_am(struct wl_client *c, void *data, uint32_t ver, uint32_t id) 
 }
 static float surf_alpha(const Surf *s) { return s->alpha == UINT32_MAX ? 1.0f : (float)((double)s->alpha / (double)UINT32_MAX); }
 
+/* color-management-v1 (wlcolor.h): a surface whose content needs converting has it as pixels, converted where they
+ * changed; a dmabuf the CPU can't map is read back from its texture first. */
+static void color_convert(Surf *s, const CcConv *cv) {
+    if (!cv || !s->px) return;
+    if (s->dmg_full) cc_convert(cv, s->px, s->w, 0, 0, s->w, s->h, s->opaque);
+    else cc_convert(cv, s->px, s->w, s->dmg.x0, s->dmg.y0, s->dmg.x1, s->dmg.y1, s->opaque);
+}
+static int dm_read_converted(Surf *s, Dmabuf *dm, const CcConv *cv) {
+    int w = dm->d.width, h = dm->d.height;
+    if (!dm_tex(dm) || w <= 0 || h <= 0 || w > 8192 || h > 8192) return -1;
+    uint32_t *px = malloc((size_t)w * (size_t)h * 4);
+    if (!px || gpu_tex_read(dm->tex, px, w, h)) { free(px); return -1; }
+    upright(&px, &w, &h, s->tf);
+    free(s->px);
+    s->px = px;
+    s->w = w;
+    s->h = h;
+    s->tf_px = s->tf;
+    s->opaque = dm->d.fourcc == DRM_FORMAT_XRGB8888 || dm->d.fourcc == DRM_FORMAT_XBGR8888;
+    s->content = 1;
+    s->tex_dirty = 1;
+    s->dmg_full = 1;
+    color_convert(s, cv);
+    return 0;
+}
+
 /* The buffer the app just sent becomes the surface's content. */
 static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
     Dmabuf *dm = dmabuf_of(buf), *old = s->dmabuf;
+    const CcConv *cv = wlcolor_conv(s->res);
     s->dmabuf = NULL;
     s->dmg_full = 1;                        /* a dmabuf or no buffer: all of it (copy_buffer says less) */
-    if (dm && s->role != R_CURSOR && dm_tex(dm)) {
+    if (dm && s->role != R_CURSOR && !cv && dm_tex(dm)) {
         dm->refs++;
         s->dmabuf = dm;
         s->w = dm->d.width;
@@ -822,6 +850,9 @@ static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
     } else if (dm && map_linear(s, dm) == 0) {
         s->content = 1;
         s->tex_dirty = 1;
+        color_convert(s, cv);
+        wl_buffer_send_release(buf);
+    } else if (dm && cv && dm_read_converted(s, dm, cv) == 0) {
         wl_buffer_send_release(buf);
     } else if (dm && !gpu_active() && s->role != R_CURSOR) {
         /* Off the GPU (the session left the monitor, or a remote viewer) with a buffer the CPU
@@ -849,11 +880,13 @@ static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
             s->content = 1;
             s->tf_px = s->tf;
             s->tex_dirty = 1;
+            color_convert(s, cv);
         }
         wl_buffer_send_release(buf);
     } else {
         copy_buffer(s, buf, dmg);
         s->tex_dirty = 1;
+        if (s->content) color_convert(s, cv);
     }
     if (s->dmg_full) s->tex_full = 1;
     else s->tex_dmg = buftf_union(s->tex_dmg, s->dmg);
@@ -979,6 +1012,10 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (keylag_enabled && key_focus && c == key_focus->client) keylag_commit();
     s->tf = s->p_tf;
+    /* color-management-v1 and color-representation-v1 (wlcolor.h): a new conversion converts all of the next buffer */
+    int cc = wlcolor_commit(s->res, s->p_attached ? s->p_buf != NULL : s->content);
+    if (cc < 0) return;
+    if (cc > 0 && s->p_attached) { free(s->px); s->px = NULL; }
     if (s->p_attached) {
         take_buffer(s, s->p_buf, commit_damage(s, s->p_buf));
         if (s->p_buf) { wl_list_remove(&s->p_buf_destroy.link); wl_list_init(&s->p_buf_destroy.link); }
@@ -1653,8 +1690,10 @@ void wl_set_outputs(const WlOutput *list, int n, int main) {
             wl_list_init(&o->res);
             wl_list_init(&o->xdg);
             o->global = wl_global_create(dpy, &wl_output_interface, 4, (void *)(intptr_t)(slot + 1), bind_output);
+            wlcolor_set_output(slot, o->o.chroma);
             continue;
         }
+        wlcolor_set_output(slot, o->o.chroma);      /* image_description_changed, before the done below */
         struct wl_resource *r;
         wl_resource_for_each(r, &o->res) send_output(r, &o->o);
         wl_resource_for_each(r, &o->xdg) send_xdg_output(r, &o->o);
@@ -1663,6 +1702,7 @@ void wl_set_outputs(const WlOutput *list, int n, int main) {
     for (int i = 0; i < OUT_MAX; i++) {
         if (!oslots[i].used || keep[i]) continue;
         surface_leave_slot(i);
+        wlcolor_output_gone(i);
         struct wl_resource *r, *t;
         wl_resource_for_each_safe(r, t, &oslots[i].res) { wl_resource_set_user_data(r, NULL); wl_list_remove(wl_resource_get_link(r)); wl_list_init(wl_resource_get_link(r)); }
         wl_resource_for_each_safe(r, t, &oslots[i].xdg) { wl_resource_set_user_data(r, NULL); wl_list_remove(wl_resource_get_link(r)); wl_list_init(wl_resource_get_link(r)); }
@@ -1703,6 +1743,7 @@ static void surface_outputs(Surf *s, float x, float y, int depth, int fslot) {
         fslot = outpick_main(p, OUT_MAX, x, y, x + s->lw, y + s->lh);
     }
     s->fslot = fslot;
+    wlcolor_surface_slot(s->res, fslot);            /* its preferred image description (wlcolor.h) */
     unsigned mask = 0;
     int best = 0;
     for (int i = 0; i < OUT_MAX; i++) {
@@ -5445,7 +5486,10 @@ static void wl_gpu_changed(void) {
     for (int i = 0; i < MAX_SURF; i++) {
         Surf *s = surfs[i];
         if (!s) continue;
-        if (s->dmabuf && dm_tex(s->dmabuf)) {
+        if (s->dmabuf && wlcolor_conv(s->res)) {           /* converted: read back once the GPU is here (wlcolor.h) */
+            Dmabuf *d = s->dmabuf;
+            if (dm_read_converted(s, d, wlcolor_conv(s->res)) == 0) { s->dmabuf = NULL; queue_release(d); apply_viewport(s); }
+        } else if (s->dmabuf && dm_tex(s->dmabuf)) {
             const GpuDmabuf *g = &s->dmabuf->d;
             s->w = g->width;
             s->h = g->height;
@@ -5911,7 +5955,7 @@ void wl_set_covered(int id, int covered) {
 void wl_output_resized(void) {
     if (!dpy) return;
     int w = (int)ui.width, h = (int)ui.height;
-    WlOutput o = { 0, 0, w, h, w, h, 60000, 100, w * 254 / 960, h * 254 / 960, "LORD-1", "LordOS display", 0 };
+    WlOutput o = { 0, 0, w, h, w, h, 60000, 100, w * 254 / 960, h * 254 / 960, "LORD-1", "LordOS display", 0, { 0 } };
     wl_set_outputs(&o, 1, 0);
 }
 
@@ -5983,6 +6027,7 @@ int wl_start(void) {
     wl_global_create(dpy, &wp_viewporter_interface, 1, NULL, bind_viewporter);
     wl_global_create(dpy, &wp_single_pixel_buffer_manager_v1_interface, 1, NULL, bind_spbm);   /* one-pixel buffers (backgrounds) */
     wl_global_create(dpy, &wp_alpha_modifier_v1_interface, 1, NULL, bind_am);                   /* a surface's opacity */
+    wlcolor_init(dpy);                  /* color-management-v1 and color-representation-v1 (wlcolor.h) */
     wl_global_create(dpy, &zwp_relative_pointer_manager_v1_interface, 1, NULL, bind_relm);
     wl_global_create(dpy, &zwp_pointer_constraints_v1_interface, 1, NULL, bind_consm);
     wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 2, NULL, bind_csm);   /* cursors by name (2: dnd_ask, all_resize) */
