@@ -1075,6 +1075,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
       of its descendants (`bad_parent`) and a surface that already has a window or menu role (`bad_surface`).
       `xdg_surface.get_popup` refuses a parent that is the popup itself or one of its own menus
       (`invalid_popup_parent`).
+      A security review then found a mixed case. A surface could first get an xdg_surface, then become a subsurface,
+      then a menu. It ended up linked twice, in its parent's `kids[]` and as a menu of another surface, and the
+      parent-chain check did not follow the edges the walks use. Now a surface with an xdg_surface can't become a
+      subsurface (`bad_surface`), and a subsurface can't take a window or menu role (`role`). The cycle check walks
+      exactly the edges the walks follow (`surf_reaches`: subsurfaces and menus). As a safety net, the recursive walks
+      (`origin`, `paint_tree`, `draw_tree`, `blit_tree`, `surface_at`) stop 64 levels down and log it once, so a tree
+      that is cut never runs the stack out.
     - **The X window manager could re-enter its own shutdown** (`src/wl/xwm.c`). When a write to Xwayland failed,
       `lost()` called `xwm_stop()`, which ends a drag and unmaps every X window through wl.c. Those calls send to X
       again, so a second failed write called `xwm_stop()` from inside itself and freed the same window twice. The
@@ -1098,7 +1105,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     - `lord.sys` keyboard layouts read a string after freeing it (`f_kb_list`).
   - Tests: `tests/cycle_client.c` (run by `tests/run_suites.sh` against a headless lord-server, through
     `tests/popup_headless.sh cycle-client`) covers a subsurface of itself, under its child and under its grandchild,
-    a popup of itself, two popups each the other's parent, and a nested subsurface tree that must still work.
+    a popup of itself, two popups each the other's parent, and a nested subsurface tree that must still work. Further
+    cases: a surface with an xdg_surface made a subsurface, a subsurface given an xdg_surface, a menu made a
+    subsurface of its own subsurface, and a window → menu → subsurface → subsurface chain that must work, with a cycle
+    in it refused.
     `wdog_test.c` covers the JS stack read from the interrupt handler and the crash report: a stack overflow ends in
     SIGSEGV with a complete report on the alternate stack, and an abort ends in SIGABRT.
 - **Store → For this computer: no firmware card for a file no package has** (`sdk/suggestengine.js`,

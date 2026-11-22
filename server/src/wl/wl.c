@@ -548,7 +548,28 @@ static void damage_sub(Surf *s, int whole) {
 }
 
 /* On-screen origin of a surface's buffer (window or menu). 0 if unknown. */
+/* The recursive walks of a surface tree (origin, paint_tree, draw_tree, blit_tree, surface_at) go no deeper than
+ * WALK_MAX levels, all of them together: the requests that link surfaces refuse cycles (surf_reaches), and this is
+ * the safety net if one is ever missed: the tree is cut there (said once) instead of the stack running out. */
+#define WALK_MAX 64
+static int walk_depth;
+static int walk_enter(void) {
+    if (walk_depth >= WALK_MAX) {
+        static int said;
+        if (!said) { said = 1; fprintf(stderr, "wayland: a surface tree deeper than %d levels: cut there\n", WALK_MAX); }
+        return 0;
+    }
+    walk_depth++;
+    return 1;
+}
+static int origin_r(Surf *s, float *x, float *y);
 static int origin(Surf *s, float *x, float *y) {
+    if (!walk_enter()) return 0;
+    int r = origin_r(s, x, y);
+    walk_depth--;
+    return r;
+}
+static int origin_r(Surf *s, float *x, float *y) {
     if (s == fs_surf) {
         float fx, fy, fw, fh;
         fs_rect(&fx, &fy, &fw, &fh);
@@ -2020,17 +2041,44 @@ static int surf_in_chain(const Surf *a, const Surf *s) {
     return a != NULL;
 }
 
+/* 1 if to can be reached from `from` along the edges the walks follow downwards: a surface's subsurfaces (kids[],
+ * paint_tree, surface_at, ...) and its menus (popups whose parent it is, origin). Linking to as from's child (or
+ * menu) would close a cycle when it is reached already. Every surface is visited once at most. */
+static int surf_reaches(Surf *from, const Surf *to) {
+    Surf *stack[MAX_SURF + 1], *seen[MAX_SURF + 1];
+    int ns = 0, nseen = 0;
+    stack[ns++] = from;
+    while (ns) {
+        Surf *a = stack[--ns];
+        if (a == to) return 1;
+        int dup = 0;
+        for (int i = 0; i < nseen && !dup; i++) dup = seen[i] == a;
+        if (dup) continue;
+        if (nseen > MAX_SURF) return 1;             /* more than every surface: a cycle already */
+        seen[nseen++] = a;
+        for (int i = 0; i < a->nkids; i++) { if (ns > MAX_SURF) return 1; stack[ns++] = a->kids[i]; }
+        for (int i = 0; i < MAX_SURF; i++)
+            if (surfs[i] && surfs[i] != a && surfs[i]->parent == a && surfs[i]->role == R_POPUP) {
+                if (ns > MAX_SURF) return 1;                /* more edges than surfaces: a cycle already */
+                stack[ns++] = surfs[i];
+            }
+    }
+    return 0;
+}
+
 static void subc_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void subc_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface, struct wl_resource *parent) {
     Surf *s = wl_resource_get_user_data(surface), *p = wl_resource_get_user_data(parent);
     if (!s || !p) { wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_SURFACE, "the wl_surface is gone"); return; }
-    /* one wl_subsurface per wl_surface, and not for a surface that has another role (window, menu, cursor, drag icon) */
-    if (s->sub || s->top || s->popup || s->role == R_CURSOR || s->role == R_DNDICON) {
+    /* one wl_subsurface per wl_surface, and not for a surface that has another role (window, menu, cursor, drag icon) or
+     * an xdg_surface that may take one: a subsurface that became a menu too was linked twice (kids[] and parent) */
+    if (s->sub || s->xdg || s->top || s->popup || s->role == R_TOPLEVEL || s->role == R_POPUP || s->role == R_CURSOR ||
+        s->role == R_DNDICON) {
         wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_SURFACE, "the wl_surface already has a role");
         return;
     }
     /* wayland.xml: the parent may be neither the surface itself nor one of its descendants */
-    if (surf_in_chain(p, s)) {
+    if (surf_in_chain(p, s) || surf_reaches(s, p)) {
         wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_PARENT, "the parent is the surface itself or one of its descendants");
         return;
     }
@@ -3645,6 +3693,7 @@ static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id)
     Surf *s = wl_resource_get_user_data(r);
     if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
     if (s->top || s->popup) { wl_resource_post_error(r, XDG_SURFACE_ERROR_ALREADY_CONSTRUCTED, "the xdg_surface already has a role object"); return; }
+    if (s->sub || s->role == R_SUB) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface is a subsurface"); return; }
     struct wl_resource *t = wl_resource_create(c, &xdg_toplevel_interface, wl_resource_get_version(r), id);
     if (!t) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(t, &toplevel_impl, s, top_gone);
@@ -3658,8 +3707,10 @@ static void xs_popup(struct wl_client *c, struct wl_resource *r, uint32_t id, st
     Surf *s = wl_resource_get_user_data(r);
     if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
     if (s->top || s->popup) { wl_resource_post_error(r, XDG_SURFACE_ERROR_ALREADY_CONSTRUCTED, "the xdg_surface already has a role object"); return; }
+    if (s->sub || s->role == R_SUB) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface is a subsurface"); return; }
     Surf *ps = parent ? wl_resource_get_user_data(parent) : NULL;
-    if (ps && surf_in_chain(ps, s)) {       /* a menu of itself or of its own menu: a cycle (surf_in_chain) */
+    /* a menu of itself, of its own menu or of a surface it reaches: a cycle (surf_in_chain, surf_reaches) */
+    if (ps && (surf_in_chain(ps, s) || surf_reaches(s, ps))) {
         wl_resource_post_error(r, XDG_WM_BASE_ERROR_INVALID_POPUP_PARENT, "the popup's parent is the popup itself or one of its menus");
         return;
     }
@@ -4058,7 +4109,13 @@ static uint32_t *capture_readback(const Surf *s) {
     return NULL;
 }
 
+static void paint_tree_r(Canvas *c, Surf *s, float x, float y, float op_tree, Rect clip);
 static void paint_tree(Canvas *c, Surf *s, float x, float y, float op_tree, Rect clip) {
+    if (!walk_enter()) return;
+    paint_tree_r(c, s, x, y, op_tree, clip);
+    walk_depth--;
+}
+static void paint_tree_r(Canvas *c, Surf *s, float x, float y, float op_tree, Rect clip) {
     uint32_t *tmp;
     float op = op_tree * surf_alpha(s);         /* wp_alpha_modifier_v1: this surface only, not its subsurfaces */
     s->hole_sig = hole_sig(s);          /* the shape it was painted with: damage_box and the GPU path compare it */
@@ -4218,7 +4275,13 @@ static void draw_surface(Surf *s, float x, float y, float dw, float dh, Rect cli
     draw_tex(s, t, PVX(x), PVY(y), dw * paint_view.k, dh * paint_view.k, phys_rect(clip), op);
 }
 
+static void draw_tree_r(Surf *s, float x, float y, float scale_x, float scale_y, Rect clip);
 static void draw_tree(Surf *s, float x, float y, float scale_x, float scale_y, Rect clip) {
+    if (!walk_enter()) return;
+    draw_tree_r(s, x, y, scale_x, scale_y, clip);
+    walk_depth--;
+}
+static void draw_tree_r(Surf *s, float x, float y, float scale_x, float scale_y, Rect clip) {
     draw_surface(s, x, y, s->lw * scale_x, s->lh * scale_y, clip, surf_alpha(s));
     for (int i = 0; i < s->nkids; i++)
         draw_tree(s->kids[i], x + s->kids[i]->sx * scale_x, y + s->kids[i]->sy * scale_y, scale_x, scale_y, clip);
@@ -4323,7 +4386,13 @@ void wl_gpu_draw_layer(int layer) {
 
 /* A fullscreen window and its subsurfaces, scaled as one (the GPU path's draw_tree): a browser such as Firefox draws
  * its page in a subsurface and leaves the window's own buffer clear, so copying only the window showed nothing. */
+static void blit_tree_r(Canvas *c, Surf *s, float x, float y, float sxk, float syk);
 static void blit_tree(Canvas *c, Surf *s, float x, float y, float sxk, float syk) {
+    if (!walk_enter()) return;
+    blit_tree_r(c, s, x, y, sxk, syk);
+    walk_depth--;
+}
+static void blit_tree_r(Canvas *c, Surf *s, float x, float y, float sxk, float syk) {
     if (s->content) {
         uint32_t *tmp = s->px ? NULL : capture_readback(s);      /* a GPU app in a screenshot */
         if (tmp) s->px = tmp;
@@ -4604,7 +4673,14 @@ static WlTiming **timing_slot(struct wl_resource *surface) {
 
 /* ---- input ---- */
 
+static Surf *surface_at_r(Surf *s, float lx, float ly, float *ox, float *oy);
 static Surf *surface_at(Surf *s, float lx, float ly, float *ox, float *oy) {
+    if (!walk_enter()) return NULL;
+    Surf *r = surface_at_r(s, lx, ly, ox, oy);
+    walk_depth--;
+    return r;
+}
+static Surf *surface_at_r(Surf *s, float lx, float ly, float *ox, float *oy) {
     for (int i = s->nkids - 1; i >= 0; i--) {
         Surf *k = s->kids[i];
         Surf *hit = surface_at(k, lx - k->sx, ly - k->sy, ox, oy);
