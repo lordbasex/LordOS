@@ -1127,10 +1127,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (every key through `ReadOne` and `ReadAll`, and the keyfile) and `tests/gtk_defaults_test.mjs` (the font folder
   against `mkdeb.sh`, the values against Debian's schema).
 - **Machines: a click lands where the pointer is, in development** (`docs/VIRTUALIZATION.md` 6.25, "Buttons in both
-  modes"). On a Windows 11 machine with an Intel GVT-g vGPU, right-click did nothing while the mouse was free (the tablet)
+  modes"). On a guest with an Intel GVT-g vGPU, right-click did nothing while the mouse was free (the tablet)
   and worked while captured. lord-vmdisplay sent a button to QEMU as soon as it arrived, but the pointer's position that
   the machine's window sends just before it only at the end of its turn. So the tablet pressed at the previous position
-  and then moved with the button down: a short drag, which Windows' shell doesn't take as a right-click. Now any motion
+  and then moved with the button down: a short drag, which the guest's shell doesn't take as a right-click. Now any motion
   gathered so far goes out before each button and wheel step, free and captured. To be confirmed on that machine.
 - **Machines: QEMU's "Failed to call update: Timeout was reached" explained, and lord-vmdisplay's answers measured, in
   development** (`docs/VIRTUALIZATION.md` 3.2). QEMU gives each display listener call 1 s. lord-vmdisplay answers every
