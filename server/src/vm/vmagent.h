@@ -89,6 +89,12 @@
  *                            alpha), rows top first.
  *   LAG_WINACT   host → guest  u32 id, u8 action (LAGA_*); LAGA_MOVE adds i32 x, i32 y, i32 w, i32 h. The guest acts
  *                            only on a window that is in the last list it sent.
+ *   LAG_WINREFUSED guest → host  u32 id, u8 action (LAGA_*), u8 reason (LAGR_*); exactly LAG_WINREFUSED_BYTES: the guest
+ *                            couldn't do that action to that window (lord-vm logs it). LAGR_ELEVATED: the window's
+ *                            program runs with more rights than the helper (Windows: as administrator; its messages
+ *                            and moves are refused by the system), so it closes only from inside the machine.
+ *   LAGW_ELEVATED in a window's flags says the same ahead of time; the guest sets it only when the host's hello says
+ *                            "elevated" (an older host refuses a flag it doesn't know).
  *   LAG_APPLIST  guest → host  u16 count (≤ LAG_APPS_MAX), then per program: u16 name length (1..LAG_NAME_MAX) + name,
  *                            u16 token length (1..LAG_TOKEN_MAX) + token; both UTF-8. The token is the guest's own
  *                            (a Start menu shortcut's path): opaque to the host.
@@ -181,6 +187,13 @@ int ag_displays_parse(const uint8_t *p, size_t n, AgDisplay out[AG_DISPLAYS_MAX]
 size_t ag_displays_write(const AgDisplay *d, int n, int shown, uint8_t *out, size_t cap);
 /* one line for a log: "\\.\DISPLAY1 1022x724 at 0,0 primary; \\.\DISPLAY2 1920x1080 at 1022,0 (shown)" */
 void ag_displays_text(const AgDisplay *d, int n, int shown, char *out, size_t cap);
+/* Which display the machine's picture shows (lordos-guest-win; pure, so it is tested here). The picture only ever comes
+ * from a PCI GPU (GVT-g, virtio-gpu, QXL, a passed-through card): while one display is on a PCI adapter (AGDS_HW), a
+ * display that isn't (a basic or indirect display) is never chosen. Among the candidates: `locked` (an index, -1 none)
+ * while it is still one; else one whose size is want_w × want_h (the size the host asked for: equal, or under it by less
+ * than 8 pixels), the primary first; else the primary candidate; else the first. *lock gets what to remember: the
+ * index chosen by size (or the kept lock), -1 otherwise. The index chosen, -1 for no display. */
+int ag_shown_pick(const AgDisplay *d, int n, uint32_t want_w, uint32_t want_h, int locked, int *lock);
 
 /* apps mode: limits, the VM_AGENT_STATE b bit (vmproto.h's VAC_* go up to VAC_DISPLAY, 128), flags, actions */
 #define LAG_CAP_WINDOWS 256u
@@ -192,8 +205,15 @@ void ag_displays_text(const AgDisplay *d, int n, int shown, char *out, size_t ca
 #define LAG_NAME_MAX    256
 #define LAG_TOKEN_MAX   512
 #define LAG_DIM_MAX     16384
-enum { LAGW_FOCUSED = 1, LAGW_MINIMIZED = 2, LAGW_TOPMOST = 4, LAGW_OWNED = 8, LAGW_ALL = 15 };
+enum { LAGW_FOCUSED = 1, LAGW_MINIMIZED = 2, LAGW_TOPMOST = 4, LAGW_OWNED = 8, LAGW_ELEVATED = 16, LAGW_ALL = 31 };
 enum { LAGA_FOCUS = 1, LAGA_CLOSE = 2, LAGA_MINIMIZE = 3, LAGA_RESTORE = 4, LAGA_MOVE = 5 };
+/* LAG_WINREFUSED: why. The window runs with more rights than the helper; the system refused for another reason */
+enum { LAG_WINREFUSED = 19 };
+enum { LAGR_ELEVATED = 1, LAGR_DENIED = 2, LAGR_LAST = LAGR_DENIED };
+#define LAG_WINREFUSED_BYTES 6
+/* 0 well formed: exactly LAG_WINREFUSED_BYTES, id ≠ 0, a known action and reason */
+int lag_winrefused_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *action, uint8_t *reason);
+int lag_winrefused_write(uint8_t out[LAG_WINREFUSED_BYTES], uint32_t id, uint8_t action, uint8_t reason);
 
 typedef struct {
     uint32_t id, flags, owner, pid;                 /* owner: 0 unless LAGW_OWNED */

@@ -427,7 +427,7 @@ export function clipState(agent, cfg) {
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w7', linux: '5' };
+export const TOOLS_SHIPPED = { windows: 'w8', linux: '5' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
@@ -1041,6 +1041,18 @@ export function planWindows(list, have) {
 export function guestAppItems(apps) {
   const seen = new Set();
   return (apps || []).filter((a) => a && a.token && a.name && !seen.has(a.token) && seen.add(a.token)).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Apps mode: the closes the guest refused (lord.vm.closeRefusals: its window runs as administrator in Windows, or the
+// system refused) as guests[dir].closeRefused: gid → { reason: 'elevated' | 'other', at (ms since 1970) }; anything else
+// the list holds is left out.
+export function closeRefusedOf(list) {
+  const out = {};
+  for (const r of Array.isArray(list) ? list : []) {
+    if (!r || !(Number.isInteger(r.gid) && r.gid > 0) || !(r.reason === 'elevated' || r.reason === 'other') || !Number.isFinite(r.at)) continue;
+    out[r.gid] = { reason: r.reason, at: r.at };
+  }
+  return out;
 }
 
 // Where a machine starts from (Configure → Boot; machine.json's boot_order): "auto" (the system disk, then the CD/DVD

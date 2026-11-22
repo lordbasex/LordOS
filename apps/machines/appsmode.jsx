@@ -14,12 +14,13 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
 import { ClipAskBar } from './clipask.jsx';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps, guestPlace, offsetRect, minimizedByUs, AGENT_CAPS, copyLine, placeBatch } from './model.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, closeRefusedOf, wheelSteps, guestPlace, offsetRect, minimizedByUs, AGENT_CAPS, copyLine, placeBatch } from './model.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
 export const CLIP_HOLD_MS = 150;
-// dir → { sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], leave() }
+// dir → { sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], closeRefused: { gid: { reason, at } },
+// leave() }
 export const guests = createStore({});
 // dir → the LordOS window id of that machine's guest window in front, if one is: the machine counts as in use then (its
 // clipboard's gate, 6.8)
@@ -67,7 +68,7 @@ function placeOf(x, w, sid, k, d, have) {
 // guest's list. on: the person wants it; ready: the agent says the guest's helper lists its windows.
 export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTouch }) {
   const sent = useRef(false);
-  const seen = useRef({ w: -1, i: -1, a: -1 });
+  const seen = useRef({ w: -1, i: -1, a: -1, r: -1 });
   // a pause keeps the windows (their pictures stay as they were); stopping, or the agent going, ends it
   const active = !!(on && ready && sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused'));
   useEffect(() => {
@@ -76,8 +77,8 @@ export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTou
     // the guest's screen as large as this display: its windows are never cut by a smaller one
     const [gw, gh] = appsGuestSize(display());
     lord.vm.resize(sid, gw, gh);
-    seen.current = { w: -1, i: -1, a: -1 };
-    publish(dir, { sid, name, mid, leave: onLeave, touch: onTouch, list: [], apps: [] });
+    seen.current = { w: -1, i: -1, a: -1, r: -1 };
+    publish(dir, { sid, name, mid, leave: onLeave, touch: onTouch, list: [], apps: [], closeRefused: {} });
     return () => {
       if (sent.current) lord.vm.apps(sid, false);
       sent.current = false;
@@ -101,6 +102,12 @@ export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTou
       windowPixelIcons.set((m) => ({ ...m, ...icons }));
     }
   }, [active, st?.windowsSeq, st?.iconsSeq, st?.guestAppsSeq]);
+  // a close the guest refused (its window runs as administrator in Windows): the windows' side says so
+  useEffect(() => {
+    if (!active || st.closeRefusedSeq === seen.current.r) return;
+    seen.current.r = st.closeRefusedSeq;
+    publish(dir, { closeRefused: closeRefusedOf(lord.vm.closeRefusals(sid)) });
+  }, [active, st?.closeRefusedSeq]);
   return active;
 }
 

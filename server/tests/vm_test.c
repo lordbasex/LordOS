@@ -1390,7 +1390,7 @@ static void test_apps_mode(void) {
     k = win1(b, put16(b, put32(b, 0, 1), 1), 5, LAG_DIM_MAX + 1, 0, 10, 10, 0, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);      /* x too far */
     k = win1(b, put16(b, put32(b, 0, 1), 1), 5, -32000, -32000, 160, 28, LAGW_MINIMIZED, 0, "a", "b");
     CHECK(lag_winlist_read(b, k, &l) == -1);                                                                                     /* minimized: still a place */
-    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 16, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);          /* unknown flag */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 32, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);          /* unknown flag */
     k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, LAGW_OWNED, 5, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);  /* owns itself */
     k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, LAGW_OWNED, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);  /* owner 0 */
     k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 0, 0, "a\x01", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);        /* control character */
@@ -1562,6 +1562,74 @@ static void test_displays(void) {
     }
 }
 
+/* which display the picture shows (lordos-guest-win w8): the maintainer's GVT-g guest as w7 reported it */
+static void test_shown_pick(void) {
+    AgDisplay d[3];
+    memset(d, 0, sizeof d);
+    /* \\.\DISPLAY2: the Intel vGPU (PCI), follows the host's size; \\.\DISPLAY1: primary, not PCI, 1022x724 */
+    d[0] = (AgDisplay){ 1022, 0, 1024, 768, AGDS_HW, "\\\\.\\DISPLAY2" };
+    d[1] = (AgDisplay){ 0, 0, 1022, 724, AGDS_PRIMARY, "\\\\.\\DISPLAY1" };
+    int lock = 9;
+    /* at hello the host asked 1022x724: the non-PCI display has that size, but never wins over a PCI one */
+    CHECK(ag_shown_pick(d, 2, 1022, 724, -1, &lock) == 0 && lock == -1);
+    /* nothing asked yet */
+    CHECK(ag_shown_pick(d, 2, 0, 0, -1, &lock) == 0 && lock == -1);
+    /* w7's lock on DISPLAY1 isn't kept while a PCI display is there */
+    CHECK(ag_shown_pick(d, 2, 1022, 724, 1, &lock) == 0 && lock == -1);
+    /* apps mode: the host asks 1920x1080 and the vGPU's output follows */
+    d[0].w = 1920; d[0].h = 1080;
+    CHECK(ag_shown_pick(d, 2, 1920, 1080, -1, &lock) == 0 && lock == 0);
+    CHECK(ag_shown_pick(d, 2, 1600, 900, 0, &lock) == 0 && lock == 0);          /* kept while it stays */
+    /* two PCI displays: the one with the size asked for, then the primary */
+    d[1].flags = AGDS_PRIMARY | AGDS_HW;
+    CHECK(ag_shown_pick(d, 2, 1920, 1080, -1, &lock) == 0 && lock == 0);
+    CHECK(ag_shown_pick(d, 2, 1022, 724, -1, &lock) == 1 && lock == 1);
+    CHECK(ag_shown_pick(d, 2, 800, 600, -1, &lock) == 1 && lock == -1);         /* no size match: the primary */
+    CHECK(ag_shown_pick(d, 2, 1925, 1085, -1, &lock) == 0 && lock == 0);        /* under by less than 8 */
+    /* no PCI display at all: the size, then the primary */
+    d[0].flags = 0; d[1].flags = AGDS_PRIMARY;
+    CHECK(ag_shown_pick(d, 2, 1920, 1080, -1, &lock) == 0 && lock == 0);
+    CHECK(ag_shown_pick(d, 2, 0, 0, -1, &lock) == 1 && lock == -1);
+    /* one display; none; a lock out of range */
+    CHECK(ag_shown_pick(d, 1, 0, 0, -1, &lock) == 0);
+    CHECK(ag_shown_pick(d, 0, 0, 0, -1, &lock) == -1 && ag_shown_pick(NULL, 2, 0, 0, -1, &lock) == -1);
+    CHECK(ag_shown_pick(d, 2, 0, 0, 5, NULL) == 1);
+    /* a third, PCI display that isn't primary beats two that aren't PCI */
+    d[2] = (AgDisplay){ 3000, 0, 1280, 800, AGDS_HW, "\\\\.\\DISPLAY3" };
+    CHECK(ag_shown_pick(d, 3, 1920, 1080, 1, &lock) == 2 && lock == -1);
+}
+
+/* LAG_WINREFUSED and LAGW_ELEVATED (w8: a window that runs as administrator in Windows) */
+static void test_winrefused(void) {
+    uint8_t b[LAG_WINREFUSED_BYTES + 1];
+    uint32_t id = 0;
+    uint8_t a = 0, r = 0;
+    CHECK(!lag_winrefused_write(b, 0x10a2c, LAGA_CLOSE, LAGR_ELEVATED));
+    CHECK(!lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, &id, &a, &r) && id == 0x10a2c && a == LAGA_CLOSE && r == LAGR_ELEVATED);
+    CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES - 1, &id, &a, &r) == -1 && lag_winrefused_parse(b, LAG_WINREFUSED_BYTES + 1, &id, &a, &r) == -1);
+    CHECK(lag_winrefused_parse(NULL, LAG_WINREFUSED_BYTES, &id, &a, &r) == -1);
+    b[4] = 0; CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, NULL) == -1);
+    b[4] = LAGA_MOVE + 1; CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, NULL) == -1);
+    b[4] = LAGA_MOVE; b[5] = 0; CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, NULL) == -1);
+    b[5] = LAGR_LAST + 1; CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, NULL) == -1);
+    b[5] = LAGR_DENIED; CHECK(!lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, &r) && r == LAGR_DENIED);
+    memset(b, 0, 4); CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, NULL) == -1);       /* id 0 */
+    CHECK(lag_winrefused_write(b, 0, LAGA_CLOSE, LAGR_ELEVATED) == -1 && lag_winrefused_write(b, 1, 9, LAGR_ELEVATED) == -1 &&
+          lag_winrefused_write(b, 1, LAGA_CLOSE, 7) == -1);
+    /* a window flagged elevated survives the list's parse and copy; an unknown flag still doesn't */
+    LagWinList l;
+    memset(&l, 0, sizeof l);
+    l.serial = 3; l.n = 1;
+    l.w[0] = (LagWinEntry){ .id = 77, .flags = LAGW_ELEVATED | LAGW_FOCUSED, .pid = 9, .x = 10, .y = 20, .w = 300, .h = 200 };
+    strcpy(l.w[0].title, "Computer Management"); strcpy(l.w[0].app, "mmc.exe");
+    static uint8_t buf[LAG_WINDOWS_BYTES];
+    size_t n = lag_windows_write(&l, buf, sizeof buf);
+    static LagWinList back;
+    CHECK(n > 0 && !lag_winlist_read(buf, n, &back) && back.n == 1 && back.w[0].flags == (LAGW_ELEVATED | LAGW_FOCUSED));
+    buf[6 + 20] = 32;               /* flags: a bit nobody knows */
+    CHECK(lag_winlist_read(buf, n, &back) == -1);
+}
+
 static void test_lag(void) {
     uint8_t d[8];
     uint32_t w = 0, h = 0;
@@ -1599,7 +1667,7 @@ static void test_lag(void) {
         { 1, 0, 0, 0, 10, 0, 0, "a", "b" },                         /* empty */
         { 1, 0, 0, 10, LAG_DIM_MAX + 1, 0, 0, "a", "b" },
         { 1, -LAG_DIM_MAX - 1, 0, 10, 10, 0, 0, "a", "b" },
-        { 1, 0, 0, 10, 10, 16, 0, "a", "b" },                       /* unknown flag */
+        { 1, 0, 0, 10, 10, 32, 0, "a", "b" },                       /* unknown flag */
         { 1, 0, 0, 10, 10, LAGW_OWNED, 0, "a", "b" },               /* owner 0 */
         { 1, 0, 0, 10, 10, LAGW_OWNED, 1, "a", "b" },               /* owns itself */
         { 1, 0, 0, 10, 10, 0, 0, "a\xff", "b" },                    /* not UTF-8 */
@@ -1730,6 +1798,16 @@ static void test_clip_on_demand(void) {
     m.d = AGF_TEXT; m.b = VCF_TEXT; CHECK(!vm_msg_valid(&m, 1));                  /* answers are in AGK_CLIPX's layout */
     m = vm_msg(VM_CLIP, 1, 10, VCF_TEXT, 0, 0, NULL); CHECK(vm_msg_valid(&m, 1)); /* a push, as before */
     m.c = -1; CHECK(!vm_msg_valid(&m, 1));
+    /* VM_WINREFUSED (w8): a window id, an action, a reason; nothing else */
+    m = vm_msg(VM_WINREFUSED, 0, 0x10a2c, LAGA_CLOSE, LAGR_ELEVATED, 0, NULL); CHECK(vm_msg_valid(&m, 0) && !vm_msg_valid(&m, 1));
+    m.c = LAGR_DENIED; CHECK(vm_msg_valid(&m, 0));
+    m.c = 0; CHECK(!vm_msg_valid(&m, 0));
+    m.c = 3; CHECK(!vm_msg_valid(&m, 0));
+    m.c = 1; m.b = 0; CHECK(!vm_msg_valid(&m, 0));
+    m.b = 6; CHECK(!vm_msg_valid(&m, 0));
+    m.b = LAGA_MOVE; m.a = 0; CHECK(!vm_msg_valid(&m, 0));
+    m.a = -5; CHECK(vm_msg_valid(&m, 0));                              /* an id above 2^31, as an int */
+    m.d = 1; CHECK(!vm_msg_valid(&m, 0));
     m = vm_msg(VM_CLIP_REQ, 0, 5, AGF_PNG, 0, 0, NULL); CHECK(vm_msg_valid(&m, 0) && !vm_msg_valid(&m, 1));
     m.a = 0; CHECK(!vm_msg_valid(&m, 0));
     m.a = 5; m.b = 4; CHECK(!vm_msg_valid(&m, 0));
@@ -1948,6 +2026,8 @@ int main(void) {
     test_resolution();
     test_lag();
     test_displays();
+    test_shown_pick();
+    test_winrefused();
     test_apps_mode();
     test_clipx();
     test_log_clean();

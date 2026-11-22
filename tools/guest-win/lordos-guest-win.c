@@ -72,7 +72,11 @@
 /* w7 (2026-11-22): the display the machine's picture shows, when Windows has more than one (a GVT-g vGPU's second
  * output): the size, apps mode's coordinates and moves follow it, windows on another display come onto it, and the
  * displays go to the host's log (AGK_DISPLAYS) */
-#define VERSION "w7"
+/* w8 (2026-11-22): the shown display is one on a PCI adapter whenever there is one (w7 took a basic display that had
+ * the asked size), is made Windows' primary, and windows come onto it as the tools start too; a window that runs as
+ * administrator is said so (LAGW_ELEVATED, when the host's hello says "elevated") and an action the system refuses is
+ * answered (LAG_WINREFUSED) */
+#define VERSION "w8"
 #define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt"
 
 enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
@@ -151,7 +155,7 @@ static wchar_t *to_utf16(const uint8_t *s, size_t n) {
 /* ---- the port ---- */
 static HANDLE port = INVALID_HANDLE_VALUE, reader, stop_ev, wr_ev;
 static volatile LONG reader_gen;
-static int host_hello, host_clipx;
+static int host_hello, host_clipx, host_elev;      /* host_elev: the host's hello says "elevated" (LAGW_ELEVATED) */
 
 /* the host's answers to this side's clipboard requests (AGK_CLIPDATA): handed over by the reader thread, since the
  * window's thread waits for them inside WM_RENDERFORMAT */
@@ -236,7 +240,7 @@ static void port_close(const char *why) {
     CloseHandle(port);
     port = INVALID_HANDLE_VALUE;
     InterlockedIncrement(&reader_gen);
-    host_hello = host_clipx = 0;
+    host_hello = host_clipx = host_elev = 0;
     apps_stop();
     mons_sent = 0;
     SetEvent(ans_ev);                   /* a paste waiting for the host stops waiting */
@@ -650,23 +654,28 @@ static int primary_device(wchar_t name[32]) {
 }
 
 /* ---- the guest's displays, and the one the machine's picture shows ----
- * Windows may have more than one display attached to its desktop while the machine's window shows one picture: an
- * Intel GVT-g vGPU (qemu's vfio display=on) can come up with a second output, a virtual display (an IddCx driver) can
- * sit next to the real one, and the primary isn't always the one the host shows. Everything this side does with the
- * picture's coordinates (the size the host asks for, apps mode's list and moves, a drop's point) is done on that one
- * display, the "shown" one, chosen by this rule:
- *   1. only one display on the desktop: that one;
- *   2. the one rule 3 chose before, while it stays on the desktop (the host's picture doesn't jump between outputs, and
- *      the size the host asks for next is set on it);
- *   3. once the host asked for a size (AGK_DISPLAY, the size of the window that shows the picture): a display whose
- *      current mode is that size (as disp_apply counts it: equal, or under it by less than 8 pixels); several: the one
- *      on a PCI adapter (a device qemu gives the guest, not a software display), then the primary, then the first;
- *   4. otherwise the primary when it is on a PCI adapter, else the first display on a PCI adapter, else the primary.
- * The list and the choice go to this log and the host's (AGK_DISPLAYS) whenever either changes. */
+ * Windows may have more than one display on its desktop while the machine's window shows one picture: an Intel GVT-g
+ * vGPU's output (PCI) can sit next to a basic or indirect display that isn't on a PCI adapter (on the maintainer's
+ * guest: a 1022x724 primary nobody sees). Everything this side does with the picture's coordinates (the size the host
+ * asks for, apps mode's list and moves, a drop's point) is done on the "shown" display, chosen by ag_shown_pick
+ * (vmagent.c, tested in vm-test):
+ *   - the host's picture only ever comes from a PCI GPU (GVT-g, virtio-gpu, QXL, a passed-through card): while a
+ *     display is on a PCI adapter, one that isn't is never chosen;
+ *   - among those: the one chosen before by size while it stays; else the one whose mode is the size the host asked
+ *     for (AGK_DISPLAY: equal, or under it by less than 8 pixels), the primary first; else the primary; else the first;
+ *   - a change of which displays there are (by name) forgets the choice made by size.
+ * The shown display is then made Windows' primary (disp_make_primary), so the taskbar, the desktop's icons, new windows
+ * and a consent prompt (UAC) are where the person looks, and windows on another display come onto it (rescue_all) as
+ * the tools start, after that change, and when apps mode ends. Nothing is detached: the other display stays, to the
+ * shown one's right, so nothing of the person's setup is lost and a wrong guess costs only a primary that can be set
+ * back in Settings. The list and the choice go to this log and the host's (AGK_DISPLAYS) whenever either changes. */
 typedef struct { wchar_t dev[32]; RECT r, work; int primary, hw; } Mon;
 static Mon mons[AG_DISPLAYS_MAX];
 static int mons_n, mons_shown = -1, mons_stale = 1;
-static wchar_t shown_locked[32];    /* chosen by rule 3, "" not yet */
+static wchar_t shown_locked[32];    /* chosen by the host's size, "" not yet */
+static wchar_t mons_topo[AG_DISPLAYS_MAX * 33];   /* the displays' names, to tell a change of topology */
+static wchar_t primary_tried[32];   /* made primary already (for this topology), "" not yet */
+static int rescue_pending = 1;      /* windows on another display come onto the shown one when things settle */
 static char mons_said[AG_DISPLAYS_MAX * 128];
 
 /* the adapter that drives a display: 1 a PCI device; its description into desc */
@@ -703,26 +712,77 @@ static BOOL CALLBACK mon_one(HMONITOR hm, HDC dc, LPRECT rc, LPARAM lp) {
     return TRUE;
 }
 
-static int mon_size_is(const Mon *m, uint32_t w, uint32_t h) {
-    LONG mw = m->r.right - m->r.left, mh = m->r.bottom - m->r.top;
-    return w && mw > 0 && mh > 0 && (uint32_t)mw <= w && (uint32_t)mh <= h && w - (uint32_t)mw < 8 && h - (uint32_t)mh < 8;
+static void mon_as_agd(const Mon *m, AgDisplay *o) {
+    memset(o, 0, sizeof *o);
+    size_t k = 0;
+    for (; k < AG_DISPLAY_NAME_MAX && m->dev[k]; k++) o->name[k] = m->dev[k] >= 0x20 && m->dev[k] <= 0x7e ? (char)m->dev[k] : '?';
+    if (!k) o->name[k++] = '?';
+    o->x = m->r.left; o->y = m->r.top;
+    LONG w = m->r.right - m->r.left, h = m->r.bottom - m->r.top;
+    o->w = w > 0 ? (uint32_t)w : 0; o->h = h > 0 ? (uint32_t)h : 0;
+    o->flags = (uint8_t)((m->primary ? AGDS_PRIMARY : 0) | (m->hw ? AGDS_HW : 0));
 }
 
 static int mon_pick(void) {
-    if (mons_n <= 1) return mons_n - 1;
-    for (int i = 0; shown_locked[0] && i < mons_n; i++) if (!wcscmp(mons[i].dev, shown_locked)) return i;
-    shown_locked[0] = 0;
-    int best = -1, score = -1;
+    AgDisplay d[AG_DISPLAYS_MAX];
+    int locked = -1, lock = -1;
     for (int i = 0; i < mons_n; i++) {
-        if (!mon_size_is(&mons[i], disp_w, disp_h)) continue;
-        int s = mons[i].hw * 2 + mons[i].primary;
-        if (s > score) { best = i; score = s; }
+        mon_as_agd(&mons[i], &d[i]);
+        if (shown_locked[0] && !wcscmp(mons[i].dev, shown_locked)) locked = i;
     }
-    if (best >= 0) { memcpy(shown_locked, mons[best].dev, sizeof shown_locked); return best; }
-    for (int i = 0; i < mons_n; i++) if (mons[i].primary && mons[i].hw) return i;
-    for (int i = 0; i < mons_n; i++) if (mons[i].hw) return i;
-    for (int i = 0; i < mons_n; i++) if (mons[i].primary) return i;
-    return 0;
+    int k = ag_shown_pick(d, mons_n, disp_w, disp_h, locked, &lock);
+    if (lock >= 0) memcpy(shown_locked, mons[lock].dev, sizeof shown_locked);
+    else shown_locked[0] = 0;
+    return k;
+}
+
+/* The shown display made Windows' primary: its source at 0,0 and the others in a row to its right, through the display
+ * configuration (what Settings' "Make this my main display" does), saved. 0 done */
+static int disp_make_primary(const wchar_t *dev) {
+    UINT32 np = 0, nm = 0;
+    if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &np, &nm) != ERROR_SUCCESS || !np || !nm || np > 64 || nm > 128) return -1;
+    DISPLAYCONFIG_PATH_INFO *paths = calloc(np, sizeof *paths);
+    DISPLAYCONFIG_MODE_INFO *modes = calloc(nm, sizeof *modes);
+    int r = -1;
+    if (paths && modes && QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &np, paths, &nm, modes, NULL) == ERROR_SUCCESS) {
+        int shown = -1;
+        UINT32 sw = 0;
+        for (UINT32 i = 0; i < np; i++) {
+            DISPLAYCONFIG_SOURCE_DEVICE_NAME sn;
+            memset(&sn, 0, sizeof sn);
+            sn.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+            sn.header.size = sizeof sn;
+            sn.header.adapterId = paths[i].sourceInfo.adapterId;
+            sn.header.id = paths[i].sourceInfo.id;
+            UINT32 ix = paths[i].sourceInfo.modeInfoIdx;
+            if (DisplayConfigGetDeviceInfo(&sn.header) != ERROR_SUCCESS || wcscmp(sn.viewGdiDeviceName, dev)) continue;
+            if (ix >= nm || modes[ix].infoType != DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE) break;
+            shown = (int)ix;
+            sw = modes[ix].sourceMode.width;
+            break;
+        }
+        if (shown >= 0) {
+            /* every other source to its right, in the order Windows lists them (a source shared by two paths once) */
+            LONG x = (LONG)sw;
+            modes[shown].sourceMode.position.x = 0;
+            modes[shown].sourceMode.position.y = 0;
+            for (UINT32 i = 0; i < nm; i++) {
+                if ((int)i == shown || modes[i].infoType != DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE) continue;
+                modes[i].sourceMode.position.x = x;
+                modes[i].sourceMode.position.y = 0;
+                x += (LONG)modes[i].sourceMode.width;
+            }
+            LONG e = SetDisplayConfig(np, paths, nm, modes, SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_SAVE_TO_DATABASE | SDC_ALLOW_CHANGES);
+            r = e ? -1 : 0;
+            char *dn = to_utf8(dev, -1, NULL);
+            if (e) lg("displays: making %s the primary display was refused (%ld)", dn ? dn : "?", e);
+            else lg("displays: %s is now the primary display (the taskbar, the desktop and new windows go there); the others to its right", dn ? dn : "?");
+            free(dn);
+        }
+    }
+    free(paths);
+    free(modes);
+    return r;
 }
 
 /* this log: every display adapter and its monitors, attached to the desktop or not (once per change) */
@@ -759,21 +819,19 @@ static void mon_scan(void) {
     int n = 0;
     EnumDisplayMonitors(NULL, NULL, mon_one, (LPARAM)&n);
     mons_n = n;
+    /* which displays there are: a change forgets the choice made by size and the primary made */
+    wchar_t topo[sizeof mons_topo / sizeof *mons_topo];
+    topo[0] = 0;
+    for (int i = 0; i < mons_n; i++) { wcsncat(topo, mons[i].dev, 31); wcscat(topo, L"|"); }
+    if (wcscmp(topo, mons_topo)) { wcscpy(mons_topo, topo); shown_locked[0] = 0; primary_tried[0] = 0; }
     mons_shown = mon_pick();
     AgDisplay d[AG_DISPLAYS_MAX];
     int dn = 0, ds = -1;
     for (int i = 0; i < mons_n; i++) {
         AgDisplay *o = &d[dn];
-        memset(o, 0, sizeof *o);
-        size_t k = 0;
-        for (; k < AG_DISPLAY_NAME_MAX && mons[i].dev[k]; k++) o->name[k] = mons[i].dev[k] >= 0x20 && mons[i].dev[k] <= 0x7e ? (char)mons[i].dev[k] : '?';
-        if (!k) o->name[k++] = '?';
-        o->x = mons[i].r.left; o->y = mons[i].r.top;
-        LONG w = mons[i].r.right - mons[i].r.left, h = mons[i].r.bottom - mons[i].r.top;
-        if (w < 1 || h < 1 || w > (LONG)AG_DISPLAY_MAX || h > (LONG)AG_DISPLAY_MAX || o->x < -LAG_DIM_MAX || o->x > LAG_DIM_MAX ||
+        mon_as_agd(&mons[i], o);
+        if (o->w < 1 || o->h < 1 || o->w > AG_DISPLAY_MAX || o->h > AG_DISPLAY_MAX || o->x < -LAG_DIM_MAX || o->x > LAG_DIM_MAX ||
             o->y < -LAG_DIM_MAX || o->y > LAG_DIM_MAX) continue;
-        o->w = (uint32_t)w; o->h = (uint32_t)h;
-        o->flags = (uint8_t)((mons[i].primary ? AGDS_PRIMARY : 0) | (mons[i].hw ? AGDS_HW : 0));
         if (i == mons_shown) ds = dn;
         dn++;
     }
@@ -782,7 +840,7 @@ static void mon_scan(void) {
     else snprintf(t, sizeof t, "none");
     if (strcmp(t, mons_said)) {
         memcpy(mons_said, t, sizeof t);
-        lg("displays: %s%s", t, mons_n > 1 && shown_locked[0] ? " (the shown one has the size the host asked for)" : "");
+        lg("displays: %s%s", t, mons_n > 1 && shown_locked[0] ? " (the shown one chosen by the size the host asked for)" : "");
         mon_log_adapters();
         mons_sent = 0;
         if (apps_on) apps_dirty = 1;      /* the list again, relative to the shown display as it is now */
@@ -791,6 +849,15 @@ static void mon_scan(void) {
         uint8_t b[AG_DISPLAYS_BYTES];
         size_t bn = ag_displays_write(d, dn, ds, b, sizeof b);
         if (bn && !send_frame(AGK_DISPLAYS, b, (uint32_t)bn)) mons_sent = 1;
+    }
+    /* the shown display made the primary, once per topology (and only one on a PCI adapter: the host's picture) */
+    if (mons_n > 1 && mons_shown >= 0 && mons[mons_shown].hw && !mons[mons_shown].primary && wcscmp(primary_tried, mons[mons_shown].dev)) {
+        memcpy(primary_tried, mons[mons_shown].dev, sizeof primary_tried);
+        if (!disp_make_primary(mons[mons_shown].dev)) {
+            mons_stale = 1;
+            rescue_pending = 1;                 /* the windows come onto it once the change settles */
+            SetTimer(win, T_MONS, 1500, NULL);
+        }
     }
 }
 
@@ -984,6 +1051,48 @@ static int apps_n;
 static int cloaked(HWND h) {
     DWORD c = 0;
     return SUCCEEDED(DwmGetWindowAttribute(h, DWMWA_CLOAKED, &c, sizeof c)) && c;
+}
+
+/* A window whose program runs with more rights than this helper (Windows: "as administrator", a high integrity level;
+ * or SYSTEM): the system drops this side's messages to it and refuses its moves (UIPI), so it can't be closed, moved,
+ * minimized or restored from here. This helper is never elevated to get around that. */
+static DWORD token_il(HANDLE tok) {
+    BYTE buf[64];
+    DWORD n = 0;
+    if (!GetTokenInformation(tok, TokenIntegrityLevel, buf, sizeof buf, &n)) return 0;
+    TOKEN_MANDATORY_LABEL *l = (TOKEN_MANDATORY_LABEL *)buf;
+    PUCHAR k = GetSidSubAuthorityCount(l->Label.Sid);
+    return k && *k ? *GetSidSubAuthority(l->Label.Sid, (DWORD)(*k - 1)) : 0;
+}
+
+static DWORD my_il;
+static int elevated_pid(DWORD pid) {
+    if (!pid) return 0;
+    if (!my_il) {
+        HANDLE t;
+        if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &t)) { my_il = token_il(t); CloseHandle(t); }
+        if (!my_il) my_il = SECURITY_MANDATORY_MEDIUM_RID;
+    }
+    HANDLE p = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!p) return 0;                   /* not known: treated as not elevated (an action still answers if refused) */
+    HANDLE t;
+    int up = 0;
+    if (OpenProcessToken(p, TOKEN_QUERY, &t)) { DWORD il = token_il(t); up = il > my_il; CloseHandle(t); }
+    else up = GetLastError() == ERROR_ACCESS_DENIED;   /* an elevated program's token isn't ours to read */
+    CloseHandle(p);
+    return up;
+}
+
+/* an action the system refused (LAG_WINREFUSED), said in this log once per window and action in a row */
+static void win_refused(uint32_t id, uint8_t action, uint8_t reason) {
+    static uint32_t last_id;
+    static uint8_t last_act;
+    static const char *const act[] = { "", "focus", "close", "minimize", "restore", "move" };
+    if (id != last_id || action != last_act)
+        lg("apps: window %lx: %s refused (%s)", (unsigned long)id, act[action], reason == LAGR_ELEVATED ? "it runs as administrator" : "access denied");
+    last_id = id; last_act = action;
+    uint8_t b[LAG_WINREFUSED_BYTES];
+    if (!lag_winrefused_write(b, id, action, reason)) send_frame(LAG_WINREFUSED, b, sizeof b);
 }
 
 static int listable(HWND h) {
@@ -1207,6 +1316,9 @@ static BOOL CALLBACK rescue_one(HWND h, LPARAM lp) {
         if (rescued_n >= (int)(sizeof rescued / sizeof *rescued)) return TRUE;
         rescued[rescued_n++] = h;
     }
+    DWORD pid = 0;
+    GetWindowThreadProcessId(h, &pid);
+    if (elevated_pid(pid)) { lg("%s: window %lx runs as administrator: the system won't let it be moved from here", c->why, (unsigned long)(uintptr_t)h); return TRUE; }
     int iconic = IsIconic(h), zoomed = IsZoomed(h);
     RECT t;
     if (iconic || zoomed) {
@@ -1279,6 +1391,7 @@ static BOOL CALLBACK list_one(HWND h, LPARAM lp) {
     if (w < 1 || hh < 1 || w > LAG_DIM_MAX || hh > LAG_DIM_MAX) return TRUE;
     DWORD pid = 0;
     GetWindowThreadProcessId(h, &pid);
+    if (host_elev && elevated_pid(pid)) fl |= LAGW_ELEVATED;
     wchar_t t[300];
     int tl = InternalGetWindowText(h, t, 300);
     char *title = tl > 0 ? to_utf8(t, tl, NULL) : NULL;
@@ -1539,12 +1652,26 @@ static void win_act(const LagAct *a) {
     for (int i = 0; i < listed_n; i++) if (listed[i] == a->id) known = 1;
     HWND h = (HWND)(LONG_PTR)(LONG)a->id;
     if (!known || !IsWindow(h)) { lg("apps: action %d for a window not listed", a->action); return; }
+    DWORD pid = 0;
+    GetWindowThreadProcessId(h, &pid);
+    int elev = elevated_pid(pid);
     switch (a->action) {
     case LAGA_FOCUS: focus(h); break;
-    case LAGA_CLOSE: PostMessageW(h, WM_CLOSE, 0, 0); break;
-    case LAGA_MINIMIZE: ShowWindowAsync(h, SW_MINIMIZE); break;
-    case LAGA_RESTORE: ShowWindowAsync(h, SW_RESTORE); break;
+    case LAGA_CLOSE:
+        /* tried even when it looks elevated (a program may take WM_CLOSE through its message filter); a refusal is said */
+        if (!PostMessageW(h, WM_CLOSE, 0, 0)) {
+            DWORD e = GetLastError();
+            win_refused(a->id, LAGA_CLOSE, elev ? LAGR_ELEVATED : LAGR_DENIED);
+            if (!elev && e != ERROR_ACCESS_DENIED) lg("apps: closing window %lx failed (error %lu)", (unsigned long)a->id, (unsigned long)e);
+        }
+        break;
+    case LAGA_MINIMIZE:
+    case LAGA_RESTORE:
+        if (elev) { win_refused(a->id, a->action, LAGR_ELEVATED); break; }
+        ShowWindowAsync(h, a->action == LAGA_MINIMIZE ? SW_MINIMIZE : SW_RESTORE);
+        break;
     case LAGA_MOVE: {
+        if (elev) { win_refused(a->id, LAGA_MOVE, LAGR_ELEVATED); break; }
         /* the host's coordinates are the shown display's (its 0,0 is that display's corner); never outside it: a window
          * put off it is out of the picture or dropped from the list (the host clamps too; this side keeps it so with an
          * older host, apps mode on several host displays) */
@@ -1911,6 +2038,7 @@ static void on_frame(const Frame *f) {
             t[f->len] = 0;
             host_hello = 1;
             host_clipx = strstr(t, " clipx") != NULL;
+            host_elev = strstr(t, " elevated") != NULL;
             if (strstr(t, " ask")) send_frame(AGK_HELLO, (const uint8_t *)HELLO, sizeof HELLO - 1);
             lg("host: %s", ag_utf8_ok(f->data, f->len) ? t : "(hello)");
             /* the displays, for the host's log (an older lord-vm skips the kind) */
@@ -2003,7 +2131,14 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             mon_get();
         } else if (wp == T_CLIP) { KillTimer(h, T_CLIP); clip_send(); }
         else if (wp == T_DISP) disp_tick();
-        else if (wp == T_MONS) { KillTimer(h, T_MONS); mons_stale = 1; mon_get(); if (apps_on) apps_dirty = 1; }
+        else if (wp == T_MONS) {
+            KillTimer(h, T_MONS);
+            mons_stale = 1;
+            mon_get();
+            if (apps_on) apps_dirty = 1;
+            /* settled (no change of the primary just asked for): windows on another display come onto the shown one */
+            else if (rescue_pending && !mons_stale) { rescue_pending = 0; rescue_all("displays", 0); }
+        }
         else if (wp == T_APPS && apps_on && apps_dirty) { apps_dirty = 0; send_windows(0); }
         return 0;
     case WM_WTSSESSION_CHANGE:
@@ -2077,6 +2212,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
     WTSRegisterSessionNotification(win, NOTIFY_FOR_THIS_SESSION);
     lg("lordos-guest-win %s in session %lu", VERSION, my_session);
     SetTimer(win, T_PORT, 2000, NULL);
+    SetTimer(win, T_MONS, 3000, NULL);  /* the displays once the session settles: the primary, windows brought back */
     port_try_open();
     MSG m;
     while (GetMessageW(&m, NULL, 0, 0) > 0) { TranslateMessage(&m); DispatchMessageW(&m); }
