@@ -32,22 +32,87 @@ const ver = (p, m) => { const g = p.globals.find((x) => m && m[x] != null); retu
 
 export function load(file = SRC) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 
+// Strict shapes for every value. Part of the JSON comes from wayland.app (tools/wayland-app-import.mjs), so nothing
+// outside these shapes reaches docs/WAYLAND.md or the site (which also escapes every value).
+export const SOURCES = ['core', 'wayland-protocols', 'wlr-protocols', 'kde-protocols', 'hyprland-protocols', 'cosmic-protocols', 'weston-protocols', 'treeland-protocols', 'river-protocols', 'gamescope-protocols', 'external'];
+export const STABILITIES = ['stable', 'staging', 'unstable', 'experimental'];
+export const RE_ID = /^[a-z][a-z0-9_-]*$/;          // protocol ids: xdg-shell, wayland-wl_seat
+export const RE_GLOBAL = /^[a-z][a-z0-9_]*$/;        // interface names: xdg_wm_base
+export const RE_URL = /^https:\/\/wayland\.app\/protocols\/[a-z0-9_#-]*$/;
+export const RE_VER = /^\d+(\.\d+){1,3}$/;          // a LordOS version: 0.8.9.5
+export const RE_DATE = /^\d{4}-\d{2}-\d{2}$/;
+export const RE_CVER = /^[0-9][0-9.]{0,15}$/;        // a compositor's version: 6.7, 51
+export const isVersion = (v) => Number.isInteger(v) && v > 0 && v < 1000;
+// free text (names, summaries, notes): no markup, no control characters, bounded
+export const isText = (x, max = 700) => typeof x === 'string' && x.length <= max && !/[<>\u0000-\u001f\u007f]/.test(x);
+
+function versionMap(m, at, errs) {
+  if (!m || typeof m !== 'object' || Array.isArray(m)) { errs.push(`${at} must be an object {interface: version}`); return; }
+  for (const [g, v] of Object.entries(m)) {
+    if (!RE_GLOBAL.test(g)) errs.push(`${at}: bad interface name ${JSON.stringify(g)}`);
+    if (!isVersion(v)) errs.push(`${at}.${g}: version must be a positive integer, not ${JSON.stringify(v)}`);
+  }
+}
+
 export function validate(d) {
   const errs = [];
   const ids = new Set();
+  const c = d.compared || {};
+  if (!RE_DATE.test(c.date || '') || c.source !== 'https://wayland.app/protocols/') errs.push('compared: needs date (YYYY-MM-DD) and source https://wayland.app/protocols/');
+  for (const k of ['kwin', 'mutter']) if (!c[k] || !RE_CVER.test(String(c[k].version)) || !RE_DATE.test(c[k].dataDate || '') || !isText(c[k].name, 40) || !isText(c[k].desktop, 40)) errs.push(`compared.${k}: needs name, desktop, version and dataDate`);
+  if (!Array.isArray(d.protocols)) return errs.concat('protocols must be a list');
   for (const p of d.protocols) {
-    const at = `${p.id}:`;
+    const at = `${typeof p.id === 'string' && RE_ID.test(p.id) ? p.id : JSON.stringify(p.id)}:`;
+    if (typeof p.id !== 'string' || !RE_ID.test(p.id)) errs.push(`${at} id must match ${RE_ID}`);
     if (ids.has(p.id)) errs.push(`${at} duplicate id`);
     ids.add(p.id);
-    if (!Array.isArray(p.globals)) errs.push(`${at} globals must be a list`);
+    if (!isText(p.name, 120) || !isText(p.summary, 300)) errs.push(`${at} name and summary must be plain text`);
+    if (!SOURCES.includes(p.source)) errs.push(`${at} source must be one of ${SOURCES.join(', ')}`);
+    if (!STABILITIES.includes(p.stability)) errs.push(`${at} stability must be one of ${STABILITIES.join(', ')}`);
+    if (!CATEGORIES.includes(category(p))) errs.push(`${at} bad category`);
+    if (typeof p.url !== 'string' || !RE_URL.test(p.url)) errs.push(`${at} url must be a https://wayland.app/protocols/ address`);
+    if (p.deprecated != null && typeof p.deprecated !== 'boolean') errs.push(`${at} deprecated must be true or false`);
+    if (!Array.isArray(p.globals) || !p.globals.every((g) => typeof g === 'string' && RE_GLOBAL.test(g))) { errs.push(`${at} globals must be a list of interface names`); continue; }
+    versionMap(p.kwin, `${at} kwin`, errs);
+    versionMap(p.mutter, `${at} mutter`, errs);
     const L = p.lordos;
     if (!L || !STATUSES.includes(L.status)) { errs.push(`${at} lordos.status must be one of ${STATUSES.join(', ')}`); continue; }
+    versionMap(L.globals || {}, `${at} lordos.globals`, errs);
     const lg = Object.keys(L.globals || {});
     if ((L.status === 'supported' || L.status === 'partial') !== lg.length > 0) errs.push(`${at} a ${L.status} protocol ${lg.length ? 'lists' : 'needs'} lordos.globals`);
     for (const g of lg) if (!p.globals.includes(g)) errs.push(`${at} lordos global ${g} is not one of the row's globals`);
     if ((L.status === 'on-purpose' || L.status === 'partial') && !L.note) errs.push(`${at} ${L.status} needs a note saying why`);
-    if (!L.checked || !/^\d{4}-\d{2}-\d{2}$/.test(L.checkedDate || '')) errs.push(`${at} lordos needs checked and checkedDate (YYYY-MM-DD)`);
-    for (const [g, b] of Object.entries(L.bumped || {})) if (!lg.includes(g) || !b.in || b.from == null) errs.push(`${at} bumped.${g} needs from, in and a current global`);
+    if (L.note != null && !isText(L.note)) errs.push(`${at} lordos.note must be plain text`);
+    if (!isText(L.checked, 200) || !L.checked || !RE_DATE.test(L.checkedDate || '')) errs.push(`${at} lordos needs checked (plain text) and checkedDate (YYYY-MM-DD)`);
+    if (L.since != null && !RE_VER.test(L.since)) errs.push(`${at} lordos.since must be a version like 0.8.9.5`);
+    if (L.libwayland != null && typeof L.libwayland !== 'boolean') errs.push(`${at} lordos.libwayland must be true or false`);
+    for (const [g, b] of Object.entries(L.bumped || {})) if (!lg.includes(g) || !b || !RE_VER.test(b.in || '') || !isVersion(b.from)) errs.push(`${at} bumped.${g} needs from (a version number), in (a LordOS version) and a current global`);
+  }
+  return errs;
+}
+
+// the site's copy (web/content/wayland/protocols.json), checked again by web/build.mjs before it renders anything
+export function validateWeb(w) {
+  const errs = [];
+  if (!w || !w.compared || !Array.isArray(w.protocols) || !w.stats) return ['not a wayland table'];
+  const c = w.compared;
+  if (!RE_DATE.test(c.date || '') || c.source !== 'https://wayland.app/protocols/') errs.push('compared: bad date or source');
+  for (const k of ['kwin', 'mutter']) if (!c[k] || !RE_CVER.test(String(c[k].version)) || !RE_DATE.test(c[k].dataDate || '')) errs.push(`compared.${k}: bad version or date`);
+  for (const [k, v] of Object.entries(w.stats)) if (k !== 'gaps' && !(Number.isInteger(v) && v >= 0)) errs.push(`stats.${k} must be a count`);
+  const ver = (v) => v === null || isVersion(v);
+  for (const p of w.protocols) {
+    const at = `${typeof p.id === 'string' && RE_ID.test(p.id) ? p.id : JSON.stringify(p.id)}:`;
+    if (typeof p.id !== 'string' || !RE_ID.test(p.id)) errs.push(`${at} bad id`);
+    if (!CATEGORIES.includes(p.cat)) errs.push(`${at} bad category ${JSON.stringify(p.cat)}`);
+    if (typeof p.url !== 'string' || !RE_URL.test(p.url)) errs.push(`${at} bad url`);
+    if (!isText(p.name, 120) || !isText(p.summary, 300)) errs.push(`${at} bad name or summary`);
+    if (!Array.isArray(p.globals) || !p.globals.every((g) => typeof g === 'string' && RE_GLOBAL.test(g))) errs.push(`${at} bad globals`);
+    if (!ver(p.kwin) || !ver(p.mutter)) errs.push(`${at} bad KWin or Mutter version`);
+    const L = p.lordos || {};
+    if (!STATUSES.includes(L.status)) errs.push(`${at} bad status ${JSON.stringify(L.status)}`);
+    if (!ver(L.version)) errs.push(`${at} bad LordOS version`);
+    for (const k of ['since', 'bumped']) if (L[k] !== null && !RE_VER.test(L[k] || '')) errs.push(`${at} bad ${k}`);
+    if (!isText(L.note) || !isText(L.checked, 200) || !RE_DATE.test(L.checkedDate || '')) errs.push(`${at} bad note, checked or checkedDate`);
   }
   return errs;
 }

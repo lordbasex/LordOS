@@ -26,6 +26,7 @@ import { chartFigure } from './lib/chartsvg.mjs';
 import { imagerGuide, writeBlock } from './lib/imager-guide.mjs';
 import { embassy } from './lib/embassy.mjs';
 import { readReports, buildModel, renderSections } from '../tools/hwreport/catalog.mjs';
+import { validateWeb } from '../tools/gen-wayland-table.mjs';
 
 const WEB = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(WEB, '..');
@@ -378,6 +379,8 @@ const HW_IN_DEV = verNum(PKG.version) < verNum('0.8.7');      // Share on GitHub
 const waylandFile = path.join(CONTENT, 'wayland/protocols.json');
 const HAS_WAYLAND = fs.existsSync(waylandFile);
 const WAYLAND = HAS_WAYLAND ? JSON.parse(fs.readFileSync(waylandFile, 'utf8')) : null;
+// part of it comes from wayland.app: refuse the build on any value outside its strict shapes (every field is also escaped)
+if (WAYLAND) { const bad = validateWeb(WAYLAND); if (bad.length) throw new Error('web/content/wayland/protocols.json:\n  ' + bad.slice(0, 20).join('\n  ')); }
 const faqFile = path.join(CONTENT, 'faq/faq.json');
 const faqJson = fs.existsSync(faqFile) ? readJson(faqFile) : null;
 let faqHeld = 0;
@@ -1254,18 +1257,18 @@ ${(c.items || []).map((it) => {
     const inDev = (v) => !!v && verNum(v) > verNum(LATEST_RELEASE);
     const STS = ['supported', 'partial', 'on-purpose', 'missing'];
     const CATS = ['core', 'stable', 'staging', 'unstable', 'experimental', 'wlr', 'kde', 'other'].filter((k) => D.protocols.some((p) => p.cat === k));
-    const pill = (st) => `<span class="wp-st wp-${st}">${esc(W.status[st])}</span>`;
-    const verCell = (v, who) => (v == null ? `<span class="wp-no" title="${esc(W.notOffered)}">—<span class="vh"> ${esc(W.notOffered)}</span></span>` : `<span class="wp-yes"><span class="vh">${esc(who)} </span>${esc(W.version)} ${v}</span>`);
+    const pill = (st) => `<span class="wp-st wp-${esc(st)}">${esc(W.status[st])}</span>`;
+    const verCell = (v, who) => (v == null ? `<span class="wp-no" title="${esc(W.notOffered)}">—<span class="vh"> ${esc(W.notOffered)}</span></span>` : `<span class="wp-yes"><span class="vh">${esc(who)} </span>${esc(W.version)} ${esc(v)}</span>`);
     const rows = D.protocols.map((p) => {
       const L = p.lordos;
       const dev = inDev(L.since) || inDev(L.bumped);
       const lc = [pill(L.status)];
-      if (L.version != null) lc.push(`<span class="wp-v">${esc(W.version)} ${L.version}</span>`);
+      if (L.version != null) lc.push(`<span class="wp-v">${esc(W.version)} ${esc(L.version)}</span>`);
       if (L.since && !inDev(L.since)) lc.push(`<span class="wp-since">${esc(fill(W.since, { v: L.since }))}</span>`);
       if (dev) lc.push(`<span class="wp-dev" title="${esc(fill(W.inDevNote, { release: LATEST_RELEASE }))}">${esc(W.inDev)}</span>`);
       const q = [p.id, p.name, p.summary, ...p.globals, L.note].join(' ').toLowerCase();
       const both = p.kwin != null && p.mutter != null;
-      return `<tr data-cat="${p.cat}" data-st="${L.status}" data-l="${L.version != null ? 1 : 0}" data-k="${p.kwin != null ? 1 : 0}" data-m="${p.mutter != null ? 1 : 0}" data-dev="${dev ? 1 : 0}" data-q="${esc(q)}" id="p-${esc(p.id)}">
+      return `<tr data-cat="${esc(p.cat)}" data-st="${esc(L.status)}" data-l="${L.version != null ? 1 : 0}" data-k="${p.kwin != null ? 1 : 0}" data-m="${p.mutter != null ? 1 : 0}" data-dev="${dev ? 1 : 0}" data-q="${esc(q)}" id="p-${esc(p.id)}">
 <th scope="row" data-label="${esc(W.hProtocol)}"><a href="${esc(p.url)}" rel="noopener">${esc(p.name)}</a>${p.deprecated ? ` <span class="wp-depr">${esc(W.deprecated)}</span>` : ''}<code>${esc(p.id)}</code>${p.summary.toLowerCase() !== p.name.toLowerCase() ? `<span class="wp-sumy">${esc(p.summary)}</span>` : ''}${p.globals.length && !(p.globals.length === 1 && p.globals[0] === p.name) ? `<span class="wp-gl">${p.globals.map((g) => `<code>${esc(g)}</code>`).join(' ')}</span>` : ''}</th>
 <td data-label="${esc(W.hCategory)}"><div><span class="wp-cat">${esc(W.cats[p.cat])}</span></div></td>
 <td data-label="LordOS" class="wp-l"><div>${lc.join(' ')}</div></td>
@@ -1275,7 +1278,7 @@ ${(c.items || []).map((it) => {
 </tr>`;
     }).join('\n');
     const opt = (v, label) => `<option value="${esc(v)}">${esc(label)}</option>`;
-    const tile = (n, label) => `<li><strong>${n}</strong><span>${esc(label)}</span></li>`;
+    const tile = (n, label) => `<li><strong>${esc(n)}</strong><span>${esc(label)}</span></li>`;
     const nDev = D.protocols.filter((p) => inDev(p.lordos.since) || inDev(p.lordos.bumped)).length;
     write(path.join(pageUrl(l, 'wayland-protocols-table'), 'index.html'), render(tpl.wayland, {
       ...common('wayland-protocols-table', [W.metaTitle, W.metaDescription], 'wayland'),

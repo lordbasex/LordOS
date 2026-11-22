@@ -34,6 +34,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `wl_global_create(…, &X_interface, VERSION, …)` in `server/src` (hand-written interface tables and libwayland's
     `wl_shm` included) and fails when a global is created and not in the JSON, listed and not created, or at another
     version, and when the generated section or the page's data is stale.
+  - **Hardened against its external input** (part of the data comes from wayland.app): the generator's `validate()`,
+    the importer (which refuses to write) and `web/build.mjs` (which refuses to build, `validateWeb()`) accept only
+    positive integer versions, interface names matching `^[a-z][a-z0-9_]*$`, protocol ids `^[a-z][a-z0-9_-]*$`,
+    sources, stabilities, categories and statuses from fixed sets, `https://wayland.app/protocols/` links and plain
+    text without markup; every value the page prints is also escaped. The drift test feeds hostile rows (for example a
+    category `"><script>`) to both checks and fails if one is accepted.
+  - **Maintainer's decisions of 2026-11-22 recorded:** the 13 KDE Plasma shell, output and settings protocols stay left
+    out on purpose (confirmed); `drm-lease-v1` is in progress (a permission, non-desktop connectors only), shown as
+    not offered yet with that note.
 
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;

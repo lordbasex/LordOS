@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { load, validate, markdown, withSection, webData } from '../../tools/gen-wayland-table.mjs';
+import { load, validate, validateWeb, markdown, withSection, webData } from '../../tools/gen-wayland-table.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 let fails = 0;
@@ -73,6 +73,52 @@ if (withSection(md, markdown(d)) !== md) bad('docs/WAYLAND.md\'s generated proto
 const webFile = path.join(REPO, 'web/content/wayland/protocols.json');
 const web = fs.existsSync(webFile) ? fs.readFileSync(webFile, 'utf8') : '';
 if (web !== JSON.stringify(webData(d), null, 1) + '\n') bad('web/content/wayland/protocols.json is stale: run node tools/gen-wayland-table.mjs');
+
+// hostile rows (wayland.app is external input): each one must be refused by validate() (the JSON, the importer) and,
+// in the site's copy, by validateWeb() (web/build.mjs refuses to build with it)
+{
+  const good = d.protocols.find((p) => p.id === 'xdg-shell');
+  const web = webData(d);
+  const goodWeb = web.protocols.find((p) => p.id === 'xdg-shell');
+  const XSS = '"><script>alert(1)</script>';
+  const cases = [
+    ['source', (p) => { p.source = XSS; }],
+    ['stability', (p) => { p.stability = XSS; }],
+    ['id', (p) => { p.id = XSS; }],
+    ['name', (p) => { p.name = XSS; }],
+    ['summary', (p) => { p.summary = 'a <img src=x onerror=alert(1)>'; }],
+    ['url', (p) => { p.url = 'javascript:alert(1)'; }],
+    ['url host', (p) => { p.url = 'https://evil.example/protocols/x'; }],
+    ['global', (p) => { p.globals = [XSS]; }],
+    ['kwin version string', (p) => { p.kwin = { xdg_wm_base: '6"><script>' }; }],
+    ['mutter version 0', (p) => { p.mutter = { xdg_wm_base: 0 }; }],
+    ['kwin interface', (p) => { p.kwin = { [XSS]: 1 }; }],
+    ['lordos status', (p) => { p.lordos.status = XSS; }],
+    ['lordos version', (p) => { p.lordos.globals = { xdg_wm_base: 7.5 }; }],
+    ['lordos note', (p) => { p.lordos.note = XSS; }],
+    ['lordos since', (p) => { p.lordos.since = XSS; }],
+  ];
+  for (const [what, spoil] of cases) {
+    const p = JSON.parse(JSON.stringify(good));
+    spoil(p);
+    if (!validate({ ...d, protocols: [p] }).length) bad(`validate() accepted a hostile ${what}`);
+  }
+  const webCases = [
+    ['category', (p) => { p.cat = XSS; }],
+    ['status', (p) => { p.lordos.status = XSS; }],
+    ['kwin', (p) => { p.kwin = XSS; }],
+    ['lordos version', (p) => { p.lordos.version = '7<b>'; }],
+    ['url', (p) => { p.url = 'javascript:alert(1)'; }],
+    ['bumped', (p) => { p.lordos.bumped = XSS; }],
+  ];
+  for (const [what, spoil] of webCases) {
+    const p = JSON.parse(JSON.stringify(goodWeb));
+    spoil(p);
+    if (!validateWeb({ ...web, protocols: [p] }).length) bad(`validateWeb() accepted a hostile ${what}`);
+  }
+  if (validateWeb({ ...web, compared: { ...web.compared, kwin: { ...web.compared.kwin, version: XSS } } }).length === 0) bad('validateWeb() accepted a hostile KWin version');
+  if (validateWeb(web).length) bad('validateWeb() refused the real table: ' + validateWeb(web).join('; '));
+}
 
 // the parser itself, on a known snippet
 {

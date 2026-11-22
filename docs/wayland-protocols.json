@@ -408,8 +408,8 @@
       "lordos": {
         "status": "missing",
         "globals": {},
-        "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list).",
-        "checked": "not in server/src/wl",
+        "note": "In progress (approved by the maintainer 2026-11-22): a VR headset or another non-desktop display leased to an app, gated by a permission; only non-desktop connectors are offered, never the session's displays.",
+        "checked": "maintainer's decision; not in server/src/wl yet",
         "checkedDate": "2026-11-22"
       }
     },
@@ -1908,8 +1908,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -1930,8 +1930,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2014,8 +2014,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2034,8 +2034,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2056,8 +2056,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2076,8 +2076,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2098,8 +2098,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2120,8 +2120,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2142,8 +2142,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2164,8 +2164,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2184,8 +2184,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2204,8 +2204,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },
@@ -2226,8 +2226,8 @@
       "lordos": {
         "status": "on-purpose",
         "globals": {},
-        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop.",
-        "checked": "docs and server/src/wl",
+        "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+        "checked": "maintainer's decision",
         "checkedDate": "2026-11-22"
       }
     },

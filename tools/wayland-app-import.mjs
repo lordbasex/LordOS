@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validate, RE_GLOBAL, RE_CVER, isVersion } from './gen-wayland-table.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = path.join(REPO, 'docs/wayland-protocols.json');
@@ -95,6 +96,11 @@ async function main() {
   const { protocols, comps } = parse(await bundle());
   const old = fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : { protocols: [] };
   const byId = new Map(old.protocols.map((p) => [p.id, p]));
+  // wayland.app is external input: every advertised global must be a plain interface name with a positive integer version
+  for (const c of ['kwin', 'mutter']) {
+    if (!RE_CVER.test(String(comps[c].version)) || !Number.isFinite(comps[c].generationTimestamp)) throw new Error(`wayland.app: ${c}: bad version or date`);
+    for (const g of comps[c].globals) if (!RE_GLOBAL.test(g.interface) || !isVersion(g.version)) throw new Error(`wayland.app: ${c}: refusing global ${JSON.stringify(g)}`);
+  }
   const adv = (c) => new Map(comps[c].globals.map((g) => [g.interface, g.version]));
   const K = adv('kwin'), M = adv('mutter');
   const out = [];
@@ -145,6 +151,9 @@ async function main() {
     ...(old.statuses ? { statuses: old.statuses } : {}),
     protocols: out,
   };
+  // nothing outside the strict shapes is written (gen-wayland-table.mjs's validate: ids, interface names, versions, sources, URLs, plain text)
+  const errs = validate(doc);
+  if (errs.length) throw new Error('refusing to write docs/wayland-protocols.json:\n  ' + errs.slice(0, 30).join('\n  '));
   fs.writeFileSync(FILE, JSON.stringify(doc, null, 2) + '\n');
   console.log(`wayland.app: ${protocols.length} protocols, KWin ${comps.kwin.version} (${comps.kwin.globals.length} globals, ${ts('kwin')}), Mutter ${comps.mutter.version} (${comps.mutter.globals.length} globals, ${ts('mutter')}); ${out.length} rows in ${path.relative(REPO, FILE)}`);
   const lost = [...K.keys(), ...M.keys()].filter((g) => !out.some((r) => r.globals.includes(g)));
