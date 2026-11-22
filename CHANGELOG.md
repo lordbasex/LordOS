@@ -12,6 +12,28 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Machines from the terminal: the `machines` command, in development** (approved by the maintainer 2026-11-21;
+  `docs/VIRTUALIZATION.md` 6.15 "From the terminal"). `machines list [--json]` shows each machine of `~/Machines` with its
+  system, state, vCPUs, memory, disk used and graphics; `status NAME [--json]`, `start NAME [--no-window]`, `open NAME`,
+  `stop|poweroff|pause|resume|suspend|reset NAME`, `snapshot NAME list|take LABEL|revert TAG|delete TAG`, `clone NAME
+  NEW_NAME [--duplicate] [--keep-identity]` and `set NAME` with lord-vm's `--set` options in friendlier units (`--memory
+  8G`, `--cpus 6`, `--disk 64G`, `--network host-only`…). NAME is the machine's name in any case, or its start when only
+  one machine matches (ambiguous: the candidates are listed), or a folder. Everything but start and open runs lord-vm on
+  the folder as the person; start and open go through the running LordOS session, so they do what the app's own
+  buttons do (the window, the bridged network, the graphics card's vGPU and its locked memory). Without a session,
+  `start --no-window` starts only machines that need no administrator step and says why for the others. Messages in all
+  35 languages (`assets/locales/*/machinescli.json`), meaningful exit statuses (0 done, 1 failed, 2 wrong command, 3 not
+  running, 4 no such machine, 5 needs the session), stable `--json`, bash completion. Installed as `/usr/bin/machines`.
+  - **The session channel:** `$XDG_RUNTIME_DIR/lordos-machines.sock` (0600, the session's own uid only by SO_PEERCRED,
+    never on the login screen) takes one line per connection from a closed set, `open`, `start`, `start-detached` or
+    `release` and a machine folder's path, and the Machines app acts only on a machine of its own library
+    (`lord.vmcli`, `apps/machines/cli.js`). No command, option or other path crosses it; no new admin action.
+  - **Tests:** `build/mcli-test` (sizes, name matching, set's options, run.json states, placeholders, the channel's
+    strict parser with a fuzz pass under ASan, which found and fixed a read past the request line before release);
+    `tests/vm_cli_test.mjs` (what the app does with each request); `tests/machinescli_headless.sh` (a throwaway machine
+    started without a window and in its window, opened and powered off through a headless lord-server, and the
+    requests the channel refuses).
+
 - **Machines: LordOS draws the pointer of a machine with the VirtIO GPU display-only driver, in development** (`docs/VIRTUALIZATION.md` 7.1.2,
   `docs/MACHINES-GPU.md` Part 1 step 2). The LordOS guest tools (`lordos-guest-win`) are now w5 and say `pointer`; lord-vm then sets
   viogpudo's `HWCursor` value through qemu-guest-agent with one fixed SYSTEM script (`PTR_PS`: only `VioGpuDod`

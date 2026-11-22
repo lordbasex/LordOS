@@ -1953,6 +1953,65 @@ Monitor shows each VM as one row with a drill-in. Cleaner never touches `~/Machi
 
 ### 6.15 Command line and coding agents
 
+#### From the terminal: `machines` (built 2026-11-21, in development; approved by the maintainer 2026-11-21)
+
+`/usr/bin/machines` (a link to `/usr/lib/lordos/bin/machines`; `server/src/cli/machines.c`, pure parts in `mcli.c`)
+works on the same library as the app, `~/Machines`, as the person, with no root and no admin action of its own:
+
+```sh
+machines list [--json]                       # name, system, state, vCPUs, memory, disk used, graphics
+machines status NAME [--json]
+machines start NAME [--no-window]            # as Play, or as "Start Without Window"
+machines open NAME                           # its window on the desktop
+machines stop|poweroff|pause|resume|suspend|reset NAME
+machines snapshot NAME list [--json] | take LABEL | revert TAG | delete TAG     # TAG, or a snapshot's unique label
+machines clone NAME NEW_NAME [--duplicate] [--keep-identity]
+machines set NAME --memory 8G --cpus 6 --disk 64G --clipboard both --network bridged --bridge eno1 ...
+machines help
+```
+
+- **NAME** is a machine's name, ASCII case ignored; its start is enough when only one machine has it (more than one:
+  the command lists them and exits 4). A path to a machine folder works too.
+- **Everything but start and open runs `lord-vm`** (the one beside the command) on the machine's folder, exactly as the
+  app does: `--status`, `--stop`, `--poweroff`, `--pause`, `--resume`, `--suspend`, `--reset`, `--snapshot`, `--clone`
+  (the new folder named as the app names it) and `--set`. `set` takes lord-vm's `--set` options with friendlier
+  values: sizes such as `8G`, `1.5G`, `512M` (a bare number is MB for memory, GB for the disk), `--cpus`, `host-only`;
+  everything else is passed through and checked by lord-vm. `list` and `status` read `machine.json`, `run.json` (a
+  state whose lord-vm is gone reads as off, as in the app) and `app.json` (the system's name); `status` of a running
+  machine asks its lord-vm. A machine with a graphics card isn't suspended (as in the app). After `stop`, `poweroff` or
+  `suspend` of a bridged or vGPU machine the command tells the session (below, `release`), so the macvtap and the vGPU
+  are given back at once.
+- **start and open go through the person's running LordOS session**, so they do exactly what the app does: Play in the
+  machine's window (`begin()`: the bridged network's `vm-net-bridge` and the graphics card's `vm-gvt-create` first, then
+  `vm-memlock` while it starts), or "Start Without Window" (`startPrep`, then `lord.vm.startDetached`, with the list
+  read meanwhile so `vm-memlock` is asked). A start in a window waits up to two minutes to say "running". **Without a
+  session**, `start --no-window` runs `lord-vm --start --detach --keep-running` itself only for a machine that needs no
+  admin step (shared, isolated or host-only network, no graphics card) and otherwise says why (exit 5); `open` and a
+  start in a window need the session (exit 5).
+- **The session channel** (`server/src/vm/vmcli.h`, lord-server's side `server/src/ui/js_vmcli.c` as `lord.vmcli`, the
+  app's side `apps/machines/cli.js` with `cliPlan` in `model.js`): `$XDG_RUNTIME_DIR/lordos-machines.sock`, an AF_UNIX
+  stream socket made 0600 (umask 0177; never replacing anything but its own socket), only in a session's lord-server
+  (never the login screen's; an `--app` process has no `lord.vmcli`). A peer is kept only when SO_PEERCRED says it runs
+  as lord-server's own uid, at most 4 at a time; the command checks the server's credentials the same way. One request
+  line per connection, within 5 s: `open <dir>`, `start <dir>`, `start-detached <dir>` or `release <dir>`, where `<dir>`
+  is a machine folder's real path (absolute, ending `.lordvm`, no control characters, no `.`/`..` component, nothing
+  after it). The app acts only on a machine its own `lord.vm.list()` has at exactly that folder (else exit 4) and answers
+  one line, `<code> <text>`: the exit status and its words in the person's language. Machines deactivated in the Store
+  refuses start and open. No command, option, name or other path ever crosses the channel, and it reads no file for the
+  peer. `build/mcli-test` checks the parser (strict, with a fuzz pass under ASan) and `tests/machinescli_headless.sh`
+  starts, opens and powers off a throwaway machine through a headless lord-server.
+- **Messages** are `assets/locales/<lang>/machinescli.json` (all 35 languages), chosen by `LC_ALL`, `LC_MESSAGES` or
+  `LANG` as lord-web's are (`weblangid.h`); lord-vm's own reasons stay in English. **Exit status:** 0 done, 1 failed, 2
+  wrong command or value, 3 not running, 4 no such machine (or more than one), 5 needs the LordOS session. **`--json`**
+  is stable: keys are only ever added (`list`: `{"library", "machines": [{name, folder, id, valid, system, state, reason,
+  view, arch, vcpus, memory_mb, disk_gb, disk_used_bytes, graphics, gpu, network}]}`; `status` adds `since`, `detail`,
+  `qemu_pid`; `snapshot list --json` is lord-vm's own). Bash completion: `/usr/share/bash-completion/completions/machines`
+  (`machines list --names` gives the names).
+- **Not yet:** a start from a memory snapshot (`--loadvm`: the app's Snapshots window does it), creating or importing
+  machines, the console, and the guest agent's `shell`/`exec` below.
+
+#### Planned: `lordvm` and the agent
+
 `lordvm list|start|stop|suspend|snapshot|clone|console <name>`, plus through the agent:
 
 ```sh

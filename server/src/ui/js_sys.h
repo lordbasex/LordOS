@@ -9,6 +9,7 @@ void js_sys_register(JSContext *c, JSValue lord);
 /* Process of an isolated app: only lord.text and lord.image (drawing and text direction). */
 void js_sys_register_app(JSContext *c, JSValue lord);
 void js_sys_set_greeter(int on);             /* login screen theme: lord.greeter */
+int js_sys_greeter(void);                    /* this lord-server draws the login screen */
 void js_sys_set_assets(const char *dir);   /* assets/ folder (language catalogs) */
 int js_sys_reserved_id(const char *id);     /* one of LordOS's string namespaces: no package may have it */
 const char *js_sys_assets(void);          /* for src: 'asset:icons/x.png' */

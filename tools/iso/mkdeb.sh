@@ -17,6 +17,9 @@
 #                                         docs/BENCHMARK.md): a link to /usr/lib/lordos/bin/lordos-sysreport,
 #                                         which starts the lord-bench and lord-media next to it
 #   /usr/bin/lordos-fetch                 the crown and a summary of the computer (a link to the same binary)
+#   /usr/bin/machines                     Machines from the terminal (docs/VIRTUALIZATION.md "From the terminal"): a link to
+#                                         /usr/lib/lordos/bin/machines, which runs the lord-vm next to it; its bash completion
+#                                         in /usr/share/bash-completion/completions/machines
 #   /usr/bin/lordos-issue                 what a bug report needs, ready to paste (CONTRIBUTING.md)
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
@@ -82,6 +85,7 @@ fi
 [ -x server/build/lord-browser-prefs ] || { echo "missing server/build/lord-browser-prefs (make -C server)" >&2; exit 1; }
 [ -x server/build/lordos-lid-wake ] || { echo "missing server/build/lordos-lid-wake (make -C server)" >&2; exit 1; }
 [ -x server/build/lordos-sysreport ] || { echo "missing server/build/lordos-sysreport (make -C server)" >&2; exit 1; }
+[ -x server/build/machines ] || { echo "missing server/build/machines (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-sessiond ] || { echo "missing server/build/lord-sessiond (make -C server, with libssl-dev, libsrtp2-dev and libusrsctp-dev)" >&2; exit 1; }
 # The helpers make builds only when their -dev packages are installed (docs/VM-SETUP.md). A package without one of
 # them loses a feature with no error anywhere (0.8.8.6 shipped without lord-media: Screenshots saved and copied
@@ -138,6 +142,13 @@ install -m 755 server/build/lordos-sysreport "$L/bin/lordos-sysreport"
 ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-sysreport"
 ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-fetch"
 install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
+# Machines from the terminal: in the LordOS folder because it runs the lord-vm next to its own binary (/proc/self/exe)
+# and reads its texts from ../assets
+install -m 755 server/build/machines "$L/bin/machines"
+"$STRIP" --strip-unneeded "$L/bin/machines" 2>/dev/null || true
+ln -s ../lib/lordos/bin/machines "$PKG/usr/bin/machines"
+install -d "$PKG/usr/share/bash-completion/completions"
+install -m 644 packaging/bash-completion/machines "$PKG/usr/share/bash-completion/completions/machines"
 # the visual test bench: a plain Wayland client, launched like any Linux app
 [ -x server/build/lordos-testbench ] && {
     install -m 755 server/build/lordos-testbench "$PKG/usr/bin/lordos-testbench"

@@ -1027,3 +1027,29 @@ export function bootSummary(order) {
   if (typeof order !== 'string' || order === 'auto' || !order) return null;
   return `machines.cfg.bootFirst.${bootList(order)[0]}`;
 }
+
+// ---- the `machines` command's session channel (cli.js; server/src/vm/vmcli.h) ----
+// The command's exit statuses, also the answer's code (vmcli.h VMCLI_*)
+export const CLI = { OK: 0, FAILED: 1, USAGE: 2, NOT_RUNNING: 3, NO_MACHINE: 4 };
+// what a request does, from lord.vm.list(): { code, key, vars } to answer now (key under machinescli.*), with open: m when
+// the machine's window opens first (openMachine: a start from there is Play's), or { detached: m } for a start without a
+// window (startPrep, then startDetached). Only a machine of this library, by its folder exactly
+export function cliPlan(req, list) {
+  const m = (list || []).find((x) => x && typeof x.dir === 'string' && x.dir === req?.dir && !x.error);
+  if (!m) return { code: CLI.NO_MACHINE, key: 'notInLibrary', vars: {} };
+  const a = actionsFor(m.state);
+  const vars = { name: m.name };
+  const notNow = () => (a.open ? { code: CLI.OK, key: 'alreadyRunning', vars } : { code: CLI.FAILED, key: 'busy', vars });
+  switch (req.verb) {
+    case 'open': return a.open ? { code: CLI.OK, key: 'opened', vars, open: m } : { code: CLI.NOT_RUNNING, key: 'notRunning', vars };
+    case 'start': return a.start ? { code: CLI.OK, key: 'startingWindow', vars, open: m } : notNow();
+    case 'start-detached': return a.start ? { detached: m } : notNow();
+    case 'release': return { code: CLI.OK, key: '', vars };    // reading the list gave back what a stopped machine held
+    default: return { code: CLI.USAGE, key: '', vars };
+  }
+}
+// lord-vm's own last word in a job's output ("lord-vm: …"), else the output
+export const lordVmWhy = (out) => {
+  const s = String(out || '').trim();
+  return (s.split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || s).slice(0, 400);
+};
