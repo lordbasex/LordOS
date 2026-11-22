@@ -217,7 +217,10 @@ static void js_run_called(JSAtom name, int argc, JSValueConst *argv) {
     run.open = 1;
     run.t_end = now_ms();
     run.name = JS_DupAtom(ctx, name);
-    run.detail = argc > 0 && JS_IsString(argv[0]) ? JS_DupValue(ctx, argv[0]) : JS_UNDEFINED;
+    /* what it was: its first argument when that is a name (__lordEvent's "up"), else the second (__lordWayland and
+     * __lordTerm take a window or session id first, then the event: "title", "map", "output") */
+    run.detail = argc > 0 && JS_IsString(argv[0]) ? JS_DupValue(ctx, argv[0])
+               : argc > 1 && JS_IsNumber(argv[0]) && JS_IsString(argv[1]) ? JS_DupValue(ctx, argv[1]) : JS_UNDEFINED;
 }
 
 /* where: what the JS was doing when it passed the limit (the sample); who: __lordStallWho(what) */

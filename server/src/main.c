@@ -3077,6 +3077,10 @@ int main(int argc, char **argv) {
             double hd = wl_frame_hidden((unsigned)now_ms());
             if (hd >= 0 && (delay < 0 || hd < delay)) delay = hd;
         }
+        {   /* a Linux window's new title waiting for its frame slot (wl.c set_title) */
+            double td = wl_title_wait();
+            if (td >= 0 && (delay < 0 || td < delay)) delay = td;
+        }
         /* nothing is drawn: the Linux apps waiting for a frame get it at most once a second (wl.c) */
         if (unseen) {
             /* a frame prepared before the screen went off would be shown stale when it comes back */

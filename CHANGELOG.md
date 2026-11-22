@@ -451,6 +451,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A Linux app's title costs a JS event only when it changes, at most once a frame, in development** (Wayland audit item
+  1, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every
+  `xdg_toplevel.set_title`, even the same title again, went to the theme as a `title` event and re-rendered its window
+  list. Now an unchanged title is dropped, and a burst reaches JS once per 16 ms per window with its last title (Wayland
+  and X11 windows). `wlperf-client titles` against a headless lord-server: 1000 repeats of the current title give 0
+  events (1000 before), 1000 different titles in a burst give 2 (1000 before). The stall detector's `__lordWayland` and
+  `__lordTerm` lines now name the event (`js __lordWayland title`).
+
 - **The Terminal no longer re-renders whole windows for a program's title, in development** (Wayland and main-thread
   audit, item 6, approved by the maintainer 2026-11-22; `docs/MAIN-THREAD.md`). A program that animates its title (Claude
   Code's spinner, progress counters) sent a `__lordTerm` "title" event per change, and each one re-rendered the whole

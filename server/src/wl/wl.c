@@ -123,6 +123,8 @@ struct Surf {
     int sent_configure, mapped, conf_w, conf_h;
     int gx, gy, gw, gh, has_geom;
     char title[256], app_id[128];
+    int title_pending;              /* a new title not told to JS yet (titles_flush: at most one event a frame) */
+    unsigned title_ms;              /* when its last title event went */
     int maximized, fullscreen, activated, csd;
     int min_w, min_h, max_w, max_h;             /* xdg_toplevel: its size limits */
     /* the window it belongs to: xdg_toplevel.set_parent, or xdg-foreign's set_parent_of (owner_by =
@@ -294,6 +296,8 @@ static unsigned now_ms(void) {
 
 /* ---- events for JS ---- */
 
+#define TITLE_MS 16                     /* a window's title goes to JS at most once a frame (set_title) */
+
 typedef struct { int id; char type[16]; char json[600]; } Ev;
 static Ev evq[64];
 static int nev;
@@ -330,7 +334,38 @@ static void emit_id(int id, const char *type, const char *json) {
     snprintf(e->json, sizeof e->json, "%s", json);
 }
 
+/* The titles due (TITLE_MS since the window's last one) join the queue; the others wait for wl_title_wait. */
+static void titles_flush(void) {
+    unsigned t = now_ms();
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !s->title_pending) continue;
+        if (!s->mapped) { s->title_pending = 0; continue; }
+        if (t - s->title_ms < TITLE_MS || nev == 64) continue;
+        char e[520];
+        json_str(e, sizeof e, s->title);
+        emit(s, "title", "{\"title\":\"%s\"}", e);
+        s->title_pending = 0;
+        s->title_ms = t;
+    }
+}
+
+/* ms until a waiting title is due (the main loop's poll), -1 if none waits */
+double wl_title_wait(void) {
+    unsigned t = now_ms();
+    double best = -1;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !s->title_pending) continue;
+        unsigned since = t - s->title_ms;
+        double d = since >= TITLE_MS ? 0 : (double)(TITLE_MS - since);
+        if (best < 0 || d < best) best = d;
+    }
+    return best;
+}
+
 void wl_events(WlEventFn fn) {
+    titles_flush();
     for (int i = 0; i < nev; i++) fn(evq[i].id, evq[i].type, evq[i].json);
     nev = 0;
 }
@@ -2385,12 +2420,20 @@ static void top_parent(struct wl_client *c, struct wl_resource *r, struct wl_res
     Surf *s = wl_resource_get_user_data(r), *o = p ? wl_resource_get_user_data(p) : NULL;
     if (s) set_owner(s, o && o->role == R_TOPLEVEL && o->top ? o : NULL, NULL);     /* only a live toplevel parents */
 }
+/* A window's title: only a different one counts, and JS hears it at most once a frame (TITLE_MS), the last one of a
+ * burst: a terminal or a player that sets its title on every redraw (a spinner, a position) re-rendered the theme's
+ * window list each time (docs/WAYLAND.md, "Titles"). */
+static void set_title(Surf *s, const char *t) {
+    char cut[sizeof s->title];
+    snprintf(cut, sizeof cut, "%s", t);
+    if (!strcmp(cut, s->title)) return;             /* the same (once cut to fit): nothing to tell */
+    memcpy(s->title, cut, sizeof cut);
+    if (s->mapped) s->title_pending = 1;
+}
 static void top_title(struct wl_client *c, struct wl_resource *r, const char *t) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
-    if (!s) return;
-    snprintf(s->title, sizeof s->title, "%s", t);
-    if (s->mapped) { char e[520]; json_str(e, sizeof e, s->title); emit(s, "title", "{\"title\":\"%s\"}", e); }
+    if (s) set_title(s, t);
 }
 /* The window's app id: the one it set, else the one the sandbox engine gave its client's security context
  * (cut to fit; "" if neither) */
@@ -2779,6 +2822,7 @@ static void geometry(Surf *s, int *w, int *h) {
 /* JS learns about a window: title, app id, content size and whether it draws its own frame. */
 static void emit_map(Surf *s, int w, int h) {
     char t[520], a[260];
+    s->title_pending = 0;                       /* the map carries it */
     json_str(t, sizeof t, s->title);
     json_str(a, sizeof a, s->app_id);
     if (s->xw) {                    /* X11: WM_CLASS class, and its instance for the .desktop match */
@@ -5471,8 +5515,8 @@ void wlx_detach(int sid) {
 void wlx_set_title(int sid, const char *t) {
     Surf *s = find(sid);
     if (!s) return;
-    snprintf(s->title, sizeof s->title, "%s", t);
-    if (s->mapped && s->role == R_TOPLEVEL) { char e[520]; json_str(e, sizeof e, s->title); emit(s, "title", "{\"title\":\"%s\"}", e); }
+    if (s->role == R_TOPLEVEL) set_title(s, t);
+    else snprintf(s->title, sizeof s->title, "%s", t);
 }
 
 void wlx_popup_moved(int sid, int x, int y) {

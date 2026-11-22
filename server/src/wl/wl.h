@@ -23,6 +23,7 @@ int  wl_frame_unseen(unsigned time_ms);
 /* The frame callbacks of minimized windows and windows on a hidden desktop (wl/framegate.h): sent
  * once a second, here when no frame of lord-server's did. ms until the next one is due, -1 when none waits. */
 double wl_frame_hidden(unsigned time_ms);
+double wl_title_wait(void);              /* ms until a window title waiting to go to JS is due (-1: none) */
 
 /* Input (main.c). hit = node under the pointer; down[i]/button[i] = buttons of this event
  * (0 left, 1 middle, 2 right). Returns 1 if the pointer is over a Wayland app and 2 if

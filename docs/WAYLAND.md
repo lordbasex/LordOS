@@ -1295,6 +1295,20 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   pipewire" without the daemon), `build/dbus-test` (fds sent with replies, in order), `build/pwguard-test` (a screen
   node is not a camera) and `tests/screencast_model_test.mjs` (the chooser's choices).
 
+## Frames, titles and damage (0.8.9.5, in development)
+
+The Wayland audit of 2026-11-22 (items 1–7, approved by the maintainer that day) made the compositor do less per app
+frame. `tests/wlperf_headless.sh` checks each part against a headless lord-server with `build/wlperf-client`
+(`tests/wlperf_client.c`); `tests/run_suites.sh` runs it.
+
+- **Titles.** `xdg_toplevel.set_title` (and an X11 window's `WM_NAME`, `wlx_set_title`) is compared with the title the
+  window has: the same one (once cut to its 255 bytes) is not news. A different one is noted and goes to JS at most once
+  per 16 ms per window, the last of a burst (`set_title`, `titles_flush`; `wl_title_wait` wakes the main loop for one
+  that waits). A terminal or a player that sets its title on every redraw re-rendered the theme's window list each
+  time. The stall detector now names the event of `__lordWayland` and `__lordTerm` lines (`js __lordWayland title`).
+  Measured with `wlperf-client titles`: the title it had set 1000 more times gives 0 events (1000 before); 1000
+  different titles in one burst give 2 (1000 before), `b999` last.
+
 ## Pending
 
 - **Firefox ESR 153 ignored mouse clicks on VM 119** (October 19, QEMU's USB tablet through QMP):

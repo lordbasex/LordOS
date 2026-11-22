@@ -247,6 +247,13 @@ EOF
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
     esac
+    # frames, titles and damage of a Linux window, against a headless lord-server (docs/WAYLAND.md)
+    WLPERF_ONLY=titles,frames sh tests/wlperf_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "wlperf (tests/wlperf_client.c, headless lord-server: titles, frames)" ;;
+        77) skip "wlperf" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "wlperf (tests/wlperf_client.c, headless lord-server: titles, frames)" ;;
+    esac
     # apps mode's guest side: lord-server's window endpoint, directly and through lordos-guest (tests/guestwin_client.c)
     sh tests/guestwin_headless.sh >"$T/out" 2>&1
     case $? in
