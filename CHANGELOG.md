@@ -165,6 +165,37 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     330 fps (mailbox), no protocol error, no stall; an ASan build runs the suite cleanly; on VM 116 the suite also
     passes with GPU composition on the monitor (llvmpipe). Not checked yet: a buffer sampled in place by a real GPU
     (virtio-gpu copies udmabufs), NVIDIA's driver (LordOS doesn't support it), Xwayland's own use.
+- **The Wayland protocol table, on lordos.org and in `docs/WAYLAND.md`, in development.** A new page,
+  [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/) (English, Spanish and Portuguese,
+  linked from the footer, the sitemap and the site's search), lists 108 Wayland protocols (the core protocol's globals,
+  every wayland-protocols one, wlroots', KDE's, and the others KWin, Mutter or LordOS offer) with the version LordOS,
+  KDE Plasma's KWin 6.7 and GNOME's Mutter 51 advertise, compared on 2026-11-22 (KWin's and Mutter's data as
+  wayland.app lists it: the globals each advertised to an ordinary client, from 2026-09-04 and 2026-09-06). For LordOS
+  each row has a status (offered, partly, left out on purpose, not offered), a note, how it was checked and when, and
+  "in development" when it is in the code after the latest release (0.8.9.4). Today: LordOS offers 30 of the 108,
+  KWin 63 and Mutter 40; of the 37 both KWin and Mutter offer, LordOS offers 24; 30 are left out on purpose, each with
+  its reason (layer-shell, data-control, foreign-toplevel, session-lock, screencopy and image capture, virtual
+  keyboard and pointer, input methods, Plasma's own shell protocols). The page has a search, filters by category,
+  LordOS's status and who offers it (including "both KDE and GNOME, not LordOS"), kept in the address, a legend, and
+  turns each row into a card on a phone; its script and stylesheet (`web/src/wayland.js`, `wayland.css`) load on that
+  page only.
+  - **One source of truth:** `docs/wayland-protocols.json`. `tools/gen-wayland-table.mjs` writes from it the
+    "Protocol table (generated)" section of `docs/WAYLAND.md` (between marker comments) and the page's data,
+    `web/content/wayland/protocols.json`; `--check` only checks. `tools/wayland-app-import.mjs` refreshes KWin's and
+    Mutter's columns and the protocol list from wayland.app's own data, keeping LordOS's entries.
+  - **Drift test:** `server/tests/wayland_table_test.mjs` (in `make -C server test`) reads every
+    `wl_global_create(…, &X_interface, VERSION, …)` in `server/src` (hand-written interface tables and libwayland's
+    `wl_shm` included) and fails when a global is created and not in the JSON, listed and not created, or at another
+    version, and when the generated section or the page's data is stale.
+  - **Hardened against its external input** (part of the data comes from wayland.app): the generator's `validate()`,
+    the importer (which refuses to write) and `web/build.mjs` (which refuses to build, `validateWeb()`) accept only
+    positive integer versions, interface names matching `^[a-z][a-z0-9_]*$`, protocol ids `^[a-z][a-z0-9_-]*$`,
+    sources, stabilities, categories and statuses from fixed sets, `https://wayland.app/protocols/` links and plain
+    text without markup; every value the page prints is also escaped. The drift test feeds hostile rows (for example a
+    category `"><script>`) to both checks and fails if one is accepted.
+  - **Maintainer's decisions of 2026-11-22 recorded:** the 13 KDE Plasma shell, output and settings protocols stay left
+    out on purpose (confirmed); `drm-lease-v1` is in progress (a permission, non-desktop connectors only), shown as
+    not offered yet with that note.
 
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
