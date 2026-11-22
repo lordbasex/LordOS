@@ -68,10 +68,15 @@ int main(void) {
 
     /* ---- limits ---- */
     CHECK(SOBJ_MAX_PENDING >= 5);                       /* a mailbox swapchain's images, all committed at once */
-    CHECK(sobj_may_wait(0, 0));
-    CHECK(sobj_may_wait(SOBJ_MAX_WAITS_CLIENT - 1, SOBJ_MAX_WAITS - 1));
-    CHECK(!sobj_may_wait(SOBJ_MAX_WAITS_CLIENT, 0));
-    CHECK(!sobj_may_wait(0, SOBJ_MAX_WAITS));
+    CHECK(sobj_wait_mode(0, 0, 0) == SOBJ_WAIT_EVENTFD);
+    CHECK(sobj_wait_mode(SOBJ_MAX_WAITS_CLIENT - 1, SOBJ_MAX_WAITS_CLIENT - 1, SOBJ_MAX_WAITS - 1) == SOBJ_WAIT_EVENTFD);
+    /* a connection past its own cap: refused (it alone is disconnected) */
+    CHECK(sobj_wait_mode(SOBJ_MAX_WAITS_CLIENT, SOBJ_MAX_WAITS_CLIENT, 0) == SOBJ_WAIT_REFUSE);
+    /* the session full: an innocent client is never refused, it polls; the process holding more than its share is */
+    CHECK(sobj_wait_mode(0, 0, SOBJ_MAX_WAITS) == SOBJ_WAIT_POLL);
+    CHECK(sobj_wait_mode(3, SOBJ_MAX_WAITS_CLIENT - 1, SOBJ_MAX_WAITS + 5) == SOBJ_WAIT_POLL);
+    CHECK(sobj_wait_mode(0, SOBJ_MAX_WAITS_CLIENT, SOBJ_MAX_WAITS) == SOBJ_WAIT_REFUSE);
+    CHECK(SOBJ_MAX_WAITS < 256);                        /* below wl.c's surfaces: others can still make windows */
 
     if (fails) { fprintf(stderr, "syncobj_test: %d failed\n", fails); return 1; }
     printf("syncobj_test: ok\n");

@@ -32,6 +32,14 @@ bind the global keep implicit sync (dma-resv), as `docs/GPU.md` says. Code: `ser
   mode has up to 5 images and all of them can be committed before the first one's rendering ends, and a state-only
   commit between them waits in the same queue. Points set and then dropped with the object (`destroy` before a commit)
   are forgotten without being signalled, as the protocol allows.
+- **The session's waits (differs from the table; security review 2026-11-22):** the plan disconnected *the client that
+  asked* once the session's eventfds were taken, so one app filling them with points it never signals would get other,
+  innocent apps disconnected. Now only a client past its own share is ever disconnected: past 32 eventfds on its own
+  connection, or, with the session full, when its process (every connection with the same pid) already holds 32. Any
+  other client whose commit waits while the session is full is never refused: its first waiting commit is checked
+  every 4 ms on a timer (`SOBJ_POLL_MS`, a non-blocking `SYNCOBJ_TIMELINE_WAIT`) instead of with an eventfd. The
+  session limit is **128** eventfds (not 256), below the compositor's 256 surfaces, so other apps can still make
+  windows. `syncobj.h` `sobj_wait_mode`, `tests/syncobj_client.c` `fair`.
 - **Subsurfaces:** lord-server applies every subsurface's commit on its own (`set_sync` is not implemented), so each
   surface's queue is its own; nothing waits for a parent.
 - **Security contexts:** offered inside them too (the plan's default; it reads nothing of other clients).
@@ -102,7 +110,7 @@ No new library: these are kernel uapi structs (`drm/drm.h`), as `kms.c` already 
 | imported timelines | 64 per client | `wl_client_post_no_memory` (the client is disconnected) |
 | syncobj surfaces | one per surface (the protocol's rule), at most 256 per client | as above |
 | pending commits per surface | 4 | the oldest waiting ones stay; the fifth commit disconnects the client (`no_memory`): a client that keeps committing unsignalled frames is broken |
-| eventfds alive | 32 per client, 256 in the session | as above for the client; the session limit refuses new waits by disconnecting the client that asked |
+| eventfds alive | 32 per client, 256 in the session | as above for the client; the session limit refuses new waits by disconnecting the client that asked (as built: 128 in the session, and only a process past its share is disconnected; see "As built") |
 | point values | any u64; the release point must be above the acquire point on the same timeline | `conflicting_points` |
 
 Every handle, eventfd and pending commit is freed when its resource, surface or client goes (the destroy listeners

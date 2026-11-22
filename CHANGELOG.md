@@ -28,8 +28,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     shown (its surface destroyed), so an app never waits on LordOS forever.
   - **Rules and limits:** every protocol error (`no_acquire_point`, `no_release_point`, `no_buffer`,
     `unsupported_buffer`, `conflicting_points`, `surface_exists`, `no_surface`, `invalid_timeline`); 64 timelines per
-    client, 8 commits waiting per surface (the plan's 4 raised for mailbox swapchains of up to 5 images), 32 eventfds
-    per client and 256 in the session, past which the client is disconnected.
+    client, 8 commits waiting per surface (the plan's 4 raised for mailbox swapchains of up to 5 images) and 32
+    eventfds per connection, past which that client is disconnected. The session has 128 eventfds; once they are
+    taken only a process already holding 32 is disconnected, and any other app's waiting frame is checked every 4 ms
+    instead, so one app filling them can't get other apps disconnected (security review).
   - **Where:** only with a render node that has timeline syncobjs and `SYNCOBJ_EVENTFD` (Linux 6.6), opened by
     lord-server itself (raw ioctls with the kernel's headers, no libdrm, no DRM master, no new privilege); on the GPU
     path and the CPU path (the CPU copy reads a frame whose point is signalled); `LORD_SYNCOBJ=0` turns it off. Apps that

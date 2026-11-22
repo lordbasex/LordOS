@@ -224,7 +224,7 @@ struct Surf {
     struct wl_resource *sobj;
     SobjPoint p_acq, p_rel, rel;
     SobjQueue sq;
-    struct wl_event_source *sq_src, *sq_timer;
+    struct wl_event_source *sq_src, *sq_timer, *sq_poll;   /* sq_poll: past the session's eventfds, a timer */
     int sq_fd, sq_logged;
 };
 
@@ -1037,7 +1037,7 @@ struct Pend {
 
 /* the per-client counts of the limits (syncobj.h); found by client, so a surface outliving its client's record (the
  * client's destroy signal comes before its resources go) just isn't counted any more */
-typedef struct { struct wl_list link; struct wl_client *c; struct wl_listener gone; int timelines, surfaces, waits; } SobjClient;
+typedef struct { struct wl_list link; struct wl_client *c; struct wl_listener gone; pid_t pid; int timelines, surfaces, waits; } SobjClient;
 static struct wl_list sobj_clients;
 static int sobj_waits;                  /* eventfds alive in the session */
 
@@ -1057,6 +1057,7 @@ static SobjClient *sobj_client(struct wl_client *c) {
     SobjClient *k = sobj_client_find(c);
     if (k || !(k = calloc(1, sizeof *k))) return k;
     k->c = c;
+    wl_client_get_credentials(c, &k->pid, NULL, NULL);
     k->gone.notify = sobj_client_gone;
     wl_client_add_destroy_listener(c, &k->gone);
     wl_list_insert(&sobj_clients, &k->link);
@@ -1166,7 +1167,16 @@ static void pend_free(Pend *e) {
 static void surface_apply(Surf *s);
 static const char *app_of_client(struct wl_client *cl);
 
+/* the eventfds every connection of k's process holds (one app can't take the session's share through many sockets) */
+static int sobj_process_waits(const SobjClient *k) {
+    int n = 0;
+    const SobjClient *o;
+    wl_list_for_each(o, &sobj_clients, link) if (o->pid == k->pid) n += o->waits;
+    return n;
+}
+
 static void sq_disarm(Surf *s) {
+    if (s->sq_poll) { wl_event_source_remove(s->sq_poll); s->sq_poll = NULL; }
     if (s->sq_src) {
         wl_event_source_remove(s->sq_src);
         s->sq_src = NULL;
@@ -1199,11 +1209,37 @@ static int sq_slow(void *data) {
     return 0;
 }
 
-/* Waits for the first queued commit's acquire point: 0 armed, -1 the kernel refused (it is applied as it is), -2 past
- * a limit (the client is disconnected) */
+/* the session's eventfds are all taken (by others): the point is checked every SOBJ_POLL_MS, without blocking */
+static int sq_polled(void *data) {
+    Surf *s = data;
+    Pend *e = sobjq_front(&s->sq);
+    if (e && e->acq.tl && sobj_signalled(e->acq) != 1) { wl_event_source_timer_update(s->sq_poll, SOBJ_POLL_MS); return 0; }
+    sq_disarm(s);
+    sq_drain(s);
+    return 0;
+}
+
+/* Waits for the first queued commit's acquire point: 0 armed (an eventfd, or a timer when the session's eventfds are
+ * taken), -1 the kernel refused (it is applied as it is), -2 past this client's (or its process's) own share: only
+ * then is the client disconnected, never for what other clients hold */
 static int sq_arm(Surf *s, Pend *e) {
     SobjClient *k = sobj_client(s->client);
-    if (!k || !sobj_may_wait(k->waits, sobj_waits)) return -2;
+    if (!k) return -2;
+    int mode = sobj_wait_mode(k->waits, sobj_waits >= SOBJ_MAX_WAITS ? sobj_process_waits(k) : 0, sobj_waits);
+    if (mode == SOBJ_WAIT_REFUSE) return -2;
+    if (mode == SOBJ_WAIT_POLL) {
+        s->sq_poll = wl_event_loop_add_timer(loop, sq_polled, s);
+        if (!s->sq_poll) return -1;
+        wl_event_source_timer_update(s->sq_poll, SOBJ_POLL_MS);
+        static int told;
+        if (!told++) fprintf(stderr, "wayland: explicit sync: the session's %d waits are taken; a frame's point is checked every %d ms\n",
+                             SOBJ_MAX_WAITS, SOBJ_POLL_MS);
+        if (!s->sq_logged) {
+            if (!s->sq_timer) s->sq_timer = wl_event_loop_add_timer(loop, sq_slow, s);
+            if (s->sq_timer) wl_event_source_timer_update(s->sq_timer, SOBJ_WAIT_LOG_MS);
+        }
+        return 0;
+    }
     int fd = sobj_eventfd(e->acq);
     if (fd < 0) return -1;
     s->sq_src = wl_event_loop_add_fd(loop, fd, WL_EVENT_READABLE, sq_ready, s);
@@ -1231,7 +1267,7 @@ static void sq_apply(Surf *s, Pend *e) {
 /* Applies the queued commits whose acquire point is signalled, in order, up to the first one that still waits */
 static void sq_drain(Surf *s) {
     Pend *e;
-    while (!s->sq_src && (e = sobjq_front(&s->sq))) {
+    while (!s->sq_src && !s->sq_poll && (e = sobjq_front(&s->sq))) {
         if (e->acq.tl && sobj_signalled(e->acq) != 1) {
             int r = sq_arm(s, e);
             if (r == 0) return;

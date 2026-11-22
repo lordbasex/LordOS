@@ -3,7 +3,7 @@
  * timeline syncobjs and the buffers are udmabufs (linear XRGB8888), so the CPU path is checked the same way as the GPU
  * one (LORD_GPU=1, on a monitor).
  *
- *   syncobj-client [check ...]       checks: wait order freeze limit errors (all of them when none is given)
+ *   syncobj-client [check ...]       checks: wait order freeze limit fair errors (all of them when none is given)
  *
  *   wait    a frame committed with an acquire point not signalled yet is not applied (no frame callback, no
  *           presentation) until the point is signalled from the CPU; then it is, and the release point of the buffer it
@@ -13,6 +13,8 @@
  *   freeze  a point never signalled freezes only its surface: another window of the same client (implicit sync) keeps
  *           getting frames; destroying the frozen surface signals its waiting frame's release point
  *   limit   a ninth commit waiting on one surface disconnects the client (no_memory)
+ *   fair    one app filling the session's waits (4 connections of 32): another app's frames still work and it is not
+ *           disconnected; the flooding app is refused one more
  *   errors  every protocol error: no_acquire_point, no_release_point, no_buffer, unsupported_buffer, conflicting_points,
  *           surface_exists, no_surface, invalid_timeline
  *
@@ -30,6 +32,7 @@
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/wait.h>
 #include <dirent.h>
 #include <drm/drm.h>
 #include <drm/drm_fourcc.h>
@@ -379,6 +382,79 @@ static void check_limit(void) {
     CHECK(err, "limit: nine waiting commits on one surface did not disconnect the client");
     printf("limit: nine waiting commits on one surface: disconnected (%s)\n", strerror(err));
     wl_display_disconnect(dpy);
+    connect_wl();                               /* a live connection for the checks after this one */
+}
+
+/* One app (this process) fills the session's waits from 4 connections of 32 waiting surfaces each (128, every
+ * connection within its own cap); another process's explicit-sync frames still work and it is not disconnected (its
+ * wait falls back to checking the point on a timer); the app holding the session's waits is the one refused when it
+ * asks for one more. */
+#define FAIR_CONNS 4
+#define FAIR_SURFS 32
+static void check_fair(void) {
+    struct wl_display *a[FAIR_CONNS + 1];
+    for (int c = 0; c < FAIR_CONNS; c++) {
+        connect_wl();
+        a[c] = dpy;
+        Tl acq = tl_new(), rel = tl_new();
+        Buf *b = dmabuf_new(0xff102030);
+        for (int i = 0; i < FAIR_SURFS; i++) {
+            struct wl_surface *s = wl_compositor_create_surface(comp);
+            struct wp_linux_drm_syncobj_surface_v1 *so = wp_linux_drm_syncobj_manager_v1_get_surface(som, s);
+            wl_surface_attach(s, b->b, 0, 0);
+            wp_linux_drm_syncobj_surface_v1_set_acquire_point(so, acq.t, 0, 1);         /* never signalled */
+            wp_linux_drm_syncobj_surface_v1_set_release_point(so, rel.t, 0, (uint32_t)i + 1);
+            wl_surface_commit(s);
+        }
+        wl_display_roundtrip(dpy);
+        CHECK(!wl_display_get_error(dpy), "fair: connection %d of the flooding app was disconnected within its own cap", c);
+    }
+    /* another process: an explicit-sync frame held, then applied once signalled; never disconnected */
+    pid_t pid = fork();
+    if (pid == 0) {
+        failed = 0;
+        if (connect_wl() || !som) _exit(2);
+        Win *w = win_new("syncobj fair", 1);
+        Tl acq = tl_new(), rel = tl_new();
+        Buf *b = dmabuf_new(0xff00a0a0);
+        Cb *c = frame(w);
+        commit_sync(w, b, acq, 1, rel, 1);
+        pump(300, &c->done);
+        CHECK(!c->done, "fair: the other app's frame was applied before its point");
+        tl_signal(acq, 1);
+        pump(2000, &c->done);
+        CHECK(c->done, "fair: the other app's frame never came with the session's waits taken");
+        CHECK(!wl_display_get_error(dpy), "fair: the other app was disconnected (%s)", strerror(wl_display_get_error(dpy)));
+        Cb *c2 = frame(w);
+        commit_sync(w, b, acq, 2, rel, 2);
+        tl_signal(acq, 2);
+        pump(2000, &c2->done);
+        CHECK(c2->done && !wl_display_get_error(dpy), "fair: the other app's second frame failed");
+        _exit(failed ? 1 : 0);
+    }
+    int st = 0;
+    waitpid(pid, &st, 0);
+    CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 0, "fair: the other app failed (status %d)", st);
+    /* the flooding app asks for one more wait on a new connection: it alone is disconnected */
+    connect_wl();
+    a[FAIR_CONNS] = dpy;
+    Tl acq = tl_new(), rel = tl_new();
+    Buf *b = dmabuf_new(0);
+    struct wl_surface *s = wl_compositor_create_surface(comp);
+    struct wp_linux_drm_syncobj_surface_v1 *so = wp_linux_drm_syncobj_manager_v1_get_surface(som, s);
+    wl_surface_attach(s, b->b, 0, 0);
+    wp_linux_drm_syncobj_surface_v1_set_acquire_point(so, acq.t, 0, 1);
+    wp_linux_drm_syncobj_surface_v1_set_release_point(so, rel.t, 0, 1);
+    wl_surface_commit(s);
+    pump(1000, NULL);
+    int refused = wl_display_get_error(dpy);
+    CHECK(refused, "fair: the app holding the session's waits got one more");
+    for (int c = 0; c < FAIR_CONNS; c++) CHECK(!wl_display_get_error(a[c]), "fair: an earlier connection of the flooding app broke");
+    if (!failed)
+        printf("fair: one app holding the session's %d waits; another app's explicit-sync frames still applied, not disconnected; "
+               "the flooding app refused one more (%s)\n", FAIR_CONNS * FAIR_SURFS, strerror(refused));
+    for (int c = 0; c <= FAIR_CONNS; c++) wl_display_disconnect(a[c]);
+    connect_wl();                               /* a live connection for the checks after this one */
 }
 
 /* each error on a connection of its own: the error's interface and code */
@@ -467,6 +543,7 @@ static void check_errors(void) {
 }
 
 int main(int argc, char **argv) {
+    setvbuf(stdout, NULL, _IOLBF, 0);          /* before fork (check_fair): nothing printed twice */
     rnode = open_rnode();
     if (rnode < 0) { printf("skipped: needs a render node with syncobj timelines\n"); return 77; }
     udmabuf = open("/dev/udmabuf", O_RDWR | O_CLOEXEC);
@@ -482,6 +559,7 @@ int main(int argc, char **argv) {
         if (all || !strcmp(c, "freeze")) check_freeze();
         if (wl_display_get_error(dpy)) { printf("FAIL the connection broke: %s\n", strerror(wl_display_get_error(dpy))); return 1; }
         if (all || !strcmp(c, "limit")) check_limit();
+        if (all || !strcmp(c, "fair")) check_fair();
         if (all || !strcmp(c, "errors")) check_errors();
         if (all) break;
     }

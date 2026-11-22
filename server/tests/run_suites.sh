@@ -260,9 +260,9 @@ EOF
     # explicit sync (linux-drm-syncobj-v1): timelines and udmabufs through the kernel, against a headless lord-server
     sh tests/syncobj_headless.sh >"$T/out" 2>&1
     case $? in
-        0) ok "syncobj (tests/syncobj_client.c, headless lord-server: wait, order, freeze, limit, errors)" ;;
+        0) ok "syncobj (tests/syncobj_client.c, headless lord-server: wait, order, freeze, limit, fair, errors)" ;;
         77) skip "syncobj" "a render node with timeline syncobjs, /dev/udmabuf (group kvm), build/lord-server and the default theme" ;;
-        *) bad "syncobj (tests/syncobj_client.c, headless lord-server: wait, order, freeze, limit, errors)" ;;
+        *) bad "syncobj (tests/syncobj_client.c, headless lord-server: wait, order, freeze, limit, fair, errors)" ;;
     esac
     # frames, titles and damage of a Linux window, against a headless lord-server (docs/WAYLAND.md)
     sh tests/wlperf_headless.sh >"$T/out" 2>&1

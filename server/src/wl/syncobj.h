@@ -37,7 +37,8 @@ enum {
 #define SOBJ_MAX_SURFACES 256       /* wp_linux_drm_syncobj_surface_v1 objects alive, per client */
 #define SOBJ_MAX_PENDING 8          /* commits waiting in one surface's queue */
 #define SOBJ_MAX_WAITS_CLIENT 32    /* eventfds alive, per client (one per surface whose first queued commit waits) */
-#define SOBJ_MAX_WAITS 256          /* eventfds alive in the session */
+#define SOBJ_MAX_WAITS 128          /* eventfds alive in the session (half of wl.c's 256 surfaces) */
+#define SOBJ_POLL_MS 4              /* past the session's eventfds: how often a waiting point is checked instead */
 #define SOBJ_WAIT_LOG_MS 5000       /* a commit waiting this long is logged, once per surface */
 
 static inline uint64_t sobj_point(uint32_t hi, uint32_t lo) { return (uint64_t)hi << 32 | lo; }
@@ -84,9 +85,15 @@ static inline void *sobjq_pop(SobjQueue *q) {
     return e;
 }
 
-/* May one more eventfd be made? (the client's and the session's counts) */
-static inline int sobj_may_wait(int client_waits, int session_waits) {
-    return client_waits < SOBJ_MAX_WAITS_CLIENT && session_waits < SOBJ_MAX_WAITS;
+/* How a commit waits for its acquire point, from the eventfds alive for this connection, for every connection of the
+ * same process, and in the session. Only the client past its own share is ever disconnected: a full session never
+ * costs another client its connection, its commit just waits by checking the point every SOBJ_POLL_MS instead. */
+enum { SOBJ_WAIT_EVENTFD = 0, SOBJ_WAIT_POLL = 1, SOBJ_WAIT_REFUSE = 2 };
+static inline int sobj_wait_mode(int client_waits, int process_waits, int session_waits) {
+    if (client_waits >= SOBJ_MAX_WAITS_CLIENT) return SOBJ_WAIT_REFUSE;           /* this connection's own cap */
+    if (session_waits < SOBJ_MAX_WAITS) return SOBJ_WAIT_EVENTFD;
+    if (process_waits >= SOBJ_MAX_WAITS_CLIENT) return SOBJ_WAIT_REFUSE;          /* the process filling the session */
+    return SOBJ_WAIT_POLL;
 }
 
 /* ---- the kernel (syncobj.c) ---- */

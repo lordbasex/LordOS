@@ -1445,7 +1445,9 @@ compositor offers it. The design and what differs from it: [SYNCOBJ-PLAN.md](SYN
   s lord-server logs it once per surface (`wayland: <app>: a frame waits for its acquire point for 5 s`); closing the
   window or the app frees everything.
 - **Limits** (past one the client is disconnected with `no_memory`): 64 timelines per client, one object per surface
-  (at most 256 per client), 8 commits waiting per surface, 32 eventfds per client and 256 in the session.
+  (at most 256 per client), 8 commits waiting per surface, 32 eventfds per connection. The session has 128 eventfds;
+  when they are taken, only a client whose process already holds 32 of them is disconnected, and any other client's
+  waiting frame is checked every 4 ms on a timer instead, so one app can't get others disconnected.
 - **Mixing:** an app may use it on some surfaces and not others, or destroy the object and go back to implicit sync;
   apps that don't bind it (Mesa's EGL in 25.0, GTK, Qt, Chromium, Firefox on Mesa) are unchanged.
 - **Tests:** `build/syncobj-test` (the error rules, what a commit does, the queue, the limits; in `make test`),
@@ -1454,7 +1456,9 @@ compositor offers it. The design and what differs from it: [SYNCOBJ-PLAN.md](SYN
   without a render node with timelines or `/dev/udmabuf`): a frame held until its acquire point is signalled from the
   CPU and then applied and presented, the replaced buffer released; a ready commit waiting behind a waiting one and both
   applied in order; a point never signalled freezing only its surface while another window of the same client gets
-  about 90 frames in 1.5 s, and destroying it releasing both points; a ninth waiting commit disconnecting the client;
+  about 90 frames in 1.5 s, and destroying it releasing both points; a ninth waiting commit disconnecting the client; one app
+  holding the session's 128 waits from 4 connections while another process's explicit-sync frames still work and it
+  stays connected, and the flooding app refused one more;
   every protocol error; implicit sync again after the object is destroyed.
 - **Checked 2026-11-22** on the development PC (Debian 13, Linux 6.12, Mesa 25.0.7), headless lord-server on the CPU
   path: the suite above passes; `vkcube --wsi wayland` (RADV, AMD RX 580) binds the global and commits every frame with
