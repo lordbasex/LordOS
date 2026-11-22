@@ -77,6 +77,7 @@ int main(void) {
     CHECK(sobj_wait_mode(3, SOBJ_MAX_WAITS_CLIENT - 1, SOBJ_MAX_WAITS + 5) == SOBJ_WAIT_POLL);
     CHECK(sobj_wait_mode(0, SOBJ_MAX_WAITS_CLIENT, SOBJ_MAX_WAITS) == SOBJ_WAIT_REFUSE);
     CHECK(SOBJ_MAX_WAITS < 256);                        /* below wl.c's surfaces: others can still make windows */
+    CHECK(SOBJ_MAX_POLLS > 0 && SOBJ_MAX_POLLS <= SOBJ_MAX_WAITS);
 
     if (fails) { fprintf(stderr, "syncobj_test: %d failed\n", fails); return 1; }
     printf("syncobj_test: ok\n");

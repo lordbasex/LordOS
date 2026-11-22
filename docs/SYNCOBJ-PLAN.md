@@ -37,7 +37,11 @@ bind the global keep implicit sync (dma-resv), as `docs/GPU.md` says. Code: `ser
   innocent apps disconnected. Now only a client past its own share is ever disconnected: past 32 eventfds on its own
   connection, or, with the session full, when its process (every connection with the same pid) already holds 32. Any
   other client whose commit waits while the session is full is never refused: its first waiting commit is checked
-  every 4 ms on a timer (`SOBJ_POLL_MS`, a non-blocking `SYNCOBJ_TIMELINE_WAIT`) instead of with an eventfd. The
+  every 4 ms (`SOBJ_POLL_MS`, a non-blocking `SYNCOBJ_TIMELINE_WAIT`) instead of with an eventfd. Those polling waits
+  count in the client's and the process's waits like eventfds (so the same 32 per connection and per process), and the
+  session has at most 64 of them (`SOBJ_MAX_POLLS`), all checked by **one shared timer** in one bounded batch per tick
+  (second security review): past 64, a commit is applied as it is (implicit sync, like an eventfd the kernel refuses),
+  never a disconnection. The
   session limit is **128** eventfds (not 256), below the compositor's 256 surfaces, so other apps can still make
   windows. `syncobj.h` `sobj_wait_mode`, `tests/syncobj_client.c` `fair`.
 - **Subsurfaces:** lord-server applies every subsurface's commit on its own (`set_sync` is not implemented), so each

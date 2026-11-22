@@ -2147,7 +2147,9 @@ compositor offers it. The design and what differs from it: [SYNCOBJ-PLAN.md](SYN
 - **Limits** (past one the client is disconnected with `no_memory`): 64 timelines per client, one object per surface
   (at most 256 per client), 8 commits waiting per surface, 32 eventfds per connection. The session has 128 eventfds;
   when they are taken, only a client whose process already holds 32 of them is disconnected, and any other client's
-  waiting frame is checked every 4 ms on a timer instead, so one app can't get others disconnected.
+  waiting frame is checked every 4 ms instead, so one app can't get others disconnected. Those checks count in the
+  client's and process's 32 like eventfds; at most 64 surfaces in the session wait that way, all checked by one timer,
+  and past that a frame is applied as it is (implicit sync), never a disconnection.
 - **Mixing:** an app may use it on some surfaces and not others, or destroy the object and go back to implicit sync;
   apps that don't bind it (Mesa's EGL in 25.0, GTK, Qt, Chromium, Firefox on Mesa) are unchanged.
 - **Tests:** `build/syncobj-test` (the error rules, what a commit does, the queue, the limits; in `make test`),
@@ -2158,7 +2160,8 @@ compositor offers it. The design and what differs from it: [SYNCOBJ-PLAN.md](SYN
   applied in order; a point never signalled freezing only its surface while another window of the same client gets
   about 90 frames in 1.5 s, and destroying it releasing both points; a ninth waiting commit disconnecting the client; one app
   holding the session's 128 waits from 4 connections while another process's explicit-sync frames still work and it
-  stays connected, and the flooding app refused one more;
+  stays connected, and the flooding app refused one more; 33 polling waits on one connection disconnecting it,
+  and three processes of 31 getting 64 polling waits and 29 frames applied as they are, none disconnected;
   every protocol error; implicit sync again after the object is destroyed.
 - **Checked 2026-11-22** on the development PC (Debian 13, Linux 6.12, Mesa 25.0.7), headless lord-server on the CPU
   path: the suite above passes; `vkcube --wsi wayland` (RADV, AMD RX 580) binds the global and commits every frame with

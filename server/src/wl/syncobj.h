@@ -39,6 +39,9 @@ enum {
 #define SOBJ_MAX_WAITS_CLIENT 32    /* eventfds alive, per client (one per surface whose first queued commit waits) */
 #define SOBJ_MAX_WAITS 128          /* eventfds alive in the session (half of wl.c's 256 surfaces) */
 #define SOBJ_POLL_MS 4              /* past the session's eventfds: how often a waiting point is checked instead */
+#define SOBJ_MAX_POLLS 64           /* surfaces waiting that way, in the session (one shared timer checks them all);
+                                     * each counts in its client's and process's waits like an eventfd. Past it a
+                                     * commit is applied as it is (implicit sync), never a disconnection */
 #define SOBJ_WAIT_LOG_MS 5000       /* a commit waiting this long is logged, once per surface */
 
 static inline uint64_t sobj_point(uint32_t hi, uint32_t lo) { return (uint64_t)hi << 32 | lo; }
