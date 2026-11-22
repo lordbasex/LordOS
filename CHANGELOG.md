@@ -10,6 +10,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Settings → Appearance → Desktop style is a gallery ready for many themes** (themes plan, stage 1;
+  `apps/settings/ThemeGallery.jsx`, `sdk/themegallery.js`, `docs/THEMES-GUIDE.md`). The single row of pictures is now a
+  search field (name, description, author and id, without accents), the filters All / Official / Community / Installed and
+  a grid of cards that wraps with the window, each with the style's picture, name, author and version. A theme whose
+  `theme.json` says `"community": true` carries the badge "Community · unofficial", and its page says LordOS didn't make or
+  review it. A card opens the theme's page: a picture twice the size, its description, author, license and version, its
+  own options (`theme.json` `options`, as before) and Apply, which still switches at once without logging out. The arrow
+  keys move over the cards (swapped right to left), Enter opens one, Escape goes back. In 35 languages.
+- **`theme.json` gains `community`, `author`, `license` and `version`**, checked by `sdk/thememeta.js`: the author is one
+  line of plain text up to 80 characters (no control or bidi-override characters; missing or `"author pending"` reads
+  "Unknown author"), the license an SPDX expression, the version `1.2.3` with an optional suffix. The official themes
+  declare none: Settings shows LordOS, MIT and the release's version for them.
+- **A theme that couldn't start says so, with Report**: when switching to a theme fails, lord-server goes back to the one
+  in use as before, and now also keeps why (the JavaScript exception and the first lines of its stack, or the verified-code
+  check's refusal; `ui.theme_failed_why`), which `lord.themes.list` gives as `failed` and `failedWhy`. The theme's card
+  says "Couldn't start — back on ‹the theme in use›", its Apply is off for the rest of the session, and Report opens the
+  GitHub bug form in the browser with the theme's id, the version and the error filled in (home paths replaced, under the
+  3000 characters `lord.apps.launchUri` takes). Nothing is sent until the person submits it there; without a browser it
+  points to `lordos-issue`.
+- Tests: `server/tests/theme_gallery_test.mjs` (41 cases: the new `theme.json` fields, search, filters, order, arrow keys,
+  the report's address), in `make -C server test`.
+
 ### Fixed
 
 - **Flatpak's Spawn portal compares fd handles as unsigned numbers** (`server/src/fpspawn.c`): a handle of 2³¹ or more read
