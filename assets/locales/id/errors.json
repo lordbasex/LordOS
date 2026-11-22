@@ -911,5 +911,10 @@
   "vm.gvtFailed": "Bagian kartu grafis tidak dapat dibuat",
   "vm.memlockCap": "Mesin ini akan mengunci {need} MB, tetapi saat ini hanya {cap} MB yang tersedia untuk mesin dengan kartu grafis (Pengaturan → Kartu grafis)",
   "vm.memlockRefused": "Memori mesin ini tidak dapat dikunci",
-  "gpu.memlockRange": "Jumlah itu di luar batas yang diizinkan komputer ini untuk dikunci oleh mesin"
+  "gpu.memlockRange": "Jumlah itu di luar batas yang diizinkan komputer ini untuk dikunci oleh mesin",
+  "studio.failed": "LordOS Studio tidak dapat dimulai.",
+  "studio.badPicture": "Gambar itu tidak dapat dipakai sebagai latar.",
+  "studio.invalid": "Pengaturan LordOS Studio itu tidak valid.",
+  "studio.noCamera": "Tidak ada kamera yang terhubung.",
+  "studio.unavailable": "LordOS Studio tidak tersedia di komputer ini."
 }

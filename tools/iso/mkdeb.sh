@@ -99,7 +99,7 @@ fi
 # nothing), so each one is required here. ALLOW_MISSING="lord-tts …" leaves out the ones named, on purpose.
 missing=""
 for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev" \
-         lord-stream:"libavcodec-dev libavformat-dev" \
+         lord-stream:"libavcodec-dev libavformat-dev" lord-studio:"libavcodec-dev libavformat-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
          lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-appstream:"" \
@@ -212,6 +212,10 @@ fi
 # lord-stream (0.8.8.10): lord-media's player with internet sockets only, for cameras and IPTV (docs/MEDIA.md "Network streams")
 [ -x server/build/lord-stream ] && install -m 755 server/build/lord-stream "$L/bin/lord-stream"
 [ -x "$L/bin/lord-stream" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-stream" 2>/dev/null || true; }
+# lord-studio (LordOS Studio, docs/CAMERA-STUDIO-PLAN.md): lord-media's camera with the effects; its models are in
+# assets/studio/models (SHA-256 pinned in server/src/media/studio/models.h), Google's Apache-2.0 notice in the docs
+[ -x server/build/lord-studio ] && install -m 755 server/build/lord-studio "$L/bin/lord-studio"
+[ -x "$L/bin/lord-studio" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-studio" 2>/dev/null || true; }
 # lord-vault: Passwords and the system keyring (docs/PASSWORDS.md); lord-server only launches the one in its own folder
 [ -x server/build/lord-vault ] && install -m 755 server/build/lord-vault "$L/bin/lord-vault"
 [ -x "$L/bin/lord-vault" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-vault" 2>/dev/null || true; }
@@ -309,7 +313,7 @@ for d in themes/*/; do
     install -m 644 "$d/theme.json" "$d/theme.bundle.js" "$L/themes/$n/"
     [ -d "$d/assets" ] && cp -r "$d/assets" "$L/themes/$n/"
 done
-cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps assets/geo assets/desktops assets/cloud assets/flatpak "$L/assets/"
+cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps assets/geo assets/desktops assets/cloud assets/flatpak assets/studio "$L/assets/"
 # the makers' keys Machines' download catalog pins (assets/machines/systems.json "keys"; docs/VIRTUALIZATION.md 3.9):
 # the admin helper checks each checksum list's signature with them before it trusts a hash
 install -d "$L/assets/machines/keys"
@@ -440,6 +444,8 @@ find "$L/themes" "$L/assets" "$L/migrations" "$L/apt" -type f -exec chmod 644 {}
 
 D="$PKG/usr/share/doc/lordos"
 install -m 644 README.md "$D/README.md"
+install -D -m 644 third_party/studio-models/LICENSE "$D/studio-models/LICENSE"
+install -m 644 third_party/studio-models/README.md "$D/studio-models/README.md"
 cat > "$D/copyright" <<'C'
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: LordOS

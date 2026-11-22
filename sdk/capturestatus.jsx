@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, MediaView, screen } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { useTheme, popupBg } from './theme.js';
-import { t, appName } from './i18n.js';
+import { t, appName, direction } from './i18n.js';
 import { Overlay } from './layers.js';
 import { statusPanelAt, statusPanelRoom } from './statusitems.js';
 import { ScrollView } from './components.jsx';
@@ -28,12 +28,14 @@ import { perms, brokerDevices, linuxCapture } from './privacy.js';
 import { closeDevicesOf } from './media.js';
 import { firewall } from './monitor.js';
 import { captureRows, captureGlyph, captureSummary, rowStops } from './capturemodel.js';
+import { StudioPanel, studioAvailable } from './studio.jsx';
 
 const GREEN = '#30d158';
 
 const isLinuxId = (id) => /^(desktop|flatpak):/.test(id || '');
 const bare = (id) => (String(id || '').startsWith('lpk:') ? String(id).slice(4) : String(id || ''));
-const nameOf = (id) => (isLinuxId(id) ? castAppName({ who: id }) : appName(getApp(bare(id))) || bare(id));
+// "studio": LordOS Studio's own preview (sdk/studio.jsx), opened from this panel
+const nameOf = (id) => (id === 'studio' ? t('studio.name') : isLinuxId(id) ? castAppName({ who: id }) : appName(getApp(bare(id))) || bare(id));
 
 // The rows, live
 export function useCaptureRows() {
@@ -222,8 +224,10 @@ function Row({ r, th }) {
   );
 }
 
-function Panel({ rows, th, room, onClose }) {
+function Panel({ rows, th, room, onClose, onStudio }) {
   const unknown = rows.some((r) => !r.app && (r.camera || r.mic));
+  // LordOS Studio (docs/CAMERA-STUDIO-PLAN.md 9.1): the camera's effects, in this same panel
+  const studio = rows.some((r) => r.camera) && studioAvailable();
   return (
     <View style={{ width: 320, padding: 12, gap: 10, maxHeight: room }}>
       <Text style={{ fontSize: 11, fontWeight: 700, color: th.textDim, textAlign: 'start' }}>{t('shell.capture.title')}</Text>
@@ -231,6 +235,13 @@ function Panel({ rows, th, room, onClose }) {
         {rows.map((r) => <Row key={r.key} r={r} th={th} />)}
       </ScrollView>
       {unknown ? <Text style={{ fontSize: 11, color: th.textDim, lineHeight: 1.35, textAlign: 'start' }}>{t('shell.capture.unknownHint')}</Text> : null}
+      {studio ? (
+        <View onClick={onStudio} focusable accessibilityLabel={t('studio.open')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 24 }}>
+          <CaptureGlyph glyph="camera" color={th.text} bg={th.control || '#3a3a40'} size={13} />
+          <Text style={{ flex: 1, fontSize: 13, color: th.text, textAlign: 'start' }}>{t('studio.open')}</Text>
+          <Text style={{ fontSize: 15, color: th.textDim }}>{direction() === 'rtl' ? '‹' : '›'}</Text>
+        </View>
+      ) : null}
       <View style={{ height: 1, backgroundColor: th.separator }} />
       <View onClick={() => { onClose(); wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } }); }} focusable accessibilityLabel={t('shell.capture.settings')}>
         <Text style={{ fontSize: 12, color: th.accent, textAlign: 'start' }}>{t('shell.capture.settings')}</Text>
@@ -249,6 +260,8 @@ export function PrivacyIndicators({ height = 22 }) {
   const glyph = captureGlyph(rows);
   const btn = useRef(null);
   const open = useStore(openAt) === btn;
+  const [studio, setStudio] = useState(false);
+  useEffect(() => { if (!open) setStudio(false); }, [open]);
   useEffect(() => { if (!glyph && openAt.get() === btn) openAt.set(() => null); }, [glyph]);
   if (!glyph) return null;
   return (
@@ -260,7 +273,8 @@ export function PrivacyIndicators({ height = 22 }) {
         <Overlay anchor={btn} onClose={() => openAt.set(() => null)}>
           <View style={{ ...statusPanelAt(btn), borderRadius: th.menuRadius || 10, backgroundColor: popupBg(th), border: `1px solid ${th.separator}`,
             boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}>
-            <Panel rows={rows} th={th} room={statusPanelRoom(btn)} onClose={() => openAt.set(() => null)} />
+            {studio ? <StudioPanel th={th} room={statusPanelRoom(btn)} onBack={() => setStudio(false)} />
+              : <Panel rows={rows} th={th} room={statusPanelRoom(btn)} onClose={() => openAt.set(() => null)} onStudio={() => setStudio(true)} />}
           </View>
         </Overlay>
       ) : null}

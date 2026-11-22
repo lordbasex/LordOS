@@ -15,6 +15,7 @@
 #include "../media/streamurl.h"
 #include "js_media.h"
 #include "../media/media_int.h"
+#include "../media/mstudio.h"
 #include "ui.h"
 #include "../media/proto.h"
 #include "../media/hwdec.h"
@@ -807,14 +808,27 @@ static int dev_ok(const char *d) {
     return 1;
 }
 
-/* camera(app, '/dev/videoN', { width, height }) → id */
+/* camera(app, '/dev/videoN' | 'studio', { width, height }) → id. 'studio' is LordOS Studio (media/mstudio.c): the
+ * same camera permission, and lord-studio instead of lord-media on the camera the person chose for it */
 static JSValue f_camera(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     const char *app = argc > 0 ? arg_app(c, argv[0]) : NULL, *dev = argc > 1 ? JS_ToCString(c, argv[1]) : NULL;
     JSValueConst o = argc > 2 ? argv[2] : JS_UNDEFINED;
     JSValue ret = JS_EXCEPTION;
-    if (!app || !dev_ok(dev)) { ret = js_throw_code(c, "camera.invalid", NULL); goto out; }
+    int studio = dev && !strcmp(dev, STUDIO_DEVICE);
+    if (!app || (!studio && !dev_ok(dev))) { ret = js_throw_code(c, "camera.invalid", NULL); goto out; }
     if (!permitted(c, app, PERM_CAMERA)) goto out;
+    if (studio) {
+        MediaSrc *s = media_src_new(SK_CAMERA, app);
+        if (!s) { ret = js_throw_code(c, "media.tooMany", NULL); goto out; }
+        const char *code = NULL;
+        s->sock = mstudio_spawn(opt_int(c, o, "width", 1280, 160, 3840), opt_int(c, o, "height", 720, 120, 2160), &s->pid, &code);
+        if (s->sock < 0) { media_src_close(s); ret = js_throw_code(c, code ? code : "studio.unavailable", NULL); goto out; }
+        s->studio = 1;
+        mstudio_attach(s->sock);
+        ret = JS_NewInt32(c, s->id);
+        goto out;
+    }
     int fd = open(dev, O_RDWR | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) { ret = js_throw_code(c, "camera.openFailed", NULL); goto out; }
     MediaSrc *s = media_src_new(SK_CAMERA, app);

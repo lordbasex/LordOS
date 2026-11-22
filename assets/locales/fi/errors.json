@@ -912,5 +912,10 @@
   "vm.gvtFailed": "Näytönohjaimen osuutta ei voitu luoda",
   "vm.memlockCap": "Tämä kone lukitsisi {need} Mt, mutta näytönohjaimella varustetuille koneille on nyt vapaana vain {cap} Mt (Asetukset → Näytönohjaimet)",
   "vm.memlockRefused": "Tämän koneen muistia ei voitu lukita",
-  "gpu.memlockRange": "Määrä on sen ulkopuolella, mitä tämä tietokone sallii koneiden lukita"
+  "gpu.memlockRange": "Määrä on sen ulkopuolella, mitä tämä tietokone sallii koneiden lukita",
+  "studio.failed": "LordOS Studiota ei voitu käynnistää.",
+  "studio.badPicture": "Tätä kuvaa ei voi käyttää taustana.",
+  "studio.invalid": "Tämä LordOS Studion asetus ei ole kelvollinen.",
+  "studio.noCamera": "Kameraa ei ole liitetty.",
+  "studio.unavailable": "LordOS Studio ei ole käytettävissä tässä tietokoneessa."
 }

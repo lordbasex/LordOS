@@ -34,8 +34,10 @@ int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
     prctl(PR_SET_PDEATHSIG, SIGKILL);           /* if lord-server goes away, so does this one */
     if (getppid() == 1) return 1;
-    #ifdef LM_NET
+#ifdef LM_NET
     prctl(PR_SET_NAME, "lord-stream");
+#elif defined(LM_STUDIO)
+    prctl(PR_SET_NAME, "lord-studio");
 #else
     prctl(PR_SET_NAME, "lord-media");
 #endif
@@ -69,6 +71,17 @@ int main(int argc, char **argv) {
 #else
     if (m.v[0] == MK_M3U) { LM_LOG("lord-media: no network jobs"); return 1; }
 #endif
+#ifdef LM_STUDIO
+    /* lord-studio: the camera with LordOS Studio's effects, nothing else. Its fds, in order (mp_send skips the missing
+     * ones): the camera (none with probe=1), the render node (when render=1), the segmenter's model */
+    if (m.v[0] != MK_CAMERA) { LM_LOG("lord-studio: only the camera"); return 1; }
+    int st_probe = mp_param_int(payload, "probe", 0) == 1, sk = 0;
+    int st_cam = st_probe ? -1 : fds[sk++];
+    int studio_render = mp_param_int(payload, "render", 0) == 1 ? fds[sk++] : -1;
+    int st_model = fds[sk];
+    for (int i = sk + 1; i < MP_MAX_FDS; i++) if (fds[i] >= 0) close(fds[i]);
+    fds[0] = st_cam; fds[1] = studio_render; fds[2] = fds[3] = -1;
+#endif
     if (m.v[0] == MK_PLAY && mp_param_int(payload, "hw", 0) && fds[2] < 0 && fds[1] >= 0) { fds[2] = fds[1]; fds[1] = -1; }
     /* The shared sandbox (sec/sandbox.c, the same as lord-doc's), before reading a byte
      * of the file and before initializing VA-API: no network, nothing opened outside the system's libraries and
@@ -92,7 +105,7 @@ int main(int argc, char **argv) {
         if (mp_param_int(payload, "render", 0) == 1) st_render = fds[st_k++];
         if (st_render >= 0) ioctls |= SANDBOX_IOCTL_DRM | SANDBOX_IOCTL_DMABUF;
     }
-    if (m.v[0] == MK_CAMERA) ioctls |= SANDBOX_IOCTL_V4L2 | (fds[1] >= 0 ? SANDBOX_IOCTL_DRM | SANDBOX_IOCTL_DMABUF : 0);
+    if (m.v[0] == MK_CAMERA) ioctls |= (fds[0] >= 0 ? SANDBOX_IOCTL_V4L2 : 0) | (fds[1] >= 0 ? SANDBOX_IOCTL_DRM | SANDBOX_IOCTL_DMABUF : 0);
     /* The Pi 5's HEVC decoder: the Raspberry Pi FFmpeg opens these by path, so only here is /dev reachable, and only
      * the two exact files of that decoder, found from sysfs before the sandbox. */
     static char dev_video[32], dev_media[32];
@@ -115,6 +128,11 @@ int main(int argc, char **argv) {
     SandboxHelperCfg cfg = { .name = "lordos-net-streams", .ro_paths = ro_net, .extra_syscalls = extra, .allow_ioctl_classes = ioctls,
                              .mem_max_mb = 768, .network = 1 };
     (void)ro_pi; (void)pi_hevc; (void)ro; (void)devs;
+#elif defined(LM_STUDIO)
+    /* lord-studio: lord-media's sandbox for a camera, in its own scope; no network, no PipeWire, no exec */
+    SandboxHelperCfg cfg = { .name = "app-lordos-studio", .ro_paths = ro, .extra_syscalls = extra, .allow_ioctl_classes = ioctls,
+                             .mem_max_mb = 1024 };
+    (void)ro_pi; (void)pi_hevc; (void)devs;
 #else
     SandboxHelperCfg cfg = { .name = "app-lordos-media", .ro_paths = pi_hevc ? ro_pi : ro, .extra_syscalls = extra, .allow_ioctl_classes = ioctls,
                              .mem_max_mb = m.v[0] == MK_WORKER ? 1024 : 1536, .dev_files = pi_hevc ? devs : NULL };
@@ -124,6 +142,11 @@ int main(int argc, char **argv) {
         syscall(SYS_ioprio_set, 1, 0, (2 << 13) | 7);   /* IOPRIO_WHO_PROCESS, this process, best effort, lowest */
     }
     sandbox_apply_helper(&cfg);
+#ifdef LM_STUDIO
+    /* the model is read and checked inside the sandbox; Mesa loads here too (from /usr/lib, read-only) */
+    if (stcam_init(st_model, studio_render)) { lm_error("studio.failed"); mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0); return 1; }
+    if (st_probe) { stcam_probe(); stcam_free(); return 0; }
+#endif
     switch (m.v[0]) {
     case MK_PLAY: lm_player(payload, fds[0], fds[1], fds[2]); break;
     case MK_WORKER:
@@ -141,5 +164,8 @@ int main(int argc, char **argv) {
 #endif
     default: LM_LOG("unknown kind %lld", (long long)m.v[0]); return 1;
     }
+#ifdef LM_STUDIO
+    stcam_free();
+#endif
     return 0;
 }

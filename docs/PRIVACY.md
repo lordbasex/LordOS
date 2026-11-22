@@ -915,6 +915,17 @@ do it anyway (no D-Bus, no new sockets).
 Not tested this round: a second user over fast user switching and the remote desktop (no test
 password at hand). Their code path is the same `cgroup_delegate_session()` per uid.
 
+## LordOS Studio's camera (in development)
+
+"LordOS Studio" (docs/CAMERA-STUDIO-PLAN.md, section 8) is one more camera in the list apps see. It is a camera like
+any other for permissions: opening it needs the app's `camera` permission and is refused by the "no camera"
+restriction, both checked by lord-server before anything starts (`js_media.c`, `sec/brokercam.c`), and revoking or
+restricting ends it at once. The real camera's fd goes only to the sandboxed `lord-studio` helper (no network, no
+PipeWire, no paths); an isolated app gets the same read-only ring as with a device. Apps never control the effects:
+`lord.studio` exists only in the desktop's own context. The popover's own preview is shown by the capture indicator
+like any camera ("LordOS Studio"), and it closes with the popover. Nothing leaves the computer: the models ship in the
+package and the effects run locally.
+
 ## Camera for isolated apps
 
 Consent, the green dot and revocation already existed. The frames now reach the app without the

@@ -912,5 +912,10 @@
   "vm.gvtFailed": "Ekran kartı payı oluşturulamadı",
   "vm.memlockCap": "Bu makine {need} MB kilitleyecekti, ancak ekran kartı olan makineler için şu anda yalnızca {cap} MB boş (Ayarlar → Ekran kartları)",
   "vm.memlockRefused": "Bu makinenin belleği kilitlenemedi",
-  "gpu.memlockRange": "Bu miktar, bu bilgisayarın makinelerin kilitlemesine izin verdiği aralığın dışında"
+  "gpu.memlockRange": "Bu miktar, bu bilgisayarın makinelerin kilitlemesine izin verdiği aralığın dışında",
+  "studio.failed": "LordOS Studio başlatılamadı.",
+  "studio.badPicture": "Bu resim arka plan olarak kullanılamaz.",
+  "studio.invalid": "Bu LordOS Studio ayarı geçerli değil.",
+  "studio.noCamera": "Bağlı kamera yok.",
+  "studio.unavailable": "LordOS Studio bu bilgisayarda kullanılamıyor."
 }

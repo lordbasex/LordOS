@@ -398,6 +398,11 @@ EOF
     if have node; then run "widget-grid-test (sdk/widgetgrid.js)" node tests/widget_grid_test.mjs; else skip "widget-grid-test" node; fi
     if have node; then run "timer-widget-test (sdk/timerwidgetmodel.js, every language)" node tests/timer_widget_test.mjs; else skip "timer-widget-test" node; fi
     if have node; then run "poll-same-test (sdk/samevalue.js)" node tests/poll_same_test.mjs; else skip "poll-same-test" node; fi
+    # LordOS Studio (docs/CAMERA-STUDIO-PLAN.md): our own inference against ONNX Runtime's stored outputs and the loader's
+    # fuzz; the frame pipeline on fixed frames (CPU, and GPU when a render node opens); the popover's plain logic
+    run "studio-nn-test (segmenter and BlazeFace against ONNX Runtime, the .lnn loader's fuzz)" build/studio-nn-test
+    run "studio-test (matte, guided filter, blur, picture, mirror; CPU and GPU agree)" build/studio-test
+    if have node; then run "studio-model-test (sdk/studiomodel.js)" node tests/studio_model_test.mjs; else skip "studio-model-test" node; fi
     if have node; then run "widget-feed-test (sdk/widgetfeedmodel.js)" node tests/widget_feed_test.mjs; else skip "widget-feed-test" node; fi
     if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi
     if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
@@ -727,6 +732,10 @@ EOF
         run "media-test wave" build/media-test wave "$T/tone.wav" 50
         run "media-test sandbox" build/media-test sandbox "$T/tone.wav"
     else skip "media-test" "build/lord-media (FFmpeg -dev packages) and python3"; fi
+    # LordOS Studio's helper without a camera: the pipeline inside its sandbox (GPU too), a non-camera fd, another job
+    # and a damaged model refused
+    if [ -x build/lord-studio ] && [ -x build/studio-helper-test ]; then run "studio-helper-test (lord-studio)" build/studio-helper-test build/lord-studio
+    else skip "studio-helper-test" "build/lord-studio (FFmpeg -dev packages)"; fi
     # (0.8.8.8) SVG icons through lord-media (MW_SVG, helper/lm_svg.c): a valid icon, a symbolic one recolored, then
     # malformed markup, huge numbers, deep nesting (also behind a comment) and a file over 1 MB, which must be
     # refused, not crash it

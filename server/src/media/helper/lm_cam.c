@@ -205,6 +205,10 @@ void lm_camera(const char *params, int dev, int render) {
                 if (r == 0 || m.type == MM_STOP) { stop = 1; for (int i = 0; i < MP_MAX_FDS; i++) if (fds[i] >= 0) close(fds[i]); break; }
                 if (m.type == MM_LINK && fds[0] >= 0) { link_start(fds[0], m.v[0] != 0, (int)m.v[1], W, H); fds[0] = -1; }
                 else if (m.type == MM_ACK) lm_out_ack(m.id);
+#ifdef LM_STUDIO
+                else if (m.type == MM_STUDIO) stcam_config(&m);
+                else if (m.type == MM_STUDIO_BG) { stcam_background(fds[0]); fds[0] = -1; }
+#endif
                 else if (m.type == MM_SIZE) { if (lm_out_box((int)m.v[0], (int)m.v[1])) lm_out_redraw(); }
                 else if (m.type == MM_PHOTO) {
                     const AVFrame *last = lm_out_last();
@@ -239,6 +243,9 @@ void lm_camera(const char *params, int dev, int render) {
             }
         }
         if (mic) lm_mic_drain(ring, on_mic);
+#ifdef LM_STUDIO
+        stcam_tick();
+#endif
         if (!(pf[1].revents & POLLIN)) continue;
         struct v4l2_buffer b = { .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP };
         if (xioctl(dev, VIDIOC_DQBUF, &b)) continue;
@@ -266,14 +273,19 @@ void lm_camera(const char *params, int dev, int render) {
             }
             if (got) {
                 int64_t t = (int64_t)(lm_now_ms() - t_start);
-                lm_out_present(frame, t);
-                link_frame(frame, t);
+#ifdef LM_STUDIO
+                AVFrame *shown = stcam_frame(frame);    /* LordOS Studio: the same picture with its effects */
+#else
+                AVFrame *shown = frame;
+#endif
+                lm_out_present(shown, t);
+                link_frame(shown, t);
                 nframes++;
                 if (enc) {
                     if (enc_mirror) {
-                        AVFrame *bg = lm_to_bgra(frame, frame->width, frame->height, 0);
+                        AVFrame *bg = lm_to_bgra(shown, shown->width, shown->height, 0);
                         if (bg) { flip_h(bg); lm_enc_video(enc, bg, (int64_t)lm_now_ms() - enc_t0); av_frame_free(&bg); }
-                    } else lm_enc_video(enc, frame, (int64_t)lm_now_ms() - enc_t0);
+                    } else lm_enc_video(enc, shown, (int64_t)lm_now_ms() - enc_t0);
                     mp_sendv(LM_SOCK, MM_LEVEL, 0, 0, (int64_t)lm_now_ms() - enc_t0, 0, 0);
                 }
             }

@@ -911,5 +911,10 @@
   "vm.gvtFailed": "Không thể tạo phần chia card đồ họa",
   "vm.memlockCap": "Máy này sẽ khóa {need} MB, nhưng hiện chỉ còn {cap} MB trống cho các máy có card đồ họa (Cài đặt → Card đồ họa)",
   "vm.memlockRefused": "Không thể khóa bộ nhớ của máy này",
-  "gpu.memlockRange": "Lượng đó nằm ngoài mức máy tính này cho phép các máy khóa"
+  "gpu.memlockRange": "Lượng đó nằm ngoài mức máy tính này cho phép các máy khóa",
+  "studio.failed": "Không thể khởi động LordOS Studio.",
+  "studio.badPicture": "Không thể dùng hình ảnh đó làm phông nền.",
+  "studio.invalid": "Thiết lập LordOS Studio đó không hợp lệ.",
+  "studio.noCamera": "Không có máy ảnh nào được kết nối.",
+  "studio.unavailable": "LordOS Studio không có trên máy tính này."
 }

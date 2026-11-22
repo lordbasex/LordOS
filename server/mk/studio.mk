@@ -1,0 +1,48 @@
+# LordOS Studio (docs/CAMERA-STUDIO-PLAN.md; phases 0 and 1): our own inference (src/media/studio/nn.c) for MediaPipe's
+# Selfie Segmenter and BlazeFace, and lord-studio, lord-media's camera built with LM_STUDIO: capture, segmentation,
+# guided filter, blur and picture backgrounds, mirror, on the GPU (GBM + surfaceless EGL + GLES 2, as lord-bench) or
+# on the CPU. It links what lord-media links plus Mesa's GBM, EGL and GLES when GPU=1, and nothing else (AGENTS.md,
+# E-S1). Without FFmpeg's -dev packages it isn't built, like lord-media.
+STUDIO_NN_SRC := src/media/studio/nn.c src/media/studio/face.c
+STUDIO_FX_SRC := src/media/studio/stfx.c src/media/studio/stgf.c
+STUDIO_GL_SRC := $(if $(filter 1,$(GPU)),src/media/studio/stgl.c)
+STUDIO_GL_FLAGS := $(if $(filter 1,$(GPU)),-DLORD_GPU $(shell pkg-config --cflags gbm egl glesv2))
+STUDIO_GL_LIBS := $(if $(filter 1,$(GPU)),$(shell pkg-config --libs gbm egl glesv2))
+STUDIO_HDR := $(wildcard src/media/studio/*.h)
+# the inference and the per-pixel effects are built with -O3: GCC's -O2 leaves their channel loops scalar, about three
+# times slower (measured: the segmenter takes 11 ms instead of 3.7 ms on an i9-10900)
+STUDIO_OBJ := $(patsubst src/media/studio/%.c,build/obj/studio/%.o,$(STUDIO_NN_SRC) $(STUDIO_FX_SRC))
+build/obj/studio/%.o: src/media/studio/%.c $(STUDIO_HDR)
+	@mkdir -p build/obj/studio
+	$(CC) $(CPPFLAGS) $(CFLAGS) -O3 $(WARN) -std=c11 -c -o $@ $<
+STUDIO_NN_OBJ := build/obj/studio/nn.o build/obj/studio/face.o
+
+ifeq ($(MEDIA),1)
+ALL += build/lord-studio
+all: build/lord-studio
+endif
+LST_SRC := $(LM_SRC) $(STUDIO_GL_SRC) src/media/studio/stcam.c
+build/lord-studio: $(LST_SRC) $(STUDIO_OBJ) $(STUDIO_HDR) $(wildcard src/media/helper/*.h) src/media/proto.h src/media/aring.h src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_STUDIO $(STUDIO_GL_FLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LST_SRC) $(STUDIO_OBJ) \
+	    $(shell pkg-config --libs $(MEDIA_PKGS)) $(STUDIO_GL_LIBS) -lpthread -lm
+
+# the inference against ONNX Runtime's stored outputs, face decoding and the loader's fuzz (tests/run_suites.sh runs it)
+test: build/studio-nn-test
+build/studio-nn-test: tests/studio_nn_test.c $(STUDIO_NN_OBJ) $(STUDIO_HDR) src/pkg/crypto.c build/obj/ui/stb.o
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/studio_nn_test.c $(STUDIO_NN_OBJ) src/pkg/crypto.c build/obj/ui/stb.o -lm
+
+# the pipeline on fixed frames: matte, guided filter, blur and picture composites, mirror; CPU always, GPU when there is
+# a render node (the two must agree)
+test: build/studio-test
+build/studio-test: tests/studio_test.c $(STUDIO_OBJ) $(STUDIO_GL_SRC) $(STUDIO_HDR) src/pkg/crypto.c build/obj/ui/stb.o
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(STUDIO_GL_FLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/studio_test.c $(STUDIO_OBJ) $(STUDIO_GL_SRC) \
+	    src/pkg/crypto.c build/obj/ui/stb.o $(STUDIO_GL_LIBS) -lm -lpthread
+
+# lord-studio itself without a camera: the pipeline inside its sandbox, refusals (tests/run_suites.sh full)
+test-full: build/studio-helper-test
+build/studio-helper-test: tests/studio_helper_test.c src/media/proto.c src/media/proto.h src/media/studio/models.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/studio_helper_test.c src/media/proto.c

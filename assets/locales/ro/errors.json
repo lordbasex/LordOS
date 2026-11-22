@@ -913,5 +913,10 @@
   "vm.gvtFailed": "Porțiunea plăcii video nu a putut fi creată",
   "vm.memlockCap": "Această mașină ar bloca {need} MB, dar acum doar {cap} MB sunt liberi pentru mașinile cu placă video (Setări → Plăci video)",
   "vm.memlockRefused": "Memoria acestei mașini nu a putut fi blocată",
-  "gpu.memlockRange": "Această cantitate depășește ce permite acest computer mașinilor să blocheze"
+  "gpu.memlockRange": "Această cantitate depășește ce permite acest computer mașinilor să blocheze",
+  "studio.failed": "LordOS Studio nu a putut porni.",
+  "studio.badPicture": "Imaginea nu poate fi folosită ca fundal.",
+  "studio.invalid": "Această setare LordOS Studio nu este validă.",
+  "studio.noCamera": "Nu este conectată nicio cameră.",
+  "studio.unavailable": "LordOS Studio nu este disponibil pe acest computer."
 }

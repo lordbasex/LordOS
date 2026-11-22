@@ -911,5 +911,10 @@
   "vm.gvtFailed": "그래픽 카드 할당분을 만들 수 없습니다",
   "vm.memlockCap": "이 머신은 {need} MB를 잠그게 되지만, 지금 그래픽 카드가 있는 머신에 남은 여유는 {cap} MB뿐입니다(설정 → 그래픽 카드)",
   "vm.memlockRefused": "이 머신의 메모리를 잠글 수 없습니다",
-  "gpu.memlockRange": "그 양은 이 컴퓨터가 머신에 허용하는 잠금 범위를 벗어납니다"
+  "gpu.memlockRange": "그 양은 이 컴퓨터가 머신에 허용하는 잠금 범위를 벗어납니다",
+  "studio.failed": "LordOS Studio를 시작할 수 없습니다.",
+  "studio.badPicture": "이 사진은 배경으로 사용할 수 없습니다.",
+  "studio.invalid": "해당 LordOS Studio 설정이 올바르지 않습니다.",
+  "studio.noCamera": "연결된 카메라가 없습니다.",
+  "studio.unavailable": "이 컴퓨터에서는 LordOS Studio를 사용할 수 없습니다."
 }

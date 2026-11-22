@@ -911,5 +911,10 @@
   "vm.gvtFailed": "無法建立顯示卡配額",
   "vm.memlockCap": "這台虛擬機器將鎖定 {need} MB，但有顯示卡的虛擬機器現在只剩 {cap} MB 可用（設定 → 顯示卡）",
   "vm.memlockRefused": "無法鎖定這台虛擬機器的記憶體",
-  "gpu.memlockRange": "該數量超出這部電腦允許虛擬機器鎖定的範圍"
+  "gpu.memlockRange": "該數量超出這部電腦允許虛擬機器鎖定的範圍",
+  "studio.failed": "LordOS Studio 無法啟動。",
+  "studio.badPicture": "這張圖片無法用作背景。",
+  "studio.invalid": "這項 LordOS Studio 設定無效。",
+  "studio.noCamera": "未連接相機。",
+  "studio.unavailable": "這部電腦無法使用 LordOS Studio。"
 }

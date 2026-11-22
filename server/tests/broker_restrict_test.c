@@ -113,6 +113,15 @@ int media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *p
 int media_render_fd(void) { return -1; }
 const char *media_hwaccel(void) { return "none"; }
 int media_cameras(char *json, size_t n) { snprintf(json, n, "[{\"dev\":\"/dev/video9\"}]"); return 1; }
+/* LordOS Studio's camera (media/mstudio.c): a helper like media_spawn's, counted */
+static int studio_spawns;
+int mstudio_spawn(int w, int h, pid_t *pid, const char **code) {
+    (void)w; (void)h;
+    studio_spawns++;
+    *code = NULL;
+    return media_spawn(MK_CAMERA, NULL, NULL, 0, pid);
+}
+void mstudio_attach(int sock) { (void)sock; }
 
 /* /dev/video9 → /dev/null, so the broker's camera open succeeds without a camera */
 int __real_open(const char *path, int flags, ...);
@@ -298,7 +307,19 @@ int main(void) {
     restrict_app("lpk:game", FW_R_NO_CAMERA);
     check(CALLS(BOP_CAMERA, "list") && !strcmp(got, "[]"), "camera: a restricted app sees no cameras");
     check(CALLS(BOP_CAMERA, "open /dev/video9 640 480") && denied_with("fw.restricted.camera"), "camera: no-camera refuses open with fw.restricted.camera");
+    /* LordOS Studio's camera is a camera like any other: the same restriction, before any helper starts */
+    check(CALLS(BOP_CAMERA, "open studio 1280 720") && denied_with("fw.restricted.camera") && studio_spawns == 0,
+          "camera: no-camera refuses LordOS Studio's camera too");
     restrict_app("lpk:game", 0);
+    check(CALLS(BOP_CAMERA, "open studio 1280 720") && got_status == BST_OK && studio_spawns == 1, "camera: LordOS Studio's camera opens through lord-studio");
+    {
+        int st_sid = atoi(got), st_closed = srcs_closed;
+        restrict_app("lpk:game", FW_R_NO_CAMERA);
+        check(srcs_closed == st_closed + 1 && !media_src_get(st_sid), "camera: restricting the app ends its LordOS Studio stream now");
+        restrict_app("lpk:game", 0);
+        app_event("");
+    }
+    check(CALLS(BOP_CAMERA, "open studiox 1280 720") && got_status == BST_ERROR && studio_spawns == 1, "camera: only the exact name \"studio\"");
     check(CALLS(BOP_CAMERA, "open /dev/video9 640 480") && got_status == BST_OK, "camera: opens without the restriction");
     int sid = atoi(got);
     int sclosed0 = srcs_closed;

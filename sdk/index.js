@@ -59,6 +59,7 @@ export { shortcutsWho } from './kbinhibitmodel.js';
 export { perms, permsRev, requestPermission, markDeviceUse, useIndicators, PermissionPrompt, registerPrivacySection, privacySections, PERMISSIONS, onPermissionRevoked, micStart, micStop, micLevel, shortcutsWhoText } from './privacy.js';
 // the capture indicator by the clock (screen, camera, microphone): themes draw it as <PrivacyIndicators />
 export { PrivacyIndicators, CaptureGlyph, useCaptureRows } from './capturestatus.jsx';
+export { StudioPanel, studioAvailable } from './studio.jsx';
 export { captureRows, captureGlyph, captureSummary, rowStops } from './capturemodel.js';
 import { PermissionPrompt } from './privacy.js';
 import { Powerbox } from './powerbox.jsx';
