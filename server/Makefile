@@ -991,10 +991,18 @@ build/shellx-client: tests/shellx_client.c $(CLIENT_GEN) $(SHELLX_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/shellx_client.c $(filter build/gen/client/xdg-shell-protocol.c,$(CLIENT_GEN)) $(filter %.c,$(SHELLX_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# Subsurface order and viewport crop/scale shown in pixels, for tools/wl-proof.mjs's screenshots (docs/wayland-proofs/)
+build/wlproof-client: tests/wlproof_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlproof_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Surfaces made children of themselves or of their own descendants (subsurfaces, popups) are refused with the
 # protocol's error and lord-server goes on (tests/cycle_client.c; tests/run_suites.sh runs it against a headless
 # lord-server: tests/popup_headless.sh cycle-client)
-test: build/cycle-client
+test: build/cycle-client build/wlfuzz-client
+# Hostile clients: random misuse of what is a protocol error, a witness window beside them (tests/wlfuzz_client.c;
+# tests/run_suites.sh runs it against a headless lord-server: tests/popup_headless.sh wlfuzz-client)
+# (xdg-activation's client code is mk/web.mk's WEB_PROTO)
+build/wlfuzz-client: tests/wlfuzz_client.c $(CLIENT_GEN) build/gen/client/xdg-activation-v1-client-protocol.h build/gen/client/xdg-activation-v1-protocol.c
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlfuzz_client.c $(filter %.c,$(CLIENT_GEN)) build/gen/client/xdg-activation-v1-protocol.c -lwayland-client
 build/cycle-client: tests/cycle_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/cycle_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag

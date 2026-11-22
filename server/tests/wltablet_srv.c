@@ -45,7 +45,7 @@ void wl__tool_press(struct wl_resource *surface, float x, float y, int down, uin
     if (down && surface) scene.presses++;
     if (!down) scene.releases++;
 }
-void wl__tool_cursor(struct wl_resource *surface, int32_t x, int32_t y) { scene.cursor_set++; scene.cursor_hx = x; scene.cursor_hy = y; (void)surface; }
+int wl__tool_cursor(struct wl_resource *surface, int32_t x, int32_t y) { scene.cursor_set++; scene.cursor_hx = x; scene.cursor_hy = y; (void)surface; return 0; }
 void wl__pointer_leave(void) { scene.pointer_leaves++; }
 
 static int warp_host(float x, float y) { scene.warps++; scene.warp_x = x; scene.warp_y = y; return 1; }

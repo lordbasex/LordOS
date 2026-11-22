@@ -312,6 +312,17 @@ static int cx_expect2(Conn *c, const struct wl_interface *a, const struct wl_int
     uint32_t got = wl_display_get_protocol_error(c->d, &i, &id);
     return i && (!strcmp(i->name, a->name) || !strcmp(i->name, b->name)) && got == code;
 }
+/* the same, for an error posted on an object the client has just destroyed (a destructor the compositor refused,
+ * as defunct_role_object): libwayland-client has made the proxy a zombie and reports the error with no interface and
+ * id 0, so only the code can be compared (and the interface and id, when they are known) */
+static int cx_expect_id(Conn *c, const struct wl_interface *iface, uint32_t want_id, uint32_t code) {
+    wl_display_roundtrip(c->d);
+    if (wl_display_get_error(c->d) != EPROTO) return 0;
+    const struct wl_interface *i = NULL;
+    uint32_t id = 0;
+    uint32_t got = wl_display_get_protocol_error(c->d, &i, &id);
+    return got == code && (i ? !strcmp(i->name, iface->name) && id == want_id : 1);
+}
 static int cx_ok(Conn *c) { wl_display_roundtrip(c->d); return wl_display_get_error(c->d) == 0; }
 
 /* ---------------------------------------------------------------- buffers and windows */
@@ -342,8 +353,8 @@ typedef struct {
     struct wl_surface *s;
     struct xdg_surface *xs;
     struct xdg_toplevel *top;
-    int configured, top_configs, xs_configs, order_bad, caps_seen, bounds_seen, closed;
-    uint32_t serial;
+    int configured, top_configs, xs_configs, order_bad, caps_seen, bounds_seen, closed, has_acked;
+    uint32_t serial, acked;     /* the last configure's serial; the last one acked (each is acked once: xdg-shell) */
     int32_t cw, ch;
     int maximized, fullscreen;
 } Win;
@@ -388,6 +399,8 @@ static int win_role(Conn *c, Win *w, const char *title) {
     wl_surface_commit(w->s);
     if (cx_wait(c, &w->configured, 3000) != 1) return -1;
     xdg_surface_ack_configure(w->xs, w->serial);
+    w->acked = w->serial;
+    w->has_acked = 1;
     return 0;
 }
 /* ... and mapped with a w×h buffer */
@@ -401,8 +414,13 @@ static int win_map(Conn *c, Win *w, const char *title, int width, int height) {
     wl_surface_commit(w->s);
     return cx_sync(c);
 }
+/* acks the last configure unless it was acked already: acking a serial twice is invalid_serial (xdg-shell) */
 static void win_ack_commit(Conn *c, Win *w, int width, int height) {
-    xdg_surface_ack_configure(w->xs, w->serial);
+    if (!w->has_acked || w->acked != w->serial) {
+        xdg_surface_ack_configure(w->xs, w->serial);
+        w->acked = w->serial;
+        w->has_acked = 1;
+    }
     struct wl_buffer *b = shm_buffer(c, width, height, 0xff113355);
     wl_surface_attach(w->s, b, 0, 0);
     wl_surface_damage_buffer(w->s, 0, 0, width, height);
@@ -514,8 +532,9 @@ static void f_compositor(void) {
         Win w;
         if (wl_proxy_get_version((struct wl_proxy *)c->comp) < 6 || win_role(c, &w, "defunct")) skip(item, "surface.defunct_role_object", "wl_surface.error.defunct_role_object", "needs v6 and a toplevel");
         else {
+            uint32_t sid = wl_proxy_get_id((struct wl_proxy *)w.s);
             wl_surface_destroy(w.s);
-            int ok = cx_expect(c, &wl_surface_interface, WL_SURFACE_ERROR_DEFUNCT_ROLE_OBJECT);
+            int ok = cx_expect_id(c, &wl_surface_interface, sid, WL_SURFACE_ERROR_DEFUNCT_ROLE_OBJECT);
             check(item, "surface.defunct_role_object", ok, "wl_surface.error.defunct_role_object", "wl_surface destroyed before its xdg_surface: %s", cx_errtext(c));
         }
         cx_close(c);
@@ -1129,7 +1148,7 @@ next2:;
         OPEN_OR_SKIP(errs[i].id);
         Win w;
         const struct wl_interface *want = NULL;
-        uint32_t code = 0;
+        uint32_t code = 0, gone_id = 0;     /* gone_id: the error is on an object the request destroyed (cx_expect_id) */
         int ok = 1;
         switch (errs[i].kind) {
         case 1: { struct xdg_positioner *p = xdg_wm_base_create_positioner(c->wm); xdg_positioner_set_size(p, 0, 0); want = &xdg_positioner_interface; code = XDG_POSITIONER_ERROR_INVALID_INPUT; break; }
@@ -1146,14 +1165,14 @@ next2:;
         case 3: ok = !win_role(c, &w, "serial"); if (ok) xdg_surface_ack_configure(w.xs, w.serial + 1000); want = &xdg_surface_interface; code = XDG_SURFACE_ERROR_INVALID_SERIAL; break;
         case 4: ok = !win_role(c, &w, "twice"); if (ok) xdg_surface_get_toplevel(w.xs); want = &xdg_surface_interface; code = XDG_SURFACE_ERROR_ALREADY_CONSTRUCTED; break;
         case 5: ok = !win_role(c, &w, "geom"); if (ok) xdg_surface_set_window_geometry(w.xs, 0, 0, 0, 0); want = &xdg_surface_interface; code = XDG_SURFACE_ERROR_INVALID_SIZE; break;
-        case 6: ok = !win_role(c, &w, "defunct") && wl_proxy_get_version((struct wl_proxy *)c->wm) >= 6; if (ok) xdg_surface_destroy(w.xs); want = &xdg_surface_interface; code = XDG_SURFACE_ERROR_DEFUNCT_ROLE_OBJECT; break;
+        case 6: ok = !win_role(c, &w, "defunct") && wl_proxy_get_version((struct wl_proxy *)c->wm) >= 6; if (ok) { gone_id = wl_proxy_get_id((struct wl_proxy *)w.xs); xdg_surface_destroy(w.xs); } want = &xdg_surface_interface; code = XDG_SURFACE_ERROR_DEFUNCT_ROLE_OBJECT; break;
         case 7: {
             struct wl_surface *p = wl_compositor_create_surface(c->comp), *s = wl_compositor_create_surface(c->comp);
             wl_subcompositor_get_subsurface(c->subc, s, p);
             xdg_wm_base_get_xdg_surface(c->wm, s);
             want = &xdg_wm_base_interface; code = XDG_WM_BASE_ERROR_ROLE; break;
         }
-        case 8: ok = !win_role(c, &w, "defunct-surfaces"); if (ok) xdg_wm_base_destroy(c->wm); want = &xdg_wm_base_interface; code = XDG_WM_BASE_ERROR_DEFUNCT_SURFACES; break;
+        case 8: ok = !win_role(c, &w, "defunct-surfaces"); if (ok) { gone_id = wl_proxy_get_id((struct wl_proxy *)c->wm); xdg_wm_base_destroy(c->wm); c->wm = NULL; } want = &xdg_wm_base_interface; code = XDG_WM_BASE_ERROR_DEFUNCT_SURFACES; break;
         case 9: {
             struct wl_surface *s = wl_compositor_create_surface(c->comp);
             wl_surface_attach(s, shm_buffer(c, 16, 16, 0), 0, 0);
@@ -1206,7 +1225,7 @@ next2:;
         }
         if (!ok) skip(item, errs[i].id, errs[i].hint, "couldn't set up: %s", cx_errtext(c));
         else {
-            int got = cx_expect(c, want, code);
+            int got = gone_id ? cx_expect_id(c, want, gone_id, code) : cx_expect(c, want, code);
             check(item, errs[i].id, got, errs[i].hint, "%s: %s", errs[i].what, cx_errtext(c));
         }
         cx_close(c);

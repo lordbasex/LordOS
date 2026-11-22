@@ -9,6 +9,7 @@
 #include "wl_tablet.h"
 #include "wl_input.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -86,14 +87,30 @@ static void res_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; w
 
 /* ---- pads' groups, rings, strips and dials: one list, each with the pad resource it was announced on ---- */
 enum { SUB_GROUP, SUB_RING, SUB_STRIP, SUB_DIAL };
-typedef struct { struct wl_list link; struct wl_resource *res, *pad; int kind, index; } PadSub;
+/* mode_serial: a group's last mode_switch serial; desc: a ring's, strip's or dial's set_feedback text */
+typedef struct { struct wl_list link; struct wl_resource *res, *pad; int kind, index; uint32_t mode_serial; char desc[128]; } PadSub;
 static void sub_gone(struct wl_resource *r) {
     PadSub *s = wl_resource_get_user_data(r);
     if (!s) return;
     wl_list_remove(&s->link);
     free(s);
 }
-static void ring_feedback(struct wl_client *c, struct wl_resource *r, const char *d, uint32_t serial) { (void)c; (void)r; (void)d; (void)serial; }
+/* set_feedback (tablet-v2): what the app does with a button, ring, strip or dial in the current mode, for an on-screen
+ * help. Taken only with the serial of the pad's last mode_switch (the protocol says to ignore a stale one), cut to
+ * 127 bytes and kept with the object; LordOS draws no pad help yet, so it is only kept (and logged with
+ * LORD_WL_DEBUG). */
+static uint32_t pad_mode_serial(struct wl_resource *pad) {
+    PadSub *s;
+    wl_list_for_each(s, &subs, link) if (s->pad == pad && s->kind == SUB_GROUP) return s->mode_serial;
+    return 0;
+}
+static void ring_feedback(struct wl_client *c, struct wl_resource *r, const char *d, uint32_t serial) {
+    (void)c;
+    PadSub *s = wl_resource_get_user_data(r);
+    if (!s || !s->pad || serial != pad_mode_serial(s->pad)) return;
+    snprintf(s->desc, sizeof s->desc, "%s", d);
+    if (getenv("LORD_WL_DEBUG")) fprintf(stderr, "tablet: pad feedback %d.%d: %s\n", s->kind, s->index, s->desc);
+}
 static const struct zwp_tablet_pad_group_v2_interface group_impl = { .destroy = res_destroy };
 static const struct zwp_tablet_pad_ring_v2_interface ring_impl = { .set_feedback = ring_feedback, .destroy = res_destroy };
 static const struct zwp_tablet_pad_strip_v2_interface strip_impl = { .set_feedback = ring_feedback, .destroy = res_destroy };
@@ -132,10 +149,28 @@ static void announce_tablet(struct wl_resource *seat, WtDev *d) {
     zwp_tablet_v2_send_done(r);
 }
 
-static void pad_feedback(struct wl_client *c, struct wl_resource *r, uint32_t b, const char *d, uint32_t serial) { (void)c; (void)r; (void)b; (void)d; (void)serial; }
+/* A pad's buttons' set_feedback texts: one record per pad resource, dropped with it */
+typedef struct { struct wl_list link; struct wl_resource *pad; char desc[TAB_PAD_BUTTONS][128]; } PadFb;
+static struct wl_list padfbs;
+static void pad_feedback(struct wl_client *c, struct wl_resource *r, uint32_t b, const char *d, uint32_t serial) {
+    (void)c;
+    WtDev *dev = ref_obj(r);
+    if (!dev || b >= (uint32_t)dev->c->nbuttons || b >= TAB_PAD_BUTTONS || serial != pad_mode_serial(r)) return;
+    PadFb *f = NULL, *q;
+    wl_list_for_each(q, &padfbs, link) if (q->pad == r) { f = q; break; }
+    if (!f) {
+        if (!(f = calloc(1, sizeof *f))) return;
+        f->pad = r;
+        wl_list_insert(&padfbs, &f->link);
+    }
+    snprintf(f->desc[b], sizeof f->desc[b], "%s", d);
+    if (getenv("LORD_WL_DEBUG")) fprintf(stderr, "tablet: pad button %u feedback: %s\n", b, f->desc[b]);
+}
 static void pad_gone(struct wl_resource *r) {
     PadSub *s;
     wl_list_for_each(s, &subs, link) if (s->pad == r) s->pad = NULL;    /* its group, rings, … live on, inert */
+    PadFb *f, *t;
+    wl_list_for_each_safe(f, t, &padfbs, link) if (f->pad == r) { wl_list_remove(&f->link); free(f); }
     listed_gone(r);
 }
 static const struct zwp_tablet_pad_v2_interface pad_impl = { .set_feedback = pad_feedback, .destroy = res_destroy };
@@ -172,7 +207,7 @@ static void announce_pad(struct wl_resource *seat, WtDev *d) {
                 struct wl_resource *x = sub_new(r, &zwp_tablet_pad_dial_v2_interface, &dial_impl, SUB_DIAL, i);
                 if (x) zwp_tablet_pad_group_v2_send_dial(g, x);
             }
-        zwp_tablet_pad_group_v2_send_done(g);     /* one mode: no modes event */
+        zwp_tablet_pad_group_v2_send_done(g);     /* one mode: no modes event (sent only for more than one) */
     }
     if (d->c->path[0]) zwp_tablet_pad_v2_send_path(r, d->c->path);
     if (d->c->nbuttons) zwp_tablet_pad_v2_send_buttons(r, (uint32_t)d->c->nbuttons);
@@ -183,7 +218,8 @@ static void tool_set_cursor(struct wl_client *c, struct wl_resource *r, uint32_t
     WtTool *t = ref_obj(r);
     /* only the app the tool is over, with the serial of that proximity_in */
     if (!t || !t->surface || t->client != c || serial != t->prox_serial) return;
-    wl__tool_cursor(surface, x, y);
+    /* a surface with another role (a window, a menu, a subsurface) is the role error */
+    if (wl__tool_cursor(surface, x, y) < 0) wl_resource_post_error(r, ZWP_TABLET_TOOL_V2_ERROR_ROLE, "the cursor surface has another role");
 }
 static const struct zwp_tablet_tool_v2_interface tool_impl = { .set_cursor = tool_set_cursor, .destroy = res_destroy };
 
@@ -288,6 +324,7 @@ void wl_tablet_init(void) {
     wl_list_init(&tools);
     wl_list_init(&seats);
     wl_list_init(&subs);
+    wl_list_init(&padfbs);
     tablet_set_host(&host);
 }
 
@@ -490,6 +527,9 @@ int wl_tablet_tool(TabDev *dev, const TabFrame *f, float x, float y) {
         if (f->flags & TF_UP) zwp_tablet_tool_v2_send_up(r);
         for (int i = 0; i < f->nbtn; i++)
             zwp_tablet_tool_v2_send_button(r, serial, f->btn[i].code, f->btn[i].down ? ZWP_TABLET_TOOL_V2_BUTTON_STATE_PRESSED : ZWP_TABLET_TOOL_V2_BUTTON_STATE_RELEASED);
+        /* the tool's wheel (a Wacom mouse or lens): 15° a click, down positive as wl_pointer's vertical axis */
+        if (f->flags & TF_WHEEL)
+            zwp_tablet_tool_v2_send_wheel(r, wl_fixed_from_double(-f->wheel * 15.0 / 120.0), -f->wheel / 120);
         zwp_tablet_tool_v2_send_frame(r, time);
     }
     if (f->flags & TF_DOWN) {
@@ -575,7 +615,7 @@ static int pad_enter(WtDev *d) {
         zwp_tablet_pad_v2_send_enter(r, serial, tabr, key_surface);
         PadSub *s;
         wl_list_for_each(s, &subs, link)
-            if (s->pad == r && s->kind == SUB_GROUP) zwp_tablet_pad_group_v2_send_mode_switch(s->res, time, serial, 0);
+            if (s->pad == r && s->kind == SUB_GROUP) { s->mode_serial = serial; zwp_tablet_pad_group_v2_send_mode_switch(s->res, time, serial, 0); }
         any = 1;
     }
     if (!any) return 0;

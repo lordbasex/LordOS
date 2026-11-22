@@ -301,7 +301,9 @@ function staticChecks(P, src, allow, global, version) {
       const base = { id: `event.${id}`, what: `event ${id}`, weight: W.event, hint: id };
       if (lib) { add({ ...base, result: 'pass', msg: 'sent by libwayland-server', where: null }); continue; }
       if (allow.events?.[id]) { add({ ...base, result: 'allowed', msg: allow.events[id], where: null }); continue; }
-      const at = src.find(new RegExp(`\\b${name}_send_${e.name}\\s*\\(`)) || src.find(new RegExp(`(?:post|queue)_event\\s*\\([^;]*\\b${up(name)}_${up(e.name)}\\b`));
+      // called, posted by opcode, or handed to a helper that calls it (wlcolor.c's info_prim(i, …, <iface>_send_primaries))
+      const at = src.find(new RegExp(`\\b${name}_send_${e.name}\\s*\\(`)) || src.find(new RegExp(`(?:post|queue)_event\\s*\\([^;]*\\b${up(name)}_${up(e.name)}\\b`)) ||
+        src.find(new RegExp(`[(,]\\s*${name}_send_${e.name}\\s*[,)]`));
       add({ ...base, result: at ? 'pass' : 'fail', msg: at ? 'sent' : `${name}_send_${e.name}() is never called`, where: at });
     }
     const errEnum = I.enums.find((x) => x.name === 'error');
@@ -367,7 +369,13 @@ async function startServer() {
   const logs = () => ['server.log', 'home/.cache/lordos/shell.log', 'home/.cache/lordos/compositor.log'].map((f) => { try { return fs.readFileSync(path.join(D, f), 'utf8'); } catch { return ''; } }).join('\n');
   const display = () => { const m = logs().match(/xwayland: DISPLAY=(:\d+)/); return m ? m[1] : ''; };
   const clientEnv = { ...env, WAYLAND_DISPLAY: sock };
-  const stop = () => { try { process.kill(-P.pid, 'SIGTERM'); } catch {} };
+  // SIGTERM, then SIGKILL after 3 s: a lord-server stuck in a loop ignores SIGTERM (its group: Xwayland too)
+  const stop = () => {
+    try { process.kill(-P.pid, 'SIGTERM'); } catch { return; }
+    const wait = new Int32Array(new SharedArrayBuffer(4));
+    for (let i = 0; i < 30; i++) { try { process.kill(P.pid, 0); } catch { return; } Atomics.wait(wait, 0, 0, 100); }
+    try { process.kill(-P.pid, 'SIGKILL'); } catch {}
+  };
   return { D, sock, env: clientEnv, logs, display, stop, alive: () => { try { process.kill(P.pid, 0); return true; } catch { return false; } }, pid: P.pid };
 }
 

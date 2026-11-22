@@ -41,6 +41,7 @@ typedef struct {
     unsigned caps;                      /* TAB_CAP_* */
     unsigned tools;                     /* TAB_TOOL_BIT of each BTN_TOOL_* it has; 0: none, the pen is always in */
     int has_touch;                      /* BTN_TOUCH (the tip); without it the tip is pressure over 5 % */
+    int wheel, wheel_hires;             /* REL_WHEEL on the pen device (a Wacom mouse or lens tool), and its _HI_RES */
     /* pad */
     int nbuttons;
     unsigned short button[TAB_PAD_BUTTONS];    /* evdev codes, in the order of their pad index */
@@ -53,7 +54,7 @@ typedef struct {
 /* What changed in a pen frame (TabFrame.flags) */
 enum {
     TF_PROX_IN = 1, TF_PROX_OUT = 2, TF_DOWN = 4, TF_UP = 8, TF_MOTION = 16, TF_PRESSURE = 32, TF_DISTANCE = 64,
-    TF_TILT = 128, TF_ROTATION = 256, TF_SLIDER = 512, TF_BUTTONS = 1024,
+    TF_TILT = 128, TF_ROTATION = 256, TF_SLIDER = 512, TF_BUTTONS = 1024, TF_WHEEL = 2048,
 };
 #define TAB_FRAME_BUTTONS 6
 /* One pen frame. On TF_PROX_IN every axis the tool has is set (and flagged), plus TF_DOWN and button presses for what
@@ -68,6 +69,7 @@ typedef struct {
     double tilt_x, tilt_y;              /* degrees, -90..90 */
     double rotation;                    /* degrees clockwise, 0..360 */
     double slider;                      /* -1..1 */
+    int wheel;                          /* TF_WHEEL: the tool's wheel turned, in 1/120 of a click (evdev's sign: positive is up) */
     int down;                           /* the tip touches, after this frame */
     int nbtn;
     struct { unsigned short code; unsigned char down; } btn[TAB_FRAME_BUTTONS];   /* BTN_STYLUS… changes */

@@ -4,10 +4,16 @@
   "wl_surface.set_opaque_region": "An optimization hint the protocol lets the compositor ignore; lord-server composites every surface with its alpha.",
   "wl_data_offer.accept@offer_impl": "accept is drag-and-drop feedback (which mime type would be taken on drop); on a selection offer it has no meaning and the protocol defines no error for it.",
   "zwp_locked_pointer_v1.set_cursor_position_hint": "'A compositor may use this information to warp the pointer upon unlock': optional; lord-server leaves the pointer where it was locked.",
-  "zwp_text_input_v3.set_text_change_cause": "Informational double-buffered state for the input method; LordOS's input method composes the same whatever the cause, so ignoring it changes nothing a client can see."
+  "zwp_text_input_v3.set_text_change_cause": "Informational double-buffered state for the input method; LordOS's input method composes the same whatever the cause, so ignoring it changes nothing a client can see.",
+  "wp_image_description_creator_icc_v1.set_icc_file": "color-management-v1 makes ICC profiles an optional feature (wp_color_manager_v1.feature.icc_v2_v4). lord-server doesn't advertise it (it has no ICC parser; parametric descriptions, named primaries and transfer functions are supported), so create_icc_creator raises unsupported_feature, as the protocol says, and no ICC creator or ICC-based description can exist.",
+  "wp_image_description_creator_icc_v1.create": "color-management-v1 makes ICC profiles an optional feature (wp_color_manager_v1.feature.icc_v2_v4). lord-server doesn't advertise it (it has no ICC parser; parametric descriptions, named primaries and transfer functions are supported), so create_icc_creator raises unsupported_feature, as the protocol says, and no ICC creator or ICC-based description can exist."
  },
- "events": {},
+ "events": {
+  "zwp_tablet_pad_group_v2.modes": "tablet-v2: 'This event is only sent when more than one mode is available.' lord-server gives each pad group one mode (it has no libwacom data to know which button switches modes), so the event must not be sent; mode_switch with mode 0 follows every enter, as the protocol asks.",
+  "wp_image_description_info_v1.icc_file": "color-management-v1 makes ICC profiles an optional feature (wp_color_manager_v1.feature.icc_v2_v4). lord-server doesn't advertise it (it has no ICC parser; parametric descriptions, named primaries and transfer functions are supported), so create_icc_creator raises unsupported_feature, as the protocol says, and no ICC creator or ICC-based description can exist."
+ },
  "errors": {
+  "xdg_wm_base.error.unresponsive": "xdg_wm_base.ping: 'It's unspecified what will happen if the client doesn't respond to the ping request ... The unresponsive error is provided for compositors that wish to disconnect unresponsive clients.' Optional; like Mutter and KWin, lord-server pings (on focus) and logs an app that doesn't answer, but never disconnects it (a busy app would lose its work).",
   "wp_presentation.error.invalid_timestamp": "No request of presentation-time carries a timestamp: the error can't be triggered by a client.",
   "wp_presentation.error.invalid_flag": "No request of presentation-time carries flags: the error can't be triggered by a client."
  },
