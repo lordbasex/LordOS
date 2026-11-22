@@ -50,6 +50,8 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `ext_idle_notifier_v1` | 1 | an app is told when the person is away from the computer and back, only once they allowed it (the `idle` permission, asked once per app; see "Idle notifications", 0.8.9.5) |
 | `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
 | `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
+| `wp_color_manager_v1` (color-management-v1) | 1 | an app describes its pixels' colour and LordOS converts them to the SDR sRGB / gamma 2.2 it drives every display with: parametric descriptions only (`set_primaries`, `set_tf_power`; no ICC, no luminances or mastering metadata, no scRGB), perceptual and relative intents, transfer functions gamma22, srgb, ext_linear, bt1886, gamma28 and power curves, every named set of primaries; each output's description (target primaries from its EDID) and the surface's preferred one. No HDR. Checked 2026-11-22 headless (`tests/color_headless.sh`: everything advertised, every error, linear light on screen as converted) and with GTK 4.18.6 (`GDK_DEBUG=color-mgmt`); see "Colour management" (0.8.9.5, in development) |
+| `wp_color_representation_manager_v1` (color-representation-v1) | 1 | alpha modes premultiplied electrical, premultiplied optical and straight (converted); coefficients and range identity / full only, since lord-server imports no YUV buffer. Checked 2026-11-22 headless (`tests/color_headless.sh`); see "Colour management" (0.8.9.5, in development) |
 | `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
@@ -1413,6 +1415,74 @@ the icon belongs to that window, and the Dock entry of an app id nobody installe
 - **Tests:** `build/wlicon-test` (the re-encoding, the limits, the session budget, which buffer is kept) and
   `wlperf-client icon` (the 64 px buffer of 64, 300 and 48 reaches the theme as 64 × 64 RGBA, a 64 × 32 buffer is
   `invalid_buffer`).
+
+## Colour management (`wp_color_manager_v1`, `wp_color_representation_manager_v1`, 0.8.9.5, in development, approved by the maintainer 2026-11-22)
+
+LordOS drives every display as an **SDR sRGB display**: sRGB (BT.709) primaries, D65 white, encoded for a gamma 2.2
+display, 8 bits a channel. HDR output (PQ, HLG, more than 8 bits, the display's HDR metadata) is **out of scope**: it
+is not built and not advertised. `color-management-v1` and `color-representation-v1` let an app say what its pixels
+are, and lord-server converts what it can into that encoding. Everything advertised is converted; nothing else is
+advertised (`server/src/wl/wlcolor.c`, the conversion in `colorconv.c`).
+
+- **What is advertised.** Rendering intents perceptual and relative (the same mapping, below). Features `parametric`,
+  `set_primaries` and `set_tf_power`; not `icc_v2_v4` (no ICC parser), `set_luminances`, `set_mastering_display_primaries`,
+  `extended_target_volume` or `windows_scrgb` (all about HDR). Transfer functions `gamma22`, `srgb`, `ext_linear`,
+  `bt1886` and `gamma28`, and power curves from 1.0 to 10.0; not `st2084_pq` or `hlg` (HDR), nor `st240`, `log_100`,
+  `log_316`, `xvycc`, `ext_srgb` or `st428`. Every named set of primaries (sRGB, PAL-M, PAL, NTSC, generic film, BT.2020,
+  CIE 1931 XYZ, DCI-P3, Display P3, Adobe RGB) and any `set_primaries` whose triangle holds its white point.
+  `set_max_cll` and `set_max_fall` are taken (the protocol always allows them) and checked against the luminance range;
+  they change nothing in SDR. Representation: alpha modes premultiplied electrical, premultiplied optical and straight;
+  coefficients and range **identity / full only**: lord-server takes only RGB buffers (shared memory ARGB/XRGB8888, dmabufs
+  ARGB/XRGB/ABGR/XBGR8888) and imports no YUV (NV12 and the like), so no YCbCr matrix or limited range is offered.
+- **The conversion** (`colorconv.h`), when a surface's buffer is taken, into the surface's own copy of the pixels (only
+  where the buffer was damaged): (1) alpha: straight colour as is; premultiplied electrical divided by alpha
+  (interpolated between table steps); premultiplied optical decoded first and divided in linear light; (2) decode to
+  linear light: `gamma22` and `srgb` as a 2.2 power (LordOS shows untagged content, which is sRGB, as it is on a gamma
+  2.2 display, the display the sRGB standard assumes, so `srgb` and `gamma22` decode the same and both are the output's
+  own encoding), `bt1886` as a 2.4 power with a zero black level, `gamma28` and power curves as that power, `ext_linear`
+  as is, clamped to [0, 1] (8-bit buffers can't hold more); (3) a 3×3 matrix from the content's primaries to sRGB's, the
+  content's white adapted to D65 with Bradford (relative colorimetric; the perceptual intent uses the same mapping),
+  out-of-gamut colour clipped per channel in linear light (no gamut compression); (4) encode with 1/2.2 and premultiply
+  again. A description equal to the output's (gamma22 or srgb, sRGB primaries, premultiplied electrical) converts
+  nothing and keeps every fast path: dmabuf textures, direct scanout, partial copies.
+- **GPU and CPU paths.** The conversion happens before composition, in the CPU copy both paths draw, so a converted
+  surface shows the same on both. Shared memory is converted as it is copied; a linear dmabuf the CPU can map is copied
+  and converted; any other dmabuf is imported, read back from its texture (`gpu_tex_read`, the same read the GPU-lost
+  path uses) and converted. A converted dmabuf surface therefore loses zero-copy and direct scanout and costs a CPU pass
+  per frame (and a GPU read-back for tiled buffers): that is the price of a description LordOS has to convert. A new
+  description takes effect with the surface's next buffer (the current pixels are not converted again).
+- **Outputs.** Each display's image description: primaries sRGB (named `srgb`), transfer function `gamma22`, luminances
+  0.2 / 80 / 80 cd/m² (the protocol's sRGB defaults), target luminance 0.2–80, and **target primaries the display's own
+  from its EDID** (bytes 25–34, `edid.c`) when they make a gamut, else sRGB's. The target is information only: LordOS
+  doesn't characterise the panel or convert to it, and a wide-gamut panel still gets sRGB values. A display whose
+  description changes sends `image_description_changed` before the `wl_output.done`; a display that goes away makes its
+  objects inert (`failed`, `no_output`). Descriptions are shared records: the same parameters give the same identity.
+- **Surfaces.** `wp_color_management_surface_feedback_v1`'s preferred description is the description of the surface's
+  main display (the first display before it has one); `preferred_changed` is sent when it moves to a display with a
+  different one. `get_preferred` and `get_preferred_parametric` give the same (every description here is parametric);
+  `get_information` is allowed on those and on outputs', not on a client's own (`no_information`).
+- **Errors** as the protocols define them: `unsupported_feature` (ICC, scRGB, luminances, mastering), `invalid_tf`,
+  `invalid_primaries_named`, `already_set`, `incomplete_set`, `invalid_luminance`, `surface_exists`, `render_intent`
+  (absolute, relative_bpc and saturation are not offered), `image_description` (a failed one), `inert`, `not_ready`,
+  `no_information`; representation `alpha_mode`, `coefficients` (anything but identity / full), `pixel_format` (a chroma
+  location committed with a buffer: every buffer here is RGB), `inert`, `surface_exists`. Primaries that can't make a
+  matrix (on one line, a white outside the triangle) give `failed` with `unsupported`.
+- **How it was checked (2026-11-22).** `build/colorconv-test` (`make -C server test`): the BT.2020 and Display P3
+  matrices against the published ones, white stays white for every set, refused primaries, and 10 sweeps of 13,824
+  pixels each (every alpha mode, transfer function and several primaries) against a double-precision reference within
+  one level (more near black and at low alpha, where 8 bits hold few steps). `tests/color_headless.sh` against a
+  headless lord-server (CPU path): `color-client protocols` checks every advertised value, the output's information,
+  the preferred description, shared records, `failed`, a description and straight alpha on a mapped window, and 22
+  protocol errors; `color-client show` maps a 200×100 window of (0x80, 0x40, 0x20) marked `ext_linear` and then the same
+  pixels undescribed, and the theme reads the screen: all 20,000 pixels of the first are (0xba, 0x88, 0x63) =
+  255·(v/255)^(1/2.2) and none is unconverted; all 20,000 of the second are as sent. **GTK 4.18.6** (Debian 13's
+  `libgtk-4-1`, color management on with `GDK_DEBUG=color-mgmt`) against the same headless lord-server, from
+  `WAYLAND_DEBUG=1`: it binds `wp_color_manager_v1`, gets the supported events, creates sRGB, linear sRGB and linear
+  BT.2020 descriptions (all `ready`), asks for `get_preferred_parametric` and reads its information (`primaries_named(1)`,
+  `tf_named(2)`, `luminances(2000, 80, 80)`, `target_primaries` sRGB's), then sets gamma 2.2 / sRGB on its window,
+  which converts nothing. Not checked: the GPU path's read-back of a converted tiled dmabuf (it needs the GPU; the live
+  session was not used), mpv `--vo=gpu-next` and the Weston colour tools (not installed on the development machine), a
+  real display's EDID primaries (to check on the dev VM, whose virtio display reports sRGB's).
 
 ## Pending
 

@@ -36,6 +36,8 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
            staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
            staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1
+# color-management-v1 and color-representation-v1 (src/wl/wlcolor.c, docs/WAYLAND.md "Colour management")
+WL_MORE += staging/color-management/color-management-v1 staging/color-representation/color-representation-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
 
@@ -83,6 +85,7 @@ SRC += src/ui/js_guestwin.c
 SRC += src/ui/js_vmcli.c src/vm/vmcli.c
 # Machines' pictures the desktop's GPU can't import (an Intel GVT-g machine's Y-tiled dmabufs): read on their own render node
 SRC += src/gpu/dmaread.c
+SRC += src/wl/wlcolor.c src/wl/colorconv.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)
@@ -245,6 +248,12 @@ test: build/cgroup-restart-test
 build/cgroup-restart-test: tests/cgroup_restart_test.c src/sec/cgroup.c src/sec/cgroup.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/cgroup_restart_test.c src/sec/cgroup.c
+	./$@ || { rm -f $@; exit 1; }
+# color-management-v1's conversion: matrices and every converted pixel against a reference (src/wl/colorconv.c)
+test: build/colorconv-test
+build/colorconv-test: tests/colorconv_test.c src/wl/colorconv.c src/wl/colorconv.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/colorconv_test.c src/wl/colorconv.c -lm
 	./$@ || { rm -f $@; exit 1; }
 # the toolkit variables Linux apps get: Wayland first, X11 as the fallback (src/wl/toolkitenv.h, #76, #96)
 test: build/toolkitenv-test
@@ -873,6 +882,14 @@ build/guestwin-client: tests/guestwin_client.c src/vm/vmagent.c src/vm/vmagent.h
 # tests/wlperf_headless.sh against a headless lord-server
 build/wlperf-client: tests/wlperf_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlperf_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+test: build/color-client
+# color-management-v1 and color-representation-v1 (tests/color_client.c, docs/WAYLAND.md "Colour management"): run
+# by tests/color_headless.sh against a headless lord-server
+COLOR_PROTO := staging/color-management/color-management-v1 staging/color-representation/color-representation-v1
+$(foreach p,$(COLOR_PROTO),$(eval $(call wl_client_proto,$(p))))
+COLOR_GEN := $(foreach p,$(COLOR_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
+build/color-client: tests/color_client.c $(CLIENT_GEN) $(COLOR_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/color_client.c $(filter %.c,$(CLIENT_GEN) $(COLOR_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag

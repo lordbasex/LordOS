@@ -286,6 +286,8 @@ int display_plan(const KmsOutput *o, int n, DisplayPlan *p) {
         DisplayOut *d = &p->o[j];
         const Cfg *f = cfg_for((Conf *)c, ids[idx[j]]);
         d->conn = k->id;
+        Edid ed;
+        if (k->edid && edid_parse(k->edid, k->edid_len, &ed) == 0) memcpy(d->chroma, ed.chroma, sizeof d->chroma);
         snprintf(d->id, sizeof d->id, "%s", ids[idx[j]]);
         snprintf(d->name, sizeof d->name, "%s", names[idx[j]]);
         snprintf(d->connector, sizeof d->connector, "%s-%u", kms_connector_type_name(k->type), k->type_id);

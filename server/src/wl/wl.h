@@ -88,6 +88,7 @@ typedef struct {
     int x, y, w, h, pw, ph, refresh, scale, mm_w, mm_h;
     char name[32], desc[96];
     int key;                    /* main.c's index of the display: the bit wl_frame_done and wl_presented name it by */
+    int chroma[8];              /* its EDID's chromaticities ×1,000,000, all 0 if unknown (color-management-v1, wlcolor.h) */
 } WlOutput;
 void wl_set_outputs(const WlOutput *o, int n, int main);
 void wl_set_pointer_scale(int pct);         /* the display under the pointer: cursor-shape images */               /* ui.width/ui.height changed */

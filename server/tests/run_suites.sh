@@ -257,6 +257,13 @@ EOF
         77) skip "wlperf" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "wlperf (tests/wlperf_client.c, headless lord-server: titles, frames, protocols, transform, damage)" ;;
     esac
+    # color-management-v1 and color-representation-v1, against a headless lord-server (docs/WAYLAND.md, "Colour management")
+    sh tests/color_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "color (tests/color_client.c, headless lord-server: what is advertised, errors, linear light on screen)" ;;
+        77) skip "color" "build/lord-server, build/color-client and the default theme (make, npm run build)" ;;
+        *) bad "color (tests/color_client.c, headless lord-server: what is advertised, errors, linear light on screen)" ;;
+    esac
     # apps mode's guest side: lord-server's window endpoint, directly and through lordos-guest (tests/guestwin_client.c)
     sh tests/guestwin_headless.sh >"$T/out" 2>&1
     case $? in

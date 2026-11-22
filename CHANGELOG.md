@@ -12,6 +12,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Linux apps can describe their colours: `color-management-v1` and `color-representation-v1`, in development**
+  (approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Colour management").
+  - **What LordOS converts.** Every display stays SDR sRGB (sRGB primaries, gamma 2.2, 8 bits); HDR output is not built
+    and not advertised. An app that marks its pixels otherwise has them converted when lord-server takes the buffer
+    (`server/src/wl/colorconv.c`): straight or premultiplied (electrical or optical) alpha, decoded with its transfer
+    function (`gamma22` and `srgb` as a 2.2 power, `bt1886` as 2.4, `gamma28`, power curves 1–10, `ext_linear`),
+    mapped from its primaries to sRGB's with a 3×3 matrix and a Bradford white adaptation to D65 (every named set:
+    BT.2020, Display P3, DCI-P3, Adobe RGB, NTSC, PAL, PAL-M, generic film, CIE XYZ, and `set_primaries`), clipped to
+    the sRGB gamut and encoded for gamma 2.2. Both compositing paths draw the same converted pixels: shared memory as
+    it is copied, a mappable dmabuf copied, any other dmabuf read back from its GPU texture. Content that matches the
+    display (gamma 2.2 or sRGB, sRGB primaries, premultiplied) is not touched and keeps zero-copy and direct scanout.
+  - **`wp_color_manager_v1` 1** (`server/src/wl/wlcolor.c`) advertises only that: intents perceptual and relative,
+    features parametric, `set_primaries` and `set_tf_power` (no ICC, luminances, mastering metadata or scRGB), the five
+    transfer functions and the ten named primaries. Each display's image description is sRGB / gamma 2.2 with the SDR
+    default luminances and **target primaries from the display's EDID** (the EDID reader now reads the chromaticities,
+    `server/src/hw/edid.c`). A window's preferred description is its display's, with `preferred_changed` when it moves
+    to a display with another one. Descriptions with the same parameters share one identity. Every protocol error is
+    raised as specified; primaries that make no gamut give `failed` (`unsupported`).
+  - **`wp_color_representation_manager_v1` 1**: the three alpha modes; coefficients and range only identity / full,
+    because lord-server imports no YUV buffer (a chroma location with an RGB buffer is `pixel_format`).
+  - **Tests:** `build/colorconv-test` (the BT.2020 and Display P3 matrices against the published ones, white kept for
+    every set, refused primaries, ten sweeps of 13,824 pixels against a double-precision reference) and
+    `tests/color_headless.sh` with `build/color-client` against a headless lord-server: every advertised value, the
+    output's information, the preferred description, 22 protocol errors, and a window of linear-light pixels read back
+    from the screen as exactly 255·(v/255)^(1/2.2) next to the same pixels undescribed shown as sent. GTK 4.18.6
+    (`GDK_DEBUG=color-mgmt`) binds the protocol, reads the preferred description and sets sRGB / gamma 2.2 on its window
+    (`WAYLAND_DEBUG` checked). Not yet checked: the GPU read-back of a converted tiled dmabuf, mpv and the Weston colour
+    tools, a real display's EDID primaries.
+
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).

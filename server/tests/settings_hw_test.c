@@ -66,6 +66,19 @@ static void test_edid(void) {
     edid_display_name(&e, name, sizeof name);
     CHECK(!strcmp(name, "QEMU Monitor"));
     CHECK(edid_diagonal_tenths(&e) == 149);           /* √(32²+20²)/2.54 = 14.86" */
+    /* chromaticities (bytes 25-34, 10 bits each): QEMU sends sRGB's, red 655/1024 … white 320/1024, 337/1024 */
+    static const int ten[8] = { 655, 338, 307, 614, 154, 61, 320, 337 };
+    for (int i = 0; i < 8; i++) CHECK(e.chroma[i] == (int)((ten[i] * 1000000LL + 512) / 1024));
+    {   /* a value of 0 (not given): none of them */
+        unsigned char z[128];
+        memcpy(z, d, 128);
+        z[27] = 0;
+        z[25] &= 0x3f;
+        fix_sum(z);
+        Edid ez;
+        CHECK(edid_parse(z, 128, &ez) == 0);
+        CHECK(ez.chroma[0] == 0 && ez.chroma[7] == 0);
+    }
 
     /* a monitor with a text serial and a binary serial: the text one wins */
     unsigned char m[128];

@@ -722,9 +722,10 @@ static void publish_displays(Server *s) {
         WlOutput *w = &wo[n];
         memset(w, 0, sizeof *w);
         *w = (WlOutput){ o->v.x, o->v.y, o->v.w, o->v.h, o->v.pw, o->v.ph, s->headless ? 60000 : mode_refresh_mhz(&o->kms.mode),
-                         out_scale(o), o->d.mm_w, o->d.mm_h, "", "", i };
+                         out_scale(o), o->d.mm_w, o->d.mm_h, "", "", i, { 0 } };
         if (s->headless) { snprintf(w->name, sizeof w->name, "LORD-1"); snprintf(w->desc, sizeof w->desc, "LordOS display"); }
         else { snprintf(w->name, sizeof w->name, "%s", o->d.connector); snprintf(w->desc, sizeof w->desc, "%s", o->d.name); }
+        if (!s->headless) memcpy(w->chroma, o->d.chroma, sizeof w->chroma);
         if (len < (int)sizeof json - 300) {
             char name[140];
             jquote(name, sizeof name, s->headless ? "LordOS" : o->d.name);
