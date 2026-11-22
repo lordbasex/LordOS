@@ -32,6 +32,16 @@ void media_shutdown(void);              /* close everything (theme change or exi
 
 /* drawing of a media node (paint.c) */
 void media_paint(Canvas *c, int handle, int node, float x, float y, float w, float h, float radius, float op);
+/* GPU path: a media node whose picture is a GPU texture noted again for layer 0 without painting (paint.c's
+ * layer_register, as wl_paint for an app window inside a moved layer) */
+void media_paint_note(Canvas *c, int handle, int node, float x, float y, float w, float h, float op);
+/* GPU path: the texture a media source's picture is now (wl.c draws it below the UI), NULL if none; *flip: its first
+ * row is the picture's bottom */
+struct GpuTex *media_gpu_tex(int id, int *flip);
+/* GPU path: a picture drawn by the GPU changed and nothing else did: the box (logical px) of the displays to present
+ * again, since the last take; 0 if none (main.c) */
+int  media_present_take(float *x0, float *y0, float *x1, float *y1);
+int  media_present_pending(void);
 
 /* The pointer of a source that brings its own (a Machines guest): b, g, r, a bytes with straight alpha, w × h,
  * hotspot; NULL: none (the host's arrow). media_src_cursor_visible: the source hid or showed it. */

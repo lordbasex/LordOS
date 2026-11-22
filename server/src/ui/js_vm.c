@@ -34,6 +34,7 @@
 #include "../wl/wl.h"
 #include "../gpu/gpu.h"
 #include "../gpu/dmaread.h"
+#include <drm/drm_fourcc.h>
 #include "../sec/json.h"
 #include "../sec/perms.h"
 #include "../sec/restrict.h"
@@ -1267,7 +1268,9 @@ typedef struct {
     uint8_t *cur;                       /* the guest's pointer (VD_CURSOR) until there's a picture to give it to */
     int vgpu;                           /* the machine has an Intel vGPU (gvt_memlock while it starts) */
     int windows;                        /* a Windows guest: its display driver draws the pointer into the picture until
-                                         * it hands one over (viogpudo's HWCursor, 7.1.2) */
+                                         * it hands one over (viogpudo's HWCursor, 7.1.2). Not with a vGPU: Intel's
+                                         * driver puts it on the vGPU's cursor plane, which QEMU hands over as
+                                         * CursorDefine; until one comes, the host's arrow */
     int ptr_guest;                      /* machine.json "pointer": "guest": a shape QEMU still holds from before (a saved
                                          * state's) isn't drawn over the guest's own */
     int cur_w, cur_h, cur_hx, cur_hy;
@@ -1320,6 +1323,19 @@ typedef struct {
     int db_y0, db_y1, db_frame, db_pending;
     long db_reads, db_fails;
     int db_warned;
+    /* With the GPU composing, the picture is shown as a texture, never read back (docs/MACHINES-GPU.md, "A vGPU's
+     * picture without a readback"): the desktop GPU's own import of QEMU's dmabuf (VmDmabuf.tex, a Linux 3D machine),
+     * or for an Intel vGPU's picture two linear copies made on the iGPU (gout), imported by the desktop's GPU: one is
+     * shown (gshow) while the next frame is copied into the other (gpend, until its fence on the copy's dmabuf
+     * signals). y0..y1: rows that copy lacks (the frames copied into the other one since). The copy also tests whether
+     * anything changed (QEMU's vfio display sends the whole picture every refresh, changed or not): a frame that
+     * didn't is acknowledged at once and nothing is presented */
+    struct { DmaOut *o; GpuTex *tex; int w, h, y0, y1; } gout[2];
+    int gshow, gpend, gfail;
+    int gcopy_y0, gcopy_y1;             /* the frame's rows in the copy in flight */
+    int db_more;                        /* frames came while a copy was in flight: another copy after it */
+    long db_same;                       /* frames that changed nothing (not shown again) */
+    unsigned rkey;                      /* names the picture in map for dmaread_rows_new's change test */
     /* sound (6.9): machine.json's choices, what the guest does now (VD_GUEST_AUDIO), and what this side has open. The
      * speakers' stream and the microphone's belong to the picture's media source (m->audio, m->mic), so lord-server's
      * loop serves them; their rings go to lord-vmdisplay (VD_AUDIO_OUT, VD_MIC) */
@@ -1381,13 +1397,14 @@ static void init_sess(Sess *s, const char *dir) {
     s->vd_state = -1;
     s->db_cur = -1;
     for (int i = 0; i < 4; i++) s->db[i].fd = -1;
+    s->gshow = s->gpend = -1;
     snprintf(s->dir, sizeof s->dir, "%s", dir);
     VmMachine m;
     if (!vm_machine_load(dir, &m, NULL, 0)) {
         s->snd_on = m.sound; s->snd_vol = m.volume; s->mic_allowed = m.microphone; snprintf(s->name, sizeof s->name, "%s", m.name);
         s->windows = m.devices == VM_DEV_WINDOWS;
         s->vgpu = m.vgpu != VM_VGPU_NONE;
-        s->ptr_guest = s->windows && m.pointer_guest;
+        s->ptr_guest = s->windows && !s->vgpu && m.pointer_guest;   /* HWCursor is viogpudo's: a vGPU's plane is always drawn here */
         memcpy(s->snd_out, m.sound_out, sizeof s->snd_out);
         memcpy(s->snd_in, m.sound_in, sizeof s->snd_in);
     }
@@ -1710,8 +1727,25 @@ static void maybe_display(Sess *s) {
 
 /* ---- 3D pictures (VD_DMABUF, vmproto.h) ---- */
 
+static MediaSrc *sess_media(Sess *s) { return s->media ? media_src_get(s->media) : NULL; }
+
+/* a texture going away is no longer the picture's */
+static void gtex_drop(Sess *s, GpuTex *t) {
+    MediaSrc *ms = sess_media(s);
+    if (ms && t && ms->gtex == t) { ms->gtex = NULL; ms->gpu_drawn = 0; }
+}
+
+static void gout_free(Sess *s) {
+    for (int k = 0; k < 2; k++) {
+        if (s->gout[k].tex) { gtex_drop(s, s->gout[k].tex); gpu_tex_free(s->gout[k].tex); }
+        dmaread_out_free(s->gout[k].o);
+        memset(&s->gout[k], 0, sizeof s->gout[k]);
+    }
+    s->gshow = s->gpend = -1;
+}
+
 static void db_free(Sess *s, int i) {
-    if (s->db[i].tex) gpu_tex_free(s->db[i].tex);
+    if (s->db[i].tex) { gtex_drop(s, s->db[i].tex); gpu_tex_free(s->db[i].tex); }
     if (s->db[i].ri) dmaread_free(s->db[i].ri);
     if (s->db[i].fd >= 0) close(s->db[i].fd);
     memset(&s->db[i], 0, sizeof s->db[i]);
@@ -1719,9 +1753,11 @@ static void db_free(Sess *s, int i) {
     if (s->db_cur == i) s->db_cur = -1;
 }
 static void db_drop_all(Sess *s) {
+    gout_free(s);
+    s->gfail = 0;
     for (int i = 0; i < 4; i++) db_free(s, i);
     s->db_cur = -1;
-    s->db_pending = 0;
+    s->db_pending = s->db_more = 0;
 }
 
 /* VD_DMABUF: the dmabuf the picture is now (fd), or none (fd < 0, m->a == 0) */
@@ -1749,16 +1785,84 @@ static void db_take(Sess *s, const VdMsg *m, int fd) {
     s->db_cur = k;
 }
 
-/* The pending rows read back into the picture: 1 done (the frame counts), 0 not yet (the dmabuf's fence hasn't
- * signalled: tried again at the next poll, and lord-vmdisplay goes on by itself after 250 ms), -1 can't (no GPU path,
- * an import refused: the picture stays as it was, and the frame is acknowledged so the guest isn't held) */
-static int db_read(Sess *s, MediaSrc *ms) {
+/* The picture may be shown as a GPU texture now: the GPU composes, and nothing needs the CPU's pixels every frame (a
+ * recording of the machine, a recording of the screen). LORD_VM_GPUTEX=0 turns it off (the readback of before). */
+static int gpu_show_ok(Sess *s) {
+    static int env = -1;
+    if (env < 0) { const char *e = getenv("LORD_VM_GPUTEX"); env = !(e && !strcmp(e, "0")); }
+    return env && gpu_active() && !s->rec && !media_needs_cpu();
+}
+
+/* the two linear copies for this dmabuf's import, made and imported by the desktop's GPU once (and again for another
+ * size or a new GPU context); 0 ready */
+static int gout_ready(Sess *s, const VmDmabuf *d) {
+    if (s->gout[0].o && (s->gout[0].w != d->w || s->gout[0].h != d->h)) gout_free(s);   /* another size */
+    for (int k = 0; k < 2; k++)
+        if (s->gout[k].tex && !gpu_tex_current(s->gout[k].tex)) { gtex_drop(s, s->gout[k].tex); gpu_tex_free(s->gout[k].tex); s->gout[k].tex = NULL; }
+    for (int k = 0; k < 2; k++) {
+        if (!s->gout[k].o) {
+            s->gout[k].o = dmaread_out_new(d->ri);
+            s->gout[k].w = d->w; s->gout[k].h = d->h;
+            if (!s->gout[k].o) return -1;
+            s->gout[k].tex = NULL;
+            s->gout[k].y0 = 0; s->gout[k].y1 = d->h;    /* nothing in it yet */
+            if (s->gshow == k) s->gshow = -1;
+        }
+        if (!s->gout[k].tex) {
+            int stride = 0, fd = dmaread_out_fd(s->gout[k].o, &stride);
+            GpuDmabuf b = { .width = d->w, .height = d->h, .nplanes = 1, .fourcc = DRM_FORMAT_XRGB8888, .modifier = DRM_FORMAT_MOD_LINEAR,
+                            .fd = { fd, -1, -1, -1 }, .offset = { 0 }, .stride = { (uint32_t)stride } };
+            s->gout[k].tex = fd >= 0 ? gpu_tex_dmabuf(&b) : NULL;
+            if (!s->gout[k].tex) return -1;
+            s->gout[k].y0 = 0; s->gout[k].y1 = d->h;    /* a new import: copied whole next time */
+            if (s->gshow == k) s->gshow = -1;
+        }
+    }
+    return 0;
+}
+
+/* map brought up to date with the frame the texture shows (media_src_need_cpu: a capture, a recording, a CPU paint) */
+static int db_cpu_read(int id) {
+    for (int i = 0; i < MAX_SESS; i++) {
+        Sess *s = &sess[i];
+        if (!s->used || s->media != id || s->db_cur < 0) continue;
+        MediaSrc *ms = sess_media(s);
+        VmDmabuf *d = &s->db[s->db_cur];
+        if (!ms || !ms->map || d->w != s->w || d->h != s->h) return -1;
+        if (d->tex) return gpu_tex_read_rows(d->tex, (uint8_t *)ms->map, 0, d->h, d->flip);
+        if (d->ri) return dmaread_rows_new(d->ri, (uint8_t *)ms->map, 0, d->h, d->flip, (const void *)(uintptr_t)s->rkey) < 0 ? -1 : 0;
+        return -1;
+    }
+    return -1;
+}
+
+/* The pending rows: 1 a new frame (in the picture's memory, or in the texture it is shown from), 2 a frame that changed
+ * nothing (acknowledged at once, nothing presented), 0 not yet (the dmabuf's fence, or the copy's, hasn't signalled:
+ * tried again when it does, and lord-vmdisplay goes on by itself after 250 ms), -1 can't (no GPU path, an import
+ * refused: the picture stays as it was, and the frame is acknowledged so the guest isn't held). *ry0..*ry1: its rows */
+static int db_read(Sess *s, MediaSrc *ms, int *ry0, int *ry1) {
     if (s->db_cur < 0 || !ms || !ms->map) return -1;
     VmDmabuf *d = &s->db[s->db_cur];
     if (d->w != s->w || d->h != s->h) return -1;
+    if (!ms->cpu_read) ms->cpu_read = db_cpu_read;
+    /* a copy in flight: done when its fence signals; the copy that was in it becomes the one shown */
+    if (s->gpend >= 0) {
+        int k = s->gpend;
+        struct pollfd pf = { dmaread_out_fd(s->gout[k].o, NULL), POLLIN, 0 };
+        if (pf.fd >= 0 && poll(&pf, 1, 0) == 0) return 0;
+        int c = dmaread_changed(s->gout[k].o);
+        s->gpend = -1;
+        s->gshow = k;
+        *ry0 = s->gcopy_y0; *ry1 = s->gcopy_y1;
+        if (s->gout[k].tex && gpu_tex_current(s->gout[k].tex)) {
+            ms->gtex = s->gout[k].tex; ms->gtex_flip = 0; ms->cpu_stale = 1;
+        }
+        if (c == 0 && ms->gtex) { s->db_same++; return 2; }
+        return 1;
+    }
     struct pollfd pf = { d->fd, POLLIN, 0 };
     if (poll(&pf, 1, 0) == 0) return 0;
-    if (d->tex && !gpu_tex_current(d->tex)) { gpu_tex_free(d->tex); d->tex = NULL; }
+    if (d->tex && !gpu_tex_current(d->tex)) { gtex_drop(s, d->tex); gpu_tex_free(d->tex); d->tex = NULL; }
     if (!d->tex && !d->ri) {
         /* Which GPU reads it: the desktop's (a Linux 3D machine's virgl picture is made on it), or the reader on the
          * Intel render node (gpu/dmaread.h) for an Intel GVT-g machine's picture: its Intel-tiled modifier can't be
@@ -1788,11 +1892,52 @@ static int db_read(Sess *s, MediaSrc *ms) {
         }
     }
     int y0 = s->db_y0 < 0 ? 0 : s->db_y0, y1 = s->db_y1 > s->h ? s->h : s->db_y1;
-    if (y1 <= y0) return 1;
-    int r = d->tex ? gpu_tex_read_rows(d->tex, (uint8_t *)ms->map, y0, y1 - y0, d->flip)
-                   : dmaread_rows(d->ri, (uint8_t *)ms->map, y0, y1 - y0, d->flip);
-    if (r) { s->db_fails++; return -1; }
+    if (y1 <= y0) return 2;
+    *ry0 = y0; *ry1 = y1;
+    int show = gpu_show_ok(s);
+    /* the desktop's GPU imported it: shown straight from it */
+    if (show && d->tex) {
+        if (ms->gtex != d->tex && s->gshow >= 0) gout_free(s);  /* the copies are an Intel picture's */
+        ms->gtex = d->tex; ms->gtex_flip = d->flip; ms->cpu_stale = 1;
+        s->db_reads++;
+        return 1;
+    }
+    /* an Intel vGPU's picture: copied on the iGPU into the copy not shown, imported by the desktop's GPU */
+    if (show && d->ri && !s->gfail) {
+        if (!gout_ready(s, d)) {
+            int k = s->gshow == 0 ? 1 : 0;
+            int cy0 = s->gout[k].y1 > s->gout[k].y0 && s->gout[k].y0 < y0 ? s->gout[k].y0 : y0;
+            int cy1 = s->gout[k].y1 > s->gout[k].y0 && s->gout[k].y1 > y1 ? s->gout[k].y1 : y1;
+            const DmaOut *prev = s->gshow >= 0 ? s->gout[s->gshow].o : NULL;
+            if (!dmaread_copy(d->ri, s->gout[k].o, cy0, cy1 - cy0, d->flip, prev)) {
+                s->gout[k].y0 = s->gout[k].y1 = 0;
+                if (s->gshow >= 0) {        /* the shown copy lacks this frame's rows now */
+                    int o = s->gshow;
+                    if (s->gout[o].y1 <= s->gout[o].y0) { s->gout[o].y0 = y0; s->gout[o].y1 = y1; }
+                    else { if (y0 < s->gout[o].y0) s->gout[o].y0 = y0; if (y1 > s->gout[o].y1) s->gout[o].y1 = y1; }
+                }
+                s->gpend = k;
+                s->gcopy_y0 = y0; s->gcopy_y1 = y1;
+                /* frames that come while it's in flight start a new band */
+                s->db_y0 = INT_MAX; s->db_y1 = INT_MIN; s->db_more = 0;
+                s->db_reads++;
+                return 0;
+            }
+        }
+        fprintf(stderr, "machines: the vGPU's picture can't be shown as a texture (no linear copy the desktop's GPU takes): read back instead\n");
+        gout_free(s);
+        s->gfail = 1;
+    }
+    /* read back into the picture's memory: all of it if a texture showed it until now */
+    if (ms->gtex) { ms->gtex = NULL; ms->gpu_drawn = 0; }
+    if (s->gshow >= 0 || s->gpend >= 0) gout_free(s);
+    if (ms->cpu_stale) { y0 = 0; y1 = s->h; *ry0 = 0; *ry1 = s->h; }
+    int r = d->tex ? (gpu_tex_read_rows(d->tex, (uint8_t *)ms->map, y0, y1 - y0, d->flip) ? -1 : 1)
+                   : dmaread_rows_new(d->ri, (uint8_t *)ms->map, y0, y1 - y0, d->flip, (const void *)(uintptr_t)s->rkey);
+    if (r < 0) { s->db_fails++; return -1; }
+    ms->cpu_stale = 0;
     s->db_reads++;
+    if (!r) { s->db_same++; return 2; }
     return 1;
 }
 
@@ -1810,7 +1955,7 @@ static void drop_display(Sess *s, int close_helper) {
     snd_apply(s);
     /* the next helper gets the guest's pointer again from QEMU; until then, the host's */
     free(s->cur); s->cur = NULL;
-    if (s->media) { media_src_cursor(s->media, NULL, 0, 0, 0, 0); if (s->windows) media_src_cursor_guest_draws(s->media, 1); }
+    if (s->media) { media_src_cursor(s->media, NULL, 0, 0, 0, 0); if (s->windows && !s->vgpu) media_src_cursor_guest_draws(s->media, 1); }
 }
 
 static void drop_creds(Sess *s) { if (s->creds[0]) { unlink(s->creds); s->creds[0] = 0; } }
@@ -2073,10 +2218,14 @@ static void set_picture(Sess *s, int w, int h) {
     if (m->map) munmap(m->map, m->map_len);
     free(m->cache); m->cache = NULL; m->cache_w = m->cache_h = 0;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->xrgb = 1; m->frame_seq++;
+    /* a new memory: what the change test compares against (dmaread_rows_new) isn't in it; nor is a texture's frame */
+    static unsigned rkeys;
+    s->rkey = ++rkeys ? rkeys : ++rkeys;
+    m->cpu_stale = 0;
     if (!s->media && s->cur) media_src_cursor(m->id, s->cur, s->cur_w, s->cur_h, s->cur_hx, s->cur_hy);
     /* Windows' display driver draws its pointer into the picture unless it was told to hand it over (HWCursor 1,
      * 7.1.2): until a shape comes (VD_CURSOR), LordOS's arrow over it would be a second one (2026-11-20) */
-    if (!s->media && s->windows && !s->cur) media_src_cursor_guest_draws(m->id, 1);
+    if (!s->media && s->windows && !s->vgpu && !s->cur) media_src_cursor_guest_draws(m->id, 1);
     s->media = m->id; s->w = w; s->h = h;
     s->ack_pending = 0;
     VdMsg r = vd_msg(VD_SHM, 0, 0, 0, 0, 0, 0);
@@ -2094,6 +2243,19 @@ static void guest_cursor(Sess *s, int fd, int w, int h, int hx, int hy) {
     munmap(p, len);
     if (!copy) return;
     if (hx < 0 || hy < 0 || hx >= w || hy >= h) { free(copy); return; }
+    /* an Intel vGPU's cursor plane read back with nothing visible in it (the guest's driver hasn't drawn one yet, or the
+     * plane went off): the host's arrow, never no pointer at all (2026-11-22). Without a vGPU a blank image is an app
+     * hiding the pointer on purpose */
+    if (s->vgpu) {
+        size_t k = 3;
+        while (k < len && !copy[k]) k += 4;
+        if (k >= len) {
+            free(copy);
+            free(s->cur); s->cur = NULL;
+            if (s->media) media_src_cursor(s->media, NULL, 0, 0, 0, 0);
+            return;
+        }
+    }
     free(s->cur);
     s->cur = copy; s->cur_w = w; s->cur_h = h; s->cur_hx = hx; s->cur_hy = hy;
     if (s->media) media_src_cursor(s->media, copy, w, h, hx, hy);
@@ -2122,9 +2284,10 @@ static void from_vd(Sess *s) {
         case VD_FRAME:
             if (!s->media || !vd_rect_inside(&m, s->w, s->h)) break;
             if (s->db_cur >= 0) {
-                /* a 3D picture: its rows are read back below, once the GPU is done with them */
+                /* a 3D picture: its rows are read back (or copied) below, once the GPU is done with them */
                 if (!s->db_pending) { s->db_y0 = m.b; s->db_y1 = m.b + m.d; }
                 else { if (m.b < s->db_y0) s->db_y0 = m.b; if (m.b + m.d > s->db_y1) s->db_y1 = m.b + m.d; }
+                if (s->gpend >= 0) s->db_more = 1;  /* after the copy in flight */
                 s->db_pending = 1; s->db_frame = m.e;
                 break;
             }
@@ -2147,13 +2310,29 @@ static void from_vd(Sess *s) {
         if (fd >= 0) close(fd);
     }
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
+    int gpu_frame = 0;
     if (s->db_pending) {
-        int r = db_read(s, ms);
-        if (r) { s->db_pending = 0; frames++; last = s->db_frame; du.x0 = 0; du.x1 = s->w; du.y0 = s->db_y0; du.y1 = s->db_y1; du.c = 1; }
+        int ry0 = 0, ry1 = s->h;
+        int was_more = s->gpend >= 0 && s->db_more;
+        int r = db_read(s, ms, &ry0, &ry1);
+        if (r == 2) {
+            /* nothing changed (QEMU's vfio display repeats the picture every refresh): acknowledged at once, so the
+             * next one comes without the 250 ms wait, and nothing is painted or presented */
+            s->db_pending = was_more;
+            VdMsg a = vd_msg(VD_FRAME_DONE, 0, 0, 0, 0, s->db_frame, 0);
+            vd_send(s->vd, &a, -1);
+        } else if (r) {
+            s->db_pending = was_more;
+            frames++; last = s->db_frame; du.x0 = 0; du.x1 = s->w; du.y0 = ry0; du.y1 = ry1; du.c = 1;
+            gpu_frame = r == 1 && ms && ms->gtex;
+        }
     }
     if (frames && ms) {
         ms->frame_seq++;
-        int shown = du.c ? media_src_damage_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0) : (media_src_damage(ms), 1);
+        int shown;
+        /* a frame in the texture the last paint drew: presenting again is enough (no UI damage, no paint) */
+        if (gpu_frame && ms->gpu_drawn) { media_src_present(ms); shown = 1; }
+        else shown = du.c ? media_src_damage_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0) : (media_src_damage(ms), 1);
         /* what changed isn't in the part of the picture shown (zoomed in), or in apps mode in any of the guest's
          * windows shown here (or none is): nothing to paint, so the frame counts as read at once (the helper isn't
          * held 250 ms) */
@@ -2202,7 +2381,12 @@ int js_vm_pollfds(struct pollfd *p, int max) {
         if (!s->used || s->vd < 0) continue;
         vm_poll_sess[n] = i;
         p[n++] = (struct pollfd){ s->vd, POLLIN, 0 };
-        if (s->db_pending && s->db_cur >= 0 && s->db[s->db_cur].fd >= 0 && n < max) {
+        /* a copy in flight (a vGPU's picture): its fence; else a frame waiting for QEMU's dmabuf */
+        int gfd = s->gpend >= 0 ? dmaread_out_fd(s->gout[s->gpend].o, NULL) : -1;
+        if (gfd >= 0 && n < max) {
+            vm_poll_sess[n] = i;
+            p[n++] = (struct pollfd){ gfd, POLLIN, 0 };
+        } else if (s->db_pending && s->db_cur >= 0 && s->db[s->db_cur].fd >= 0 && n < max) {
             vm_poll_sess[n] = i;
             p[n++] = (struct pollfd){ s->db[s->db_cur].fd, POLLIN, 0 };
         }
@@ -2771,6 +2955,7 @@ static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    media_src_need_cpu(m);              /* a picture shown as a texture: read back now */
     if (!m || !m->px || m->w < 1 || m->h < 1) return JS_FALSE;
     return JS_NewBool(c, !vm_thumb_save_async(s->dir, m->px, m->w, m->h, VM_THUMB_W));
 }
@@ -2782,6 +2967,7 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     const char *home = getenv("HOME");
+    media_src_need_cpu(m);
     if (!m || !m->px || !home || home[0] != '/') return JS_NewString(c, "");
     char dir[PATH_MAX], name[256], path[PATH_MAX + 260];
     snprintf(dir, sizeof dir, "%s/Pictures", home); mkdir(dir, 0755);
@@ -3250,6 +3436,7 @@ static JSValue f_record(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     const char *home = getenv("HOME");
+    media_src_need_cpu(m);              /* the recording reads the picture's memory from now on (gpu_show_ok) */
     if (!m || !m->px || m->w < 16 || m->h < 16 || !home || home[0] != '/' || s->rec) return JS_NewInt32(c, 0);
     char dir[PATH_MAX], name[256], path[PATH_MAX + 260];
     snprintf(dir, sizeof dir, "%s/Pictures", home); mkdir(dir, 0755);
@@ -3430,6 +3617,7 @@ static JSValue f_snap_take(JSContext *c, JSValueConst t, int argc, JSValueConst 
     snprintf(file, sizeof file, "%s.png", tag);
     Sess *s = argc >= 3 ? get(c, argv[2]) : NULL;
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    media_src_need_cpu(m);
     if (m && m->px && m->w > 0 && m->h > 0) vm_png_save(sd, file, m->px, m->w, m->h, 640);
     else {
         char from[PATH_MAX + 32], to[PATH_MAX + 96];

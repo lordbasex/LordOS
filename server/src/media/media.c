@@ -18,6 +18,7 @@
 #include "../fsops.h"
 #include "../pkg/crypto.h"
 #include "../ui/ui.h"
+#include "../gpu/gpu.h"
 #include "../ui/js_sys.h"
 #include "../errcode.h"
 #include "../sec/json.h"
@@ -407,6 +408,55 @@ void media_src_damage(MediaSrc *s) {
     else s->node = 0;
     if (s->w > 0 && s->h > 0) for (int i = 0; i < MEDIA_CROP_NODES; i++) if (s->crop_nodes[i] && crop_node(s, i)) { media_src_damage_rect(s, 0, 0, s->w, s->h); break; }
     ui.dirty = 1;
+}
+
+/* ---- pictures that are GPU textures (Machines: docs/MACHINES-GPU.md, "A vGPU's picture without a readback") ---- */
+
+struct GpuTex *media_gpu_tex(int id, int *flip) {
+    MediaSrc *s = media_src_get(id);
+    if (!s || !s->gtex || !gpu_tex_current(s->gtex)) return NULL;
+    if (flip) *flip = s->gtex_flip;
+    return s->gtex;
+}
+
+void media_src_need_cpu(MediaSrc *s) {
+    if (!s || !s->cpu_stale || !s->cpu_read) return;
+    if (!s->cpu_read(s->id)) s->cpu_stale = 0;
+}
+
+static Box present_box;
+static int present_on;
+
+void media_src_present(MediaSrc *s) {
+    Box b = { 0, 0, 0, 0 };
+    int k = 0;
+    Node *n = s->node ? node_get(s->node) : NULL;
+    if (n && n->type == NODE_MEDIA && n->term == s->id && !n->crop && n->prev_box.x1 > n->prev_box.x0) { b = n->prev_box; k = 1; }
+    for (int i = 0; i < MEDIA_CROP_NODES; i++) {
+        Node *c = crop_node(s, i);
+        if (!c || c->prev_box.x1 <= c->prev_box.x0) continue;
+        if (!k) b = c->prev_box;
+        else { b.x0 = fminf(b.x0, c->prev_box.x0); b.y0 = fminf(b.y0, c->prev_box.y0); b.x1 = fmaxf(b.x1, c->prev_box.x1); b.y1 = fmaxf(b.y1, c->prev_box.y1); }
+        k = 1;
+    }
+    if (!k) { s->painted_seq = s->frame_seq; return; }      /* not shown anywhere: nothing to present */
+    if (!present_on) present_box = b;
+    else {
+        present_box.x0 = fminf(present_box.x0, b.x0); present_box.y0 = fminf(present_box.y0, b.y0);
+        present_box.x1 = fmaxf(present_box.x1, b.x1); present_box.y1 = fmaxf(present_box.y1, b.y1);
+    }
+    present_on = 1;
+    /* the frame counts as read: the present that follows draws the texture it is in (js_vm_painted acknowledges it) */
+    s->painted_seq = s->frame_seq;
+}
+
+int media_present_pending(void) { return present_on; }
+
+int media_present_take(float *x0, float *y0, float *x1, float *y1) {
+    if (!present_on) return 0;
+    *x0 = present_box.x0; *y0 = present_box.y0; *x1 = present_box.x1; *y1 = present_box.y1;
+    present_on = 0;
+    return 1;
 }
 
 /* ---- a source's own pointer (Machines: the guest's CursorDefine) ---- */

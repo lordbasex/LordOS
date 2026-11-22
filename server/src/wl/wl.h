@@ -94,6 +94,10 @@ void wl_tf_end(void);
 void wl_tf_nested(int d);                /* +1 / -1: inside another transform: no quad */
 void wl_tf_open_holes(Canvas *c);        /* in the canvas the raster goes to, before it is blended */
 void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float op);
+/* GPU path: a media node's picture that is a GPU texture (a Machines 3D or vGPU picture), drawn below the UI like an app
+ * window: box and picture in the canvas's physical px, the part of the picture (s*, picture px). 0: paint it by CPU */
+int  wl_paint_media(Canvas *c, int src, int node, float bx, float by, float bw, float bh, float px, float py, float pw, float ph,
+                    float sx, float sy, float sw, float sh, float op);
 void wl_paint_popups(Canvas *c);
 
 /* Presentation (main.c). */

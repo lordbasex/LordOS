@@ -17,6 +17,12 @@ int mp_sendv(int sock, uint32_t type, uint32_t id, int64_t a, int64_t b, int64_t
 }
 
 void media_cursor_touch(void) {}
+int wl_paint_media(Canvas *c, int sid, int node, float bx, float by, float bw, float bh, float px, float py, float pw, float ph,
+                   float sx, float sy, float sw, float sh, float op) {
+    (void)c; (void)sid; (void)node; (void)bx; (void)by; (void)bw; (void)bh; (void)px; (void)py; (void)pw; (void)ph; (void)sx; (void)sy; (void)sw; (void)sh; (void)op;
+    return 0;
+}
+void media_src_need_cpu(MediaSrc *s) { (void)s; }
 
 static int fails, checks;
 #define CHECK(cond, what) do { checks++; if (!(cond)) { fails++; fprintf(stderr, "FAIL: %s\n", what); } } while (0)

@@ -72,6 +72,15 @@ typedef struct {
     float cur_shown_f;
     uint32_t *mip[8];           /* halvings (large photos) */
     int mip_w[8], mip_h[8], nmip;
+    /* a picture that is a GPU texture (a Machines 3D or vGPU picture; docs/MACHINES-GPU.md, "A vGPU's picture without
+     * a readback"): with the GPU composing it's drawn straight from gtex below the UI (wl_paint_media). map/px then
+     * hold an older frame (cpu_stale) until something needs the pixels (a capture, a recording, a rotation, the CPU
+     * path): media_src_need_cpu asks the owner (cpu_read) to read the picture back into them */
+    struct GpuTex *gtex;
+    int gtex_flip;                      /* its first row is the picture's bottom */
+    int cpu_stale;
+    int gpu_drawn;                      /* the last paint of its node(s) drew gtex: a new frame needs only a present */
+    int (*cpu_read)(int id);            /* 0 when map holds the shown frame now */
     /* player state */
     int64_t pos, dur;
     int playing;
@@ -181,5 +190,10 @@ typedef struct {
     char text[512];
 } MediaOp;
 void media_annotate(uint32_t *px, int w, int h, const MediaOp *ops, int n, int opaque);
+
+/* map/px brought up to date with the frame gtex shows (a readback), when cpu_stale; mview.c and the users of px */
+void media_src_need_cpu(MediaSrc *s);
+/* a new frame of a picture drawn by the GPU (gpu_drawn): no UI damage, its node(s) presented again (main.c) */
+void media_src_present(MediaSrc *s);
 
 #endif
