@@ -1,0 +1,3609 @@
+{
+ "format": 1,
+ "comment": "Curation record for assets/studio/backgrounds.json; tools/studio/build-backgrounds.py rebuilds everything from it.",
+ "items": [
+  {
+   "id": "office-bright-lounge",
+   "kind": "picture",
+   "category": "office",
+   "name": "Bright lounge",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/aft_lounge",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "aft_lounge",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/aft_lounge.jpg",
+    "md5": "744f723202331d0c2210d43ba35a8081",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/aft_lounge",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 0,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "office-brick-hall",
+   "kind": "picture",
+   "category": "office",
+   "name": "Brick loft hall",
+   "author": "Dimitrios Savva, Jarod Guest",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/events_hall_interior",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "events_hall_interior",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/events_hall_interior.jpg",
+    "md5": "c1b6ae585a34bbc7ae08270433f02b20",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/events_hall_interior",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Dimitrios Savva": "Photography",
+     "Jarod Guest": "Processing"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 10,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "office-pine-attic",
+   "kind": "picture",
+   "category": "office",
+   "name": "Pine attic",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/pine_attic",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "pine_attic",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/pine_attic.jpg",
+    "md5": "4d4028d938da00d7afbb4a113f068030",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/pine_attic",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -10,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "office-palm-lobby",
+   "kind": "picture",
+   "category": "office",
+   "name": "Palm lobby",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/cinema_lobby",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "cinema_lobby",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/cinema_lobby.jpg",
+    "md5": "b9e22169670e8ff46493c8b0fcaa4590",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/cinema_lobby",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -45,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "office-reading-room",
+   "kind": "picture",
+   "category": "office",
+   "name": "Reading room",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/reading_room",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "reading_room",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/reading_room.jpg",
+    "md5": "031b8cece6b1eaccd94b346c64e03b9a",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/reading_room",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 50,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "office-classic-hall",
+   "kind": "picture",
+   "category": "office",
+   "name": "Classic hall",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/entrance_hall",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "entrance_hall",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/entrance_hall.jpg",
+    "md5": "1700dab8a991aa62229528736124c5f3",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/entrance_hall",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 45,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "office-brick-cafe",
+   "kind": "picture",
+   "category": "office",
+   "name": "Brick cafe",
+   "author": "Greg Zaal, Jarod Guest",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/warm_restaurant",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "warm_restaurant",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/warm_restaurant.jpg",
+    "md5": "8b09508cfac91b9c1291c5130e02c603",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/warm_restaurant",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "Photography",
+     "Jarod Guest": "Processing"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -45,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "home-curtained-window",
+   "kind": "picture",
+   "category": "home",
+   "name": "Curtained window",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/anniversary_lounge",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "anniversary_lounge",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/anniversary_lounge.jpg",
+    "md5": "3df39e24797865650d33278341d77847",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/anniversary_lounge",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -90,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "home-cream-sofa",
+   "kind": "picture",
+   "category": "home",
+   "name": "Cream sofa",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/brown_photostudio_01",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "brown_photostudio_01",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/brown_photostudio_01.jpg",
+    "md5": "f1c3dafddd4ae892876348e5ff7bab00",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/brown_photostudio_01",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -50,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "home-white-fireplace",
+   "kind": "picture",
+   "category": "home",
+   "name": "White fireplace",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/brown_photostudio_03",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "brown_photostudio_03",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/brown_photostudio_03.jpg",
+    "md5": "747ed8ef4adf28524c52000bdd803a76",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/brown_photostudio_03",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -85,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "home-brick-loft",
+   "kind": "picture",
+   "category": "home",
+   "name": "Brick loft",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/brown_photostudio_07",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "brown_photostudio_07",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/brown_photostudio_07.jpg",
+    "md5": "aeb977c8be20a1061a919484c0bfa941",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/brown_photostudio_07",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 15,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "home-glasshouse",
+   "kind": "picture",
+   "category": "home",
+   "name": "Glasshouse view",
+   "author": "Dario Barresi",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/glasshouse_interior",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "glasshouse_interior",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/glasshouse_interior.jpg",
+    "md5": "f9bfc47f33ddccbb803baae3db3e0d80",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/glasshouse_interior",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Dario Barresi": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -15,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "home-sunny-lounge",
+   "kind": "picture",
+   "category": "home",
+   "name": "Sunny lounge",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/lythwood_lounge",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "lythwood_lounge",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/lythwood_lounge.jpg",
+    "md5": "482855e7c9d03b260f3ff26c115ad774",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/lythwood_lounge",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 30,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "home-garden-window",
+   "kind": "picture",
+   "category": "home",
+   "name": "Garden window",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/lythwood_room",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "lythwood_room",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/lythwood_room.jpg",
+    "md5": "004ed677597376a17b4642f4d6e61883",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/lythwood_room",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 15,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "home-plant-corner",
+   "kind": "picture",
+   "category": "home",
+   "name": "Plant corner",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/photo_studio_london_hall",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "photo_studio_london_hall",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/photo_studio_london_hall.jpg",
+    "md5": "7124c3700ae6b2cb85e67b04be251300",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/photo_studio_london_hall",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -10,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "home-country-kitchen",
+   "kind": "picture",
+   "category": "home",
+   "name": "Country kitchen",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/studio_country_hall",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "studio_country_hall",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/studio_country_hall.jpg",
+    "md5": "a66fecf7c5cd7fd0e2328f59b8c26ba5",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/studio_country_hall",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 0,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "home-blue-room",
+   "kind": "picture",
+   "category": "home",
+   "name": "Blue room",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/blue_photo_studio",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "blue_photo_studio",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/blue_photo_studio.jpg",
+    "md5": "3c10e7f8cfe029544c5b961b84ed9032",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/blue_photo_studio",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -100,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-white-arches",
+   "kind": "picture",
+   "category": "studio",
+   "name": "White arches",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/blocky_photo_studio",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "blocky_photo_studio",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/blocky_photo_studio.jpg",
+    "md5": "97c2c8da3cbe7d99ba9860d9e1f64a90",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/blocky_photo_studio",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -100,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-yellow-sofa",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Yellow sofa",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/colorful_studio",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "colorful_studio",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/colorful_studio.jpg",
+    "md5": "1074a0a8945e65f6a5acf6825a5fa9b4",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/colorful_studio",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -20,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-paneled-window",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Paneled window",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/brown_photostudio_04",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "brown_photostudio_04",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/brown_photostudio_04.jpg",
+    "md5": "c19bff53bec5c5352d0ea5c8f022d1af",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/brown_photostudio_04",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -40,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-blue-armchairs",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Blue armchairs",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/brown_photostudio_05",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "brown_photostudio_05",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/brown_photostudio_05.jpg",
+    "md5": "a5746154f2ee8c4f882023a5c01160f5",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/brown_photostudio_05",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 75,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-neon-wall",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Neon wall",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/neon_photostudio",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "neon_photostudio",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/neon_photostudio.jpg",
+    "md5": "ca2135360495c86667c7b20fb49e5213",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/neon_photostudio",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 0,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-grey-room",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Grey studio",
+   "author": "Grzegorz Wronkowski",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/monochrome_studio_01",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "monochrome_studio_01",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/monochrome_studio_01.jpg",
+    "md5": "799d304a09e1045e29160fd7f96e2752",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/monochrome_studio_01",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Grzegorz Wronkowski": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 15,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-white-curtain",
+   "kind": "picture",
+   "category": "studio",
+   "name": "White curtain",
+   "author": "Grzegorz Wronkowski",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/pav_studio_01",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "pav_studio_01",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/pav_studio_01.jpg",
+    "md5": "fade7afe6e1cce7219817f9f823f5f3a",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/pav_studio_01",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Grzegorz Wronkowski": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 100,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-green-wall",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Green wall",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/photo_studio_loft_hall",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "photo_studio_loft_hall",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/photo_studio_loft_hall.jpg",
+    "md5": "3456280ca1b1cb80ebe14f257bca296d",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/photo_studio_loft_hall",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -100,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-moulded-wall",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Moulded wall",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/photo_studio_broadway_hall",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "photo_studio_broadway_hall",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/photo_studio_broadway_hall.jpg",
+    "md5": "6c1ebee72c559021ddc9e369504461af",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/photo_studio_broadway_hall",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -40,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-white-loft",
+   "kind": "picture",
+   "category": "studio",
+   "name": "White loft",
+   "author": "Grzegorz Wronkowski",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/white_studio_01",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "white_studio_01",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/white_studio_01.jpg",
+    "md5": "d8f23aece4c0a27c976606a4f8a41480",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/white_studio_01",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Grzegorz Wronkowski": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 0,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "studio-blue-drapes",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Blue drapes",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/small_empty_room_3",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "small_empty_room_3",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/small_empty_room_3.jpg",
+    "md5": "efe1c093c70c8972f25508a6ae5e7f3a",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/small_empty_room_3",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Sergej Majboroda": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 10,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-alpine-valley",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Alpine valley",
+   "author": "Andreas Mischok",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/alps_field",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "alps_field",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/alps_field.jpg",
+    "md5": "6693084c7fd3831ba3c183314fbb6ade",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/alps_field",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Andreas Mischok": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 100,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-autumn-forest",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Autumn forest",
+   "author": "Andreas Mischok",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/autumn_forest_01",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "autumn_forest_01",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/autumn_forest_01.jpg",
+    "md5": "950ec8ce8dea28794ed0f3f814ce47dd",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/autumn_forest_01",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Andreas Mischok": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 0,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-chinese-garden",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Chinese garden",
+   "author": "Andreas Mischok",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/chinese_garden",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "chinese_garden",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/chinese_garden.jpg",
+    "md5": "8c9eef94a032fc1131754db60a4faf94",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/chinese_garden",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Andreas Mischok": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 15,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-highland-ridge",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Highland ridge",
+   "author": "Dimitrios Savva, Jarod Guest",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/drakensberg_solitary_mountain",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "drakensberg_solitary_mountain",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/drakensberg_solitary_mountain.jpg",
+    "md5": "e98d8032f7d95b0f78979e3d9494fb8a",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/drakensberg_solitary_mountain",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Dimitrios Savva": "Photography",
+     "Jarod Guest": "Processing"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -130,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-pond-trees",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Pond and trees",
+   "author": "Alexander Scholten",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/frozen_lake",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "frozen_lake",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/frozen_lake.jpg",
+    "md5": "6dd8216699d092c99377aa941fe55081",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/frozen_lake",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Alexander Scholten": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 100,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-golden-hills",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Golden hills",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/kiara_8_sunset",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "kiara_8_sunset",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/kiara_8_sunset.jpg",
+    "md5": "27971791900cb4faf1d6071d81b07dcc",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/kiara_8_sunset",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -50,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-lake-horizon",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Lake horizon",
+   "author": "Alexander Scholten",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/lake_pier",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "lake_pier",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/lake_pier.jpg",
+    "md5": "044387259f76a1df3aa68882a6687b5a",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/lake_pier",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Alexander Scholten": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 20,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-lake-sunrise",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Lake sunrise",
+   "author": "Greg Zaal, Jarod Guest",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/lakeside_sunrise",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "lakeside_sunrise",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/lakeside_sunrise.jpg",
+    "md5": "a74df42be4be097c3b45c264daff71af",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/lakeside_sunrise",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "Photography",
+     "Jarod Guest": "Processing"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -40,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-forest-stream",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Forest stream",
+   "author": "Andreas Mischok",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/lauter_waterfall",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "lauter_waterfall",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/lauter_waterfall.jpg",
+    "md5": "3e79a33adc3fb5bd0c53a3210718f34d",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/lauter_waterfall",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Andreas Mischok": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 60,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-misty-pines",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Misty pines",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/misty_pines",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "misty_pines",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/misty_pines.jpg",
+    "md5": "d2073546d2a8d0c7bf5e82d071fa2b29",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/misty_pines",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 10,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-mossy-forest",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Mossy forest",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/mossy_forest",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "mossy_forest",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/mossy_forest.jpg",
+    "md5": "3e11675120c96f7998c0a8d0cdadc739",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/mossy_forest",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -60,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-rocky-beach",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Rocky beach",
+   "author": "Greg Zaal, Rico Cilliers",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/secluded_beach",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "secluded_beach",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/secluded_beach.jpg",
+    "md5": "a2b0081194aa71ed7b0b65835c17f451",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/secluded_beach",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All",
+     "Rico Cilliers": "Backplates"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 0,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-meadow-sunset",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Meadow sunset",
+   "author": "Elvis Posa",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/sunset_meadow_path",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "sunset_meadow_path",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/sunset_meadow_path.jpg",
+    "md5": "ce839c8e0009db983b9c43daa67d30dd",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/sunset_meadow_path",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Elvis Posa": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 0,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-beach-sunrise",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Beach sunrise",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/umhlanga_sunrise",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "umhlanga_sunrise",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/umhlanga_sunrise.jpg",
+    "md5": "370c0bdd40dd89a8c0c5284e62378d04",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/umhlanga_sunrise",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 20,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "nature-fountain-garden",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Fountain garden",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/symmetrical_garden",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "symmetrical_garden",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/symmetrical_garden.jpg",
+    "md5": "766e81b76f50b87a781c2d8084091f60",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/symmetrical_garden",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 0,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "city-lakeside",
+   "kind": "picture",
+   "category": "city",
+   "name": "Lakeside city",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/binnenalster",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "binnenalster",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/binnenalster.jpg",
+    "md5": "15ed06091ec8100576f0d5bec4834025",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/binnenalster",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 0,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "city-river-harbour",
+   "kind": "picture",
+   "category": "city",
+   "name": "River harbour",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/dusseldorf_bridge",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "dusseldorf_bridge",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/dusseldorf_bridge.jpg",
+    "md5": "a2752149823b9c4581f4579fe01547d7",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/dusseldorf_bridge",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 15,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "city-brick-canal",
+   "kind": "picture",
+   "category": "city",
+   "name": "Brick canal",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/hamburg_canal",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "hamburg_canal",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/hamburg_canal.jpg",
+    "md5": "842a8ed91e6e7a19385869c7387dca98",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/hamburg_canal",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -25,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "city-rooftop-view",
+   "kind": "picture",
+   "category": "city",
+   "name": "Rooftop view",
+   "author": "Dimitrios Savva, Jarod Guest",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/hotel_rooftop_balcony",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "hotel_rooftop_balcony",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/hotel_rooftop_balcony.jpg",
+    "md5": "011c91d352fc924987b8948b5e93ef4e",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/hotel_rooftop_balcony",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Dimitrios Savva": "Photography",
+     "Jarod Guest": "Processing"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 45,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "city-riverside-glass",
+   "kind": "picture",
+   "category": "city",
+   "name": "Riverside glass",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/modern_buildings",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "modern_buildings",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/modern_buildings.jpg",
+    "md5": "d13188a9a1292696e11fe228349168d5",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/modern_buildings",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -40,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "city-night-bridge",
+   "kind": "picture",
+   "category": "city",
+   "name": "Night bridge",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/modern_buildings_night",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "modern_buildings_night",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/modern_buildings_night.jpg",
+    "md5": "91e4166589c46bd2bee5fe60aefcfc79",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/modern_buildings_night",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 160,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "city-lagoon-dawn",
+   "kind": "picture",
+   "category": "city",
+   "name": "Lagoon at dawn",
+   "author": "Greg Zaal, Rico Cilliers",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/venice_dawn_1",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "venice_dawn_1",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/venice_dawn_1.jpg",
+    "md5": "f94b47bb12e0242ecf9d7529ab7e1b07",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/venice_dawn_1",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All",
+     "Rico Cilliers": "Backplates"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 75,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "city-lagoon-sunset",
+   "kind": "picture",
+   "category": "city",
+   "name": "Lagoon sunset",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/venice_sunset",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "venice_sunset",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/venice_sunset.jpg",
+    "md5": "a94465af83fd4c9c2be08cca0389e33a",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/venice_sunset",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 5,
+    "pitch": 0,
+    "fov": 62,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "city-palace-night",
+   "kind": "picture",
+   "category": "city",
+   "name": "Palace at night",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/zwinger_night",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "zwinger_night",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/zwinger_night.jpg",
+    "md5": "91084b767483df5e4172b0affc760be7",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/zwinger_night",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "All"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": 0,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "city-rooftops-dusk",
+   "kind": "picture",
+   "category": "city",
+   "name": "Rooftops at dusk",
+   "author": "Greg Zaal, Dimitrios Savva",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/sunset_jhbcentral",
+   "origin": {
+    "type": "polyhaven",
+    "asset": "sunset_jhbcentral",
+    "download": "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/sunset_jhbcentral.jpg",
+    "md5": "4843bff2861e9c04185402da8ba0c97a",
+    "verifiedAt": [
+     "https://api.polyhaven.com/info/sunset_jhbcentral",
+     "https://polyhaven.com/license"
+    ],
+    "verifiedLicense": "CC0 (Poly Haven license page: all assets CC0)",
+    "authorsFromApi": {
+     "Greg Zaal": "Processing",
+     "Dimitrios Savva": "Photography"
+    }
+   },
+   "process": {
+    "op": "equirect-to-perspective",
+    "yaw": -50,
+    "pitch": 0,
+    "fov": 70,
+    "note": "yaw in degrees right of the panorama centre, pitch up, horizontal FOV"
+   }
+  },
+  {
+   "id": "abstract-concrete",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Grey concrete",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Concrete036",
+   "origin": {
+    "type": "ambientcg",
+    "asset": "Concrete036",
+    "download": "https://ambientcg.com/get?file=Concrete036_2K-JPG.zip",
+    "member": "Concrete036_2K-JPG_Color.jpg",
+    "verifiedAt": [
+     "https://ambientcg.com/a/Concrete036",
+     "https://docs.ambientcg.com/license/"
+    ],
+    "verifiedLicense": "Creative Commons CC0 1.0 Universal (ambientCG license page: all assets)"
+   },
+   "process": {
+    "op": "texture-crop",
+    "crop": "centre 16:9 of the 2048x2048 colour map",
+    "resize": "1920x1080 Lanczos",
+    "light": "soft radial key light and vignette (multiplicative)"
+   }
+  },
+  {
+   "id": "abstract-plaster",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "White plaster",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Plaster002",
+   "origin": {
+    "type": "ambientcg",
+    "asset": "Plaster002",
+    "download": "https://ambientcg.com/get?file=Plaster002_2K-JPG.zip",
+    "member": "Plaster002_2K-JPG_Color.jpg",
+    "verifiedAt": [
+     "https://ambientcg.com/a/Plaster002",
+     "https://docs.ambientcg.com/license/"
+    ],
+    "verifiedLicense": "Creative Commons CC0 1.0 Universal (ambientCG license page: all assets)"
+   },
+   "process": {
+    "op": "texture-crop",
+    "crop": "centre 16:9 of the 2048x2048 colour map",
+    "resize": "1920x1080 Lanczos",
+    "light": "soft radial key light and vignette (multiplicative)"
+   }
+  },
+  {
+   "id": "abstract-bricks",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Light bricks",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Bricks105",
+   "origin": {
+    "type": "ambientcg",
+    "asset": "Bricks105",
+    "download": "https://ambientcg.com/get?file=Bricks105_2K-JPG.zip",
+    "member": "Bricks105_2K-JPG_Color.jpg",
+    "verifiedAt": [
+     "https://ambientcg.com/a/Bricks105",
+     "https://docs.ambientcg.com/license/"
+    ],
+    "verifiedLicense": "Creative Commons CC0 1.0 Universal (ambientCG license page: all assets)"
+   },
+   "process": {
+    "op": "texture-crop",
+    "crop": "centre 16:9 of the 2048x2048 colour map",
+    "resize": "1920x1080 Lanczos",
+    "light": "soft radial key light and vignette (multiplicative)"
+   }
+  },
+  {
+   "id": "abstract-terrazzo",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Terrazzo",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Terrazzo013",
+   "origin": {
+    "type": "ambientcg",
+    "asset": "Terrazzo013",
+    "download": "https://ambientcg.com/get?file=Terrazzo013_2K-JPG.zip",
+    "member": "Terrazzo013_2K-JPG_Color.jpg",
+    "verifiedAt": [
+     "https://ambientcg.com/a/Terrazzo013",
+     "https://docs.ambientcg.com/license/"
+    ],
+    "verifiedLicense": "Creative Commons CC0 1.0 Universal (ambientCG license page: all assets)"
+   },
+   "process": {
+    "op": "texture-crop",
+    "crop": "centre 16:9 of the 2048x2048 colour map",
+    "resize": "1920x1080 Lanczos",
+    "light": "soft radial key light and vignette (multiplicative)"
+   }
+  },
+  {
+   "id": "abstract-marble",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "White marble",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Marble012",
+   "origin": {
+    "type": "ambientcg",
+    "asset": "Marble012",
+    "download": "https://ambientcg.com/get?file=Marble012_2K-JPG.zip",
+    "member": "Marble012_2K-JPG_Color.jpg",
+    "verifiedAt": [
+     "https://ambientcg.com/a/Marble012",
+     "https://docs.ambientcg.com/license/"
+    ],
+    "verifiedLicense": "Creative Commons CC0 1.0 Universal (ambientCG license page: all assets)"
+   },
+   "process": {
+    "op": "texture-crop",
+    "crop": "centre 16:9 of the 2048x2048 colour map",
+    "resize": "1920x1080 Lanczos",
+    "light": "soft radial key light and vignette (multiplicative)"
+   }
+  },
+  {
+   "id": "abstract-wood",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Warm wood",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Wood098",
+   "origin": {
+    "type": "ambientcg",
+    "asset": "Wood098",
+    "download": "https://ambientcg.com/get?file=Wood098_2K-JPG.zip",
+    "member": "Wood098_2K-JPG_Color.jpg",
+    "verifiedAt": [
+     "https://ambientcg.com/a/Wood098",
+     "https://docs.ambientcg.com/license/"
+    ],
+    "verifiedLicense": "Creative Commons CC0 1.0 Universal (ambientCG license page: all assets)"
+   },
+   "process": {
+    "op": "texture-crop",
+    "crop": "centre 16:9 of the 2048x2048 colour map",
+    "resize": "1920x1080 Lanczos",
+    "light": "soft radial key light and vignette (multiplicative)"
+   }
+  },
+  {
+   "id": "abstract-linen",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "White linen",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Fabric086",
+   "origin": {
+    "type": "ambientcg",
+    "asset": "Fabric086",
+    "download": "https://ambientcg.com/get?file=Fabric086_2K-JPG.zip",
+    "member": "Fabric086_2K-JPG_Color.jpg",
+    "verifiedAt": [
+     "https://ambientcg.com/a/Fabric086",
+     "https://docs.ambientcg.com/license/"
+    ],
+    "verifiedLicense": "Creative Commons CC0 1.0 Universal (ambientCG license page: all assets)"
+   },
+   "process": {
+    "op": "texture-crop",
+    "crop": "centre 16:9 of the 2048x2048 colour map",
+    "resize": "1920x1080 Lanczos",
+    "light": "soft radial key light and vignette (multiplicative)"
+   }
+  },
+  {
+   "id": "space-aurora-manitoba",
+   "kind": "picture",
+   "category": "space",
+   "name": "Aurora over Canada",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss072e159172",
+   "origin": {
+    "type": "nasa",
+    "asset": "iss072e159172",
+    "download": "https://images-assets.nasa.gov/image/iss072e159172/iss072e159172~orig.jpg",
+    "verifiedAt": [
+     "https://images-api.nasa.gov/search?nasa_id=iss072e159172",
+     "https://images-api.nasa.gov/metadata/iss072e159172",
+     "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    ],
+    "verifiedLicense": "NASA imagery, center JSC, no third-party credit in description/metadata: US public domain",
+    "description": "iss072e159172 (Oct. 30, 2024) --- The aurora borealis blankets the Earth in this photograph from the International Space Station as it soared 257 miles above Canada's province of Manitoba."
+   },
+   "process": {
+    "op": "crop",
+    "crop": {
+     "x": 0.0,
+     "y": null,
+     "w": 1.0,
+     "note": "fractions; height = width*9/16; y null = bottom aligned"
+    },
+    "resize": "1920x1080 Lanczos"
+   }
+  },
+  {
+   "id": "space-aurora-stars",
+   "kind": "picture",
+   "category": "space",
+   "name": "Aurora and stars",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss071e564695",
+   "origin": {
+    "type": "nasa",
+    "asset": "iss071e564695",
+    "download": "https://images-assets.nasa.gov/image/iss071e564695/iss071e564695~orig.jpg",
+    "verifiedAt": [
+     "https://images-api.nasa.gov/search?nasa_id=iss071e564695",
+     "https://images-api.nasa.gov/metadata/iss071e564695",
+     "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    ],
+    "verifiedLicense": "NASA imagery, center JSC, no third-party credit in description/metadata: US public domain",
+    "description": "iss071e564695 (Aug. 11, 2024) -- In this long-exposure shot taken from the International Space Station as it orbited 268 miles above the Indian Ocean, stars glitter above green and red auroras swirling through Earth's atmosphere."
+   },
+   "process": {
+    "op": "crop",
+    "crop": {
+     "x": 0.12,
+     "y": 0.33,
+     "w": 0.8,
+     "note": "fractions; height = width*9/16; y null = bottom aligned"
+    },
+    "resize": "1920x1080 Lanczos"
+   }
+  },
+  {
+   "id": "space-aurora-red",
+   "kind": "picture",
+   "category": "space",
+   "name": "Red aurora",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss072e451023",
+   "origin": {
+    "type": "nasa",
+    "asset": "iss072e451023",
+    "download": "https://images-assets.nasa.gov/image/iss072e451023/iss072e451023~orig.jpg",
+    "verifiedAt": [
+     "https://images-api.nasa.gov/search?nasa_id=iss072e451023",
+     "https://images-api.nasa.gov/metadata/iss072e451023",
+     "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    ],
+    "verifiedLicense": "NASA imagery, center JSC, no third-party credit in description/metadata: US public domain",
+    "description": "iss072e451023 (Jan. 4, 2025) --- A red and green aurora shimmers brightly above Ontario, Canada, near James Bay in this photograph from the International Space Station as it orbited 260 miles above North America."
+   },
+   "process": {
+    "op": "crop",
+    "crop": {
+     "x": 0.0,
+     "y": 0.3,
+     "w": 0.55,
+     "note": "fractions; height = width*9/16; y null = bottom aligned"
+    },
+    "resize": "1920x1080 Lanczos"
+   }
+  },
+  {
+   "id": "space-aurora-swirl",
+   "kind": "picture",
+   "category": "space",
+   "name": "Aurora swirl",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss073e0256896",
+   "origin": {
+    "type": "nasa",
+    "asset": "iss073e0256896",
+    "download": "https://images-assets.nasa.gov/image/iss073e0256896/iss073e0256896~orig.jpg",
+    "verifiedAt": [
+     "https://images-api.nasa.gov/search?nasa_id=iss073e0256896",
+     "https://images-api.nasa.gov/metadata/iss073e0256896",
+     "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    ],
+    "verifiedLicense": "NASA imagery, center JSC, no third-party credit in description/metadata: US public domain",
+    "description": "iss073e0256896 (June 3, 2025) --- The aurora australis swirls over a cloudy Pacific Ocean in this photograph from the International Space Station as it orbited 270 miles above and southeast of New Zealand."
+   },
+   "process": {
+    "op": "crop",
+    "crop": {
+     "x": 0.0,
+     "y": 0.15,
+     "w": 0.6,
+     "note": "fractions; height = width*9/16; y null = bottom aligned"
+    },
+    "resize": "1920x1080 Lanczos"
+   }
+  },
+  {
+   "id": "space-city-lights",
+   "kind": "picture",
+   "category": "space",
+   "name": "City lights",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss073e0685684",
+   "origin": {
+    "type": "nasa",
+    "asset": "iss073e0685684",
+    "download": "https://images-assets.nasa.gov/image/iss073e0685684/iss073e0685684~orig.jpg",
+    "verifiedAt": [
+     "https://images-api.nasa.gov/search?nasa_id=iss073e0685684",
+     "https://images-api.nasa.gov/metadata/iss073e0685684",
+     "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    ],
+    "verifiedLicense": "NASA imagery, center JSC, no third-party credit in description/metadata: US public domain",
+    "description": "iss073e0685684 (Aug. 21, 2025) --- Underneath a starry night sky, the city lights of New Delhi, India, and its surrounding suburbs glitter below Earth's atmospheric glow and at the edge of the Himalayas. This photograph was taken at approximately 2:55 a.m. local time as the International Space Station orbited 260 miles above."
+   },
+   "process": {
+    "op": "crop",
+    "crop": {
+     "x": 0.125,
+     "y": 0.0,
+     "w": 0.75,
+     "note": "fractions; height = width*9/16; y null = bottom aligned"
+    },
+    "resize": "1920x1080 Lanczos"
+   }
+  },
+  {
+   "id": "space-milky-way",
+   "kind": "picture",
+   "category": "space",
+   "name": "Milky Way airglow",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss073e0982679",
+   "origin": {
+    "type": "nasa",
+    "asset": "iss073e0982679",
+    "download": "https://images-assets.nasa.gov/image/iss073e0982679/iss073e0982679~orig.jpg",
+    "verifiedAt": [
+     "https://images-api.nasa.gov/search?nasa_id=iss073e0982679",
+     "https://images-api.nasa.gov/metadata/iss073e0982679",
+     "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    ],
+    "verifiedLicense": "NASA imagery, center JSC, no third-party credit in description/metadata: US public domain",
+    "description": "iss073e0982679 (Oct. 25, 2025) --- The Milky Way spans the night sky above a bright orange-yellow airglow that blankets the city lights along the east coast of Africa, from Kenya to Somalia. The International Space Station was orbiting 259 miles above the Indian Ocean, north of Madagascar, at approximately 10:29 p.m. local time when this photograph was taken."
+   },
+   "process": {
+    "op": "crop",
+    "crop": {
+     "x": 0.0,
+     "y": 0.5,
+     "w": 1.0,
+     "note": "fractions; height = width*9/16; y null = bottom aligned"
+    },
+    "resize": "1920x1080 Lanczos"
+   }
+  },
+  {
+   "id": "space-orbital-sunset",
+   "kind": "picture",
+   "category": "space",
+   "name": "Orbital sunset",
+   "author": "NASA/Chris Williams",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss074e0046371",
+   "origin": {
+    "type": "nasa",
+    "asset": "iss074e0046371",
+    "download": "https://images-assets.nasa.gov/image/iss074e0046371/iss074e0046371~orig.jpg",
+    "verifiedAt": [
+     "https://images-api.nasa.gov/search?nasa_id=iss074e0046371",
+     "https://images-api.nasa.gov/metadata/iss074e0046371",
+     "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    ],
+    "verifiedLicense": "NASA imagery, center JSC, no third-party credit in description/metadata: US public domain",
+    "description": "iss074e0046371 (Jan. 3, 2025) --- An orbital sunset silhouettes the cloud tops above the Pacific Ocean as the atmosphere along the horizon fades from orange to white, then to blue, in this photograph taken from the International Space Station while it orbited 262 miles above Earth. Credit: NASA/Chris Williams"
+   },
+   "process": {
+    "op": "crop",
+    "crop": {
+     "x": 0.0,
+     "y": 0.5,
+     "w": 1.0,
+     "note": "fractions; height = width*9/16; y null = bottom aligned"
+    },
+    "resize": "1920x1080 Lanczos"
+   }
+  },
+  {
+   "id": "space-orbital-sunrise",
+   "kind": "picture",
+   "category": "space",
+   "name": "Orbital sunrise",
+   "author": "NASA/Jessica Meir",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss074e0796544",
+   "origin": {
+    "type": "nasa",
+    "asset": "iss074e0796544",
+    "download": "https://images-assets.nasa.gov/image/iss074e0796544/iss074e0796544~orig.jpg",
+    "verifiedAt": [
+     "https://images-api.nasa.gov/search?nasa_id=iss074e0796544",
+     "https://images-api.nasa.gov/metadata/iss074e0796544",
+     "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    ],
+    "verifiedLicense": "NASA imagery, center JSC, no third-party credit in description/metadata: US public domain",
+    "description": "iss074e0796544 (July 10, 2026) --- An orbital sunrise above the Pacific Ocean illuminates Earth's atmosphere, revealing cloud tops and orange and blue hues outlining the planet's horizon. The International Space Station was orbiting 263 miles above the Hawaiian island chain at approximately 4:09 a.m. local time when this photograph was taken. Credit: NASA/Jessica Meir"
+   },
+   "process": {
+    "op": "crop",
+    "crop": {
+     "x": 0.0,
+     "y": 0.5,
+     "w": 1.0,
+     "note": "fractions; height = width*9/16; y null = bottom aligned"
+    },
+    "resize": "1920x1080 Lanczos"
+   }
+  },
+  {
+   "id": "space-horizon-glow",
+   "kind": "picture",
+   "category": "space",
+   "name": "Horizon glow",
+   "author": "NASA/Chris Williams",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss074e0722845",
+   "origin": {
+    "type": "nasa",
+    "asset": "iss074e0722845",
+    "download": "https://images-assets.nasa.gov/image/iss074e0722845/iss074e0722845~orig.jpg",
+    "verifiedAt": [
+     "https://images-api.nasa.gov/search?nasa_id=iss074e0722845",
+     "https://images-api.nasa.gov/metadata/iss074e0722845",
+     "https://www.nasa.gov/nasa-brand-center/images-and-media/"
+    ],
+    "verifiedLicense": "NASA imagery, center JSC, no third-party credit in description/metadata: US public domain",
+    "description": "iss074e0722845 (June 16, 2026) --- A sunset below Earth’s horizon silhouettes the clouds and illuminates the atmosphere in orange and blue hues, contrasting the planet’s darkened surface with the blackness of outer space. The International Space Station was orbiting 270 miles above the South Atlantic Ocean, off the coast of Argentina, at approximately 6:53 p.m. local time. Credit: NASA/Chris Willi"
+   },
+   "process": {
+    "op": "crop",
+    "crop": {
+     "x": 0.0,
+     "y": 0.5,
+     "w": 1.0,
+     "note": "fractions; height = width*9/16; y null = bottom aligned"
+    },
+    "resize": "1920x1080 Lanczos"
+   }
+  },
+  {
+   "id": "studio-backdrop-warm",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Warm backdrop",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "backdrop-warm-still",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "render"
+   }
+  },
+  {
+   "id": "studio-backdrop-navy",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Navy backdrop",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "backdrop-navy-still",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "render"
+   }
+  },
+  {
+   "id": "abstract-dawn-gradient",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Dawn gradient",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "gradient-dawn-still",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "render"
+   }
+  },
+  {
+   "id": "loop-wetland-clouds",
+   "kind": "video",
+   "category": "nature",
+   "name": "Wetland big sky",
+   "author": "Bureau of Land Management Oregon and Washington",
+   "license": "CC BY 2.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Warner_Wetlands_big_sky_time-lapse_video.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Warner Wetlands big sky time-lapse video.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/4/4d/Warner_Wetlands_big_sky_time-lapse_video.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "4661973d7f39ba6cb8ddd3b331cc10753042b70a",
+    "localKey": "0d112e3de9d7",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Warner_Wetlands_big_sky_time-lapse_video.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Warner_Wetlands_big_sky_time-lapse_video.webm"
+    ],
+    "verifiedLicense": "CC BY 2.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/2.0",
+    "credit": "Warner Wetlands big sky time-lapse video - Flickr",
+    "artist": "Bureau of Land Management Oregon and Washington"
+   },
+   "process": {
+    "op": "loop",
+    "start": 2.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: Bureau of Land Management Oregon and Washington, CC BY 2.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-iceland-waves",
+   "kind": "video",
+   "category": "nature",
+   "name": "Black sand waves",
+   "author": "Alexander Grebenkov",
+   "license": "CC BY 3.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Ocean_waves_at_L%C3%A6kjavik_beach,_Iceland.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Ocean waves at Lækjavik beach, Iceland.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/9/9b/Ocean_waves_at_L%C3%A6kjavik_beach%2C_Iceland.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "dc0bda423e95e4a94fca7673a3ec9e3aa3c039ad",
+    "localKey": "0e58a0b0d872",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Ocean_waves_at_L%C3%A6kjavik_beach,_Iceland.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Ocean_waves_at_Lækjavik_beach,_Iceland.webm"
+    ],
+    "verifiedLicense": "CC BY 3.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/3.0",
+    "credit": "Own work",
+    "artist": "Alexander Grebenkov"
+   },
+   "process": {
+    "op": "loop",
+    "start": 0.3,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: Alexander Grebenkov, CC BY 3.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-sea-nettle",
+   "kind": "video",
+   "category": "nature",
+   "name": "Sea nettle",
+   "author": "Fastily",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Jellyfish_at_Monterey_Bay_Aquarium_6_2024-01-11.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Jellyfish at Monterey Bay Aquarium 6 2024-01-11.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/1/12/Jellyfish_at_Monterey_Bay_Aquarium_6_2024-01-11.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "f9b96a95d4fdca57c58e2be315f815dbe231204c",
+    "localKey": "21e4e761ae6f",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Jellyfish_at_Monterey_Bay_Aquarium_6_2024-01-11.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Jellyfish_at_Monterey_Bay_Aquarium_6_2024-01-11.webm"
+    ],
+    "verifiedLicense": "CC BY-SA 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
+    "credit": "Own work",
+    "artist": "Fastily"
+   },
+   "process": {
+    "op": "loop",
+    "start": 1.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-snowy-woods",
+   "kind": "video",
+   "category": "nature",
+   "name": "Snowy woods",
+   "author": "Peter Cooper Jr.",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Snow_falling_in_Charlton_MA_2025-12-14.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Snow falling in Charlton MA 2025-12-14.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/5/56/Snow_falling_in_Charlton_MA_2025-12-14.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "57b3fd4e444a6c287613e5499e6b22d5f4beea3c",
+    "localKey": "2915e642b674",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Snow_falling_in_Charlton_MA_2025-12-14.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Snow_falling_in_Charlton_MA_2025-12-14.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Peter Cooper Jr."
+   },
+   "process": {
+    "op": "loop",
+    "start": 2.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-sunset-afterglow",
+   "kind": "video",
+   "category": "nature",
+   "name": "Sunset afterglow",
+   "author": "John Fowler (away)",
+   "license": "CC BY 2.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Second_Glow_(video).webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Second Glow (video).webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/1/14/Second_Glow_%28video%29.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "1c0ee73a4d12f01fcf05639852311b000e9f92d6",
+    "localKey": "31be6499b6e6",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Second_Glow_(video).webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Second_Glow_(video).webm"
+    ],
+    "verifiedLicense": "CC BY 2.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/2.0",
+    "credit": "Second Glow - Flickr",
+    "artist": "John Fowler (away)"
+   },
+   "process": {
+    "op": "loop",
+    "start": 0.5,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: John Fowler (away), CC BY 2.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-cumulus",
+   "kind": "video",
+   "category": "nature",
+   "name": "Cumulus clouds",
+   "author": "John Fowler (away)",
+   "license": "CC BY 2.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Cloud_timelapse.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Cloud timelapse.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/5/5f/Cloud_timelapse.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "ad983a1311132d392534b397a19fac331b778a42",
+    "localKey": "31d41bc6d724",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Cloud_timelapse.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Cloud_timelapse.webm"
+    ],
+    "verifiedLicense": "CC BY 2.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/2.0",
+    "credit": "Cloud timelapse - Flickr",
+    "artist": "John Fowler (away)"
+   },
+   "process": {
+    "op": "loop",
+    "start": 10.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: John Fowler (away), CC BY 2.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-lake-sunrise",
+   "kind": "video",
+   "category": "nature",
+   "name": "Lake sunrise",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:30s_Time_lapse_of_Sunrise_at_the_shore_line_of_Raymer_Bay_on_Okanagan_Lake,_24fps.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:30s Time lapse of Sunrise at the shore line of Raymer Bay on Okanagan Lake, 24fps.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/8/8b/30s_Time_lapse_of_Sunrise_at_the_shore_line_of_Raymer_Bay_on_Okanagan_Lake%2C_24fps.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "9ed68e14bf4ee0cf5d6bb3fec4172b8fc129e532",
+    "localKey": "704b5f9c586f",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:30s_Time_lapse_of_Sunrise_at_the_shore_line_of_Raymer_Bay_on_Okanagan_Lake,_24fps.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:30s_Time_lapse_of_Sunrise_at_the_shore_line_of_Raymer_Bay_on_Okanagan_Lake,_24fps.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Extemporalist"
+   },
+   "process": {
+    "op": "loop",
+    "start": 18.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-mossy-river",
+   "kind": "video",
+   "category": "nature",
+   "name": "Mossy river",
+   "author": "BLM Oregon & Washington",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Little_Applegate_River_(50982975823).webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Little Applegate River (50982975823).webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c9/Little_Applegate_River_%2850982975823%29.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "a650673889ab058ee210458510912e50b3efa122",
+    "localKey": "78549b9a04e0",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Little_Applegate_River_(50982975823).webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Little_Applegate_River_(50982975823).webm"
+    ],
+    "verifiedLicense": "Public domain",
+    "licenseUrlFromApi": "",
+    "credit": "Little Applegate River",
+    "artist": "BLM Oregon & Washington"
+   },
+   "process": {
+    "op": "loop",
+    "start": 12.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-valley-pasture",
+   "kind": "video",
+   "category": "nature",
+   "name": "Valley pasture",
+   "author": "Rose Abrams",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Pasture_in_Tay_Valley_-_timelapse.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Pasture in Tay Valley - timelapse.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/0/00/Pasture_in_Tay_Valley_-_timelapse.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "f1151146c44f73abbd93fe3570ec22686ca7b809",
+    "localKey": "84ab76924b75",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Pasture_in_Tay_Valley_-_timelapse.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Pasture_in_Tay_Valley_-_timelapse.webm"
+    ],
+    "verifiedLicense": "CC BY 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/4.0",
+    "credit": "Own work",
+    "artist": "Rose Abrams"
+   },
+   "process": {
+    "op": "loop",
+    "start": 3.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: Rose Abrams, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-shore-waves",
+   "kind": "video",
+   "category": "nature",
+   "name": "Shore waves",
+   "author": "דוד שי",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Water_waves_in_Herzliya_beach.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Water waves in Herzliya beach.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/0/09/Water_waves_in_Herzliya_beach.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "42d3f1ee7fa78165014708126ee700635ddd48d0",
+    "localKey": "87fb847e2fca",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Water_waves_in_Herzliya_beach.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Water_waves_in_Herzliya_beach.webm"
+    ],
+    "verifiedLicense": "CC BY-SA 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
+    "credit": "Own work",
+    "artist": "דוד שי"
+   },
+   "process": {
+    "op": "loop",
+    "start": 2.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: דוד שי, CC BY-SA 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-freezing-fog",
+   "kind": "video",
+   "category": "nature",
+   "name": "Freezing fog",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Okanagan_Wila_wafting_on_branches_in_freezing_fog.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Okanagan Wila wafting on branches in freezing fog.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/4/41/Okanagan_Wila_wafting_on_branches_in_freezing_fog.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "e4409f4a615157c15c086505a04acd02e601f237",
+    "localKey": "8814b75091b8",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Okanagan_Wila_wafting_on_branches_in_freezing_fog.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Okanagan_Wila_wafting_on_branches_in_freezing_fog.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Extemporalist"
+   },
+   "process": {
+    "op": "loop",
+    "start": 2.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-mountain-clouds",
+   "kind": "video",
+   "category": "nature",
+   "name": "Mountain clouds",
+   "author": "BLM Oregon & Washington",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Time_Lapse_Clouds_above_Steens_Mountain_(36203941112).webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Time Lapse Clouds above Steens Mountain (36203941112).webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/b/b2/Time_Lapse_Clouds_above_Steens_Mountain_%2836203941112%29.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "d3eea9de806097594cc7c86197bd7679d55e1f21",
+    "localKey": "904e77deb9c0",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Time_Lapse_Clouds_above_Steens_Mountain_(36203941112).webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Time_Lapse_Clouds_above_Steens_Mountain_(36203941112).webm"
+    ],
+    "verifiedLicense": "Public domain",
+    "licenseUrlFromApi": "",
+    "credit": "Time Lapse Clouds above Steens Mountain",
+    "artist": "BLM Oregon & Washington"
+   },
+   "process": {
+    "op": "loop",
+    "start": 3.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-foggy-forest",
+   "kind": "video",
+   "category": "nature",
+   "name": "Foggy forest",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Aerial_View_of_freezing_fog_in_the_Okanagan_Highlands.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Aerial View of freezing fog in the Okanagan Highlands.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c9/Aerial_View_of_freezing_fog_in_the_Okanagan_Highlands.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "e586b84620d1f3838e1af2ff7df867ae545b87c3",
+    "localKey": "9216f963598f",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Aerial_View_of_freezing_fog_in_the_Okanagan_Highlands.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Aerial_View_of_freezing_fog_in_the_Okanagan_Highlands.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Extemporalist"
+   },
+   "process": {
+    "op": "loop",
+    "start": 3.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-snowy-evergreens",
+   "kind": "video",
+   "category": "nature",
+   "name": "Snowy evergreens",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Snow_falls_on_evergreens_protected_by_a_rocky_outcrop.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Snow falls on evergreens protected by a rocky outcrop.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Snow_falls_on_evergreens_protected_by_a_rocky_outcrop.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "f8ee5a41f4e9be08be51526022d948007ffacd9c",
+    "localKey": "9508cf5a2553",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Snow_falls_on_evergreens_protected_by_a_rocky_outcrop.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Snow_falls_on_evergreens_protected_by_a_rocky_outcrop.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Extemporalist"
+   },
+   "process": {
+    "op": "loop",
+    "start": 3.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-wetland-creek",
+   "kind": "video",
+   "category": "nature",
+   "name": "Wetland creek",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Creek_babbling_through_Benvoulin_wetlands.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Creek babbling through Benvoulin wetlands.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c3/Creek_babbling_through_Benvoulin_wetlands.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "ce2128207da88e966ba9aebd01d76a66a2072add",
+    "localKey": "b206c2c8221c",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Creek_babbling_through_Benvoulin_wetlands.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Creek_babbling_through_Benvoulin_wetlands.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Extemporalist"
+   },
+   "process": {
+    "op": "loop",
+    "start": 3.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-comb-jelly",
+   "kind": "video",
+   "category": "nature",
+   "name": "Comb jelly",
+   "author": "Fastily",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Jellyfish_at_Monterey_Bay_Aquarium_3_2024-01-11.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Jellyfish at Monterey Bay Aquarium 3 2024-01-11.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/2/20/Jellyfish_at_Monterey_Bay_Aquarium_3_2024-01-11.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "6a7cc35cebfdc5c3b6513dc307c8adff30c11984",
+    "localKey": "b384ecc66256",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Jellyfish_at_Monterey_Bay_Aquarium_3_2024-01-11.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Jellyfish_at_Monterey_Bay_Aquarium_3_2024-01-11.webm"
+    ],
+    "verifiedLicense": "CC BY-SA 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
+    "credit": "Own work",
+    "artist": "Fastily"
+   },
+   "process": {
+    "op": "loop",
+    "start": 1.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-powder-creek",
+   "kind": "video",
+   "category": "nature",
+   "name": "Powder creek",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Falling_Powder_overlies_melt-water_flowing_down_Hachey_Creek_in_Myra-Bellevue_Park,_British_Columbia.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Falling Powder overlies melt-water flowing down Hachey Creek in Myra-Bellevue Park, British Columbia.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/7/75/Falling_Powder_overlies_melt-water_flowing_down_Hachey_Creek_in_Myra-Bellevue_Park%2C_British_Columbia.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "c6fe08a92de579c207cc8bd769cb946e76dd3936",
+    "localKey": "b9f9a28e9e24",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Falling_Powder_overlies_melt-water_flowing_down_Hachey_Creek_in_Myra-Bellevue_Park,_British_Columbia.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Falling_Powder_overlies_melt-water_flowing_down_Hachey_Creek_in_Myra-Bellevue_Park,_British_Columbia.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Extemporalist"
+   },
+   "process": {
+    "op": "loop",
+    "start": 3.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-big-aquarium",
+   "kind": "video",
+   "category": "nature",
+   "name": "Big aquarium",
+   "author": "Sebastian Wallroth",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Ozeaneum_Stralsund_2019-04_002.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Ozeaneum Stralsund 2019-04 002.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/2/26/Ozeaneum_Stralsund_2019-04_002.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "a3cc39fcfe338626234587e848628ad0f5f477a2",
+    "localKey": "bee6ccedd354",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Ozeaneum_Stralsund_2019-04_002.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Ozeaneum_Stralsund_2019-04_002.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Sebastian Wallroth"
+   },
+   "process": {
+    "op": "loop",
+    "start": 10.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-granite-dusk",
+   "kind": "video",
+   "category": "nature",
+   "name": "Granite dusk",
+   "author": "G. Edward Johnson",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Sunset_on_Halfdome_timelapse_Yosemite_CA_2023-07-15_20-11-06_1.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Sunset on Halfdome timelapse Yosemite CA 2023-07-15 20-11-06 1.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/4/4c/Sunset_on_Halfdome_timelapse_Yosemite_CA_2023-07-15_20-11-06_1.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "c0aa9bef7beb54c410a7faf6712424310b6b8c07",
+    "localKey": "c3ff4ffba326",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Sunset_on_Halfdome_timelapse_Yosemite_CA_2023-07-15_20-11-06_1.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Sunset_on_Halfdome_timelapse_Yosemite_CA_2023-07-15_20-11-06_1.webm"
+    ],
+    "verifiedLicense": "CC BY 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/4.0",
+    "credit": "Own work",
+    "artist": "G. Edward Johnson"
+   },
+   "process": {
+    "op": "loop",
+    "start": 0.5,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: G. Edward Johnson, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-cliff-waterfall",
+   "kind": "video",
+   "category": "nature",
+   "name": "Cliff waterfall",
+   "author": "Psypherium",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Delaneys_Falls.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Delaneys Falls.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/8/8b/Delaneys_Falls.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "0138fbb19753b2f2a2ca52f2d4c070750dcfa8f6",
+    "localKey": "cfd7dbbcf6eb",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Delaneys_Falls.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Delaneys_Falls.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Psypherium"
+   },
+   "process": {
+    "op": "loop",
+    "start": 15.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-sardine-school",
+   "kind": "video",
+   "category": "nature",
+   "name": "Sardine school",
+   "author": "Fastily",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Fish_at_Monterey_Bay_Aquarium_1_2024-01-11.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Fish at Monterey Bay Aquarium 1 2024-01-11.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Fish_at_Monterey_Bay_Aquarium_1_2024-01-11.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "30eaeebe98826737fbcbf590af38949d171337ae",
+    "localKey": "d0be954f773c",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Fish_at_Monterey_Bay_Aquarium_1_2024-01-11.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Fish_at_Monterey_Bay_Aquarium_1_2024-01-11.webm"
+    ],
+    "verifiedLicense": "CC BY-SA 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
+    "credit": "Own work",
+    "artist": "Fastily"
+   },
+   "process": {
+    "op": "loop",
+    "start": 2.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-snowy-creek",
+   "kind": "video",
+   "category": "nature",
+   "name": "Snowy creek",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:KLO_Creek_gurgles_during_an_early_winter_snowfall.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:KLO Creek gurgles during an early winter snowfall.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c7/KLO_Creek_gurgles_during_an_early_winter_snowfall.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "47ee7c8f1f08e56bfee0ad83dde920262cc66fcf",
+    "localKey": "d2d10182f9e5",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:KLO_Creek_gurgles_during_an_early_winter_snowfall.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:KLO_Creek_gurgles_during_an_early_winter_snowfall.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Extemporalist"
+   },
+   "process": {
+    "op": "loop",
+    "start": 3.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-snow-sky",
+   "kind": "video",
+   "category": "nature",
+   "name": "Snow against sky",
+   "author": "Роман Рябенко",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:%D0%A1%D0%BD%D1%96%D0%B3_%D0%BD%D0%B0_%D1%82%D0%BB%D1%96_%D0%BB%D0%B5%D0%B3%D0%BA%D0%BE%D1%97_%D1%85%D0%BC%D0%B0%D1%80%D0%B8_%D0%B2_%D0%BD%D0%B5%D0%B1%D1%96.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Сніг на тлі легкої хмари в небі.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/3/37/%D0%A1%D0%BD%D1%96%D0%B3_%D0%BD%D0%B0_%D1%82%D0%BB%D1%96_%D0%BB%D0%B5%D0%B3%D0%BA%D0%BE%D1%97_%D1%85%D0%BC%D0%B0%D1%80%D0%B8_%D0%B2_%D0%BD%D0%B5%D0%B1%D1%96.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "fa37fb88f71bb5138fc5a4b053e9a961adfa0f4d",
+    "localKey": "e6990eff6522",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:%D0%A1%D0%BD%D1%96%D0%B3_%D0%BD%D0%B0_%D1%82%D0%BB%D1%96_%D0%BB%D0%B5%D0%B3%D0%BA%D0%BE%D1%97_%D1%85%D0%BC%D0%B0%D1%80%D0%B8_%D0%B2_%D0%BD%D0%B5%D0%B1%D1%96.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Сніг_на_тлі_легкої_хмари_в_небі.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Роман Рябенко"
+   },
+   "process": {
+    "op": "loop",
+    "start": 0.5,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-roof-clouds",
+   "kind": "video",
+   "category": "city",
+   "name": "Clouds over roofs",
+   "author": "Thomas Bresson",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:2020-04-03_timelapse-nuages-Belfort.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:2020-04-03 timelapse-nuages-Belfort.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/f/f5/2020-04-03_timelapse-nuages-Belfort.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "6b1e5c9283edfe11ffd0aba4355a34ce2f74c4aa",
+    "localKey": "a9c0bbb3ce6f",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:2020-04-03_timelapse-nuages-Belfort.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:2020-04-03_timelapse-nuages-Belfort.webm"
+    ],
+    "verifiedLicense": "CC BY 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/4.0",
+    "credit": "Due to file size or type limitations, this file is a reduced resolution or reduced quality version of the original file. The original version is available at the Internet Archive.",
+    "artist": "Thomas Bresson"
+   },
+   "process": {
+    "op": "loop",
+    "start": 5.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: Thomas Bresson, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-river-city-dusk",
+   "kind": "video",
+   "category": "city",
+   "name": "River city dusk",
+   "author": "Ecelan",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Zaragoza_-_Vistas_del_Pilar_-_Anochecer.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Zaragoza - Vistas del Pilar - Anochecer.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c7/Zaragoza_-_Vistas_del_Pilar_-_Anochecer.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "4b5438f8226b42e6e8e975585ace86eb3010589f",
+    "localKey": "d56ab561956d",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Zaragoza_-_Vistas_del_Pilar_-_Anochecer.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Zaragoza_-_Vistas_del_Pilar_-_Anochecer.webm"
+    ],
+    "verifiedLicense": "CC BY-SA 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
+    "credit": "Own work",
+    "artist": "Ecelan"
+   },
+   "process": {
+    "op": "loop",
+    "start": 3.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": [
+     0,
+     300,
+     1920,
+     1080
+    ]
+   },
+   "credit": "Video: Ecelan, CC BY-SA 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-fireplace",
+   "kind": "video",
+   "category": "home",
+   "name": "Fireplace",
+   "author": "FASTILY",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Fireplace_1_2021-02-14.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Fireplace 1 2021-02-14.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/0/04/Fireplace_1_2021-02-14.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "d9364a111f54b0729071b85021f91ee16dafe6bf",
+    "localKey": "6e0f5565fdb8",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Fireplace_1_2021-02-14.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Fireplace_1_2021-02-14.webm"
+    ],
+    "verifiedLicense": "CC BY-SA 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
+    "credit": "Own work",
+    "artist": "FASTILY"
+   },
+   "process": {
+    "op": "loop",
+    "start": 2.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: FASTILY, CC BY-SA 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-fire-pit",
+   "kind": "video",
+   "category": "home",
+   "name": "Fire pit",
+   "author": "FASTILY",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Fire_pit_1_2017-11-21.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Fire pit 1 2017-11-21.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/4/45/Fire_pit_1_2017-11-21.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "20716073678b735d04962abc1cb2111e91559cd8",
+    "localKey": "bd166b2746b6",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Fire_pit_1_2017-11-21.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Fire_pit_1_2017-11-21.webm"
+    ],
+    "verifiedLicense": "CC BY-SA 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
+    "credit": "Own work",
+    "artist": "FASTILY"
+   },
+   "process": {
+    "op": "loop",
+    "start": 2.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": [
+     256,
+     216,
+     1536,
+     864
+    ]
+   },
+   "credit": "Video: FASTILY, CC BY-SA 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-candle",
+   "kind": "video",
+   "category": "home",
+   "name": "Candle",
+   "author": "Bautsch",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Corona.Candle.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Corona.Candle.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/7/72/Corona.Candle.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "d025abc28729fe93422e6b3ced7eb205e045c177",
+    "localKey": "9debda8230e2",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Corona.Candle.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Corona.Candle.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Bautsch"
+   },
+   "process": {
+    "op": "loop",
+    "start": 4.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-snow-fence",
+   "kind": "video",
+   "category": "home",
+   "name": "Snow by the fence",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:FluffySnowfallByFence.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:FluffySnowfallByFence.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/b/ba/FluffySnowfallByFence.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "93004d369f29959d76384097292797ab02555573",
+    "localKey": "5118c4314fef",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:FluffySnowfallByFence.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:FluffySnowfallByFence.webm"
+    ],
+    "verifiedLicense": "CC0",
+    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "credit": "Own work",
+    "artist": "Extemporalist"
+   },
+   "process": {
+    "op": "loop",
+    "start": 5.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-aurora-iceland",
+   "kind": "video",
+   "category": "space",
+   "name": "Aurora over Iceland",
+   "author": "G. Edward Johnson",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Aurora-Iceland_Northern_Lights_timelapse_2026-02-06.hd.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Aurora-Iceland Northern Lights timelapse 2026-02-06.hd.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Aurora-Iceland_Northern_Lights_timelapse_2026-02-06.hd.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "2e3b1edf28b841d9b55f3f2aad0f8d6bec43ec66",
+    "localKey": "44b8db31d711",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Aurora-Iceland_Northern_Lights_timelapse_2026-02-06.hd.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Aurora-Iceland_Northern_Lights_timelapse_2026-02-06.hd.webm"
+    ],
+    "verifiedLicense": "CC BY 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/4.0",
+    "credit": "Own work",
+    "artist": "G. Edward Johnson"
+   },
+   "process": {
+    "op": "loop",
+    "start": 0.2,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: G. Edward Johnson, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-desert-stars",
+   "kind": "video",
+   "category": "space",
+   "name": "Desert stars",
+   "author": "Joshua Tree National Park",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Stars_and_Clouds_Over_Headstone_Rock_(30230087163).webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Stars and Clouds Over Headstone Rock (30230087163).webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/1/12/Stars_and_Clouds_Over_Headstone_Rock_%2830230087163%29.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "1c86969efd04b31d62d493b3a7fddae9540c8c6b",
+    "localKey": "df0232b16b0d",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Stars_and_Clouds_Over_Headstone_Rock_(30230087163).webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Stars_and_Clouds_Over_Headstone_Rock_(30230087163).webm"
+    ],
+    "verifiedLicense": "Public domain",
+    "licenseUrlFromApi": "",
+    "credit": "Stars and Clouds Over Headstone Rock",
+    "artist": "Joshua Tree National Park"
+   },
+   "process": {
+    "op": "loop",
+    "start": 6.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-earth-solar-array",
+   "kind": "video",
+   "category": "space",
+   "name": "Earth from orbit",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Earth-solar-array-timelapse.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Earth-solar-array-timelapse.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/3/31/Earth-solar-array-timelapse.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "058b68851c465067777919f5bb041a45c9079416",
+    "localKey": "eb0b7a53e974",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Earth-solar-array-timelapse.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Earth-solar-array-timelapse.webm"
+    ],
+    "verifiedLicense": "Public domain",
+    "licenseUrlFromApi": "",
+    "credit": "earth-solar-array-timelapse",
+    "artist": "NASA"
+   },
+   "process": {
+    "op": "loop",
+    "start": 1.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-rain-drops",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Rain drops",
+   "author": "Nesnad",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Rain_drops_-_Japan_-2016_July_20.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Rain drops - Japan -2016 July 20.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/b/bd/Rain_drops_-_Japan_-2016_July_20.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha1": "93cecd76ba5cdd8d6cf689b49973382112386083",
+    "localKey": "fcecf6431144",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Rain_drops_-_Japan_-2016_July_20.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Rain_drops_-_Japan_-2016_July_20.webm"
+    ],
+    "verifiedLicense": "CC BY 4.0",
+    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/4.0",
+    "credit": "Own work",
+    "artist": "Nesnad"
+   },
+   "process": {
+    "op": "loop",
+    "start": 5.0,
+    "seconds": 7,
+    "crossfade": 1.0,
+    "crop": null
+   },
+   "credit": "Video: Nesnad, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-flow-ocean",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Ocean flow",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "flow-ocean",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-flow-peach",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Peach flow",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "flow-peach",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-flow-violet",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Violet flow",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "flow-violet",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-flow-mint",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Mint flow",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "flow-mint",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-flow-graphite",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Graphite flow",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "flow-graphite",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-bokeh-amber",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Amber bokeh",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "bokeh-amber",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-bokeh-blue",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Blue bokeh",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "bokeh-blue",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-bokeh-city",
+   "kind": "video",
+   "category": "city",
+   "name": "City lights bokeh",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "bokeh-city-night",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-aurora-green",
+   "kind": "video",
+   "category": "space",
+   "name": "Green aurora",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "aurora-green",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-aurora-violet",
+   "kind": "video",
+   "category": "space",
+   "name": "Violet aurora",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "aurora-violet",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-starfield",
+   "kind": "video",
+   "category": "space",
+   "name": "Starfield nebula",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "starfield-nebula",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-waves-dusk",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Dusk waves",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "waves-dusk",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-waves-mint",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Mint waves",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "waves-mint",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-floating-dust",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Floating dust",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "particles-dust",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-backdrop-grey",
+   "kind": "video",
+   "category": "studio",
+   "name": "Grey backdrop",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "backdrop-grey",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  },
+  {
+   "id": "loop-backdrop-teal",
+   "kind": "video",
+   "category": "studio",
+   "name": "Teal backdrop",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "origin": {
+    "type": "procedural",
+    "generator": "tools/studio/gen-studio-loops.py",
+    "item": "backdrop-teal",
+    "verifiedLicense": "MIT (our own render)"
+   },
+   "process": {
+    "op": "encode",
+    "seconds": 8,
+    "note": "periodic by construction, no crossfade"
+   }
+  }
+ ]
+}
