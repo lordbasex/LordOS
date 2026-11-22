@@ -457,6 +457,33 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   streams and a restricted app could record (the polkit agent was starved too). pwguard and the polkit agent are now
   polled before the helpers, and the set holds 48 (16 fixed + 32 helpers); a helper that doesn't fit is drained on the
   tick.
+- **Apps that start their real process and leave no longer vanish: VS Code from Flathub opened a window and closed at
+  once** (`server/src/sec/sandbox.c`, `server/src/fpspawner.c`; found by the Flathub compatibility run of 2026-11-22).
+  VS Code's `code` runs `cli.js`, which starts Electron detached and exits. The view every Flatpak app (and every
+  restricted Linux app) runs in had its PID 1 leave as soon as that first process did, and the kernel then killed
+  everything else in the view. PID 1 now stays while anything the app started is still running, as bubblewrap's own
+  PID 1 does, and leaves with the app's status; stopping an app (a SIGTERM to the view) still ends what it left behind
+  at once. The app's Spawn helper no longer dies with the app's first process (its Electron keeps asking for
+  sub-sandboxes): PID 1 ends it once nothing else is left (`sandbox_view_helper`). Nothing in what the view, its scope
+  or Landlock allow changed. Test: `build/sandbox-view-lifetime-test` (a process left behind runs to its end, the helper
+  is ended, a stop still ends everything; it fails on the old PID 1).
+- **Steam from Flathub starts: LordOS's Spawn portal answers `org.freedesktop.DBus.Peer`** (`server/src/fpspawn.c`,
+  `fpak_bus_peer` in `server/src/fpak.c`). Steam's Flatpak pings the portal on "/" before anything else and, answered
+  "no such object", stopped on "The unofficial Steam Flatpak app requires a working D-Bus session bus and flatpak-portal
+  service". Every D-Bus connection answers `Peer.Ping` and `GetMachineId` on any path; now this one does too. Test:
+  `build/fpak-test`.
+- **Session restore opens a Flatpak app once, whatever its window count** (`sdk/sessionmodel.js` `launchesOnce`,
+  `sdk/sessionrestore.jsx`). Each launch of a Flatpak app is a view of its own, so a second launch never reaches the
+  first (Chromium's and Electron's single-instance lock, Firefox's profile lock): four saved VS Code windows became four
+  copies of VS Code on one profile ("argv.json contains errors"), Chromium showed "Profile error occurred". The frames
+  still go to the windows the app brings back. Test: `tests/session_model_test.mjs`.
+- **The screen-share chooser and its indicator name a Flatpak app, and each window's app** (`sdk/screencastmodel.js`
+  `castAskerName`, `castWindowOf`; `sdk/hardware.jsx`, `sdk/screencast.jsx`). They said
+  "flatpak:org.chromium.Chromium wants to see your screen", and every Linux window in the list was labelled "Linux".
+  Still only from lord-server's verified identity (the app's root-owned scope): a Flatpak app's name comes from its own
+  metadata, so it is always shown with that verified id ("Chromium · org.chromium.Chromium"; an app calling itself
+  "Firefox" still shows its real id), and it is looked up by that exact id only, never by a window class.
+  Test: `tests/screencast_model_test.mjs` (a spoofed name included).
 - **Flatpak apps built on Chromium or Electron no longer die at start** (Whatsie from Flathub: it showed its tray icon
   and quit, with `trap int3` in libQt6WebEngineCore at every launch). Chromium (QtWebEngine, CEF, the browser) and zypak
   (Electron) ask Flatpak's Spawn for a sub-sandbox that joins the app's own user and PID namespaces (EXPOSE_PIDS /

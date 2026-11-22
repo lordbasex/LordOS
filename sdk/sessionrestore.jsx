@@ -28,7 +28,7 @@ import { isAppOff } from './appsoff.js';
 import { useLauncherApps, shortAppName } from './apps.js';
 import { admin } from './admin.js';
 import { clipboard } from './clipboard.js';
-import { RESTORE_MODES, RESTORE_DEFAULT, MAX_WINDOWS, NEVER, cleanArgs, cleanFrame, cleanList, restoreDecision, restoreSplit, planRestore, fitFrame } from './sessionmodel.js';
+import { RESTORE_MODES, RESTORE_DEFAULT, MAX_WINDOWS, NEVER, cleanArgs, cleanFrame, cleanList, restoreDecision, restoreSplit, planRestore, fitFrame, launchesOnce } from './sessionmodel.js';
 
 const AUTOSAVE_MS = 2000;     // a dragged window or a new one reaches the disk this long after
 const START_MS = 1500;        // after the theme's first frames
@@ -171,11 +171,11 @@ setLinuxPlacement((dockId) => {
 export const restoredIds = new Set();
 
 // A browser brings back its own windows from one launch (the action below); with that off, each
-// window is a launch of its own.
+// window is a launch of its own. A Flatpak app always runs once (launchesOnce).
 const isBrowser = (id) => /^desktop:(chromium|firefox|firefox-esr)$/.test(id);
 const runsOnce = (id) => {
   const p = parseDockId(id);
-  if (p?.kind === 'lpk' || (p?.kind === 'app' && getApp(p.key)?.isolated)) return true;
+  if (p?.kind === 'lpk' || (p?.kind === 'app' && getApp(p.key)?.isolated) || launchesOnce(id)) return true;
   return isBrowser(id) && restoreBrowsers();
 };
 

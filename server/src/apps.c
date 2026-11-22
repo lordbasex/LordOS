@@ -1445,7 +1445,8 @@ int apps_launch_view_main(void) {
         if (h < 0) { if (write(2, fail, sizeof fail - 1) < 0) {} return 126; }
         if (h == 0) fpsw_main(FPSW_FD);
         close(FPSW_FD);
-    }
+        sandbox_view_helper(h);                     /* PID 1 ends it once nothing else of the app is left */
+    } else sandbox_view_helper(0);
     execve(prog, args, environ);
     return 127;
 }

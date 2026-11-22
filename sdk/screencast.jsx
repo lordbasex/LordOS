@@ -20,7 +20,7 @@ import { useTheme } from './theme.js';
 import { t } from './i18n.js';
 import { ScrollView } from './components.jsx';
 import { windows, wm } from './windows.js';
-import { castChoices, castToggle, castSources } from './screencastmodel.js';
+import { castChoices, castToggle, castSources, castWindowOf } from './screencastmodel.js';
 
 const api = () => typeof lord !== 'undefined' && lord.portal && typeof lord.portal.cast === 'function';
 const castAsk = createStore(null);      // { id, monitor, window, multiple, who }
@@ -110,7 +110,7 @@ export function ScreenCastPrompt() {
   const screens = choices.screens.map((s) => h(Card, { key: s.key, th, thumb: thumbs[s.key], picked: picked.includes(s.key), onClick: () => pick(s.key),
     label: s.name || t('shell.cast.screenN', { n: s.index + 1 }) }));
   const wins = choices.windows.map((w) => h(Card, { key: w.key, th, thumb: thumbs[w.key], picked: picked.includes(w.key), onClick: () => pick(w.key),
-    label: w.title || names.window(w), sub: w.title ? names.window(w) : '' }));
+    label: w.title || names.window(castWindowOf(w, windows.get())), sub: w.title ? names.window(castWindowOf(w, windows.get())) : '' }));
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start', backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 100000 } },
     h(View, { style: { marginTop: 70, width: 560, maxHeight: Math.max(320, mainBox().height - 140), borderRadius: 14, padding: 20, gap: 8, alignItems: 'center',
       backgroundColor: th.windowBg, border: `1px solid ${th.separator}`, boxShadow: '0 20px 60px rgba(0,0,0,0.45)' } },

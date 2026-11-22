@@ -394,6 +394,36 @@ static int remount_ro_under(const char *dir) {
     return bad ? -1 : 0;
 }
 
+/* the app's end of the pipe to the view's PID 1 (sandbox_files_isolate), until sandbox_view_helper */
+static int view_ctl = -1;
+
+/* Whether the view's PID 1 has a child other than `except`: its children in this PID namespace's own procfs. 1 when
+ * it can't tell (the list unreadable or too long), so PID 1 then waits for them, as for any child. */
+int sandbox_view_others_in(const char *list, pid_t except) {
+    if (!list) return 1;
+    for (const char *p = list; *p;) {
+        while (*p == ' ' || *p == '\n') p++;
+        if (!*p) break;
+        char *end;
+        long v = strtol(p, &end, 10);
+        if (end == p) return 1;
+        if (v != (long)except) return 1;
+        p = end;
+    }
+    return 0;
+}
+
+static int view_others(pid_t except) {
+    char buf[4096];
+    int fd = open("/proc/1/task/1/children", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return 1;
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n < 0 || n == (ssize_t)sizeof buf - 1) return 1;
+    buf[n] = 0;
+    return sandbox_view_others_in(buf, except);
+}
+
 int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     if (!cfg->home || cfg->home[0] != '/' || !strcmp(cfg->home, "/")) return -1;
     char map[64];
@@ -505,24 +535,61 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     close(sync[1]);
     if (bad) _exit(1);
 
+    /* the app's side tells PID 1 the pid of a helper it forks (sandbox_view_helper) */
+    int ctl[2];
+    if (pipe2(ctl, O_CLOEXEC | O_NONBLOCK)) _exit(1);
     pid_t app = fork();
     if (app < 0) _exit(1);
-    if (app == 0) { prctl(PR_SET_PDEATHSIG, SIGKILL); return 0; }   /* the app: Landlock, then execve */
-    /* PID 1 only reaps; it leaves with the app's status. SIGTERM/SIGINT/SIGHUP go to the app. */
+    if (app == 0) {                                 /* the app: Landlock, then execve */
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        close(ctl[0]);
+        view_ctl = ctl[1];
+        return 0;
+    }
+    close(ctl[1]);
+    /* PID 1 only reaps. It stays while anything the app started is still running, as bubblewrap's PID 1 does:
+     * a program that starts its real process and leaves (VS Code's `code` runs cli.js, which starts Electron detached)
+     * kept nothing before, because PID 1 leaving ends the namespace and the kernel kills everything in it. Once the
+     * app is gone and only its Spawn helper is left (or nothing), the helper is ended and PID 1 leaves with the app's
+     * status. SIGTERM/SIGINT/SIGHUP go to the app (once it has left after one, PID 1 leaves too and the kernel ends the
+ * rest, as before), or once it is gone to everything left in the view. */
     sigset_t all;
     sigfillset(&all);
     sigprocmask(SIG_BLOCK, &all, NULL);
+    pid_t helper = 0;
+    int app_done = 0, status = 0, stopping = 0;
     for (;;) {
         struct timespec tick = { 1, 0 };
         siginfo_t si;
         int sig = sigtimedwait(&all, &si, &tick);
-        if (sig == SIGTERM || sig == SIGINT || sig == SIGHUP) kill(app, sig);
+        if (sig == SIGTERM || sig == SIGINT || sig == SIGHUP) {
+            if (!app_done) stopping = 1;
+            kill(app_done ? -1 : app, sig);
+        }
+        if (!helper) {
+            pid_t h = 0;
+            if (read(ctl[0], &h, sizeof h) == (ssize_t)sizeof h && h > 1 && h != app) helper = h;
+        }
         int st;
         pid_t w;
-        while ((w = waitpid(-1, &st, WNOHANG)) > 0)
-            if (w == app) _exit(WIFEXITED(st) ? WEXITSTATUS(st) : 128 + (WIFSIGNALED(st) ? WTERMSIG(st) : 0));
-        if (w < 0 && errno == ECHILD) _exit(0);
+        while ((w = waitpid(-1, &st, WNOHANG)) > 0) {
+            if (w == app) { app_done = 1; status = WIFEXITED(st) ? WEXITSTATUS(st) : 128 + (WIFSIGNALED(st) ? WTERMSIG(st) : 0); }
+            if (w == helper) helper = -1;
+        }
+        if (w < 0 && errno == ECHILD) _exit(app_done ? status : 0);
+        /* asked to stop (the app's own end, a logout): as before, what is left goes with PID 1 */
+        if (app_done && (stopping || !view_others(helper))) {
+            if (helper > 1) kill(helper, SIGKILL);
+            _exit(status);
+        }
     }
+}
+
+void sandbox_view_helper(pid_t pid) {
+    if (view_ctl < 0) return;
+    if (pid > 1 && write(view_ctl, &pid, sizeof pid) < 0) {}
+    close(view_ctl);
+    view_ctl = -1;
 }
 
 /* ---- seccomp-bpf: allowlist ---- */

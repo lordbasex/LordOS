@@ -224,6 +224,14 @@ int main(void) {
     char cmd[600];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", root);
     if (system(cmd)) {}
+    /* Peer on the Spawn portal: Ping with or without the interface, GetMachineId, nothing else */
+    CHECK(fpak_bus_peer("org.freedesktop.DBus.Peer", "Ping") == 1);
+    CHECK(fpak_bus_peer(NULL, "Ping") == 1);
+    CHECK(fpak_bus_peer("org.freedesktop.DBus.Peer", "GetMachineId") == 2);
+    CHECK(fpak_bus_peer("org.freedesktop.portal.Flatpak", "Ping") == 0);
+    CHECK(fpak_bus_peer("org.freedesktop.DBus.Peer", "Spawn") == 0);
+    CHECK(fpak_bus_peer(NULL, "Spawn") == 0);
+    CHECK(fpak_bus_peer("org.freedesktop.DBus.Peer", NULL) == 0);
     printf("fpak-test: %d passed, %d failed\n", pass, failc);
     return failc != 0;
 }

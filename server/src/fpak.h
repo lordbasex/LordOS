@@ -86,6 +86,10 @@ typedef struct {
  * LD_PRELOAD and the like matter: they reach only the app's own new sandbox), expose names that are one plain path
  * element, every string under FPAK_SPAWN_STR_MAX bytes and none with a newline in an option. 1 yes, 0 no. */
 int fpak_spawn_ok(const FpakSpawn *s);
+/* org.freedesktop.DBus.Peer on lord-server's Spawn portal name, on any object path as the D-Bus spec has every
+ * connection answer it: 1 Ping, 2 GetMachineId, 0 anything else. Steam's Flatpak checks the portal with a Ping on "/"
+ * and stopped on "requires a working D-Bus session bus and flatpak-portal service" when it got UnknownObject. */
+int fpak_bus_peer(const char *iface, const char *member);
 
 /* argv for a Spawn of app r->id: as fpak_argv (r->opened must be NULL), with what s asks for. argv has room for
  * FPAK_SPAWN_ARGV_MAX entries. → argc, or -1. */

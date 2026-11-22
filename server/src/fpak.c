@@ -129,6 +129,13 @@ static int str_ok(const char *v, int option) {
 
 static int list_len(const char *const *l) { int n = 0; while (l && l[n]) n++; return n; }
 
+int fpak_bus_peer(const char *iface, const char *member) {
+    if (!member || (iface && strcmp(iface, "org.freedesktop.DBus.Peer"))) return 0;
+    if (!strcmp(member, "Ping")) return 1;
+    if (!strcmp(member, "GetMachineId") && iface) return 2;
+    return 0;
+}
+
 int fpak_spawn_ok(const FpakSpawn *s) {
     if (!s || (s->flags & ~FPAK_SPAWN_FLAGS_ALL) || (s->sandbox_flags & ~FPAK_SANDBOX_FLAGS_ALL)) return 0;
     if ((s->flags & (FPAK_SPAWN_EXPOSE_PIDS | FPAK_SPAWN_SHARE_PIDS)) && s->parent_pid <= 0) return 0;
