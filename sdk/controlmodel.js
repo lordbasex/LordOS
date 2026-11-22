@@ -82,6 +82,13 @@ export function tipSide(anchor, size, area, pointer = null, gap = 6) {
   return covers(below) && !covers(above) ? 'above' : fits(below) || !fits(above) ? 'below' : 'above';
 }
 
+// The tallest a Popover may be on the side it opens to: from the anchor's edge (with the 4 px gap) to the area's edge,
+// less an 8 px margin; never under 80 so a cramped spot still shows a few rows (the content scrolls).
+export function popoverRoom(anchor, area, up) {
+  const room = up ? anchor.y - area.y - 12 : area.y + area.h - (anchor.y + anchor.h) - 12;
+  return Math.max(80, Math.floor(room));
+}
+
 // A ProgressBar: the filled part for value (0..1; null or undefined for indeterminate). Determinate: from the start
 // edge to the value ({ from: 0, to }). Indeterminate: a band a third of the bar wide that slides across and comes back
 // in at the start, at time ms (period: one pass); with reduced motion it stays still over the whole bar

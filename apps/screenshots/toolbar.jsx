@@ -11,7 +11,7 @@
 // one the keyboard is on, ↓ on Options opens it and ↑ ↓ go through its rows.
 import {
   View, Text, Tooltip, Popover, DisclosureGlyph, useTheme, useStore, useSettings, useSound, microphones, useAppWindow,
-  wm, windows, addListener, screenDisplays, placeFloatingBar, rememberFloatingBar, direction, t as tr,
+  wm, windows, addListener, screenDisplays, displayAt, workAreaOf, placeFloatingBar, rememberFloatingBar, direction, ScrollView, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
 import { APP, bar, recent, setOptions } from './state.js';
@@ -176,14 +176,19 @@ function MenuRow({ row, lit, onPick }) {
   );
 }
 
-function OptionsMenu({ anchor, rows }) {
+// The menu stays inside the work area of the display the bar is on (the bar's own frame is only as tall as the bar):
+// above the bar when there is more room there, and scrolling when even that side is too short.
+function OptionsMenu({ anchor, rows, frame }) {
   const b = useStore(bar);
   const pick = (row) => { row.run(); if (!row.keep) bar.set({ menu: false, page: 'main', lit: -1 }); };
+  const area = frame ? workAreaOf(displayAt(frame.x + frame.w / 2, frame.y + frame.h / 2)) : null;
   return (
-    <Popover anchor={anchor} width={280} padding={5} onClose={() => bar.set({ menu: false, page: 'main', lit: -1 })}>
-      <View style={{ gap: 0 }} onMouseMove={() => { if (b.lit >= 0) bar.set({ lit: -1 }); }}>
-        {rows.map((row, i) => <MenuRow key={row.key || `${i}`} row={row} lit={b.lit === i} onPick={pick} />)}
-      </View>
+    <Popover anchor={anchor} width={280} padding={5} area={area} onClose={() => bar.set({ menu: false, page: 'main', lit: -1 })}>
+      <ScrollView style={{ flexShrink: 1, minHeight: 0 }} resetKey={b.page}>
+        <View style={{ gap: 0 }} onMouseMove={() => { if (b.lit >= 0) bar.set({ lit: -1 }); }}>
+          {rows.map((row, i) => <MenuRow key={row.key || `${i}`} row={row} lit={b.lit === i} onPick={pick} />)}
+        </View>
+      </ScrollView>
     </Popover>
   );
 }
@@ -268,7 +273,7 @@ export function Toolbar({ actions }) {
           backgroundColor: rec ? '#ff453a' : th.accent || '#0a84ff', border: `2px solid ${ring('primary') ? '#fff' : 'transparent'}` }}>
         <Text style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap' }}>{primLabel}</Text>
       </View>
-      {b.menu ? <OptionsMenu anchor={optRef} rows={rows} /> : null}
+      {b.menu ? <OptionsMenu anchor={optRef} rows={rows} frame={me?.pip} /> : null}
     </View>
   );
 }

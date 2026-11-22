@@ -1086,6 +1086,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **The Screenshots bar's Options menu opened below the bar, off the bottom of the screen.** The bar sits near the
+  bottom of the screen in a bare floating window only as tall as the bar, and the menu chose its side by that window, so
+  it always opened downward. A `Popover` can now be given an `area` (a screen box) in place of the window: the bar passes
+  the work area of the display it is on, so the menu opens above the bar when there is more room there, moves sideways
+  to stay on that display, and is never taller than the room on its side (`popoverRoom` in `sdk/controlmodel.js`); the
+  rows scroll when even that is too short, for example on a small screen with the bar dragged to the middle. Other
+  popovers keep their behaviour. Tests: `control_model_test.mjs` (the room above a bar near the bottom, below a control
+  near the top, a second display) and the toolbar scene.
 - **The Timer desktop widget fits its card at every size and in every language, in development**
   (`sdk/deskwidgets.jsx` TimerBody, new `sdk/timerwidgetmodel.js`; `server/tests/timer_widget_test.mjs`,
   `server/tests/workspaces_scene.mjs`). At the small size (one 170 px cell) and on the timer half of the medium one,

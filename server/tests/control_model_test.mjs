@@ -1,7 +1,7 @@
 // control_model_test.mjs — (0.8.8.8) the keys of the SDK's choice controls (sdk/controlmodel.js): Tabs and a radio
 // group (going round, skipping disabled ones, right to left), a Dropdown open and closed, the wheel on a slider or a
 // stepper, where a tooltip goes so it never covers the pointer, and the band of an indeterminate progress bar.
-import { groupKey, dropdownKey, wheelValue, tipSide, progressSpan, disclosureDir, chevronGeometry, DISCLOSURE_SIZE, DISCLOSURE_BOX } from '../../sdk/controlmodel.js';
+import { groupKey, dropdownKey, wheelValue, tipSide, popoverRoom, progressSpan, disclosureDir, chevronGeometry, DISCLOSURE_SIZE, DISCLOSURE_BOX } from '../../sdk/controlmodel.js';
 
 let ok = 0, bad = 0;
 const eq = (label, got, want) => {
@@ -65,6 +65,15 @@ eq('below the control', tipSide({ x: 100, y: 100, w: 40, h: 28 }, size, area), '
 eq('above near the bottom edge', tipSide({ x: 100, y: 570, w: 40, h: 28 }, size, area), 'above');
 eq('above when the pointer is where it would go', tipSide({ x: 100, y: 100, w: 40, h: 28 }, size, area, { x: 150, y: 140 }), 'above');
 eq('below when the pointer is elsewhere', tipSide({ x: 100, y: 100, w: 40, h: 28 }, size, area, { x: 400, y: 400 }), 'below');
+
+// popoverRoom: the Screenshots bar's Options menu (a bar 50 px tall near the bottom of a 1920×1080 work area that ends at
+// 1010 above the Dock) gets the room above the bar, not the bar's own height
+const work = { x: 0, y: 25, w: 1920, h: 985 };
+const opt = { x: 1200, y: 918, w: 90, h: 34 };
+eq('room above a bar near the bottom', popoverRoom(opt, work, true), 918 - 25 - 12);
+eq('room below it is the floor (80)', popoverRoom(opt, work, false), 80);
+eq('room below a control near the top', popoverRoom({ x: 0, y: 40, w: 90, h: 34 }, work, false), 25 + 985 - 74 - 12);
+eq('second display offset', popoverRoom({ x: 2000, y: 900, w: 90, h: 34 }, { x: 1920, y: 0, w: 1280, h: 1024 }, true), 900 - 12);
 eq('no room either side: below unless it covers the pointer', tipSide({ x: 0, y: 10, w: 40, h: 570 }, size, area), 'below');
 eq('with no area it goes below', tipSide({ x: 0, y: 0, w: 10, h: 10 }, size, null), 'below');
 
