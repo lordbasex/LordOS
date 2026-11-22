@@ -15,7 +15,7 @@ import {
 import { useEffect, useRef } from 'react';
 import { ClipAskBar } from './clipask.jsx';
 import { menus } from './ui.jsx';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, iconsToAsk, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune } from './model.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, iconsToAsk, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune, guestKeys, guestMayTakeFront } from './model.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
@@ -132,6 +132,10 @@ function sync(dir, sid, mid, name, list, gw, gh) {
     wm.close(x.winId, true);
     windowPixelIcons.set((m) => { if (!(x.winId in m)) return m; const n = { ...m }; delete n[x.winId]; return n; });
   }
+  // a window the guest opens or brings back takes the front only while the person is in this machine; otherwise it goes
+  // behind the window in front, which keeps the keyboard (model.js guestMayTakeFront: no focus stealing from a Terminal)
+  const front = wm.focused();
+  const keep = guestMayTakeFront(front ? wm.get(front) : null, dir) ? null : front;
   // bottom first, so the guest's front window ends up in front here too
   for (const w of [...plan.open].reverse()) {
     const instance = guestInstance(mid, w.id);
@@ -153,7 +157,8 @@ function sync(dir, sid, mid, name, list, gw, gh) {
     x.minimized = true;
     wm.minimize(x.winId);
   }
-  for (const w of plan.restore) { const x = have.get(w.id); if (x) { x.minimized = false; wm.focus(x.winId); } }
+  for (const w of plan.restore) { const x = have.get(w.id); if (x) { x.minimized = false; if (keep) wm.raise(x.winId); else wm.focus(x.winId); } }
+  if (keep && wm.get(keep) && wm.focused() !== keep) wm.raise(keep);
   for (const w of plan.follow) {
     const x = have.get(w.id);
     if (!x) continue;
@@ -305,9 +310,12 @@ export function GuestWindow({ dir, gid }) {
   useEffect(() => {
     if (!focused || !g?.sid) return undefined;
     const sid = g.sid;
+    // each key asks whether this window has the keyboard now (wm.hasKeyboard; model.js guestKeys): never a key typed in
+    // another window, a search or a system prompt; a release only for a press that went to the guest
+    const gk = guestKeys({ send: (c, v) => lord.vm.key(sid, c, v), owns: () => wm.hasKeyboard(winId), release: () => lord.vm.release(sid) });
     // while the clipboard's bar asks, the keys are the bar's; while a menu of ours is open (the status item's search), the menu's
-    const ka = addListener('keydown', (e) => { if (!(e.code > 0) || gref.current?.ask || menus.open > 0) return; e.preventDefault?.(); lord.vm.key(sid, e.code, 1); });
-    const kb = addListener('keyup', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 0); });
+    const ka = addListener('keydown', (e) => { if (!(e.code > 0) || gref.current?.ask || menus.open > 0) return; if (gk.down(e.code)) e.preventDefault?.(); });
+    const kb = addListener('keyup', (e) => { gk.up(e.code); });
     const kc = addListener('pointerup', (e) => {
       if (!buttons.current.has(e.button)) return;
       buttons.current.delete(e.button);

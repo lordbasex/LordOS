@@ -294,5 +294,18 @@ eq('notice: not a window with an app id, a title, a parent, a dialog or X11', [
   eq('grid: an unknown window stays', M.gridNeighbor(P, ids, 'x', 'down'), 'x');
 }
 
+// the keyboard of a LordOS window (wm.hasKeyboard): only the front window, never a full-screen window under another
+// window brought forward, never while a shell surface (search, a system prompt) has it
+{
+  const kw = M.keyboardWindow;
+  const ws = [win('vm', 1, { fullscreen: true }), win('term', 1)];
+  eq('keyboard: the Terminal in front, not the full-screen machine behind it', kw(ws, 1, false), 'term');
+  eq('keyboard: the full-screen machine in front', kw([ws[1], ws[0]], 1, false), 'vm');
+  eq('keyboard: no window while a system prompt has it', kw(ws, 1, true), null);
+  eq('keyboard: never a window of a hidden desktop', kw([win('vm', 2), win('term', 2)], 1, false), null);
+  eq('keyboard: never picture-in-picture', kw([win('term', 1), win('pop', 1, { pip: { x: 0 } })], 1, false), 'term');
+  eq('keyboard: never a minimized window', kw([win('term', 1), win('vm', 1, { minimized: true })], 1, false), 'term');
+}
+
 if (bad) { console.error(`desktop-model-test: ${bad} of ${n} failed`); process.exit(1); }
 console.log(`desktop-model-test: ${n} checks passed`);

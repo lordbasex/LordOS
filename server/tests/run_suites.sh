@@ -629,6 +629,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "list-scene (sdk/lists.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs list_scene.mjs
     else skip "list-scene" "node and the repository's node_modules (npm install)"; fi
+    # (security) a key typed while another window, a full-screen window's neighbour or a system prompt has the keyboard
+    # never reaches a virtual machine's guest (wm.hasKeyboard, AppHost, apps/machines/model.js guestKeys)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "vm-keys-scene (sdk/components.jsx AppHost, sdk/windows.js hasKeyboard, apps/machines guestKeys)" node tests/focus_scene_test.mjs vm_keys_scene.mjs
+    else skip "vm-keys-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) menus from the keyboard in both themes: arrows, type-ahead, submenus, the hover pause, F10 and ⌥ alone
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menu-keys-test (themes/default Menu, themes/classic Menu, sdk/shortcuts.js)" node tests/menu_keys_test.mjs
