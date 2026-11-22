@@ -327,7 +327,7 @@ export function Configure({ dir, section: section0, onClose }) {
           Not with an Intel graphics card: HWCursor is the virtio driver's, and Intel's puts the pointer on the vGPU's cursor
           plane, which LordOS always draws */}
       {gpuRow}
-      {m.windowsDevices && !cur.gpu ? <Row label={tr('machines.cfg.pointer')} last note={[tr('machines.cfg.pointerNote'), offNote].filter(Boolean).join(' ')}>
+      {m.windowsDevices && !cur.gpu ? <Row label={tr('machines.cfg.pointerDraw')} last note={[tr('machines.cfg.pointerDrawNote'), offNote].filter(Boolean).join(' ')}>
         <Off off={running}><Segmented small value={cur.pointer} onChange={(x) => set({ pointer: x })}
           options={[['lordos', tr('machines.cfg.pointerLordos')], ['guest', tr('machines.cfg.pointerGuest')]]} /></Off>
       </Row> : null}
