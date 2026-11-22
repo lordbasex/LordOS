@@ -224,7 +224,8 @@ struct Surf {
     struct wl_resource *sobj;
     SobjPoint p_acq, p_rel, rel;
     SobjQueue sq;
-    struct wl_event_source *sq_src, *sq_timer, *sq_poll;   /* sq_poll: past the session's eventfds, a timer */
+    struct wl_event_source *sq_src, *sq_timer;
+    int sq_polling;                 /* past the session's eventfds: in sobj_polls, checked by one shared timer */
     int sq_fd, sq_logged;
 };
 
@@ -1175,8 +1176,20 @@ static int sobj_process_waits(const SobjClient *k) {
     return n;
 }
 
+/* Surfaces whose first queued commit waits by polling (the session's eventfds are taken): at most SOBJ_MAX_POLLS, all
+ * checked by one timer every SOBJ_POLL_MS. Each counts as one of its client's waits, like an eventfd. */
+static Surf *sobj_polls[SOBJ_MAX_POLLS];
+static int sobj_npolls;
+static struct wl_event_source *sobj_poll_timer;
+
 static void sq_disarm(Surf *s) {
-    if (s->sq_poll) { wl_event_source_remove(s->sq_poll); s->sq_poll = NULL; }
+    if (s->sq_polling) {
+        for (int i = 0; i < sobj_npolls; i++)
+            if (sobj_polls[i] == s) { sobj_polls[i] = sobj_polls[--sobj_npolls]; break; }
+        s->sq_polling = 0;
+        SobjClient *k = sobj_client_find(s->client);
+        if (k) k->waits--;
+    }
     if (s->sq_src) {
         wl_event_source_remove(s->sq_src);
         s->sq_src = NULL;
@@ -1209,13 +1222,21 @@ static int sq_slow(void *data) {
     return 0;
 }
 
-/* the session's eventfds are all taken (by others): the point is checked every SOBJ_POLL_MS, without blocking */
-static int sq_polled(void *data) {
-    Surf *s = data;
-    Pend *e = sobjq_front(&s->sq);
-    if (e && e->acq.tl && sobj_signalled(e->acq) != 1) { wl_event_source_timer_update(s->sq_poll, SOBJ_POLL_MS); return 0; }
-    sq_disarm(s);
-    sq_drain(s);
+/* the shared timer: every polling surface's point checked once (a bounded batch: at most SOBJ_MAX_POLLS, without
+ * blocking); the ready ones are applied, and it is re-armed while any still wait */
+static int sobj_polled(void *data) {
+    (void)data;
+    Surf *ready[SOBJ_MAX_POLLS];
+    int n = 0;
+    for (int i = 0; i < sobj_npolls; i++) {
+        Pend *e = sobjq_front(&sobj_polls[i]->sq);
+        if (!e || !e->acq.tl || sobj_signalled(e->acq) == 1) ready[n++] = sobj_polls[i];
+    }
+    for (int i = 0; i < n; i++) {           /* (applying never destroys a surface; it may queue one again) */
+        sq_disarm(ready[i]);
+        sq_drain(ready[i]);
+    }
+    if (sobj_npolls && sobj_poll_timer) wl_event_source_timer_update(sobj_poll_timer, SOBJ_POLL_MS);
     return 0;
 }
 
@@ -1228,9 +1249,14 @@ static int sq_arm(Surf *s, Pend *e) {
     int mode = sobj_wait_mode(k->waits, sobj_waits >= SOBJ_MAX_WAITS ? sobj_process_waits(k) : 0, sobj_waits);
     if (mode == SOBJ_WAIT_REFUSE) return -2;
     if (mode == SOBJ_WAIT_POLL) {
-        s->sq_poll = wl_event_loop_add_timer(loop, sq_polled, s);
-        if (!s->sq_poll) return -1;
-        wl_event_source_timer_update(s->sq_poll, SOBJ_POLL_MS);
+        /* the session's polls are taken too (many processes, each within its share): applied as it is, as when the
+         * kernel refuses an eventfd; never a disconnection for what others hold */
+        if (sobj_npolls >= SOBJ_MAX_POLLS) return -1;
+        if (!sobj_poll_timer && !(sobj_poll_timer = wl_event_loop_add_timer(loop, sobj_polled, NULL))) return -1;
+        if (!sobj_npolls) wl_event_source_timer_update(sobj_poll_timer, SOBJ_POLL_MS);
+        sobj_polls[sobj_npolls++] = s;
+        s->sq_polling = 1;
+        k->waits++;
         static int told;
         if (!told++) fprintf(stderr, "wayland: explicit sync: the session's %d waits are taken; a frame's point is checked every %d ms\n",
                              SOBJ_MAX_WAITS, SOBJ_POLL_MS);
@@ -1267,7 +1293,7 @@ static void sq_apply(Surf *s, Pend *e) {
 /* Applies the queued commits whose acquire point is signalled, in order, up to the first one that still waits */
 static void sq_drain(Surf *s) {
     Pend *e;
-    while (!s->sq_src && !s->sq_poll && (e = sobjq_front(&s->sq))) {
+    while (!s->sq_src && !s->sq_polling && (e = sobjq_front(&s->sq))) {
         if (e->acq.tl && sobj_signalled(e->acq) != 1) {
             int r = sq_arm(s, e);
             if (r == 0) return;

@@ -32,6 +32,7 @@
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <dirent.h>
 #include <drm/drm.h>
@@ -391,6 +392,53 @@ static void check_limit(void) {
  * asks for one more. */
 #define FAIR_CONNS 4
 #define FAIR_SURFS 32
+
+/* Another process with n surfaces waiting on points never signalled, each with a release timeline of its own: it
+ * reports how many frames were applied anyway (no wait left for them: the copied buffer's release point signalled) and whether it was disconnected, then keeps its connection until
+ * it is ended (waiter_end). */
+typedef struct { pid_t pid; int applied, gone; } Waiter;
+static Waiter waiter(int n) {
+    Waiter w = { -1, -1, -1 };
+    int res[2];
+    if (pipe(res)) return w;
+    w.pid = fork();
+    if (w.pid == 0) {
+        close(res[0]);
+        int r[2] = { -1, 1 };
+        if (!connect_wl() && som) {
+            Tl acq = tl_new(), rel[40];
+            Buf *b = dmabuf_new(0xff203040);
+            for (int i = 0; i < n && i < 40; i++) {
+                rel[i] = tl_new();
+                struct wl_surface *s = wl_compositor_create_surface(comp);
+                struct wp_linux_drm_syncobj_surface_v1 *so = wp_linux_drm_syncobj_manager_v1_get_surface(som, s);
+                wl_surface_attach(s, b->b, 0, 0);
+                wp_linux_drm_syncobj_surface_v1_set_acquire_point(so, acq.t, 0, 1);
+                wp_linux_drm_syncobj_surface_v1_set_release_point(so, rel[i].t, 0, 1);
+                wl_surface_commit(s);
+            }
+            pump(500, NULL);
+            r[0] = 0;
+            for (int i = 0; i < n && i < 40; i++) r[0] += tl_wait(rel[i], 1, 0);
+            r[1] = wl_display_get_error(dpy) != 0;
+        }
+        if (write(res[1], r, sizeof r) != sizeof r) _exit(1);
+        close(res[1]);
+        for (;;) pause();
+    }
+    close(res[1]);
+    int r[2] = { -1, -1 };
+    if (read(res[0], r, sizeof r) != sizeof r) r[0] = r[1] = -1;
+    close(res[0]);
+    w.applied = r[0];
+    w.gone = r[1];
+    return w;
+}
+static void waiter_end(Waiter *w) {
+    if (w->pid > 0) { kill(w->pid, SIGKILL); waitpid(w->pid, NULL, 0); }
+    w->pid = -1;
+}
+
 static void check_fair(void) {
     struct wl_display *a[FAIR_CONNS + 1];
     for (int c = 0; c < FAIR_CONNS; c++) {
@@ -435,6 +483,25 @@ static void check_fair(void) {
     int st = 0;
     waitpid(pid, &st, 0);
     CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 0, "fair: the other app failed (status %d)", st);
+    /* polling waits count like eventfds: a process can't make more than its own 32 (the 33rd disconnects it) */
+    Waiter c = waiter(33);
+    CHECK(c.gone == 1, "fair: a process got 33 polling waits on one connection (gone %d)", c.gone);
+    waiter_end(&c);
+    pump(300, NULL);
+    /* and the session's polls are bounded (64): three processes of 31 each, all within their share: the first 64
+     * wait, the rest are applied as they are (implicit sync), and nobody is disconnected */
+    Waiter p[3];
+    int applied = 0, gone = 0;
+    for (int i = 0; i < 3; i++) {
+        p[i] = waiter(31);
+        applied += p[i].applied;
+        gone += p[i].gone;
+    }
+    CHECK(gone == 0, "fair: %d processes within their share were disconnected", gone);
+    CHECK(applied == 3 * 31 - 64, "fair: %d frames applied past the session's polls (want %d)", applied, 3 * 31 - 64);
+    for (int i = 0; i < 3; i++) waiter_end(&p[i]);
+    pump(300, NULL);
+    if (!failed) printf("fair: polling waits capped: 33 on one connection disconnects it; 3 processes of 31: 64 wait, %d applied as they are, none disconnected\n", applied);
     /* the flooding app asks for one more wait on a new connection: it alone is disconnected */
     connect_wl();
     a[FAIR_CONNS] = dpy;
