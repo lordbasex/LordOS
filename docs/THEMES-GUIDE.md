@@ -53,6 +53,7 @@ its own layout (for example what the Super key alone does).
 | Lord Flow | `themes/default` | menu bar on top (with the app's menus), magnifying Dock, app launcher, Control Center |
 | Lord Classic | `themes/classic` | taskbar (bottom, top or a side), start menu with search, quick settings, notification panel, menus in each window, snapping and the SDK's Overview |
 | Lord Workspaces (in development) | `themes/workspaces` | activities (desktops with an icon, a colour, pinned apps and a layout per display), a Context Spine, group frames with static tiling, its own Search panel and Control Center, menus in each window, three effects styles ([WORKSPACES.md](WORKSPACES.md)) |
+| Lord Celeste (community, in development) | `themes/celeste` | a frame around each display with rounded inner corners, a bar on its thick side (running apps, status items, privacy indicators, clock), drawers that slide out of the frame's edges (dashboard, launcher, session, sidebar with the notifications), menus in each window, mirrored right to left; the theme options of `theme.json` and a node-tested geometry (`model.js`). Layout inspired by Caelestia (caelestia-dots/shell); no code from it |
 
 `themes/greeter` is the login and lock screen: it is a separate program, not a desktop theme (see
 [The login and lock screen](#the-login-and-lock-screen-are-not-your-theme)).
@@ -109,6 +110,9 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
     (the theme then uses `flowDesktopKeys` and `flowGrabs()`).
 
   Lord Workspaces' `theme.json` uses all three.
+- A community theme (one LordOS didn't design, such as Lord Celeste) also says so in its `theme.json`:
+  `"community": true`, `"author"` (who made it) and `"license"` (an SPDX id), and credits any work it was inspired by in
+  `THIRD_PARTY.md`. Settings doesn't read these fields yet; they are data for the Appearance gallery.
 
 ### `tokens.js`: the contract with the apps
 

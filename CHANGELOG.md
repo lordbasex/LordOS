@@ -10,6 +10,33 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Lord Celeste, a community theme** (`themes/celeste`, in development; not part of a release yet). A frame around each
+  display with rounded inner corners, a bar on its thick side and drawers that slide out of its edges: a dashboard on
+  top (the date, a month calendar, CPU, memory, battery and what is playing, with Media and Performance tabs), the app
+  launcher at the bottom (apps, `=` a calculator, `>` the theme's actions), a session drawer and a sidebar at the end
+  edge (Wi-Fi, Bluetooth, Do Not Disturb, Night Light, volume, brightness and the notifications with their buttons).
+  The layout is inspired by Caelestia (caelestia-dots/shell, GPL-3.0); no code or assets come from it, and the theme is
+  MIT (`THIRD_PARTY.md`). Its `theme.json` marks it `community: true` with its author pending confirmation. Made to
+  follow the theme rules (`docs/THEMES-GUIDE.md`): the system's notification banners are left alone (sticky alarms
+  and the code-signature notice behave as in Lord Flow); the bar shows the camera, microphone and screen indicators,
+  the apps' status items and the running apps (a click brings one forward or back from minimized, a right click opens
+  its Dock menu); an app's menus are in a strip under its title bar with Window and Help, and a right click on the
+  title opens the app menu and the Window menu; restart and shut down go through the system's confirmation and log
+  out asks first; every text is translated into the 35 languages; the frame, bar and drawers are mirrored in
+  right-to-left languages; dark and light modes, transparency off and reduce motion; a frame and a bar on every display unless
+  Settings → Desktop & Dock → "Show the menu bar on every display" is off or the displays are mirrored, and each
+  display's own wallpaper. Its options are in Settings → Appearance: colour scheme (Lavender, Rose, Sky, Mint, Sand),
+  frame (Clear, Glass, Solid, Opaque), the hover edges (off-able; small zones pushed against the screen's edge, with
+  a longer wait for the session drawer) and a wallpaper change effect (None, Fade, Curtain, Blinds, Shutter, Zoom).
+  The clock and the network status each share one timer (1 s and 5 s) and redraw only their own part; drawers and the
+  wallpaper effect animate with `lord.setStyle`, without a React render per frame. Tests:
+  `server/tests/celeste_model_test.mjs` (geometry, mirrored frame, hover zones, the calculator, `theme.json`'s options)
+  in `make test`, and `theme_cost_scene.mjs` now measures it too (426 native calls on the first render and 312 timer
+  wake-ups a minute at rest, against Lord Flow's 465 and 330). Seen in headless sessions on the development machine in
+  dark, light and Arabic; not yet on a real session with real monitors, a Linux app's own bar or the GPU path.
+
 ### Fixed
 
 - **Flatpak's Spawn portal compares fd handles as unsigned numbers** (`server/src/fpspawn.c`): a handle of 2³¹ or more read
