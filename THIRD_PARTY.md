@@ -14,6 +14,7 @@ the components below, each under its own license.
 | EFF large wordlist, SecLists common passwords | passphrase generator, weak-password check | CC BY 3.0 (EFF), MIT (SecLists, `third_party/wordlists/LICENSE-SecLists`) |
 | `pointer-warp-v1.xml` from wayland-protocols 1.45 (`staging/pointer-warp`, commit `b3f29d8a41320a9231587835ee5e485f4a5f6eba`; Debian 13 ships 1.44 without it), in `server/protocols/`, unmodified | `wp_pointer_warp_v1` (wayland-scanner generates the code) | MIT (copyright notice in the file) |
 | wayland-protocols 1.50: `ext-background-effect-v1.xml`, `xdg-session-management-v1.xml` (in `server/protocols/`, unchanged; newer than Debian 13's 1.44) | protocol descriptions wayland-scanner turns into code for lord-server | MIT (the notice is in each file) |
+| KDE's `server-decoration.xml` (plasma-wayland-protocols, as shipped in the KDE Platform 6.11 runtime; SHA-256 `c5f857734bb190dc9adfb65fb05550a6245f12af1a2be5eefd05be199805a68c`), in `third_party/plasma-wayland-protocols/`, unmodified | only the Wayland conformance tool's test client (`tools/wl-conformance.mjs` runs wayland-scanner on it); lord-server's `org_kde_kwin_server_decoration_manager` stays hand-written in `wl.c` | LGPL-2.1-or-later (`third_party/plasma-wayland-protocols/LGPL-2.1.txt`; the notice is in the file) |
 
 ## Fetched at build time (`third_party/audiocpp`, ignored by git)
 

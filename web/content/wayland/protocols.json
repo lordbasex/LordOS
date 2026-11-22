@@ -30,7 +30,7 @@
  },
  "conformance": {
   "date": "2026-11-22",
-  "commit": "de240de5",
+  "commit": "0d24bb85",
   "dirty": true,
   "tool": "tools/wl-conformance.mjs",
   "schema": 1,
@@ -42,7 +42,7 @@
   },
   "summary": {
    "protocols": 48,
-   "complete": 29,
+   "complete": 48,
    "mean": 100,
    "x11Items": 28,
    "x11Complete": 23,
@@ -55,10 +55,10 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 15,
-    "total": 15,
+    "points": 42,
+    "total": 42,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -79,10 +79,10 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 12,
-    "total": 12,
-    "skipped": 1,
-    "depth": "partial",
+    "points": 32,
+    "total": 32,
+    "skipped": 0,
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -115,10 +115,10 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 5,
-    "total": 5,
+    "points": 20,
+    "total": 20,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -139,10 +139,10 @@
     "version": 9,
     "advertised": true,
     "score": 100,
-    "points": 109,
-    "total": 109,
-    "skipped": 1,
-    "depth": "partial",
+    "points": 116,
+    "total": 116,
+    "skipped": 0,
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -189,11 +189,13 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 118,
-    "total": 118,
+    "points": 236,
+    "total": 236,
     "skipped": 0,
-    "depth": "general",
-    "proofs": []
+    "depth": "complete",
+    "proofs": [
+     "xdg_system_bell_v1-wp_color_manager_v1-foot"
+    ]
    },
    {
     "global": "wp_color_representation_manager_v1",
@@ -201,10 +203,10 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 19,
-    "total": 19,
+    "points": 58,
+    "total": 58,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -213,11 +215,13 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 18,
-    "total": 18,
+    "points": 39,
+    "total": 39,
     "skipped": 0,
-    "depth": "general",
-    "proofs": []
+    "depth": "complete",
+    "proofs": [
+     "wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube"
+    ]
    },
    {
     "global": "wp_content_type_manager_v1",
@@ -225,10 +229,10 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 15,
-    "total": 15,
+    "points": 24,
+    "total": 24,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -249,10 +253,10 @@
     "version": 1,
     "advertised": false,
     "score": 100,
-    "points": 43,
-    "total": 43,
+    "points": 82,
+    "total": 82,
     "skipped": 0,
-    "depth": "code",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -261,11 +265,13 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 19,
-    "total": 19,
+    "points": 34,
+    "total": 34,
     "skipped": 0,
-    "depth": "general",
-    "proofs": []
+    "depth": "complete",
+    "proofs": [
+     "wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube"
+    ]
    },
    {
     "global": "wp_fractional_scale_manager_v1",
@@ -285,11 +291,13 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 31,
-    "total": 31,
+    "points": 76,
+    "total": 76,
     "skipped": 0,
-    "depth": "general",
-    "proofs": []
+    "depth": "complete",
+    "proofs": [
+     "wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube"
+    ]
    },
    {
     "global": "wp_pointer_warp_v1",
@@ -297,10 +305,10 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 8,
-    "total": 8,
+    "points": 20,
+    "total": 20,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -345,10 +353,10 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 15,
-    "total": 15,
+    "points": 27,
+    "total": 27,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -383,10 +391,10 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 44,
-    "total": 44,
+    "points": 95,
+    "total": 95,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -395,11 +403,13 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 8,
-    "total": 8,
+    "points": 26,
+    "total": 26,
     "skipped": 0,
-    "depth": "general",
-    "proofs": []
+    "depth": "complete",
+    "proofs": [
+     "xdg_system_bell_v1-wp_color_manager_v1-foot"
+    ]
    },
    {
     "global": "xdg_toplevel_drag_manager_v1",
@@ -407,10 +417,10 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 17,
-    "total": 17,
+    "points": 44,
+    "total": 44,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -431,10 +441,10 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 11,
-    "total": 11,
+    "points": 32,
+    "total": 32,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -471,10 +481,10 @@
     "version": 1,
     "advertised": false,
     "score": 100,
-    "points": 15,
-    "total": 15,
+    "points": 42,
+    "total": 42,
     "skipped": 0,
-    "depth": "code",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -531,8 +541,8 @@
     "version": 3,
     "advertised": true,
     "score": 100,
-    "points": 39,
-    "total": 39,
+    "points": 45,
+    "total": 45,
     "skipped": 0,
     "depth": "complete",
     "proofs": []
@@ -555,8 +565,8 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 14,
-    "total": 14,
+    "points": 16,
+    "total": 16,
     "skipped": 0,
     "depth": "complete",
     "proofs": []
@@ -567,10 +577,10 @@
     "version": 2,
     "advertised": true,
     "score": 100,
-    "points": 156,
-    "total": 156,
+    "points": 201,
+    "total": 201,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "proofs": []
    },
    {
@@ -974,6 +984,22 @@
     "shows": "vkcube through the Vulkan WSI: its buffers pass the new zwp_linux_buffer_params_v1 out_of_bounds checks (offset + stride × height inside each dmabuf)."
    },
    {
+    "id": "wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube",
+    "png": "wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube.png",
+    "kind": "wayland",
+    "app": "vkcube (Vulkan)",
+    "version": "vkcube 1.4.304.0+dfsg1-1, Mesa 25.0.7-2+deb13u1",
+    "shows": "vkcube's FIFO present mode through Mesa's Vulkan WSI on the new protocols: every frame waits on the fifo-v1 barrier the one before set, carries a commit-timing-v1 target time, and explicit-sync acquire and release points (linux-drm-syncobj-v1) on timelines it imported; no protocol error."
+   },
+   {
+    "id": "xdg_system_bell_v1-wp_color_manager_v1-foot",
+    "png": "xdg_system_bell_v1-wp_color_manager_v1-foot.png",
+    "kind": "wayland",
+    "app": "foot",
+    "version": "foot 1.21.0-2",
+    "shows": "foot rang the terminal bell (BEL) through xdg-system-bell-v1 (its default bell.system=yes), on its own surface (LordOS plays its alert sound unless Do Not Disturb is on), and described its surfaces as sRGB through color-management-v1 (a parametric image description set on each). No protocol error."
+   },
+   {
     "id": "egl-es2gears",
     "png": "egl-es2gears.png",
     "kind": "wayland",
@@ -1201,10 +1227,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 109,
-    "total": 109,
-    "skipped": 1,
-    "depth": "partial",
+    "points": 116,
+    "total": 116,
+    "skipped": 0,
+    "depth": "complete",
     "globals": [
      "wl_seat"
     ],
@@ -1302,10 +1328,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 5,
-    "total": 5,
+    "points": 20,
+    "total": 20,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "wl_fixes"
     ],
@@ -1473,10 +1499,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 156,
-    "total": 156,
+    "points": 201,
+    "total": 201,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "zwp_tablet_manager_v2"
     ],
@@ -1539,10 +1565,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 43,
-    "total": 43,
+    "points": 82,
+    "total": 82,
     "skipped": 0,
-    "depth": "code",
+    "depth": "complete",
     "globals": [
      "wp_drm_lease_device_v1"
     ],
@@ -1572,14 +1598,16 @@
    },
    "conf": {
     "score": 100,
-    "points": 31,
-    "total": 31,
+    "points": 76,
+    "total": 76,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "wp_linux_drm_syncobj_manager_v1"
     ],
-    "proofs": []
+    "proofs": [
+     "wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube"
+    ]
    }
   },
   {
@@ -1661,10 +1689,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 15,
-    "total": 15,
+    "points": 24,
+    "total": 24,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "wp_content_type_manager_v1"
     ],
@@ -1774,10 +1802,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 15,
-    "total": 15,
+    "points": 27,
+    "total": 27,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "wp_tearing_control_manager_v1"
     ],
@@ -1807,10 +1835,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 15,
-    "total": 15,
+    "points": 42,
+    "total": 42,
     "skipped": 0,
-    "depth": "code",
+    "depth": "complete",
     "globals": [
      "xwayland_shell_v1"
     ],
@@ -1985,10 +2013,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 17,
-    "total": 17,
+    "points": 44,
+    "total": 44,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "xdg_toplevel_drag_manager_v1"
     ],
@@ -2117,14 +2145,16 @@
    },
    "conf": {
     "score": 100,
-    "points": 18,
-    "total": 18,
+    "points": 39,
+    "total": 39,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "wp_commit_timing_manager_v1"
     ],
-    "proofs": []
+    "proofs": [
+     "wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube"
+    ]
    }
   },
   {
@@ -2173,14 +2203,16 @@
    },
    "conf": {
     "score": 100,
-    "points": 19,
-    "total": 19,
+    "points": 34,
+    "total": 34,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "wp_fifo_manager_v1"
     ],
-    "proofs": []
+    "proofs": [
+     "wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube"
+    ]
    }
   },
   {
@@ -2206,14 +2238,16 @@
    },
    "conf": {
     "score": 100,
-    "points": 8,
-    "total": 8,
+    "points": 26,
+    "total": 26,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "xdg_system_bell_v1"
     ],
-    "proofs": []
+    "proofs": [
+     "xdg_system_bell_v1-wp_color_manager_v1-foot"
+    ]
    }
   },
   {
@@ -2262,14 +2296,16 @@
    },
    "conf": {
     "score": 100,
-    "points": 118,
-    "total": 118,
+    "points": 236,
+    "total": 236,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "wp_color_manager_v1"
     ],
-    "proofs": []
+    "proofs": [
+     "xdg_system_bell_v1-wp_color_manager_v1-foot"
+    ]
    }
   },
   {
@@ -2295,10 +2331,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 19,
-    "total": 19,
+    "points": 58,
+    "total": 58,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "wp_color_representation_manager_v1"
     ],
@@ -2328,10 +2364,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 11,
-    "total": 11,
+    "points": 32,
+    "total": 32,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "xdg_toplevel_tag_manager_v1"
     ],
@@ -2361,10 +2397,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 8,
-    "total": 8,
+    "points": 20,
+    "total": 20,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "wp_pointer_warp_v1"
     ],
@@ -2394,10 +2430,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 15,
-    "total": 15,
+    "points": 42,
+    "total": 42,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "ext_background_effect_manager_v1"
     ],
@@ -2427,10 +2463,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 44,
-    "total": 44,
+    "points": 95,
+    "total": 95,
     "skipped": 0,
-    "depth": "general",
+    "depth": "complete",
     "globals": [
      "xdg_session_manager_v1"
     ],
@@ -2857,8 +2893,8 @@
    },
    "conf": {
     "score": 100,
-    "points": 39,
-    "total": 39,
+    "points": 45,
+    "total": 45,
     "skipped": 0,
     "depth": "complete",
     "globals": [
@@ -2923,8 +2959,8 @@
    },
    "conf": {
     "score": 100,
-    "points": 14,
-    "total": 14,
+    "points": 16,
+    "total": 16,
     "skipped": 0,
     "depth": "complete",
     "globals": [
@@ -3826,10 +3862,10 @@
    },
    "conf": {
     "score": 100,
-    "points": 12,
-    "total": 12,
-    "skipped": 1,
-    "depth": "partial",
+    "points": 32,
+    "total": 32,
+    "skipped": 0,
+    "depth": "complete",
     "globals": [
      "org_kde_kwin_server_decoration_manager"
     ],

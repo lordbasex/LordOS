@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <drm/drm.h>
@@ -190,6 +191,43 @@ void drmlease_test_drm(int (*scan)(void *, DrmlConn *, int), int (*lease)(void *
     open_fd = open;
 }
 #endif
+
+/* ---- the conformance tool's fake card (lord-server --headless --test-hooks, testhooks.h "lease") ----
+ * A desktop display and, while "plugged", a non-desktop one (a VR headset). drm_fd and every lease_fd are memfds and
+ * the lessee ids are counted here: no ioctl reaches a card. Everything else is the real code: drmlcore.c's rules, the
+ * "vr" permission (perms.c, the person's answer from the theme's prompt) and the protocol. */
+static int fake_plugged, fake_card = -1;
+static uint32_t fake_lessee;
+static int fk_scan(void *u, DrmlConn *out, int max) {
+    (void)u;
+    int n = 0;
+    if (max > n) out[n++] = (DrmlConn){ .id = 41, .connected = 1, .non_desktop = 0, .name = "DP-1", .desc = "LordOS test display" };
+    if (fake_plugged && max > n) out[n++] = (DrmlConn){ .id = 42, .connected = 1, .non_desktop = 1, .name = "DP-2", .desc = "LordOS test headset" };
+    return n;
+}
+static int fk_lease(void *u, const uint32_t *conns, int n, uint32_t avoid, uint32_t *lessee, uint32_t *crtcs) {
+    (void)u; (void)conns; (void)avoid;
+    if (n < 1 || n > DRML_PER_LEASE) return -1;
+    *lessee = ++fake_lessee;
+    *crtcs = 0;                         /* no head of the headless frame is ever reserved */
+    return memfd_create("lordos-test-lease", MFD_CLOEXEC);
+}
+static int fk_revoke(void *u, uint32_t lessee) { (void)u; (void)lessee; return 0; }
+static int fk_open(void) { return memfd_create("lordos-test-drm", MFD_CLOEXEC); }
+int drmlease_fake_card(int plugged) {
+    if (!ldpy) return -1;
+    if (fake_card < 0) {
+        fake_card = memfd_create("lordos-test-card", MFD_CLOEXEC);
+        if (fake_card < 0) return -1;
+        ops.scan = fk_scan;
+        ops.lease = fk_lease;
+        ops.revoke = fk_revoke;
+        open_fd = fk_open;
+    }
+    fake_plugged = !!plugged;
+    drmlease_card(fake_card);           /* the first time the card arrives, later a rescan (hotplug) */
+    return 0;
+}
 
 /* ---- wp_drm_lease_connector_v1 ---- */
 

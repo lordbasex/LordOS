@@ -72,6 +72,7 @@ int  wlx_scale(void);
 int  wlx_attach(uint32_t res_id, XWin *w, const XWinInfo *info);
 int  wlx_attach_id(int sid, XWin *w, const XWinInfo *info);    /* the same, the surface named by xwayland-shell-v1 */
 int  wlx_surface_free(struct wl_resource *surface);            /* Xwayland's, with no role yet */
+void wlx_surface_role(struct wl_resource *surface);            /* xwayland_shell_v1 gave it its role */
 int  xwshell_surface_for(uint64_t serial);     /* xwshell.c: the surface that committed this serial, 0 if none yet */
 void wlx_detach(int sid);                      /* the X window was unmapped or destroyed */
 void wlx_set_title(int sid, const char *title);

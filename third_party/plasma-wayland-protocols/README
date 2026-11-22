@@ -1,0 +1,10 @@
+server-decoration.xml: KDE's org_kde_kwin_server_decoration_manager protocol (version 1), from
+plasma-wayland-protocols, unmodified (SHA-256 c5f857734bb190dc9adfb65fb05550a6245f12af1a2be5eefd05be199805a68c,
+the copy shipped in the KDE Platform 6.11 and 5.15-25.08 runtimes). Copyright 2015 Martin Gräßlin,
+LGPL-2.1-or-later (LGPL-2.1.txt, the license's text).
+
+Only tools/wl-conformance.mjs reads it: wayland-scanner makes the conformance test client's code from it, so
+lord-server's server-side decoration protocol (hand-written in server/src/wl/wl.c, which GTK 3 and Firefox use)
+is checked against KDE's own description. lord-server itself does not compile it.
+
+Upstream: https://invent.kde.org/libraries/plasma-wayland-protocols/-/blob/master/src/protocols/server-decoration.xml
