@@ -71,6 +71,11 @@ int pubhost_ipv6_ok(const uint8_t a[16]) {
     if (a[0] == 0xfe && (a[1] & 0xc0) == 0x80) return 0;                         /* fe80::/10 */
     if (a[0] == 0xfe && (a[1] & 0xc0) == 0xc0) return 0;                         /* fec0::/10 */
     if (a[0] == 0xff) return 0;                                                  /* multicast */
+    /* Only global unicast (2000::/3) from here on: this also refuses the local-use NAT64 prefix 64:ff9b:1::/48 and
+     * the SIIT ::ffff:0:a.b.c.d/96, whose IPv4 half the network may route anywhere, and any range assigned later. */
+    if ((a[0] & 0xe0) != 0x20) return 0;
+    if (a[0] == 0x20 && a[1] == 0x01 && a[2] < 0x02) return 0;                   /* 2001::/23 (Teredo, ORCHID, …) */
+    if (a[0] == 0x3f && a[1] == 0xff && (a[2] & 0xf0) == 0) return 0;            /* 3fff::/20 (documentation) */
     return 1;
 }
 

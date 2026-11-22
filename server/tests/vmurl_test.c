@@ -137,7 +137,9 @@ static void test_addrs(void) {
     for (int i = 0; priv4[i]; i++) CHECK(!v4(priv4[i]), "not public: %s", priv4[i]);
     static const char *const pub6[] = { "2001:4860:4860::8888", "2606:4700::1111", "2a00:1450:4001::1", "::ffff:8.8.8.8", "64:ff9b::808:808", "2002:808:808::1", NULL };
     static const char *const priv6[] = { "::", "::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1", "::ffff:192.168.1.1", "64:ff9b::a00:1", "2002:a00:1::1", "2002:7f00:1::",
-        "fc00::1", "fd12:3456::1", "fe80::1", "febf::1", "fec0::1", "ff02::1", "2001:db8::1", "100::1", "::7f00:1", NULL };
+        "fc00::1", "fd12:3456::1", "fe80::1", "febf::1", "fec0::1", "ff02::1", "2001:db8::1", "100::1", "::7f00:1",
+        "64:ff9b:1::a00:1", "64:ff9b:1::808:808", "::ffff:0:a00:1", "::ffff:0:808:808", "2001::1", "2001:0:4136:e378::1", "2001:10::1",
+        "2001:1ff::1", "3fff::1", "5f00::1", "4000::1", "e000::1", NULL };
     for (int i = 0; pub6[i]; i++) CHECK(v6(pub6[i]), "public: %s", pub6[i]);
     for (int i = 0; priv6[i]; i++) CHECK(!v6(priv6[i]), "not public: %s", priv6[i]);
     struct sockaddr_in s4 = { .sin_family = AF_INET };
