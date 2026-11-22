@@ -224,6 +224,7 @@ EOF
     if have node; then run "mem-figure-test (sdk/memfigure.js)" node tests/mem_figure_test.mjs; fi
     if have node; then run "openwith-model-test (sdk/openwithmodel.js, Files' Open with providers)" node tests/openwith_model_test.mjs; fi
     if have node; then run "vm-openwith-test (apps/machines/openwith.js, a machine in Open with)" node tests/vm_openwith_test.mjs; fi
+    if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
     if have node; then run "photos-places-test (apps/photos/places.js)" node tests/photos_places_test.mjs; fi
     if have node; then run "photos-trash-test (apps/photos/trash.js)" node tests/photos_trash_test.mjs; fi
     if have node; then run "bt-power-model-test (sdk/btpowermodel.js)" node tests/bt_power_model_test.mjs; fi
@@ -249,6 +250,14 @@ EOF
         0) ok "guestwin (tests/guestwin_client.c, headless lord-server and lordos-guest, apps mode)" ;;
         77) skip "guestwin" "build/lord-server, build/lordos-guest and the default theme (make, npm run build)" ;;
         *) bad "guestwin (tests/guestwin_client.c, headless lord-server and lordos-guest, apps mode)" ;;
+    esac
+    # the machines command's session channel: start, open and poweroff of a throwaway machine through a headless
+    # lord-server's Machines app, and the requests the channel refuses (tests/machinescli_headless.sh)
+    sh tests/machinescli_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "machines-cli (tests/machinescli_headless.sh, headless lord-server, a throwaway machine)" ;;
+        77) skip "machines-cli" "build/lord-server, build/machines, build/lord-vm, KVM, QEMU and the default theme (make, npm run build)" ;;
+        *) bad "machines-cli (tests/machinescli_headless.sh, headless lord-server, a throwaway machine)" ;;
     esac
     # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
     sh tests/guest_clip_test.sh >"$T/out" 2>&1

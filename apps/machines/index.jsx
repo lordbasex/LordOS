@@ -15,6 +15,7 @@ import { Logs } from './logs.jsx';
 import { Snapshots } from './snapshots.jsx';
 import { Storage } from './storage.jsx';
 import { GuestWindow } from './appsmode.jsx';
+import { startMachinesCli } from './cli.js';
 
 export function Icon({ size }) { return <AppMark size={size} />; }
 
@@ -51,6 +52,9 @@ registerOpenProviders('machines', () => {
   if (windowsNeedsTools(list, readMeta)) out.push({ id: 'machines:tools', hint: (f) => (isForeignProgram(f) ? tr('machines.win.openWithUpdate') : '') });
   return out;
 });
+
+// the `machines` command's start and open go through this session (cli.js); a moment after the desktop is up
+setTimeout(startMachinesCli, 1000);
 
 export const isLibraryKey = (e) => !!e && !!e.meta && !e.ctrl && !e.alt && (e.base || e.key) === '0';
 

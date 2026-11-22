@@ -2420,6 +2420,7 @@ static const JSCFunctionListEntry users_funcs[] = {
 
 static int greeter_mode;
 void js_sys_set_greeter(int on) { greeter_mode = on; }
+int js_sys_greeter(void) { return greeter_mode; }
 
 /* is the session managed by lord-sessiond (is there a login screen to go back to)? */
 static JSValue f_session_managed(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {

@@ -77,6 +77,8 @@ FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/
 SRC += $(FW_SRC)
 # Apps mode's guest side (ui/js_guestwin.c): this lord-server's windows for lordos-guest, inside a Machines guest
 SRC += src/ui/js_guestwin.c
+# The machines command's session channel (ui/js_vmcli.c, vm/vmcli.c): start and open a machine as the Machines app does
+SRC += src/ui/js_vmcli.c src/vm/vmcli.c
 # Machines' pictures the desktop's GPU can't import (an Intel GVT-g machine's Y-tiled dmabufs): read on their own render node
 SRC += src/gpu/dmaread.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
