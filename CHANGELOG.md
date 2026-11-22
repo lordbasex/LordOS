@@ -1783,12 +1783,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   removed from every language; the new ones are in all 35.
 - **Screenshots: a thin floating toolbar instead of the panel window, in development** (`apps/screenshots/toolbar.jsx`,
   `toolbarmodel.js`, `state.js`; `docs/MEDIA.md`). ❖⇧5 (or opening Screenshots) no longer opens the big "Screenshots"
-  window that covered the screen: a compact dark bar shows near the bottom center, as macOS's ⇧⌘5 bar, translucent and
+  window that covered the screen: a compact dark bar shows near the bottom center, translucent and
   blurred where the theme has blur (Settings' effects on), with a soft shadow and a hairline border. Left to right: a
   grip (drag it anywhere, to any display; it opens there next time, as the reading-aloud player), Close, the capture
   modes (Entire Screen, Selected Window, Selected Portion), the recording modes (Record Entire Screen, Record Selected
   Portion), Color and Text (OCR) as small icons, Options ⌄ and the primary Capture or Record button. Icons only, each
-  with a tooltip (the ❖⇧3 and ❖⇧4 shortcuts in theirs); the chosen mode is lit and kept. Options follows macOS's menu:
+  with a tooltip (the ❖⇧3 and ❖⇧4 shortcuts in theirs); the chosen mode is lit and kept. Options is grouped in sections:
   dimmed section headers and separators: **Save to** Desktop, Documents, Pictures (the Screenshots folder, the
   default), Clipboard, Mail (a new message with the capture attached, when Mail is installed), Markup Editor (opens
   on the capture at once) and Other Location… (a folder chosen in the file dialog, remembered); **Timer** None, 5 or
