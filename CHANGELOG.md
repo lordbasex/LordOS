@@ -1059,6 +1059,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   theme and size aren't served: GTK asks for cursors by shape and LordOS draws them. Tests: `build/portal-gs-test`
   (every key through `ReadOne` and `ReadAll`, and the keyfile) and `tests/gtk_defaults_test.mjs` (the font folder
   against `mkdeb.sh`, the values against Debian's schema).
+- **Machines: a click lands where the pointer is, in development** (`docs/VIRTUALIZATION.md` 6.25, "Buttons in both
+  modes"). On a Windows 11 machine with an Intel GVT-g vGPU, right-click did nothing while the mouse was free (the tablet)
+  and worked while captured. lord-vmdisplay sent a button to QEMU as soon as it arrived, but the pointer's position that
+  the machine's window sends just before it only at the end of its turn. So the tablet pressed at the previous position
+  and then moved with the button down: a short drag, which Windows' shell doesn't take as a right-click. Now any motion
+  gathered so far goes out before each button and wheel step, free and captured. To be confirmed on that machine.
+- **Machines: QEMU's "Failed to call update: Timeout was reached" explained, and lord-vmdisplay's answers measured, in
+  development** (`docs/VIRTUALIZATION.md` 3.2). QEMU gives each display listener call 1 s. lord-vmdisplay answers every
+  call from its loop at once, or holds an `UpdateDMABUF` for lord-server 250 ms at most, and never waits on QEMU. The new
+  `build/vmdisplay-test` (a mock QEMU display and a mock lord-server, in `make test`) checks it: with lord-server reading
+  every frame, reading none, slow with the picture after a resize to 1920x1080, and 200 updates at once with input
+  arriving, every call is answered and the slowest takes 251 ms. It also checks that buttons follow the pointer's position.
+  The likely source of the timeouts is QEMU itself: when it sends a new picture buffer (`ScanoutDMABUF`) or `Disable`, it
+  throws away the updates still in its queue (`ui/dbus-listener.c`), and those calls never get an answer. On a GVT-g
+  machine that doesn't stop the picture. To tell the two causes apart in a real session, lord-vmdisplay now logs a turn of
+  its loop that took 200 ms or more, and at the end how many answers it held and the longest. Not fixed, and noted: QEMU
+  keeps calling a display connection after it closed, about 66 log lines a second in `lord-vm.log`.
 - **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
   copied its whole buffer, uploaded the whole texture and, on the CPU path, repainted the whole window, whatever it

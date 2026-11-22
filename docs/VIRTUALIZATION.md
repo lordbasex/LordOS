@@ -383,6 +383,25 @@ lord-server passes `--render-node none` when it draws without a GPU, so the CPU 
   nothing, and passes the descriptor on (`VD_DMABUF`, `vmproto.h`). QEMU doesn't let the guest draw again until `UpdateDMABUF` is
   answered, so the helper answers once lord-server read that frame (`VD_FRAME_DONE`) or after 250 ms: no tearing, and a stuck
   compositor holds the guest 250 ms at most.
+- **QEMU's "Failed to call update: Timeout was reached"** (seen 2026-11-22 on a Windows 11 machine with an Intel GVT-g vGPU,
+  five times, around a capture switch and when apps mode resized the guest to 1920x1080). QEMU gives each listener call 1 s
+  (`DBUS_DEFAULT_TIMEOUT`, `include/qemu/dbus.h`) and logs this when an `UpdateDMABUF` gets no answer in time. lord-vmdisplay
+  answers every listener call from its main loop at once, or holds an `UpdateDMABUF` 250 ms at most (above), and never calls
+  QEMU and waits; `tests/vmdisplay_test.c` (a mock QEMU and a mock lord-server, in `make test`) checks it: with lord-server
+  reading every frame, never reading one, slow with the picture for a new size, and 200 updates at once with input arriving, the
+  slowest answer is 251 ms and every call is answered. QEMU itself drops listener calls: when it sends a new `ScanoutDMABUF` or
+  `Disable`, every `Update`/`UpdateDMABUF`/`Scanout*` still waiting in its D-Bus queue is thrown away (`ddl_discard_display_messages`
+  and the connection's filter in `ui/dbus-listener.c`, 10.0). Such a call never reaches the helper, its answer never comes, and
+  QEMU logs the timeout a second later. That is the likely source of these lines: they come when the guest's picture changes
+  buffers or size. On a vfio display (GVT-g) they don't stop the picture (QEMU's vfio display sends an `UpdateDMABUF` every refresh
+  whatever is pending); on virgl the guest's drawing waits that second. To tell the two apart in a real session, lord-vmdisplay
+  now logs a turn of its loop that took 200 ms or more, and at the end how many `UpdateDMABUF` answers it held and the longest
+  (`the display listener's calls: …`): QEMU timeouts with a longest well under 1000 ms are QEMU's own drops. **To check** in the
+  maintainer's session: those lines beside QEMU's.
+- **A closed display connection stays registered in QEMU** (seen the same day): after the machine's window closed, QEMU went on
+  calling the dead listener and logged `Failed to call update: The connection is closed` twice every 30 ms (32,557 lines in
+  `lord-vm.log` in six minutes); the next window's connection is added beside it. That is QEMU's (its D-Bus display doesn't drop a
+  peer-to-peer listener whose connection closed); not fixed here.
 - lord-server imports each dmabuf once with EGL (`gpu_tex_dmabuf`; QEMU names the same few buffers again on each flip, known by
   inode, four kept) and reads the damaged rows back into the shared picture (`gpu_tex_read_rows`), so the rest of the picture's path
   (MediaView, thumbnails, recordings) is unchanged. It never waits on the guest's GPU work: the dmabuf's fence is polled, and a frame
@@ -2503,6 +2522,17 @@ pointer is hidden and held inside the picture, and the guest gets relative motio
   and `rel` was ignored. With compat devices the same on *QEMU USB Mouse* and *QEMU USB Tablet*. The first move after a switch goes
   the right way (lord-vmdisplay asks `IsAbsolute` again every 100 ms for 3 s). Not yet seen: the lord-server window itself (the
   pointer lock, the button, the notice, full screen), Windows guests and arm64.
+- **Buttons in both modes** (fixed 2026-11-22). Free and captured, a button or wheel step goes to QEMU the same way
+  (`Mouse.Press`/`Release` with QEMU's button number, 2 for the right), and QEMU hands it to whichever mouse is active: the
+  tablet when free, the relative mouse when captured. Each of them reports left, right and middle. The difference was the
+  order: the machine's window sends a click as the pointer's position and then the button (`VD_MOTION`, `VD_BUTTON`) in one
+  burst, and lord-vmdisplay sent the button at once but the position only at the end of its turn. So the tablet pressed at the
+  previous position, then moved with the button down, which is a short drag. Captured, a press only sends a button, so nothing
+  moved in between. Windows' shell treats a right-button drag of more than a few pixels as a drag, and no menu opens. That is the
+  likely reason right-click failed only with the mouse free, while a left click still landed. Now any motion gathered so far
+  goes out before each button and wheel step, in both modes. `tests/vmdisplay_test.c` checks the order for right, left and wheel
+  clicks, free and captured, and that release-all lets go of a right button. **To check** on the Windows 11 GVT-g machine: a
+  right-click with the mouse free, on the desktop and in Explorer, in a window and in apps mode.
 - Hotkeys are fixed for now (❖Esc and Ctrl+Alt); choosing them is for later.
 
 ## 7. Guest tools
