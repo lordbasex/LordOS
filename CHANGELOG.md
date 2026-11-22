@@ -12,6 +12,37 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Explicit sync for Linux apps (`linux-drm-syncobj-v1`), in development** (approved by the maintainer 2026-11-22: "do
+  everything the compositor is missing"; `docs/SYNCOBJ-PLAN.md`, `docs/WAYLAND.md` "Explicit sync"). lord-server now
+  offers `wp_linux_drm_syncobj_manager_v1` version 1: an app hands over each GPU buffer (dmabuf) with an acquire point
+  (its rendering is done) and a release point (LordOS is done with it), as NVIDIA's driver needs and as Mesa's Vulkan
+  WSI (24.1 and later) and Xwayland 24.1 and later use whenever it is offered.
+  - **Never blocking:** a commit whose acquire point is already signalled is applied at once; otherwise all of its
+    state waits in the surface's queue while the Wayland event loop polls an eventfd the kernel signals with the point
+    (`DRM_IOCTL_SYNCOBJ_EVENTFD`), and the surface's later commits wait behind it in order. A point that never signals
+    freezes only that surface on its last frame (logged once after 5 s); other windows, apps, the shell and the cursor
+    go on.
+  - **Release:** at once after the CPU copy; on the GPU path after the frame that replaced the buffer is done or its
+    direct scanout ends, carrying the buffer's own fences (`DMA_BUF_IOCTL_EXPORT_SYNC_FILE` into a temporary syncobj,
+    transferred onto the point), so the GPU's last read is waited for in the kernel; always for a frame that was never
+    shown (its surface destroyed), so an app never waits on LordOS forever.
+  - **Rules and limits:** every protocol error (`no_acquire_point`, `no_release_point`, `no_buffer`,
+    `unsupported_buffer`, `conflicting_points`, `surface_exists`, `no_surface`, `invalid_timeline`); 64 timelines per
+    client, 8 commits waiting per surface (the plan's 4 raised for mailbox swapchains of up to 5 images), 32 eventfds
+    per client and 256 in the session, past which the client is disconnected.
+  - **Where:** only with a render node that has timeline syncobjs and `SYNCOBJ_EVENTFD` (Linux 6.6), opened by
+    lord-server itself (raw ioctls with the kernel's headers, no libdrm, no DRM master, no new privilege); on the GPU
+    path and the CPU path (the CPU copy reads a frame whose point is signalled); `LORD_SYNCOBJ=0` turns it off. Apps that
+    don't bind it keep implicit sync, unchanged.
+  - **Tests:** `build/syncobj-test` (pure rules, in `make test`), `build/syncobj-kernel-test` (the ioctls on this
+    machine's render node) and `tests/syncobj_headless.sh` (a test client through
+    the kernel with udmabufs, against a headless lord-server, in `tests/run_suites.sh`). Checked 2026-11-22 on the
+    development PC (Linux 6.12, Mesa 25.0.7, headless CPU path): the suite passes; `vkcube --wsi wayland` on an AMD
+    RX 580 commits every frame with `set_acquire_point`/`set_release_point`, 600 frames at 60 fps (FIFO) and 1500 at
+    330 fps (mailbox), no protocol error, no stall; an ASan build runs the suite cleanly; on VM 116 the suite also
+    passes with GPU composition on the monitor (llvmpipe). Not checked yet: a buffer sampled in place by a real GPU
+    (virtio-gpu copies udmabufs), NVIDIA's driver (LordOS doesn't support it), Xwayland's own use.
+
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).

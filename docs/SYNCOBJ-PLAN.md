@@ -1,7 +1,40 @@
 # Explicit sync for Linux apps (`linux-drm-syncobj-v1`): the plan
 
-**Status: design for the maintainer's review (written 2026-11-22). Nothing of it is built.** Until it is approved,
-lord-server keeps implicit sync (dma-resv), as `docs/GPU.md` says.
+**Status: approved by the maintainer and built on 2026-11-22 (in development, branch `feat/wl-syncobj`).** The design
+below is the one that was approved; "As built" right after it says where the code differs and why. Clients that don't
+bind the global keep implicit sync (dma-resv), as `docs/GPU.md` says. Code: `server/src/wl/syncobj.h` (the pure rules),
+`server/src/wl/syncobj.c` (the kernel side), the protocol and the commit queue in `server/src/wl/wl.c`.
+
+## As built (2026-11-22)
+
+- **Where it is offered:** whenever lord-server can open a render node with `DRM_CAP_SYNCOBJ_TIMELINE` and
+  `DRM_IOCTL_SYNCOBJ_EVENTFD` (the GPU context's node first, else the first one that has them; syncobjs belong to no
+  device, so a timeline made on any GPU imports on any node). That is on the GPU path **and on the CPU path**: a commit
+  is applied only once its acquire point is *signalled*, so the CPU copy (`map_linear`) always reads a finished frame.
+  Without such a node (no GPU driver, a kernel before 6.6) the global is not created. `LORD_SYNCOBJ=0` also turns it off.
+  The node is opened once, by lord-server itself (`O_RDWR`, render ioctls only, no master), and kept for the session: a
+  GPU context re-created (`GPU.md`) never invalidates a client's imported timelines.
+- **Waiting (differs from "Never blocking the loop" 1 and 4):** one rule for both paths. At `wl_surface.commit` the
+  acquire point is checked without blocking (`SYNCOBJ_TIMELINE_WAIT` with a deadline of 0 and `WAIT_FOR_SUBMIT`); if it
+  is signalled the commit is applied at once (the usual case), otherwise its whole state goes into the surface's queue
+  and an eventfd (`SYNCOBJ_EVENTFD`, flags 0: *signalled*, not only available) is polled by the Wayland event loop.
+  The GPU never waits in its queue (`eglWaitSyncKHR` is not used): a late client can't delay the frame for everybody,
+  which is why mutter, KWin and wlroots also wait on the CPU side. A commit behind a waiting one waits too, even with no
+  point (order is kept).
+- **Releasing (differs from the table's last two rows):** a release point is signalled when lord-server stops using the
+  buffer, at the moment it sends `wl_buffer.release` today: at once after a CPU copy (or for a buffer it refused); on
+  the GPU path after the frame that replaced the buffer is done (`wl_frame_done`), or when its direct scanout ends. The
+  buffer's own fences go with it: `DMA_BUF_IOCTL_EXPORT_SYNC_FILE` (`DMA_BUF_SYNC_WRITE`: every reader's fence) into a
+  temporary syncobj (`FD_TO_HANDLE` with `IMPORT_SYNC_FILE`), `SYNCOBJ_TRANSFER` onto the release point, so the GPU's
+  last read is waited for in the kernel; if that export fails, `SYNCOBJ_TIMELINE_SIGNAL`. No EGL native fence is
+  needed. A frame that is never shown (its surface destroyed while it waits) has its release point signalled too.
+- **Limits:** as in the table, except **8** commits waiting per surface instead of 4: a Vulkan swapchain in mailbox
+  mode has up to 5 images and all of them can be committed before the first one's rendering ends, and a state-only
+  commit between them waits in the same queue. Points set and then dropped with the object (`destroy` before a commit)
+  are forgotten without being signalled, as the protocol allows.
+- **Subsurfaces:** lord-server applies every subsurface's commit on its own (`set_sync` is not implemented), so each
+  surface's queue is its own; nothing waits for a parent.
+- **Security contexts:** offered inside them too (the plan's default; it reads nothing of other clients).
 
 ## Why
 
@@ -110,6 +143,27 @@ surface destroyed), so the app never waits on lord-server forever.
   24.1+ (explicit sync in use: `WAYLAND_DEBUG` shows `set_acquire_point`), no tearing or half-drawn frames, and
   LordBench's frame phases unchanged.
 - **ASan build** of lord-server for the whole syncobj suite (handles and eventfds freed with their resources).
+
+### Results (2026-11-22)
+
+- **Unit:** `build/syncobj-test` (error rules, commit action, queue, limits; in `make test`).
+- **Kernel:** `build/syncobj-kernel-test` (import, a non-blocking check, the eventfd waking on the app's signal, release
+  at once and through a udmabuf's exported fences, a non-dmabuf fd falling back, references) and
+  `tests/syncobj_headless.sh` (`tests/syncobj_client.c`: wait, order, freeze, limit, every error, implicit again), both
+  in `tests/run_suites.sh`. They pass on the development PC (Linux 6.12, i915 + amdgpu render nodes) and on VM 116
+  (virtio-gpu render node), headless on the CPU path.
+- **GPU path, VM 116:** lord-server on the monitor with `gpu: GPU composition (llvmpipe …)` (`LORD_GPU=1`, the card
+  lent by `build/seat-cycle` with `lordos.service` stopped for the run and started again): the same client passes every
+  check (the presentation check aside: in that setup no frame is presented at all, the same with `origin/main` and a
+  plain `dmabuf-client`, so it is not this work). virtio-gpu refuses to import udmabufs in EGL (`GPU.md`), so there too
+  the buffers are copied and released at once: **a buffer sampled in place on a real GPU and released after the next
+  frame with its fences is not checked on hardware yet** (the kernel plumbing of that release is, above).
+- **Real client:** `vkcube --wsi wayland` (Mesa 25.0.7, RADV on an AMD RX 580) against a headless lord-server binds the
+  global and sends `set_acquire_point`/`set_release_point` with every commit: 600 frames at 60.1 fps in FIFO, 1500 at
+  330 fps in mailbox, no protocol error, no stall. `eglgears_wayland` (Mesa's EGL doesn't use it in 25.0) unchanged.
+- **ASan:** lord-server built with `-fsanitize=address` ran the whole client suite with no error.
+- **Not checked:** NVIDIA's driver (unsupported, no card), Xwayland 24.1's use of it, GPU sampling in place on a real
+  card (above), LordBench's frame phases with an explicit-sync client.
 
 ## What it costs
 

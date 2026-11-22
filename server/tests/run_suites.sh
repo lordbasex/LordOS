@@ -250,6 +250,20 @@ EOF
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
     esac
+    # explicit sync's kernel side (src/wl/syncobj.c) on this machine's render node
+    ./build/syncobj-kernel-test >"$T/out" 2>&1
+    case $? in
+        0) ok "syncobj-kernel-test (src/wl/syncobj.c: import, eventfd, release at once and with a dmabuf's fences)" ;;
+        77) skip "syncobj-kernel-test" "a render node with timeline syncobjs and SYNCOBJ_EVENTFD (Linux 6.6)" ;;
+        *) bad "syncobj-kernel-test (src/wl/syncobj.c)" ;;
+    esac
+    # explicit sync (linux-drm-syncobj-v1): timelines and udmabufs through the kernel, against a headless lord-server
+    sh tests/syncobj_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "syncobj (tests/syncobj_client.c, headless lord-server: wait, order, freeze, limit, errors)" ;;
+        77) skip "syncobj" "a render node with timeline syncobjs, /dev/udmabuf (group kvm), build/lord-server and the default theme" ;;
+        *) bad "syncobj (tests/syncobj_client.c, headless lord-server: wait, order, freeze, limit, errors)" ;;
+    esac
     # frames, titles and damage of a Linux window, against a headless lord-server (docs/WAYLAND.md)
     sh tests/wlperf_headless.sh >"$T/out" 2>&1
     case $? in

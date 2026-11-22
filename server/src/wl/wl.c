@@ -89,6 +89,8 @@
 #include "idlenotify.h"
 #include "ext-idle-notify-v1-protocol.h"
 #include "xdg-toplevel-icon-v1-protocol.h"
+#include "linux-drm-syncobj-v1-protocol.h"
+#include "syncobj.h"
 #include "wlicon.h"
 #include "wl_input.h"
 #include "../gpu/gpu.h"
@@ -112,7 +114,14 @@ typedef struct Dmabuf {
     GpuTex *tex;                        /* EGLImage (GPU path); stale once its context is gone */
     int refs, scanned;
     unsigned no_import;                 /* the GPU context (generation) where EGL refused it: mapped and copied */
+    /* explicit sync: release points of commits that showed it, waiting for its direct scanout to end (scanout_done) */
+    SobjPoint srel[4];
+    int nsrel;
 } Dmabuf;
+
+/* A commit's double-buffered state (Surf's p_* fields), moved out of the surface while the commit waits for its
+ * acquire point (explicit sync, syncobj.h) and moved back when it is applied */
+typedef struct Pend Pend;
 
 typedef struct Surf Surf;
 struct Surf {
@@ -210,6 +219,13 @@ struct Surf {
     WlRgn input, p_input;
     int has_input, p_input_set, p_has_input;
     struct wl_resource *ksi;        /* zwp_keyboard_shortcuts_inhibitor_v1: one per surface (kbinhibit.h) */
+    /* explicit sync (syncobj.h): its wp_linux_drm_syncobj_surface_v1, the points pending until commit, the current
+     * buffer's release point, and the commits waiting for an acquire point (the first one's eventfd and 5 s timer) */
+    struct wl_resource *sobj;
+    SobjPoint p_acq, p_rel, rel;
+    SobjQueue sq;
+    struct wl_event_source *sq_src, *sq_timer;
+    int sq_fd, sq_logged;
 };
 
 /* Shape of a surface's hole in the UI: if it changes, the UI must be repainted. */
@@ -252,7 +268,8 @@ static int ndraws[2];
 static int need_frame;              /* an app changed its content: must present */
 static int frames_held;             /* frame callbacks wait for their own display's frame (wl_frame_done) */
 static unsigned new_keys;           /* the displays (WlOutput.key bits) new content must reach: wl_new_content */
-static Dmabuf *to_release[64];      /* replaced: released after the next frame */
+typedef struct { Dmabuf *d; SobjPoint rel; } Release;
+static Release to_release[64];      /* replaced: released after the next frame (with the commit's release point) */
 static int nrelease;
 
 /* fullscreen (presented by the compositor, on top of everything) */
@@ -669,6 +686,7 @@ static void upright(uint32_t **px, int *w, int *h, int tf) {
 
 static void dm_unref(Dmabuf *d) {
     if (!d || --d->refs > 0) return;
+    for (int i = 0; i < d->nsrel; i++) sobj_release_after(&d->srel[i], d->d.fd[0]);
     gpu_tex_free(d->tex);
     for (int i = 0; i < d->d.nplanes; i++) if (d->d.fd[i] >= 0) close(d->d.fd[i]);
     free(d);
@@ -736,9 +754,21 @@ static int map_linear(Surf *s, Dmabuf *d) {
     return 0;
 }
 
-static void queue_release(Dmabuf *d) {
-    if (nrelease < 64) { to_release[nrelease++] = d; return; }
+/* A commit's release point, now that the frame that replaced its buffer is done: signalled with the buffer's fences
+ * (the GPU's reads of it), or once its direct scanout ends */
+static void dm_release_point(Dmabuf *d, SobjPoint *p) {
+    if (!p->tl) return;
+    if (d->scanned && d->nsrel < 4) { d->srel[d->nsrel++] = *p; p->tl = NULL; return; }
+    sobj_release_after(p, d->d.fd[0]);
+}
+
+/* d no longer shows on its surface: wl_buffer.release and its release point (*rel, taken) after the next frame */
+static void queue_release(Dmabuf *d, SobjPoint *rel) {
+    SobjPoint r = { 0 };
+    if (rel) { r = *rel; rel->tl = NULL; }
+    if (nrelease < 64) { to_release[nrelease++] = (Release){ d, r }; return; }
     if (d->res && !d->scanned) wl_buffer_send_release(d->res);
+    dm_release_point(d, &r);
     dm_unref(d);
 }
 
@@ -804,14 +834,19 @@ static void bind_am(struct wl_client *c, void *data, uint32_t ver, uint32_t id) 
 }
 static float surf_alpha(const Surf *s) { return s->alpha == UINT32_MAX ? 1.0f : (float)((double)s->alpha / (double)UINT32_MAX); }
 
-/* The buffer the app just sent becomes the surface's content. */
-static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
+/* The buffer the app just sent becomes the surface's content. rel: its commit's release point (explicit sync), taken:
+ * kept with a dmabuf held on screen, signalled at once when the buffer was copied (or refused). */
+static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg, SobjPoint *rel) {
     Dmabuf *dm = dmabuf_of(buf), *old = s->dmabuf;
+    SobjPoint old_rel = s->rel;
+    s->rel.tl = NULL;
     s->dmabuf = NULL;
     s->dmg_full = 1;                        /* a dmabuf or no buffer: all of it (copy_buffer says less) */
     if (dm && s->role != R_CURSOR && dm_tex(dm)) {
         dm->refs++;
         s->dmabuf = dm;
+        s->rel = *rel;
+        rel->tl = NULL;
         s->w = dm->d.width;
         s->h = dm->d.height;
         s->opaque = dm->d.fourcc == DRM_FORMAT_XRGB8888 || dm->d.fourcc == DRM_FORMAT_XBGR8888;
@@ -829,6 +864,8 @@ static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
          * is back without waiting for the app's next frame. */
         dm->refs++;
         s->dmabuf = dm;
+        s->rel = *rel;
+        rel->tl = NULL;
         s->content = s->px != NULL;
     } else if (dm) {
         s->content = 0;
@@ -856,7 +893,9 @@ static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
     }
     if (s->dmg_full) s->tex_full = 1;
     else s->tex_dmg = buftf_union(s->tex_dmg, s->dmg);
-    if (old) queue_release(old);
+    sobj_release(rel);                      /* not held: copied, or refused (a no-op without a point) */
+    if (old) queue_release(old, &old_rel);
+    else sobj_release(&old_rel);
 }
 
 /* The transform its texture is drawn with: a dmabuf's own (shared memory is copied upright, buftf.h) */
@@ -973,19 +1012,378 @@ static void srf_input(struct wl_client *c, struct wl_resource *r, struct wl_reso
     s->p_has_input = region != NULL;
 }
 
-static void srf_commit(struct wl_client *c, struct wl_resource *r) {
+/* ---- explicit sync: linux-drm-syncobj-v1 (syncobj.h, docs/SYNCOBJ-PLAN.md) ---- */
+
+/* The p_* fields of a Surf: a commit's state. Values the protocol keeps from one commit to the next (transform, scale,
+ * opacity, the viewport's numbers, a subsurface's place, the cursor's hotspot) are copied; the rest is moved. */
+struct Pend {
+    struct wl_resource *buf;
+    struct wl_listener buf_destroy;
+    int attached, gx, gy, gw, gh, geom;
+    struct wl_list frames, feedback;
+    float ds[4];
+    int ds_on, db_on;
+    BufBox db;
+    int tf;
+    uint32_t alpha;
+    WlIcon *icon;
+    int icon_set;
+    float vsx, vsy, vsw, vsh;
+    int vdw, vdh, vp, hx, hy, dnd_x, dnd_y, sx, sy, bscale;
+    WlRgn input;
+    int input_set, has_input;
+    SobjPoint acq, rel;
+};
+
+/* the per-client counts of the limits (syncobj.h); found by client, so a surface outliving its client's record (the
+ * client's destroy signal comes before its resources go) just isn't counted any more */
+typedef struct { struct wl_list link; struct wl_client *c; struct wl_listener gone; int timelines, surfaces, waits; } SobjClient;
+static struct wl_list sobj_clients;
+static int sobj_waits;                  /* eventfds alive in the session */
+
+static void sobj_client_gone(struct wl_listener *l, void *data) {
+    (void)data;
+    SobjClient *k = wl_container_of(l, k, gone);
+    wl_list_remove(&k->link);
+    wl_list_remove(&k->gone.link);
+    free(k);
+}
+static SobjClient *sobj_client_find(struct wl_client *c) {
+    SobjClient *k;
+    wl_list_for_each(k, &sobj_clients, link) if (k->c == c) return k;
+    return NULL;
+}
+static SobjClient *sobj_client(struct wl_client *c) {
+    SobjClient *k = sobj_client_find(c);
+    if (k || !(k = calloc(1, sizeof *k))) return k;
+    k->c = c;
+    k->gone.notify = sobj_client_gone;
+    wl_client_add_destroy_listener(c, &k->gone);
+    wl_list_insert(&sobj_clients, &k->link);
+    return k;
+}
+
+static void pend_buf_gone(struct wl_listener *l, void *data) {
+    (void)data;
+    Pend *e = wl_container_of(l, e, buf_destroy);
+    e->buf = NULL;
+    wl_list_remove(&l->link);
+    wl_list_init(&l->link);
+}
+
+/* The surface's pending state into e; the surface is left with nothing pending (its kept values stay) */
+static void pend_take(Surf *s, Pend *e) {
+    e->buf = s->p_buf;
+    e->attached = s->p_attached;
+    wl_list_init(&e->buf_destroy.link);
+    if (s->p_buf) {
+        wl_list_remove(&s->p_buf_destroy.link);
+        wl_list_init(&s->p_buf_destroy.link);
+        e->buf_destroy.notify = pend_buf_gone;
+        wl_resource_add_destroy_listener(e->buf, &e->buf_destroy);
+    }
+    s->p_buf = NULL;
+    s->p_attached = 0;
+    e->gx = s->p_gx; e->gy = s->p_gy; e->gw = s->p_gw; e->gh = s->p_gh; e->geom = s->p_geom;
+    s->p_geom = 0;
+    wl_list_init(&e->frames);
+    wl_list_insert_list(&e->frames, &s->p_frames);
+    wl_list_init(&s->p_frames);
+    wl_list_init(&e->feedback);
+    wl_list_insert_list(&e->feedback, &s->p_feedback);
+    wl_list_init(&s->p_feedback);
+    memcpy(e->ds, s->p_ds, sizeof e->ds);
+    e->ds_on = s->p_ds_on; e->db_on = s->p_db_on; e->db = s->p_db;
+    s->p_ds_on = s->p_db_on = 0;
+    e->tf = s->p_tf;
+    e->alpha = s->p_alpha;
+    e->icon = s->p_icon; e->icon_set = s->p_icon_set;
+    s->p_icon = NULL;
+    s->p_icon_set = 0;
+    e->vsx = s->p_vsx; e->vsy = s->p_vsy; e->vsw = s->p_vsw; e->vsh = s->p_vsh;
+    e->vdw = s->p_vdw; e->vdh = s->p_vdh; e->vp = s->p_vp;
+    s->p_vp = 0;
+    e->hx = s->p_hx; e->hy = s->p_hy; e->sx = s->p_sx; e->sy = s->p_sy; e->bscale = s->p_bscale;
+    e->dnd_x = s->p_dnd_x; e->dnd_y = s->p_dnd_y;
+    s->p_dnd_x = s->p_dnd_y = 0;
+    e->input = s->p_input; e->input_set = s->p_input_set; e->has_input = s->p_has_input;
+    s->p_input = (WlRgn){ 0 };
+    s->p_input_set = 0;
+    e->acq = s->p_acq; e->rel = s->p_rel;
+    s->p_acq.tl = s->p_rel.tl = NULL;
+}
+
+/* e back into the surface's pending state (what is left there of an applied commit is dropped) */
+static void pend_put(Surf *s, Pend *e) {
+    if (s->p_buf) { wl_list_remove(&s->p_buf_destroy.link); wl_list_init(&s->p_buf_destroy.link); }
+    s->p_buf = e->buf;
+    s->p_attached = e->attached;
+    if (e->buf) {
+        wl_list_remove(&e->buf_destroy.link);
+        s->p_buf_destroy.notify = buffer_destroyed;
+        wl_resource_add_destroy_listener(e->buf, &s->p_buf_destroy);
+    }
+    wl_list_init(&e->buf_destroy.link);
+    s->p_gx = e->gx; s->p_gy = e->gy; s->p_gw = e->gw; s->p_gh = e->gh; s->p_geom = e->geom;
+    wl_list_insert_list(s->p_frames.prev, &e->frames);
+    wl_list_init(&e->frames);
+    wl_list_insert_list(s->p_feedback.prev, &e->feedback);
+    wl_list_init(&e->feedback);
+    memcpy(s->p_ds, e->ds, sizeof e->ds);
+    s->p_ds_on = e->ds_on; s->p_db_on = e->db_on; s->p_db = e->db;
+    s->p_tf = e->tf;
+    s->p_alpha = e->alpha;
+    wlicon_unref(s->p_icon);
+    s->p_icon = e->icon; s->p_icon_set = e->icon_set;
+    e->icon = NULL;
+    s->p_vsx = e->vsx; s->p_vsy = e->vsy; s->p_vsw = e->vsw; s->p_vsh = e->vsh;
+    s->p_vdw = e->vdw; s->p_vdh = e->vdh; s->p_vp = e->vp;
+    s->p_hx = e->hx; s->p_hy = e->hy; s->p_sx = e->sx; s->p_sy = e->sy; s->p_bscale = e->bscale;
+    s->p_dnd_x = e->dnd_x; s->p_dnd_y = e->dnd_y;
+    wlrgn_free(&s->p_input);
+    s->p_input = e->input; s->p_input_set = e->input_set; s->p_has_input = e->has_input;
+    e->input = (WlRgn){ 0 };
+    sobj_unref(s->p_acq.tl);
+    sobj_unref(s->p_rel.tl);
+    s->p_acq = e->acq; s->p_rel = e->rel;
+    e->acq.tl = e->rel.tl = NULL;
+}
+
+/* A commit that will never be applied (its surface is gone): its callbacks are dropped, its presentation feedback
+ * discarded, and its release point signalled (the app may wait on it) */
+static void pend_free(Pend *e) {
+    if (e->buf) wl_list_remove(&e->buf_destroy.link);
+    struct wl_resource *cb, *tmp;
+    wl_resource_for_each_safe(cb, tmp, &e->frames) wl_resource_destroy(cb);
+    wl_resource_for_each_safe(cb, tmp, &e->feedback) { wp_presentation_feedback_send_discarded(cb); wl_resource_destroy(cb); }
+    wlicon_unref(e->icon);
+    wlrgn_free(&e->input);
+    sobj_unref(e->acq.tl);
+    sobj_release(&e->rel);
+    free(e);
+}
+
+static void surface_apply(Surf *s);
+static const char *app_of_client(struct wl_client *cl);
+
+static void sq_disarm(Surf *s) {
+    if (s->sq_src) {
+        wl_event_source_remove(s->sq_src);
+        s->sq_src = NULL;
+        close(s->sq_fd);
+        s->sq_fd = -1;
+        sobj_waits--;
+        SobjClient *k = sobj_client_find(s->client);
+        if (k) k->waits--;
+    }
+    if (s->sq_timer) wl_event_source_timer_update(s->sq_timer, 0);
+}
+
+static void sq_drain(Surf *s);
+static int sq_ready(int fd, uint32_t mask, void *data) {
+    (void)fd; (void)mask;
+    Surf *s = data;
+    sq_disarm(s);
+    sq_drain(s);
+    return 0;
+}
+
+/* a frame that waits 5 s: logged once per surface; it keeps waiting (the protocol has no timeout) */
+static int sq_slow(void *data) {
+    Surf *s = data;
+    if (s->sq.n && !s->sq_logged) {
+        s->sq_logged = 1;
+        fprintf(stderr, "wayland: %s: a frame waits for its acquire point for %d s\n",
+                s->app_id[0] ? s->app_id : app_of_client(s->client), SOBJ_WAIT_LOG_MS / 1000);
+    }
+    return 0;
+}
+
+/* Waits for the first queued commit's acquire point: 0 armed, -1 the kernel refused (it is applied as it is), -2 past
+ * a limit (the client is disconnected) */
+static int sq_arm(Surf *s, Pend *e) {
+    SobjClient *k = sobj_client(s->client);
+    if (!k || !sobj_may_wait(k->waits, sobj_waits)) return -2;
+    int fd = sobj_eventfd(e->acq);
+    if (fd < 0) return -1;
+    s->sq_src = wl_event_loop_add_fd(loop, fd, WL_EVENT_READABLE, sq_ready, s);
+    if (!s->sq_src) { close(fd); return -1; }
+    s->sq_fd = fd;
+    k->waits++;
+    sobj_waits++;
+    if (!s->sq_logged) {
+        if (!s->sq_timer) s->sq_timer = wl_event_loop_add_timer(loop, sq_slow, s);
+        if (s->sq_timer) wl_event_source_timer_update(s->sq_timer, SOBJ_WAIT_LOG_MS);
+    }
+    return 0;
+}
+
+/* A queued commit applied: the state pending now (later requests of the app) is set aside around it */
+static void sq_apply(Surf *s, Pend *e) {
+    Pend live;
+    pend_take(s, &live);
+    pend_put(s, e);
+    surface_apply(s);
+    pend_put(s, &live);
+    free(e);
+}
+
+/* Applies the queued commits whose acquire point is signalled, in order, up to the first one that still waits */
+static void sq_drain(Surf *s) {
+    Pend *e;
+    while (!s->sq_src && (e = sobjq_front(&s->sq))) {
+        if (e->acq.tl && sobj_signalled(e->acq) != 1) {
+            int r = sq_arm(s, e);
+            if (r == 0) return;
+            if (r == -2) { wl_client_post_no_memory(s->client); return; }
+            static int told;
+            if (!told++) fprintf(stderr, "wayland: explicit sync: could not wait for an acquire point; applied as it is\n");
+        }
+        sobjq_pop(&s->sq);
+        sq_apply(s, e);
+    }
+}
+
+/* The surface goes: its waiting commits are dropped (their release points signalled), its points forgotten */
+static void sobj_surface_gone(Surf *s) {
+    sq_disarm(s);
+    if (s->sq_timer) { wl_event_source_remove(s->sq_timer); s->sq_timer = NULL; }
+    Pend *e;
+    while ((e = sobjq_pop(&s->sq))) pend_free(e);
+    sobj_unref(s->p_acq.tl);
+    sobj_unref(s->p_rel.tl);
+    s->p_acq.tl = s->p_rel.tl = NULL;
+    if (s->sobj) {
+        wl_resource_set_user_data(s->sobj, NULL);
+        SobjClient *k = sobj_client_find(s->client);
+        if (k) k->surfaces--;
+        s->sobj = NULL;
+    }
+}
+
+static const char *sobj_err_text(int err) {
+    switch (err) {
+    case SOBJ_ERR_UNSUPPORTED_BUFFER: return "the buffer is not a dmabuf";
+    case SOBJ_ERR_NO_BUFFER: return "timeline points set with no buffer attached";
+    case SOBJ_ERR_NO_ACQUIRE_POINT: return "a buffer attached with no acquire point";
+    case SOBJ_ERR_NO_RELEASE_POINT: return "a buffer attached with no release point";
+    case SOBJ_ERR_CONFLICTING_POINTS: return "the acquire point is not below the release point on the same timeline";
+    default: return "explicit sync error";
+    }
+}
+
+/* wp_linux_drm_syncobj_timeline_v1 */
+static void sobjt_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct wp_linux_drm_syncobj_timeline_v1_interface sobjt_impl = { .destroy = sobjt_destroy };
+static void sobjt_gone(struct wl_resource *r) {
+    sobj_unref(wl_resource_get_user_data(r));           /* points still pending keep their own reference */
+    SobjClient *k = sobj_client_find(wl_resource_get_client(r));
+    if (k) k->timelines--;
+}
+
+/* wp_linux_drm_syncobj_surface_v1 */
+static void sobjs_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void sobjs_point(struct wl_resource *r, struct wl_resource *timeline, uint32_t hi, uint32_t lo, int release) {
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s) { wl_resource_post_error(r, WP_LINUX_DRM_SYNCOBJ_SURFACE_V1_ERROR_NO_SURFACE, "the wl_surface is gone"); return; }
+    SobjPoint *p = release ? &s->p_rel : &s->p_acq;
+    sobj_unref(p->tl);
+    p->tl = sobj_ref(wl_resource_get_user_data(timeline));
+    p->point = sobj_point(hi, lo);
+}
+static void sobjs_acquire(struct wl_client *c, struct wl_resource *r, struct wl_resource *t, uint32_t hi, uint32_t lo) {
     (void)c;
+    sobjs_point(r, t, hi, lo, 0);
+}
+static void sobjs_release(struct wl_client *c, struct wl_resource *r, struct wl_resource *t, uint32_t hi, uint32_t lo) {
+    (void)c;
+    sobjs_point(r, t, hi, lo, 1);
+}
+static const struct wp_linux_drm_syncobj_surface_v1_interface sobjs_impl = {
+    .destroy = sobjs_destroy, .set_acquire_point = sobjs_acquire, .set_release_point = sobjs_release,
+};
+/* the object goes: points set since the last commit are dropped; commits already made keep theirs (and still wait) */
+static void sobjs_gone(struct wl_resource *r) {
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s || s->sobj != r) return;
+    s->sobj = NULL;
+    sobj_unref(s->p_acq.tl);
+    sobj_unref(s->p_rel.tl);
+    s->p_acq.tl = s->p_rel.tl = NULL;
+    SobjClient *k = sobj_client_find(s->client);
+    if (k) k->surfaces--;
+}
+
+/* wp_linux_drm_syncobj_manager_v1 */
+static void sobjm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void sobjm_get_surface(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface) {
+    Surf *s = wl_resource_get_user_data(surface);
+    if (s->sobj) {
+        wl_resource_post_error(r, WP_LINUX_DRM_SYNCOBJ_MANAGER_V1_ERROR_SURFACE_EXISTS, "the wl_surface has a syncobj object");
+        return;
+    }
+    SobjClient *k = sobj_client(c);
+    if (!k || k->surfaces >= SOBJ_MAX_SURFACES) { wl_client_post_no_memory(c); return; }
+    struct wl_resource *o = wl_resource_create(c, &wp_linux_drm_syncobj_surface_v1_interface, wl_resource_get_version(r), id);
+    if (!o) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(o, &sobjs_impl, s, sobjs_gone);
+    s->sobj = o;
+    k->surfaces++;
+}
+static void sobjm_import(struct wl_client *c, struct wl_resource *r, uint32_t id, int32_t fd) {
+    SobjClient *k = sobj_client(c);
+    if (!k || k->timelines >= SOBJ_MAX_TIMELINES) { close(fd); wl_client_post_no_memory(c); return; }
+    SobjTimeline *t = sobj_import(fd);
+    close(fd);
+    if (!t) { wl_resource_post_error(r, WP_LINUX_DRM_SYNCOBJ_MANAGER_V1_ERROR_INVALID_TIMELINE, "not a DRM syncobj"); return; }
+    struct wl_resource *o = wl_resource_create(c, &wp_linux_drm_syncobj_timeline_v1_interface, wl_resource_get_version(r), id);
+    if (!o) { sobj_unref(t); wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(o, &sobjt_impl, t, sobjt_gone);
+    k->timelines++;
+}
+static const struct wp_linux_drm_syncobj_manager_v1_interface sobjm_impl = {
+    .destroy = sobjm_destroy, .get_surface = sobjm_get_surface, .import_timeline = sobjm_import,
+};
+static void bind_sobjm(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &wp_linux_drm_syncobj_manager_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &sobjm_impl, NULL, NULL);
+}
+
+/* wl_surface.commit: with explicit sync, the protocol's rules first; then applied now, or queued while its acquire
+ * point (or an earlier commit's) is not signalled. Without it, a commit still waits behind queued ones (order). */
+static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (keylag_enabled && key_focus && c == key_focus->client) keylag_commit();
+    if (s->sobj) {
+        int err = sobj_commit_error(s->p_attached, s->p_buf != NULL, dmabuf_of(s->p_buf) != NULL, s->p_acq.tl != NULL,
+                                    s->p_rel.tl != NULL, s->p_acq.tl && s->p_acq.tl == s->p_rel.tl, s->p_acq.point, s->p_rel.point);
+        if (err) { wl_resource_post_error(s->sobj, (uint32_t)err, "%s", sobj_err_text(err)); return; }
+    }
+    int act = sobj_commit_action(s->sq.n > 0, s->p_acq.tl != NULL, s->p_acq.tl ? sobj_signalled(s->p_acq) == 1 : 1);
+    if (act == SOBJ_APPLY) { surface_apply(s); return; }
+    Pend *e = calloc(1, sizeof *e);
+    if (!e) { wl_client_post_no_memory(c); return; }
+    pend_take(s, e);
+    if (sobjq_push(&s->sq, e)) { pend_free(e); wl_client_post_no_memory(c); return; }
+    if (s->sq.n == 1) sq_drain(s);
+}
+
+/* A commit's state becomes current (at wl_surface.commit, or later once its acquire point is signalled) */
+static void surface_apply(Surf *s) {
     s->tf = s->p_tf;
+    sobj_unref(s->p_acq.tl);                    /* waited for */
+    s->p_acq.tl = NULL;
     if (s->p_attached) {
-        take_buffer(s, s->p_buf, commit_damage(s, s->p_buf));
+        take_buffer(s, s->p_buf, commit_damage(s, s->p_buf), &s->p_rel);
         if (s->p_buf) { wl_list_remove(&s->p_buf_destroy.link); wl_list_init(&s->p_buf_destroy.link); }
         s->p_buf = NULL;
         s->p_attached = 0;
     }
     else if (s->p_ds_on || s->p_db_on) s->dmg_full = 1;     /* damage with no new buffer: shown again as it is */
     else { s->dmg_full = 0; s->dmg = (BufBox){ 0, 0, 0, 0 }; }  /* a commit of state only */
+    sobj_release(&s->p_rel);                    /* (none left: take_buffer took it, or no buffer had one) */
     s->p_ds_on = s->p_db_on = 0;
     if (s->p_alpha != s->alpha) { s->alpha = s->p_alpha; s->dmg_full = 1; }   /* a new opacity: all of it again */
     if (s->p_icon_set) {                        /* xdg_toplevel_icon_manager_v1.set_icon, double-buffered */
@@ -1305,7 +1703,9 @@ static void surface_gone(struct wl_resource *r) {
     if (cursor_surf == s) { cursor_surf = NULL; cursor_mode = 0; cursor_gen++; }
     if (constraint && constraint->surf == s) { constraint->surf = NULL; constraint->active = 0; }
     constraint_update();                /* s may have been the window with the keyboard */
-    if (s->dmabuf) queue_release(s->dmabuf);
+    if (s->dmabuf) queue_release(s->dmabuf, &s->rel);
+    else sobj_release(&s->rel);
+    sobj_surface_gone(s);
     gpu_tex_free(s->tex);
     wlrgn_free(&s->input);
     wlrgn_free(&s->p_input);
@@ -1347,6 +1747,7 @@ static void comp_create_surface(struct wl_client *c, struct wl_resource *r, uint
     s->bscale = s->p_bscale = 1;
     s->fslot = -1;
     s->p_alpha = s->alpha = UINT32_MAX;
+    s->sq_fd = -1;
     surfs[slot] = s;
     wl_resource_set_implementation(res, &surface_impl, s, surface_gone);
     if (c == xwl_client) xwm_surface_created(id);   /* WL_SURFACE_ID may have come first */
@@ -3727,6 +4128,8 @@ static void scanout_done(void *data) {
     int current = 0;
     for (int i = 0; i < MAX_SURF && !current; i++) if (surfs[i] && surfs[i]->dmabuf == d) current = 1;
     if (d->res && !current) wl_buffer_send_release(d->res);
+    for (int i = 0; i < d->nsrel; i++) sobj_release_after(&d->srel[i], d->d.fd[0]);   /* off the screen now */
+    d->nsrel = 0;
     dm_unref(d);
 }
 
@@ -3755,8 +4158,9 @@ void wl_frame_done(unsigned t, unsigned keys) {
     frames_held = 0;
     update_surface_outputs();
     for (int i = 0; i < nrelease; i++) {
-        Dmabuf *d = to_release[i];
+        Dmabuf *d = to_release[i].d;
         if (d->res && !d->scanned) wl_buffer_send_release(d->res);
+        dm_release_point(d, &to_release[i].rel);
         dm_unref(d);
     }
     nrelease = 0;
@@ -5978,6 +6382,13 @@ int wl_start(void) {
     if (gpu_active()) ngpu_fmt = gpu_formats(gpu_fmt_cache, 256);
     gpu_set_hooks(wl_gpu_lost, wl_gpu_changed);
     wl_global_create(dpy, &zwp_linux_dmabuf_v1_interface, 5, NULL, bind_dmabuf);   /* 5: one modifier for every plane */
+    /* explicit sync: only with a render node that has timeline syncobjs and SYNCOBJ_EVENTFD (syncobj.c); on both the
+     * GPU and the CPU path (a commit is applied once its acquire point is signalled, so the CPU copy reads a finished
+     * frame) */
+    wl_list_init(&sobj_clients);
+    dev_t sdev = drm_dev;
+    if (gpu_active()) gpu_device(&sdev);
+    if (sobj_init(sdev) == 0) wl_global_create(dpy, &wp_linux_drm_syncobj_manager_v1_interface, 1, NULL, bind_sobjm);
     wl_global_create(dpy, &wp_presentation_interface, 2, NULL, bind_presentation);
     wl_global_create(dpy, &wp_viewporter_interface, 1, NULL, bind_viewporter);
     wl_global_create(dpy, &wp_single_pixel_buffer_manager_v1_interface, 1, NULL, bind_spbm);   /* one-pixel buffers (backgrounds) */
