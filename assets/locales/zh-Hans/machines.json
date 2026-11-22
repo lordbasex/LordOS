@@ -1036,6 +1036,8 @@
   "apps.noMatch": "没有与搜索匹配的应用",
   "apps.closeWindow": "在机器中关闭此窗口",
   "apps.untitled": "无标题窗口",
+  "apps.statusTip": "{name}(应用模式)",
+  "apps.showWindow": "显示虚拟机窗口",
   "cfg.resolutionFollowNote": "机器以窗口的大小启动，并在系统允许时跟随窗口。窗口的工具栏仍可选择其他大小。",
   "cfg.resolutionFixedNote": "机器以此大小启动：每个系统在启动时都会采用它，包括不跟随窗口的系统。运行时仍可在窗口的工具栏选择其他大小。",
   "cfg.gpu": "显卡",

@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Ninguna app coincide con la búsqueda",
   "apps.closeWindow": "Cerrar esta ventana en la máquina",
   "apps.untitled": "Ventana sin título",
+  "apps.statusTip": "{name} en modo apps",
+  "apps.showWindow": "Mostrar la ventana de la máquina",
   "cfg.resolutionFollowNote": "La máquina arranca con el tamaño de la ventana y lo sigue mientras su sistema lo permita. Desde la barra de la ventana igual podés elegir otro tamaño.",
   "cfg.resolutionFixedNote": "La máquina arranca con este tamaño: todo sistema lo toma al iniciar, también los que no siguen a la ventana. Desde la barra de la ventana igual podés elegir otro mientras corre.",
   "cfg.gpu": "Tarjeta gráfica",

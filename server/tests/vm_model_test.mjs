@@ -508,6 +508,20 @@ eq('guest apps menu', M.guestAppItems([{ name: 'Zeta', token: 'z' }, { name: 'al
   eq('apps search: every word', [M.appsMatching(apps, 'micro edge').map((a) => a.token), M.appsMatching(apps, 'micro paint')], [['e'], []]);
   eq('apps search: inside a word last', M.appsMatching(apps, 'a').map((a) => a.token)[0], 'c');
   eq('app initial', [M.appInitial(' paint'), M.appInitial(''), M.appInitial('écran')], ['P', '?', 'É']);
+  // the launcher's apps (status item, controller): the search, and an icon per token when the guest sent one
+  const px = { w: 16, h: 16 };
+  eq('launcher apps: icons by token, none otherwise', M.launcherApps(apps, 'ed', { d: px }).map((a) => [a.token, a.icon]), [['d', px], ['e', null]]);
+  eq('launcher apps: no icons at all', M.launcherApps(apps, '', undefined).every((a) => a.icon === null), true);
+  eq('launcher apps: keeps name and token', M.launcherApps([{ name: 'Paint', token: 'p' }], 'pa', {})[0], { name: 'Paint', token: 'p', icon: null });
+  // the status items by the clock: one per machine with a session, in name order
+  const gs = { '/m/win': { sid: 3, name: 'Windows 11' }, '/m/deb': { sid: 2, name: 'Debian' }, '/m/off': { name: 'Off' }, '/m/x': null };
+  eq('apps status list', M.appsStatusList(gs), [{ dir: '/m/deb', name: 'Debian' }, { dir: '/m/win', name: 'Windows 11' }]);
+  eq('apps status list: no name → the folder', M.appsStatusList({ '/a/b/vm1': { sid: 1 } }), [{ dir: '/a/b/vm1', name: 'vm1' }]);
+  eq('apps status list: none', [M.appsStatusList(null), M.appsStatusList({})], [[], []]);
+  eq('apps status diff: added and gone', M.appsStatusDiff(['/m/deb', '/m/old'], gs), { add: ['/m/win'], remove: ['/m/old'] });
+  eq('apps status diff: nothing to do', M.appsStatusDiff(['/m/win', '/m/deb'], gs), { add: [], remove: [] });
+  eq('apps status diff: apps mode ended everywhere', M.appsStatusDiff(['/m/deb'], {}), { add: [], remove: ['/m/deb'] });
+  eq('machine os: kept, then guessed', [M.machineOsId({ os: 'fedora' }, 'Debian'), M.machineOsId({ osName: 'Ubuntu 24.04' }, 'Work'), M.machineOsId({}, 'Debian 13'), M.machineOsId(null, 'zzz')], ['fedora', 'ubuntu', 'debian', 'other']);
 }
 // the boot order (Configure → Boot)
 eq('boot list auto', M.bootList('auto'), ['disk', 'cd', 'network']);

@@ -1077,6 +1077,28 @@ export function appsMatching(apps, query) {
 // the letter a guest app's row shows (the guest lists no icons for its apps): its first character, upper case
 export const appInitial = (name) => (Array.from(String(name || '').trim())[0] || '?').toUpperCase();
 
+// The guest's apps a launcher lists (the controller's panel, the status item's menu): the ones matching the search, each
+// with its icon when the guest sent one (icons: token → pixels; none yet, so the initial tile shows instead)
+export function launcherApps(apps, query, icons) {
+  return appsMatching(apps, query).map((a) => ({ ...a, icon: (icons && a && icons[a.token]) || null }));
+}
+
+// The machines in apps mode, as their status items by the clock show them: one per machine with a session (guests: dir →
+// what useAppsMode publishes), in name order so the items keep their places
+export function appsStatusList(guests) {
+  const out = [];
+  for (const [dir, g] of Object.entries(guests || {})) if (g && g.sid) out.push({ dir, name: String(g.name || dir.split('/').pop() || '') });
+  return out.sort((a, b) => a.name.localeCompare(b.name) || a.dir.localeCompare(b.dir));
+}
+// what to add and remove so the registered items (have: dirs) are the machines in apps mode now
+export function appsStatusDiff(have, guests) {
+  const now = appsStatusList(guests).map((x) => x.dir);
+  const was = new Set(have || []);
+  return { add: now.filter((d) => !was.has(d)), remove: [...was].filter((d) => !now.includes(d)) };
+}
+// the system a machine runs, for its mark (ui.jsx OsMark): the one kept in app.json, or guessed from its name
+export const machineOsId = (meta, name) => meta?.os || systemOf(meta?.osName, name).id;
+
 // Where a machine starts from (Configure → Boot; machine.json's boot_order): "auto" (the system disk, then the CD/DVD
 // drive) or the devices the firmware tries, in order, as lord-vm takes them ("network,disk").
 export const BOOT_DEVS = ['disk', 'cd', 'network'];

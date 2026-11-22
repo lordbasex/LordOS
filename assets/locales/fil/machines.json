@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Walang app na tumutugma sa hinahanap",
   "apps.closeWindow": "Isara ang window na ito sa machine",
   "apps.untitled": "Window na walang pamagat",
+  "apps.statusTip": "{name} sa Apps Mode",
+  "apps.showWindow": "Ipakita ang Window ng Machine",
   "cfg.resolutionFollowNote": "Nagsisimula ang makina sa laki ng window at sinusundan ito hangga't pinapayagan ng sistema nito. Puwede pa ring pumili ng ibang laki sa toolbar ng window.",
   "cfg.resolutionFixedNote": "Nagsisimula ang makina sa laking ito: kinukuha ito ng bawat sistema sa pagsisimula, pati ng mga hindi sumusunod sa window. Puwede pa ring pumili ng iba sa toolbar ng window habang tumatakbo.",
   "cfg.gpu": "Graphics card",

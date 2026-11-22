@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Tiada apl yang sepadan dengan carian",
   "apps.closeWindow": "Tutup tetingkap ini dalam mesin",
   "apps.untitled": "Tetingkap tanpa tajuk",
+  "apps.statusTip": "{name} dalam Mod Aplikasi",
+  "apps.showWindow": "Tunjukkan Tetingkap Mesin",
   "cfg.resolutionFollowNote": "Mesin bermula dengan saiz tetingkap dan mengikutinya selagi sistemnya membenarkan. Bar alat tetingkap masih boleh memilih saiz lain.",
   "cfg.resolutionFixedNote": "Mesin bermula dengan saiz ini: setiap sistem mengambilnya semasa bermula, termasuk yang tidak mengikut tetingkap. Bar alat tetingkap masih boleh memilih saiz lain semasa ia berjalan.",
   "cfg.gpu": "Kad grafik",

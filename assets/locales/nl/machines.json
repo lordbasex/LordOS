@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Geen app komt overeen met de zoekopdracht",
   "apps.closeWindow": "Dit venster in de machine sluiten",
   "apps.untitled": "Venster zonder titel",
+  "apps.statusTip": "{name} in appmodus",
+  "apps.showWindow": "Venster van de machine tonen",
   "cfg.resolutionFollowNote": "De machine start op de grootte van het venster en volgt die zolang het systeem het toelaat. De werkbalk van het venster kan nog steeds een andere grootte kiezen.",
   "cfg.resolutionFixedNote": "De machine start op deze grootte: elk systeem neemt die over bij het starten, ook systemen die het venster niet volgen. De werkbalk van het venster kan tijdens het draaien nog steeds een andere kiezen.",
   "cfg.gpu": "Videokaart",

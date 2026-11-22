@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Nessuna app corrisponde alla ricerca",
   "apps.closeWindow": "Chiudi questa finestra nella macchina",
   "apps.untitled": "Finestra senza titolo",
+  "apps.statusTip": "{name} in modalità app",
+  "apps.showWindow": "Mostra la finestra della macchina",
   "cfg.resolutionFollowNote": "La macchina si avvia con la dimensione della finestra e la segue finché il suo sistema lo consente. La barra della finestra può comunque scegliere un'altra dimensione.",
   "cfg.resolutionFixedNote": "La macchina si avvia con questa dimensione: ogni sistema la prende all'avvio, anche quelli che non seguono la finestra. La barra della finestra può comunque sceglierne un'altra mentre è in esecuzione.",
   "cfg.gpu": "Scheda grafica",

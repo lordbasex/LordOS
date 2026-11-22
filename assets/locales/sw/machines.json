@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Hakuna programu inayolingana na utafutaji",
   "apps.closeWindow": "Funga dirisha hili kwenye mashine",
   "apps.untitled": "Dirisha lisilo na jina",
+  "apps.statusTip": "{name} katika Hali ya Programu",
+  "apps.showWindow": "Onyesha Dirisha la Mashine",
   "cfg.resolutionFollowNote": "Mashine inaanza kwa ukubwa wa dirisha na kuufuata kadiri mfumo wake unavyoruhusu. Upau wa zana wa dirisha bado unaweza kuchagua ukubwa mwingine.",
   "cfg.resolutionFixedNote": "Mashine inaanza kwa ukubwa huu: kila mfumo huuchukua inapoanza, hata isiyofuata dirisha. Upau wa zana wa dirisha bado unaweza kuchagua mwingine ikiendelea kufanya kazi.",
   "cfg.gpu": "Kadi ya michoro",

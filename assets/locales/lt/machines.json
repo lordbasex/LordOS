@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Paieškos neatitinka jokia programa",
   "apps.closeWindow": "Uždaryti šį langą mašinoje",
   "apps.untitled": "Langas be pavadinimo",
+  "apps.statusTip": "{name} programų režimu",
+  "apps.showWindow": "Rodyti mašinos langą",
   "cfg.resolutionFollowNote": "Mašina paleidžiama lango dydžio ir seka jį, kol leidžia jos sistema. Lango įrankių juostoje vis tiek galima pasirinkti kitą dydį.",
   "cfg.resolutionFixedNote": "Mašina paleidžiama šio dydžio: kiekviena sistema jį perima paleidžiama, net ir tos, kurios neseka lango. Veikiant lango įrankių juostoje vis tiek galima pasirinkti kitą.",
   "cfg.gpu": "Vaizdo plokštė",

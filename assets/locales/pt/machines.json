@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Nenhum app corresponde à busca",
   "apps.closeWindow": "Fechar esta janela na máquina",
   "apps.untitled": "Janela sem título",
+  "apps.statusTip": "{name} no modo apps",
+  "apps.showWindow": "Mostrar a janela da máquina",
   "cfg.resolutionFollowNote": "A máquina inicia com o tamanho da janela e o acompanha enquanto o sistema permitir. A barra da janela ainda pode escolher outro tamanho.",
   "cfg.resolutionFixedNote": "A máquina inicia com este tamanho: todo sistema o adota ao iniciar, também os que não acompanham a janela. A barra da janela ainda pode escolher outro enquanto ela roda.",
   "cfg.gpu": "Placa de vídeo",
