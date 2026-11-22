@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Neleidžiama",
   "set.input.privacy": "Privatumo nustatymai",
   "set.input.mouse": "Pelė",
-  "set.input.mouseNote": "Naujos mašinos tai perima iš savo profilio (Klaviatūra ir pelė): automatiškai arba užfiksuojama spustelėjus."
+  "set.input.mouseNote": "Naujos mašinos tai perima iš savo profilio (Klaviatūra ir pelė): automatiškai arba užfiksuojama spustelėjus.",
+  "set.imp.adj.lan": "Prievadas {from} buvo atviras jūsų tinklui; dabar tik šis kompiuteris.",
+  "set.imp.portLocal": "{rule}, tik šis kompiuteris",
+  "set.imp.portLan": "{rule}, atviras jūsų tinklui",
+  "set.imp.exposure": "Ką jis atveria",
+  "set.imp.bridged": "Tiltinis tinklas: mašina prisijungia prie jūsų tinklo kaip dar vienas kompiuteris, per plokštę iš Mašinų nustatymų → Tinklas.",
+  "set.imp.clipBoth": "Iškarpinė veikia abiem kryptimis: tai, ką nukopijuojate čia, galima perskaityti mašinoje.",
+  "set.imp.shareWrite": "Mašina gali keisti bendrinamo aplanko failus; aplanką pasirenkate patys kurdami.",
+  "set.edit.lanWarn": "Jūsų tinklas: kiti jūsų tinklo kompiuteriai gali pasiekti šį prievadą."
 }

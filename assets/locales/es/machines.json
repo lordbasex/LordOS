@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "No permitido",
   "set.input.privacy": "Ajustes de privacidad",
   "set.input.mouse": "Mouse",
-  "set.input.mouseNote": "Las máquinas nuevas lo toman de su perfil (Teclado y mouse): automático, o capturado con un clic."
+  "set.input.mouseNote": "Las máquinas nuevas lo toman de su perfil (Teclado y mouse): automático, o capturado con un clic.",
+  "set.imp.adj.lan": "El puerto {from} estaba abierto a tu red; ahora solo esta computadora.",
+  "set.imp.portLocal": "{rule}, solo esta computadora",
+  "set.imp.portLan": "{rule}, abierto a tu red",
+  "set.imp.exposure": "Qué abre",
+  "set.imp.bridged": "Red en puente: la máquina se une a tu red como una computadora más, en la placa elegida en Ajustes de Máquinas → Red.",
+  "set.imp.clipBoth": "El portapapeles va en los dos sentidos: lo que copiás acá se puede leer en la máquina.",
+  "set.imp.shareWrite": "La máquina puede cambiar los archivos de la carpeta compartida; la carpeta la elegís vos al crearla.",
+  "set.edit.lanWarn": "Tu red: otras computadoras de tu red pueden llegar a este puerto."
 }

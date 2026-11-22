@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Nem engedélyezett",
   "set.input.privacy": "Adatvédelmi beállítások",
   "set.input.mouse": "Egér",
-  "set.input.mouseNote": "Az új gépek a profiljukból veszik (Billentyűzet és egér): automatikus, vagy kattintásra befogott."
+  "set.input.mouseNote": "Az új gépek a profiljukból veszik (Billentyűzet és egér): automatikus, vagy kattintásra befogott.",
+  "set.imp.adj.lan": "A(z) {from} port nyitva volt a hálózata felé; most már csak ez a számítógép.",
+  "set.imp.portLocal": "{rule}, csak ez a számítógép",
+  "set.imp.portLan": "{rule}, nyitva a hálózata felé",
+  "set.imp.exposure": "Mit nyit meg",
+  "set.imp.bridged": "Hídhálózat: a gép egy újabb számítógépként csatlakozik a hálózatához, a Gépek beállításai → Hálózat részben megadott kártyán.",
+  "set.imp.clipBoth": "A vágólap mindkét irányban működik: amit itt másol, az a gépben olvasható.",
+  "set.imp.shareWrite": "A gép módosíthatja a megosztott mappa fájljait; a mappát Ön választja ki létrehozáskor.",
+  "set.edit.lanWarn": "Az Ön hálózata: a hálózat más számítógépei elérhetik ezt a portot."
 }

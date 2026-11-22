@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Nepermis",
   "set.input.privacy": "Setări de confidențialitate",
   "set.input.mouse": "Mouse",
-  "set.input.mouseNote": "Mașinile noi îl preiau din profilul lor (Tastatură și mouse): automat sau capturat la un clic."
+  "set.input.mouseNote": "Mașinile noi îl preiau din profilul lor (Tastatură și mouse): automat sau capturat la un clic.",
+  "set.imp.adj.lan": "Portul {from} era deschis către rețeaua dumneavoastră; acum doar acest computer.",
+  "set.imp.portLocal": "{rule}, doar acest computer",
+  "set.imp.portLan": "{rule}, deschis către rețeaua dumneavoastră",
+  "set.imp.exposure": "Ce deschide",
+  "set.imp.bridged": "Rețea în punte: mașina intră în rețeaua dumneavoastră ca încă un computer, pe placa aleasă în Setările Mașinilor → Rețea.",
+  "set.imp.clipBoth": "Clipboardul funcționează în ambele sensuri: ce copiați aici poate fi citit în mașină.",
+  "set.imp.shareWrite": "Mașina poate modifica fișierele dosarului partajat; dosarul îl alegeți dumneavoastră la creare.",
+  "set.edit.lanWarn": "Rețeaua dumneavoastră: alte computere din rețea pot ajunge la acest port."
 }

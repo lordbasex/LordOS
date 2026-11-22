@@ -11,7 +11,7 @@ import CATALOG from '../../assets/machines/systems.json';
 import { systemsFor, unattendedOf } from './catalog.js';
 import { LIB_VIEWS, LIB_SORTS, libView, NET_MODES, GPU_CHOICES, PORT_HOST_MIN, newPortRule, portProblems, portInput, usesPorts, CLOSE_CHOICES, gvtGpu, no3dReason, missingFor } from './model.js';
 import { BUILTIN, DEFAULT_PROFILE, CLIPBOARDS, MOUSE, SHORTCUTS, allProfiles, builtinProfile, blankProfile, readProfile, writeProfile, onHost, cpuCap, memCap,
-  defaultProfileId, exportName, shareRel, PROFILE_FILE_MAX } from './profiles.js';
+  defaultProfileId, exportName, shareRel, exposureOf, PROFILE_FILE_MAX } from './profiles.js';
 import { CARD_COLORS, COLOR_HEX, SYSTEM_KINDS, INSTALLS, validateSystem, newId, systemState, downloadCandidates, fileOfUrl, hostOf } from './systems.js';
 import { loadProfiles, saveProfile, deleteProfile, loadSystems, saveSystems, defaultsOf, setDefaults, removeLogos, storeRev, profileTitle } from './store.js';
 import { fetchAllLogos, logoSystems } from './logos.js';
@@ -194,7 +194,7 @@ function Profiles({ host, gpus }) {
       if (!st || st.size > PROFILE_FILE_MAX) { setErr(tr('machines.set.imp.err.tooBig')); return; }
       const systems = loadSystems();
       const known = [...systemsFor(CATALOG, host.arch).map((x) => x.id), ...systems.map((x) => x.id)];
-      const r = readProfile(fs.read(path), { host, gpuReady: !!gvtGpu(gpus), systems: known, home: fs.home(), id: newId('u', ids), imageId: newId('s', systems.map((x) => x.id)) });
+      const r = readProfile(fs.read(path), { imported: true, host, gpuReady: !!gvtGpu(gpus), systems: known, home: fs.home(), id: newId('u', ids), imageId: newId('s', systems.map((x) => x.id)) });
       if (!r.ok) { setErr(tr(`machines.set.imp.err.${r.error}`)); return; }
       setImp({ file: path.split('/').pop(), r });
     } catch (e) { setErr(tr('machines.set.imp.err.json')); }
@@ -407,8 +407,11 @@ function ProfileEdit({ host, gpus, start, fresh, taken, onClose, onSaved }) {
                         <TextInput value={r.host ? String(r.host) : ''} onChange={(x) => setRule({ host: portInput(x) })} style={{ width: 70 }} />
                         <Text style={{ fontSize: 12, color: p.dim }}>→ {tr('machines.cfg.portGuest')}</Text>
                         <TextInput value={r.guest ? String(r.guest) : ''} onChange={(x) => setRule({ guest: portInput(x) })} style={{ width: 70 }} />
+                        {pr.network.mode === 'shared' ? <Segmented small value={r.open === 'lan' ? 'lan' : 'this-computer'} onChange={(x) => setRule({ open: x })}
+                          options={[['this-computer', tr('machines.cfg.portOpen.local')], ['lan', tr('machines.cfg.portOpen.lan')]]} /> : null}
                         <Btn label={tr('machines.cfg.portRemove')} onClick={() => set('network', { ports: pr.network.ports.filter((_, k) => k !== i) })} />
                       </View>
+                      {r.open === 'lan' && pr.network.mode === 'shared' ? <Text style={{ fontSize: 12, color: '#ff9f0a', textAlign: 'start' }}>{tr('machines.set.edit.lanWarn')}</Text> : null}
                       {bad ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr(`machines.cfg.portProblem.${bad.code}`, { min: PORT_HOST_MIN })}</Text> : null}
                     </View>
                   );
@@ -486,7 +489,8 @@ function adjustedText(a) {
   const field = String(a.field).split('.').pop();
   return tr(`machines.set.imp.adj.${a.why}`, { field, from: typeof a.from === 'object' ? JSON.stringify(a.from) : String(a.from), to: String(a.to ?? '') });
 }
-function portsText(ports) { return ports.map((r) => `${r.proto.toUpperCase()} ${r.host} → ${r.guest}`).join(', '); }
+// every rule with who can reach it (after import: this computer only)
+function portsText(ports) { return ports.map((r) => tr(r.open === 'lan' ? 'machines.set.imp.portLan' : 'machines.set.imp.portLocal', { rule: `${r.proto.toUpperCase()} ${r.host} → ${r.guest}` })).join(', '); }
 
 function ImportSummary({ file, r, host, onCancel, onImport }) {
   const p = usePal();
@@ -542,6 +546,12 @@ function ImportSummary({ file, r, host, onCancel, onImport }) {
           {kv(tr('machines.set.edit.share'), pr.integration.share ? tr('machines.set.imp.share', { path: pr.integration.share.path, how: tr(pr.integration.share.writable ? 'machines.set.imp.write' : 'machines.set.imp.read') }) : tr('machines.set.edit.shareNone'))}
           {logo ? kv(tr('machines.set.imp.logo'), `${logo.url} — ${tr('machines.set.imp.logoNotDownloaded')}`, true) : null}
         </View>
+        {exposureOf(pr).length ? (
+          <View style={{ padding: 14, gap: 6, borderRadius: 12, backgroundColor: p.raised, border: `1px solid ${p.line}` }}>
+            <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.set.imp.exposure')}</Text>
+            {exposureOf(pr).map((k) => <Text key={k} style={{ fontSize: 12, lineHeight: 1.4, color: p.text, textAlign: 'start' }}>{tr(`machines.set.imp.${k}`)}</Text>)}
+          </View>
+        ) : null}
         {notes.length ? (
           <View style={{ padding: 14, gap: 6, borderRadius: 12, backgroundColor: p.warnBg }}>
             <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.set.imp.adjusted')}</Text>

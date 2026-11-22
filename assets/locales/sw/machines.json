@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Haijaruhusiwa",
   "set.input.privacy": "Mipangilio ya faragha",
   "set.input.mouse": "Kipanya",
-  "set.input.mouseNote": "Mashine mpya huichukua kutoka kwa wasifu wao (Kibodi na kipanya): kiotomatiki, au kunaswa kwa kubofya."
+  "set.input.mouseNote": "Mashine mpya huichukua kutoka kwa wasifu wao (Kibodi na kipanya): kiotomatiki, au kunaswa kwa kubofya.",
+  "set.imp.adj.lan": "Lango {from} lilikuwa wazi kwa mtandao wako; sasa ni kompyuta hii tu.",
+  "set.imp.portLocal": "{rule}, kompyuta hii tu",
+  "set.imp.portLan": "{rule}, wazi kwa mtandao wako",
+  "set.imp.exposure": "Kinachofungua",
+  "set.imp.bridged": "Mtandao wa daraja: mashine inajiunga na mtandao wako kama kompyuta nyingine, kwenye kadi iliyochaguliwa katika Mipangilio ya Mashine → Mtandao.",
+  "set.imp.clipBoth": "Ubao wa kunakili hufanya kazi pande zote mbili: unachonakili hapa kinaweza kusomwa ndani ya mashine.",
+  "set.imp.shareWrite": "Mashine inaweza kubadilisha faili za folda iliyoshirikiwa; unachagua folda mwenyewe unapoiunda.",
+  "set.edit.lanWarn": "Mtandao wako: kompyuta nyingine kwenye mtandao wako zinaweza kufikia lango hili."
 }

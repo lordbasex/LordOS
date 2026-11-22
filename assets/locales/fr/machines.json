@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Non autorisé",
   "set.input.privacy": "Réglages de confidentialité",
   "set.input.mouse": "Souris",
-  "set.input.mouseNote": "Les nouvelles machines la reprennent de leur profil (Clavier et souris) : automatique, ou capturée par un clic."
+  "set.input.mouseNote": "Les nouvelles machines la reprennent de leur profil (Clavier et souris) : automatique, ou capturée par un clic.",
+  "set.imp.adj.lan": "Le port {from} était ouvert à votre réseau ; désormais, seulement cet ordinateur.",
+  "set.imp.portLocal": "{rule}, cet ordinateur seulement",
+  "set.imp.portLan": "{rule}, ouvert à votre réseau",
+  "set.imp.exposure": "Ce qu’il ouvre",
+  "set.imp.bridged": "Réseau en pont : la machine rejoint votre réseau comme un ordinateur de plus, sur la carte choisie dans Réglages de Machines → Réseau.",
+  "set.imp.clipBoth": "Le presse-papiers fonctionne dans les deux sens : ce que vous copiez ici peut être lu dans la machine.",
+  "set.imp.shareWrite": "La machine peut modifier les fichiers du dossier partagé ; vous choisissez le dossier lors de la création.",
+  "set.edit.lanWarn": "Votre réseau : les autres ordinateurs de votre réseau peuvent atteindre ce port."
 }

@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Não permitido",
   "set.input.privacy": "Ajustes de privacidade",
   "set.input.mouse": "Mouse",
-  "set.input.mouseNote": "As máquinas novas pegam isso do perfil (Teclado e mouse): automático, ou capturado com um clique."
+  "set.input.mouseNote": "As máquinas novas pegam isso do perfil (Teclado e mouse): automático, ou capturado com um clique.",
+  "set.imp.adj.lan": "A porta {from} estava aberta para a sua rede; agora só este computador.",
+  "set.imp.portLocal": "{rule}, só este computador",
+  "set.imp.portLan": "{rule}, aberta para a sua rede",
+  "set.imp.exposure": "O que ele abre",
+  "set.imp.bridged": "Rede em ponte: a máquina entra na sua rede como mais um computador, na placa escolhida em Ajustes de Máquinas → Rede.",
+  "set.imp.clipBoth": "A área de transferência funciona nos dois sentidos: o que você copia aqui pode ser lido na máquina.",
+  "set.imp.shareWrite": "A máquina pode alterar os arquivos da pasta compartilhada; você escolhe a pasta ao criá-la.",
+  "set.edit.lanWarn": "Sua rede: outros computadores da sua rede podem acessar esta porta."
 }

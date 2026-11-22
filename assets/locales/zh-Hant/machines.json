@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "不允許",
   "set.input.privacy": "隱私權設定",
   "set.input.mouse": "滑鼠",
-  "set.input.mouseNote": "新虛擬機器會沿用其設定檔（鍵盤與滑鼠）：自動，或點按時擷取。"
+  "set.input.mouseNote": "新虛擬機器會沿用其設定檔（鍵盤與滑鼠）：自動，或點按時擷取。",
+  "set.imp.adj.lan": "連接埠 {from} 原本對你的網路開放；現在僅限這台電腦。",
+  "set.imp.portLocal": "{rule}，僅限這台電腦",
+  "set.imp.portLan": "{rule}，對你的網路開放",
+  "set.imp.exposure": "它會開放什麼",
+  "set.imp.bridged": "橋接網路：虛擬機透過「虛擬機」設定 → 網路中選定的網路卡，以另一台電腦的身分加入你的網路。",
+  "set.imp.clipBoth": "剪貼簿雙向共用：你在這裡複製的內容可在虛擬機中讀取。",
+  "set.imp.shareWrite": "虛擬機可以修改共用資料夾中的檔案；資料夾由你在建立時選擇。",
+  "set.edit.lanWarn": "你的網路：網路中的其他電腦可以連到這個連接埠。"
 }

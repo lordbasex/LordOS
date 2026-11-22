@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "不允许",
   "set.input.privacy": "隐私设置",
   "set.input.mouse": "鼠标",
-  "set.input.mouseNote": "新虚拟机从其用途（键盘和鼠标）获取此项：自动，或点击时捕获。"
+  "set.input.mouseNote": "新虚拟机从其用途（键盘和鼠标）获取此项：自动，或点击时捕获。",
+  "set.imp.adj.lan": "端口 {from} 曾对你的网络开放；现在仅限本电脑。",
+  "set.imp.portLocal": "{rule}，仅限本电脑",
+  "set.imp.portLan": "{rule}，对你的网络开放",
+  "set.imp.exposure": "它会开放什么",
+  "set.imp.bridged": "桥接网络：虚拟机通过“虚拟机”设置 → 网络中选定的网卡，作为另一台电脑加入你的网络。",
+  "set.imp.clipBoth": "剪贴板双向共享：你在这里复制的内容可在虚拟机中读取。",
+  "set.imp.shareWrite": "虚拟机可以修改共享文件夹中的文件；文件夹由你在创建时选择。",
+  "set.edit.lanWarn": "你的网络：你网络中的其他电脑可以访问此端口。"
 }

@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Tidak dibenarkan",
   "set.input.privacy": "Tetapan privasi",
   "set.input.mouse": "Tetikus",
-  "set.input.mouseNote": "Mesin baharu mengambilnya daripada profilnya (Papan kekunci dan tetikus): automatik, atau ditawan apabila diklik."
+  "set.input.mouseNote": "Mesin baharu mengambilnya daripada profilnya (Papan kekunci dan tetikus): automatik, atau ditawan apabila diklik.",
+  "set.imp.adj.lan": "Port {from} terbuka kepada rangkaian anda; kini hanya komputer ini.",
+  "set.imp.portLocal": "{rule}, komputer ini sahaja",
+  "set.imp.portLan": "{rule}, terbuka kepada rangkaian anda",
+  "set.imp.exposure": "Apa yang dibukanya",
+  "set.imp.bridged": "Rangkaian jambatan: mesin menyertai rangkaian anda sebagai satu lagi komputer, melalui kad yang dipilih dalam Tetapan Mesin → Rangkaian.",
+  "set.imp.clipBoth": "Papan keratan berfungsi dua hala: apa yang anda salin di sini boleh dibaca dalam mesin.",
+  "set.imp.shareWrite": "Mesin boleh mengubah fail folder kongsi; anda sendiri memilih folder semasa menciptanya.",
+  "set.edit.lanWarn": "Rangkaian anda: komputer lain dalam rangkaian anda boleh mencapai port ini."
 }

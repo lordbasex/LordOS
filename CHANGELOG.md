@@ -59,7 +59,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (64 KB, known fields only and the unknown ones listed, ranges, port rules as Configure checks them, a shared folder
     only under the home and not hidden, enums), fitted to this computer, and a summary sheet that shows everything,
     including a system the file brings (full https address, size, SHA-256, signature fields), before anything is kept. A
-    profile never runs or downloads anything.
+    profile never runs or downloads anything. An imported profile never widens anything silently: a port open to the network becomes
+    this computer only and is listed, and the summary's "What it opens" names a bridged network, the clipboard both ways
+    and a writable shared folder; the editor has a per-rule This computer / The network control with a warning.
   - **Systems** (`systems.js`, `download.js`): the catalog with Downloaded or "Download · size" (the same pinned, signed
     machinery as the assistant), and "Added by you" (`~/.config/lordos/machines/systems.json`): name, kind, icon color,
     default profile, manual install or without questions the way the catalog's preseed, autoinstall or kickstart installers

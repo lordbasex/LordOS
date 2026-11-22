@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "허용 안 됨",
   "set.input.privacy": "개인정보 보호 설정",
   "set.input.mouse": "마우스",
-  "set.input.mouseNote": "새 머신은 프로필(키보드 및 마우스)에서 가져옵니다: 자동 또는 클릭 시 캡처."
+  "set.input.mouseNote": "새 머신은 프로필(키보드 및 마우스)에서 가져옵니다: 자동 또는 클릭 시 캡처.",
+  "set.imp.adj.lan": "포트 {from}이(가) 네트워크에 열려 있었습니다. 이제 이 컴퓨터만 접근할 수 있습니다.",
+  "set.imp.portLocal": "{rule}, 이 컴퓨터만",
+  "set.imp.portLan": "{rule}, 네트워크에 열림",
+  "set.imp.exposure": "여는 항목",
+  "set.imp.bridged": "브리지 네트워크: 머신이 머신 설정 → 네트워크에서 고른 카드로 네트워크에 컴퓨터 한 대처럼 참여합니다.",
+  "set.imp.clipBoth": "클립보드가 양방향으로 동작합니다. 여기서 복사한 내용을 머신에서 읽을 수 있습니다.",
+  "set.imp.shareWrite": "머신이 공유 폴더의 파일을 바꿀 수 있습니다. 폴더는 만들 때 직접 고릅니다.",
+  "set.edit.lanWarn": "내 네트워크: 네트워크의 다른 컴퓨터가 이 포트에 접근할 수 있습니다."
 }

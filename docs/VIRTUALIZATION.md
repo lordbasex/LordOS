@@ -1623,6 +1623,13 @@ computer knows (the catalog, the person's own, the one the file brings). The sum
 all of it before anything is kept; Import keeps the profile and, when the file brings a system, adds it to "Added by you".
 A profile never executes or downloads anything by itself.
 
+**An import never widens anything silently** (commit security review 2026-11-22): every forwarded port of an imported
+profile becomes this computer only (`readProfile` with `imported`, listed as "Port … was open to your network; now only this
+computer"); the summary's ports line says each rule's reach, and "What it opens" (`exposureOf`) names a bridged network (on
+the card the person set in Machines settings → Network, shown again in the review), the clipboard both ways or from the
+machine, and a writable shared folder (the folder is confirmed by the person in the review). The person's own profiles keep
+a port open to the network only when they chose it in the editor, whose per-rule control warns about it.
+
 ### 5.6.1 Your own systems (Machines settings → Systems)
 
 The catalog (assets/machines/systems.json) with its state per architecture: Downloaded (an image of the card, or of the one

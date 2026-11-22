@@ -100,6 +100,9 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const size = windows ? windowsSize(base, host) : base;
   const home = typeof lord !== 'undefined' && lord.fs?.home ? lord.fs.home() : '';
   const shareDir = pv.share ? shareAbs(pv.share.path, home) : '';
+  // a bridged machine joins the card chosen in Machines settings → Network (else the first wired one up): said in the review
+  const bridgeCard = pv.network === 'bridged' ? defaultCard(host.cards, defaultsOf(settings.get().machinesDefaults).bridge) : '';
+  const netText = [tr(`machines.cfg.net.${pv.network}`), bridgeCard || null, pv.ports.length ? tr('machines.cfg.sum.ports', { n: pv.ports.length }) : null].filter(Boolean).join(' · ');
   const shareThere = (() => { if (!shareDir) return false; try { return !!fs.stat(shareDir)?.dir || !!fs.stat(shareDir)?.isDir; } catch (e) { return false; } })();
   const downloading = source === 'download';
   const evalFile = windows && win?.mode === 'eval' ? evalFiles(winE).find((f) => f.lang === win.lang) || evalFor(winE, hd.locale) : null;
@@ -516,7 +519,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       [tr('machines.as.r.cpu'), tr('machines.vcpus', { n: size.vcpus })],
       [tr('machines.as.r.memory'), gb(size.memoryMb)],
       [tr('machines.as.r.disk'), tr('machines.as.r.diskNew', { n: size.diskGb })],
-      [tr('machines.as.r.network'), tr(`machines.cfg.net.${size.network}`)],
+      [tr('machines.as.r.network'), netText],
       [tr('machines.as.r.where'), `~/Machines/${name}.lordvm`],
     ] : [
       [tr('machines.as.r.system'), [sys.name || tr('machines.as.unknownSystem'), ver].filter(Boolean).join(' ')],
@@ -528,7 +531,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       [tr('machines.as.r.memory'), gb(size.memoryMb)],
       [tr('machines.as.r.disk'), source === 'iso' || source === 'custom' || downloading ? tr('machines.as.r.diskNew', { n: size.diskGb }) : tr('machines.as.r.diskCopy', { n: size.diskGb })],
       [tr('machines.as.r.profile'), profileTitle(prof)],
-      [tr('machines.as.r.network'), tr(`machines.cfg.net.${size.network}`)],
+      [tr('machines.as.r.network'), netText],
       [tr('machines.as.r.where'), `~/Machines/${name}.lordvm`],
     ];
     body = <>

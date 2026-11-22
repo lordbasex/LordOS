@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Không cho phép",
   "set.input.privacy": "Cài đặt quyền riêng tư",
   "set.input.mouse": "Chuột",
-  "set.input.mouseNote": "Máy ảo mới lấy giá trị này từ cấu hình mẫu (Bàn phím và chuột): tự động, hoặc giữ khi nhấp."
+  "set.input.mouseNote": "Máy ảo mới lấy giá trị này từ cấu hình mẫu (Bàn phím và chuột): tự động, hoặc giữ khi nhấp.",
+  "set.imp.adj.lan": "Cổng {from} đã mở ra mạng của bạn; giờ chỉ máy tính này.",
+  "set.imp.portLocal": "{rule}, chỉ máy tính này",
+  "set.imp.portLan": "{rule}, mở ra mạng của bạn",
+  "set.imp.exposure": "Những gì nó mở",
+  "set.imp.bridged": "Mạng cầu nối: máy ảo tham gia mạng của bạn như một máy tính nữa, qua card đã chọn trong Cài đặt Máy ảo → Mạng.",
+  "set.imp.clipBoth": "Bảng nhớ tạm hoạt động hai chiều: những gì bạn sao chép ở đây có thể được đọc trong máy ảo.",
+  "set.imp.shareWrite": "Máy ảo có thể thay đổi tệp trong thư mục chia sẻ; bạn tự chọn thư mục khi tạo.",
+  "set.edit.lanWarn": "Mạng của bạn: các máy tính khác trong mạng có thể truy cập cổng này."
 }

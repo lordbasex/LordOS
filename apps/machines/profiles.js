@@ -94,8 +94,9 @@ const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 // Reads a profile (a parsed .lordprofile, a stored one) → { ok, error, profile, adjusted, ignored, image, imageErrors }.
 //   ctx: { host, gpuReady (a graphics card is set up for machines here), systems: [known system ids], home, id,
-//          stored (true: the person's own file, its id kept) }
-//   adjusted: [{ field, from, to, why }] — why: 'half' (more than half the processors), 'memory' (more than machines may
+//          stored (true: the person's own file, its id kept), imported (a file from elsewhere: a port open to the
+//          network becomes this computer only, 'lan') }
+//   adjusted: [{ field, from, to, why }] — why: 'lan' (a port that was open to the network, now this computer only), 'half' (more than half the processors), 'memory' (more than machines may
 //             use here), 'range', 'gpu' (none set up here), 'invalid' (a wrong value: the default kept), 'port' (a port
 //             rule dropped), 'system' (a suggested system that isn't here)
 //   ignored: the unknown fields, by path ('script', 'resources.turbo')
@@ -210,6 +211,8 @@ export function readProfile(input, ctx = {}) {
           && (r.open === undefined || r.open === 'lan' || r.open === 'this-computer');
         const rule = ok ? portRule(r) : null;
         if (!rule || portProblems([...rules, rule], p.network.mode).length) { note('network.ports', isObj(r) ? `${r.proto || 'tcp'} ${r.host} → ${r.guest}` : r, null, 'port'); continue; }
+        // an imported profile never opens a port to the network by itself: this computer only, and said
+        if (ctx.imported && rule.open === 'lan') { rule.open = 'this-computer'; note('network.ports', `${rule.proto.toUpperCase()} ${rule.host} → ${rule.guest}`, 'this-computer', 'lan'); }
         rules.push(rule);
       }
       if (net.ports.length > PORTS_MAX) note('network.ports', net.ports.length, PORTS_MAX, 'range');
@@ -304,3 +307,14 @@ export const profileById = (id, own, host) => (BUILTIN.includes(id) ? builtinPro
 export const defaultProfileId = (v, own) => (BUILTIN.includes(v) || (own || []).some((p) => p.id === v) ? v : DEFAULT_PROFILE);
 // a file name for an exported profile: its name in plain letters
 export const exportName = (p) => `${String(p?.name || 'profile').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'profile'}.lordprofile`;
+
+// What an imported profile would open beyond the machine itself, shown in the import summary before it is kept (none of
+// it happens silently): its network bridged (the person picks the card), the clipboard both ways or from the machine,
+// a writable shared folder (the person picks the folder when creating). → ['bridged', 'clipBoth', 'shareWrite', …]
+export function exposureOf(p) {
+  const out = [];
+  if (p?.network?.mode === 'bridged') out.push('bridged');
+  if (p?.integration?.clipboard === 'both' || p?.integration?.clipboard === 'from-guest') out.push('clipBoth');
+  if (p?.integration?.share?.writable) out.push('shareWrite');
+  return out;
+}

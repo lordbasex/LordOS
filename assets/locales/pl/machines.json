@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Niedozwolone",
   "set.input.privacy": "Ustawienia prywatności",
   "set.input.mouse": "Mysz",
-  "set.input.mouseNote": "Nowe maszyny biorą to ze swojego profilu (Klawiatura i mysz): automatycznie albo przechwytywana po kliknięciu."
+  "set.input.mouseNote": "Nowe maszyny biorą to ze swojego profilu (Klawiatura i mysz): automatycznie albo przechwytywana po kliknięciu.",
+  "set.imp.adj.lan": "Port {from} był otwarty dla twojej sieci; teraz tylko ten komputer.",
+  "set.imp.portLocal": "{rule}, tylko ten komputer",
+  "set.imp.portLan": "{rule}, otwarty dla twojej sieci",
+  "set.imp.exposure": "Co otwiera",
+  "set.imp.bridged": "Sieć mostkowana: maszyna dołącza do twojej sieci jako kolejny komputer, przez kartę wybraną w Ustawieniach Maszyn → Sieć.",
+  "set.imp.clipBoth": "Schowek działa w obie strony: to, co tu skopiujesz, można odczytać w maszynie.",
+  "set.imp.shareWrite": "Maszyna może zmieniać pliki udostępnionego folderu; folder wybierasz sam przy tworzeniu.",
+  "set.edit.lanWarn": "Twoja sieć: inne komputery w twojej sieci mogą dotrzeć do tego portu."
 }
