@@ -14,6 +14,8 @@ Hoy funciona en **PC de 64 bits** (x86-64); la Raspberry Pi viene después.
 
 **Recorrerlo.** Las apps de Flathub aparecen en su propia sección, en Descubrir y en la búsqueda, con los nombres, íconos y categorías del propio Flathub. De entrada la Tienda muestra **solo las apps que Flathub verificó como publicadas por sus propios desarrolladores**; un interruptor muestra el resto, marcadas como «No verificada».
 
+**Populares, Tendencias y la app del día** (en desarrollo después de la 0.8.9.4). El inicio de Flathub en la Tienda abre con la app del día del propio Flathub y filas de Apps de la semana, Populares, Tendencias, Añadidas recientemente y Actualizadas recientemente. LordOS le pide esas listas a `flathub.org` como mucho una vez por día, con un pedido fijo que no dice nada de vos, y guarda solo los identificadores de las apps: los nombres, íconos y descripciones siguen saliendo del catálogo firmado de Flathub, y las reglas de instalación no cambian. Un interruptor en la Tienda lo apaga; sin internet, las filas simplemente no están.
+
 **Antes de instalar**, la página de cada app dice quién la publica, su licencia y **lo que declara**: internet, sonido, tus archivos, dispositivos, otras apps en el bus. Al lado de cada cosa, lo que hace LordOS al respecto: lo que podés bloquear en el Firewall, lo que LordOS limita y lo que nunca da.
 
 [[shot:1]]

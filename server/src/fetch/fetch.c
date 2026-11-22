@@ -1,8 +1,9 @@
 /* fetch.c — lord-fetch: downloads the subscribed blocklists over HTTPS for lord-server, sandboxed
- * (see fetchproto.h), and since 0.8.8.10 the weather widget's forecast from one fixed host
- * (weather.h). With lord-sessiond and lord-maild, the only binaries that link OpenSSL. */
+ * (see fetchproto.h), since 0.8.8.10 the weather widget's forecast from one fixed host
+ * (weather.h), and (E10, approved 2026-11-22) the Store's rankings from flathub.org (flathub.h, E10). With lord-sessiond and lord-maild, the only binaries that link OpenSSL. */
 #include "fetchproto.h"
 #include "weather.h"
+#include "fhget.h"
 #include "../doc/wire.h"
 #include "../fw/fwlists.h"
 #include "../mail/http.h"
@@ -17,6 +18,7 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #define SOCK 3
@@ -163,6 +165,42 @@ static void weather(uint32_t id, const char *json, size_t len, int fd) {
     jb_free(&b);
 }
 
+/* The Store's rankings (E10): the request is {"list": N} and nothing else, N one of flathub.h's closed list; the path is
+ * built from N and the clock here, one GET to FH_HOST on the socket lord-server connected there (the flathub connector),
+ * no redirect followed, and only app ids go back (fh_parse). */
+static void flathub(uint32_t id, const char *json, size_t len, int fd) {
+    JDoc d;
+    if (json_parse(json, len, &d, NULL, 0)) { close(fd); fail(id, "bad-request", ""); return; }
+    const JVal *l = json_get(d.root, "list");
+    int list = -1;
+    if (d.root && d.root->type == J_OBJ && d.root->len == 1 && l && l->type == J_NUM && l->num >= 0 && l->num < FH_LISTS && l->num == (int)l->num)
+        list = (int)l->num;
+    json_free(&d);
+    if (list < 0) { close(fd); fail(id, "bad-request", ""); return; }
+    Conn *c = conn_new(fd, FH_HOST, 20000);
+    if (!c) { close(fd); fail(id, "oom", ""); return; }
+    TlsInfo info;
+    memset(&info, 0, sizeof info);
+    if (conn_tls(c, NULL, &info)) {
+        fail(id, info.code ? "cert" : "tls", "");
+        conn_close(c);
+        return;
+    }
+    static FhIds ids;
+    char err[24] = "";
+    int bad = fh_exchange(c, list, (long long)time(NULL), &ids, err, sizeof err);
+    conn_close(c);
+    if (bad) { fail(id, err, ""); return; }
+    static char out[FH_IDS_MAX * (FPAK_ID_MAX + 3) + 32];
+    size_t n = fh_compact(&ids, out, sizeof out);
+    if (!n) { fail(id, "format", ""); return; }
+    JBuf b;
+    jb_init(&b);
+    jb_rawn(&b, out, n);
+    reply(FR_FLATHUB, id, &b, -1);
+    jb_free(&b);
+}
+
 int main(void) {
     prctl(PR_SET_PDEATHSIG, SIGKILL);
     prctl(PR_SET_DUMPABLE, 0);
@@ -198,6 +236,11 @@ int main(void) {
             m.fds[0] = -1;
             m.nfds = 0;
             weather(m.h.id, m.json, m.len, fd);
+        } else if (m.h.op == FQ_FLATHUB && m.nfds == 1 && m.json) {
+            int fd = m.fds[0];
+            m.fds[0] = -1;
+            m.nfds = 0;
+            flathub(m.h.id, m.json, m.len, fd);
         } else fail(m.h.id, "bad-request", "");
         doc_msg_free(&m);
     }

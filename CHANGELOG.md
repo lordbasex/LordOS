@@ -32,9 +32,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (`fpakas_line`: exactly ten fields, digits only, no leading zero) and `lord.flatpak.catalog()` gives it as
     `updated`. Measured on Flathub's catalog of 2026-11-22: 3381 x86-64 apps, every one with a release date, 2243
     verified.
-  - **Not yet: Popular, Trending, Recently added and the app of the day/week.** Flathub computes them on its web API
-    (`flathub.org/api/v2/collection/…`, `app-picks/…`), which nothing in LordOS may reach today: it would be a new
-    network job and needs the maintainer's review first (proposed in `docs/FLATPAK.md`, "Rankings from Flathub's API").
+  - **Popular, Trending, Recently added and the app of the day/week** come from Flathub's web API, which needed a new
+    network job: approved as E10 and built in the entry below.
   - The logic is plain data in `sdk/flathubmodel.js` (`SUBCATS`, `subcategoryCounts`, `recentlyUpdated` (a release
     more than a day in the future, before 2000 or not a whole number never counts), `verifiedApps`, `collection`,
     `homeRows`, `spotlight`, `filterCatalog`'s `sub`). New texts `flathub.verifiedShort`, `flathub.home.*`,
@@ -45,6 +44,55 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     catalog (`tests/data/flathub/catalog-2026-11-22.json`, 38 apps, public data only) for the collections, the banner
     and the subcategories, hostile entries (future, fractional, text, negative, NaN, infinite and missing dates, a
     category listed twice, entries that aren't objects) and every new text in every language.
+- **Store: Flathub's Popular, Trending, Recently added, Recently updated, app of the day and apps of the week, in
+  development (the latest release is 0.8.9.4).** Exception E10, approved by the maintainer on 2026-11-22: a third
+  `lord-fetch` job. See `docs/FLATPAK.md`, "Rankings from Flathub's API"; the `AGENTS.md` entry sits with lord-fetch's
+  other jobs.
+  - **What the Store shows** (`apps/store/flathubpages.js`): Flathub's home opens on Flathub's **App of the day** (else
+    the latest release, as before), then rows **Apps of the week**, **Popular**, **Trending**, **Recently added**,
+    **Recently updated** and, with every app shown, **Verified apps**, each with **See all**. Names, icons and summaries
+    come only from the signed catalog (`rankedApps` in `sdk/flathubmodel.js`): an id the catalog hasn't is dropped and
+    an unverified app shows only while the switch shows every app. Recently updated is Flathub's (its builds) when at
+    least four of its apps are shown, else the catalog's newest `<release>` dates. The install rules are unchanged
+    (x86-64 only, the verified subset unless the switch, installing only from the app's own page). Without network,
+    with Flathub blocked in the Firewall or on any failure the rows are simply absent.
+  - **A switch to turn it off**, on by default, under the verified-apps switch in the Store's Flathub section
+    (`settings.flathub.rankings`; absent means on, so no migration). Off, the Store never asks.
+  - **The request** (`server/src/fetch/flathub.c`, `fhget.c`, `fetch.c`): `FQ_FLATHUB` carries `{"list": N}` and
+    nothing else, N one of six: `collection/popular`, `trending`, `recently-added`, `recently-updated`,
+    `app-picks/app-of-the-day/<date>`, `app-picks/apps-of-the-week/<date>`; the helper builds the path, the date from its
+    own clock in UTC by arithmetic. Any other number, a fraction, text, another key or no socket is refused. The socket
+    is made by a new connector, `flathub` (`sec/netconn.h` `NC_FLATHUB`), to `flathub.org:443` only, in
+    `lordos-net-flathub.scope`: the firewall component `lordos:flathub` that Flatpak's downloads already use, so one row
+    blocks both (its Monitor hint says so now, in all 35 languages). TLS with the certificate checked as for the other
+    jobs, one GET, no redirect followed (a 3xx fails), at most 1 MB read, 20 s to connect and 30 s for the answer.
+  - **Only app ids come back:** the answer is parsed strictly (`sec/json.h`) and only `app_id`s that pass `fpak_id_ok`
+    leave the helper, at most 250 a list in Flathub's order (the week's in `position` order); members of another type,
+    bad ids and duplicates are skipped; no name, text, number or address of the answer leaves it, and an error carries
+    only its code. lord-server checks every id again (`fh_from_compact`).
+  - **At most once a day** (`server/src/fetch/fhsvc.c`): a list is fetched when its last copy is from another UTC day;
+    a failure waits 15 minutes, doubled after each failure in a row, at most a day. The lists are kept in
+    `~/.cache/lordos/flathub/<list>.json`, folders `0700` checked to be the user's, no link followed, written to a new
+    file then renamed, every id checked again when read. `lord.flatpak.rankRequest()` and `lord.flatpak.ranks()` (ids
+    only) exist only in the desktop's own JS context, as the rest of `lord.flatpak`.
+  - **Fixed on the way:** the connectors' table in `sec/netconn.c` was written by hand for five connectors after the
+    sixth (`weather`) was added, so the weather connector's slot started at fd 0 and its first request in a session
+    sent to and then closed lord-server's stdin before the connector was started again; the table now starts empty
+    whatever the number of connectors. `lord-fetch`'s start and the connect to a host by a connector are shared by the
+    weather widget and the rankings (`fetch/fetchspawn.c`).
+  - New texts `flathub.home.appOfTheDay`, `flathub.coll.{week,popular,trending,added}`, `flathub.rankingsOn`,
+    `flathub.rankingsOff` and the changed `monitor.comp.flathubHint`, in all 35 languages.
+  - Tests: `build/flathub-rank-test` (76 checks: the six paths and every number outside them refused, the UTC date,
+    Flathub's answers recorded on 2026-11-22 in `server/tests/data/flathub/api-2026-11-22/` (popular whole, 250 ids;
+    the other collections cut to 40 hits), and hostile JSON: over 1 MB, 40 levels deep, duplicate keys, wrong types,
+    ids with spaces, `../`, newlines, quotes, non-ASCII, a leading digit, a `-` before the last part, 60 bytes,
+    duplicates, 800 hits); `build/flathub-fetch-test` (63 checks: the exchange against a stand-in server: the exact GET
+    path and `Host: flathub.org`, 301/302/303/307/308 not followed, the cap with a Content-Length, chunked and until
+    close, 404/500, HTML; then `build/lord-fetch` refusing 14 bad requests and failing on a peer without TLS);
+    `build/fhsvc-test` (43 checks: once a UTC day, the doubling wait, the cache read back strictly, a link replaced and
+    its target untouched); `tests/flathub_model_test.mjs` (the rows on the recorded answers against the recorded
+    catalog, hostile `ranks()` values, every new text in every language); `build/netconn-test` checks that every
+    connector is a firewall component.
 - **Every Wayland global "complete" in the conformance run: 48 of 48, in development (the latest release is 0.8.9.4;
   branch `feat/wl-conformance-complete`; `docs/WAYLAND.md` "Conformance", `docs/wayland-conformance.json`).** Complete
   means tests written for that protocol, all passed, nothing skipped. Before: 29 of 48 (15 checked only by the generic

@@ -197,8 +197,10 @@ export function progressOf(line) {
 // Does the catalog need fetching again (the Store opened and the last update --appstream is older than a day)?
 export const appstreamStale = (at, now) => !(at > 0) || now - at > APPSTREAM_EVERY || at > now + 60e3;
 
-// The Flathub settings (settings.flathub): { on, showAll, appstreamAt }.
-export const prefsOf = (s) => ({ on: !!(s && s.on), showAll: !!(s && s.showAll), appstreamAt: (s && Number(s.appstreamAt)) || 0 });
+// The Flathub settings (settings.flathub): { on, showAll, appstreamAt, rankings }. rankings (Flathub's Popular,
+// Trending… from flathub.org, E10) is on unless turned off: absent means on, so no migration is needed.
+export const prefsOf = (s) => ({ on: !!(s && s.on), showAll: !!(s && s.showAll), appstreamAt: (s && Number(s.appstreamAt)) || 0,
+  rankings: !(s && s.rankings === false) });
 
 // A note on an app's page about how it works in LordOS (the Flathub compatibility run, 2026-11-22): a key under
 // "flathub.note.", or null. OBS Studio: the home folder is read-only in a Flatpak app's view (docs/FLATPAK.md, E2), so
@@ -314,12 +316,82 @@ export function verifiedApps(cat, { now = Date.now() } = {}) {
   return [...dated, ...filterCatalog(v.filter((a) => !seen.has(a.id)), { showAll: true })];
 }
 
-// The home's collections: a key under "flathub.coll." → its apps. 'verified' only while the unverified apps are shown
-// too (otherwise every app shown is verified and the row would repeat the catalog).
-export const COLLECTIONS = ['updated', 'verified'];
+// ---- the rankings from Flathub's API (E10, docs/FLATPAK.md "Rankings from Flathub's API") ----
+// lord.flatpak.ranks() gives app ids only (lord-fetch keeps nothing else of Flathub's answer, and lord-server checks
+// every id again): Popular, Trending, Recently added, Recently updated, the app of the day and the apps of the week.
+// Names, icons and summaries still come only from the signed catalog: an id the catalog hasn't is dropped, and the
+// install rules don't change (an unverified app only while the switch shows every app).
+export const RANK_LISTS = ['popular', 'trending', 'added', 'updated', 'day', 'week'];
+export const RANK_MAX = 250;
+// Flathub's Recently updated (its builds) replaces the catalog's (the newest <release> date an app declares, which many
+// apps forget to add) when at least this many of its apps are shown.
+export const RANK_UPDATED_MIN = 4;
+
+// What lord.flatpak.ranks() returned → { list: [ids] } with only the known lists, ids that pass idOk, no duplicates, at
+// most RANK_MAX each, in their order. Anything else (a missing list, another type) is left out.
+export function ranksOf(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const k of RANK_LISTS) {
+    const v = Object.prototype.hasOwnProperty.call(raw, k) ? raw[k] : null;
+    if (!Array.isArray(v)) continue;
+    const seen = new Set();
+    for (const id of v.slice(0, RANK_MAX)) if (idOk(id)) seen.add(id);
+    if (seen.size) out[k] = [...seen];
+  }
+  return out;
+}
+
+// the catalog by id, built once per catalog read
+const indexes = new WeakMap();
+function byId(cat) {
+  if (!Array.isArray(cat)) return new Map();
+  let m = indexes.get(cat);
+  if (!m) {
+    m = new Map();
+    for (const a of cat) if (a && typeof a === 'object' && idOk(a.id) && !m.has(a.id)) m.set(a.id, a);
+    indexes.set(cat, m);
+  }
+  return m;
+}
+
+// The catalog's apps for a ranked list of ids, in the list's order: only those in the catalog, and only the verified
+// ones unless showAll.
+export function rankedApps(cat, ids, { showAll = false } = {}) {
+  if (!Array.isArray(ids) || !ids.length) return [];
+  const m = byId(cat), out = [], seen = new Set();
+  for (const id of ids) {
+    const a = typeof id === 'string' ? m.get(id) : null;
+    if (a && !seen.has(id) && (showAll || a.verified)) { seen.add(id); out.push(a); }
+  }
+  return out;
+}
+
+// Flathub's app of the day, when it is in the catalog and shown, or null.
+export const appOfTheDay = (cat, ranks, { showAll = false } = {}) => rankedApps(cat, ranks && ranks.day, { showAll })[0] || null;
+
+// The home's banner: { kind: 'day', app } (Flathub's app of the day) or { kind: 'latest', app } (the app released most
+// recently, from the catalog alone), or null.
+export function banner(cat, { showAll = false, now = Date.now(), ranks = null } = {}) {
+  const day = appOfTheDay(cat, ranks, { showAll });
+  if (day) return { kind: 'day', app: day };
+  const latest = spotlight(cat, { showAll, now });
+  return latest ? { kind: 'latest', app: latest } : null;
+}
+
+// The home's collections: a key under "flathub.coll." → its apps, in this order. The rankings are there only when
+// lord.flatpak.ranks() had them (off, offline or failed: they are simply absent). 'updated' is Flathub's when it is good
+// enough (RANK_UPDATED_MIN), else the catalog's. 'verified' only while the unverified apps are shown too (otherwise every
+// app shown is verified and the row would repeat the catalog).
+export const COLLECTIONS = ['week', 'popular', 'trending', 'added', 'updated', 'verified'];
 export const collectionOk = (k) => COLLECTIONS.includes(k);
-export function collection(cat, key, { showAll = false, now = Date.now() } = {}) {
-  if (key === 'updated') return recentlyUpdated(cat, { showAll, now });
+export function collection(cat, key, { showAll = false, now = Date.now(), ranks = null } = {}) {
+  const r = ranks || {};
+  if (key === 'week' || key === 'popular' || key === 'trending' || key === 'added') return rankedApps(cat, r[key], { showAll });
+  if (key === 'updated') {
+    const api = rankedApps(cat, r.updated, { showAll });
+    return api.length >= RANK_UPDATED_MIN ? api : recentlyUpdated(cat, { showAll, now });
+  }
   if (key === 'verified') return showAll ? verifiedApps(cat, { now }) : [];
   return [];
 }

@@ -1,6 +1,7 @@
 // flathubpages.js — the Store's Flathub section (docs/FLATPAK.md, phase 1 step 5): turning Flathub on (the `flatpak`
 // package through the Store's package job, then the remote and the catalog), a home like other app centres' (a banner,
-// the categories, the collections; docs/FLATPAK.md, "The Store's home") over the catalog as cards (Flathub's verified
+// the categories, the collections; docs/FLATPAK.md, "The Store's home"; with Flathub's rankings when they are on, E10,
+// "Rankings from Flathub's API": ids only, shown with the catalog's names and icons) over the catalog as cards (Flathub's verified
 // apps unless the setting shows the rest), a category's subcategories, each app's page with what it declares and what LordOS changes before it is
 // installed, and the installed ones with Update and Remove. Chromium and Electron apps install like any other: their
 // helpers' sub-sandboxes are served by LordOS (docs/FLATPAK.md, "Sub-sandboxes"). The jobs and state are
@@ -155,11 +156,14 @@ function InstalledList({ onOpen }) {
 
 // ---- the home's pieces (Bazaar-like: a banner, the categories, the collections, then every app) ----
 
-// The banner: the app released most recently (M.spotlight), said as such.
-function Spotlight({ a, onOpen }) {
-  if (!a) return null;
+// The banner (M.banner): Flathub's app of the day when the rankings have it, else the app released most recently, each
+// said as such. Name, icon and summary from the catalog either way.
+function Spotlight({ b, onOpen }) {
+  if (!b) return null;
+  const a = b.app;
   return h(Featured, {
-    icon: h(FlathubIcon, { a, size: 96 }), glow: nameColor(a.name), kicker: t('flathub.home.spotlight'), title: a.name, text: a.summary,
+    icon: h(FlathubIcon, { a, size: 96 }), glow: nameColor(a.name), kicker: t(b.kind === 'day' ? 'flathub.home.appOfTheDay' : 'flathub.home.spotlight'),
+    title: a.name, text: a.summary,
     action: h(Pill, { big: true, onDark: true, label: t('store.get'), onClick: () => onOpen(a.id) }), onClick: () => onOpen(a.id),
   });
 }
@@ -216,17 +220,20 @@ export function FlathubPage({ query, onOpen, category = null, sub = null, coll =
   const s = { catalog, loaded };
   const fh = useFlathub();
   const showAll = fh.prefs.showAll;
+  // Flathub's rankings (E10): ids only, empty when off, offline or failed
+  const ranks = useStore(F.state, (x) => x.ranks);
   useEffect(() => { if (fh.on) { if (!s.loaded) F.loadCatalog(); F.refreshInstalled(); } }, [fh.on]);
   const q = String(query || '').trim();
   const mode = q ? 'search' : coll && M.collectionOk(coll) ? 'coll' : category ? 'cat' : 'home';
+  useEffect(() => { if (fh.on && fh.prefs.rankings && (mode === 'home' || mode === 'coll')) F.loadRanks(); }, [fh.on, fh.prefs.rankings, mode]);
   const subKey = mode === 'cat' && M.subOk(category, sub) ? sub : null;
   // "now" for the release dates: once per catalog read
   const now = useMemo(() => Date.now(), [s.catalog]);
-  const list = useMemo(() => (mode === 'coll' ? M.collection(s.catalog, coll, { showAll, now })
+  const list = useMemo(() => (mode === 'coll' ? M.collection(s.catalog, coll, { showAll, now, ranks })
     : M.filterCatalog(s.catalog, { query, showAll, category: mode === 'home' ? null : category, sub: subKey })),
-  [s.catalog, query, showAll, category, subKey, mode, coll, now]);
-  const rows = useMemo(() => (mode === 'home' ? M.homeRows(s.catalog, { showAll, now }) : []), [s.catalog, showAll, now, mode]);
-  const spot = useMemo(() => (mode === 'home' ? M.spotlight(s.catalog, { showAll, now }) : null), [s.catalog, showAll, now, mode]);
+  [s.catalog, query, showAll, category, subKey, mode, coll, now, ranks]);
+  const rows = useMemo(() => (mode === 'home' ? M.homeRows(s.catalog, { showAll, now, ranks }) : []), [s.catalog, showAll, now, mode, ranks]);
+  const spot = useMemo(() => (mode === 'home' ? M.banner(s.catalog, { showAll, now, ranks }) : null), [s.catalog, showAll, now, mode, ranks]);
   const counts = useMemo(() => (mode === 'home' ? M.categoryCounts(s.catalog, showAll) : {}), [s.catalog, showAll, mode]);
   const subCounts = useMemo(() => (mode === 'cat' ? M.subcategoryCounts(s.catalog, category, showAll) : {}), [s.catalog, category, showAll, mode]);
   const catTotal = useMemo(() => (mode === 'cat' && subKey ? M.filterCatalog(s.catalog, { showAll, category }).length : list.length), [s.catalog, showAll, category, subKey, list, mode]);
@@ -246,10 +253,14 @@ export function FlathubPage({ query, onOpen, category = null, sub = null, coll =
         fh.prefs.showAll ? t('flathub.showAllOn') : t('flathub.showAllOff', { count: hidden })),
       h(Button, { small: true, label: t('flathub.refresh'), busy: working, onClick: () => F.loadCatalog({ fetch: true }) }),
       h(Button, { small: true, label: t('flathub.turnOff'), pending: true, onClick: F.turnOff })),
+    h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: -spacing.s, marginBottom: spacing.l } },
+      h(Toggle, { on: fh.prefs.rankings, onChange: F.setRankings }),
+      h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } },
+        fh.prefs.rankings ? t('flathub.rankingsOn') : t('flathub.rankingsOff'))),
     h(JobProgress),
     mode === 'home' || mode === 'search' ? h(InstalledList, { onOpen }) : null,
     s.loaded && mode === 'home' ? h(View, { style: { gap: 26, marginBottom: 26 } },
-      h(Spotlight, { a: spot, onOpen: open }),
+      h(Spotlight, { b: spot, onOpen: open }),
       h(CategoryTiles, { counts, onCategory }),
       h(CollectionRows, { rows, onOpen: open, onCollection })) : null,
     s.loaded && mode === 'cat' ? h(SubChips, { sub: subKey, counts: subCounts, total: catTotal, onSub }) : null,

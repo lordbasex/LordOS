@@ -603,7 +603,7 @@
   "comp.weather": "Hali ya hewa",
   "comp.weatherHint": "Utabiri wa wijeti ya hali ya hewa kutoka Open-Meteo, ukiuwasha.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Programu za Flatpak kutoka Flathub: katalogi, usakinishaji na masasisho yake.",
+  "comp.flathubHint": "Programu za Flatpak kutoka Flathub: katalogi, usakinishaji, masasisho yake na orodha za Duka kutoka flathub.org.",
   "comp.streams": "Kamera na TV",
   "comp.streamsHint": "Wijeti ya video na anwani za Kicheza: kamera, mitiririko na chaneli za TV (lord-stream)."
 }

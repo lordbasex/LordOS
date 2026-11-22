@@ -14,6 +14,8 @@ It works on **64-bit PCs** (x86-64) today; the Raspberry Pi will come later.
 
 **Browsing.** Flathub's apps show in their own section, in Discover and in search, with Flathub's own names, icons and categories. By default the Store shows **only the apps Flathub verified as published by their own developers**; a switch shows the rest, which are marked "Not verified".
 
+**Popular, Trending and the app of the day** (in development after 0.8.9.4). Flathub's home in the Store opens on Flathub's own app of the day and rows of Apps of the week, Popular, Trending, Recently added and Recently updated. LordOS asks `flathub.org` for those lists at most once a day, with a fixed request that says nothing about you, and keeps only the apps' ids: names, icons and descriptions still come from Flathub's signed catalog, and the install rules don't change. A switch in the Store turns it off; without internet the rows simply aren't there.
+
 **Before installing**, each app's page says who publishes it, its license, and **what it declares**: internet, sound, your files, devices, other apps on the bus. Next to each one, what LordOS does about it: what you can block in the Firewall, what LordOS limits, and what it never grants.
 
 [[shot:1]]

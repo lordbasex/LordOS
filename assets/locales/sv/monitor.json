@@ -603,7 +603,7 @@
   "comp.weather": "Väder",
   "comp.weatherHint": "Väderwidgetens prognoser från Open-Meteo, när du slår på dem.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Flatpak-appar från Flathub: katalogen, installationerna och uppdateringarna.",
+  "comp.flathubHint": "Flatpak-appar från Flathub: katalogen, installationerna, uppdateringarna och Butikens topplistor från flathub.org.",
   "comp.streams": "Kameror och tv",
   "comp.streamsHint": "Videowidgeten och Spelarens adresser: kameror, strömmar och tv-kanaler (lord-stream)."
 }

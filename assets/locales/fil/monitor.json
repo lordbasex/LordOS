@@ -603,7 +603,7 @@
   "comp.weather": "Panahon",
   "comp.weatherHint": "Ang mga taya ng widget ng panahon mula sa Open-Meteo, kapag in-on mo.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Mga Flatpak app mula sa Flathub: ang katalogo, ang pag-install at ang mga update nila.",
+  "comp.flathubHint": "Mga Flatpak app mula sa Flathub: ang katalogo, ang pag-install at ang mga update nila, at ang mga ranking ng Store mula sa flathub.org.",
   "comp.streams": "Mga camera at TV",
   "comp.streamsHint": "Ang video widget at mga address ng Player: camera, stream at TV channel (lord-stream)."
 }

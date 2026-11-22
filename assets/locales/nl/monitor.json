@@ -603,7 +603,7 @@
   "comp.weather": "Weer",
   "comp.weatherHint": "De verwachtingen van de weerwidget van Open-Meteo, zodra je ze inschakelt.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Flatpak-apps van Flathub: de catalogus, de installaties en de updates.",
+  "comp.flathubHint": "Flatpak-apps van Flathub: de catalogus, de installaties, de updates en de ranglijsten van de Store van flathub.org.",
   "comp.streams": "Camera's en tv",
   "comp.streamsHint": "De videowidget en de adressen van de Speler: camera's, streams en tv-zenders (lord-stream)."
 }

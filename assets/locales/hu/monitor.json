@@ -603,7 +603,7 @@
   "comp.weather": "Időjárás",
   "comp.weatherHint": "Az időjárás-widget előrejelzései az Open-Meteótól, ha bekapcsolod.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Flatpak-alkalmazások a Flathubról: a katalógus, a telepítésük és a frissítéseik.",
+  "comp.flathubHint": "Flatpak-alkalmazások a Flathubról: a katalógus, a telepítésük, a frissítéseik és az Áruház rangsorai a flathub.org-ról.",
   "comp.streams": "Kamerák és tévé",
   "comp.streamsHint": "A videó-widget és a Lejátszó címei: kamerák, adások és tévécsatornák (lord-stream)."
 }

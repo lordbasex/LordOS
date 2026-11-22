@@ -20,8 +20,8 @@ export const setPrefs = (p) => settings.set((s) => ({ ...s, flathub: { ...M.pref
 // catalog: the last read (lord.flatpak.catalog()); installed: `flatpak list` ({ id, branch, version }); listed: that
 // list was read at least once (before, its 0 means "not known yet"); job: the
 // running install, removal or update ({ kind, id, name, pct, line }); busy: the catalog or setup step running ('' when
-// none); msg: the last outcome ({ ok, text }).
-export const state = createStore({ catalog: [], loaded: false, installed: [], listed: false, job: null, busy: '', msg: null });
+// none); msg: the last outcome ({ ok, text }); ranks: Flathub's rankings as app ids (M.ranksOf; loadRanks below).
+export const state = createStore({ catalog: [], loaded: false, installed: [], listed: false, job: null, busy: '', msg: null, ranks: {} });
 const patch = (p) => state.set((s) => ({ ...s, ...p }));
 
 // ---- the job pump: lord.flatpak.take() while something runs ----
@@ -222,6 +222,45 @@ export function info(ref) {
     }));
   }
   return infos.get(ref);
+}
+
+// ---- Flathub's rankings (E10): Popular, Trending, Recently added, Recently updated, the app of the day and the apps of
+// the week, as app ids from lord.flatpak.ranks() (lord-fetch, flathub.org only, each list at most once a day; the
+// lists kept on disk). Asked only while the person leaves them on (settings.flathub.rankings, on by default) and the
+// Store shows Flathub's home. Off, offline or failed: state.ranks stays as it was (empty at first) and the rows are
+// simply absent. ----
+let rankTimer = 0;
+const readRanks = () => {
+  const a = api();
+  let raw = null;
+  try { raw = a && typeof a.ranks === 'function' ? a.ranks() : null; } catch (e) { raw = null; }
+  const ranks = M.ranksOf(raw);
+  const prev = state.get().ranks;
+  if (JSON.stringify(prev) !== JSON.stringify(ranks)) patch({ ranks });
+  return !!(raw && raw.busy);
+};
+export function loadRanks() {
+  const a = api();
+  if (!prefs().rankings) { if (Object.keys(state.get().ranks).length) patch({ ranks: {} }); return; }
+  if (!a || typeof a.rankRequest !== 'function') return;
+  let busy = false;
+  try { busy = !!a.rankRequest(); } catch (e) { busy = false; }
+  readRanks();
+  if (!busy || rankTimer) return;
+  // while lord-fetch works: read again every 2 s, for at most 3 minutes
+  let left = 90;
+  rankTimer = setInterval(() => {
+    if (readRanks() && --left > 0) return;
+    clearInterval(rankTimer);
+    rankTimer = 0;
+    readRanks();
+  }, 2000);
+}
+// The switch: off clears what is shown (the copies on disk stay until the next day's fetch replaces them).
+export function setRankings(on) {
+  setPrefs({ rankings: !!on });
+  if (on) loadRanks();
+  else patch({ ranks: {} });
 }
 
 export const catalogApp = (id) => state.get().catalog.find((a) => a.id === id) || null;

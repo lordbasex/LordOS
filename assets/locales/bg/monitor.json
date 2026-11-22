@@ -603,7 +603,7 @@
   "comp.weather": "Времето",
   "comp.weatherHint": "Прогнозите на джаджата за времето от Open-Meteo, след като ги включите.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Приложенията Flatpak от Flathub: каталогът, инсталирането и обновяванията им.",
+  "comp.flathubHint": "Приложенията Flatpak от Flathub: каталогът, инсталирането и обновяванията им, и класациите на Магазина от flathub.org.",
   "comp.streams": "Камери и ТВ",
   "comp.streamsHint": "Видео джаджата и адресите на Плейъра: камери, потоци и ТВ канали (lord-stream)."
 }

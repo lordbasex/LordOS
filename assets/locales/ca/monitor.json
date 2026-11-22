@@ -603,7 +603,7 @@
   "comp.weather": "Temps",
   "comp.weatherHint": "Les previsions del giny del temps, d'Open-Meteo, quan les actives.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Les aplicacions Flatpak de Flathub: el catàleg, les instal·lacions i les actualitzacions.",
+  "comp.flathubHint": "Les aplicacions Flatpak de Flathub: el catàleg, les instal·lacions, les actualitzacions i les classificacions de la Botiga des de flathub.org.",
   "comp.streams": "Càmeres i TV",
   "comp.streamsHint": "El giny de vídeo i les adreces del Reproductor: càmeres, emissions i canals de TV (lord-stream)."
 }

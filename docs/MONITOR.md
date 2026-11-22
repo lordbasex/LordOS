@@ -155,6 +155,7 @@ backed by its own process and cgroup scope, so its rules are enforced by the ker
 | Terminal | `lordos:terminal` | the shell of every terminal and every program it starts; the detail lists the programs by name |
 | Blocklist updates | `lordos:lists` | the daily blocklist downloads (`lord-fetch`) |
 | Weather | `lordos:weather` | the weather widget's forecasts from Open-Meteo, once turned on (`lord-fetch`) |
+| Flathub | `lordos:flathub` | Flatpak's catalog, installs and updates, and the Store's rankings from `flathub.org` (`lord-fetch`, at most once a day per list; FLATPAK.md "Rankings from Flathub's API") |
 | VPN | `lordos:vpn` | the counters of LordOS's own VPN interfaces (Settings → Network); not blockable |
 | Name resolution (DNS) | `system:dns` | systemd-resolved; shown, never blockable |
 | Time synchronization | `system:time` | systemd-timesyncd; shown, never blockable |

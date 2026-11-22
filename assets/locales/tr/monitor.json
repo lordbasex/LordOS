@@ -603,7 +603,7 @@
   "comp.weather": "Hava Durumu",
   "comp.weatherHint": "Açtığında, hava durumu widget'ının Open-Meteo tahminleri.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Flathub'dan Flatpak uygulamaları: katalog, kurulumlar ve güncellemeler.",
+  "comp.flathubHint": "Flathub'dan Flatpak uygulamaları: katalog, kurulumlar, güncellemeler ve flathub.org'dan Mağaza sıralamaları.",
   "comp.streams": "Kameralar ve TV",
   "comp.streamsHint": "Video widget'ı ve Oynatıcı'nın adresleri: kameralar, yayınlar ve TV kanalları (lord-stream)."
 }

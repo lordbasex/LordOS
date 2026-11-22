@@ -588,7 +588,7 @@
   "comp.weather": "天气",
   "comp.weatherHint": "开启后，天气小组件从 Open-Meteo 获取的预报。",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "来自 Flathub 的 Flatpak 应用：目录、安装和更新。",
+  "comp.flathubHint": "来自 Flathub 的 Flatpak 应用：目录、安装、更新，以及来自 flathub.org 的商店排行。",
   "comp.streams": "摄像头和电视",
   "comp.streamsHint": "视频小组件和播放器的地址：摄像头、直播流和电视频道（lord-stream）。"
 }
