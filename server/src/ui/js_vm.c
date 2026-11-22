@@ -30,8 +30,10 @@
 #include "../vm/logclean.h"
 #include "../vm/vmagent.h"
 #include "../vm/vmnet.h"
+#include "../vm/vmgpu.h"
 #include "../wl/wl.h"
 #include "../gpu/gpu.h"
+#include "../gpu/dmaread.h"
 #include "../sec/json.h"
 #include "../sec/perms.h"
 #include "../sec/restrict.h"
@@ -222,6 +224,67 @@ static void unbridge_idle(const VmMachine *m, const char *state) {
     next = (next + 1) % 8;
 }
 
+/* a machine's Intel vGPU (docs/MACHINES-GPU.md, Mode A) that nothing runs on any more goes, the same way: the admin
+ * helper's vm-gvt-remove removes only the caller's and never one a process holds */
+static void gvt_idle(const VmMachine *m, const char *state) {
+    static struct { char id[37]; time_t at; } sent[8];
+    static int next;
+    char p[96];
+    snprintf(p, sizeof p, "/sys/bus/mdev/devices/%s", m->id);
+    if (access(p, F_OK)) return;
+    if (strcmp(state, "stopped") && strcmp(state, "crashed")) return;
+    time_t now = time(NULL);
+    if (now - last_start < 30) return;
+    for (int i = 0; i < 8; i++) if (!strcmp(sent[i].id, m->id) && now - sent[i].at < 60) return;
+    if (admin_fd() < 0 || admin_send("vm-gvt-remove", m->id, strlen(m->id)) < 0) return;
+    snprintf(sent[next].id, sizeof sent[next].id, "%s", m->id);
+    sent[next].at = now;
+    next = (next + 1) % 8;
+}
+
+/* While a machine with a vGPU runs, the iGPU's minimum frequency is raised (gpu-min-freq): i915's own governor kept a
+ * GVT-g guest at 350 MHz and 11–16 fps where 800–1150 MHz gives 75 (docs/MACHINES-GPU.md). Two thirds of RP0, to a
+ * multiple of 50 (800 MHz on a UHD 630); "default" once none runs. Asked again at most once a minute */
+static void gvt_freq(int running) {
+    static int raised;
+    static time_t at;
+    time_t now = time(NULL);
+    if (running == raised || now - at < (running ? 5 : 60)) return;
+    VmGpu g[VMGPU_MAX];
+    int n = vmgpu_list("", g, VMGPU_MAX);
+    vmgpu_mark_desktop("", "/proc/self/fd", g, n);
+    const VmGpu *x = vmgpu_gvt(g, n);
+    if (!x || x->card < 0) { raised = running; return; }
+    char arg[48];
+    if (running) {
+        char p[160], b[32] = "";
+        snprintf(p, sizeof p, "/sys/bus/pci/devices/%s/drm/card%d/gt/gt0/rps_RP0_freq_mhz", x->addr, x->card);
+        int fd = open(p, O_RDONLY | O_CLOEXEC);
+        ssize_t r = fd >= 0 ? read(fd, b, sizeof b - 1) : -1;
+        if (fd >= 0) close(fd);
+        int rp0 = r > 0 ? (b[r] = 0, atoi(b)) : 0;
+        if (rp0 <= 0) { raised = running; return; }
+        snprintf(arg, sizeof arg, "%s %d", x->addr, rp0 * 2 / 3 / 50 * 50);
+    } else snprintf(arg, sizeof arg, "%s default", x->addr);
+    if (admin_fd() < 0 || admin_send("gpu-min-freq", arg, strlen(arg)) < 0) return;
+    raised = running;
+    at = now;
+}
+
+/* gpus() → { gpus: [...], configured, restart } (vmgpu.h's vmgpu_json): Settings → Graphics cards and Machines'
+ * Configure. The desktop's GPU is the card this process holds */
+static JSValue f_gpus(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    VmGpu g[VMGPU_MAX];
+    int n = vmgpu_list("", g, VMGPU_MAX);
+    vmgpu_mark_desktop("", "/proc/self/fd", g, n);
+    char *j = vmgpu_json(g, n, vmgpu_configured(""));
+    if (!j) return JS_NULL;
+    JSValue v = JS_ParseJSON(c, j, strlen(j), "<gpus>");
+    free(j);
+    return v;
+}
+
 /* ---- the library ---- */
 
 /* run.json, read as lord-vm writes it; a state that says "active" with no lord-vm behind it is a machine whose
@@ -279,6 +342,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     DIR *d = opendir(lib);
     if (!d) return arr;
     uint32_t n = 0;
+    int gvt_running = 0;
     struct dirent *e;
     while ((e = readdir(d)) && n < 256) {
         size_t l = strlen(e->d_name);
@@ -354,6 +418,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             /* the windows device set (4.3), and the graphics (6.10): 3D for Linux machines only */
             JS_SetPropertyStr(c, o, "windowsDevices", JS_NewBool(c, m.devices == VM_DEV_WINDOWS));
             set_str(c, o, "graphics", m.graphics == VM_GFX_3D ? "3d" : "2d");
+            set_str(c, o, "gpu", VM_VGPU_NAMES[m.vgpu]);        /* an Intel vGPU (schema 11): "", "intel-whole", "intel-shared" */
             {
                 char rs[24] = "follow";
                 if (m.res_w && m.res_h) snprintf(rs, sizeof rs, "%dx%d", m.res_w, m.res_h);
@@ -392,7 +457,14 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         if (r == VM_OK) {
             JSValue sv = JS_GetPropertyStr(c, o, "state");
             const char *ss = JS_ToCString(c, sv);
-            if (ss) { unbridge_idle(&m, ss); JS_FreeCString(c, ss); }
+            if (ss) {
+                unbridge_idle(&m, ss);
+                if (m.vgpu) {
+                    gvt_idle(&m, ss);
+                    if (!strcmp(ss, "running") || !strcmp(ss, "paused") || !strcmp(ss, "starting")) gvt_running++;
+                }
+                JS_FreeCString(c, ss);
+            }
             JS_FreeValue(c, sv);
         }
         /* an operation that was interrupted and waits for the next start (3.6) */
@@ -409,6 +481,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_SetPropertyUint32(c, arr, n++, o);
     }
     closedir(d);
+    gvt_freq(gvt_running > 0);
     return arr;
 }
 
@@ -810,7 +883,7 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[52 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[54 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -882,6 +955,14 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         if (gs && (!strcmp(gs, "2d") || !strcmp(gs, "3d"))) { snprintf(gfx, sizeof gfx, "%s", gs); args[n++] = "--graphics"; args[n++] = gfx; } else ok = 0;
         if (gs) JS_FreeCString(c, gs);
     }
+    JS_FreeValue(c, v);
+    char gpu[16] = "";
+    v = JS_GetPropertyStr(c, argv[1], "gpu");
+    if (JS_IsString(v)) {
+        const char *gs = JS_ToCString(c, v);
+        if (gs && (!gs[0] || !strcmp(gs, "intel-whole") || !strcmp(gs, "intel-shared"))) { snprintf(gpu, sizeof gpu, "%s", gs[0] ? gs : "none"); args[n++] = "--gpu"; args[n++] = gpu; } else ok = 0;
+        if (gs) JS_FreeCString(c, gs);
+    } else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     char res[24] = "";
     v = JS_GetPropertyStr(c, argv[1], "resolution");
@@ -1133,8 +1214,9 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 /* ---- sessions: one running machine and its window ---- */
 
 #define MAX_SESS 4
-/* one dmabuf of a 3D machine's picture (VD_DMABUF) and its texture */
-typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; unsigned used; } VmDmabuf;
+/* one dmabuf of a 3D machine's picture (VD_DMABUF) and its import: a texture of the desktop's GPU (tex) or of the reader
+ * on the buffer's own render node (ri, gpu/dmaread.h); gfail/rfail: that one refused it (not tried again for this dmabuf) */
+typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; DmaImg *ri; int gfail, rfail; unsigned used; } VmDmabuf;
 typedef struct {
     int used, vm, vd, err;              /* channels; lord-vm's stderr (until its log is open) */
     pid_t vm_pid, vd_pid;
@@ -1598,6 +1680,7 @@ static void maybe_display(Sess *s) {
 
 static void db_free(Sess *s, int i) {
     if (s->db[i].tex) gpu_tex_free(s->db[i].tex);
+    if (s->db[i].ri) dmaread_free(s->db[i].ri);
     if (s->db[i].fd >= 0) close(s->db[i].fd);
     memset(&s->db[i], 0, sizeof s->db[i]);
     s->db[i].fd = -1;
@@ -1644,19 +1727,39 @@ static int db_read(Sess *s, MediaSrc *ms) {
     struct pollfd pf = { d->fd, POLLIN, 0 };
     if (poll(&pf, 1, 0) == 0) return 0;
     if (d->tex && !gpu_tex_current(d->tex)) { gpu_tex_free(d->tex); d->tex = NULL; }
-    if (!d->tex) {
-        GpuDmabuf b = { .width = d->w, .height = d->h, .nplanes = 1, .fourcc = d->fourcc, .modifier = d->mod, .fd = { d->fd, -1, -1, -1 },
-                        .offset = { 0 }, .stride = { (uint32_t)d->stride } };
-        d->tex = gpu_active() ? gpu_tex_dmabuf(&b) : NULL;
-        if (!d->tex) {
-            if (!s->db_warned++) fprintf(stderr, "machines: a 3D picture can't be shown: %s\n", gpu_active() ? "the GPU refused its dmabuf" : "the desktop draws without a GPU");
+    if (!d->tex && !d->ri) {
+        /* Which GPU reads it: the desktop's (a Linux 3D machine's virgl picture is made on it), or the reader on the
+         * Intel render node (gpu/dmaread.h) for an Intel GVT-g machine's picture: its Intel-tiled modifier can't be
+         * imported by another vendor's GPU, and on the CPU path (LORD_GPU=0, no usable GPU) there is no desktop GPU;
+         * also when the desktop's GPU refused it. */
+        const char *in = dmaread_intel_node();
+        GpuInfo gi;
+        gpu_info(&gi);
+        int desk_intel = in && gi.render_node && !strcmp(gi.render_node, in);
+        if (gpu_active() && !d->gfail && !(in && dmaread_mod_intel(d->mod) && !desk_intel)) {
+            GpuDmabuf b = { .width = d->w, .height = d->h, .nplanes = 1, .fourcc = d->fourcc, .modifier = d->mod, .fd = { d->fd, -1, -1, -1 },
+                            .offset = { 0 }, .stride = { (uint32_t)d->stride } };
+            d->tex = gpu_tex_dmabuf(&b);
+            if (!d->tex) d->gfail = 1;
+        }
+        if (!d->tex && in && !d->rfail) {
+            d->ri = dmaread_import(in, d->fd, d->w, d->h, d->stride, d->fourcc, d->mod);
+            if (!d->ri) d->rfail = 1;
+        }
+        if (!d->tex && !d->ri) {
+            if (!s->db_warned++)
+                fprintf(stderr, "machines: a 3D picture can't be shown: %s (modifier %llx)\n",
+                        gpu_active() ? "no GPU took its dmabuf" : in ? "the desktop draws without a GPU and the Intel GPU refused its dmabuf" : "the desktop draws without a GPU",
+                        (unsigned long long)d->mod);
             s->db_fails++;
             return -1;
         }
     }
     int y0 = s->db_y0 < 0 ? 0 : s->db_y0, y1 = s->db_y1 > s->h ? s->h : s->db_y1;
     if (y1 <= y0) return 1;
-    if (gpu_tex_read_rows(d->tex, (uint8_t *)ms->map, y0, y1 - y0, d->flip)) { s->db_fails++; return -1; }
+    int r = d->tex ? gpu_tex_read_rows(d->tex, (uint8_t *)ms->map, y0, y1 - y0, d->flip)
+                   : dmaread_rows(d->ri, (uint8_t *)ms->map, y0, y1 - y0, d->flip);
+    if (r) { s->db_fails++; return -1; }
     s->db_reads++;
     return 1;
 }
@@ -3762,7 +3865,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
     JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act),
-    JS_CFUNC_DEF("guestApps", 1, f_guest_apps), JS_CFUNC_DEF("launch", 2, f_launch),
+    JS_CFUNC_DEF("guestApps", 1, f_guest_apps), JS_CFUNC_DEF("gpus", 0, f_gpus), JS_CFUNC_DEF("launch", 2, f_launch),
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {

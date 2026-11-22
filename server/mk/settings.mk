@@ -16,6 +16,12 @@ build/settings-hw-test: tests/settings_hw_test.c src/hw/rpifw.c src/hw/edid.c sr
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/settings_hw_test.c src/hw/rpifw.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/hw_admin.c src/hw/battery_admin.c src/hw/tabletpower.c src/bench/boottest.c src/hw/hwscan.c src/sysreport/smbios.c src/hw/jbuf.c src/sec/json.c -lm
 	./$@ || { rm -f $@; exit 1; }
+# kernel uevents (hw/uevent.c): subsystems, and drm uevents of a card lord-server doesn't drive ignored
+test: build/uevent-test
+build/uevent-test: tests/uevent_test.c src/hw/uevent.c src/hw/uevent.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/uevent_test.c src/hw/uevent.c
+	./$@ || { rm -f $@; exit 1; }
 # BlueZ parsing (GetManagedObjects, PropertiesChanged, Battery1, paths, state JSON) without a bus
 test: build/bt-test
 BT_TEST_SRC := tests/bt_test.c src/hw/bt.c src/hw/sysbus.c src/hw/jbuf.c src/vault/dbus.c src/sec/json.c

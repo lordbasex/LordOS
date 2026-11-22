@@ -174,5 +174,9 @@
   "vm.kvmNextLogin": "Permis de la următoarea autentificare",
   "pkg.foreignArchAdded": "Pachetele pe 32 de biți ({arch}) au fost activate",
   "pkg.foreignArchPresent": "Pachetele pe 32 de biți ({arch}) erau deja activate",
-  "pkg.why.multiarchPair": "Aceeași versiune ca {name}"
+  "pkg.why.multiarchPair": "Aceeași versiune ca {name}",
+  "gpu.roleSet": "Utilizarea plăcii video a fost salvată ({card}): reporniți pentru a aplica",
+  "vm.gvtReady": "Partea din placa video este gata ({name})",
+  "vm.gvtGone": "Partea din placa video a fost eliminată",
+  "gpu.freqSet": "Frecvența minimă a plăcii video a fost setată"
 }

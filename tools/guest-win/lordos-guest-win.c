@@ -67,8 +67,10 @@
 
 /* w5 (2026-11-21): "pointer": lord-vm may set the display driver's hardware pointer (viogpudo's HWCursor) through
  * qemu-guest-agent once these tools run (docs/VIRTUALIZATION.md 7.1.2); this program itself doesn't touch it */
-#define VERSION "w5"
-#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer"
+/* w6 (2026-11-21): "gvt": lord-vm may install Intel's driver for a GVT-g vGPU, block its updates and turn hibernation
+ * off through qemu-guest-agent once these tools run (server/src/vm/vmgvtwin.h); this program itself doesn't touch them */
+#define VERSION "w6"
+#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt"
 
 enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
 enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS };

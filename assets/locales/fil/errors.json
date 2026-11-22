@@ -893,5 +893,17 @@
   "media.streamAuth": "Humingi ng user at password ang stream, o mali ang mga ito",
   "media.streamLost": "Naputol ang stream",
   "media.streamNoChannels": "Walang channel ang list",
-  "media.noStreamHelper": "Hindi available ang stream helper (lord-stream)"
+  "media.noStreamHelper": "Hindi available ang stream helper (lord-stream)",
+  "gpu.notFound": "Wala sa computer na ito ang graphics card na iyon",
+  "gpu.desktop": "Iginuguhit ng graphics card na iyon ang desktop na ito: hindi ito mabibigyan ng ibang gamit",
+  "gpu.notGvt": "Hindi maibabahagi sa mga makina ang graphics card na iyon",
+  "gpu.roleNotYet": "Hindi pa available sa bersyong ito ang gamit na iyon ng graphics card",
+  "gpu.writeFailed": "Hindi maisulat ang mga setting ng graphics card",
+  "gpu.initramfsFailed": "Hindi ma-update ang startup image (initramfs) gamit ang mga setting ng graphics card",
+  "gpu.freqRange": "Labas sa sinusuportahan ng graphics card na ito ang frequency na iyon",
+  "vm.gvtNoType": "Hindi iniaalok ng graphics card ang bahaging iyon",
+  "vm.gvtNone": "Walang bahagi ng graphics card na available para sa mga makina ngayon",
+  "vm.gvtBusy": "Pag-aari ng iba ang bahagi ng graphics card ng makinang iyon",
+  "vm.gvtInUse": "Ginagamit pa ng isang tumatakbong makina ang bahaging iyon ng graphics card",
+  "vm.gvtFailed": "Hindi magawa ang bahagi ng graphics card"
 }

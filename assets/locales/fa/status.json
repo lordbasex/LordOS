@@ -165,5 +165,9 @@
   "vm.kvmNextLogin": "از ورود بعدی شما مجاز است",
   "pkg.foreignArchAdded": "بسته‌های ۳۲ بیتی ({arch}) فعال شدند",
   "pkg.foreignArchPresent": "بسته‌های ۳۲ بیتی ({arch}) از قبل فعال بودند",
-  "pkg.why.multiarchPair": "همان نسخهٔ {name}"
+  "pkg.why.multiarchPair": "همان نسخهٔ {name}",
+  "gpu.roleSet": "کاربرد کارت گرافیک ذخیره شد ({card}): برای اعمال، راه‌اندازی مجدد کنید",
+  "vm.gvtReady": "سهم کارت گرافیک آماده است ({name})",
+  "vm.gvtGone": "سهم کارت گرافیک حذف شد",
+  "gpu.freqSet": "کمینهٔ بسامد کارت گرافیک تنظیم شد"
 }

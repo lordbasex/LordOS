@@ -893,5 +893,17 @@
   "media.streamAuth": "Der Stream verlangte Benutzer und Passwort, oder sie waren falsch",
   "media.streamLost": "Der Stream ist abgebrochen",
   "media.streamNoChannels": "Die Liste enthält keine Sender",
-  "media.noStreamHelper": "Der Stream-Helfer (lord-stream) ist nicht verfügbar"
+  "media.noStreamHelper": "Der Stream-Helfer (lord-stream) ist nicht verfügbar",
+  "gpu.notFound": "Diese Grafikkarte ist nicht in diesem Computer",
+  "gpu.desktop": "Diese Grafikkarte zeichnet diesen Desktop: Sie kann keine andere Verwendung bekommen",
+  "gpu.notGvt": "Diese Grafikkarte kann nicht mit Maschinen geteilt werden",
+  "gpu.roleNotYet": "Diese Verwendung einer Grafikkarte ist in dieser Version noch nicht verfügbar",
+  "gpu.writeFailed": "Die Einstellungen der Grafikkarte konnten nicht geschrieben werden",
+  "gpu.initramfsFailed": "Das Startabbild (initramfs) konnte nicht mit den Einstellungen der Grafikkarte aktualisiert werden",
+  "gpu.freqRange": "Diese Frequenz liegt außerhalb dessen, was diese Grafikkarte unterstützt",
+  "vm.gvtNoType": "Die Grafikkarte bietet diesen Anteil nicht an",
+  "vm.gvtNone": "Derzeit ist kein Grafikkarten-Anteil für Maschinen verfügbar",
+  "vm.gvtBusy": "Der Grafikkarten-Anteil dieser Maschine gehört jemand anderem",
+  "vm.gvtInUse": "Dieser Anteil der Grafikkarte wird noch von einer laufenden Maschine verwendet",
+  "vm.gvtFailed": "Der Anteil der Grafikkarte konnte nicht erstellt werden"
 }

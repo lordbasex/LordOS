@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 10
+#define VM_SCHEMA 11
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -60,6 +60,11 @@ enum { VM_RTC_UTC = 0, VM_RTC_LOCAL };
 /* the guest's graphics (schema 5): 2D, a virtio GPU whose picture QEMU draws in shared memory; 3D, virgl (virtio-vga-gl),
  * which opens the host GPU's render node from QEMU's sandbox: Linux guests only (no device set "windows") */
 enum { VM_GFX_2D = 0, VM_GFX_3D };
+/* a real GPU for the machine (schema 11, docs/MACHINES-GPU.md Mode A): none; an Intel GVT-g vGPU of the largest type the
+ * iGPU lists ("intel-whole", close to the whole iGPU for this machine), or of the smallest that shows the machine's
+ * resolution ("intel-shared", so several machines can have one). The vGPU is then the machine's only display */
+enum { VM_VGPU_NONE = 0, VM_VGPU_WHOLE, VM_VGPU_SHARED };
+extern const char *const VM_VGPU_NAMES[];  /* "", "intel-whole", "intel-shared" */
 /* the boot order (schema 6): the devices the firmware tries, each once; none listed is "auto" */
 enum { VM_BOOT_DISK = 0, VM_BOOT_CD, VM_BOOT_NET, VM_BOOT_DEVS };
 extern const char *const VM_BOOT_NAMES[];  /* "disk", "cd", "network" */
@@ -166,6 +171,8 @@ typedef struct {
      * into the picture (viogpudo's HWCursor 0, upstream's default); missing or "lordos": LordOS, from the shape the guest
      * hands over (HWCursor 1, set by lord-vm through the guest tools' agent when they say "pointer") */
     int pointer_guest;
+    /* schema 11: VM_VGPU_* ("gpu": "intel-whole" | "intel-shared", written only then); amd64 UEFI machines with 2D graphics */
+    int vgpu;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 

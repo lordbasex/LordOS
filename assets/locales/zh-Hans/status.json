@@ -156,5 +156,9 @@
   "vm.kvmNextLogin": "将从你下次登录时起允许",
   "pkg.foreignArchAdded": "已启用 32 位（{arch}）软件包",
   "pkg.foreignArchPresent": "32 位（{arch}）软件包已经启用",
-  "pkg.why.multiarchPair": "与 {name} 版本相同"
+  "pkg.why.multiarchPair": "与 {name} 版本相同",
+  "gpu.roleSet": "已保存显卡的用途（{card}）：重新启动后生效",
+  "vm.gvtReady": "显卡份额已就绪（{name}）",
+  "vm.gvtGone": "已移除显卡份额",
+  "gpu.freqSet": "已设置显卡的最低频率"
 }

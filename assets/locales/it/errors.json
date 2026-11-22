@@ -893,5 +893,17 @@
   "media.streamAuth": "Lo stream ha chiesto utente e password, o erano errati",
   "media.streamLost": "Lo stream si è interrotto",
   "media.streamNoChannels": "La lista non ha canali",
-  "media.noStreamHelper": "L'assistente degli stream (lord-stream) non è disponibile"
+  "media.noStreamHelper": "L'assistente degli stream (lord-stream) non è disponibile",
+  "gpu.notFound": "Quella scheda grafica non è presente in questo computer",
+  "gpu.desktop": "Quella scheda grafica disegna questa scrivania: non può avere un altro uso",
+  "gpu.notGvt": "Quella scheda grafica non può essere condivisa con le macchine",
+  "gpu.roleNotYet": "Quell’uso di una scheda grafica non è ancora disponibile in questa versione",
+  "gpu.writeFailed": "Impossibile scrivere le impostazioni della scheda grafica",
+  "gpu.initramfsFailed": "Impossibile aggiornare l’immagine di avvio (initramfs) con le impostazioni della scheda grafica",
+  "gpu.freqRange": "Quella frequenza è fuori da quanto supportato da questa scheda grafica",
+  "vm.gvtNoType": "La scheda grafica non offre quella parte",
+  "vm.gvtNone": "Al momento nessuna parte della scheda grafica è disponibile per le macchine",
+  "vm.gvtBusy": "La parte di scheda grafica di quella macchina appartiene a qualcun altro",
+  "vm.gvtInUse": "Quella parte della scheda grafica è ancora usata da una macchina in esecuzione",
+  "vm.gvtFailed": "Impossibile creare la parte della scheda grafica"
 }

@@ -13,11 +13,13 @@
 #include "vm/vmops.h"
 #include "vm/vmagent.h"
 #include "vm/vmnet.h"
+#include "vm/vmgvtwin.h"
 
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
@@ -65,7 +67,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "11", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "12", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -108,7 +110,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":11,\"whatever\":true}";
+    const char newer[] = "{\"schema\":12,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -413,6 +415,40 @@ static void test_schema(void) {
                 free(jj);
             }
             CHECK(VM_SCHEMA >= 10);
+        }
+        /* schema 11: gpu, an Intel vGPU ("intel-whole" | "intel-shared"; none is never written), amd64 UEFI only, never
+         * with 3D graphics, never below schema 11 */
+        {
+            char amd[2048];
+            const char *a = "\"arch\":\"arm64\"", *mt = "\"machine_type\":\"virt-10.0\"", *fc = "/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd";
+            const char *pa = strstr(GOOD, a), *pm = strstr(GOOD, mt), *pf = strstr(GOOD, fc);
+            snprintf(amd, sizeof amd, "%.*s\"arch\":\"amd64\"%.*s\"machine_type\":\"pc-q35-10.0\"%.*s/usr/share/OVMF/OVMF_CODE_4M.secboot.fd%s",
+                     (int)(pa - GOOD), GOOD, (int)(pm - pa - strlen(a)), pa + strlen(a), (int)(pf - pm - strlen(mt)), pm + strlen(mt), pf + strlen(fc));
+            struct { const char *add; int schema, arm, want, vgpu; } s11[] = {
+                { "\"gpu\":\"intel-whole\"", 11, 0, VM_OK, VM_VGPU_WHOLE }, { "\"gpu\":\"intel-shared\"", 11, 0, VM_OK, VM_VGPU_SHARED },
+                { "\"gpu\":\"\"", 11, 0, VM_OK, 0 }, { "\"agent\":true", 11, 0, VM_OK, 0 },
+                { "\"gpu\":\"amd\"", 11, 0, VM_E_RANGE, 0 }, { "\"gpu\":1", 11, 0, VM_E_FIELD, 0 }, { "\"gpu\":\"intel-whole\"", 10, 0, VM_E_FIELD, 0 },
+                { "\"gpu\":\"intel-whole\"", 11, 1, VM_E_RANGE, 0 }, { "\"gpu\":\"intel-whole\",\"graphics\":\"3d\"", 11, 0, VM_E_RANGE, 0 },
+                { "\"gpu\":\"intel-whole\",\"firmware\":\"bios\"", 11, 0, VM_E_JSON, 0 },
+            };
+            for (size_t i = 0; i < sizeof s11 / sizeof s11[0]; i++) {
+                if (s11[i].want == VM_E_JSON) continue;          /* a key twice isn't this test's business */
+                const char *base = s11[i].arm ? GOOD : amd;
+                char t[4096];
+                const char *at = strstr(base, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - base), base, s11[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s11[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s11[i].want) fprintf(stderr, "  schema 11 %s (%d): got %d (%s)\n", s11[i].add, s11[i].schema, r, err);
+                CHECK(r == s11[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.vgpu == s11[i].vgpu);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"gpu\": ") == !!s11[i].vgpu);
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(VM_SCHEMA >= 11);
         }
         /* exactly VM_SOUND_DEV_MAX fits */
         longn[VM_SOUND_DEV_MAX] = 0;
@@ -1582,6 +1618,107 @@ static void test_clip_on_demand(void) {
 }
 
 /* Files' "Open with" a machine (docs/VIRTUALIZATION.md 7.3): AGK_OPEN, AGK_OPENED, the hello word, VM_FILE a = 1 */
+/* Intel's driver for a GVT-g vGPU (vmgvtwin.h): the fixed script's constants, and the one line it prints */
+static void test_gvtwin(void) {
+    /* the script carries the constants and nothing to fill in */
+    CHECK(strstr(GVTWIN_PS, "$U='" GVTWIN_DRV_URL "'") && strstr(GVTWIN_PS, "$H='" GVTWIN_DRV_SHA256 "'"));
+    CHECK(strstr(GVTWIN_PS, "$V='" GVTWIN_DRV_VERSION "'") && strstr(GVTWIN_PS, "$I='" GVTWIN_DRV_INF "'"));
+    CHECK(!strchr(GVTWIN_PS, '%') && !strstr(GVTWIN_PS, "@VER@") && !strstr(GVTWIN_PS, "@URL@"));
+    static const char host[] = "https://catalog.s.download.windowsupdate.com/d/msdownload/update/driver/drvs/";
+    CHECK(!strncmp(GVTWIN_DRV_URL, host, sizeof host - 1) && !strchr(GVTWIN_DRV_URL, '\'') && !strchr(GVTWIN_DRV_URL, ' '));
+    CHECK(strlen(GVTWIN_DRV_SHA256) == 64);
+    for (const char *h = GVTWIN_DRV_SHA256; *h; h++) CHECK((*h >= '0' && *h <= '9') || (*h >= 'A' && *h <= 'F'));
+    /* the device's ID goes into the block only after the driver is there, and the block is lifted only for our install */
+    CHECK(strstr(GVTWIN_PS, "DenyDeviceIDsRetroactive -Value 0") && strstr(GVTWIN_PS, "if($dr -in 'already','installed','restart'){"));
+    CHECK(strstr(GVTWIN_PS, "Microsoft Windows Hardware Compatibility Publisher") && strstr(GVTWIN_PS, "O=Intel Corporation"));
+    /* PowerShell's variable names ignore case: two names that differ only in case are one variable ($K the registry key
+     * and $k a list of SIDs overwrote each other, seen on the dev VM 2026-11-21: "the block: path 'S-1-5-18' not found") */
+    {
+        char names[64][24];
+        int nn = 0, clash = 0;
+        for (const char *q = GVTWIN_PS; (q = strchr(q, '$'));) {
+            q++;
+            size_t l = 0;
+            while ((q[l] >= 'a' && q[l] <= 'z') || (q[l] >= 'A' && q[l] <= 'Z') || (q[l] >= '0' && q[l] <= '9') || q[l] == '_') l++;
+            if (!l || l >= sizeof names[0]) continue;
+            int seen = 0;
+            for (int i = 0; i < nn && !seen; i++) {
+                if (strlen(names[i]) != l || strncasecmp(names[i], q, l)) continue;
+                seen = 1;
+                if (strncmp(names[i], q, l)) { clash = 1; fprintf(stderr, "  GVTWIN_PS: $%s and $%.*s are one variable\n", names[i], (int)l, q); }
+            }
+            if (!seen && nn < 64) { memcpy(names[nn], q, l); names[nn][l] = 0; nn++; }
+        }
+        CHECK(!clash && nn > 10);
+    }
+    /* every line ends with a newline (lines aren't run together) and the braces balance outside quotes */
+    {
+        int depth = 0, q = 0, neg = 0;
+        for (const char *c = GVTWIN_PS; *c; c++) {
+            if (q) { if (*c == '\'') q = 0; continue; }
+            if (*c == '\'') q = 1;
+            else if (*c == '{') depth++;
+            else if (*c == '}' && --depth < 0) neg = 1;
+        }
+        CHECK(depth == 0 && !q && !neg);
+        CHECK(GVTWIN_PS[strlen(GVTWIN_PS) - 1] == '\n');
+    }
+
+    GvtWinResult g;
+    char line[400];
+    struct { const char *said; int ok, d, b, p; const char *id, *why; } c[] = {
+        { "already kept off PCI\\VEN_8086&DEV_9BC5 ", 0, GW_D_ALREADY, GW_B_KEPT, GW_P_OFF, "PCI\\VEN_8086&DEV_9BC5", "" },
+        { "already kept off PCI\\VEN_8086&DEV_9BC5", 0, GW_D_ALREADY, GW_B_KEPT, GW_P_OFF, "PCI\\VEN_8086&DEV_9BC5", "" },
+        { "installed added turned PCI\\VEN_8086&DEV_3E92 ", 0, GW_D_INSTALLED, GW_B_ADDED, GW_P_TURNED, "PCI\\VEN_8086&DEV_3E92", "" },
+        { "restart added off PCI\\VEN_8086&DEV_9BC5 ", 0, GW_D_RESTART, GW_B_ADDED, GW_P_OFF, "PCI\\VEN_8086&DEV_9BC5", "" },
+        { "refused none off PCI\\VEN_8086&DEV_9BC5 the download is not the driver LordOS checked (SHA-256)", 0, GW_D_REFUSED, GW_B_NONE, GW_P_OFF, "PCI\\VEN_8086&DEV_9BC5", "the download is not the driver LordOS checked (SHA-256)" },
+        { "failed none failed - hibernation: access denied", 0, GW_D_FAILED, GW_B_NONE, GW_P_FAILED, "", "hibernation: access denied" },
+        { "nodevice none off - ", 0, GW_D_NODEVICE, GW_B_NONE, GW_P_OFF, "", "" },
+        { "busy none failed - another run is at work", 0, GW_D_BUSY, GW_B_NONE, GW_P_FAILED, "", "another run is at work" },
+        { "installed failed off PCI\\VEN_8086&DEV_9BC5 the block: denied", 0, GW_D_INSTALLED, GW_B_FAILED, GW_P_OFF, "PCI\\VEN_8086&DEV_9BC5", "the block: denied" },
+        /* malformed */
+        { "", -1, 0, 0, 0, "", "" },
+        { "already", -1, 0, 0, 0, "", "" },
+        { "already kept off", -1, 0, 0, 0, "", "" },
+        { "Already kept off PCI\\VEN_8086&DEV_9BC5 ", -1, 0, 0, 0, "", "" },
+        { "already kept on PCI\\VEN_8086&DEV_9BC5 ", -1, 0, 0, 0, "", "" },
+        { "already kept off - ", -1, 0, 0, 0, "", "" },                         /* a driver on no device */
+        { "refused added off PCI\\VEN_8086&DEV_9BC5 ", -1, 0, 0, 0, "", "" },  /* a block without our driver */
+        { "already kept off PCI\\VEN_10DE&DEV_9BC5 ", -1, 0, 0, 0, "", "" },
+        { "already kept off PCI\\VEN_8086&DEV_9bc5 ", -1, 0, 0, 0, "", "" },
+        { "already kept off PCI\\VEN_8086&DEV_9BC ", -1, 0, 0, 0, "", "" },
+        { "already kept off PCI\\VEN_8086&DEV_9BC55 ", -1, 0, 0, 0, "", "" },
+        { "already  kept off PCI\\VEN_8086&DEV_9BC5 ", -1, 0, 0, 0, "", "" },
+        { "failed none off - caf\xc3\xa9", -1, 0, 0, 0, "", "" },
+        { "failed none off - a\tb", -1, 0, 0, 0, "", "" },
+    };
+    for (size_t i = 0; i < sizeof c / sizeof c[0]; i++) {
+        int r = gvtwin_parse(c[i].said, &g);
+        if (r != c[i].ok) fprintf(stderr, "  gvtwin_parse \"%s\": got %d\n", c[i].said, r);
+        CHECK(r == c[i].ok);
+        if (r) continue;
+        CHECK(g.driver == c[i].d && g.block == c[i].b && g.power == c[i].p && !strcmp(g.id, c[i].id) && !strcmp(g.why, c[i].why));
+        gvtwin_describe(&g, line, sizeof line);
+        CHECK(!strncmp(line, "intel driver: ", 14) && (!g.why[0] || strstr(line, g.why)));
+    }
+    /* a reason of exactly GVTWIN_WHY_MAX fits, one more doesn't */
+    {
+        char t[256];
+        int o = snprintf(t, sizeof t, "failed none off - ");
+        memset(t + o, 'x', GVTWIN_WHY_MAX); t[o + GVTWIN_WHY_MAX] = 0;
+        CHECK(gvtwin_parse(t, &g) == 0 && strlen(g.why) == GVTWIN_WHY_MAX);
+        t[o + GVTWIN_WHY_MAX] = 'x'; t[o + GVTWIN_WHY_MAX + 1] = 0;
+        CHECK(gvtwin_parse(t, &g) == -1);
+    }
+    CHECK(gvtwin_parse(NULL, &g) == -1);
+    gvtwin_parse("installed added turned PCI\\VEN_8086&DEV_9BC5 ", &g);
+    gvtwin_describe(&g, line, sizeof line);
+    CHECK(!strcmp(line, "intel driver: " GVTWIN_DRV_VERSION " installed (PCI\\VEN_8086&DEV_9BC5); its updates are blocked now; hibernation and Fast Startup turned off"));
+    char tiny[8];
+    gvtwin_describe(&g, tiny, sizeof tiny);
+    CHECK(!strcmp(tiny, "intel d"));
+}
+
 static void test_open_with(void) {
     static const char tok[] = "0123456789abcdef0123456789abcdef";
     uint8_t sha[32], o[AG_OPEN_BYTES], back[32];
@@ -1643,6 +1780,8 @@ static void test_open_with(void) {
     CHECK(ag_hello_caps((const uint8_t *)"w4 open place", 13) == (AG_HELLO_OPEN | AG_HELLO_PLACE));
     CHECK(ag_hello_caps((const uint8_t *)"w5 open place pointer", 21) == (AG_HELLO_OPEN | AG_HELLO_PLACE | AG_HELLO_POINTER));
     CHECK(ag_hello_caps((const uint8_t *)"w5 pointers", 11) == 0);
+    CHECK(ag_hello_caps((const uint8_t *)"w6 pointer gvt", 14) == (AG_HELLO_POINTER | AG_HELLO_GVT));
+    CHECK(ag_hello_caps((const uint8_t *)"w6 gvtx gv", 10) == 0);
     /* the hello word */
     CHECK(ag_hello_caps((const uint8_t *)"w3 clipboard open windows", 25) == (AG_HELLO_CLIPBOARD | AG_HELLO_OPEN | AG_HELLO_WINDOWS));
     CHECK(!(ag_hello_caps((const uint8_t *)"w3 opens openx", 14) & AG_HELLO_OPEN));
@@ -1674,6 +1813,7 @@ static void test_open_with(void) {
 }
 
 int main(void) {
+    test_gvtwin();
     test_open_with();
     test_clip_on_demand();
     test_resolution();

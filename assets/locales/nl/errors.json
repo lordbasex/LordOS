@@ -893,5 +893,17 @@
   "media.streamAuth": "De stream vroeg om gebruiker en wachtwoord, of ze waren fout",
   "media.streamLost": "De stream is weggevallen",
   "media.streamNoChannels": "De lijst heeft geen zenders",
-  "media.noStreamHelper": "De streamhelper (lord-stream) is niet beschikbaar"
+  "media.noStreamHelper": "De streamhelper (lord-stream) is niet beschikbaar",
+  "gpu.notFound": "Die videokaart zit niet in deze computer",
+  "gpu.desktop": "Die videokaart tekent dit bureaublad: ze kan geen ander gebruik krijgen",
+  "gpu.notGvt": "Die videokaart kan niet met machines worden gedeeld",
+  "gpu.roleNotYet": "Dat gebruik van een videokaart is in deze versie nog niet beschikbaar",
+  "gpu.writeFailed": "De instellingen van de videokaart konden niet worden geschreven",
+  "gpu.initramfsFailed": "De opstartimage (initramfs) kon niet worden bijgewerkt met de instellingen van de videokaart",
+  "gpu.freqRange": "Die frequentie valt buiten wat deze videokaart ondersteunt",
+  "vm.gvtNoType": "De videokaart biedt dat deel niet aan",
+  "vm.gvtNone": "Er is nu geen deel van een videokaart beschikbaar voor machines",
+  "vm.gvtBusy": "Het deel van de videokaart van die machine is van iemand anders",
+  "vm.gvtInUse": "Dat deel van de videokaart wordt nog gebruikt door een draaiende machine",
+  "vm.gvtFailed": "Het deel van de videokaart kon niet worden gemaakt"
 }

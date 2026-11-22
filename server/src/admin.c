@@ -790,6 +790,7 @@ static void helper(int fd, const char *user) {
 #ifndef LORD_NETD
     /* Machines' bridged networks (vm_admin.h) a crashed session left, if no machine holds them */
     vm_net_sweep(req.uid);
+    vm_gvt_sweep(req.uid);
 #endif
     struct sigaction term = { .sa_handler = on_term };     /* no SA_RESTART: poll returns, the loop ends and sweeps */
     sigaction(SIGTERM, &term, NULL);
@@ -836,6 +837,7 @@ static void helper(int fd, const char *user) {
     for (int i = 0; i < MAX_KIDS; i++) if (kids[i].pid) kill(kids[i].pid, SIGTERM);
 #ifndef LORD_NETD
     vm_net_sweep(req.uid);
+    vm_gvt_sweep(req.uid);
 #endif
     _exit(0);
 }

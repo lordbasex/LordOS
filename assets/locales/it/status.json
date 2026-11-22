@@ -165,5 +165,9 @@
   "vm.kvmNextLogin": "Possibile dal tuo prossimo accesso",
   "pkg.foreignArchAdded": "Pacchetti a 32 bit ({arch}) abilitati",
   "pkg.foreignArchPresent": "I pacchetti a 32 bit ({arch}) erano già abilitati",
-  "pkg.why.multiarchPair": "Stessa versione di {name}"
+  "pkg.why.multiarchPair": "Stessa versione di {name}",
+  "gpu.roleSet": "Uso della scheda grafica salvato ({card}): riavvia per applicarlo",
+  "vm.gvtReady": "Quota della scheda grafica pronta ({name})",
+  "vm.gvtGone": "Quota della scheda grafica rimossa",
+  "gpu.freqSet": "Frequenza minima della scheda grafica impostata"
 }

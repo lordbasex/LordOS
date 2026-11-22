@@ -624,5 +624,34 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('the default is what ships', M.toolsOutdated(on('w1')), true);
 }
 
+
+// ---- a graphics card for a machine (Mode A, Intel GVT-g) ----
+{
+  const T = (name, highMb, maxW, maxH, weight, available) => ({ name, lowMb: 64, highMb, maxW, maxH, weight, available });
+  const types = [T('i915-GVTg_V5_1', 2048, 1920, 1200, 16, 1), T('i915-GVTg_V5_2', 1024, 1920, 1200, 8, 1), T('i915-GVTg_V5_4', 512, 1920, 1200, 4, 2),
+    T('i915-GVTg_V5_8', 256, 1024, 768, 2, 4)];
+  const igpu = { address: '0000:00:02.0', vendor: 0x8086, device: 0x9bc5, desktop: false, gvtCapable: true, gvtOn: true, types };
+  const amd = { address: '0000:01:00.0', vendor: 0x1002, device: 0x67df, desktop: true, gvtCapable: false, gvtOn: false, types: [] };
+  eq('gvtGpu: the spare Intel iGPU with GVT-g on', M.gvtGpu({ gpus: [amd, igpu] })?.address, '0000:00:02.0');
+  eq('gvtGpu: not the desktop\'s', M.gvtGpu({ gpus: [{ ...igpu, desktop: true }] }), null);
+  eq('gvtGpu: not when GVT-g is off', [M.gvtGpu({ gpus: [{ ...igpu, gvtOn: false }] }), M.gvtGpu(null), M.gvtGpu({})], [null, null, null]);
+  eq('gvtSpare: capable but off', M.gvtSpare({ gpus: [amd, { ...igpu, gvtOn: false }] })?.address, '0000:00:02.0');
+  eq('gvtSpare: none when on', M.gvtSpare({ gpus: [amd, igpu] }), null);
+  eq('gpuIds', M.gpuIds(igpu), '8086:9bc5');
+  eq('whole: the largest', M.gvtType(igpu, 'intel-whole', 'follow')?.name, 'i915-GVTg_V5_1');
+  eq('whole: largest by memory, then weight', M.gvtType({ types: [T('a', 512, 1920, 1200, 4, 1), T('b', 512, 1920, 1200, 8, 1)] }, 'intel-whole', 'follow')?.name, 'b');
+  eq('shared, follows the window: smallest showing 1920 × 1080', M.gvtType(igpu, 'intel-shared', 'follow')?.name, 'i915-GVTg_V5_4');
+  eq('shared, 1024 × 768: the smallest', M.gvtType(igpu, 'intel-shared', '1024x768')?.name, 'i915-GVTg_V5_8');
+  eq('shared, 2560 × 1440: none fits, the largest', M.gvtType(igpu, 'intel-shared', '2560x1440')?.name, 'i915-GVTg_V5_1');
+  eq('none, or no types', [M.gvtType(igpu, '', 'follow'), M.gvtType({ types: [] }, 'intel-whole', 'follow'), M.gvtType(null, 'intel-shared', 'follow')], [null, null, null]);
+  const busy = { ...igpu, types: types.map((t) => ({ ...t, available: t.name === 'i915-GVTg_V5_2' ? 1 : 0 })) };
+  eq('shared, free only: the next one up that has an instance', M.gvtType(busy, 'intel-shared', 'follow', true)?.name, 'i915-GVTg_V5_2');
+  eq('whole, free only: the largest or nothing', M.gvtType(busy, 'intel-whole', 'follow', true), null);
+  eq('shared, free only: none free', M.gvtType({ ...igpu, types: types.map((t) => ({ ...t, available: 0 })) }, 'intel-shared', 'follow', true), null);
+  eq('gvt arg', M.gvtArg({ id: '0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b' }, types[2]), '0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b i915-GVTg_V5_4');
+  eq('gvt arg without a type', [M.gvtArg({ id: 'x' }, null), M.gvtArg({}, types[0])], ['', '']);
+  eq('no suspend: a graphics card, or 3D running', [M.noSuspend(null, 'intel-shared'), M.noSuspend({ sandbox: 512 }, ''), M.noSuspend({ sandbox: 1 }, '')], [true, true, false]);
+}
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

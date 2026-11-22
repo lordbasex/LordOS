@@ -40,6 +40,7 @@ import { DefaultAppsSettings } from './DefaultApps.jsx';
 import { WebAppsSettings } from './WebApps.jsx';
 import { FlatpakSettings } from './Flatpak.jsx';
 import { FirmwareSettings } from './Firmware.jsx';
+import { GpusSettings, manyGpus } from './Gpus.jsx';
 import { Stack, Section, SettingRow, ValueRow, Badge, Note, Message, Actions, PopUp, shade } from './ui.jsx';
 import { compareNames } from '../../sdk/collate.js';
 
@@ -866,12 +867,23 @@ function ChipGlyph() {
   );
 }
 
+// A graphics card: a board with a fan and its connector's pins below.
+function GpuGlyph() {
+  return (
+    <View style={{ width: 14, height: 14, direction: 'ltr' }}>
+      <View style={{ position: 'absolute', left: 0, top: 3, width: 14, height: 7, borderRadius: 1.5, backgroundColor: '#fff' }} />
+      <View style={{ position: 'absolute', left: 6.5, top: 4.5, width: 4, height: 4, borderRadius: 2, backgroundColor: '#5e5ce6' }} />
+      <View style={{ position: 'absolute', left: 2, top: 10, width: 7, height: 2, backgroundColor: '#fff' }} />
+    </View>
+  );
+}
+
 // Sidebar groups (as in TangoOS): [id, component, icon color, symbol (a glyph or a component)].
 const GROUPS = [
   [['general', General, '#8e8e93', 'i'], ['appearance', Appearance, '#3a3a3c', '◐'], ['wallpaper', Wallpapers, '#30b0c7', '▣'], ['dock', DockSettings, '#3a3a3c', '▁'], ['displays', DisplaysSettings, '#0a84ff', '▭']],
   [['network', NetworkSettings, '#0a84ff', '⇅'], ['bluetooth', BluetoothSettings, '#0a84ff', 'ᛒ'], ['sound', SoundSettings, '#ff375f', '♪'], ['notifications', NotificationsSettings, '#ff3b30', '◉'], ['printers', PrintersSettings, '#636366', '⎙'], ['clipboard', ClipboardSettings, '#5e5ce6', '⎘'], ['sharing', SharingSettings, '#34c759', '⇄'], ['cloud', CloudSettings, '#0a84ff', '☁']],
   [['language', LanguageRegion, '#30b0c7', 'A'], ['datetime', DateTimeSettings, '#0a84ff', '◷'], ['keyboard', Keyboard, '#8e8e93', '⌨'], ['trackpad', TrackpadSettings, '#8e8e93', '▭'], ['defaultapps', DefaultAppsSettings, '#8e8e93', '◫'], ['webapps', WebAppsSettings, '#5e5ce6', '◎'], ['flatpak', FlatpakSettings, '#4a86cf', '◇'], ['ai', AISettings, '#bf5af2', '✦']],
-  [['battery', BatterySettings, '#30d158', '▮'], ['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
+  [['battery', BatterySettings, '#30d158', '▮'], ['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['gpus', GpusSettings, '#5e5ce6', GpuGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
 ];
 const SECTIONS = GROUPS.flat();
 // Board firmware
@@ -879,7 +891,9 @@ const SECTIONS = GROUPS.flat();
 const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
 // Battery: on a computer with one, or when something connected has a battery (docs/BATTERY.md)
 const hasAnyBattery = () => { try { return !!battery.get()?.hasBattery || deviceList().length > 0; } catch (e) { return false; } };
-const sectionShown = (id, hasPad, pi5 = isPi5()) => (id !== 'firmware' || pi5) && (id !== 'battery' || hasAnyBattery());
+// Graphics cards: only with more than one GPU (lord.vm.gpus; docs/MACHINES-GPU.md)
+const sectionShown = (id, hasPad, pi5 = isPi5(), gpus = id === 'gpus' && manyGpus()) => (id !== 'firmware' || pi5) && (id !== 'battery' || hasAnyBattery())
+  && (id !== 'gpus' || gpus);
 
 // The Dock's right-click menu lists every section, in the sidebar's order and with its names; one
 // opens Settings on that page (sdk/dock.js, quick actions). Built from SECTIONS, so it never drifts.
@@ -938,7 +952,8 @@ export default function Settings() {
   // hasPad is still passed to sectionShown, which only hides Board firmware off a Raspberry Pi 5
   const hasPad = useTrackpads().some((d) => d.kind === 'touchpad');
   const [pi5] = useState(isPi5);
-  const visible = (id) => sectionShown(id, hasPad, pi5) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
+  const [gpus] = useState(manyGpus);
+  const visible = (id) => sectionShown(id, hasPad, pi5, gpus) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
   const groups = GROUPS.map((g) => g.filter(([id]) => visible(id))).filter((g) => g.length);
   const pad = side.narrow ? spacing.l : spacing.xxl;
   const sidebar = (

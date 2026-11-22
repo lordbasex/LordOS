@@ -894,5 +894,17 @@
   "media.streamAuth": "Transmisja wymagała użytkownika i hasła albo były błędne",
   "media.streamLost": "Transmisja została przerwana",
   "media.streamNoChannels": "Lista nie ma kanałów",
-  "media.noStreamHelper": "Pomocnik transmisji (lord-stream) jest niedostępny"
+  "media.noStreamHelper": "Pomocnik transmisji (lord-stream) jest niedostępny",
+  "gpu.notFound": "Tej karty graficznej nie ma w tym komputerze",
+  "gpu.desktop": "Ta karta graficzna rysuje ten pulpit: nie można jej nadać innego zastosowania",
+  "gpu.notGvt": "Tej karty graficznej nie można współdzielić z maszynami",
+  "gpu.roleNotYet": "To zastosowanie karty graficznej nie jest jeszcze dostępne w tej wersji",
+  "gpu.writeFailed": "Nie udało się zapisać ustawień karty graficznej",
+  "gpu.initramfsFailed": "Nie udało się zaktualizować obrazu startowego (initramfs) ustawieniami karty graficznej",
+  "gpu.freqRange": "Ta częstotliwość wykracza poza zakres obsługiwany przez tę kartę graficzną",
+  "vm.gvtNoType": "Karta graficzna nie oferuje takiej części",
+  "vm.gvtNone": "Żadna część karty graficznej nie jest teraz dostępna dla maszyn",
+  "vm.gvtBusy": "Część karty graficznej tej maszyny należy do kogoś innego",
+  "vm.gvtInUse": "Ta część karty graficznej jest nadal używana przez działającą maszynę",
+  "vm.gvtFailed": "Nie udało się utworzyć części karty graficznej"
 }

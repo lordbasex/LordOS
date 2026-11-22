@@ -892,5 +892,17 @@
   "media.streamAuth": "Siaran meminta pengguna dan kata sandi, atau keduanya salah",
   "media.streamLost": "Siaran terputus",
   "media.streamNoChannels": "Daftar tidak berisi saluran",
-  "media.noStreamHelper": "Pembantu siaran (lord-stream) tidak tersedia"
+  "media.noStreamHelper": "Pembantu siaran (lord-stream) tidak tersedia",
+  "gpu.notFound": "Kartu grafis itu tidak ada di komputer ini",
+  "gpu.desktop": "Kartu grafis itu menggambar desktop ini: tidak bisa diberi penggunaan lain",
+  "gpu.notGvt": "Kartu grafis itu tidak bisa dibagi dengan mesin",
+  "gpu.roleNotYet": "Penggunaan kartu grafis itu belum tersedia di versi ini",
+  "gpu.writeFailed": "Pengaturan kartu grafis tidak dapat ditulis",
+  "gpu.initramfsFailed": "Image awal (initramfs) tidak dapat diperbarui dengan pengaturan kartu grafis",
+  "gpu.freqRange": "Frekuensi itu di luar yang didukung kartu grafis ini",
+  "vm.gvtNoType": "Kartu grafis tidak menawarkan bagian itu",
+  "vm.gvtNone": "Saat ini tidak ada bagian kartu grafis yang tersedia untuk mesin",
+  "vm.gvtBusy": "Bagian kartu grafis milik mesin itu adalah milik orang lain",
+  "vm.gvtInUse": "Bagian kartu grafis itu masih dipakai oleh mesin yang sedang berjalan",
+  "vm.gvtFailed": "Bagian kartu grafis tidak dapat dibuat"
 }

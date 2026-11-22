@@ -892,5 +892,17 @@
   "media.streamAuth": "Luồng yêu cầu người dùng và mật khẩu, hoặc chúng sai",
   "media.streamLost": "Luồng đã mất",
   "media.streamNoChannels": "Danh sách không có kênh",
-  "media.noStreamHelper": "Trình trợ giúp luồng (lord-stream) không có sẵn"
+  "media.noStreamHelper": "Trình trợ giúp luồng (lord-stream) không có sẵn",
+  "gpu.notFound": "Card đồ họa đó không có trên máy tính này",
+  "gpu.desktop": "Card đồ họa đó đang vẽ màn hình nền này: không thể dùng vào mục đích khác",
+  "gpu.notGvt": "Card đồ họa đó không thể dùng chung với các máy",
+  "gpu.roleNotYet": "Mục đích sử dụng card đồ họa đó chưa có trong phiên bản này",
+  "gpu.writeFailed": "Không thể ghi cài đặt của card đồ họa",
+  "gpu.initramfsFailed": "Không thể cập nhật ảnh khởi động (initramfs) với cài đặt của card đồ họa",
+  "gpu.freqRange": "Tần số đó nằm ngoài phạm vi card đồ họa này hỗ trợ",
+  "vm.gvtNoType": "Card đồ họa không cung cấp phần chia đó",
+  "vm.gvtNone": "Hiện không có phần chia card đồ họa nào khả dụng cho các máy",
+  "vm.gvtBusy": "Phần chia card đồ họa của máy đó thuộc về người khác",
+  "vm.gvtInUse": "Phần chia card đồ họa đó vẫn đang được một máy đang chạy sử dụng",
+  "vm.gvtFailed": "Không thể tạo phần chia card đồ họa"
 }

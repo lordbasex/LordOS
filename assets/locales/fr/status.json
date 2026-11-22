@@ -165,5 +165,9 @@
   "vm.kvmNextLogin": "Ce sera possible dès votre prochaine connexion",
   "pkg.foreignArchAdded": "Paquets 32 bits ({arch}) activés",
   "pkg.foreignArchPresent": "Les paquets 32 bits ({arch}) étaient déjà activés",
-  "pkg.why.multiarchPair": "Même version que {name}"
+  "pkg.why.multiarchPair": "Même version que {name}",
+  "gpu.roleSet": "Usage de la carte graphique enregistré ({card}) : redémarrez pour l'appliquer",
+  "vm.gvtReady": "Part de la carte graphique prête ({name})",
+  "vm.gvtGone": "Part de la carte graphique retirée",
+  "gpu.freqSet": "Fréquence minimale de la carte graphique définie"
 }

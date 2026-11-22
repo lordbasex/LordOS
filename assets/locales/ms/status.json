@@ -156,5 +156,9 @@
   "vm.kvmNextLogin": "Dibenarkan mulai log masuk anda yang seterusnya",
   "pkg.foreignArchAdded": "Pakej 32-bit ({arch}) didayakan",
   "pkg.foreignArchPresent": "Pakej 32-bit ({arch}) sudah didayakan",
-  "pkg.why.multiarchPair": "Versi yang sama dengan {name}"
+  "pkg.why.multiarchPair": "Versi yang sama dengan {name}",
+  "gpu.roleSet": "Penggunaan kad grafik disimpan ({card}): mulakan semula untuk menggunakannya",
+  "vm.gvtReady": "Bahagian kad grafik sedia ({name})",
+  "vm.gvtGone": "Bahagian kad grafik dibuang",
+  "gpu.freqSet": "Frekuensi minimum kad grafik ditetapkan"
 }

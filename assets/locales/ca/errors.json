@@ -893,5 +893,17 @@
   "media.streamAuth": "L'emissió ha demanat usuari i contrasenya, o eren incorrectes",
   "media.streamLost": "S'ha perdut l'emissió",
   "media.streamNoChannels": "La llista no té canals",
-  "media.noStreamHelper": "L'ajudant d'emissions (lord-stream) no està disponible"
+  "media.noStreamHelper": "L'ajudant d'emissions (lord-stream) no està disponible",
+  "gpu.notFound": "Aquesta targeta gràfica no és en aquest ordinador",
+  "gpu.desktop": "Aquesta targeta gràfica dibuixa aquest escriptori: no se li pot donar un altre ús",
+  "gpu.notGvt": "Aquesta targeta gràfica no es pot compartir amb màquines",
+  "gpu.roleNotYet": "Aquest ús d’una targeta gràfica encara no està disponible en aquesta versió",
+  "gpu.writeFailed": "No s’han pogut escriure els paràmetres de la targeta gràfica",
+  "gpu.initramfsFailed": "No s’ha pogut actualitzar la imatge d’arrencada (initramfs) amb els paràmetres de la targeta gràfica",
+  "gpu.freqRange": "Aquesta freqüència és fora del que admet aquesta targeta gràfica",
+  "vm.gvtNoType": "La targeta gràfica no ofereix aquesta part",
+  "vm.gvtNone": "Ara no hi ha cap part d’una targeta gràfica disponible per a màquines",
+  "vm.gvtBusy": "La part de la targeta gràfica d’aquesta màquina pertany a una altra persona",
+  "vm.gvtInUse": "Aquesta part de la targeta gràfica encara la fa servir una màquina en marxa",
+  "vm.gvtFailed": "No s’ha pogut crear la part de la targeta gràfica"
 }

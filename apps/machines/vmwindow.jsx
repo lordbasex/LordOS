@@ -9,11 +9,11 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, runs3d, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated } from './model.js';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { ClipAskBar } from './clipask.jsx';
-import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, bridgeUp, soundDevItems } from './ui.jsx';
+import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, startPrep, needsPrep, soundDevItems } from './ui.jsx';
 import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
 import { opensOf, openStep, withoutAsks, askStale } from './openwith.js';
 import { Configure } from './configure.jsx';
@@ -373,6 +373,10 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const [err, setErr] = useWindowState('vm.err', '');
   // a start on its way: a bridged machine's network is made by the admin helper first (6.5), shown as Starting
   const [starting, setStarting] = useWindowState('vm.starting', false);
+  // the machine's graphics card (machine.json's gpu): like 3D, it can't be suspended or keep snapshots with its memory
+  const [gpu, setGpu] = useWindowState('vm.gpu', () => (has() ? lord.vm.list().find((x) => x.dir === dir)?.gpu || '' : ''));
+  const gpuRef = useRef(gpu);
+  gpuRef.current = gpu;
   const [closing, setClosing] = useWindowState('vm.closing', false);   // false, 'shutdown' or 'suspend'
   const [askClose, setAskClose] = useWindowState('vm.ask', false);
   const [always, setAlways] = useState(false);
@@ -443,13 +447,14 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       if (!b.ok) { setErr(tr('machines.win.noMemory', { need: b.need, free: b.free })); return; }
     }
     // a bridged machine's network first (6.5): Starting meanwhile, then the start, once
-    if (!active && m.network === 'bridged') {
+    setGpu(m.gpu || '');
+    if (!active && needsPrep(m)) {
       bridging.add(dir);
       setErr('');
       setStarting(true);
       // a window closed meanwhile doesn't start its machine after all
-      bridgeUp(m).then(() => { bridging.delete(dir); if (windows.get().some((w) => w.id === winId)) startNow.current(false, opts); },
-        (e) => { bridging.delete(dir); setStarting(false); setErr(tr('machines.win.bridgeFailed', { why: e.message })); });
+      startPrep(m).then(() => { bridging.delete(dir); if (windows.get().some((w) => w.id === winId)) startNow.current(false, opts); },
+        (e) => { bridging.delete(dir); setStarting(false); setErr(e.message); });
     } else startNow.current(active, opts);
   };
   // Play on the library's card while this window is open: the machine starts if it's off here
@@ -500,6 +505,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         // an unattended install ended with the installer's restart: lord-vm took the installer and the seed disk away,
         // so starting again is the installed system (3.9, "Unattended install")
         if (q.state === 'stopped' && q.reason === 'installed') { setTimeout(() => begin(), 300); return; }
+        // a machine with an Intel graphics card restarted: QEMU ends on a guest reset (a reset crashes a GVT-g guest), so
+        // Machines starts it again (docs/MACHINES-GPU.md, Mode A)
+        if (q.state === 'stopped' && q.reason === 'reset' && cfgRef.current?.gpu) { setTimeout(() => begin(), 300); return; }
         if (q.state !== 'stopped' || !['guest-shutdown', 'host-shutdown', 'poweroff', 'installed'].includes(q.reason)) setLog(lord.vm.log(dir, 'vm', 16384));
       }
     }, 16);
@@ -524,8 +532,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     const q = stRef.current;
     if (!s || !q || !['running', 'paused', 'starting', 'stopping'].includes(q.state)) return true;
     if (closingRef.current) return false;
-    // a machine with 3D can't be suspended (virgl can't be saved): it shuts down instead
-    const how = closeChoice(readMeta(dir)) === 'suspend' && runs3d(q) ? 'shutdown' : closeChoice(readMeta(dir));
+    // a machine with 3D (virgl can't be saved) or a graphics card can't be suspended: it shuts down instead
+    const how = closeChoice(readMeta(dir)) === 'suspend' && noSuspend(q, gpuRef.current) ? 'shutdown' : closeChoice(readMeta(dir));
     if (how === 'ask' || q.state === 'starting') setAskClose(true); else finish(how);
     return false;
   }), [winId]);
@@ -917,7 +925,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     screenshot: shot,
     power: [
       { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
-      { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy || runs3d(st), onClick: () => cmd('suspend') },
+      { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy || noSuspend(st, gpu), onClick: () => cmd('suspend') },
       { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => cmd('reset') },
       { label: tr('machines.cmd.cad'), disabled: !a.keys, onClick: cad },
       '-',
@@ -941,10 +949,10 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         { label: tr('machines.cmd.cad'), disabled: !a.keys, onClick: cad },
         '-',
         { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
-        { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy || runs3d(st), onClick: () => cmd('suspend') },
+        { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy || noSuspend(st, gpu), onClick: () => cmd('suspend') },
         { label: tr('machines.cmd.poweroff'), disabled: !a.poweroff, onClick: () => cmd('poweroff') },
         '-',
-        { label: tr('machines.snap.takeNow'), disabled: !sid || busy || runs3d(st) || !(st?.state === 'running' || st?.state === 'paused'), onClick: snapNow },
+        { label: tr('machines.snap.takeNow'), disabled: !sid || busy || noSuspend(st, gpu) || !(st?.state === 'running' || st?.state === 'paused'), onClick: snapNow },
         { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m0) },
         '-',
         { label: tr('machines.tb.transferOpen'), disabled: !cfg.transfer, onClick: xferOpen },
@@ -969,7 +977,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   let card = null;
   let failed = null;
   if (err) card = <Card title={tr('machines.win.problem')} text={err} actions={[<Btn key="r" primary label={tr('machines.win.tryAgain')} onClick={() => { setErr(''); begin(); }} />]} />;
-  else if (askClose) card = <Card width={560} title={tr('machines.close.title', { name })} text={tr('machines.close.text') + (runs3d(st) ? ` ${tr('machines.close.no3dSuspend')}` : '')}
+  else if (askClose) card = <Card width={560} title={tr('machines.close.title', { name })} text={tr('machines.close.text') + (gpu ? ` ${tr('machines.close.noGpuSuspend')}` : noSuspend(st) ? ` ${tr('machines.close.no3dSuspend')}` : '')}
     extra={<View style={{ gap: 8, marginTop: 4 }}>
       {/* a copy into the machine still going: said here, where the person decides (the copy line itself is hidden under a card) */}
       {line ? <Text style={{ fontSize: 13, color: TONE.warn || p.text, textAlign: 'start' }}>{tr(line.fast ? 'machines.drop.copyingFast' : 'machines.drop.copying', { name: line.name, pct: line.pct })}</Text> : null}
@@ -978,7 +986,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     <Btn key="c" label={tr('machines.cancel')} onClick={() => setAskClose(false)} />,
     <Btn key="k" label={tr('machines.close.keep')} onClick={() => { if (always) writeMeta(dir, { onClose: 'keep' }); finish('keep'); }} />,
     <Btn key="s" label={tr('machines.cmd.shutdown')} onClick={() => { if (always) writeMeta(dir, { onClose: 'shutdown' }); finish('shutdown'); }} />,
-    <Btn key="u" primary label={tr('machines.cmd.suspend')} disabled={st?.state === 'starting' || runs3d(st)} onClick={() => { if (always) writeMeta(dir, { onClose: 'suspend' }); finish('suspend'); }} />,
+    <Btn key="u" primary label={tr('machines.cmd.suspend')} disabled={st?.state === 'starting' || noSuspend(st, gpu)} onClick={() => { if (always) writeMeta(dir, { onClose: 'suspend' }); finish('suspend'); }} />,
   ]} />;
   else if (job) card = <Card title={tr(`machines.job.${job.kind}`, { name })} text={job.pct >= 0 ? tr('machines.job.pct', { pct: job.pct }) : tr('machines.job.wait')} />;
   else if (closing === 'suspend') card = <Card title={tr('machines.job.suspend', { name })} text={tr('machines.job.wait')} />;

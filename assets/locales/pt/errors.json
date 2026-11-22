@@ -893,5 +893,17 @@
   "media.streamAuth": "A transmissão pediu usuário e senha, ou estavam errados",
   "media.streamLost": "A transmissão caiu",
   "media.streamNoChannels": "A lista não tem canais",
-  "media.noStreamHelper": "O auxiliar de transmissões (lord-stream) não está disponível"
+  "media.noStreamHelper": "O auxiliar de transmissões (lord-stream) não está disponível",
+  "gpu.notFound": "Essa placa de vídeo não está neste computador",
+  "gpu.desktop": "Essa placa de vídeo desenha esta área de trabalho: não pode receber outro uso",
+  "gpu.notGvt": "Essa placa de vídeo não pode ser compartilhada com máquinas",
+  "gpu.roleNotYet": "Esse uso de uma placa de vídeo ainda não está disponível nesta versão",
+  "gpu.writeFailed": "Não foi possível gravar as configurações da placa de vídeo",
+  "gpu.initramfsFailed": "Não foi possível atualizar a imagem de inicialização (initramfs) com as configurações da placa de vídeo",
+  "gpu.freqRange": "Essa frequência está fora do que esta placa de vídeo suporta",
+  "vm.gvtNoType": "A placa de vídeo não oferece essa parte",
+  "vm.gvtNone": "Nenhuma parte de placa de vídeo está disponível para máquinas agora",
+  "vm.gvtBusy": "A parte da placa de vídeo dessa máquina pertence a outra pessoa",
+  "vm.gvtInUse": "Essa parte da placa de vídeo ainda está em uso por uma máquina em execução",
+  "vm.gvtFailed": "Não foi possível criar a parte da placa de vídeo"
 }

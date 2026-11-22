@@ -1,0 +1,406 @@
+/* vmgpu_admin.c — Machines' graphics cards in the admin helper (vm_admin.h: gpu-role, vm-gvt-create, vm-gvt-remove,
+ * gpu-min-freq; AGENTS.md "Machines' graphics cards", docs/MACHINES-GPU.md Mode A). Every argument is checked here
+ * against the GPUs root reads itself from sysfs (vmgpu.c); the GPU that drives the desktop (the cards the session's
+ * lord-server, this helper's parent, holds open) is always refused. Writes only: the two fixed configuration files
+ * (and removes the two hand-written ones only when they say exactly what LordOS writes), an mdev's create/remove, the
+ * iGPU's minimum frequency, and its own notes under /run/lordos/vm-gvt. Runs one program: update-initramfs -u.
+ *
+ * For the tests every path is under vmgpu_admin_root ("" here) and the desktop's descriptors are read from
+ * vmgpu_admin_fd_dir (NULL: /proc/<parent>/fd); vmgpu_admin_initramfs runs update-initramfs. */
+#include "vm_admin.h"
+#include "vmgpu.h"
+
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
+#include <time.h>
+#include <unistd.h>
+
+static int run_initramfs(void) {
+    const char *const argv[] = { "/usr/sbin/update-initramfs", "-u", NULL };
+    return admin_run(argv);
+}
+
+const char *vmgpu_admin_root = "";
+const char *vmgpu_admin_fd_dir = NULL;
+int (*vmgpu_admin_initramfs)(void) = run_initramfs;
+
+#define R vmgpu_admin_root
+
+static void rpath(char *out, size_t n, const char *fmt, const char *a, const char *b) {
+    char rel[600];
+    int k = snprintf(rel, sizeof rel, fmt, a, b);
+    if (k < 0 || (size_t)k >= sizeof rel) { out[0] = 0; return; }
+    k = snprintf(out, n, "%s%s", R, rel);
+    if (k < 0 || (size_t)k >= n) out[0] = 0;
+}
+
+static int read_line(const char *path, char *out, size_t n) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    ssize_t r = read(fd, out, n - 1);
+    close(fd);
+    if (r < 0) return -1;
+    out[r] = 0;
+    out[strcspn(out, "\n")] = 0;
+    return 0;
+}
+
+/* a sysfs attribute written as the kernel wants it: one write, no O_CREAT (it must already be there; a test's folder
+ * has the file) */
+static int write_attr(const char *path, const char *text) {
+    int fd = open(path, O_WRONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    ssize_t w = write(fd, text, strlen(text));
+    int e = errno;
+    close(fd);
+    errno = e;
+    return w == (ssize_t)strlen(text) ? 0 : -1;
+}
+
+/* a configuration file replaced whole: a new file beside it, then rename; never through a link */
+static int write_file(const char *path, const char *text) {
+    char tmp[1100];
+    snprintf(tmp, sizeof tmp, "%s.lordos-new", path);
+    unlink(tmp);
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0644);
+    if (fd < 0) return -1;
+    size_t n = strlen(text);
+    int ok = write(fd, text, n) == (ssize_t)n && !fsync(fd);
+    close(fd);
+    if (!ok || rename(tmp, path)) { unlink(tmp); return -1; }
+    return 0;
+}
+
+static int file_says_ours(const char *path, int which) {
+    char text[2048];
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return 0;
+    ssize_t r = read(fd, text, sizeof text - 1);
+    close(fd);
+    if (r < 0) return 0;
+    text[r] = 0;
+    return vmgpu_conf_ours(text, which);
+}
+
+/* the GPUs, with the desktop's marked */
+static int gpus(VmGpu *g) {
+    int n = vmgpu_list(R, g, VMGPU_MAX);
+    char fdd[64];
+    if (!vmgpu_admin_fd_dir) snprintf(fdd, sizeof fdd, "/proc/%d/fd", (int)getppid());
+    vmgpu_mark_desktop(R, vmgpu_admin_fd_dir ? vmgpu_admin_fd_dir : fdd, g, n);
+    return n;
+}
+
+static const VmGpu *find(const VmGpu *g, int n, const char *addr) {
+    for (int i = 0; i < n; i++) if (!strcmp(g[i].addr, addr)) return &g[i];
+    return NULL;
+}
+
+/* ---- gpu-role ---- */
+
+void vm_act_gpu_role(const AdminReq *r, const char *arg, size_t len) {
+    (void)r;
+    char addr[16];
+    int role;
+    if (vmgpu_role_arg(arg, len, addr, &role)) { admin_err("admin.invalidArgument", NULL); return; }
+    VmGpu g[VMGPU_MAX];
+    int n = gpus(g);
+    const VmGpu *x = find(g, n, addr);
+    if (!x) { admin_err("gpu.notFound", "card", addr, NULL); return; }
+    if (x->desktop) { admin_err("gpu.desktop", "card", addr, NULL); return; }
+    if (role == VMGPU_ROLE_DEDICATED || role == VMGPU_ROLE_AI) { admin_err("gpu.roleNotYet", "card", addr, NULL); return; }
+    char probe[1024], load[1024], lprobe[1024], lload[1024];
+    snprintf(probe, sizeof probe, "%s%s", R, VMGPU_MODPROBE);
+    snprintf(load, sizeof load, "%s%s", R, VMGPU_MODLOAD);
+    snprintf(lprobe, sizeof lprobe, "%s%s", R, VMGPU_LEGACY_MODPROBE);
+    snprintf(lload, sizeof lload, "%s%s", R, VMGPU_LEGACY_MODLOAD);
+    int changed = 0;
+    if (role == VMGPU_ROLE_SHARED) {
+        if (!x->gvt_capable) { admin_err("gpu.notGvt", "card", addr, NULL); return; }
+        if (!file_says_ours(probe, 0)) {
+            if (write_file(probe, VMGPU_MODPROBE_TEXT)) { admin_err("gpu.writeFailed", "name", VMGPU_MODPROBE, NULL); return; }
+            changed = 1;
+        }
+        if (!file_says_ours(load, 1)) {
+            if (write_file(load, VMGPU_MODLOAD_TEXT)) { unlink(probe); admin_err("gpu.writeFailed", "name", VMGPU_MODLOAD, NULL); return; }
+            changed = 1;
+        }
+        /* the same lines written by hand before (the feasibility test): adopted, so nothing says it twice */
+        if (file_says_ours(lprobe, 0) && !unlink(lprobe)) changed = 1;
+        if (file_says_ours(lload, 1) && !unlink(lload)) changed = 1;
+    } else {
+        /* unused: only an iGPU GVT-g can share has anything written for it */
+        if (x->gvt_capable) {
+            if (!unlink(probe)) changed = 1;
+            if (!unlink(load)) changed = 1;
+            if (file_says_ours(lprobe, 0) && !unlink(lprobe)) changed = 1;
+            if (file_says_ours(lload, 1) && !unlink(lload)) changed = 1;
+        }
+    }
+    if (changed && vmgpu_admin_initramfs && vmgpu_admin_initramfs()) { admin_err("gpu.initramfsFailed", NULL); return; }
+    admin_ok("gpu.roleSet", "card", addr, NULL);
+}
+
+/* ---- vm-gvt-create, vm-gvt-remove ---- */
+
+/* the note of who asked for a vGPU: its uid, or -1 */
+static long note_uid(const char *id) {
+    char p[1024], b[32];
+    rpath(p, sizeof p, VMGPU_RUN "/%s%s", id, "");
+    if (read_line(p, b, sizeof b) || !b[0]) return -1;
+    char *e;
+    long u = strtol(b, &e, 10);
+    return *e || u < 0 ? -1 : u;
+}
+
+static int note_write(const char *id, uid_t uid) {
+    char d[1024], p[1024], b[32];
+    rpath(d, sizeof d, "/run/lordos%s%s", "", "");
+    mkdir(d, 0755);
+    rpath(d, sizeof d, VMGPU_RUN "%s%s", "", "");
+    if (mkdir(d, 0700) && errno != EEXIST) return -1;
+    rpath(p, sizeof p, VMGPU_RUN "/%s%s", id, "");
+    snprintf(b, sizeof b, "%u\n", (unsigned)uid);
+    return write_file(p, b);
+}
+
+static void note_drop(const char *id) {
+    char p[1024];
+    rpath(p, sizeof p, VMGPU_RUN "/%s%s", id, "");
+    unlink(p);
+}
+
+/* the mdev's IOMMU group, or -1 when it isn't there */
+static int mdev_group(const char *id) {
+    char p[1024], t[256];
+    rpath(p, sizeof p, "/sys/bus/mdev/devices/%s/iommu_group", id, "");
+    ssize_t l = readlink(p, t, sizeof t - 1);
+    if (l <= 0) return -1;
+    t[l] = 0;
+    const char *b = strrchr(t, '/');
+    b = b ? b + 1 : t;
+    if (!*b || strspn(b, "0123456789") != strlen(b) || strlen(b) > 6) return -1;
+    return atoi(b);
+}
+
+/* /dev/vfio/<group> is open in some process (root reads every process's descriptors) */
+static int group_in_use(int grp) {
+    char want[48], proc[1024];
+    snprintf(want, sizeof want, "/dev/vfio/%d", grp);
+    rpath(proc, sizeof proc, "/proc%s%s", "", "");
+    DIR *d = opendir(proc);
+    if (!d) return 1;
+    int used = 0;
+    for (struct dirent *e; !used && (e = readdir(d));) {
+        if (e->d_name[0] < '1' || e->d_name[0] > '9') continue;
+        char fdp[1100];
+        int k = snprintf(fdp, sizeof fdp, "%s/%s/fd", proc, e->d_name);
+        DIR *f = k > 0 && (size_t)k < sizeof fdp ? opendir(fdp) : NULL;
+        if (!f) continue;
+        for (struct dirent *x; !used && (x = readdir(f));) {
+            if (x->d_name[0] == '.') continue;
+            char lp[1400], t[64];
+            snprintf(lp, sizeof lp, "%s/%s", fdp, x->d_name);
+            ssize_t l = readlink(lp, t, sizeof t - 1);
+            if (l > 0) { t[l] = 0; if (!strcmp(t, want)) used = 1; }
+        }
+        closedir(f);
+    }
+    closedir(d);
+    return used;
+}
+
+/* /dev/vfio/<group> to the caller, 0600: checked by what it is (that group's character device), never followed */
+static int give_group(int grp, uid_t uid, gid_t gid) {
+    char p[1024], dev[32], g[16];
+    snprintf(g, sizeof g, "%d", grp);
+    rpath(p, sizeof p, "/sys/class/vfio/%s/dev", g, "");
+    unsigned ma, mi;
+    if (read_line(p, dev, sizeof dev) || sscanf(dev, "%u:%u", &ma, &mi) != 2) return -1;
+    rpath(p, sizeof p, "/dev/vfio/%s", g, "");
+    int fd = -1;
+    for (int i = 0; i < 50 && (fd = open(p, O_PATH | O_NOFOLLOW | O_CLOEXEC)) < 0; i++) { struct timespec t = { 0, 20000000 }; nanosleep(&t, NULL); }
+    if (fd < 0) return -1;
+    struct stat st;
+    int ok = !fstat(fd, &st) && (S_ISCHR(st.st_mode) || (R[0] && S_ISREG(st.st_mode))) &&
+             (R[0] || (major(st.st_rdev) == ma && minor(st.st_rdev) == mi)) && !fchownat(fd, "", uid, gid, AT_EMPTY_PATH);
+    if (ok) {
+        char fp[64];
+        snprintf(fp, sizeof fp, "/proc/self/fd/%d", fd);
+        ok = !chmod(fp, 0600);
+    }
+    close(fd);
+    return ok ? 0 : -1;
+}
+
+void vm_act_gvt_create(const AdminReq *r, const char *arg, size_t len) {
+    char id[37], type[VMGPU_TYPE_MAX + 1];
+    if (vmgpu_create_arg(arg, len, id, type)) { admin_err("admin.invalidArgument", NULL); return; }
+    VmGpu g[VMGPU_MAX];
+    int n = gpus(g);
+    const VmGpu *x = vmgpu_gvt(g, n);
+    if (!x) { admin_err("vm.gvtNone", NULL); return; }
+    int grp = mdev_group(id);
+    if (grp >= 0) {
+        /* already there: this caller's (by root's note) is given again, anyone else's is refused */
+        if (note_uid(id) != (long)r->uid) { admin_err("vm.gvtBusy", NULL); return; }
+    } else {
+        int k = -1;
+        for (int i = 0; i < x->n_types; i++) if (!strcmp(x->types[i].name, type)) k = i;
+        if (k < 0 || x->types[k].available <= 0) { admin_err("vm.gvtNoType", "type", type, NULL); return; }
+        char p[1024];
+        rpath(p, sizeof p, "/sys/bus/pci/devices/%s/mdev_supported_types/%s/create", x->addr, type);
+        if (note_write(id, r->uid)) { admin_err("vm.gvtFailed", NULL); return; }
+        if (write_attr(p, id)) {
+            fprintf(stderr, "admin: vm-gvt-create: %s on %s: %s\n", type, x->addr, strerror(errno));
+            note_drop(id);
+            admin_err("vm.gvtFailed", NULL);
+            return;
+        }
+        for (int i = 0; i < 100 && (grp = mdev_group(id)) < 0; i++) { struct timespec t = { 0, 20000000 }; nanosleep(&t, NULL); }
+        if (grp < 0) { note_drop(id); admin_err("vm.gvtFailed", NULL); return; }
+    }
+    if (give_group(grp, r->uid, r->gid)) {
+        char p[1024];
+        rpath(p, sizeof p, "/sys/bus/mdev/devices/%s/remove", id, "");
+        if (!group_in_use(grp) && !write_attr(p, "1")) note_drop(id);
+        admin_err("vm.gvtFailed", NULL);
+        return;
+    }
+    char gs[16];
+    snprintf(gs, sizeof gs, "%d", grp);
+    admin_ok("vm.gvtReady", "name", gs, NULL);
+}
+
+void vm_act_gvt_remove(const AdminReq *r, const char *arg, size_t len) {
+    char id[37];
+    if (vmgpu_remove_arg(arg, len, id)) { admin_err("admin.invalidArgument", NULL); return; }
+    int grp = mdev_group(id);
+    long owner = note_uid(id);
+    if (grp < 0) { if (owner == (long)r->uid) note_drop(id); admin_ok("vm.gvtGone", NULL); return; }
+    if (owner != (long)r->uid) { admin_err("vm.gvtBusy", NULL); return; }
+    if (group_in_use(grp)) { admin_err("vm.gvtInUse", NULL); return; }
+    char p[1024];
+    rpath(p, sizeof p, "/sys/bus/mdev/devices/%s/remove", id, "");
+    if (write_attr(p, "1")) { admin_err("vm.gvtFailed", NULL); return; }
+    note_drop(id);
+    admin_ok("vm.gvtGone", NULL);
+}
+
+/* ---- gpu-min-freq ---- */
+
+/* the iGPU's rps file (gt/gt0/rps_<what>_freq_mhz, or the older card-level gt_<what>_freq_mhz) */
+static int freq_path(const VmGpu *x, const char *what, char *out, size_t n) {
+    char card[16];
+    snprintf(card, sizeof card, "card%d", x->card);
+    char rel[200];
+    snprintf(rel, sizeof rel, "/sys/bus/pci/devices/%s/drm/%s/gt/gt0/rps_", x->addr, card);
+    int k = snprintf(out, n, "%s%s%s_freq_mhz", R, rel, what);
+    if (k > 0 && (size_t)k < n && !access(out, F_OK)) return 0;
+    snprintf(rel, sizeof rel, "/sys/bus/pci/devices/%s/drm/%s/gt_", x->addr, card);
+    k = snprintf(out, n, "%s%s%s_freq_mhz", R, rel, what);
+    return k < 0 || (size_t)k >= n || access(out, F_OK) ? -1 : 0;
+}
+
+static int read_mhz(const VmGpu *x, const char *what) {
+    char p[1100], b[32];
+    if (freq_path(x, what, p, sizeof p) || read_line(p, b, sizeof b)) return -1;
+    return atoi(b);
+}
+
+/* any vGPU root made (a note) that is still there; for uid only when uid >= 0 */
+static int any_vgpu(long uid) {
+    char d[1024];
+    rpath(d, sizeof d, VMGPU_RUN "%s%s", "", "");
+    DIR *dir = opendir(d);
+    if (!dir) return 0;
+    int found = 0;
+    for (struct dirent *e; !found && (e = readdir(dir));) {
+        char id[37];
+        if (strlen(e->d_name) != 36 || vmgpu_remove_arg(e->d_name, 36, id)) continue;
+        if (mdev_group(id) < 0) continue;
+        if (uid < 0 || note_uid(id) == uid) found = 1;
+    }
+    closedir(dir);
+    return found;
+}
+
+void vm_act_gpu_min_freq(const AdminReq *r, const char *arg, size_t len) {
+    char addr[16];
+    int mhz;
+    if (vmgpu_freq_arg(arg, len, addr, &mhz)) { admin_err("admin.invalidArgument", NULL); return; }
+    VmGpu g[VMGPU_MAX];
+    int n = gpus(g);
+    const VmGpu *x = find(g, n, addr);
+    if (!x) { admin_err("gpu.notFound", "card", addr, NULL); return; }
+    if (x->desktop) { admin_err("gpu.desktop", "card", addr, NULL); return; }
+    if (!x->gvt_on || x->card < 0) { admin_err("gpu.notGvt", "card", addr, NULL); return; }
+    char minp[1100], saved[1024], b[32];
+    if (freq_path(x, "min", minp, sizeof minp)) { admin_err("gpu.writeFailed", "name", addr, NULL); return; }
+    rpath(saved, sizeof saved, VMGPU_RUN "/minfreq-%s%s", addr, "");
+    if (!mhz) {
+        /* back to the value read before the first change, once no machine has a vGPU any more */
+        if (read_line(saved, b, sizeof b)) { admin_ok("gpu.freqSet", NULL); return; }
+        if (any_vgpu(-1)) { admin_ok("gpu.freqSet", NULL); return; }
+        if (write_attr(minp, b)) { admin_err("gpu.writeFailed", "name", addr, NULL); return; }
+        unlink(saved);
+        admin_ok("gpu.freqSet", NULL);
+        return;
+    }
+    if (!any_vgpu((long)r->uid)) { admin_err("vm.gvtNone", NULL); return; }
+    int lo = read_mhz(x, "RPn"), hi = read_mhz(x, "RP0");
+    if (lo <= 0 || hi <= 0 || mhz < lo || mhz > hi) { admin_err("gpu.freqRange", NULL); return; }
+    if (access(saved, F_OK)) {
+        int cur = read_mhz(x, "min");
+        if (cur <= 0) { admin_err("gpu.writeFailed", "name", addr, NULL); return; }
+        snprintf(b, sizeof b, "%d\n", cur);
+        char d[1024];
+        rpath(d, sizeof d, "/run/lordos%s%s", "", "");
+        mkdir(d, 0755);
+        rpath(d, sizeof d, VMGPU_RUN "%s%s", "", "");
+        mkdir(d, 0700);
+        if (write_file(saved, b)) { admin_err("gpu.writeFailed", "name", addr, NULL); return; }
+    }
+    snprintf(b, sizeof b, "%d", mhz);
+    if (write_attr(minp, b)) { admin_err("gpu.writeFailed", "name", addr, NULL); return; }
+    admin_ok("gpu.freqSet", NULL);
+}
+
+/* at the helper's start and end: the caller's vGPUs no process holds go, and the minimum frequency comes back when
+ * none is left */
+void vm_gvt_sweep(uid_t uid) {
+    char d[1024];
+    rpath(d, sizeof d, VMGPU_RUN "%s%s", "", "");
+    DIR *dir = opendir(d);
+    if (!dir) return;
+    char ids[16][37];
+    int k = 0;
+    for (struct dirent *e; k < 16 && (e = readdir(dir));) {
+        char id[37];
+        if (strlen(e->d_name) != 36 || vmgpu_remove_arg(e->d_name, 36, id) || note_uid(id) != (long)uid) continue;
+        snprintf(ids[k++], 37, "%s", id);
+    }
+    closedir(dir);
+    for (int i = 0; i < k; i++) {
+        int grp = mdev_group(ids[i]);
+        char p[1024];
+        rpath(p, sizeof p, "/sys/bus/mdev/devices/%s/remove", ids[i], "");
+        if (grp < 0) note_drop(ids[i]);
+        else if (!group_in_use(grp) && !write_attr(p, "1")) { note_drop(ids[i]); fprintf(stderr, "admin: removed a machine's vGPU nobody uses (%s)\n", ids[i]); }
+    }
+    if (any_vgpu(-1)) return;
+    VmGpu g[VMGPU_MAX];
+    int n = vmgpu_list(R, g, VMGPU_MAX);
+    for (int i = 0; i < n; i++) {
+        char saved[1024], minp[1100], b[32];
+        rpath(saved, sizeof saved, VMGPU_RUN "/minfreq-%s%s", g[i].addr, "");
+        if (read_line(saved, b, sizeof b)) continue;
+        if (!freq_path(&g[i], "min", minp, sizeof minp) && !write_attr(minp, b)) unlink(saved);
+    }
+}

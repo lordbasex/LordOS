@@ -893,5 +893,17 @@
   "media.streamAuth": "Mtiririko uliomba mtumiaji na nenosiri, au yalikuwa si sahihi",
   "media.streamLost": "Mtiririko umekatika",
   "media.streamNoChannels": "Orodha haina chaneli",
-  "media.noStreamHelper": "Msaidizi wa mitiririko (lord-stream) haupatikani"
+  "media.noStreamHelper": "Msaidizi wa mitiririko (lord-stream) haupatikani",
+  "gpu.notFound": "Kadi hiyo ya michoro haipo kwenye kompyuta hii",
+  "gpu.desktop": "Kadi hiyo ya michoro huchora eneo-kazi hili: haiwezi kupewa matumizi mengine",
+  "gpu.notGvt": "Kadi hiyo ya michoro haiwezi kushirikiwa na mashine",
+  "gpu.roleNotYet": "Matumizi hayo ya kadi ya michoro bado hayapatikani katika toleo hili",
+  "gpu.writeFailed": "Mipangilio ya kadi ya michoro haikuweza kuandikwa",
+  "gpu.initramfsFailed": "Picha ya kuanzisha (initramfs) haikuweza kusasishwa kwa mipangilio ya kadi ya michoro",
+  "gpu.freqRange": "Masafa hayo yako nje ya yale yanayotumiwa na kadi hii ya michoro",
+  "vm.gvtNoType": "Kadi ya michoro haitoi sehemu hiyo",
+  "vm.gvtNone": "Hakuna sehemu ya kadi ya michoro inayopatikana kwa mashine sasa",
+  "vm.gvtBusy": "Sehemu ya kadi ya michoro ya mashine hiyo ni ya mtu mwingine",
+  "vm.gvtInUse": "Sehemu hiyo ya kadi ya michoro bado inatumiwa na mashine inayoendeshwa",
+  "vm.gvtFailed": "Sehemu ya kadi ya michoro haikuweza kuundwa"
 }

@@ -892,5 +892,17 @@
   "media.streamAuth": "配信がユーザー名とパスワードを求めたか、それが違っていました",
   "media.streamLost": "配信が途切れました",
   "media.streamNoChannels": "リストにチャンネルがありません",
-  "media.noStreamHelper": "配信ヘルパー（lord-stream）を利用できません"
+  "media.noStreamHelper": "配信ヘルパー（lord-stream）を利用できません",
+  "gpu.notFound": "そのグラフィックカードはこのコンピューターにありません",
+  "gpu.desktop": "そのグラフィックカードはこのデスクトップを描画しています: 別の用途には使えません",
+  "gpu.notGvt": "そのグラフィックカードはマシンと共有できません",
+  "gpu.roleNotYet": "そのグラフィックカードの用途は、このバージョンではまだ使えません",
+  "gpu.writeFailed": "グラフィックカードの設定を書き込めませんでした",
+  "gpu.initramfsFailed": "起動イメージ (initramfs) をグラフィックカードの設定で更新できませんでした",
+  "gpu.freqRange": "その周波数はこのグラフィックカードの対応範囲外です",
+  "vm.gvtNoType": "グラフィックカードはその割り当てを提供していません",
+  "vm.gvtNone": "現在マシンに使えるグラフィックカードの割り当てはありません",
+  "vm.gvtBusy": "そのマシンのグラフィックカードの割り当ては他のユーザーのものです",
+  "vm.gvtInUse": "そのグラフィックカードの割り当ては、実行中のマシンがまだ使用しています",
+  "vm.gvtFailed": "グラフィックカードの割り当てを作成できませんでした"
 }

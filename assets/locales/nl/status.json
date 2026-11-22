@@ -165,5 +165,9 @@
   "vm.kvmNextLogin": "Toegestaan vanaf je volgende aanmelding",
   "pkg.foreignArchAdded": "32-bits pakketten ({arch}) ingeschakeld",
   "pkg.foreignArchPresent": "32-bits pakketten ({arch}) waren al ingeschakeld",
-  "pkg.why.multiarchPair": "Dezelfde versie als {name}"
+  "pkg.why.multiarchPair": "Dezelfde versie als {name}",
+  "gpu.roleSet": "Gebruik van de videokaart opgeslagen ({card}): herstart om toe te passen",
+  "vm.gvtReady": "Deel van de videokaart klaar ({name})",
+  "vm.gvtGone": "Deel van de videokaart verwijderd",
+  "gpu.freqSet": "Minimale frequentie van de videokaart ingesteld"
 }

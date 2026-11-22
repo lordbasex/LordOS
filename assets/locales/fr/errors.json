@@ -893,5 +893,17 @@
   "media.streamAuth": "Le flux a demandé un utilisateur et un mot de passe, ou ils étaient faux",
   "media.streamLost": "Le flux a été perdu",
   "media.streamNoChannels": "La liste ne contient aucune chaîne",
-  "media.noStreamHelper": "L'assistant de flux (lord-stream) n'est pas disponible"
+  "media.noStreamHelper": "L'assistant de flux (lord-stream) n'est pas disponible",
+  "gpu.notFound": "Cette carte graphique n’est pas présente sur cet ordinateur",
+  "gpu.desktop": "Cette carte graphique dessine ce bureau : elle ne peut pas recevoir une autre utilisation",
+  "gpu.notGvt": "Cette carte graphique ne peut pas être partagée avec les machines",
+  "gpu.roleNotYet": "Cette utilisation d’une carte graphique n’est pas encore disponible dans cette version",
+  "gpu.writeFailed": "Les réglages de la carte graphique n’ont pas pu être écrits",
+  "gpu.initramfsFailed": "L’image de démarrage (initramfs) n’a pas pu être mise à jour avec les réglages de la carte graphique",
+  "gpu.freqRange": "Cette fréquence est en dehors de ce que prend en charge cette carte graphique",
+  "vm.gvtNoType": "La carte graphique ne propose pas cette part",
+  "vm.gvtNone": "Aucune part de carte graphique n’est disponible pour les machines pour l’instant",
+  "vm.gvtBusy": "La part de carte graphique de cette machine appartient à quelqu’un d’autre",
+  "vm.gvtInUse": "Cette part de la carte graphique est encore utilisée par une machine en cours d’exécution",
+  "vm.gvtFailed": "La part de la carte graphique n’a pas pu être créée"
 }

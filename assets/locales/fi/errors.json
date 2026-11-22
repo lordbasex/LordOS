@@ -893,5 +893,17 @@
   "media.streamAuth": "Lähetys pyysi käyttäjää ja salasanaa, tai ne olivat väärät",
   "media.streamLost": "Lähetys katkesi",
   "media.streamNoChannels": "Listalla ei ole kanavia",
-  "media.noStreamHelper": "Lähetysapuri (lord-stream) ei ole käytettävissä"
+  "media.noStreamHelper": "Lähetysapuri (lord-stream) ei ole käytettävissä",
+  "gpu.notFound": "Tuota näytönohjainta ei ole tässä tietokoneessa",
+  "gpu.desktop": "Tuo näytönohjain piirtää tämän työpöydän: sille ei voi antaa muuta käyttöä",
+  "gpu.notGvt": "Tuota näytönohjainta ei voi jakaa koneiden kanssa",
+  "gpu.roleNotYet": "Tuo näytönohjaimen käyttötapa ei ole vielä saatavilla tässä versiossa",
+  "gpu.writeFailed": "Näytönohjaimen asetuksia ei voitu kirjoittaa",
+  "gpu.initramfsFailed": "Käynnistyskuvaa (initramfs) ei voitu päivittää näytönohjaimen asetuksilla",
+  "gpu.freqRange": "Taajuus on tämän näytönohjaimen tukeman alueen ulkopuolella",
+  "vm.gvtNoType": "Näytönohjain ei tarjoa tuota osuutta",
+  "vm.gvtNone": "Näytönohjaimen osuutta ei ole nyt saatavilla koneille",
+  "vm.gvtBusy": "Tuon koneen osuus näytönohjaimesta kuuluu jollekulle toiselle",
+  "vm.gvtInUse": "Käynnissä oleva kone käyttää yhä tuota näytönohjaimen osuutta",
+  "vm.gvtFailed": "Näytönohjaimen osuutta ei voitu luoda"
 }
