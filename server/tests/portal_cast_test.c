@@ -208,6 +208,31 @@ static void session_close(const char *session) {
     pump(150);
 }
 
+/* a share the person picks (the monitor), started: its session id, and the restore token in Start's answer */
+static int shared(const char *stoken, char *session, char *token) {
+    cast_start(stoken, NULL, session);
+    int id = json_id();
+    portal_cast_chosen(id, &(CastSource){ .kind = CAST_SRC_MONITOR, .display = 51 }, 1);
+    ngot = 0;
+    portal_cast_streams(id, &(CastStreamInfo){ .node = 40, .w = 1440, .h = 900, .kind = CAST_SRC_MONITOR }, 1);
+    pump(100);
+    Got *g = last_response();
+    snprintf(token, 64, "%s", g ? g->token : "");
+    return id;
+}
+
+/* a session with token: 1 when it went to the chooser (then cancelled), 0 when the token started it (then closed) */
+static int asks_again(const char *stoken, const char *token) {
+    char s[400];
+    emits_cast = 0;
+    int was = begun;
+    cast_start(stoken, token, s);
+    int chooser = emits_cast == 1 && begun == was;
+    if (chooser) portal_cast_chosen(json_id(), NULL, 0);
+    session_close(s);
+    return chooser;
+}
+
 static void shot_call(const char *member) {
     char req[400], err[128];
     DBuf b; dw_init(&b);
@@ -296,6 +321,31 @@ int main(void) {
     g = last_response();
     CHECK(g && g->code == 0 && !g->token[0]);
     session_close(s4);
+
+    /* 5b. revoked (Claude Security F6/F7, 2026-11-22): the person's Stop, every share ending (cast_end_all: a lock, a
+     * user switch, the shell going) and a locked session each kill a token before it is spent */
+    fake_app = "flatpak:org.chromium.Chromium";
+    char t5[64];
+    id = shared("r1", s4, t5);
+    CHECK(strlen(t5) == 32);
+    portal_cast_stop(id);                                       /* the indicator's Stop */
+    pump(100);
+    CHECK(asks_again("r2", t5));                                /* dead: the chooser again */
+    shared("r3", s4, t5);
+    CHECK(strlen(t5) == 32);
+    session_close(s4);                                          /* the app's own Close keeps it (OBS restarts)... */
+    portal_cast_tokens_drop();                                  /* ...but cast_end_all revokes every one */
+    CHECK(asks_again("r4", t5));
+    shared("r5", s4, t5);
+    CHECK(strlen(t5) == 32);
+    session_close(s4);
+    portal_cast_away(1);                                        /* the screen locks */
+    CHECK(asks_again("r6", t5));                                /* refused while locked, and gone */
+    portal_cast_away(0);                                        /* the person is back */
+    CHECK(asks_again("r7", t5));                                /* still gone after the unlock */
+    shared("r8", s4, t5);
+    session_close(s4);
+    CHECK(!asks_again("r9", t5));                               /* a new token works again once unlocked */
 
     /* 6. Screenshot: the chooser (always interactive), the file lent to a Flatpak app, the indicator */
     fake_app = "flatpak:org.flameshot.Flameshot";
@@ -396,6 +446,40 @@ int main(void) {
     pump(100);
     g = last_response();
     CHECK(lent == 0 && g && !strcmp(g->uri, "file:///home/x/Docs/chosen.txt"));
+    /* a chosen path not written the plain way (an app's current_folder "/home/x/./.config") never reaches the lending
+     * (Claude Security F1/F2): dropped, and with none left the dialog counts as cancelled */
+    fake_app = "flatpak:org.gnome.TextEditor";
+    const char *odd[] = { "/home/x/./.config", "/home/x//.ssh", "/home/x/.config/", "/home/x/Docs/../.ssh", "/home/x/Docs/chosen.txt" };
+    for (int k = 0; k < 5; k++) {
+        dw_init(&b);
+        dw_str(&b, "");
+        dw_str(&b, "Open");
+        a = dw_arr_begin(&b, 8);
+        dw_arr_end(&b, a);
+        ngot = 0;
+        call("org.freedesktop.portal.FileChooser", "OpenFile", "ssa{sv}", &b, req, err);
+        dw_free(&b);
+        pump(100);
+        lent = 0;
+        portal_file_chosen(json_id(), &odd[k], 1);
+        pump(100);
+        g = last_response();
+        if (k < 4) CHECK(lent == 0 && g && g->code == 1 && !g->uri[0]);
+        else CHECK(lent == 1 && g && g->code == 0);                 /* the plain one still goes */
+    }
+    lent = 0;
+    dw_init(&b);
+    dw_str(&b, "");
+    dw_str(&b, "Open");
+    a = dw_arr_begin(&b, 8);
+    dw_arr_end(&b, a);
+    call("org.freedesktop.portal.FileChooser", "OpenFile", "ssa{sv}", &b, req, err);
+    dw_free(&b);
+    pump(100);
+    portal_file_chosen(json_id(), odd, 5);                          /* several: only the plain one is answered */
+    pump(100);
+    g = last_response();
+    CHECK(lent == 1 && g && g->code == 0 && strstr(g->uri, "/chosen.txt"));
 
     char cmd[128];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", home);

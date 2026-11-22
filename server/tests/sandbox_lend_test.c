@@ -6,11 +6,13 @@
  *      <runtime>/app/<id>/doc/<grant>/<name>, while a file next to it in the same folder is not there, and the lent
  *      folder can't be written; with bubblewrap installed, the same from inside a bubblewrap sandbox that binds
  *      app/<id> as its runtime folder before the grant is made (as `flatpak run` does): the grant reaches it;
- *   3. a save: the chosen folder read-only, only the chosen name writable;
- *   4. a folder; a stale inode, a link on the way and a bad name are refused.
+ *   3. a save: only the chosen file, writable, alone in its grant: nothing else of its folder is seen (Claude Security F5);
+ *   4. a folder; a stale inode, a link on the way, a bad name and a path not written the canonical way ("/./", "//",
+ *      Claude Security F1/F2) are refused.
  * Needs unprivileged user namespaces (exit 77 without). */
 #include "../src/sec/sandbox.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -75,6 +77,7 @@ static int hear(int fd, char *out, size_t n, int ms) {
  *   "w PATH TEXT"  write TEXT to PATH            → "ok" | errno text
  *   "r PATH"       read PATH                     → its text | "!" errno text
  *   "m PATH"       mkdir PATH                    → "ok" | errno text
+ *   "l PATH"       the names in folder PATH      → "name,name," | "!" errno text
  *   "q"            leave */
 static void fake_app(int in, int out) {
     char line[8192], ans[8192];
@@ -91,6 +94,16 @@ static void fake_app(int in, int out) {
         } else if (line[0] == 'r') {
             char buf[4096];
             if (get(path, buf, sizeof buf)) snprintf(ans, sizeof ans, "!%s", strerror(errno)); else snprintf(ans, sizeof ans, "%s", buf);
+        } else if (line[0] == 'l') {
+            DIR *d = opendir(path);
+            if (!d) snprintf(ans, sizeof ans, "!%s", strerror(errno));
+            else {
+                size_t o = 0;
+                ans[0] = 0;
+                for (struct dirent *e; (e = readdir(d)) && o < sizeof ans - 300;)
+                    if (strcmp(e->d_name, ".") && strcmp(e->d_name, "..")) o += (size_t)snprintf(ans + o, sizeof ans - o, "%s,", e->d_name);
+                closedir(d);
+            }
         } else if (line[0] == 'm') {
             snprintf(ans, sizeof ans, "%s", mkdir(path, 0700) ? strerror(errno) : "ok");
         } else snprintf(ans, sizeof ans, "?");
@@ -282,22 +295,57 @@ int main(int argc, char **argv) {
         free(m);
     }
 
-    /* 3. a save: the folder read-only, the chosen name writable */
-    snprintf(p, sizeof p, "%s/Docs", home);
+    /* 3. a save: the chosen file alone, writable; its folder is never lent (F5) */
     snprintf(q, sizeof q, "%s/Docs/new.txt", home);
     put(q, "");                                         /* lord-server makes the target first */
-    r = lend(&a1, SB_LEND_SAVE, p, "new.txt", 1, q, grant);
+    r = lend(&a1, SB_LEND_SAVE, q, "new.txt", 1, NULL, grant);
     CHECK(r == 0, "3: a save is lent");
     char c2[8800];
     snprintf(c2, sizeof c2, "w %s/app/org.example.App/doc/%s/new.txt saved", rt, grant); ask(&a1, c2, ans, sizeof ans);
     CHECK(!strcmp(ans, "ok"), "3: the app writes the chosen name");
     get(q, ans, sizeof ans);
     CHECK(!strcmp(ans, "saved"), "3: the save reached the real file");
+    snprintf(c2, sizeof c2, "l %s/app/org.example.App/doc/%s", rt, grant); ask(&a1, c2, ans, sizeof ans);
+    CHECK(!strcmp(ans, "new.txt,"), "3: the grant holds the chosen name and nothing else of its folder");
+    snprintf(c2, sizeof c2, "r %s/app/org.example.App/doc/%s/sibling.txt", rt, grant); ask(&a1, c2, ans, sizeof ans);
+    CHECK(ans[0] == '!', "3: a file next to it can't be read");
+    snprintf(c2, sizeof c2, "r %s/app/org.example.App/doc/%s/Sub/in.txt", rt, grant); ask(&a1, c2, ans, sizeof ans);
+    CHECK(ans[0] == '!', "3: nor a folder next to it");
     snprintf(c2, sizeof c2, "w %s/app/org.example.App/doc/%s/other.txt x", rt, grant); ask(&a1, c2, ans, sizeof ans);
-    CHECK(strcmp(ans, "ok"), "3: nothing else can be written in that folder");
+    CHECK(strcmp(ans, "ok"), "3: nothing else can be written there");
     snprintf(c2, sizeof c2, "w %s/app/org.example.App/doc/%s/sibling.txt x", rt, grant); ask(&a1, c2, ans, sizeof ans);
-    CHECK(strcmp(ans, "ok"), "3: a file next to it can't be changed");
-    CHECK(lend(&a1, SB_LEND_SAVE, p, "new.txt", 1, p, grant) != 0, "3: a target that isn't the checked file is refused");
+    snprintf(p, sizeof p, "%s/Docs/sibling.txt", home);
+    get(p, ans + 100, 100);
+    CHECK(strcmp(ans, "ok") && !strcmp(ans + 100, "sibling"), "3: a file next to it can't be changed");
+    snprintf(p, sizeof p, "%s/Docs", home);
+    CHECK(lend(&a1, SB_LEND_SAVE, p, "Docs", 1, NULL, grant) != 0, "3: a save naming a folder is refused");
+    {   /* the target lord-server checked is not this file */
+        SbLendMsg *m = calloc(1, sizeof *m);
+        struct stat st;
+        snprintf(p, sizeof p, "%s/Docs/sibling.txt", home);
+        stat(p, &st);
+        m->magic = SB_LEND_MAGIC; m->type = SB_LEND_LEND; m->seq = 10; m->kind = SB_LEND_SAVE; m->rw = 1;
+        snprintf(m->path, sizeof m->path, "%.1300s", q);
+        snprintf(m->name, sizeof m->name, "new.txt");
+        m->dev = st.st_dev; m->ino = st.st_ino;
+        int ok = send(a1.lend, m, sizeof *m, 0) == (ssize_t)sizeof *m && recv(a1.lend, m, sizeof *m, 0) == (ssize_t)sizeof *m &&
+                 m->type == SB_LEND_DONE && m->status == ESTALE;
+        CHECK(ok, "3: a save target that isn't the checked file is refused (ESTALE)");
+        free(m);
+    }
+    CHECK(lend(&a1, SB_LEND_SAVE, q, "other.txt", 1, NULL, grant) == EINVAL, "3: a name that isn't the path's own is refused");
+
+    /* 4. paths not written the canonical way never reach a grant (F1/F2): the view refuses them too */
+    snprintf(p, sizeof p, "%s/Docs/./chosen.txt", home);
+    CHECK(lend(&a1, SB_LEND_FILE, p, "chosen.txt", 1, NULL, g2) == EINVAL, "4: a file through \"/./\" is refused");
+    snprintf(p, sizeof p, "%s//Docs/chosen.txt", home);
+    CHECK(lend(&a1, SB_LEND_FILE, p, "chosen.txt", 1, NULL, g2) == EINVAL, "4: a file through \"//\" is refused");
+    snprintf(p, sizeof p, "%s/./Docs", home);
+    CHECK(lend(&a1, SB_LEND_DIR, p, "Docs", 1, NULL, g2) == EINVAL, "4: a folder through \"/./\" is refused");
+    snprintf(p, sizeof p, "%s/Docs/Sub/", home);
+    CHECK(lend(&a1, SB_LEND_DIR, p, "Sub", 1, NULL, g2) == EINVAL, "4: a folder with a '/' at the end is refused");
+    snprintf(p, sizeof p, "%s/Docs//new.txt", home);
+    CHECK(lend(&a1, SB_LEND_SAVE, p, "new.txt", 1, NULL, g2) == EINVAL, "4: a save through \"//\" is refused");
 
     /* 4. a folder */
     snprintf(p, sizeof p, "%s/Docs/Sub", home);

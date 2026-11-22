@@ -61,6 +61,14 @@ build/sandbox-lend-test: tests/sandbox_lend_test.c src/sec/sandbox.c src/sec/cgr
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/sandbox_lend_test.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
 	./$@; r=$$?; [ $$r = 0 ] || [ $$r = 77 ] || { rm -f $@; exit 1; }
 
+# lord-server's checks before a chosen file is lent: only canonical paths reach the policy, a save names its file alone
+# (tests/fplend_test.c; Claude Security F1/F2/F5, 2026-11-22)
+test: build/fplend-test
+build/fplend-test: tests/fplend_test.c src/fplend.c src/fplend.h src/fpak.c src/fpak.h src/fsops.c src/fsops.h src/sec/sandbox.c src/sec/cgroup.c src/sec/sandbox.h src/sec/pathcanon.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/fplend_test.c src/fplend.c src/fpak.c src/fsops.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
+	./$@ || (rm -f $@; exit 1)
+
 # tests/fpportal_probe.c: a fake Flatpak app's side of the portals, run inside a real sandbox for the end-to-end checks
 # (docs/FLATPAK.md, "Lending a chosen file"); static, so it runs on any runtime. A test tool: never installed.
 build/fpportal-probe: tests/fpportal_probe.c src/vault/dbus.c src/vault/dbus.h

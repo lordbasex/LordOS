@@ -166,20 +166,21 @@ typedef struct {
  * path itself, in the view, never following a link, and only lends it if it is the very file lord-server checked
  * (device and inode). Revoked with the view: when the app's last process leaves, the mounts go with it.
  *   view → lord-server  HELLO + PID 1's pidfd (lord-server learns which view the socket serves)
- *   lord-server → view  LEND  (kind, rw, path, dev/ino; for SAVE also the name and the target's dev/ino)
+ *   lord-server → view  LEND  (kind, rw, path, name, dev/ino)
  *   view → lord-server  DONE  (status 0 and the grant's name, or the errno that stopped it) */
 #define SB_LEND_MAGIC 0x4c454e44u
 enum { SB_LEND_HELLO = 1, SB_LEND_LEND, SB_LEND_DONE };
-/* FILE: that file; DIR: that folder (and what is in it); SAVE: path is the target's folder, lent read-only, and name the
- * target file in it (made by lord-server beforehand), lent writable over it: write limited to that name */
+/* FILE: that file; DIR: that folder (and what is in it); SAVE: path is the target file (made by lord-server beforehand),
+ * lent writable and alone, as a FILE is: its folder is never lent (Claude Security F5, 2026-11-22), so the write is
+ * limited to that name and nothing next to it is seen. path is always canonical (sec/pathcanon.h). */
 enum { SB_LEND_FILE = 1, SB_LEND_DIR, SB_LEND_SAVE };
 #define SB_LEND_NAME_MAX 255
 #define SB_LEND_MAX 256                 /* grants per view */
-typedef struct {
+typedef struct SbLendMsg {
     uint32_t magic, type, seq, kind, rw;
     int32_t status;
     uint64_t dev, ino;                  /* path's */
-    uint64_t tdev, tino;                /* SAVE: the target file's */
+    uint64_t tdev, tino;                /* the same as dev/ino (kept so the message's layout doesn't change) */
     char path[4096];
     char name[SB_LEND_NAME_MAX + 1];
     char grant[33];                     /* DONE: the folder under lend_dir */

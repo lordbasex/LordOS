@@ -151,6 +151,26 @@ int main(void) {
         CHECK(csm_token_take(&t, "desktop:obs", last, 100101, got, sizeof got) == (int)sizeof src);
         CHECK(csm_token_take(&t, "desktop:obs", tok, 100101, got, 4) == -1);                   /* no room for it */
     }
+    {   /* revoked (Claude Security F6/F7): the person's Stop drops that app's tokens only; a lock or cast_end_all every one */
+        CastSm t;
+        csm_init(&t);
+        char src[16] = "a monitor", got[64], ta[33], tb[33], tc[33];
+        unsigned char rnd[16] = { 1 };
+        CHECK(csm_token_issue(&t, "flatpak:org.chromium.Chromium", src, sizeof src, 1000, rnd, ta) == CSM_OK);
+        rnd[0] = 2;
+        CHECK(csm_token_issue(&t, "flatpak:org.chromium.Chromium", src, sizeof src, 1000, rnd, tb) == CSM_OK);
+        rnd[0] = 3;
+        CHECK(csm_token_issue(&t, "desktop:obs", src, sizeof src, 1000, rnd, tc) == CSM_OK);
+        CHECK(csm_token_drop(&t, "flatpak:org.chromium.Chromium") == 2);
+        CHECK(csm_token_take(&t, "flatpak:org.chromium.Chromium", ta, 1001, got, sizeof got) == -1);   /* dead after Stop */
+        CHECK(csm_token_take(&t, "flatpak:org.chromium.Chromium", tb, 1001, got, sizeof got) == -1);
+        CHECK(csm_token_drop(&t, "flatpak:org.chromium.Chromium") == 0);
+        rnd[0] = 4;
+        CHECK(csm_token_issue(&t, "flatpak:org.chromium.Chromium", src, sizeof src, 1000, rnd, ta) == CSM_OK);
+        CHECK(csm_token_drop(&t, NULL) == 2);                                                          /* every one */
+        CHECK(csm_token_take(&t, "desktop:obs", tc, 1001, got, sizeof got) == -1);
+        CHECK(csm_token_take(&t, "flatpak:org.chromium.Chromium", ta, 1001, got, sizeof got) == -1);
+    }
 
     printf("castsm-test: %d/%d\n", ok, ok + bad);
     return bad ? 1 : 0;
