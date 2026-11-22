@@ -533,7 +533,7 @@ export function clipState(agent, cfg) {
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w9', linux: '5' };
+export const TOOLS_SHIPPED = { windows: 'w10', linux: '5' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
@@ -1156,6 +1156,25 @@ export function cropPoint(px, py, box, crop, gw, gh) {
   const x = Math.floor(crop[0] + lx * crop[2] / box[2]), y = Math.floor(crop[1] + ly * crop[3] / box[3]);
   return [Math.max(0, Math.min(gw - 1, x)), Math.max(0, Math.min(gh - 1, y))];
 }
+
+// A point while a button is held on a guest's window (dragging its own title bar, a selection): mapped as the window and
+// its crop were when the button went down (anchor { box, crop }), never as they are now. The guest moves its window as
+// the pointer goes and the LordOS window follows a moment later; mapped through the window as it is now, every move of
+// the guest's window pushed the point further by as much again and the window ran away from the pointer. Outside the
+// box too (the pointer may leave it during a drag); kept inside the guest's screen (gw × gh)
+export function anchorPoint(px, py, anchor, gw, gh) {
+  const box = anchor?.box, crop = anchor?.crop;
+  if (!box || !crop || !(box[2] > 0) || !(box[3] > 0)) return null;
+  const x = Math.floor(crop[0] + (px - box[0]) * crop[2] / box[2]), y = Math.floor(crop[1] + (py - box[1]) * crop[3] / box[3]);
+  return [Math.max(0, Math.min(gw - 1, x)), Math.max(0, Math.min(gh - 1, y))];
+}
+
+// Apps mode: the guest's picture changed size (a change of resolution; the guest's displays moved around it): the window
+// list the guest sent before it may be relative to the display as it was, and a crop of it shows part of one display,
+// part of another, or black. Held (the windows show black, not a wrong part of the picture) until the guest's next list,
+// unless a list came just before the size did (they cross), or for at most STALE_MS
+export const STALE_MS = 1500;
+export const cropsStale = (resizedAt, listedAt, now) => !!resizedAt && !(listedAt >= resizedAt - 400) && now - resizedAt < STALE_MS;
 
 // Apps mode: a place asked of a guest's window (lord.vm.winAct move) that the guest didn't take, and won't: its window
 // is still elsewhere (a smaller size than its minimum, a maximized window) a while after the ask. The LordOS window

@@ -1086,6 +1086,57 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **Machines: clicks with the mouse free, resolutions, and apps mode's windows on a guest with two displays, in
+  development** (LordOS guest tools **w10**; found on the maintainer's guest with an Intel GVT-g vGPU, ws126 and tools
+  w9, whose desktop has the vGPU's output and a second display that isn't on a PCI adapter).
+  - **Clicks land where they're aimed with the mouse free.** The guest maps QEMU's absolute tablet (a HID mouse) over
+    its *primary* display only, not over its whole desktop: its tablet input carries no `MOUSE_VIRTUAL_DESKTOP`. The
+    mapping of before (`vd_abs_map` over the whole desktop) put a click on a 1920x1080 shown display beside a 1784x830
+    second one at about half its x (in Notepad the caret went elsewhere, the Start button missed). lord-vm now computes
+    the layout with `ag_tablet_layout` (`vmagent.c`): with the shown display primary the picture is all the tablet
+    covers (no layout, every pixel 1:1); with another display primary the tablet can't reach the picture at all, which
+    is said in lord-vm's log once, and the tools make the shown display primary again (below). The tools no longer
+    leave it to an assumption: they read the tablet's own raw input in the background (`RIDEV_INPUTSINK` for mice,
+    nothing taken from anyone) and say how the guest maps it (`AGK_TABLET`, 21, one byte: 1 the primary display, 2 the
+    whole desktop; a strict parser), and lord-vm uses the whole-desktop layout of before only when they say 2. The tools'
+    log (`%LOCALAPPDATA%\LordOS\lordos-guest-win.log`) shows the first three moves with where the guest put the pointer
+    against both readings, so the mapping is measured, not guessed. `vm-test` checks every layout of the maintainer's
+    log in both mappings (each picture pixel within 2 of its guest pixel through QEMU's scale) and the parser.
+  - **The shown display stays the guest's primary.** w8 made it primary once per set of displays; a change of size on
+    it then let the guest put the other display at 0,0 as primary (the log flipped between "at 0,0 primary" and "at
+    1784,0" within a second, and sometimes stayed so: clicks, the taskbar and new windows went out of sight). The tools
+    now put it back after every change of mode and whenever they find another display primary, at most once in 2 s and
+    five times a minute (a guest that keeps undoing it isn't fought with).
+  - **Resolutions settle.** The tools asked the guest's display configuration for a size that wasn't listed yet on
+    every 250 ms try for 4 s, each one a mode set the person saw (the flicker after a change of resolution); now twice
+    at most. A size the guest changes by itself right after it was set (a vGPU's monitor comes back with a new EDID
+    after QEMU's ui_info, and the guest applies the mode it remembers for it: 1920x1080 set, 1400x1050 half a second
+    later, and it stayed) is asked again, twice at most per request and within 30 s of it, never when it is the closest
+    mode the tools themselves ended with.
+  - **Apps mode's windows show their own window after a change of resolution.** The tools made the window list with
+    the shown display's corner from before the change until 500 ms after it, so a window's crop showed part of one
+    display, part of the other and a black block. The list now looks the displays up again every time, a change of
+    the displays marks it at once and sends it even when nothing in it changed, and Machines holds a window's picture
+    (black, not a wrong part) after a change of the picture's size until the guest's next list, 1.5 s at most
+    (`cropsStale`, model.js).
+  - **The ~1 s stutter after a change of resolution, also with the mouse captured**: not reproduced here (it needs the
+    GVT-g guest). QEMU's "Failed to call update: Timeout was reached" lines in that log mean a display update waited
+    1 s for its answer; lord-vmdisplay answers within 250 ms in `vmdisplay-test`, so the wait is either QEMU's own main
+    loop or lord-server reading the vGPU's picture. The changes above remove the mode sets and display flips that came
+    after each change; whether the stutter goes with them is still to be checked on that guest.
+- **Machines: apps mode's windows have no LordOS frame, and the panel has the machine's bar, in development.** A guest
+  window in apps mode is now only the guest's window, with its own title bar and caption buttons (`args.csd`, as a
+  Linux app that draws its own bar; every theme then shows the content with its shadow; rounded 8 px unless it fills
+  the guest's screen), as other hypervisors' seamless modes do: its own buttons minimize, maximize and close it in
+  the guest and dragging its title bar moves it there, and the LordOS window follows from the guest's next list. A
+  press on a guest window is now mapped as the window was at the press for as long as the button is held, also when
+  the pointer leaves it (`anchorPoint`, model.js): mapped through the window as it was a moment later, each move of
+  the guest's window pushed the point further and a dragged window ran away from the pointer. Resizing from the
+  LordOS window's edges asks the guest as before. The machine's menus stay in the menu bar, the Dock's menu, the
+  machine's panel and its status item by the clock. Apps mode's panel (Running, Open an app) now has the machine's
+  bar: the agent, clipboard, shared folders; keys, devices, sound; the console, logs, screenshot, recording; pause and
+  power; Configure, wrapped over the rows it needs (the resolution, Capture mouse and full screen have no use in apps
+  mode). With the console open the panel is taller.
 - **The Screenshots bar's Options menu opened below the bar, off the bottom of the screen.** The bar sits near the
   bottom of the screen in a bare floating window only as tall as the bar, and the menu chose its side by that window, so
   it always opened downward. A `Popover` can now be given an `area` (a screen box) in place of the window: the bar passes

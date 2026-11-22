@@ -70,6 +70,8 @@
  *                            (printable ASCII, e.g. \\.\DISPLAY1); nothing after the last. Sent at hello and when
  *                            the guest's display configuration changes. Apps mode's rectangles (LAG_WINDOWS,
  *                            LAG_WINACT, AGK_PLACE) are relative to the shown display's top left corner.
+ *   AGK_TABLET guest → host  u8 mode (AG_TABLET_PRIMARY or AG_TABLET_DESKTOP, below): how the guest maps the absolute
+ *                            tablet with several displays; lord-vm uses it for where clicks land (ag_tablet_layout).
  *
  * Apps mode (docs/VIRTUALIZATION.md 7.2), capability "windows" in the guest's hello (lord-vm then sets LAG_CAP_WINDOWS
  * in VM_AGENT_STATE b). Everything little endian; every length is checked by the lag_*_parse functions below, which
@@ -205,6 +207,20 @@ int ag_displays_extra(const AgDisplay *d, int n, int shown);
  * the box's top left, its width, height, the box's width, height }. 0 a layout to use (more than one display and the
  * box larger than the shown one, every side ≤ 32767); 1 none (L all 0: the picture is the whole desktop) */
 int ag_displays_layout(const AgDisplay *d, int n, int shown, int L[6]);
+/* AGK_TABLET guest → host (tools w10, "tablet" in their hello): exactly 1 byte, how the guest maps the absolute tablet
+ * with several displays, as the guest's own input stack says it (lordos-guest-win reads it from the tablet's raw input:
+ * MOUSE_VIRTUAL_DESKTOP set or not): AG_TABLET_PRIMARY its range covers the primary display only (what Windows does for
+ * a HID tablet through mouhid, whose input carries no MOUSE_VIRTUAL_DESKTOP), AG_TABLET_DESKTOP the whole desktop.
+ * Sent when it is first seen and when it changes. 0 well formed */
+enum { AGK_TABLET = 21 };
+enum { AG_TABLET_UNKNOWN = 0, AG_TABLET_PRIMARY = 1, AG_TABLET_DESKTOP = 2 };
+int ag_tablet_parse(const uint8_t *p, size_t n, int *mode);
+/* Where QEMU's tablet has to point so a click lands on the shown display's pixel, for how the guest maps the tablet
+ * (mode: AG_TABLET_*; unknown counts as primary, what a Windows guest's HID tablet does): L as ag_displays_layout.
+ * AG_TABLET_DESKTOP: ag_displays_layout's. Primary: the tablet covers the primary display; 1 none (the shown display is
+ * the primary, or the only one: the picture is all the tablet covers), 2 none either, but the tablet can't reach the
+ * shown display at all (another display is the primary: the tools make the shown one primary again). 0 a layout. */
+int ag_tablet_layout(const AgDisplay *d, int n, int shown, int mode, int L[6]);
 
 /* apps mode: limits, the VM_AGENT_STATE b bit (vmproto.h's VAC_* go up to VAC_DISPLAY, 128), flags, actions */
 #define LAG_CAP_WINDOWS 256u

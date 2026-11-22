@@ -1046,6 +1046,10 @@ static struct {
     char lag_disps[AG_DISPLAYS_MAX * 128];   /* the guest's displays (AGK_DISPLAYS) as last logged, "" none yet */
     int layout[6];                          /* where the picture sits in the guest's desktop (VM_GUEST_LAYOUT), 0s none */
     int lag_extra, lag_extraoff, extra_avail; /* the tools turn off an extra display (AGK_EXTRA); one is off; one is there */
+    AgDisplay disp_list[AG_DISPLAYS_MAX];   /* the guest's displays (AGK_DISPLAYS) as last said, for the tablet's layout */
+    int disp_n, disp_shown;
+    int tablet;                             /* how the guest maps the tablet (AGK_TABLET, AG_TABLET_*; 0 not said yet) */
+    int tablet_far;                         /* said in the log: the tablet covers a primary that isn't the shown display */
     /* "Open with" a machine (7.3): the helper said "open"; the drop's token and its hash on the agent's way (the
      * transfer folder's way has fx_dig); the drops waiting for the guest tools' answer */
     int lag_open, lag_place;
@@ -4592,6 +4596,7 @@ static void lag_windows_off(void) {
  * it came), and given to every client as a sealed memfd (VM_WINDATA); the list of apps is kept, with a generation, for
  * VM_LAUNCH */
 static void layout_set(const int L[6]);
+static void layout_update(void);
 static void lag_windata(const AgFrame *f) {
     static LagWinList wl;
     uint8_t *out = NULL;
@@ -4733,13 +4738,23 @@ static void drain_lag(void) {
             else {
                 ag_displays_text(d, n, shown, t, sizeof t);
                 if (strcmp(t, S.lag_disps)) { memcpy(S.lag_disps, t, sizeof t); vlog("agent: guest displays: %s", t); }
-                int L[6];
-                ag_displays_layout(d, n, shown, L);
-                if (memcmp(L, S.layout, sizeof L)) layout_set(L);
+                memcpy(S.disp_list, d, sizeof S.disp_list);
+                S.disp_n = n;
+                S.disp_shown = shown;
+                layout_update();
                 /* a display the tools can turn off (Machines offers it) */
                 S.extra_avail = ag_displays_extra(d, n, shown);
                 int caps = (S.ag_caps & ~VAC_EXTRA) | (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0);
                 if (caps != S.ag_caps) { S.ag_caps = caps; ag_broadcast(); }
+            }
+        } else if (f.kind == AGK_TABLET && S.lag_hello) {
+            /* how the guest maps the absolute tablet (tools w10, from the tablet's own raw input) */
+            int mode;
+            if (ag_tablet_parse(f.data, f.len, &mode)) vlog("agent: the guest's tablet mapping: malformed");
+            else if (mode != S.tablet) {
+                S.tablet = mode;
+                vlog("agent: the guest maps the tablet over %s", mode == AG_TABLET_DESKTOP ? "its whole desktop (every display)" : "its primary display only");
+                layout_update();
             }
         } else if ((f.kind == LAG_WINDOWS || f.kind == LAG_WINICON || f.kind == LAG_APPLIST) && S.lag_hello && S.lag_windows) {
             lag_windata(&f);
@@ -4756,9 +4771,22 @@ static void drain_lag(void) {
 static void layout_set(const int L[6]) {
     memcpy(S.layout, L, sizeof S.layout);
     if (L[4]) vlog("agent: the tablet points at the shown display: %dx%d at %d,%d of a %dx%d desktop", L[2], L[3], L[0], L[1], L[4], L[5]);
-    else vlog("agent: the tablet covers the picture (one display)");
+    else vlog("agent: the tablet covers the picture (%s)", S.disp_n > 1 ? "the shown display is the one the guest maps it over" : "one display");
     VmMsg m = vm_msg(VM_GUEST_LAYOUT, 0, L[0], L[1], L[2] << 16 | L[3], L[4] << 16 | L[5], "");
     for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
+}
+
+/* The tablet's layout from the guest's displays and how it maps the tablet (ag_tablet_layout). A Windows guest maps a
+ * HID tablet over its primary display only (mouhid sets no MOUSE_VIRTUAL_DESKTOP; tools w10 read it from the tablet's raw
+ * input and say so, AGK_TABLET): with the shown display primary, the picture is all of it, as with one display. Until
+ * the tools say, the primary is assumed (2026-11-22, the maintainer's guest: with the shown display primary at 0,0 and a
+ * second display beside it, the whole-desktop mapping of before put clicks at about half their x) */
+static void layout_update(void) {
+    int L[6];
+    int r = ag_tablet_layout(S.disp_list, S.disp_n, S.disp_shown, S.tablet, L);
+    if (r == 2 && !S.tablet_far) vlog("agent: the guest's primary display isn't the shown one: the tablet can't reach the picture until the tools make it primary again");
+    S.tablet_far = r == 2;
+    if (memcmp(L, S.layout, sizeof L)) layout_set(L);
 }
 
 /* the agent's turn of the loop: sync, ping, the journal, the shutdown fallback */
@@ -5220,7 +5248,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;

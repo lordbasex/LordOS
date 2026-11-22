@@ -572,6 +572,24 @@ int ag_displays_layout(const AgDisplay *d, int n, int shown, int L[6]) {
     return 0;
 }
 
+int ag_tablet_parse(const uint8_t *p, size_t n, int *mode) {
+    if (!p || n != 1 || (p[0] != AG_TABLET_PRIMARY && p[0] != AG_TABLET_DESKTOP)) return -1;
+    if (mode) *mode = p[0];
+    return 0;
+}
+
+int ag_tablet_layout(const AgDisplay *d, int n, int shown, int mode, int L[6]) {
+    if (mode == AG_TABLET_DESKTOP) return ag_displays_layout(d, n, shown, L);
+    for (int i = 0; i < 6; i++) L[i] = 0;
+    if (!d || n < 2 || n > AG_DISPLAYS_MAX || shown < 0 || shown >= n) return 1;
+    int primary = -1;
+    for (int i = 0; i < n; i++) if (d[i].flags & AGDS_PRIMARY) { primary = i; break; }
+    /* no primary said (never from Windows): Windows' primary is the display at 0,0 */
+    if (primary < 0) for (int i = 0; i < n; i++) if (!d[i].x && !d[i].y) { primary = i; break; }
+    if (primary < 0 || primary == shown) return 1;
+    return 2;
+}
+
 int ag_extra_parse(const uint8_t *p, size_t n, int *off) {
     if (!p || n != 1 || p[0] > 1) return -1;
     if (off) *off = p[0];

@@ -184,9 +184,10 @@
  *   absolute, the helper moves its own position by it and sends that. VD_CAPTURE a = 1 / 0: VD_MOTION is ignored while
  *   captured, and IsAbsolute is asked again sooner for the next 3 s.
  *   VD_LAYOUT a, b = the shown display's corner in the guest's whole desktop, c, d = its size, e, f = the desktop's size
- *   (vm_layout_ok; all 0: none). A guest's absolute tablet covers its whole desktop (Windows maps a HID tablet's range over
- *   every display), and QEMU's Mouse.SetAbsPosition scales by the picture's width: with a layout, VD_MOTION's point is
- *   given as vd_abs_map's, so it lands on the shown display's pixel instead of somewhere across all of them.
+ *   (vm_layout_ok; all 0: none). For a guest whose absolute tablet covers its whole desktop (AGK_TABLET says so; a
+ *   Windows HID tablet covers the primary display only, and then there is no layout while the shown display is the
+ *   primary: vmagent.h ag_tablet_layout), QEMU's Mouse.SetAbsPosition still scales by the picture's width: with a
+ *   layout, VD_MOTION's point is given as vd_abs_map's, so it lands on the shown display's pixel.
  *   VD_WHEEL a = vertical steps (+ up, − down), b = horizontal steps (+ right). VD_RELEASE_ALL lets go of every
  *   key and button held (window lost focus). VD_RESIZE a, b = the window's size in pixels: the guest is asked
  *   to use it (Console.SetUIInfo), at most every 100 ms. VD_RATE a = the display's refresh rate (1..240; 60 by

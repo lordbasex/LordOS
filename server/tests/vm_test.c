@@ -1646,6 +1646,50 @@ static void test_tablet_layout(void) {
     /* the right edge of the shown display stays left of the other display */
     CHECK(vd_abs_map(1919, 1920, 0, 1920, 2942) * 2942LL / 1920 < 1920);
 
+    /* How the guest maps the tablet (AGK_TABLET, tools w10), over every layout of the maintainer's log (2026-11-22, ws126,
+     * tools w9): the vGPU's \\.\DISPLAY2 (shown) beside a display not on a PCI adapter, \\.\DISPLAY1 1784x830 */
+    struct { int sx, sw, sh, gx, sprim; } logged[] = {
+        { 0, 1784, 830, 1784, 1 }, { 1784, 1920, 1080, 0, 0 }, { 0, 1920, 1080, 1920, 1 }, { 0, 1400, 1050, 1400, 1 },
+        { 1784, 1400, 1050, 0, 0 }, { 1784, 1680, 1050, 0, 0 }, { 1784, 1600, 900, 0, 0 },
+    };
+    for (size_t c = 0; c < sizeof logged / sizeof *logged; c++) {
+        AgDisplay g[2];
+        memset(g, 0, sizeof g);
+        g[0] = (AgDisplay){ logged[c].sx, 0, (uint32_t)logged[c].sw, (uint32_t)logged[c].sh, (uint8_t)(AGDS_HW | (logged[c].sprim ? AGDS_PRIMARY : 0)), "\\\\.\\DISPLAY2" };
+        g[1] = (AgDisplay){ logged[c].gx, 0, 1784, 830, (uint8_t)(logged[c].sprim ? 0 : AGDS_PRIMARY), "\\\\.\\DISPLAY1" };
+        /* the primary mapping (Windows' HID tablet, and the default until the tools say): with the shown display primary
+         * the picture is all the tablet covers (no layout: identity); with the other one primary it can't be reached */
+        int r0 = ag_tablet_layout(g, 2, 0, AG_TABLET_UNKNOWN, L), r1 = ag_tablet_layout(g, 2, 0, AG_TABLET_PRIMARY, L);
+        CHECK(r0 == r1 && r1 == (logged[c].sprim ? 1 : 2) && !L[0] && !L[2] && !L[4]);
+        /* the whole-desktop mapping: the shown display's place in the box, every pixel within 2 */
+        CHECK(ag_tablet_layout(g, 2, 0, AG_TABLET_DESKTOP, L) == 0 && L[0] == logged[c].sx && L[2] == logged[c].sw && L[4] == logged[c].sw + 1784);
+        int worst = 0;
+        for (int p = 0; p < logged[c].sw; p++) {
+            long long abs = (long long)vd_abs_map(p, logged[c].sw, L[0], L[2], L[4]) * 0x7fff / logged[c].sw;
+            int err = (int)(abs * L[4] / 0x7fff - (L[0] + p));
+            if (err < 0) err = -err;
+            if (err > worst) worst = err;
+        }
+        CHECK(worst <= 2);
+        /* identity really is: the primary mapping's picture pixel is the guest's (QEMU's scale only) */
+        for (int p = 0; p < logged[c].sw; p += 7) {
+            long long abs = (long long)vd_abs_map(p, logged[c].sw, 0, 0, 0) * 0x7fff / logged[c].sw;
+            int err = (int)(abs * logged[c].sw / 0x7fff - p);
+            CHECK(err >= -1 && err <= 1);
+        }
+    }
+    /* one display: nothing to map; no primary flag at all: the display at 0,0 counts as the primary */
+    d[0] = (AgDisplay){ 0, 0, 1920, 1080, AGDS_HW, "A" };
+    d[1] = (AgDisplay){ 1920, 0, 800, 600, 0, "B" };
+    CHECK(ag_tablet_layout(d, 1, 0, AG_TABLET_PRIMARY, L) == 1 && ag_tablet_layout(d, 2, 0, AG_TABLET_PRIMARY, L) == 1);
+    CHECK(ag_tablet_layout(d, 2, 1, AG_TABLET_PRIMARY, L) == 2 && ag_tablet_layout(d, 2, -1, AG_TABLET_PRIMARY, L) == 1 && ag_tablet_layout(NULL, 2, 0, 0, L) == 1);
+    /* the message: exactly one byte, 1 or 2 */
+    int tm = -1;
+    CHECK(!ag_tablet_parse((const uint8_t *)"\x01", 1, &tm) && tm == AG_TABLET_PRIMARY);
+    CHECK(!ag_tablet_parse((const uint8_t *)"\x02", 1, &tm) && tm == AG_TABLET_DESKTOP);
+    CHECK(ag_tablet_parse((const uint8_t *)"\x00", 1, &tm) && ag_tablet_parse((const uint8_t *)"\x03", 1, &tm));
+    CHECK(ag_tablet_parse((const uint8_t *)"\x01\x01", 2, &tm) && ag_tablet_parse(NULL, 1, &tm) && ag_tablet_parse((const uint8_t *)"", 0, &tm));
+
     /* the messages */
     VmMsg m = vm_msg(VM_GUEST_LAYOUT, 0, 0, 0, 1920 << 16 | 1080, 2942 << 16 | 1080, NULL);
     CHECK(vm_msg_valid(&m, 0) && !vm_msg_valid(&m, 1));

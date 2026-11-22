@@ -399,6 +399,26 @@ eq('crop of', M.cropOf({ x: 10, y: 20, w: 30, h: 40 }), [10, 20, 30, 40]);
 eq('crop point 1:1', M.cropPoint(110, 220, [100, 200, 300, 400], [500, 600, 300, 400], 1920, 1080), [510, 620]);
 eq('crop point scaled', M.cropPoint(250, 400, [100, 200, 300, 400], [500, 600, 600, 800], 1920, 1080), [800, 1000]);
 eq('crop point clamped to the screen', M.cropPoint(399, 599, [100, 200, 300, 400], [1800, 1000, 300, 400], 1920, 1080), [1919, 1079]);
+// a drag on the guest's own title bar: mapped as at the press, whatever the guest's window and the LordOS one did since
+{
+  const anchor = { box: [100, 200, 300, 400], crop: [500, 600, 300, 400] };
+  eq('anchor point at the press', M.anchorPoint(110, 220, anchor, 1920, 1080), [510, 620]);
+  // the pointer went 40 px right: the guest gets 40 px right of the press point, not 40 + however far its window moved
+  eq('anchor point after a move', M.anchorPoint(150, 220, anchor, 1920, 1080), [550, 620]);
+  eq('anchor point outside the box', M.anchorPoint(40, 150, anchor, 1920, 1080), [440, 550]);
+  eq('anchor point clamped', M.anchorPoint(5000, -5000, anchor, 1920, 1080), [1919, 0]);
+  eq('anchor point scaled', M.anchorPoint(250, 400, { box: [100, 200, 300, 400], crop: [500, 600, 600, 800] }, 1920, 1080), [800, 1000]);
+  eq('no anchor', M.anchorPoint(1, 1, null, 1920, 1080), null);
+  // the runaway it replaces: through the crop as it is now, a guest window that moved by 40 put the point 40 further
+  const moved = M.cropPoint(150, 220, [100, 200, 300, 400], [540, 600, 300, 400], 1920, 1080);
+  eq('crop point through a moved window runs ahead', moved[0], 590);
+}
+// crops held after a change of the picture's size until the guest's next list
+eq('crops: no resize', M.cropsStale(0, 0, 1000), false);
+eq('crops: resized, no list since', M.cropsStale(10000, 5000, 10200), true);
+eq('crops: a list after the resize', M.cropsStale(10000, 10100, 10200), false);
+eq('crops: a list just before the resize (they crossed)', M.cropsStale(10000, 9700, 10200), false);
+eq('crops: not held for long', M.cropsStale(10000, 5000, 10000 + M.STALE_MS), false);
 eq('crop point outside', [M.cropPoint(99, 220, [100, 200, 300, 400], [0, 0, 300, 400], 1920, 1080), M.cropPoint(400, 220, [100, 200, 300, 400], [0, 0, 300, 400], 1920, 1080), M.cropPoint(1, 1, [0, 0, 0, 0], [0, 0, 1, 1], 9, 9)], [null, null, null]);
 {
   // a guest window above the menu bar (Calculator at y = -10 on a 1:1 guest; 28 px menu bar, 32 px title bar): moved

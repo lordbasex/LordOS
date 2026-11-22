@@ -152,7 +152,9 @@ function AgentPop({ ctl, onClose }) {
 
 // The bar, in groups (5.3): the agent and what it brings (clipboard, folders, apps) | the guest's display and devices |
 // shell, logs, screenshot, record | pause and power | configure and full screen. Icons, each named in its tooltip.
-function Tools({ ctl, floating, compact, tiny }) {
+// apps: apps mode's panel (AppsController), the same buttons less the ones apps mode has no use for: the resolution (the
+// guest's screen is this display's size then), Capture mouse (never in apps mode) and full screen (a panel)
+function Tools({ ctl, floating, compact, tiny, apps }) {
   const { st, a, follow, cfg } = ctl;
   // the mock "Toolbar": sizes that fit this display, then Follow the window (5.3)
   const res = [
@@ -207,10 +209,10 @@ function Tools({ ctl, floating, compact, tiny }) {
       {compact ? null : <BarSep />}
     </> : null}
     <BarGroup>
-      <IconMenuBtn sym="display" label={resLabel} items={res} disabled={!a.keys} on={!follow} />
+      {apps ? null : <IconMenuBtn sym="display" label={resLabel} items={res} disabled={!a.keys} on={!follow} />}
       {/* Capture mouse (6.25): Automatic (the tablet, the pointer free) or Captured; never in apps mode, which says why */}
-      <IconBtn sym="capture" label={tr(captureLabelKey({ on: ctl.capOn, why: ctl.capOffer.why }))} on={ctl.capOn}
-        disabled={!ctl.capOffer.offered && !ctl.capOn} onClick={ctl.toggleCapture} />
+      {apps ? null : <IconBtn sym="capture" label={tr(captureLabelKey({ on: ctl.capOn, why: ctl.capOffer.why }))} on={ctl.capOn}
+        disabled={!ctl.capOffer.offered && !ctl.capOn} onClick={ctl.toggleCapture} />}
       {/* Keys: held keys, the guest's combinations, single keys and the on-screen keyboard (keys.jsx) */}
       <KeysBtn ctl={ctl} />
       <IconMenuBtn sym="eject" label={tr('machines.tb.devices')} items={ctl.devices} />
@@ -239,7 +241,7 @@ function Tools({ ctl, floating, compact, tiny }) {
     {compact ? null : <BarSep />}
     <BarGroup>
       {!floating ? <IconBtn sym="gear" label={tr('machines.cmd.configure')} onClick={() => ctl.configure()} /> : null}
-      {floating ? <IconBtn sym="fullscreen-exit" label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} />
+      {apps ? null : floating ? <IconBtn sym="fullscreen-exit" label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} />
         : <IconBtn sym="fullscreen" label={tr('machines.cmd.fullscreen')} onClick={() => ctl.setFull(true)} />}
     </BarGroup>
   </>;
@@ -373,17 +375,21 @@ function Failed({ name, v, st, log, onStart, onSettings, onAnyway, onDiscard }) 
 // (like a Unity mode's launcher): Running, the guest's windows (a click brings one to the front, × asks the guest to close
 // it), then the guest's apps to open, with a search; and the way back to its desktop (Esc too). The same lists are in the
 // machine's status item by the clock (appsstatus.jsx); both come from appslist.jsx.
-function AppsController({ name, g, onLeave }) {
+// The machine's bar is on the panel too (the agent, clipboard, folders and apps; keys, devices and sound; the console,
+// logs, screenshot and recording; pause and power; Configure), its groups wrapped over as many rows as the panel needs.
+function AppsController({ name, g, onLeave, ctl }) {
   const p = usePal();
   const [query, setQuery] = useState('');
   const apps = launcherApps(g?.apps || [], query, g?.appIcons);
+  const v = stateView(ctl?.st?.state, ctl?.st?.reason);
   return (
     <View style={{ flex: 1, padding: 16, gap: 10, backgroundColor: p.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <StateDot tone="run" size={9} />
+        <StateDot tone={v.tone} size={9} />
         <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{name}</Text>
         <Btn label={tr('machines.apps.leave')} onClick={onLeave} />
       </View>
+      {ctl ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}><Tools ctl={ctl} compact apps /></View> : null}
       <ListHead label={tr('machines.apps.running')} />
       <ScrollView style={{ maxHeight: 176, borderRadius: 10, backgroundColor: p.raised }} contentStyle={{ padding: 4 }}>
         <RunningList g={g} />
@@ -1020,9 +1026,11 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (appsActive) {
       if (w && !preApps.current) preApps.current = { w: w.w, h: w.h };
       if (full) wm.setFullscreen(winId, false);
-      wm.resize(winId, 420, 520);      // the controller's panel: Running and the guest's apps (AppsController)
+      // the controller's panel: the machine's bar, Running and the guest's apps (AppsController); taller with the
+      // console open under it
+      wm.resize(winId, 420, shell ? 860 : 600);
     } else if (preApps.current) { wm.resize(winId, preApps.current.w, preApps.current.h); preApps.current = null; }
-  }, [appsActive]);
+  }, [appsActive, appsActive && shell]);
   const gApps = useStore(guests, (x) => x[dir] || null);
   const gRunning = runningKey(runningWindows(gApps?.list));
   // why it can't be on: the agent, or a guest whose helper can't list its windows (it needs LordOS or Windows inside)
@@ -1149,7 +1157,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
 
   return (
     <View ref={root} {...drop.props} style={{ flex: 1, backgroundColor: '#000' }}>
-      {appsActive ? <AppsController name={name} g={gApps} onLeave={() => setApps(false)} />
+      {appsActive ? <AppsController name={name} g={gApps} onLeave={() => setApps(false)} ctl={ctl} />
         : <View ref={box} onMouseDown={(e) => { setShellKeys(false); down(e, sendClipRef.current(true)); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
           {st?.media && st.display === 'up' ? <MediaView media={st.media} style={{ flex: 1 }} /> : null}
         </View>}

@@ -78,11 +78,17 @@
  * answered (LAG_WINREFUSED) */
 /* w9 (2026-11-22): "extra": turns off, when the host asks (AGK_EXTRA), a display that isn't on a PCI adapter next to
  * the shown one (and back on; by itself too when no PCI display is left), saying "extraoff" while it keeps one off */
-#define VERSION "w9"
-#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt extra"
+/* w10 (2026-11-22): "tablet": how Windows maps the absolute tablet with several displays, read from the tablet's own raw
+ * input (MOUSE_VIRTUAL_DESKTOP or not), goes to the host (AGK_TABLET), which aims clicks with it; the shown display is
+ * made primary again whenever a change of mode (or Windows) leaves another one primary, not once per set of displays;
+ * the display configuration is asked twice at most per size, not every 250 ms; a size Windows changes by itself right
+ * after (a monitor that reappears with a new EDID) is asked again, twice at most; apps mode's list follows a change of
+ * the displays at once (the shown display's corner looked up for every list) */
+#define VERSION "w10"
+#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt extra tablet"
 
 enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
-enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS, T_MONS };
+enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS, T_MONS, T_TABLET };
 
 static HWND win;
 static wchar_t port_path[260] = L"\\\\.\\Global\\org.lordos.agent";
@@ -233,7 +239,8 @@ static DWORD WINAPI reader_main(LPVOID arg) {
 
 static void apps_stop(void);
 static int mons_sent;               /* the displays went to the host (AGK_DISPLAYS) since the port opened */
-static int apps_on, apps_dirty;     /* apps mode (below) */
+static int tablet_mode, tablet_sent; /* how Windows maps the tablet (AG_TABLET_*, 0 not seen yet); said to the host */
+static int apps_on, apps_dirty, apps_force;   /* apps mode (below); apps_force: the next list goes even if the same */
 static void port_close(const char *why) {
     if (port == INVALID_HANDLE_VALUE) return;
     lg("port closed: %s", why);
@@ -245,6 +252,7 @@ static void port_close(const char *why) {
     host_hello = host_clipx = host_elev = 0;
     apps_stop();
     mons_sent = 0;
+    tablet_sent = 0;
     SetEvent(ans_ev);                   /* a paste waiting for the host stops waiting */
 }
 
@@ -653,6 +661,9 @@ static void clip_render(UINT fmt) {
 /* ---- the display's size ---- */
 static uint32_t disp_w, disp_h;     /* what the host asked for last */
 static int disp_tries;
+static DWORD disp_got_w, disp_got_h; /* what that ask ended with (0 still trying) */
+static int disp_again;              /* asked again after Windows changed it by itself, for this ask */
+static ULONGLONG disp_asked_at;
 
 static int primary_device(wchar_t name[32]) {
     DISPLAY_DEVICEW d;
@@ -685,7 +696,8 @@ static Mon mons[AG_DISPLAYS_MAX];
 static int mons_n, mons_shown = -1, mons_stale = 1;
 static wchar_t shown_locked[32];    /* chosen by the host's size, "" not yet */
 static wchar_t mons_topo[AG_DISPLAYS_MAX * 33];   /* the displays' names, to tell a change of topology */
-static wchar_t primary_tried[32];   /* made primary already (for this topology), "" not yet */
+static wchar_t primary_tried[32];   /* made primary already (for this topology), "" not yet: for the log */
+static ULONGLONG primary_at[5];     /* when the shown display was last made primary (the last five), to keep it so */
 static int rescue_pending = 1;      /* windows on another display come onto the shown one when things settle */
 static char mons_said[AG_DISPLAYS_MAX * 128];
 
@@ -932,21 +944,36 @@ static void mon_scan(void) {
         lg("displays: %s%s", t, mons_n > 1 && shown_locked[0] ? " (the shown one chosen by the size the host asked for)" : "");
         mon_log_adapters();
         mons_sent = 0;
-        if (apps_on) apps_dirty = 1;      /* the list again, relative to the shown display as it is now */
+        if (apps_on) apps_dirty = apps_force = 1;   /* the list again, relative to the shown display as it is now, sent
+                                                     * even when nothing in it changed (the host waits for it) */
     }
     if (!mons_sent && dn && port != INVALID_HANDLE_VALUE && host_hello) {
         uint8_t b[AG_DISPLAYS_BYTES];
         size_t bn = ag_displays_write(d, dn, ds, b, sizeof b);
         if (bn && !send_frame(AGK_DISPLAYS, b, (uint32_t)bn)) mons_sent = 1;
     }
-    /* the shown display made the primary, once per topology (and only one on a PCI adapter: the host's picture) */
-    if (mons_n > 1 && mons_shown >= 0 && mons[mons_shown].hw && !mons[mons_shown].primary && wcscmp(primary_tried, mons[mons_shown].dev)) {
-        memcpy(primary_tried, mons[mons_shown].dev, sizeof primary_tried);
-        if (!disp_make_primary(mons[mons_shown].dev)) {
-            mons_stale = 1;
-            rescue_pending = 1;                 /* the windows come onto it once the change settles */
-            SetTimer(win, T_MONS, 1500, NULL);
-        }
+    /* The shown display made the primary (only one on a PCI adapter: the host's picture), and kept so: a change of mode
+     * on it (ChangeDisplaySettingsEx, a monitor that comes back with a new EDID) lets Windows put another display at
+     * 0,0 as the primary, and then the tablet, the taskbar and new windows go where nobody looks (w9 made it primary
+     * once per set of displays only; 2026-11-22 log: the layout flipped on every size). Not more than once in 2 s, nor
+     * five times in a minute: a Windows that keeps undoing it isn't fought with */
+    if (mons_n > 1 && mons_shown >= 0 && mons[mons_shown].hw && !mons[mons_shown].primary) {
+        ULONGLONG now = GetTickCount64();
+        if (now - primary_at[0] >= 2000 && (!primary_at[4] || now - primary_at[4] >= 60000)) {
+            memmove(primary_at + 1, primary_at, sizeof primary_at - sizeof *primary_at);
+            primary_at[0] = now;
+            int again = !wcscmp(primary_tried, mons[mons_shown].dev);
+            memcpy(primary_tried, mons[mons_shown].dev, sizeof primary_tried);
+            if (again) lg("displays: another display became the primary: the shown one is made primary again");
+            if (!disp_make_primary(mons[mons_shown].dev)) {
+                mons_stale = 1;
+                rescue_pending = 1;             /* the windows come onto it once the change settles */
+                SetTimer(win, T_MONS, 1500, NULL);
+            }
+        } else if (!(now - primary_at[0] < 2000)) {
+            static ULONGLONG told;
+            if (now - told > 60000) { told = now; lg("displays: Windows made another display the primary five times in a minute: left so for now"); }
+        } else SetTimer(win, T_MONS, 2100, NULL);   /* looked at again once the 2 s are over */
     }
     /* an extra display was turned off but no display on a PCI adapter is left: everything back on, once */
     static int extra_auto_tried;
@@ -1075,7 +1102,8 @@ static int disp_apply(int last) {
     }
     if (!found && !last) {
         /* not listed (yet): Windows is asked for it through the display configuration, from the second try on */
-        if (disp_tries >= 2 && !disp_setconfig(dev, disp_w, disp_h)) {
+        /* twice at most (each one is a mode set the person sees: every 250 ms it flickered for 4 s) */
+        if ((disp_tries == 2 || disp_tries == 8) && !disp_setconfig(dev, disp_w, disp_h)) {
             memset(&cur, 0, sizeof cur);
             cur.dmSize = sizeof cur;
             if (EnumDisplaySettingsExW(dev, ENUM_CURRENT_SETTINGS, &cur, 0) && cur.dmPelsWidth <= disp_w && cur.dmPelsHeight <= disp_h &&
@@ -1105,6 +1133,8 @@ static int disp_apply(int last) {
     if (best.dmPelsWidth == cur.dmPelsWidth && best.dmPelsHeight == cur.dmPelsHeight) return 1;
     LONG r = ChangeDisplaySettingsExW(dev, &want, NULL, CDS_UPDATEREGISTRY, NULL);
     lg("display: %lux%lu%s: %ld", best.dmPelsWidth, best.dmPelsHeight, found ? "" : " (the closest listed)", r);
+    /* Windows may have moved the displays around for the new size (another one primary at 0,0): put back at once */
+    if (r == DISP_CHANGE_SUCCESSFUL) { mons_stale = 1; mon_get(); }
     return r == DISP_CHANGE_SUCCESSFUL ? 1 : -1;
 }
 
@@ -1113,7 +1143,9 @@ static void disp_report(void) {
     DEVMODEW cur;
     memset(&cur, 0, sizeof cur);
     cur.dmSize = sizeof cur;
+    mons_stale = 1;
     if (shown_device(dev) || !EnumDisplaySettingsExW(dev, ENUM_CURRENT_SETTINGS, &cur, 0)) return;
+    disp_got_w = cur.dmPelsWidth; disp_got_h = cur.dmPelsHeight;
     uint8_t o[8];
     if (cur.dmPelsWidth < AG_DISPLAY_MIN_W || cur.dmPelsHeight < AG_DISPLAY_MIN_H || cur.dmPelsWidth > AG_DISPLAY_MAX || cur.dmPelsHeight > AG_DISPLAY_MAX) return;
     ag_display_write(o, cur.dmPelsWidth, cur.dmPelsHeight);
@@ -1123,6 +1155,26 @@ static void disp_report(void) {
     send_frame(AGK_DISPLAY, o, 8);
 }
 
+/* The size the host asked for, settled, changed by Windows itself a moment later: a vGPU's monitor comes back with a new
+ * EDID after QEMU's ui_info, and Windows then applies the mode it remembers for that monitor (2026-11-22 log: 1920x1080
+ * set, 1400x1050 half a second later, and it stayed). Asked again, twice at most per ask and within 30 s of it, and only
+ * when it isn't what this side itself ended with (the closest listed mode) */
+static void disp_keep(void) {
+    if (!disp_w || !disp_got_w || disp_again >= 2 || GetTickCount64() - disp_asked_at > 30000) return;
+    wchar_t dev[32];
+    DEVMODEW cur;
+    memset(&cur, 0, sizeof cur);
+    cur.dmSize = sizeof cur;
+    if (shown_device(dev) || !EnumDisplaySettingsExW(dev, ENUM_CURRENT_SETTINGS, &cur, 0)) return;
+    if (cur.dmPelsWidth == disp_got_w && cur.dmPelsHeight == disp_got_h) return;
+    disp_again++;
+    lg("display: Windows changed the size to %lux%lu by itself after %lux%lu was set: %ux%u asked again", cur.dmPelsWidth, cur.dmPelsHeight,
+       disp_got_w, disp_got_h, disp_w, disp_h);
+    disp_got_w = disp_got_h = 0;
+    disp_tries = 0;
+    SetTimer(win, T_DISP, 250, NULL);
+}
+
 /* the host's size arrives with (or just before) the driver's own change: the mode is looked for every 250 ms for 4 s */
 static void disp_tick(void) {
     disp_tries++;
@@ -1130,6 +1182,56 @@ static void disp_tick(void) {
     if (disp_tries == 4) { wchar_t dev[32]; if (!shown_device(dev)) viogpu_ask(dev, disp_w, disp_h); }
     int r = disp_apply(disp_tries >= 16);
     if (r != 0) { KillTimer(win, T_DISP); disp_report(); }
+}
+
+/* ---- how Windows maps the absolute tablet (AGK_TABLET) ----
+ * QEMU's USB tablet is a HID mouse with absolute X and Y (mouhid). Whether Windows spreads its range over the whole
+ * desktop (every display) or the primary display alone decides where a click lands when the guest has more than one
+ * display, and the host has to know it to aim. Windows says it in the input itself: MOUSE_VIRTUAL_DESKTOP set on an
+ * absolute move means the whole desktop, unset the primary display (RAWMOUSE, the same flags mouclass hands win32k).
+ * This window reads the mice's raw input in the background (RIDEV_INPUTSINK: it takes nothing from anyone), notes the
+ * mapping of the first absolute move and of any change, and says it to the host. The first few moves are logged with
+ * where Windows put the pointer (GetCursorPos a moment later) against both readings, so the log shows it measured. */
+static int tablet_logged;
+static LONG tablet_raw_x, tablet_raw_y;
+static int tablet_raw_flags;
+static void tablet_say(void) {
+    if (!tablet_mode || tablet_sent || port == INVALID_HANDLE_VALUE || !host_hello) return;
+    uint8_t b = (uint8_t)tablet_mode;
+    if (!send_frame(AGK_TABLET, &b, 1)) tablet_sent = 1;
+}
+static void tablet_input(HRAWINPUT ri) {
+    RAWINPUT r;
+    UINT n = sizeof r;
+    if (GetRawInputData(ri, RID_INPUT, &r, &n, sizeof r.header) == (UINT)-1 || r.header.dwType != RIM_TYPEMOUSE) return;
+    USHORT f = r.data.mouse.usFlags;
+    if (!(f & MOUSE_MOVE_ABSOLUTE)) return;
+    int mode = f & MOUSE_VIRTUAL_DESKTOP ? AG_TABLET_DESKTOP : AG_TABLET_PRIMARY;
+    if (mode != tablet_mode) {
+        lg("tablet: Windows maps the absolute tablet over %s (raw input flags 0x%x)", mode == AG_TABLET_DESKTOP ? "the whole desktop" : "the primary display", f);
+        tablet_mode = mode;
+        tablet_sent = 0;
+        tablet_logged = 0;
+    }
+    tablet_say();
+    if (tablet_logged < 3) {
+        tablet_raw_x = r.data.mouse.lLastX; tablet_raw_y = r.data.mouse.lLastY; tablet_raw_flags = f;
+        SetTimer(win, T_TABLET, 60, NULL);
+    }
+}
+/* a moment after a move: where Windows put the pointer, against what each mapping gives for that raw position */
+static void tablet_check(void) {
+    if (tablet_logged >= 3) return;
+    tablet_logged++;
+    POINT c;
+    if (!GetCursorPos(&c)) return;
+    int vx = GetSystemMetrics(SM_XVIRTUALSCREEN), vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+    int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN), vh = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+    int pw = GetSystemMetrics(SM_CXSCREEN), ph = GetSystemMetrics(SM_CYSCREEN);
+    long dx = vx + (long)((long long)tablet_raw_x * vw / 65536), dy = vy + (long)((long long)tablet_raw_y * vh / 65536);
+    long px = (long)((long long)tablet_raw_x * pw / 65536), py = (long)((long long)tablet_raw_y * ph / 65536);
+    lg("tablet: raw %ld,%ld (flags 0x%x): the pointer is at %ld,%ld; the whole desktop (%dx%d at %d,%d) gives %ld,%ld, the primary (%dx%d) %ld,%ld",
+       tablet_raw_x, tablet_raw_y, tablet_raw_flags, c.x, c.y, vw, vh, vx, vy, dx, dy, pw, ph, px, py);
 }
 
 /* ---- apps mode ---- */
@@ -1600,6 +1702,7 @@ static void send_windows(int force) {
     memset(&c, 0, sizeof c);
     c.b = &b;
     c.fg = GetForegroundWindow();
+    mons_stale = 1;                     /* the shown display's corner as it is now, never one from before a change */
     rescue_all("apps", 1);
     shown_rect(&c.desk, NULL);
     apps_note(&c.desk);
@@ -2138,10 +2241,12 @@ static void on_frame(const Frame *f) {
             host_elev = strstr(t, " elevated") != NULL;
             if (strstr(t, " ask")) say_hello();
             lg("host: %s", ag_utf8_ok(f->data, f->len) ? t : "(hello)");
-            /* the displays, for the host's log (an older lord-vm skips the kind) */
+            /* the displays, for the host's log (an older lord-vm skips the kind), and how the tablet maps */
             mons_sent = 0;
             mons_stale = 1;
             mon_get();
+            tablet_sent = 0;
+            tablet_say();
         }
         break;
     case AGK_CLIP:
@@ -2168,6 +2273,9 @@ static void on_frame(const Frame *f) {
         if (ag_display_parse(f->data, f->len, &w, &h)) break;
         disp_w = w; disp_h = h;
         disp_tries = 0;
+        disp_got_w = disp_got_h = 0;
+        disp_again = 0;
+        disp_asked_at = GetTickCount64();
         mons_stale = 1;
         lg("display: the host wants %ux%u", w, h);
         SetTimer(win, T_DISP, 250, NULL);
@@ -2242,16 +2350,25 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (apps_on) apps_dirty = 1;
             /* settled (no change of the primary just asked for): windows on another display come onto the shown one */
             else if (rescue_pending && !mons_stale) { rescue_pending = 0; rescue_all("displays", 0); }
+            disp_keep();
         }
-        else if (wp == T_APPS && apps_on && apps_dirty) { apps_dirty = 0; send_windows(0); }
+        else if (wp == T_APPS && apps_on && apps_dirty) { int f = apps_force; apps_dirty = apps_force = 0; send_windows(f); }
+        else if (wp == T_TABLET) { KillTimer(h, T_TABLET); tablet_check(); }
         return 0;
     case WM_WTSSESSION_CHANGE:
         if (wp == WTS_CONSOLE_DISCONNECT || wp == WTS_REMOTE_CONNECT || wp == WTS_SESSION_LOCK) { if (!console_session()) port_close("the session left the console"); }
         else port_try_open();
         return 0;
     case WM_DISPLAYCHANGE:
-        /* a display came, went or changed its mode: looked at once things settle */
+        /* a display came, went or changed its mode: apps mode's next list looks it up again at once (a list made with
+         * the corner of before cut the picture in the wrong place: half of one display, half of another), and
+         * everything else once things settle */
+        mons_stale = 1;
+        if (apps_on) apps_dirty = apps_force = 1;
         SetTimer(h, T_MONS, 500, NULL);
+        break;
+    case WM_INPUT:
+        tablet_input((HRAWINPUT)lp);
         break;
     case WM_SETTINGCHANGE:
         if (wp == SPI_SETWORKAREA) SetTimer(h, T_MONS, 500, NULL);
@@ -2313,6 +2430,9 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
     win = CreateWindowExW(WS_EX_TOOLWINDOW, wc.lpszClassName, L"LordOS guest tools", WS_POPUP, 0, 0, 0, 0, NULL, NULL, inst, NULL);
     if (!win) return 1;
     AddClipboardFormatListener(win);
+    /* the mice's raw input, read in the background for how the tablet maps (above) */
+    RAWINPUTDEVICE rid = { 0x01, 0x02, RIDEV_INPUTSINK, win };
+    if (!RegisterRawInputDevices(&rid, 1, sizeof rid)) lg("tablet: raw input refused (%lu): the host assumes the primary display", (unsigned long)GetLastError());
     WTSRegisterSessionNotification(win, NOTIFY_FOR_THIS_SESSION);
     lg("lordos-guest-win %s in session %lu", VERSION, my_session);
     SetTimer(win, T_PORT, 2000, NULL);
