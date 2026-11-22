@@ -919,5 +919,10 @@
   "studio.noCamera": "কোনো ক্যামেরা সংযুক্ত নেই।",
   "studio.unavailable": "এই কম্পিউটারে LordOS Studio উপলব্ধ নয়।",
   "studio.downloadFailed": "ব্যাকগ্রাউন্ড ডাউনলোড করা যায়নি।",
-  "studio.removeFailed": "ব্যাকগ্রাউন্ড সরানো যায়নি।"
+  "studio.removeFailed": "ব্যাকগ্রাউন্ড সরানো যায়নি।",
+  "dkms.mokInvalid": "Secure Boot কী-এর এই অনুরোধটি বৈধ নয়।",
+  "dkms.mokNotNeeded": "এই কম্পিউটারে এখন কী নথিভুক্ত করার দরকার নেই।",
+  "dkms.mokNothingPending": "পরের রিস্টার্টে নথিভুক্ত হওয়ার জন্য কোনো কী অপেক্ষা করছে না।",
+  "dkms.mokNoTool": "mokutil প্রোগ্রামটি ইনস্টল করা নেই।",
+  "dkms.mokFailed": "পরের রিস্টার্টের জন্য কী প্রস্তুত করা যায়নি।"
 }

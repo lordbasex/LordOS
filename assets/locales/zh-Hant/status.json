@@ -162,5 +162,7 @@
   "vm.gvtGone": "已移除顯示卡配額",
   "gpu.freqSet": "已設定顯示卡的最低頻率",
   "gpu.memlockSet": "已儲存虛擬機器可鎖定的記憶體",
-  "vm.memlockSet": "已鎖定虛擬機器的記憶體"
+  "vm.memlockSet": "已鎖定虛擬機器的記憶體",
+  "dkms.mokState": "Secure Boot 金鑰：{state}",
+  "dkms.mokPassword": "金鑰將在下次重新啟動時登錄。"
 }

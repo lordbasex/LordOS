@@ -100,7 +100,8 @@ Fedora already defaults Firefox to it. They also give a cleaner permission story
   the image. Until then, Studio offers only the LordOS ring there.
 - **Configuration, static and root-owned, shipped by an optional package `lordos-studio-camera`.** The module's
   options live in `/etc/modprobe.d/lordos-studio.conf`:
-  `options v4l2loopback devices=1 video_nr=50 card_label="LordOS Studio" exclusive_caps=1 max_buffers=4`. The file
+  `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`
+  (the second device since 11.4: OBS Studio's own virtual camera, which LordOS never writes). The file
   `/etc/modules-load.d/lordos-studio.conf` loads it at boot. There is **no runtime root action** to create or remove
   devices: `/dev/v4l2loopback`'s control ioctls stay unused. Installing and removing the package goes through the
   Store's existing package engine.
@@ -625,8 +626,8 @@ The effort is for one developer with the existing patterns. These are **estimate
   architectures. It goes into the APT pool with each release like `lordos-disk-formats` (`docs/RELEASING.md`).
 - **The Store card**: rule `studioCamera` in `assets/store/suggestions.json` (Store → For this computer), shown when a USB
   device has a video-class interface (`usbClass: ["0e"]`, new in `sdk/suggestengine.js`), with the notes `dkms` and
-  `secureBoot`. The guided MOK enrolment (`dkms-mok-enroll`, NVIDIA plan A.5) is **not** built: like the NVIDIA card, the
-  `secureBoot` note explains the manual step until that action is approved.
+  `secureBoot`. The guided MOK enrolment (`dkms-mok-enroll`, NVIDIA plan A.5) was not built in phase 2; it is since
+  11.4.
 - **The hub** (`stcam_hub`, `loopback=1`): one lord-studio per session, fds = render node, model, loopback (opened by
   lord-server after checking major 81, driver `v4l2 loopback` and card "LordOS Studio"); the real camera arrives later by
   `MM_STUDIO_CAM` (v[0] 0 idle card, 1 camera with its fd, 2 off card; v[1] the preview's frames wanted) and leaves the
@@ -652,8 +653,8 @@ The effort is for one developer with the existing patterns. These are **estimate
   sandboxed browser's reader process is visible in `/proc` to the same uid; the Pi kernel with the module (v0.15.0 against
   6.18: if it doesn't build, a later 0.15.x tag).
 - **Known limits**: one streaming reader at a time (v4l2loopback 0.15's tokens), so a LordOS app and a browser can't read
-  LordOS Studio together; OBS's own virtual camera finds the module already loaded with our single device (it would need a
-  second device, `devices=2`, which is a change to E-S2's file); a same-uid process could still open `/dev/video50` as a
+  LordOS Studio together; OBS's own virtual camera found the module already loaded with our single device (fixed in 11.4
+  with a second device); a same-uid process could still open `/dev/video50` as a
   writer before lord-studio does (8.4: lord-studio then fails to set its format and stays off, logged).
 
 ### 11.3 Phase 3 as built (2026-11-22, in development)
@@ -750,6 +751,35 @@ The effort is for one developer with the existing patterns. These are **estimate
 
 Every phase also updates CHANGELOG, the paper (en, es, pt), the site and `THIRD_PARTY.md` (model cards, Apache-2.0
 NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
+
+### 11.4 Follow-ups (2026-11-22, in development; approved by the maintainer the same day)
+
+- **OBS beside LordOS Studio.** `lordos-studio-camera`'s file now makes two devices:
+  `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`.
+  **Read** in OBS's `plugins/linux-v4l2/v4l2-output.c` (master, 2026-11-22): OBS runs `pkexec modprobe v4l2loopback
+  exclusive_caps=1 card_label='OBS Virtual Camera'` only when no v4l2loopback is loaded, and otherwise takes the first
+  `/dev/video*` in version order (`scandir` with `versionsort`) whose device caps include `V4L2_CAP_VIDEO_OUTPUT`; it never
+  looks at the card label. With `exclusive_caps` an idle loopback announces output, so with OBS's device after ours
+  (`video_nr=50,51`, the first proposal) OBS would take `/dev/video50` whenever LordOS Studio's camera is off, and
+  lord-studio could no longer write it. OBS's device is therefore **49**, before ours; ours stays `/dev/video50`.
+  lord-server still opens only `/dev/video50` after the major, driver and card checks, and lord-studio's `stcam_hub`
+  now checks the card too, so OBS's device is never written by LordOS (`studio_package_test.sh` checks that the number
+  and label appear only as constants in `mstudiohub.h`). While OBS streams, its device announces capture and is listed
+  as a camera like any other; the "no camera" restriction covers both (major 81; `tests/fwlinux/devices.sh` step 6b).
+  The postinst reloads the module on an update from the one-device file only when nothing uses it (`refcnt` 0, and
+  `modprobe -r` itself refuses a module in use); otherwise the second device appears at the next restart.
+- **Guided Secure Boot enrolment** (`dkms-mok-enroll`, NVIDIA plan A.5's `gpu-mok-enroll` renamed;
+  `server/src/hw/mok_admin.c`): one closed admin action, administrators only, `status|import|cancel`, shared by the Store
+  cards with the `secureBoot` note (`studioCamera`, `nvidiaDriver`). Once the item is installed, the card asks `status`;
+  with the key still needed it offers **Prepare the Key**, which makes an 8-digit one-time password root-side, gives it
+  to the fixed `/usr/bin/mokutil --import /var/lib/dkms/mok.pub` on standard input only and shows it once, with the
+  MokManager steps and **Restart Now**. The details are in `NVIDIA-PLAN.md` A.5. `lordos-studio-camera` now depends on
+  `mokutil` on amd64, and the card gained the `obs` note (the second device). Tests: `build/mok-admin-test`.
+- **Mic Mode's names** are our own: Standard, Noise Reduction and Full Range (the locale keys and the PipeWire node
+  names `lordos_voice_*` didn't change; the microphone other apps list is "LordOS Noise Reduction").
+- **To verify on a VM** (never on the maintainer's PC): OBS (Debian's and Flathub's) starting its virtual camera on
+  `/dev/video49` with LordOS Studio's camera both off and on, Meet seeing both cameras, the update reloading the module
+  when unused, and the whole MOK flow with Secure Boot on (OVMF with enrolled keys).
 
 ## 12. Risks
 

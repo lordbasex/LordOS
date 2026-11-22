@@ -171,5 +171,7 @@
   "vm.gvtGone": "Anteil der Grafikkarte entfernt",
   "gpu.freqSet": "Mindestfrequenz der Grafikkarte festgelegt",
   "gpu.memlockSet": "Sperrbarer Speicher für Maschinen gespeichert",
-  "vm.memlockSet": "Arbeitsspeicher der Maschine gesperrt"
+  "vm.memlockSet": "Arbeitsspeicher der Maschine gesperrt",
+  "dkms.mokState": "Secure-Boot-Schlüssel: {state}",
+  "dkms.mokPassword": "Der Schlüssel wird beim nächsten Neustart registriert."
 }

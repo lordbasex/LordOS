@@ -171,5 +171,7 @@
   "vm.gvtGone": "Qrafik kart payı silindi",
   "gpu.freqSet": "Qrafik kartın minimum tezliyi təyin edildi",
   "gpu.memlockSet": "Maşınların kilidləyə biləcəyi yaddaş saxlanıldı",
-  "vm.memlockSet": "Maşının yaddaşı kilidləndi"
+  "vm.memlockSet": "Maşının yaddaşı kilidləndi",
+  "dkms.mokState": "Secure Boot açarı: {state}",
+  "dkms.mokPassword": "Açar növbəti yenidən başlatmada qeydiyyata salınacaq."
 }

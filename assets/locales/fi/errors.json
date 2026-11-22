@@ -919,5 +919,10 @@
   "studio.noCamera": "Kameraa ei ole liitetty.",
   "studio.unavailable": "LordOS Studio ei ole käytettävissä tässä tietokoneessa.",
   "studio.downloadFailed": "Taustaa ei voitu ladata.",
-  "studio.removeFailed": "Taustaa ei voitu poistaa."
+  "studio.removeFailed": "Taustaa ei voitu poistaa.",
+  "dkms.mokInvalid": "Tämä Secure Boot -avaimen pyyntö ei kelpaa.",
+  "dkms.mokNotNeeded": "Tämän tietokoneen ei tarvitse rekisteröidä avainta nyt.",
+  "dkms.mokNothingPending": "Mikään avain ei odota rekisteröintiä seuraavassa uudelleenkäynnistyksessä.",
+  "dkms.mokNoTool": "mokutil-ohjelmaa ei ole asennettu.",
+  "dkms.mokFailed": "Avainta ei voitu valmistella seuraavaa uudelleenkäynnistystä varten."
 }

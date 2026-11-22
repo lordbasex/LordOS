@@ -162,5 +162,7 @@
   "vm.gvtGone": "Đã gỡ phần card đồ họa",
   "gpu.freqSet": "Đã đặt tần số tối thiểu của card đồ họa",
   "gpu.memlockSet": "Đã lưu bộ nhớ các máy được phép khóa",
-  "vm.memlockSet": "Đã khóa bộ nhớ của máy"
+  "vm.memlockSet": "Đã khóa bộ nhớ của máy",
+  "dkms.mokState": "Khóa Secure Boot: {state}",
+  "dkms.mokPassword": "Khóa sẽ được đăng ký ở lần khởi động lại tới."
 }

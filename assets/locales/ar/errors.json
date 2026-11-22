@@ -923,5 +923,10 @@
   "studio.noCamera": "لا توجد كاميرا متصلة.",
   "studio.unavailable": "LordOS Studio غير متاح على هذا الكمبيوتر.",
   "studio.downloadFailed": "تعذّر تنزيل الخلفية.",
-  "studio.removeFailed": "تعذّرت إزالة الخلفية."
+  "studio.removeFailed": "تعذّرت إزالة الخلفية.",
+  "dkms.mokInvalid": "طلب مفتاح Secure Boot هذا غير صالح.",
+  "dkms.mokNotNeeded": "لا يحتاج هذا الكمبيوتر إلى تسجيل المفتاح الآن.",
+  "dkms.mokNothingPending": "لا يوجد مفتاح ينتظر التسجيل عند إعادة التشغيل القادمة.",
+  "dkms.mokNoTool": "برنامج mokutil غير مثبّت.",
+  "dkms.mokFailed": "تعذّر تجهيز المفتاح لإعادة التشغيل القادمة."
 }

@@ -919,5 +919,10 @@
   "studio.noCamera": "کوئی کیمرا منسلک نہیں ہے۔",
   "studio.unavailable": "اس کمپیوٹر پر LordOS Studio دستیاب نہیں ہے۔",
   "studio.downloadFailed": "پس منظر ڈاؤن لوڈ نہیں ہو سکا۔",
-  "studio.removeFailed": "پس منظر ہٹایا نہیں جا سکا۔"
+  "studio.removeFailed": "پس منظر ہٹایا نہیں جا سکا۔",
+  "dkms.mokInvalid": "Secure Boot کلید کی یہ درخواست درست نہیں ہے۔",
+  "dkms.mokNotNeeded": "اس کمپیوٹر کو ابھی کلید درج کرنے کی ضرورت نہیں ہے۔",
+  "dkms.mokNothingPending": "اگلی ری اسٹارٹ پر درج ہونے کے لیے کوئی کلید انتظار میں نہیں ہے۔",
+  "dkms.mokNoTool": "mokutil پروگرام انسٹال نہیں ہے۔",
+  "dkms.mokFailed": "اگلی ری اسٹارٹ کے لیے کلید تیار نہیں کی جا سکی۔"
 }

@@ -360,5 +360,15 @@
   "suggest.studioCamera.detail": "يمنح كل التطبيقات، بما فيها المتصفحات ومكالمات الفيديو، كاميرا «LordOS Studio» بتأثيراتك: خلفية ضبابية أو صورة خلفك ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} غير موجود في مصادر الحزم على هذا الحاسوب.",
   "suggest.studioCamera.note.dkms": "على الحاسوب الشخصي تُبنى وحدة النواة الخاصة به لنواتك على هذا الحاسوب (DKMS)، ما يجلب نحو 500 ميغابايت من المترجمات وترويسات النواة، ثم يُعاد بناؤها بعد كل تحديث للنواة. على Raspberry Pi تأتي مع نواة LordOS.",
-  "suggest.studioCamera.note.secureBoot": "عند تفعيل Secure Boot يجب تسجيل مفتاح توقيع الوحدة عند إعادة التشغيل التالية، وإلا فلن تظهر الكاميرا."
+  "suggest.studioCamera.note.secureBoot": "عند تفعيل Secure Boot يجب تسجيل مفتاح توقيع الوحدة عند إعادة التشغيل التالية، وإلا فلن تظهر الكاميرا.",
+  "suggest.studioCamera.note.obs": "يضيف أيضًا جهاز كاميرا ثانيًا، “OBS Virtual Camera”، لتعمل الكاميرا الافتراضية الخاصة بـ OBS Studio بجانب LordOS Studio.",
+  "suggest.mok.title": "خطوة أخرى عند إعادة التشغيل القادمة",
+  "suggest.mok.body": "Secure Boot مفعّل، لذلك لا يُحمَّل ما ثبّته هذا العنصر إلا بعد تسجيل مفتاح توقيعه. يجهّز LordOS المفتاح ويعطيك كلمة مرور لمرة واحدة لتكتبها على شاشة زرقاء عند إعادة التشغيل القادمة.",
+  "suggest.mok.prepare": "تجهيز المفتاح",
+  "suggest.mok.pending": "سيُسجَّل المفتاح عند إعادة التشغيل القادمة. إذا لم تعد لديك كلمة المرور، فاطلب واحدة جديدة.",
+  "suggest.mok.passwordTitle": "كلمة المرور لمرة واحدة",
+  "suggest.mok.passwordHint": "اكتبها الآن: تظهر مرة واحدة فقط ولا تُحفظ في أي مكان.",
+  "suggest.mok.steps": "أعد التشغيل، وعندما تظهر الشاشة الزرقاء اضغط أي مفتاح خلال 10 ثوانٍ. ثم اختر Enroll MOK → Continue → Yes، واكتب كلمة المرور هذه واختر Reboot.",
+  "suggest.mok.newPassword": "كلمة مرور جديدة",
+  "suggest.mok.cancel": "إلغاء التسجيل"
 }

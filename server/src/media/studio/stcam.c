@@ -12,6 +12,7 @@
 #include "st.h"
 #include "stout.h"
 #include "models.h"
+#include "../mstudiohub.h"               /* the loopback's driver and card (what lord-server checks too) */
 
 #include <errno.h>
 #include <linux/videodev2.h>
@@ -386,8 +387,9 @@ void stcam_hub(const char *params, int loop, int render) {
     struct v4l2_capability cap;
     memset(&cap, 0, sizeof cap);
     /* lord-server checked it already; the helper doesn't trust that either */
-    if (loop < 0 || ioctl(loop, VIDIOC_QUERYCAP, &cap) || strcmp((const char *)cap.driver, "v4l2 loopback")) {
-        LM_LOG("not a v4l2loopback device");
+    if (loop < 0 || ioctl(loop, VIDIOC_QUERYCAP, &cap) || strcmp((const char *)cap.driver, STUDIO_LOOPBACK_DRIVER) ||
+        strcmp((const char *)cap.card, STUDIO_LOOPBACK_CARD)) {        /* never OBS's device or another loopback */
+        LM_LOG("not LordOS Studio's v4l2loopback device");
         lm_error("studio.failed");
         mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0);
         return;

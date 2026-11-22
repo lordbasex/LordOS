@@ -919,5 +919,10 @@
   "studio.noCamera": "No hay ninguna cámara conectada.",
   "studio.unavailable": "LordOS Studio no está disponible en esta computadora.",
   "studio.downloadFailed": "No se pudo descargar el fondo.",
-  "studio.removeFailed": "No se pudo eliminar el fondo."
+  "studio.removeFailed": "No se pudo eliminar el fondo.",
+  "dkms.mokInvalid": "Esa solicitud de clave de Secure Boot no es válida.",
+  "dkms.mokNotNeeded": "Esta computadora no necesita inscribir la clave ahora.",
+  "dkms.mokNothingPending": "No hay ninguna clave esperando inscribirse en el próximo reinicio.",
+  "dkms.mokNoTool": "El programa mokutil no está instalado.",
+  "dkms.mokFailed": "No se pudo preparar la clave para el próximo reinicio."
 }

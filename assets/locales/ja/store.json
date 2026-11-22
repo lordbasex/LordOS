@@ -320,5 +320,15 @@
   "suggest.studioCamera.detail": "ブラウザやビデオ通話を含むすべてのアプリで、エフェクト付きの「LordOS Studio」カメラを使えるようにします：背景のぼかしや背景画像（{packages}）。",
   "suggest.studioCamera.unavailable": "{packages} はこのコンピュータのパッケージソースにありません。",
   "suggest.studioCamera.note.dkms": "PC ではカーネルモジュールがこのコンピュータ上でお使いのカーネル向けにビルドされ（DKMS）、約 500 MB のコンパイラとカーネルヘッダーが追加されます。カーネルを更新するたびに再ビルドされます。Raspberry Pi では LordOS のカーネルに含まれています。",
-  "suggest.studioCamera.note.secureBoot": "セキュアブートが有効な場合は、次回の再起動時にモジュールの署名鍵を登録する必要があります。登録しないとカメラは表示されません。"
+  "suggest.studioCamera.note.secureBoot": "セキュアブートが有効な場合は、次回の再起動時にモジュールの署名鍵を登録する必要があります。登録しないとカメラは表示されません。",
+  "suggest.studioCamera.note.obs": "2 台目のカメラデバイス「OBS Virtual Camera」も追加されるので、OBS Studio 自身の仮想カメラが LordOS Studio と並んで使えます。",
+  "suggest.mok.title": "次回の再起動でもう 1 ステップ",
+  "suggest.mok.body": "Secure Boot がオンのため、この項目がインストールしたものは署名キーを登録して初めて読み込まれます。LordOS がキーを準備し、次回の再起動時に青い画面で入力する 1 回限りのパスワードを表示します。",
+  "suggest.mok.prepare": "キーを準備",
+  "suggest.mok.pending": "キーは次回の再起動時に登録されます。パスワードが手元にない場合は、新しいものを取得してください。",
+  "suggest.mok.passwordTitle": "1 回限りのパスワード",
+  "suggest.mok.passwordHint": "今すぐ書き留めてください。表示は 1 回だけで、どこにも保存されません。",
+  "suggest.mok.steps": "再起動し、青い画面が表示されたら 10 秒以内に任意のキーを押します。次に Enroll MOK → Continue → Yes を選び、このパスワードを入力して Reboot を選びます。",
+  "suggest.mok.newPassword": "新しいパスワード",
+  "suggest.mok.cancel": "登録をキャンセル"
 }

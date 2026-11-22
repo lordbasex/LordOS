@@ -919,5 +919,10 @@
   "studio.noCamera": "Nincs csatlakoztatott kamera.",
   "studio.unavailable": "A LordOS Studio nem érhető el ezen a számítógépen.",
   "studio.downloadFailed": "A hátteret nem sikerült letölteni.",
-  "studio.removeFailed": "A hátteret nem sikerült eltávolítani."
+  "studio.removeFailed": "A hátteret nem sikerült eltávolítani.",
+  "dkms.mokInvalid": "Ez a Secure Boot-kulcskérés érvénytelen.",
+  "dkms.mokNotNeeded": "Ennek a számítógépnek most nem kell regisztrálnia a kulcsot.",
+  "dkms.mokNothingPending": "Nincs kulcs, amely a következő újraindításkor regisztrálásra vár.",
+  "dkms.mokNoTool": "A mokutil program nincs telepítve.",
+  "dkms.mokFailed": "A kulcsot nem sikerült előkészíteni a következő újraindításra."
 }

@@ -936,7 +936,9 @@ Studio (the real camera) · effects on", and its Turn off sets that app's "no ca
 device like any camera (major 81, `lord-netperm`'s `cgroup/dev`). Turned off while an app reads it, the device shows a
 "camera off" card, never the raw camera. Known limit (plan 8.4): an unsandboxed program of the same user could open the
 device as a writer before lord-studio does; lord-studio then stays off, as any program of the user can already open
-the real camera.
+the real camera. The package's second device, `/dev/video49` "OBS Virtual Camera", is there for OBS Studio's own virtual
+camera (OBS takes the first idle loopback, so it sits before ours); LordOS never writes it (lord-studio refuses any
+loopback whose card isn't "LordOS Studio"), and the "no camera" restriction blocks it like any V4L2 device.
 
 ## Camera for isolated apps
 

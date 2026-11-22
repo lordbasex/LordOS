@@ -320,5 +320,15 @@
   "suggest.studioCamera.detail": "Memberi semua aplikasi, termasuk peramban dan panggilan video, kamera “LordOS Studio” dengan efek Anda: latar belakang buram atau gambar di belakang Anda ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} tidak ada di sumber paket komputer ini.",
   "suggest.studioCamera.note.dkms": "Di PC, modul kernelnya dibangun untuk kernel Anda di komputer ini (DKMS), yang membawa sekitar 500 MB kompiler dan header kernel, dan dibangun lagi setelah setiap pembaruan kernel. Di Raspberry Pi, modul ini sudah ada di kernel LordOS.",
-  "suggest.studioCamera.note.secureBoot": "Jika Secure Boot aktif, Anda harus mendaftarkan kunci tanda tangan modul pada mulai ulang berikutnya, atau kamera tidak akan muncul."
+  "suggest.studioCamera.note.secureBoot": "Jika Secure Boot aktif, Anda harus mendaftarkan kunci tanda tangan modul pada mulai ulang berikutnya, atau kamera tidak akan muncul.",
+  "suggest.studioCamera.note.obs": "Juga menambahkan perangkat kamera kedua, “OBS Virtual Camera”, agar kamera virtual milik OBS Studio sendiri berfungsi di samping LordOS Studio.",
+  "suggest.mok.title": "Satu langkah lagi pada mulai ulang berikutnya",
+  "suggest.mok.body": "Secure Boot aktif, jadi yang dipasang item ini baru dimuat setelah kunci tanda tangannya didaftarkan. LordOS menyiapkan kunci dan memberi Anda kata sandi sekali pakai untuk diketik di layar biru pada mulai ulang berikutnya.",
+  "suggest.mok.prepare": "Siapkan Kunci",
+  "suggest.mok.pending": "Kunci akan didaftarkan pada mulai ulang berikutnya. Jika Anda tidak lagi memiliki kata sandinya, minta yang baru.",
+  "suggest.mok.passwordTitle": "Kata sandi sekali pakai Anda",
+  "suggest.mok.passwordHint": "Catat sekarang: hanya ditampilkan sekali dan tidak disimpan di mana pun.",
+  "suggest.mok.steps": "Mulai ulang, dan saat layar biru muncul, tekan tombol apa saja dalam 10 detik. Lalu pilih Enroll MOK → Continue → Yes, ketik kata sandi ini, dan pilih Reboot.",
+  "suggest.mok.newPassword": "Kata Sandi Baru",
+  "suggest.mok.cancel": "Batalkan Pendaftaran"
 }

@@ -918,5 +918,10 @@
   "studio.noCamera": "연결된 카메라가 없습니다.",
   "studio.unavailable": "이 컴퓨터에서는 LordOS Studio를 사용할 수 없습니다.",
   "studio.downloadFailed": "배경을 다운로드할 수 없습니다.",
-  "studio.removeFailed": "배경을 제거할 수 없습니다."
+  "studio.removeFailed": "배경을 제거할 수 없습니다.",
+  "dkms.mokInvalid": "이 Secure Boot 키 요청은 올바르지 않습니다.",
+  "dkms.mokNotNeeded": "이 컴퓨터는 지금 키를 등록할 필요가 없습니다.",
+  "dkms.mokNothingPending": "다음 재시동 때 등록을 기다리는 키가 없습니다.",
+  "dkms.mokNoTool": "mokutil 프로그램이 설치되어 있지 않습니다.",
+  "dkms.mokFailed": "다음 재시동을 위한 키를 준비하지 못했습니다."
 }

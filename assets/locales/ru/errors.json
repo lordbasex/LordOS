@@ -920,5 +920,10 @@
   "studio.noCamera": "Камера не подключена.",
   "studio.unavailable": "LordOS Studio недоступна на этом компьютере.",
   "studio.downloadFailed": "Не удалось загрузить фон.",
-  "studio.removeFailed": "Не удалось удалить фон."
+  "studio.removeFailed": "Не удалось удалить фон.",
+  "dkms.mokInvalid": "Этот запрос ключа Secure Boot недействителен.",
+  "dkms.mokNotNeeded": "Этому компьютеру сейчас не нужно регистрировать ключ.",
+  "dkms.mokNothingPending": "Нет ключа, ожидающего регистрации при следующей перезагрузке.",
+  "dkms.mokNoTool": "Программа mokutil не установлена.",
+  "dkms.mokFailed": "Не удалось подготовить ключ к следующей перезагрузке."
 }

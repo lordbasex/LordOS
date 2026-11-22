@@ -320,5 +320,15 @@
   "suggest.studioCamera.detail": "Memberi semua apl, termasuk pelayar dan panggilan video, kamera “LordOS Studio” dengan kesan anda: latar belakang kabur atau gambar di belakang anda ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} tiada dalam sumber pakej komputer ini.",
   "suggest.studioCamera.note.dkms": "Pada PC, modul kernelnya dibina untuk kernel anda pada komputer ini (DKMS), yang membawa kira-kira 500 MB pengkompil dan pengepala kernel, dan dibina semula selepas setiap kemas kini kernel. Pada Raspberry Pi ia disertakan dengan kernel LordOS.",
-  "suggest.studioCamera.note.secureBoot": "Dengan Secure Boot dihidupkan, anda perlu mendaftarkan kunci tandatangan modul pada mula semula seterusnya, jika tidak kamera tidak akan muncul."
+  "suggest.studioCamera.note.secureBoot": "Dengan Secure Boot dihidupkan, anda perlu mendaftarkan kunci tandatangan modul pada mula semula seterusnya, jika tidak kamera tidak akan muncul.",
+  "suggest.studioCamera.note.obs": "Ia juga menambah peranti kamera kedua, “OBS Virtual Camera”, supaya kamera maya OBS Studio sendiri berfungsi di sebelah LordOS Studio.",
+  "suggest.mok.title": "Satu langkah lagi pada mula semula seterusnya",
+  "suggest.mok.body": "Secure Boot dihidupkan, jadi apa yang dipasang oleh item ini hanya dimuatkan selepas kunci tandatangannya didaftarkan. LordOS menyediakan kunci dan memberi anda kata laluan sekali guna untuk ditaip pada skrin biru pada mula semula seterusnya.",
+  "suggest.mok.prepare": "Sediakan Kunci",
+  "suggest.mok.pending": "Kunci akan didaftarkan pada mula semula seterusnya. Jika anda tidak lagi mempunyai kata laluan itu, dapatkan yang baharu.",
+  "suggest.mok.passwordTitle": "Kata laluan sekali guna anda",
+  "suggest.mok.passwordHint": "Catat sekarang: ia ditunjukkan sekali sahaja dan tidak disimpan di mana-mana.",
+  "suggest.mok.steps": "Mulakan semula, dan apabila skrin biru muncul, tekan sebarang kekunci dalam masa 10 saat. Kemudian pilih Enroll MOK → Continue → Yes, taip kata laluan ini dan pilih Reboot.",
+  "suggest.mok.newPassword": "Kata Laluan Baharu",
+  "suggest.mok.cancel": "Batalkan Pendaftaran"
 }

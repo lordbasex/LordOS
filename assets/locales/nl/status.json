@@ -171,5 +171,7 @@
   "vm.gvtGone": "Deel van de videokaart verwijderd",
   "gpu.freqSet": "Minimale frequentie van de videokaart ingesteld",
   "gpu.memlockSet": "Geheugen dat machines mogen vastzetten opgeslagen",
-  "vm.memlockSet": "Geheugen van de machine vastgezet"
+  "vm.memlockSet": "Geheugen van de machine vastgezet",
+  "dkms.mokState": "Secure Boot-sleutel: {state}",
+  "dkms.mokPassword": "De sleutel wordt bij de volgende herstart geregistreerd."
 }

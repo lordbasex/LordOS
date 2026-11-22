@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Dà a tutte le app, browser e videochiamate compresi, la fotocamera «LordOS Studio» con i tuoi effetti: sfondo sfocato o un’immagine dietro di te ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} non è tra le sorgenti dei pacchetti di questo computer.",
   "suggest.studioCamera.note.dkms": "Su un PC il suo modulo del kernel viene compilato per il tuo kernel su questo computer (DKMS), il che porta circa 500 MB di compilatori e intestazioni del kernel, e di nuovo dopo ogni aggiornamento del kernel. Su un Raspberry Pi è incluso nel kernel di LordOS.",
-  "suggest.studioCamera.note.secureBoot": "Con Secure Boot attivo devi registrare la chiave di firma del modulo al prossimo riavvio, altrimenti la fotocamera non comparirà."
+  "suggest.studioCamera.note.secureBoot": "Con Secure Boot attivo devi registrare la chiave di firma del modulo al prossimo riavvio, altrimenti la fotocamera non comparirà.",
+  "suggest.studioCamera.note.obs": "Aggiunge anche un secondo dispositivo videocamera, “OBS Virtual Camera”, così la videocamera virtuale di OBS Studio funziona accanto a LordOS Studio.",
+  "suggest.mok.title": "Ancora un passaggio al prossimo riavvio",
+  "suggest.mok.body": "Secure Boot è attivo, quindi ciò che questo elemento ha installato si carica solo dopo la registrazione della sua chiave di firma. LordOS prepara la chiave e ti dà una password monouso da digitare su una schermata blu al prossimo riavvio.",
+  "suggest.mok.prepare": "Prepara la chiave",
+  "suggest.mok.pending": "La chiave sarà registrata al prossimo riavvio. Se non hai più la password, richiedine una nuova.",
+  "suggest.mok.passwordTitle": "La tua password monouso",
+  "suggest.mok.passwordHint": "Annotala ora: viene mostrata una sola volta e non viene salvata da nessuna parte.",
+  "suggest.mok.steps": "Riavvia e, quando compare la schermata blu, premi un tasto entro 10 secondi. Poi scegli Enroll MOK → Continue → Yes, digita questa password e scegli Reboot.",
+  "suggest.mok.newPassword": "Nuova password",
+  "suggest.mok.cancel": "Annulla registrazione"
 }

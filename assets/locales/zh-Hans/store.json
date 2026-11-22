@@ -320,5 +320,15 @@
   "suggest.studioCamera.detail": "让所有应用（包括浏览器和视频通话）都能使用带有你的效果的“LordOS Studio”摄像头：背景虚化或身后的图片（{packages}）。",
   "suggest.studioCamera.unavailable": "此电脑的软件包来源中没有 {packages}。",
   "suggest.studioCamera.note.dkms": "在 PC 上，它的内核模块会在这台电脑上为你的内核编译（DKMS），这会带来约 500 MB 的编译器和内核头文件，并在每次内核更新后重新编译。在 Raspberry Pi 上，它随 LordOS 内核提供。",
-  "suggest.studioCamera.note.secureBoot": "启用安全启动（Secure Boot）时，需要在下次重启时登记该模块的签名密钥，否则摄像头不会出现。"
+  "suggest.studioCamera.note.secureBoot": "启用安全启动（Secure Boot）时，需要在下次重启时登记该模块的签名密钥，否则摄像头不会出现。",
+  "suggest.studioCamera.note.obs": "它还会添加第二个摄像头设备“OBS Virtual Camera”，让 OBS Studio 自己的虚拟摄像头与 LordOS Studio 并存工作。",
+  "suggest.mok.title": "下次重新启动时还有一步",
+  "suggest.mok.body": "Secure Boot 已开启，因此此项目安装的内容只有在其签名密钥注册后才会加载。LordOS 会准备好密钥，并给你一个一次性密码，供你在下次重新启动时在蓝色屏幕上输入。",
+  "suggest.mok.prepare": "准备密钥",
+  "suggest.mok.pending": "密钥将在下次重新启动时注册。如果你已经没有这个密码，请获取一个新密码。",
+  "suggest.mok.passwordTitle": "你的一次性密码",
+  "suggest.mok.passwordHint": "请现在记下来：它只显示一次，不会保存在任何地方。",
+  "suggest.mok.steps": "重新启动，蓝色屏幕出现后请在 10 秒内按任意键。然后选择 Enroll MOK → Continue → Yes，输入此密码并选择 Reboot。",
+  "suggest.mok.newPassword": "新密码",
+  "suggest.mok.cancel": "取消注册"
 }

@@ -162,5 +162,7 @@
   "vm.gvtGone": "グラフィックカードの割り当てを削除しました",
   "gpu.freqSet": "グラフィックカードの最低周波数を設定しました",
   "gpu.memlockSet": "マシンがロックできるメモリを保存しました",
-  "vm.memlockSet": "マシンのメモリをロックしました"
+  "vm.memlockSet": "マシンのメモリをロックしました",
+  "dkms.mokState": "Secure Boot キー: {state}",
+  "dkms.mokPassword": "キーは次回の再起動時に登録されます。"
 }

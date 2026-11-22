@@ -180,5 +180,7 @@
   "vm.gvtGone": "Partea din placa video a fost eliminată",
   "gpu.freqSet": "Frecvența minimă a plăcii video a fost setată",
   "gpu.memlockSet": "Memoria pe care mașinile o pot bloca a fost salvată",
-  "vm.memlockSet": "Memoria mașinii a fost blocată"
+  "vm.memlockSet": "Memoria mașinii a fost blocată",
+  "dkms.mokState": "Cheie Secure Boot: {state}",
+  "dkms.mokPassword": "Cheia va fi înregistrată la următoarea repornire."
 }

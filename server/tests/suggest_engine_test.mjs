@@ -68,7 +68,7 @@ eq('another 80ee device is not the guest device', ids(run(facts({ pci: [{ vendor
 const nv = facts({ pci: [...base().pci, { vendor: '10de', device: '2484', class: '030000', driver: 'nouveau' }] });
 const s = one(run(nv), 'nvidiaDriver');
 eq('nvidia install', s.state, 'install');
-eq('nvidia packages', s.install, ['linux-headers-amd64', 'nvidia-driver', 'firmware-misc-nonfree']);
+eq('nvidia packages', s.install, ['linux-headers-amd64', 'nvidia-driver', 'firmware-misc-nonfree', 'mokutil']);
 eq('nvidia not free', [s.free, s.component], [false, 'non-free']);
 eq('nvidia notes', s.notes, ['nonfree', 'nouveau', 'secureBoot', 'older']);
 eq('nvidia without non-free sources', ids(run(nv, { nonfree: false })), ['nvidiaDriver=unavailable']);
@@ -77,7 +77,7 @@ eq('nvidia audio function only (class 0403)', ids(run(facts({ pci: [{ vendor: '1
 eq('nvidia 3D controller (0302)', ids(run(facts({ pci: [{ vendor: '10de', device: '1eb8', class: '030200', driver: '' }] }))), ['nvidiaDriver=install']);
 eq('nvidia on arm64: nothing', ids(run({ ...nv, arch: 'aarch64' })), []);
 eq('nvidia: plan impossible (contrib missing) → explained', ids(run(nv, {}, { check: (names) => !names.includes('nvidia-driver') })), ['nvidiaDriver=unavailable']);
-eq('nvidia: plan impossible names what it would install', one(run(nv, {}, { check: () => false }), 'nvidiaDriver').missing, ['linux-headers-amd64', 'nvidia-driver', 'firmware-misc-nonfree']);
+eq('nvidia: plan impossible names what it would install', one(run(nv, {}, { check: () => false }), 'nvidiaDriver').missing, ['linux-headers-amd64', 'nvidia-driver', 'firmware-misc-nonfree', 'mokutil']);
 eq('check passes → installable', ids(run(nv, {}, { check: () => true })), ['nvidiaDriver=install']);
 eq('check is not asked for installed cards', ids(run(vmware, { installed: ['open-vm-tools'] }, { check: () => false })), ['vmwareTools=installed']);
 eq('nvidia dismissed', ids(run(nv, {}, { dismissed: ['nvidiaDriver'] })), []);
@@ -109,7 +109,7 @@ eq('bad vendor id ignored', ids(run(facts({ usb: [{ vendor: '03F0x', product: '1
 const webcam = facts({ usb: [{ vendor: '046d', product: '0843', class: 'ef', ifaces: ['0e0100', '0e0200', '010100', '010200'], driver: 'uvcvideo', sane: false }] });
 eq('webcam: LordOS Studio Camera', ids(run(webcam)), ['studioCamera=install']);
 eq('webcam: our own package, free', [one(run(webcam), 'studioCamera').install, one(run(webcam), 'studioCamera').free], [['lordos-studio-camera'], true]);
-eq('webcam: its notes', one(run(webcam), 'studioCamera').notes, ['dkms', 'secureBoot']);
+eq('webcam: its notes', one(run(webcam), 'studioCamera').notes, ['dkms', 'secureBoot', 'obs']);
 eq('webcam: installed', ids(run(webcam, { installed: ['lordos-studio-camera'] })), ['studioCamera=installed']);
 eq('webcam on the Pi too (the module is in the LordOS kernel)', ids(run({ ...webcam, arch: 'aarch64' })), ['studioCamera=install']);
 eq('webcam: not in the sources yet → no card', ids(evaluate(DATA, webcam, { info: (n) => (n === 'lordos-studio-camera' ? null : { name: n }) })), []);

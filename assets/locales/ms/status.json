@@ -162,5 +162,7 @@
   "vm.gvtGone": "Bahagian kad grafik dibuang",
   "gpu.freqSet": "Frekuensi minimum kad grafik ditetapkan",
   "gpu.memlockSet": "Memori yang boleh dikunci oleh mesin disimpan",
-  "vm.memlockSet": "Memori mesin dikunci"
+  "vm.memlockSet": "Memori mesin dikunci",
+  "dkms.mokState": "Kunci Secure Boot: {state}",
+  "dkms.mokPassword": "Kunci akan didaftarkan pada mula semula seterusnya."
 }

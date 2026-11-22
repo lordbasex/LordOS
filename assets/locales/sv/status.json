@@ -171,5 +171,7 @@
   "vm.gvtGone": "Grafikkortsandel borttagen",
   "gpu.freqSet": "Grafikkortets lägsta frekvens inställd",
   "gpu.memlockSet": "Minne som maskiner får låsa sparat",
-  "vm.memlockSet": "Maskinens minne låst"
+  "vm.memlockSet": "Maskinens minne låst",
+  "dkms.mokState": "Secure Boot-nyckel: {state}",
+  "dkms.mokPassword": "Nyckeln registreras vid nästa omstart."
 }

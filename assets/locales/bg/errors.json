@@ -919,5 +919,10 @@
   "studio.noCamera": "Няма свързана камера.",
   "studio.unavailable": "LordOS Studio не е налично на този компютър.",
   "studio.downloadFailed": "Фонът не можа да бъде изтеглен.",
-  "studio.removeFailed": "Фонът не можа да бъде премахнат."
+  "studio.removeFailed": "Фонът не можа да бъде премахнат.",
+  "dkms.mokInvalid": "Тази заявка за ключ за Secure Boot не е валидна.",
+  "dkms.mokNotNeeded": "Този компютър не се нуждае от записване на ключа сега.",
+  "dkms.mokNothingPending": "Няма ключ, който чака да бъде записан при следващото рестартиране.",
+  "dkms.mokNoTool": "Програмата mokutil не е инсталирана.",
+  "dkms.mokFailed": "Ключът не можа да бъде подготвен за следващото рестартиране."
 }

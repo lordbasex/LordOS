@@ -920,5 +920,10 @@
   "studio.noCamera": "Neprijungta jokia kamera.",
   "studio.unavailable": "LordOS Studio šiame kompiuteryje nepasiekiama.",
   "studio.downloadFailed": "Nepavyko atsisiųsti fono.",
-  "studio.removeFailed": "Nepavyko pašalinti fono."
+  "studio.removeFailed": "Nepavyko pašalinti fono.",
+  "dkms.mokInvalid": "Ši Secure Boot rakto užklausa netinkama.",
+  "dkms.mokNotNeeded": "Šiam kompiuteriui dabar nereikia užregistruoti rakto.",
+  "dkms.mokNothingPending": "Joks raktas nelaukia registracijos kito paleidimo iš naujo metu.",
+  "dkms.mokNoTool": "Programa mokutil neįdiegta.",
+  "dkms.mokFailed": "Nepavyko paruošti rakto kitam paleidimui iš naujo."
 }

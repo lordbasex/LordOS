@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Geeft alle apps, ook browsers en videogesprekken, de camera ‘LordOS Studio’ met je effecten: een vage achtergrond of een afbeelding achter je ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} staat niet in de pakketbronnen van deze computer.",
   "suggest.studioCamera.note.dkms": "Op een pc wordt de kernelmodule op deze computer voor je kernel gebouwd (DKMS), wat ongeveer 500 MB aan compilers en kernelheaders meebrengt, en opnieuw na elke kernelupdate. Op een Raspberry Pi zit hij in de LordOS-kernel.",
-  "suggest.studioCamera.note.secureBoot": "Met Secure Boot aan moet je de ondertekeningssleutel van de module bij de volgende herstart registreren, anders verschijnt de camera niet."
+  "suggest.studioCamera.note.secureBoot": "Met Secure Boot aan moet je de ondertekeningssleutel van de module bij de volgende herstart registreren, anders verschijnt de camera niet.",
+  "suggest.studioCamera.note.obs": "Voegt ook een tweede cameraapparaat toe, ‘OBS Virtual Camera’, zodat de eigen virtuele camera van OBS Studio naast LordOS Studio werkt.",
+  "suggest.mok.title": "Nog één stap bij de volgende herstart",
+  "suggest.mok.body": "Secure Boot staat aan, dus wat dit item heeft geïnstalleerd laadt pas nadat de ondertekeningssleutel is geregistreerd. LordOS bereidt de sleutel voor en geeft je een eenmalig wachtwoord om bij de volgende herstart op een blauw scherm te typen.",
+  "suggest.mok.prepare": "Sleutel voorbereiden",
+  "suggest.mok.pending": "De sleutel wordt bij de volgende herstart geregistreerd. Heb je het wachtwoord niet meer, vraag dan een nieuw aan.",
+  "suggest.mok.passwordTitle": "Je eenmalige wachtwoord",
+  "suggest.mok.passwordHint": "Schrijf het nu op: het wordt maar één keer getoond en nergens bewaard.",
+  "suggest.mok.steps": "Start opnieuw op en druk, wanneer het blauwe scherm verschijnt, binnen 10 seconden op een toets. Kies daarna Enroll MOK → Continue → Yes, typ dit wachtwoord en kies Reboot.",
+  "suggest.mok.newPassword": "Nieuw wachtwoord",
+  "suggest.mok.cancel": "Registratie annuleren"
 }

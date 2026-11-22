@@ -15,6 +15,11 @@
 #define STUDIO_LOOPBACK_CARD "LordOS Studio"
 #define STUDIO_LOOPBACK_DRIVER "v4l2 loopback"
 #define STUDIO_V4L2_MAJOR 81
+/* The package's second device is OBS Studio's own virtual camera (OBS takes the first idle loopback in version order,
+ * so it sits before ours). LordOS never opens it to write: only STUDIO_LOOPBACK_DEV, after the driver and card checks
+ * (mstudio.c loopback_open, and the helper checks the card again). studio_package_test.sh keeps these in step. */
+#define STUDIO_OBS_DEV "/dev/video49"
+#define STUDIO_OBS_CARD "OBS Virtual Camera"
 
 enum { STUDIO_SHOW_IDLE = 0, STUDIO_SHOW_CAMERA = 1, STUDIO_SHOW_OFF = 2 };
 

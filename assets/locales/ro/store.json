@@ -336,5 +336,15 @@
   "suggest.studioCamera.detail": "Oferă tuturor aplicațiilor, inclusiv browserelor și apelurilor video, camera „LordOS Studio” cu efectele tale: fundal estompat sau o imagine în spatele tău ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} nu se află în sursele de pachete ale acestui computer.",
   "suggest.studioCamera.note.dkms": "Pe un PC, modulul său de nucleu este compilat pentru nucleul tău pe acest computer (DKMS), ceea ce aduce circa 500 MB de compilatoare și antete de nucleu, și din nou după fiecare actualizare a nucleului. Pe un Raspberry Pi vine cu nucleul LordOS.",
-  "suggest.studioCamera.note.secureBoot": "Cu Secure Boot activat, trebuie să înregistrezi cheia de semnare a modulului la următoarea repornire, altfel camera nu apare."
+  "suggest.studioCamera.note.secureBoot": "Cu Secure Boot activat, trebuie să înregistrezi cheia de semnare a modulului la următoarea repornire, altfel camera nu apare.",
+  "suggest.studioCamera.note.obs": "Adaugă și un al doilea dispozitiv de cameră, „OBS Virtual Camera”, ca propria cameră virtuală a OBS Studio să funcționeze lângă LordOS Studio.",
+  "suggest.mok.title": "Încă un pas la următoarea repornire",
+  "suggest.mok.body": "Secure Boot este activat, așa că ce a instalat acest element se încarcă doar după ce cheia lui de semnare este înregistrată. LordOS pregătește cheia și îți dă o parolă de unică folosință, pe care o tastezi pe un ecran albastru la următoarea repornire.",
+  "suggest.mok.prepare": "Pregătește cheia",
+  "suggest.mok.pending": "Cheia va fi înregistrată la următoarea repornire. Dacă nu mai ai parola, cere una nouă.",
+  "suggest.mok.passwordTitle": "Parola ta de unică folosință",
+  "suggest.mok.passwordHint": "Noteaz-o acum: apare o singură dată și nu este salvată nicăieri.",
+  "suggest.mok.steps": "Repornește și, când apare ecranul albastru, apasă o tastă în cel mult 10 secunde. Apoi alege Enroll MOK → Continue → Yes, tastează această parolă și alege Reboot.",
+  "suggest.mok.newPassword": "Parolă nouă",
+  "suggest.mok.cancel": "Anulează înregistrarea"
 }

@@ -919,5 +919,10 @@
   "studio.noCamera": "Es ist keine Kamera angeschlossen.",
   "studio.unavailable": "LordOS Studio ist auf diesem Computer nicht verfügbar.",
   "studio.downloadFailed": "Der Hintergrund konnte nicht heruntergeladen werden.",
-  "studio.removeFailed": "Der Hintergrund konnte nicht entfernt werden."
+  "studio.removeFailed": "Der Hintergrund konnte nicht entfernt werden.",
+  "dkms.mokInvalid": "Diese Anfrage für den Secure-Boot-Schlüssel ist ungültig.",
+  "dkms.mokNotNeeded": "Dieser Computer muss den Schlüssel jetzt nicht registrieren.",
+  "dkms.mokNothingPending": "Kein Schlüssel wartet darauf, beim nächsten Neustart registriert zu werden.",
+  "dkms.mokNoTool": "Das Programm mokutil ist nicht installiert.",
+  "dkms.mokFailed": "Der Schlüssel konnte nicht für den nächsten Neustart vorbereitet werden."
 }
