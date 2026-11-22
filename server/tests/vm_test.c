@@ -1496,6 +1496,72 @@ static void tbwin(TB *t, uint32_t id, int32_t x, int32_t y, int32_t w, int32_t h
     if (flags & LAGW_OWNED) tb32(t, owner);
     tb32(t, 4242); tbs(t, title); tbs(t, app);
 }
+/* AGK_DISPLAYS: the guest's displays, for lord-vm's log (lordos-guest-win w7) */
+static void test_displays(void) {
+    AgDisplay in[AG_DISPLAYS_MAX], out[AG_DISPLAYS_MAX];
+    memset(in, 0, sizeof in);
+    in[0] = (AgDisplay){ 0, 0, 1022, 724, AGDS_PRIMARY | AGDS_HW, "\\\\.\\DISPLAY1" };
+    in[1] = (AgDisplay){ 1022, 0, 1920, 1080, AGDS_HW, "\\\\.\\DISPLAY2" };
+    uint8_t b[AG_DISPLAYS_BYTES + 4];
+    size_t n = ag_displays_write(in, 2, 1, b, sizeof b);
+    int shown = 7;
+    CHECK(n == 2 + 2 * 18 + 24 && ag_displays_parse(b, n, out, &shown) == 2 && shown == 1);
+    CHECK(out[1].x == 1022 && out[1].w == 1920 && out[1].h == 1080 && out[1].flags == AGDS_HW && !strcmp(out[1].name, "\\\\.\\DISPLAY2"));
+    char t[512];
+    ag_displays_text(out, 2, shown, t, sizeof t);
+    CHECK(!strcmp(t, "\\\\.\\DISPLAY1 1022x724 at 0,0 primary; \\\\.\\DISPLAY2 1920x1080 at 1022,0 (shown)"));
+    ag_displays_text(out, 2, shown, t, 10);
+    CHECK(strlen(t) == 9);
+    /* exact length: one byte short or one too many */
+    CHECK(ag_displays_parse(b, n - 1, out, &shown) == -1);
+    b[n] = 0; CHECK(ag_displays_parse(b, n + 1, out, &shown) == -1);
+    CHECK(ag_displays_parse(NULL, n, out, &shown) == -1 && ag_displays_parse(b, 1, out, &shown) == -1);
+    /* no shown display */
+    CHECK(ag_displays_write(in, 2, -1, b, sizeof b) == n && b[1] == AG_DISPLAYS_NONE && ag_displays_parse(b, n, out, &shown) == 2 && shown == -1);
+    /* count 0 or above AG_DISPLAYS_MAX, shown out of range */
+    uint8_t c[AG_DISPLAYS_BYTES + 64];
+    memcpy(c, b, n); c[0] = 0; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[0] = AG_DISPLAYS_MAX + 1; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[1] = 2; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[1] = 1; CHECK(ag_displays_parse(c, n, out, &shown) == 2);
+    /* the name: empty, too long, not printable ASCII; its length past the end */
+    memcpy(c, b, n); c[2 + 17] = 0; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[2 + 17] = AG_DISPLAY_NAME_MAX + 1; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[2 + 18] = 0x1b; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[2 + 18] = 0xc3; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[2 + 18 + 12 + 17] = 200; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    /* flags: an unknown bit, two primaries */
+    memcpy(c, b, n); c[2 + 16] |= 4; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[2 + 18 + 12 + 16] |= AGDS_PRIMARY; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    /* sizes and places */
+    AgDisplay bad[1] = { { 0, 0, 0, 600, 0, "X" } };
+    CHECK(ag_displays_write(bad, 1, 0, b, sizeof b) == 0);
+    bad[0].w = AG_DISPLAY_MAX + 1; CHECK(ag_displays_write(bad, 1, 0, b, sizeof b) == 0);
+    bad[0].w = 800; bad[0].x = LAG_DIM_MAX + 1; CHECK(ag_displays_write(bad, 1, 0, b, sizeof b) == 0);
+    bad[0].x = -LAG_DIM_MAX; CHECK(ag_displays_write(bad, 1, 0, b, sizeof b) == 2 + 18 + 1);
+    memcpy(c, b, 21); memset(c + 2 + 8, 0, 4); CHECK(ag_displays_parse(c, 21, out, &shown) == -1);               /* w 0 */
+    memcpy(c, b, 21); c[2 + 11] = 0x80; CHECK(ag_displays_parse(c, 21, out, &shown) == -1);           /* w huge */
+    memcpy(c, b, 21); c[2 + 3] = 0x7f; CHECK(ag_displays_parse(c, 21, out, &shown) == -1);            /* x huge */
+    memcpy(c, b, 21); c[2 + 4] = 0xff; c[2 + 7] = 0x80; CHECK(ag_displays_parse(c, 21, out, &shown) == -1);   /* y negative huge */
+    bad[0].name[0] = 0; CHECK(ag_displays_write(bad, 1, 0, b, sizeof b) == 0);
+    /* the writer: a shown index out of range, too many, a buffer too small */
+    CHECK(ag_displays_write(in, 2, 2, b, sizeof b) == 0 && ag_displays_write(in, 0, -1, b, sizeof b) == 0);
+    CHECK(ag_displays_write(in, AG_DISPLAYS_MAX + 1, -1, b, sizeof b) == 0 && ag_displays_write(in, 2, 0, b, 30) == 0);
+    /* eight displays fit AG_DISPLAYS_BYTES with the longest names */
+    for (int i = 0; i < AG_DISPLAYS_MAX; i++) { in[i] = (AgDisplay){ i * 100, 0, 640, 480, i ? 0 : AGDS_PRIMARY, "" }; memset(in[i].name, 'A' + i, AG_DISPLAY_NAME_MAX); }
+    n = ag_displays_write(in, AG_DISPLAYS_MAX, 3, b, sizeof b);
+    CHECK(n == AG_DISPLAYS_BYTES && ag_displays_parse(b, n, out, &shown) == AG_DISPLAYS_MAX && shown == 3 && strlen(out[7].name) == AG_DISPLAY_NAME_MAX);
+    /* random bytes never crash it */
+    uint32_t r = 12345;
+    for (int k = 0; k < 20000; k++) {
+        size_t m = 2 + (r % 120);
+        for (size_t i = 0; i < m; i++) { r = r * 1103515245u + 12345u; c[i] = (uint8_t)(r >> 16); }
+        c[0] = (uint8_t)(1 + c[0] % 3);
+        int s2 = 0;
+        (void)ag_displays_parse(c, m, out, &s2);
+    }
+}
+
 static void test_lag(void) {
     uint8_t d[8];
     uint32_t w = 0, h = 0;
@@ -1881,6 +1947,7 @@ int main(void) {
     test_clip_on_demand();
     test_resolution();
     test_lag();
+    test_displays();
     test_apps_mode();
     test_clipx();
     test_log_clean();

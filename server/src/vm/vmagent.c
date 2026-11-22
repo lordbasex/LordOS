@@ -474,6 +474,77 @@ void ag_display_write(uint8_t o[8], uint32_t w, uint32_t h) {
     for (int i = 0; i < 4; i++) { o[i] = (uint8_t)(w >> (8 * i)); o[4 + i] = (uint8_t)(h >> (8 * i)); }
 }
 
+/* AGK_DISPLAYS: the guest's displays, for lord-vm's log */
+static int ag_disp_ok(int32_t x, int32_t y, uint32_t w, uint32_t h, uint8_t flags, const uint8_t *name, size_t nl) {
+    if (x < -LAG_DIM_MAX || x > LAG_DIM_MAX || y < -LAG_DIM_MAX || y > LAG_DIM_MAX) return 0;
+    if (w < 1 || h < 1 || w > AG_DISPLAY_MAX || h > AG_DISPLAY_MAX || (flags & ~AGDS_ALL)) return 0;
+    if (nl < 1 || nl > AG_DISPLAY_NAME_MAX) return 0;
+    for (size_t i = 0; i < nl; i++) if (name[i] < 0x20 || name[i] > 0x7e) return 0;
+    return 1;
+}
+
+int ag_displays_parse(const uint8_t *p, size_t n, AgDisplay out[AG_DISPLAYS_MAX], int *shown) {
+    if (!p || !out || n < 2 || n > AG_DISPLAYS_BYTES) return -1;
+    unsigned cnt = p[0], sh = p[1];
+    if (cnt < 1 || cnt > AG_DISPLAYS_MAX || (sh != AG_DISPLAYS_NONE && sh >= cnt)) return -1;
+    size_t o = 2;
+    int primaries = 0;
+    for (unsigned i = 0; i < cnt; i++) {
+        if (n - o < 18) return -1;
+        int32_t x = lei32(p + o), y = lei32(p + o + 4);
+        uint32_t w = le32(p + o + 8), h = le32(p + o + 12);
+        uint8_t fl = p[o + 16];
+        size_t nl = p[o + 17];
+        o += 18;
+        if (n - o < nl || !ag_disp_ok(x, y, w, h, fl, p + o, nl)) return -1;
+        if ((fl & AGDS_PRIMARY) && ++primaries > 1) return -1;
+        out[i].x = x; out[i].y = y; out[i].w = w; out[i].h = h; out[i].flags = fl;
+        memcpy(out[i].name, p + o, nl);
+        out[i].name[nl] = 0;
+        o += nl;
+    }
+    if (o != n) return -1;
+    if (shown) *shown = sh == AG_DISPLAYS_NONE ? -1 : (int)sh;
+    return (int)cnt;
+}
+
+static void ag_put32(uint8_t *p, uint32_t v) { for (int i = 0; i < 4; i++) p[i] = (uint8_t)(v >> (8 * i)); }
+
+size_t ag_displays_write(const AgDisplay *d, int n, int shown, uint8_t *out, size_t cap) {
+    if (!d || !out || n < 1 || n > AG_DISPLAYS_MAX || shown < -1 || shown >= n || cap < 2) return 0;
+    size_t o = 2;
+    int primaries = 0;
+    out[0] = (uint8_t)n;
+    out[1] = shown < 0 ? (uint8_t)AG_DISPLAYS_NONE : (uint8_t)shown;
+    for (int i = 0; i < n; i++) {
+        size_t nl = strnlen(d[i].name, AG_DISPLAY_NAME_MAX + 1);
+        if (!ag_disp_ok(d[i].x, d[i].y, d[i].w, d[i].h, d[i].flags, (const uint8_t *)d[i].name, nl)) return 0;
+        if ((d[i].flags & AGDS_PRIMARY) && ++primaries > 1) return 0;
+        if (cap - o < 18 + nl) return 0;
+        ag_put32(out + o, (uint32_t)d[i].x); ag_put32(out + o + 4, (uint32_t)d[i].y);
+        ag_put32(out + o + 8, d[i].w); ag_put32(out + o + 12, d[i].h);
+        out[o + 16] = d[i].flags;
+        out[o + 17] = (uint8_t)nl;
+        memcpy(out + o + 18, d[i].name, nl);
+        o += 18 + nl;
+    }
+    return o;
+}
+
+void ag_displays_text(const AgDisplay *d, int n, int shown, char *out, size_t cap) {
+    if (!out || !cap) return;
+    size_t o = 0;
+    out[0] = 0;
+    for (int i = 0; d && i < n && o < cap; i++) {
+        int k = snprintf(out + o, cap - o, "%s%s %ux%u at %d,%d%s%s%s", i ? "; " : "", d[i].name, (unsigned)d[i].w, (unsigned)d[i].h,
+                         (int)d[i].x, (int)d[i].y, d[i].flags & AGDS_PRIMARY ? " primary" : "", d[i].flags & AGDS_HW ? "" : " (not a PCI adapter)",
+                         i == shown ? " (shown)" : "");
+        if (k < 0) break;
+        o += (size_t)k;
+    }
+    if (o >= cap) out[cap - 1] = 0;
+}
+
 int lag_apps_parse(const uint8_t *p, size_t n, int *on) {
     if (!p || n != 1 || p[0] > 1) return -1;
     if (on) *on = p[0];
