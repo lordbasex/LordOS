@@ -40,14 +40,100 @@ async function bundle() {
   return (await fetch(new URL(m[1], SITE))).text();
 }
 
+// The bundle is untrusted text from a third-party site: nothing in it is ever run. Its registry and its
+// JSON.parse('...') modules are read by the small literal reader below, which accepts only string, number and
+// boolean literals, arrays, objects, enum members (X.y, from the bundle's own string enums) and module references
+// (f(123)); anything else (a call, an operator, a template, a getter) is refused.
+const ESC = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', '0': '\0' };
+// the string literal opening at s[i] ('"' or "'"): { value, end } (end is just past the closing quote)
+export function readString(s, i) {
+  const q = s[i];
+  if (q !== '"' && q !== "'") throw new Error(`wayland.app: expected a string at ${i}`);
+  let out = '';
+  for (let k = i + 1; k < s.length; k++) {
+    const c = s[k];
+    if (c === q) return { value: out, end: k + 1 };
+    if (c === '\n' || c === '\r') throw new Error('wayland.app: newline in a string literal');
+    if (c !== '\\') { out += c; continue; }
+    const e = s[++k];
+    if (e === undefined) break;
+    if (e in ESC && !(e === '0' && /[0-9]/.test(s[k + 1] || ''))) out += ESC[e];
+    else if (e === 'x') { const h = s.slice(k + 1, k + 3); if (!/^[0-9a-fA-F]{2}$/.test(h)) throw new Error('wayland.app: bad \\x escape'); out += String.fromCharCode(parseInt(h, 16)); k += 2; }
+    else if (e === 'u') {
+      let h, n;
+      if (s[k + 1] === '{') { const z = s.indexOf('}', k); h = s.slice(k + 2, z); n = z - k; if (!/^[0-9a-fA-F]{1,6}$/.test(h)) throw new Error('wayland.app: bad \\u escape'); }
+      else { h = s.slice(k + 1, k + 5); n = 4; if (!/^[0-9a-fA-F]{4}$/.test(h)) throw new Error('wayland.app: bad \\u escape'); }
+      const cp = parseInt(h, 16); if (cp > 0x10ffff) throw new Error('wayland.app: bad \\u escape');
+      out += String.fromCodePoint(cp); k += n;
+    } else if (e === '\r') { if (s[k + 1] === '\n') k++; }             // line continuation
+    else if (e === '\n' || e === '\u2028' || e === '\u2029') { /* line continuation */ }
+    else if (/[0-9]/.test(e)) throw new Error('wayland.app: octal escape in a string literal');
+    else out += e;                                              // \' \" \\ and other identity escapes
+  }
+  throw new Error('wayland.app: unterminated string literal');
+}
+
+// the literal starting at s[i] (see above); enums: { name: { member: string } }. Returns { value, end }.
+export function readLiteral(s, i, enums = {}) {
+  const ws = (k) => { while (k < s.length && /\s/.test(s[k])) k++; return k; };
+  const ident = (k) => { const m = /^[A-Za-z_$][\w$]*/.exec(s.slice(k, k + 256)); return m ? m[0] : null; };
+  let depth = 0;
+  const value = (k) => {
+    k = ws(k);
+    const c = s[k];
+    if (c === '"' || c === "'") return readString(s, k);
+    if (c === '[' || c === '{') {
+      if (++depth > 64) throw new Error('wayland.app: literal nested too deep');
+      const close = c === '[' ? ']' : '}';
+      const out = c === '[' ? [] : Object.create(null);
+      k = ws(k + 1);
+      while (s[k] !== close) {
+        if (c === '[') { const v = value(k); out.push(v.value); k = ws(v.end); }
+        else {
+          let key;
+          if (s[k] === '"' || s[k] === "'") { const r = readString(s, k); key = r.value; k = r.end; }
+          else if (/[0-9]/.test(s[k])) { const m = /^\d+/.exec(s.slice(k)); key = m[0]; k += key.length; }
+          else { key = ident(k); if (!key) throw new Error(`wayland.app: bad key at ${k}`); k += key.length; }
+          if (key === '__proto__' || key === 'constructor' || key === 'prototype') throw new Error('wayland.app: refusing key ' + key);
+          k = ws(k);
+          if (s[k] !== ':') throw new Error(`wayland.app: expected ':' at ${k}`);
+          const v = value(k + 1); out[key] = v.value; k = ws(v.end);
+        }
+        if (s[k] === ',') k = ws(k + 1);
+        else if (s[k] !== close) throw new Error(`wayland.app: expected ',' or '${close}' at ${k}`);
+      }
+      depth--;
+      return { value: c === '{' ? Object.assign({}, out) : out, end: k + 1 };
+    }
+    if (c === '!' && (s[k + 1] === '0' || s[k + 1] === '1') && !/[\w$.]/.test(s[k + 2] || '')) return { value: s[k + 1] === '0', end: k + 2 };
+    const num = /^-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/.exec(s.slice(k, k + 64));
+    if (num) return { value: Number(num[0]), end: k + num[0].length };
+    const id = ident(k);
+    if (!id) throw new Error(`wayland.app: unexpected '${c}' at ${k}`);
+    let e = k + id.length;
+    if (id === 'true' || id === 'false') return { value: id === 'true', end: e };
+    if (id === 'null') return { value: null, end: e };
+    if (id === 'void' && s.slice(ws(e), ws(e) + 1) === '0') return { value: undefined, end: ws(e) + 1 };
+    if (s[e] === '.') {                                          // an enum member: X.y
+      const m = ident(e + 1);
+      if (!m || !Object.hasOwn(enums, id) || !Object.hasOwn(enums[id], m)) throw new Error(`wayland.app: unknown enum ${id}.${m}`);
+      return { value: enums[id][m], end: e + 1 + m.length };
+    }
+    if (s[e] === '(') {                                          // a module reference: f(123)
+      const m = /^\((\d{1,9})\)/.exec(s.slice(e, e + 16));
+      if (!m) throw new Error(`wayland.app: refusing call ${id}(...) at ${k}`);
+      return { value: { mod: Number(m[1]) }, end: e + m[0].length };
+    }
+    throw new Error(`wayland.app: refusing identifier ${id} at ${k}`);
+  };
+  return value(i);
+}
+
 // the JSON.parse('...') module with this webpack id
-function moduleJson(s, id) {
+export function moduleJson(s, id) {
   const i = s.indexOf(`${id}:function(e){"use strict";e.exports=JSON.parse('`);
   if (i < 0) return null;
-  const st = s.indexOf("'", i) + 1;
-  let k = st;
-  while (!(s[k] === "'" && s[k - 1] !== '\\')) k++;
-  return JSON.parse(Function(`return '${s.slice(st, k)}'`)());
+  return JSON.parse(readString(s, s.indexOf("'", i)).value);
 }
 
 // the balanced [...] that starts at `start`
@@ -69,14 +155,16 @@ function enumOf(s, v) {
   return Object.fromEntries([...seg.matchAll(/e\.(\w+)="([^"]+)"/g)].map((m) => [m[1], m[2]]));
 }
 
-function parse(s) {
+export function parse(s) {
   const at = s.search(/\w=\[\{id:"wayland",name:/);
   if (at < 0) throw new Error('wayland.app: protocol registry not found');
   const arr = balanced(s, s.indexOf('[', at));
-  // the registry is code: source/stability enums and n(<module>) for each protocol's XML
+  // the registry is written as code: source/stability enum members and f(<module>) for each protocol's XML; it is
+  // read as a literal (readLiteral), never run
   const vars = [...new Set([...arr.matchAll(/source:(\w+)\.\w+,stability:(\w+)\.\w+/g)].flatMap((m) => [m[1], m[2]]))];
-  const enums = vars.map((v) => enumOf(s, v));
-  const reg = Function(...vars, 'n', `return ${arr}`)(...enums, (id) => ({ mod: id }));
+  const enums = Object.fromEntries(vars.map((v) => [v, enumOf(s, v)]));
+  const reg = readLiteral(arr, 0, enums).value;
+  if (!Array.isArray(reg)) throw new Error('wayland.app: the registry is not an array');
   const comps = {};
   for (const m of s.matchAll(/\{id:"(mutter|kwin)",name:"[^"]+",icon:"[^"]+",info:\w+\((\d+)\)\}/g)) comps[m[1]] = moduleJson(s, m[2]);
   if (!comps.mutter || !comps.kwin) throw new Error('wayland.app: Mutter or KWin data not found');
@@ -160,4 +248,4 @@ async function main() {
   if (lost.length) console.warn('advertised but in no row:', [...new Set(lost)].join(', '));
 }
 
-main().catch((e) => { console.error(e.message); process.exit(1); });
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch((e) => { console.error(e.message); process.exit(1); });

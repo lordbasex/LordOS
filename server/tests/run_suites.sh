@@ -237,6 +237,7 @@ EOF
     if have node; then run "bt-power-model-test (sdk/btpowermodel.js)" node tests/bt_power_model_test.mjs; fi
     if have node; then run "archive-vol-test (sdk/archivevol.js)" node tests/archive_vol_test.mjs; fi
     if have node; then run "wayland-table-test (docs/wayland-protocols.json against server/src/wl's globals, generated table up to date)" node tests/wayland_table_test.mjs; else skip "wayland-table-test" "node"; fi
+    if have node; then run "wayland-import-test (tools/wayland-app-import.mjs reads wayland.app's bundle as literals, never runs it)" node tests/wayland_import_test.mjs; else skip "wayland-import-test" "node"; fi
     if have node; then run "bt-audio-model-test (sdk/btaudiomodel.js)" node tests/bt_audio_model_test.mjs; fi
     if have node; then run "bt-list-model-test (sdk/btlistmodel.js)" node tests/bt_list_model_test.mjs; fi
     if have node; then run "kbinhibit-model-test (sdk/kbinhibitmodel.js)" node tests/kbinhibit_model_test.mjs; fi

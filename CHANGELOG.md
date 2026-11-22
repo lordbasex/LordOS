@@ -2100,6 +2100,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Raspberry Pi build (`server/src/apps.c`).
 
 ### Security
+- **The Wayland table importer no longer runs code from wayland.app** (`tools/wayland-app-import.mjs`, a maintainer
+  tool, new in development; found by the pre-merge security scan). It cut the protocol registry and each
+  `JSON.parse('...')` module out of wayland.app's JavaScript bundle and evaluated them with `Function()`, so whoever
+  controlled that third-party bundle could run code on the maintainer's machine when the table was refreshed; the
+  string scan also let an escaped backslash before a quote end the literal early. The bundle is now read by a small
+  literal reader (`readLiteral`, `readString`): string, number and boolean literals, arrays, objects, the bundle's own
+  string enum members and module references only, with JavaScript's escape rules, a depth limit and no
+  `__proto__`/`constructor` keys; anything else is refused and nothing in the bundle ever runs. Test:
+  `server/tests/wayland_import_test.mjs` (both breakouts refused, nothing executed).
 
 - **Machines: keys typed in another window never reach a machine, in development** (`docs/VIRTUALIZATION.md` 5.8;
   `sdk/components.jsx` `AppHost`/`FloatingWindows`, `sdk/windows.js` `wm.hasKeyboard`/`setFullscreen`,
