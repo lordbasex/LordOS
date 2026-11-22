@@ -917,5 +917,7 @@
   "studio.badPicture": "Tätä kuvaa ei voi käyttää taustana.",
   "studio.invalid": "Tämä LordOS Studion asetus ei ole kelvollinen.",
   "studio.noCamera": "Kameraa ei ole liitetty.",
-  "studio.unavailable": "LordOS Studio ei ole käytettävissä tässä tietokoneessa."
+  "studio.unavailable": "LordOS Studio ei ole käytettävissä tässä tietokoneessa.",
+  "studio.downloadFailed": "Taustaa ei voitu ladata.",
+  "studio.removeFailed": "Taustaa ei voitu poistaa."
 }

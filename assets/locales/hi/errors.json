@@ -917,5 +917,7 @@
   "studio.badPicture": "उस चित्र को पृष्ठभूमि के रूप में उपयोग नहीं किया जा सकता।",
   "studio.invalid": "LordOS Studio की वह सेटिंग मान्य नहीं है।",
   "studio.noCamera": "कोई कैमरा जुड़ा नहीं है।",
-  "studio.unavailable": "इस कंप्यूटर पर LordOS Studio उपलब्ध नहीं है।"
+  "studio.unavailable": "इस कंप्यूटर पर LordOS Studio उपलब्ध नहीं है।",
+  "studio.downloadFailed": "बैकग्राउंड डाउनलोड नहीं हो सका।",
+  "studio.removeFailed": "बैकग्राउंड हटाया नहीं जा सका।"
 }

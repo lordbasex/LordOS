@@ -73,14 +73,17 @@ int main(int argc, char **argv) {
 #endif
 #ifdef LM_STUDIO
     /* lord-studio: the camera with LordOS Studio's effects, nothing else. Its fds, in order (mp_send skips the missing
-     * ones): the camera (none with probe=1 or loopback=1), the render node (when render=1), the segmenter's model, and
+     * ones): the camera (none with probe=1 or loopback=1), the render node (when render=1), the segmenter's model,
+     * BlazeFace (when face=1, phase 3: Center Stage, Studio Light and Retouch) and,
      * with loopback=1 the "LordOS Studio" loopback device (the real camera then comes later, by MM_STUDIO_CAM) */
     if (m.v[0] != MK_CAMERA) { LM_LOG("lord-studio: only the camera"); return 1; }
     int st_probe = mp_param_int(payload, "probe", 0) == 1, st_hub = !st_probe && mp_param_int(payload, "loopback", 0) == 1, sk = 0;
     int st_cam = st_probe || st_hub ? -1 : fds[sk++];
     int studio_render = mp_param_int(payload, "render", 0) == 1 ? fds[sk++] : -1;
     int st_model = fds[sk++];
+    int st_face = mp_param_int(payload, "face", 0) == 1 && sk < MP_MAX_FDS ? fds[sk++] : -1;
     int st_loop = st_hub && sk < MP_MAX_FDS ? fds[sk++] : -1;
+    int st_bg = st_probe && mp_param_int(payload, "bg", 0) == 1 && sk < MP_MAX_FDS ? fds[sk++] : -1;   /* the self-test's background */
     if (st_hub && st_loop < 0) { LM_LOG("lord-studio: no loopback"); return 1; }
     for (int i = sk; i < MP_MAX_FDS; i++) if (fds[i] >= 0) close(fds[i]);
     /* fds[0]: the V4L2 device of the sandbox's ioctl class (the camera, or the loopback) */
@@ -148,8 +151,8 @@ int main(int argc, char **argv) {
     sandbox_apply_helper(&cfg);
 #ifdef LM_STUDIO
     /* the model is read and checked inside the sandbox; Mesa loads here too (from /usr/lib, read-only) */
-    if (stcam_init(st_model, studio_render)) { lm_error("studio.failed"); mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0); return 1; }
-    if (st_probe) { stcam_probe(); stcam_free(); return 0; }
+    if (stcam_init(st_model, st_face, studio_render)) { lm_error("studio.failed"); mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0); return 1; }
+    if (st_probe) { stcam_probe(st_bg); stcam_free(); return 0; }
     if (st_hub) { stcam_hub(payload, st_loop, studio_render); stcam_free(); return 0; }
 #endif
     switch (m.v[0]) {

@@ -1,12 +1,13 @@
 # Camera Studio: plan and design for approval
 
-**Status (2026-11-22): approved by the maintainer; phases 0 and 1 built (branch `feat/camera-studio`) and phase 2 built
-(branch `feat/camera-studio-2`, 11.2), in development; phase 2's device is still to verify on a VM.**
+**Status (2026-11-22): approved by the maintainer; phases 0 and 1 built (branch `feat/camera-studio`), phase 2 built
+(branch `feat/camera-studio-2`, 11.2) and phase 3 built (branch `feat/camera-studio-3`, 11.3), in development; phase 2's
+device and phase 3's Mic Mode are still to verify on a VM.**
 The maintainer approved the whole plan and the exceptions E-S1 to E-S7 on 2026-11-22; E-S8 (ONNX Runtime linked) was
 **not** approved: D3 is our own C inference, and ONNX Runtime is only the dev machine's reference in tests. The name is
 "LordOS Studio" and the status item's label "Camera" (D6); D5 and D7 to D10 take this plan's recommendations. D4: the
-package is an optional Store item (approved 2026-11-22). Phases 3 to 5 (the other effects, the portal, the app) are not
-built yet. Section 3.3 now has measured numbers.
+package is an optional Store item (approved 2026-11-22). Phases 4 and 5 (the portal, the app) are not built yet.
+Sections 3.3 and 11.3 have measured numbers.
 Facts are labelled the way `GO-LINK.md` does it:
 
 - **Read**: checked in this repository or in the cited source on 2026-11-22.
@@ -654,6 +655,98 @@ The effort is for one developer with the existing patterns. These are **estimate
   LordOS Studio together; OBS's own virtual camera finds the module already loaded with our single device (it would need a
   second device, `devices=2`, which is a change to E-S2's file); a same-uid process could still open `/dev/video50` as a
   writer before lord-studio does (8.4: lord-studio then fails to set its format and stays off, logged).
+
+### 11.3 Phase 3 as built (2026-11-22, in development)
+
+- **The looks** (`server/src/media/studio/stlook.c`, `stframe.c`, the pipeline in `stfx.c`, the GPU composite in
+  `stgl.c`; one shader does them all, and the CPU path is the same arithmetic in row passes):
+  - **Green screen** (4.4): the key colour is the median of the frame's border in CbCr, taken when it is clearly green
+    (or blue), otherwise the preset; alpha is `smoothstep` of the CbCr distance with the Similarity and Smoothness
+    sliders; spill suppression pulls the key channel down to the mean of the other two by Spill; the "better cut-out"
+    keeps the chroma alpha only inside the person's mask dilated by 12 pixels, lets the matte decide where the chroma is
+    unsure, and never punches a hole where the matte is sure. It applies with a picture or a video behind.
+  - **Video backgrounds**: lord-studio decodes the file with libavcodec inside its sandbox (two threads), one picture
+    per camera picture at most, paced by the file's timestamps, looped at its end, cover-fitted to the camera's size by
+    swscale, so the composite takes it as it is. A still file is a picture, anything else a video.
+  - **Center Stage** (5.2): BlazeFace (already converted in phase 0) every 6th frame on a 128×128 letterboxed copy;
+    the largest face; a crop of the frame's shape whose height is 4.2 (wide) to 2 (tight) face heights, the eyes at a
+    third, at most 2×; a dead zone of 4 %; a 1€ filter (mincut 0.4 Hz, β 0.004) and at most half the frame a second;
+    back to the whole frame after 2 s without a face. The crop is scaled back to the frame (bilinear, fixed point)
+    before everything else, so the matte, the light and the retouch see the framed picture.
+  - **Studio Light** (5.3): +0.15 EV on the whole person and up to +0.6 EV inside the face's feathered ellipse (a soft
+    lift that rolls highlights off instead of clipping), the background −0.5 EV, scaled by Intensity. Without a face it
+    still dims the background. Spotlight and rim light are not built.
+  - **Colour match** (5.3): Reinhard et al.'s transfer in a linear opponent space (so it is one 3×3 matrix and an
+    offset per frame), statistics of the person (weighted by the matte) and of the visible background on the guide
+    cells, the exposure within ±1 EV, the colour channels only 60 % of the way, smoothed over about a second; 0..60 %.
+  - **Filters** (5.4): Warm, Cool, Vivid, Mono, Noir, Film, Fade, Sepia, each a 3×3 matrix and a curve per channel
+    built from our own numbers (no file); the CPU applies that directly, the GPU samples it as a 33³ 3D texture. A
+    Strength slider. `tools/studio/gen-luts.mjs` and user `.cube` files were not needed (the latter is phase 5).
+  - **Retouch** (5.4): the fast guided filter with each channel as its own guide, at half the face region's size,
+    mixed in by a skin weight (the YCbCr skin range, feathered) inside the face's ellipse; nothing else changes. No
+    under-eye lift and no reshaping.
+- **Measured** on the maintainer's PC (i9-10900, RX 580 with radeonsi), 1280×720, one thread, medians of 40 frames
+  (`build/studio-fx-test time`; Center Stage and Retouch include BlazeFace's share, about 3.7–4.3 ms every 6th frame):
+
+  | Effects on | CPU path | GPU path |
+  |---|---|---|
+  | blur (phase 1) | 16.4 ms | 11.3 ms |
+  | picture (phase 1) | 13.8 ms | 10.3 ms |
+  | video (a new 720p picture every frame; decode not included) | 13.4 ms | 10.8 ms |
+  | green screen + picture | 20.5 ms | 11.1 ms |
+  | colour match + picture | 15.6 ms | 10.6 ms |
+  | Studio Light alone (the matte is needed to dim the background) | 16.0 ms | 11.4 ms |
+  | Studio Light + blur | 19.3 ms | 12.3 ms |
+  | filter (Film) alone | 8.0 ms | 2.5 ms |
+  | filter (Film) + blur | 21.4 ms | 11.5 ms |
+  | Center Stage alone (crop and scale 4.4 ms) | 4.6 ms | 6.8 ms |
+  | Retouch alone | 4.0 ms | 6.4 ms |
+  | everything (blur, light, Film, Center Stage, Retouch) | 36.2 ms | 23.9 ms |
+
+  A video background's own decode, measured with `ffmpeg -benchmark` on an 8 s H.264 clip (CRF 23): 1.8 ms a picture
+  at 720p and 3.6 ms at 1080p on one thread, plus its swscale conversion (about 1–2 ms, **Estimate**). Inside
+  lord-studio's sandbox (`build/studio-helper-test`, 640×360, every look on at once, synthetic frames): 10.9 ms on the
+  CPU, 6.9 ms with the GPU. So at 720p30 the PC keeps every single effect within one frame on both paths; everything at
+  once fits only with the GPU (24 ms of the 33 ms), which D10's GPU-only 1080p already assumes. The Pi 5 is not
+  measured yet.
+- **Accuracy** (`build/studio-fx-test` on the CC0 frames of `tests/data/studio` and frames made from them): Studio Light
+  lifts the person and dims the background by half a stop at full Intensity (0.70–0.72); the colour match moves the
+  person toward a blue picture; Mono is grey, a filter at 0 % changes nothing and at 50 % is halfway within 0.25
+  levels; a person in front of a painted green screen keeps every sure-person pixel within 0.1 level while the screen
+  becomes the picture with no green left; every frame of a video background shows; Center Stage converges to its target
+  and then moves less than 3 pixels in 10 frames, and goes back to the whole frame without a face; Retouch removes
+  35–46 % of the face's fine detail and changes nothing away from it. CPU and GPU agree within 0.16 levels on average
+  for every look.
+- **Mic Mode** (section 7, E-S6): the drop-in `/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf`
+  (`tools/iso/rootfs/usr/share/…`, installed by `mkdeb.sh`) as planned, without echo cancellation (D8); the popover's
+  Standard, Voice Isolation and Wide Spectrum set the default microphone and point the filter's capture at the real
+  microphone through `lord.sound` (`micPlan`). Standard and Wide Spectrum are the same path: the microphone with no
+  processing. The sound lists hide the filter's own echo reference and streams. The capture indicator would have shown
+  the filter's own capture as "an unknown program" for as long as PipeWire runs, so `pwguard.c` skips that one link
+  when the node is really the session daemon's (checked by pid, executable and unit); the app reading Voice Isolation
+  is reported as before. `server/tests/studio_voice_test.mjs` parses the file and checks it against Debian's module
+  and plugin on the dev machine; it never touches this machine's PipeWire. **Not verified yet:** the filter loaded by a
+  real PipeWire (a VM), whether the hardware microphone stays open while nothing reads Voice Isolation, and the sound
+  heard in a Meet call.
+- **The background catalog** (section 6, E-S4): `assets/studio/backgrounds.json` (the shape of `motion.json`, plus
+  `kind`, `category`, `builtin` and `credit`), thumbnails in `assets/studio/backgrounds/`, one built-in picture per
+  category, the full files staged for the `LordOS-wallpapers` repository's `studio/` folder (not in this repository).
+  121 backgrounds (72 pictures, 49 loops), each license checked on the file's own page or API: 56 rendered from Poly Haven
+  panoramas and 7 ambientCG textures (CC0), 9 NASA ISS photographs (public domain), 33 Wikimedia Commons clips (CC0,
+  public domain, CC BY and CC BY-SA, each with its credit line) and 19 of our own renders (MIT,
+  `tools/studio/gen-studio-loops.py`); no Unsplash, Pexels or Pixabay, nothing with people, logos or readable text
+  (looked at frame by frame). The curation record is `tools/studio/bg-sources.json`, rebuilt by
+  `tools/studio/build-backgrounds.py`. About 2.6 MB ship (121 thumbnails, 7 built-in pictures); the full files are about
+  255 MB (loops at 720p, and 1080p for 48 of them). The closed actions `studio-bg-get` and `studio-bg-remove` (`server/src/hw/studio_bg_admin.c`) follow
+  `wallpaper-get` (`build/studio-bg-admin-test`). The popover's Background page shows the catalog by category
+  (pictures and videos), LordOS's wallpapers (without the Cyberpunk City pictures, which show people), "Add your own…"
+  (a picture or a short video) and Credits; a ↓ marks what downloads when chosen.
+- **The popover** (9.1): the main page's rows Portrait, Background, Studio Light, Center Stage, Filters, Retouch and
+  Mirror, then Mic Mode; detail pages for each (Center Stage's slider is "Wide ↔ Tight") and the green screen's. All
+  35 languages.
+- **Not built in phase 3:** the light wrap and rim light, Spotlight, the eyedropper for the key colour, the indicator
+  naming "Voice Isolation" next to the app, UVC pan/tilt/zoom, the segmenter on a second thread, and RNNoise (D9).
+  Hardware decode of video backgrounds (the Pi's HEVC) is not used: lord-studio decodes in software.
 
 Every phase also updates CHANGELOG, the paper (en, es, pt), the site and `THIRD_PARTY.md` (model cards, Apache-2.0
 NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).

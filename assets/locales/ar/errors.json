@@ -921,5 +921,7 @@
   "studio.badPicture": "لا يمكن استخدام هذه الصورة كخلفية.",
   "studio.invalid": "إعداد LordOS Studio هذا غير صالح.",
   "studio.noCamera": "لا توجد كاميرا متصلة.",
-  "studio.unavailable": "LordOS Studio غير متاح على هذا الكمبيوتر."
+  "studio.unavailable": "LordOS Studio غير متاح على هذا الكمبيوتر.",
+  "studio.downloadFailed": "تعذّر تنزيل الخلفية.",
+  "studio.removeFailed": "تعذّرت إزالة الخلفية."
 }

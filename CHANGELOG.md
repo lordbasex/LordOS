@@ -144,6 +144,57 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     "LordOS Studio" and showing the effects in a video call, the camera's light going off with no reader, the
     indicator naming the app, `devices.sh` step 6, and the Pi kernel build.
 
+- **LordOS Studio: video backgrounds, green screen, Center Stage, Studio Light, colour match, filters, Retouch, Mic
+  Mode and a background catalog, in development (phase 3 of `docs/CAMERA-STUDIO-PLAN.md`, section 11.3; exceptions E-S4
+  and E-S6 approved by the maintainer on 2026-11-22).** Every effect reaches every app that chose the "LordOS Studio"
+  camera, like phases 1 and 2.
+  - **The effects** (`server/src/media/studio/stlook.c`, `stframe.c`, `stfx.c`; one OpenGL ES 3 shader in `stgl.c`,
+    and the same arithmetic on the CPU):
+    - **Video backgrounds:** lord-studio plays a short loop behind the person, decoded with libavcodec inside its
+      sandbox, paced by the file's own timestamps, looped and scaled to the camera's size.
+    - **Green screen:** a real green or blue screen is cut out by colour (the key from the frame's border, Similarity,
+      Smoothness and Spill sliders), but only near the person, and never with holes where the person is sure.
+    - **Center Stage:** BlazeFace finds the face every sixth frame, and the picture is cropped around the person (eyes
+      at a third, from Wide to Tight, at most 2×) with a 1€ filter, a dead zone and a speed limit, so the frame moves
+      like a camera operator, not in jumps. With no face for two seconds it goes back to the whole picture.
+    - **Studio Light:** lifts the face (up to +0.6 EV, softly, without clipping) and dims the background half a stop.
+    - **Colour match:** tints the person toward the picture or video behind them (Reinhard's colour transfer, up to
+      60 %, smoothed over a second).
+    - **Filters:** Warm, Cool, Vivid, Mono, Noir, Film, Fade and Sepia, with a strength slider, built from LordOS's own
+      numbers (no file is read).
+    - **Retouch:** smooths skin inside the face only; the shape of the face never changes.
+  - **Measured** at 1280×720 on an i9-10900 with an RX 580 (`build/studio-fx-test time`): each single effect fits one
+    frame at 30 fps on both paths (10–12 ms with the GPU, 4–21 ms on the CPU); all of them at once take 24 ms with the
+    GPU and 36 ms on the CPU. A 720p H.264 loop decodes in 1.8 ms a picture.
+  - **The background catalog** (`assets/studio/backgrounds.json`, E-S4): 121 backgrounds in seven categories (Office,
+    Home, Studio, Nature, City, Abstract, Space), 72 pictures and 49 loops. Each license was checked on the file's own
+    page: Poly Haven and ambientCG (CC0), NASA (public domain), Wikimedia Commons (CC0, public domain, CC BY and
+    CC BY-SA with credit) and LordOS's own renders (MIT). Nothing comes from Unsplash, Pexels or Pixabay, and nothing
+    shows people, logos or readable text. The thumbnails and one picture per category ship in the package (2.6 MB);
+    the rest download when chosen through two new closed admin actions, `studio-bg-get "<id> <variant>"` (anyone) and
+    `studio-bg-remove` (administrators), the twins of `wallpaper-get`: JS names a catalog entry, never a URL or a path,
+    the download runs as `nobody` in the Store's scope, and a file whose size or SHA-256 isn't the catalog's is never
+    kept (`/var/lib/lordos/studio/<sha256>.jpg` or `.mp4`). A Credits page lists every author and license.
+  - **Mic Mode** (E-S6): Standard, Voice Isolation and Wide Spectrum in the popover. Voice Isolation is one more
+    microphone, "LordOS Voice Isolation", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
+    static drop-in (`/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf`); choosing a mode only sets the default
+    microphone through LordOS's existing sound client. There is no echo cancellation (nothing is routed to its echo
+    reference), no module loaded at runtime and no new privilege. Standard and Wide Spectrum both use the microphone
+    with no processing. The sound lists hide the filter's own echo reference and streams, and the capture indicator
+    no longer counts the filter's own link to the microphone (only when PipeWire itself owns it); the app that records
+    Voice Isolation is shown as before.
+  - **The popover** (`sdk/studio.jsx`, logic in `sdk/studiomodel.js`, downloads in `sdk/studiobg.js`): new rows Studio
+    Light, Center Stage, Filters and Retouch, each with its page; the Background page has None, Blur, Picture and Video,
+    the green screen and colour match, the catalog by category, "Add your own…" (a picture or a short video) and
+    Credits. LordOS's Cyberpunk City wallpapers are no longer offered as camera backgrounds (some show people). New
+    `settings.studio` keys with defaults (no migration). Text in all 35 languages.
+  - **Tests:** `build/studio-fx-test` (every effect against reference frames, CPU and GPU agreeing within 0.16 levels),
+    `build/studio-bg-admin-test` (the admin actions' arguments, a wrong hash or a 404 never kept, the shipped catalog),
+    `tests/studio_voice_test.mjs` (the drop-in, without touching PipeWire), new cases in `build/studio-hub-test`,
+    `tests/pwguard_test.c`, `tests/studio_model_test.mjs` and `build/studio-helper-test` (every look, BlazeFace and a
+    looping video inside lord-studio's sandbox).
+  - **Still to verify on a VM:** Voice Isolation loaded by a real PipeWire and heard in a Meet call, and whether the
+    microphone stays open while nothing records it. Not built yet: light wrap, the face spotlight, the key-colour eyedropper.
 - **`fastfetch` and `neofetch` run LordOS's `lordos-fetch` until the real package is installed, in development**
   (`packaging/fallback-bin/fastfetch`, `packaging/profile.d/lordos-fallback.sh`, `server/src/remote/sess.c`,
   `tools/iso/mkdeb.sh`; `docs/BENCHMARK.md`). People type the command they know and got "command not found". The

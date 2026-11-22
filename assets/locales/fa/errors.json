@@ -917,5 +917,7 @@
   "studio.badPicture": "از این تصویر نمی‌توان به‌عنوان پس‌زمینه استفاده کرد.",
   "studio.invalid": "این تنظیم LordOS Studio معتبر نیست.",
   "studio.noCamera": "هیچ دوربینی وصل نیست.",
-  "studio.unavailable": "LordOS Studio در این رایانه در دسترس نیست."
+  "studio.unavailable": "LordOS Studio در این رایانه در دسترس نیست.",
+  "studio.downloadFailed": "بارگیری پس‌زمینه ممکن نشد.",
+  "studio.removeFailed": "حذف پس‌زمینه ممکن نشد."
 }

@@ -918,5 +918,7 @@
   "studio.badPicture": "Tego obrazu nie można użyć jako tła.",
   "studio.invalid": "To ustawienie LordOS Studio jest nieprawidłowe.",
   "studio.noCamera": "Nie podłączono żadnej kamery.",
-  "studio.unavailable": "LordOS Studio nie jest dostępne na tym komputerze."
+  "studio.unavailable": "LordOS Studio nie jest dostępne na tym komputerze.",
+  "studio.downloadFailed": "Nie udało się pobrać tła.",
+  "studio.removeFailed": "Nie udało się usunąć tła."
 }

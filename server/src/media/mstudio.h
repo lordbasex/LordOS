@@ -16,6 +16,7 @@
 #define LORD_MEDIA_MSTUDIO_H
 
 #include <stddef.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 #define STUDIO_DEVICE "studio"
@@ -36,15 +37,23 @@ int  mstudio_is_loopback_card(const char *card);
  * media.noHelper, studio.noCamera, studio.unavailable). src: a MediaSrc (media_int.h) just made by media_src_new. */
 int  mstudio_open(void *src, int w, int h, const char **code);
 
-/* the settings (lord.studio.set): on, camera "/dev/videoN" ("" = the first), mode 0..2, blur 0..100, mirror. Every
- * running source gets them now; a new camera applies to sources opened from now on (and to the hub's next open) */
-int  mstudio_set(int on, const char *camera, int mode, int blur, int mirror);
-/* the background picture: "asset:wallpapers/…" or a path inside lord.fs's roots; NULL or "" clears it. 0 ok, -1 refused */
+/* the settings (lord.studio.set): on, camera "/dev/videoN" ("" = the first), mode 0 none, 1 blur, 2 picture, 3 video
+ * (2 and 3 both mean "the background file", whichever it is), blur 0..100, mirror, and phase 3's: key 0 none, 1 green,
+ * 2 blue; similarity, smoothness, spill, framing (Center Stage), light (Studio Light), filter_amt and retouch 0..100;
+ * match 0..60; filter 0..STUDIO_FILTERS. Out-of-range values are clamped. Every running source gets them now; a new
+ * camera applies to sources opened from now on (and to the hub's next open). */
+typedef struct {
+    int on; const char *camera;
+    int mode, blur, mirror, key, similarity, smoothness, spill, framing, light, match, filter, filter_amt, retouch;
+} MStudioSet;
+int  mstudio_set(const MStudioSet *c);
+/* the background (picture or video): "asset:wallpapers/…", "asset:studio/backgrounds/…", a catalog download in
+ * /var/lib/lordos/studio or a path inside lord.fs's roots; NULL or "" clears it. 0 ok, -1 refused */
 int  mstudio_set_background(const char *path);
 /* status JSON for lord.studio.status() */
 void mstudio_status(char *json, size_t n);
 /* lord-studio's MM_STUDIO_STATS (values checked) */
-void mstudio_stats(int src_id, long long frames, long long seg_us, long long fx_us, long long gpu);
+void mstudio_stats(int src_id, const int64_t v[6]);
 /* the hub's MM_STUDIO_READERS (values checked) */
 void mstudio_readers(int src_id, long long readers, long long cam_open, long long what);
 

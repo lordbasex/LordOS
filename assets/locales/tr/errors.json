@@ -917,5 +917,7 @@
   "studio.badPicture": "Bu resim arka plan olarak kullanılamaz.",
   "studio.invalid": "Bu LordOS Studio ayarı geçerli değil.",
   "studio.noCamera": "Bağlı kamera yok.",
-  "studio.unavailable": "LordOS Studio bu bilgisayarda kullanılamıyor."
+  "studio.unavailable": "LordOS Studio bu bilgisayarda kullanılamıyor.",
+  "studio.downloadFailed": "Arka plan indirilemedi.",
+  "studio.removeFailed": "Arka plan kaldırılamadı."
 }

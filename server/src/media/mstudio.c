@@ -26,17 +26,21 @@
 #include <unistd.h>
 
 #define BG_MAX (32 << 20)            /* bytes of a background picture */
+#define BG_VIDEO_MAX (100 << 20)     /* bytes of a background video (the catalog's own limit per file) */
+#define BG_STORE "/var/lib/lordos/studio"   /* the catalog's downloads (studio-bg-get, root's) */
 
 static struct {
     int on;                          /* LordOS Studio's camera for every app (the loopback's hub) */
     char camera[32];                 /* "/dev/videoN" or "" (the first camera) */
-    int mode, blur, mirror;
+    int mode, blur, mirror;          /* mode 0 none, 1 blur, 2 picture, 3 video (2 and 3: whatever the file is) */
+    int key, similarity, smoothness, spill, framing, light, match, filter, filter_amt, retouch;   /* phase 3 (st.h) */
     char bg[PATH_MAX];               /* the checked real path, or "" */
     char bg_name[PATH_MAX];          /* as JS gave it (status) */
-} cfg = { 1, "", 1, 50, 0, "", "" };
+} cfg = { .on = 1, .mode = 1, .blur = 50, .similarity = 40, .smoothness = 20, .spill = 50, .filter_amt = 100 };
 
-static struct { long long frames, seg_us, fx_us; int gpu; double fps; double at; long long at_frames; } stats;
+static struct { long long frames, seg_us, fx_us, frame_us, vid_us; int gpu; double fps; double at; long long at_frames; } stats;
 static int model_state;              /* 0 unknown, 1 good, -1 refused */
+static int face_state;               /* the same for BlazeFace (optional: without it, no Center Stage, face light or Retouch) */
 
 /* the hub: the session's one lord-studio writing the loopback */
 #define HUB_MAX_READERS 32
@@ -127,15 +131,15 @@ static int loopback_open(void) {
 
 /* The model: opened read-only, its size and SHA-256 checked against models.h on every open (the helper reads the
  * same fd). -1 if it is missing or differs. */
-static int open_model(void) {
+static int open_pinned(const char *file, const char *sha, int *state) {
     char path[PATH_MAX];
-    snprintf(path, sizeof path, "%s/studio/models/%s", js_sys_assets(), STUDIO_SEG_FILE);
+    snprintf(path, sizeof path, "%s/studio/models/%s", js_sys_assets(), file);
     int fd = open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
     struct stat st;
     if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > STUDIO_MODEL_MAX) {
         if (fd >= 0) close(fd);
-        if (model_state != -1) fprintf(stderr, "studio: the model %s is missing\n", path);
-        model_state = -1;
+        if (*state != -1) fprintf(stderr, "studio: the model %s is missing\n", path);
+        *state = -1;
         return -1;
     }
     unsigned char *b = malloc((size_t)st.st_size);
@@ -153,15 +157,18 @@ static int open_model(void) {
         for (int i = 0; i < 32; i++) snprintf(hex + 2 * i, 3, "%02x", h[i]);
     }
     free(b);
-    if (strcmp(hex, STUDIO_SEG_SHA256)) {
-        if (model_state != -1) fprintf(stderr, "studio: the model %s does not match its pinned hash; LordOS Studio stays off\n", path);
-        model_state = -1;
+    if (strcmp(hex, sha)) {
+        if (*state != -1) fprintf(stderr, "studio: the model %s does not match its pinned hash; it isn't used\n", path);
+        *state = -1;
         close(fd);
         return -1;
     }
-    model_state = 1;
+    *state = 1;
     return fd;
 }
+
+static int open_model(void) { return open_pinned(STUDIO_SEG_FILE, STUDIO_SEG_SHA256, &model_state); }
+static int open_face(void) { return open_pinned(STUDIO_FACE_FILE, STUDIO_FACE_SHA256, &face_state); }
 
 int mstudio_available(void) {
     if (!media_has_studio()) return 0;
@@ -176,47 +183,77 @@ void mstudio_camera_entry(char *json, size_t n, int first) {
     snprintf(json, n, "%s{\"device\":\"" STUDIO_DEVICE "\",\"name\":\"LordOS Studio\",\"bus\":\"studio\",\"studio\":true}", first ? "" : ",");
 }
 
-/* the background: one of LordOS's wallpapers ("asset:wallpapers/…") or a picture inside lord.fs's roots; a regular
- * file of at most BG_MAX with a picture's extension. real: the resolved path */
-static int check_background(const char *path, char *real, size_t n) {
-    char full[PATH_MAX * 2], r[PATH_MAX];
-    if (!path || !*path || strlen(path) >= PATH_MAX) return -1;
-    for (const char *p = path; *p; p++) if ((unsigned char)*p < 0x20) return -1;
-    int asset = !strncmp(path, "asset:wallpapers/", 17);
-    if (asset) {
-        if (strstr(path, "..")) return -1;
-        snprintf(full, sizeof full, "%s/wallpapers/%s", js_sys_assets(), path + 17);
-    } else if (path[0] == '/') snprintf(full, sizeof full, "%s", path);
-    else return -1;
+/* r (a real path) is inside the real directory dir */
+static int inside(const char *r, const char *dir) {
+    char base[PATH_MAX];
+    size_t bl;
+    return realpath(dir, base) && (bl = strlen(base), !strncmp(r, base, bl)) && r[bl] == '/';
+}
+
+static int is_video_ext(const char *ext) {
+    return !strcmp(ext, "mp4") || !strcmp(ext, "webm") || !strcmp(ext, "mkv") || !strcmp(ext, "mov") || !strcmp(ext, "m4v");
+}
+
+/* The background (studio_bg_path_ok in mstudiohub.c says which names are acceptable at all):
+ *   "asset:wallpapers/…"            one of LordOS's wallpapers
+ *   "asset:studio/backgrounds/…"    one of the catalog's pictures shipped in the package
+ *   "/var/lib/lordos/studio/<sha256>.jpg|.mp4"   one the catalog downloaded (studio-bg-get), owned by root
+ *   any other absolute path         a picture or a short video inside lord.fs's roots
+ * A regular file with a picture's (or a video's) extension. real: the resolved path; *video: 1 for a video. */
+static int check_background(const char *path, char *real, size_t n, int *video) {
+    char full[PATH_MAX * 2], r[PATH_MAX], dir[PATH_MAX * 2];
+    if (studio_bg_path_ok(path)) return -1;
+    int wall = !strncmp(path, "asset:wallpapers/", 17), cat = !strncmp(path, "asset:studio/backgrounds/", 25);
+    int store = !strncmp(path, BG_STORE "/", sizeof BG_STORE);
+    if (wall) snprintf(full, sizeof full, "%s/wallpapers/%s", js_sys_assets(), path + 17);
+    else if (cat) snprintf(full, sizeof full, "%s/studio/backgrounds/%s", js_sys_assets(), path + 25);
+    else snprintf(full, sizeof full, "%s", path);
     if (!realpath(full, r)) return -1;
-    if (asset) {
-        char base[PATH_MAX], dir[PATH_MAX * 2];
-        snprintf(dir, sizeof dir, "%s/wallpapers", js_sys_assets());
-        size_t bl;
-        if (!realpath(dir, base) || (bl = strlen(base), strncmp(r, base, bl)) || r[bl] != '/') return -1;
+    if (wall || cat) {
+        snprintf(dir, sizeof dir, wall ? "%s/wallpapers" : "%s/studio/backgrounds", js_sys_assets());
+        if (!inside(r, dir)) return -1;
+    } else if (store) {
+        struct stat st;
+        if (!inside(r, BG_STORE) || stat(r, &st) || !S_ISREG(st.st_mode) || st.st_uid != 0) return -1;
     } else if (!fsops_allowed(r)) return -1;
     const char *dot = strrchr(r, '.');
     char ext[8] = "";
     for (int i = 0; dot && dot[1 + i] && i < 7; i++) { ext[i] = (char)tolower((unsigned char)dot[1 + i]); ext[i + 1] = 0; }
-    if (strcmp(ext, "jpg") && strcmp(ext, "jpeg") && strcmp(ext, "png") && strcmp(ext, "webp")) return -1;
+    int vid = is_video_ext(ext);
+    if (!vid && strcmp(ext, "jpg") && strcmp(ext, "jpeg") && strcmp(ext, "png") && strcmp(ext, "webp")) return -1;
+    if (vid && (wall || cat)) return -1;
     snprintf(real, n, "%s", r);
+    *video = vid;
     return 0;
 }
 
-static int open_background(const char *real) {
+static int open_background(const char *real, int video) {
     int fd = open(real, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
     struct stat st;
-    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > BG_MAX) { if (fd >= 0) close(fd); return -1; }
+    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > (video ? BG_VIDEO_MAX : BG_MAX)) {
+        if (fd >= 0) close(fd);
+        return -1;
+    }
     fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) & ~O_NONBLOCK);
     return fd;
 }
 
+static int bg_video;                 /* the chosen background is a video */
+
+/* any effect at all (the indicator's "effects on") */
+static int effects_on(void) {
+    return cfg.mode != 0 || cfg.framing || cfg.light || (cfg.filter && cfg.filter_amt) || cfg.retouch;
+}
+
 static void send_config(int sock) {
-    mp_sendv(sock, MM_STUDIO, 0, cfg.mode, cfg.blur, cfg.mirror, 0);
+    int64_t v[6];
+    studio_pack_config(cfg.mode, cfg.key, cfg.filter, cfg.mirror, cfg.blur, cfg.similarity, cfg.smoothness, cfg.spill, cfg.framing,
+                       cfg.light, cfg.match, cfg.filter_amt, cfg.retouch, v);
+    mp_send(sock, MM_STUDIO, 0, v, NULL, 0, NULL, 0);
 }
 
 static void send_background(int sock) {
-    int fd = cfg.bg[0] ? open_background(cfg.bg) : -1;
+    int fd = cfg.bg[0] ? open_background(cfg.bg, bg_video) : -1;
     mp_send(sock, MM_STUDIO_BG, 0, NULL, NULL, 0, fd >= 0 ? &fd : NULL, fd >= 0 ? 1 : 0);
     if (fd >= 0) close(fd);
 }
@@ -236,18 +273,22 @@ static int spawn_own(int w, int h, pid_t *pid, const char **code) {
     if (cam < 0) return -1;
     int model = open_model();
     if (model < 0) { close(cam); *code = "studio.unavailable"; return -1; }
+    int face = open_face();
     int render = media_render_fd();
     if (w < 160 || w > 3840) w = 1280;
     if (h < 120 || h > 2160) h = 720;
-    char params[128];
-    snprintf(params, sizeof params, "width=%d\nheight=%d\nhw=%d\nhwaccel=%s\nrender=%d\n", w, h, render >= 0, media_hwaccel(), render >= 0);
-    int fds[3], n = 0;
+    char params[160];
+    snprintf(params, sizeof params, "width=%d\nheight=%d\nhw=%d\nhwaccel=%s\nrender=%d\nface=%d\n", w, h, render >= 0, media_hwaccel(),
+             render >= 0, face >= 0);
+    int fds[4], n = 0;
     fds[n++] = cam;
     if (render >= 0) fds[n++] = render;
     fds[n++] = model;
+    if (face >= 0) fds[n++] = face;
     int sock = media_spawn_studio(params, fds, n, pid);
     close(cam);
     close(model);
+    if (face >= 0) close(face);
     if (render >= 0) close(render);
     if (sock < 0) { *code = "media.noHelper"; return -1; }
     *code = NULL;
@@ -302,14 +343,26 @@ static void each_source(void (*fn)(int sock)) {
     }
 }
 
-int mstudio_set(int on, const char *camera, int mode, int blur, int mirror) {
-    if (camera && *camera && !dev_ok(camera)) return -1;
-    if (camera) snprintf(cfg.camera, sizeof cfg.camera, "%s", camera);
-    if ((on != 0) != cfg.on) { hub.gave_up = 0; memset(hub.spawns, 0, sizeof hub.spawns); }   /* turned on again: tries again */
-    cfg.on = on != 0;
-    cfg.mode = mode < 0 || mode > 2 ? 0 : mode;
-    cfg.blur = blur < 0 ? 0 : blur > 100 ? 100 : blur;
-    cfg.mirror = mirror != 0;
+static int c100(int v) { return v < 0 ? 0 : v > 100 ? 100 : v; }
+
+int mstudio_set(const MStudioSet *c) {
+    if (!c || (c->camera && *c->camera && !dev_ok(c->camera))) return -1;
+    if (c->camera) snprintf(cfg.camera, sizeof cfg.camera, "%s", c->camera);
+    if ((c->on != 0) != cfg.on) { hub.gave_up = 0; memset(hub.spawns, 0, sizeof hub.spawns); }   /* turned on again: tries again */
+    cfg.on = c->on != 0;
+    cfg.mode = c->mode < 0 || c->mode > 3 ? 0 : c->mode;
+    cfg.blur = c100(c->blur);
+    cfg.mirror = c->mirror != 0;
+    cfg.key = c->key < 0 || c->key > 2 ? 0 : c->key;
+    cfg.similarity = c100(c->similarity);
+    cfg.smoothness = c100(c->smoothness);
+    cfg.spill = c100(c->spill);
+    cfg.framing = c100(c->framing);
+    cfg.light = c100(c->light);
+    cfg.match = c->match < 0 ? 0 : c->match > 60 ? 60 : c->match;
+    cfg.filter = c->filter < 0 || c->filter > STUDIO_FILTERS ? 0 : c->filter;
+    cfg.filter_amt = c100(c->filter_amt);
+    cfg.retouch = c100(c->retouch);
     each_source(send_config);
     hub.tick_at = 0;                                /* on/off: the hub follows at the next turn of the loop */
     return 0;
@@ -318,22 +371,28 @@ int mstudio_set(int on, const char *camera, int mode, int blur, int mirror) {
 int mstudio_set_background(const char *path) {
     if (!path || !*path) {
         cfg.bg[0] = cfg.bg_name[0] = 0;
+        bg_video = 0;
         each_source(send_background);
         return 0;
     }
     char real[PATH_MAX];
-    if (check_background(path, real, sizeof real)) return -1;
-    int fd = open_background(real);
+    int video = 0;
+    if (check_background(path, real, sizeof real, &video)) return -1;
+    int fd = open_background(real, video);
     if (fd < 0) return -1;
     close(fd);
     snprintf(cfg.bg, sizeof cfg.bg, "%s", real);
     snprintf(cfg.bg_name, sizeof cfg.bg_name, "%s", path);
+    bg_video = video;
     each_source(send_background);
     return 0;
 }
 
-void mstudio_stats(int src_id, long long frames, long long seg_us, long long fx_us, long long gpu) {
-    if (frames < 0 || frames > (1LL << 40) || seg_us < 0 || seg_us > 10000000 || fx_us < 0 || fx_us > 10000000 || (gpu != 0 && gpu != 1)) return;
+void mstudio_stats(int src_id, const int64_t v[6]) {
+    long long frames = v[0], seg_us = v[1], fx_us = v[2], gpu = v[3], frame_us = v[4], vid_us = v[5];
+    if (frames < 0 || frames > (1LL << 40) || seg_us < 0 || seg_us > 10000000 || fx_us < 0 || fx_us > 10000000 || (gpu != 0 && gpu != 1) ||
+        frame_us < 0 || frame_us > 10000000 || vid_us < 0 || vid_us > 10000000)
+        return;
     double t = now_s();
     if (stats.at > 0 && t > stats.at && frames >= stats.at_frames) stats.fps = (double)(frames - stats.at_frames) / (t - stats.at);
     stats.at = t;
@@ -341,8 +400,11 @@ void mstudio_stats(int src_id, long long frames, long long seg_us, long long fx_
     stats.frames = frames;
     stats.seg_us = seg_us;
     stats.fx_us = fx_us;
+    stats.frame_us = frame_us;
+    stats.vid_us = vid_us;
     stats.gpu = (int)gpu;
-    media_event(src_id, "studio", "{\"fps\":%.1f,\"segMs\":%.2f,\"fxMs\":%.2f,\"gpu\":%s}", stats.fps, seg_us / 1000.0, fx_us / 1000.0, gpu ? "true" : "false");
+    media_event(src_id, "studio", "{\"fps\":%.1f,\"segMs\":%.2f,\"fxMs\":%.2f,\"frameMs\":%.2f,\"videoMs\":%.2f,\"gpu\":%s}", stats.fps,
+                seg_us / 1000.0, fx_us / 1000.0, frame_us / 1000.0, vid_us / 1000.0, gpu ? "true" : "false");
 }
 
 /* ---- the hub -------------------------------------------------------------------------------------------------- */
@@ -399,15 +461,18 @@ static MediaSrc *hub_spawn(double t) {
 #if defined(__aarch64__)
     if (render < 0) { w = 640; h = 360; }           /* a Raspberry Pi compositing on its CPU (plan 3.3) */
 #endif
-    char params[128];
-    snprintf(params, sizeof params, "loopback=1\nwidth=%d\nheight=%d\nhw=0\nrender=%d\n", w, h, render >= 0);
-    int fds[3], n = 0;
+    int face = open_face();
+    char params[160];
+    snprintf(params, sizeof params, "loopback=1\nwidth=%d\nheight=%d\nhw=0\nrender=%d\nface=%d\n", w, h, render >= 0, face >= 0);
+    int fds[4], n = 0;
     if (render >= 0) fds[n++] = render;
     fds[n++] = model;
+    if (face >= 0) fds[n++] = face;
     fds[n++] = lfd;
     s->sock = media_spawn_studio(params, fds, n, &s->pid);
     close(lfd);
     close(model);
+    if (face >= 0) close(face);
     if (render >= 0) close(render);
     if (s->sock < 0) { media_src_close(s); return NULL; }
     s->studio = STUDIO_SRC_HUB;
@@ -454,8 +519,8 @@ static void hub_scan(void) {
     static char apps[HUB_MAX_READERS][FW_APP_MAX];
     for (int i = 0; i < n; i++) if (appid_of_pid((unsigned)pids[i], apps[i], sizeof apps[i])) apps[i][0] = 0;
     char json[sizeof hub.use_last];
-    if (studio_use_format(&apps[0][0], FW_APP_MAX, n, hub.camera_name, cfg.mode != 0, json, sizeof json))
-        snprintf(json, sizeof json, "{\"apps\":[\"\"],\"camera\":\"\",\"effects\":%s}", cfg.mode ? "true" : "false");
+    if (studio_use_format(&apps[0][0], FW_APP_MAX, n, hub.camera_name, effects_on(), json, sizeof json))
+        snprintf(json, sizeof json, "{\"apps\":[\"\"],\"camera\":\"\",\"effects\":%s}", effects_on() ? "true" : "false");
     use_send(json);
 }
 
@@ -509,7 +574,8 @@ void mstudio_preview_end(void) {
 int mstudio_is_hub(int src_id) { return src_id > 0 && hub.id == src_id && hub_src() != NULL; }
 
 void mstudio_status(char *json, size_t n) {
-    static const char *const modes[] = { "none", "blur", "picture" };
+    static const char *const modes[] = { "none", "blur", "picture", "video" };
+    static const char *const keys[] = { "none", "green", "blue" };
     static const char *const shows[] = { "idle", "camera", "off" };
     char bg[PATH_MAX * 2 + 8], cam[80], camname[160];
     media_json_str(bg, sizeof bg, cfg.bg_name);
@@ -522,12 +588,18 @@ void mstudio_status(char *json, size_t n) {
     if (a && e) snprintf(apps, sizeof apps, "%.*s", (int)(e - (a + 7)) + 1, a + 7);
     /* loopback: 'missing' (no device: the package isn't installed or its module isn't loaded), 'ready', 'running' */
     const char *lb = h && hub.ready ? "running" : (h || hub.device) ? "ready" : "missing";
+    if (face_state == 0) { int fd = open_face(); if (fd >= 0) close(fd); }
     size_t o = (size_t)snprintf(json, n, "{\"available\":%s,\"on\":%s,\"camera\":%s,\"mode\":\"%s\",\"blur\":%d,\"mirror\":%s,\"background\":%s,"
-                                "\"fps\":%.1f,\"segMs\":%.2f,\"fxMs\":%.2f,\"gpu\":%s,"
+                                "\"video\":%s,\"key\":\"%s\",\"similarity\":%d,\"smoothness\":%d,\"spill\":%d,\"framing\":%d,\"light\":%d,"
+                                "\"match\":%d,\"filter\":\"%s\",\"filterStrength\":%d,\"retouch\":%d,\"faces\":%s,"
+                                "\"fps\":%.1f,\"segMs\":%.2f,\"fxMs\":%.2f,\"frameMs\":%.2f,\"videoMs\":%.2f,\"gpu\":%s,"
                                 "\"loopback\":\"%s\",\"hub\":%d,\"readers\":%d,\"cameraOpen\":%s,\"shows\":\"%s\",\"cameraName\":%s,\"stopped\":%s,"
                                 "\"apps\":%s,\"sources\":[",
                                 mstudio_available() ? "true" : "false", cfg.on ? "true" : "false", cam, modes[cfg.mode], cfg.blur,
-                                cfg.mirror ? "true" : "false", bg, stats.fps, stats.seg_us / 1000.0, stats.fx_us / 1000.0, stats.gpu ? "true" : "false",
+                                cfg.mirror ? "true" : "false", bg, bg_video ? "true" : "false", keys[cfg.key], cfg.similarity, cfg.smoothness,
+                                cfg.spill, cfg.framing, cfg.light, cfg.match, studio_filter_name(cfg.filter), cfg.filter_amt, cfg.retouch,
+                                face_state == 1 ? "true" : "false",
+                                stats.fps, stats.seg_us / 1000.0, stats.fx_us / 1000.0, stats.frame_us / 1000.0, stats.vid_us / 1000.0, stats.gpu ? "true" : "false",
                                 lb, h ? h->id : 0, hub.readers < 0 ? hub.scanned : hub.readers, hub.cam_open ? "true" : "false",
                                 shows[hub.shows < 0 || hub.shows > 2 ? 0 : hub.shows], camname, hub.gave_up ? "true" : "false", apps);
     int first = 1;

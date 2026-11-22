@@ -918,5 +918,7 @@
   "studio.badPicture": "Imaginea nu poate fi folosită ca fundal.",
   "studio.invalid": "Această setare LordOS Studio nu este validă.",
   "studio.noCamera": "Nu este conectată nicio cameră.",
-  "studio.unavailable": "LordOS Studio nu este disponibil pe acest computer."
+  "studio.unavailable": "LordOS Studio nu este disponibil pe acest computer.",
+  "studio.downloadFailed": "Fundalul nu a putut fi descărcat.",
+  "studio.removeFailed": "Fundalul nu a putut fi șters."
 }

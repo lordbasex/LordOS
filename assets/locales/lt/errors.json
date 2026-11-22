@@ -918,5 +918,7 @@
   "studio.badPicture": "Šio paveikslėlio negalima naudoti kaip fono.",
   "studio.invalid": "Šis LordOS Studio nustatymas netinkamas.",
   "studio.noCamera": "Neprijungta jokia kamera.",
-  "studio.unavailable": "LordOS Studio šiame kompiuteryje nepasiekiama."
+  "studio.unavailable": "LordOS Studio šiame kompiuteryje nepasiekiama.",
+  "studio.downloadFailed": "Nepavyko atsisiųsti fono.",
+  "studio.removeFailed": "Nepavyko pašalinti fono."
 }

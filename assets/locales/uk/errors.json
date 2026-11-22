@@ -918,5 +918,7 @@
   "studio.badPicture": "Це зображення не можна використати як тло.",
   "studio.invalid": "Це налаштування LordOS Studio недійсне.",
   "studio.noCamera": "Камеру не під’єднано.",
-  "studio.unavailable": "LordOS Studio недоступна на цьому комп’ютері."
+  "studio.unavailable": "LordOS Studio недоступна на цьому комп’ютері.",
+  "studio.downloadFailed": "Не вдалося завантажити фон.",
+  "studio.removeFailed": "Не вдалося видалити фон."
 }

@@ -917,5 +917,7 @@
   "studio.badPicture": "Essa imagem não pode ser usada como fundo.",
   "studio.invalid": "Essa configuração do LordOS Studio não é válida.",
   "studio.noCamera": "Nenhuma câmera está conectada.",
-  "studio.unavailable": "O LordOS Studio não está disponível neste computador."
+  "studio.unavailable": "O LordOS Studio não está disponível neste computador.",
+  "studio.downloadFailed": "Não foi possível baixar o fundo.",
+  "studio.removeFailed": "Não foi possível remover o fundo."
 }

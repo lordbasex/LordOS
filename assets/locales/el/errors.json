@@ -917,5 +917,7 @@
   "studio.badPicture": "Αυτή η εικόνα δεν μπορεί να χρησιμοποιηθεί ως φόντο.",
   "studio.invalid": "Αυτή η ρύθμιση του LordOS Studio δεν είναι έγκυρη.",
   "studio.noCamera": "Δεν είναι συνδεδεμένη καμία κάμερα.",
-  "studio.unavailable": "Το LordOS Studio δεν είναι διαθέσιμο σε αυτόν τον υπολογιστή."
+  "studio.unavailable": "Το LordOS Studio δεν είναι διαθέσιμο σε αυτόν τον υπολογιστή.",
+  "studio.downloadFailed": "Δεν ήταν δυνατή η λήψη του φόντου.",
+  "studio.removeFailed": "Δεν ήταν δυνατή η αφαίρεση του φόντου."
 }

@@ -67,6 +67,22 @@ Downloaded on demand, not in this repository; each clip's author, license and so
 and in the README of the `LordOS-wallpapers` repository. NASA material (public domain), CC0, CC BY 3.0 and CC BY-SA 4.0
 works; see `docs/WALLPAPERS.md`. The built-in clip is the project's own.
 
+## LordOS Studio's backgrounds
+
+The catalog `assets/studio/backgrounds.json` lists 121 backgrounds (72 pictures, 49 short loops) with each one's title,
+author, license, license URL, source page and, for CC BY and CC BY-SA works, its credit line; the camera popover shows
+them under Background → Credits. Their thumbnails and seven pictures (one per category) ship in
+`assets/studio/backgrounds/`; the full files are downloaded on demand from the `LordOS-wallpapers` repository's
+`studio/` folder, whose README credits every file. Sources: Poly Haven HDRIs rendered to flat views and ambientCG
+textures (CC0), NASA ISS photographs (public domain; no insignia), Wikimedia Commons clips (CC0, public domain,
+CC BY 2.0/3.0/4.0 and CC BY-SA 4.0; the share-alike applies to those files only) and the project's own renders (MIT,
+`tools/studio/gen-studio-loops.py`). The record of each file's license check is `tools/studio/bg-sources.json`. Nothing
+from Unsplash, Pexels or Pixabay (`docs/CAMERA-STUDIO-PLAN.md` 6.1).
+
+LordOS Studio's Voice Isolation uses PipeWire's own echo-cancel module with WebRTC Audio Processing (BSD-3-Clause), both
+Debian packages LordOS already installs (`libspa-0.2-modules`, `libwebrtc-audio-processing-1-3`); LordOS ships only the
+configuration file that loads them.
+
 ## Voices
 
 Downloaded on demand from the signed APT repository (Settings → AI → Voice), not in this repository and not on the ISO

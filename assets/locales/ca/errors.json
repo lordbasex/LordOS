@@ -917,5 +917,7 @@
   "studio.badPicture": "Aquesta imatge no es pot fer servir de fons.",
   "studio.invalid": "Aquest ajust de LordOS Studio no és vàlid.",
   "studio.noCamera": "No hi ha cap càmera connectada.",
-  "studio.unavailable": "LordOS Studio no està disponible en aquest ordinador."
+  "studio.unavailable": "LordOS Studio no està disponible en aquest ordinador.",
+  "studio.downloadFailed": "No s’ha pogut baixar el fons.",
+  "studio.removeFailed": "No s’ha pogut eliminar el fons."
 }

@@ -917,5 +917,7 @@
   "studio.badPicture": "Dieses Bild kann nicht als Hintergrund verwendet werden.",
   "studio.invalid": "Diese Einstellung von LordOS Studio ist ungültig.",
   "studio.noCamera": "Es ist keine Kamera angeschlossen.",
-  "studio.unavailable": "LordOS Studio ist auf diesem Computer nicht verfügbar."
+  "studio.unavailable": "LordOS Studio ist auf diesem Computer nicht verfügbar.",
+  "studio.downloadFailed": "Der Hintergrund konnte nicht heruntergeladen werden.",
+  "studio.removeFailed": "Der Hintergrund konnte nicht entfernt werden."
 }

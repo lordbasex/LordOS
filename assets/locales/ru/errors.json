@@ -918,5 +918,7 @@
   "studio.badPicture": "Это изображение нельзя использовать как фон.",
   "studio.invalid": "Эта настройка LordOS Studio недопустима.",
   "studio.noCamera": "Камера не подключена.",
-  "studio.unavailable": "LordOS Studio недоступна на этом компьютере."
+  "studio.unavailable": "LordOS Studio недоступна на этом компьютере.",
+  "studio.downloadFailed": "Не удалось загрузить фон.",
+  "studio.removeFailed": "Не удалось удалить фон."
 }

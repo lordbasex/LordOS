@@ -917,5 +917,7 @@
   "studio.badPicture": "یہ تصویر پس منظر کے طور پر استعمال نہیں ہو سکتی۔",
   "studio.invalid": "LordOS Studio کی یہ ترتیب درست نہیں ہے۔",
   "studio.noCamera": "کوئی کیمرا منسلک نہیں ہے۔",
-  "studio.unavailable": "اس کمپیوٹر پر LordOS Studio دستیاب نہیں ہے۔"
+  "studio.unavailable": "اس کمپیوٹر پر LordOS Studio دستیاب نہیں ہے۔",
+  "studio.downloadFailed": "پس منظر ڈاؤن لوڈ نہیں ہو سکا۔",
+  "studio.removeFailed": "پس منظر ہٹایا نہیں جا سکا۔"
 }

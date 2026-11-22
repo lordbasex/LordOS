@@ -916,5 +916,7 @@
   "studio.badPicture": "ไม่สามารถใช้ภาพนั้นเป็นพื้นหลังได้",
   "studio.invalid": "การตั้งค่า LordOS Studio นั้นไม่ถูกต้อง",
   "studio.noCamera": "ไม่มีกล้องเชื่อมต่ออยู่",
-  "studio.unavailable": "LordOS Studio ไม่พร้อมใช้งานบนคอมพิวเตอร์เครื่องนี้"
+  "studio.unavailable": "LordOS Studio ไม่พร้อมใช้งานบนคอมพิวเตอร์เครื่องนี้",
+  "studio.downloadFailed": "ไม่สามารถดาวน์โหลดพื้นหลังได้",
+  "studio.removeFailed": "ไม่สามารถลบพื้นหลังได้"
 }

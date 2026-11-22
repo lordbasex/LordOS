@@ -53,6 +53,10 @@ uint32_t pwguard_stream_flag(const char *media_class);
  * Video/Source whose media.role is Screen, or named lordos-screencast-*) is FW_R_NO_SCREEN, not a camera; else as
  * pwguard_capture_flag. Any app's node that says so is hidden from no-screen apps, which only hides it more. */
 uint32_t pwguard_node_flag(const char *media_class, const char *media_role, const char *node_name);
+/* 1 for the capture stream of LordOS Studio's Voice Isolation filter (lordos-voice.conf: an audio capture stream named
+ * "lordos_voice_capture"). Its link from the microphone isn't an app's use (the app reading the filter's source is);
+ * pwguard.c only skips it when the node is the session's pipewire daemon's own, never an app's. */
+int pwguard_voice_capture(const char *media_class, const char *node_name);
 /* The capture indicator's JSON from (app, flags) pairs, one entry per app: 0, or -1 when it doesn't fit or an id isn't
  * plain. */
 typedef struct { char app[128]; uint32_t flags; } PwUse;

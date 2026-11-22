@@ -916,5 +916,7 @@
   "studio.badPicture": "Không thể dùng hình ảnh đó làm phông nền.",
   "studio.invalid": "Thiết lập LordOS Studio đó không hợp lệ.",
   "studio.noCamera": "Không có máy ảnh nào được kết nối.",
-  "studio.unavailable": "LordOS Studio không có trên máy tính này."
+  "studio.unavailable": "LordOS Studio không có trên máy tính này.",
+  "studio.downloadFailed": "Không thể tải xuống hình nền.",
+  "studio.removeFailed": "Không thể xóa hình nền."
 }
