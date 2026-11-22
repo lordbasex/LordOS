@@ -913,5 +913,10 @@
   "vm.gvtFailed": "Nie udało się utworzyć części karty graficznej",
   "vm.memlockCap": "Ta maszyna zablokowałaby {need} MB, ale dla maszyn z kartą graficzną jest teraz wolne tylko {cap} MB (Ustawienia → Karty graficzne)",
   "vm.memlockRefused": "Nie udało się zablokować pamięci tej maszyny",
-  "gpu.memlockRange": "Ta ilość wykracza poza to, co ten komputer pozwala maszynom zablokować"
+  "gpu.memlockRange": "Ta ilość wykracza poza to, co ten komputer pozwala maszynom zablokować",
+  "studio.failed": "Nie udało się uruchomić LordOS Studio.",
+  "studio.badPicture": "Tego obrazu nie można użyć jako tła.",
+  "studio.invalid": "To ustawienie LordOS Studio jest nieprawidłowe.",
+  "studio.noCamera": "Nie podłączono żadnej kamery.",
+  "studio.unavailable": "LordOS Studio nie jest dostępne na tym komputerze."
 }

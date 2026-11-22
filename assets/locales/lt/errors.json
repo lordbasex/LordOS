@@ -913,5 +913,10 @@
   "vm.gvtFailed": "Nepavyko sukurti vaizdo plokštės dalies",
   "vm.memlockCap": "Ši mašina užrakintų {need} MB, bet dabar mašinoms su vaizdo plokšte laisva tik {cap} MB (Nustatymai → Vaizdo plokštės)",
   "vm.memlockRefused": "Šios mašinos atminties nepavyko užrakinti",
-  "gpu.memlockRange": "Šis kiekis viršija ribas, kiek šis kompiuteris leidžia mašinoms užrakinti"
+  "gpu.memlockRange": "Šis kiekis viršija ribas, kiek šis kompiuteris leidžia mašinoms užrakinti",
+  "studio.failed": "Nepavyko paleisti LordOS Studio.",
+  "studio.badPicture": "Šio paveikslėlio negalima naudoti kaip fono.",
+  "studio.invalid": "Šis LordOS Studio nustatymas netinkamas.",
+  "studio.noCamera": "Neprijungta jokia kamera.",
+  "studio.unavailable": "LordOS Studio šiame kompiuteryje nepasiekiama."
 }

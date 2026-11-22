@@ -911,5 +911,10 @@
   "vm.gvtFailed": "グラフィックカードの割り当てを作成できませんでした",
   "vm.memlockCap": "このマシンは {need} MB をロックしようとしていますが、グラフィックカードを使うマシンに現在空いているのは {cap} MB だけです（設定 → グラフィックカード）",
   "vm.memlockRefused": "このマシンのメモリをロックできませんでした",
-  "gpu.memlockRange": "この量は、このコンピューターがマシンにロックを許可している範囲外です"
+  "gpu.memlockRange": "この量は、このコンピューターがマシンにロックを許可している範囲外です",
+  "studio.failed": "LordOS Studio を起動できませんでした。",
+  "studio.badPicture": "その画像は背景に使用できません。",
+  "studio.invalid": "その LordOS Studio の設定は無効です。",
+  "studio.noCamera": "カメラが接続されていません。",
+  "studio.unavailable": "このコンピュータでは LordOS Studio を利用できません。"
 }

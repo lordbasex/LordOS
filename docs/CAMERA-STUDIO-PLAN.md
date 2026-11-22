@@ -1,8 +1,11 @@
 # Camera Studio: plan and design for approval
 
-**Status (2026-11-22): research and design FOR REVIEW.** Nothing here is built. No package, module, admin action,
-portal, helper or library is added until the maintainer approves the exceptions in section 10 (AGENTS.md: every root
-action, helper and library needs the same review). Facts are labelled the way `GO-LINK.md` does it:
+**Status (2026-11-22): approved by the maintainer; phases 0 and 1 built, in development (branch `feat/camera-studio`).**
+The maintainer approved the whole plan and the exceptions E-S1 to E-S7 on 2026-11-22; E-S8 (ONNX Runtime linked) was
+**not** approved: D3 is our own C inference, and ONNX Runtime is only the dev machine's reference in tests. The name is
+"LordOS Studio" and the status item's label "Camera" (D6); D5 and D7 to D10 take this plan's recommendations. Phases 2 to
+5 (the loopback package, the portal, the other effects, the app) are not built yet. Section 3.3 now has measured numbers.
+Facts are labelled the way `GO-LINK.md` does it:
 
 - **Read**: checked in this repository or in the cited source on 2026-11-22.
 - **Seen**: observed read-only on the maintainer's PC (i9-10900, RX 580, Logitech C930e, Debian 13) on 2026-11-22.
@@ -178,18 +181,40 @@ Fedora already defaults Firefox to it. They also give a cleaner permission story
 The deadline at 30 fps is 33.3 ms. The goal is to **add at most one frame of latency** and to stay under about 10 % of
 the CPU on the PC.
 
+**Measured on 2026-11-22 (phase 0 and 1)** on the maintainer's PC (i9-10900, RX 580 with radeonsi, Debian 13, GCC 14),
+one thread, medians; the Pi 5 column is still the earlier **Estimate** (no Pi was measured in this pass). Programs:
+`build/studio-nn-test time`, `build/studio-test time` (and the same at 1920×1080 with `-DSTUDIO_TEST_W=1920
+-DSTUDIO_TEST_H=1080`), `build/studio-helper-test` (inside lord-studio's sandbox) and `ffmpeg -benchmark -threads 1` for
+MJPEG.
+
 | Stage | PC, GPU (RX 580, radeonsi) | PC, CPU only | Pi 5, GPU (V3D 7.1, GLES 3.1) | Pi 5, CPU only |
 |---|---|---|---|---|
-| MJPEG 720p decode | 2–3 ms (1 core) | same | 6–9 ms | same |
-| Segmenter 256×144, own C (1 thread, AVX2 / NEON) | 2–4 ms | same | 8–14 ms | same |
-| BlazeFace 128×128, every 6th frame | < 1 ms on average | same | ~2 ms on average | same |
-| Guided filter plus composite at 720p | 1–2 ms (shaders) | 6–10 ms | 4–7 ms | 20–30 ms (too slow) |
-| Upload and readback (720p) | ~1 ms | — | ~3 ms | — |
-| **Total at 720p30** | **~7–11 ms** | ~12–18 ms | **~23–33 ms** (tight) | over budget |
-| 1080p30 | ~10–15 ms | ~20–28 ms | not offered | not offered |
+| MJPEG decode, libavcodec, 1 thread (synthetic 720p frames of about 62 KB) | 2.4 ms at 720p, 4.3 ms at 1080p | same | 6–9 ms (**Estimate**) | same |
+| Selfie Segmenter 256×144, our own C (`nn.c`; 33.3 M multiply-adds) | **3.65 ms** | same | 8–14 ms (**Estimate**) | same |
+| The same model in ONNX Runtime 1.21, 1 thread (dev machine reference only, never linked) | 1.97 ms | same | — | — |
+| BlazeFace 128×128, our own C (30.8 M multiply-adds; not in the phase 1 pipeline yet) | 2.39 ms (ONNX Runtime: 1.16 ms) | same | ~2 ms a frame on average at every 6th frame (**Estimate**) | same |
+| Segmenter step in the pipeline (one pass over the frame into the guide grid, the 256×144 input, the network) | 5.2–5.5 ms at 720p, 7.6 ms at 1080p | same | — | — |
+| Matte (temporal), guided filter coefficients at a quarter of the frame, background blur at that size | 2.7 ms at 720p, 5.6 ms at 1080p | same | — | — |
+| Composite (alpha from the guided filter, blur or picture, mirror) | 3.1 ms at 720p incl. upload and read back; 6.8 ms at 1080p | 8.3–8.9 ms at 720p, 18.9 ms at 1080p | 4–7 ms (**Estimate**) | 20–30 ms (**Estimate**) |
+| **Pipeline total, frame in → frame out** | **11.3–11.9 ms at 720p**, 20.1 ms at 1080p | 16.2–17.3 ms at 720p, 32.2 ms at 1080p | ~23–33 ms (**Estimate**) | over budget (**Estimate**) |
+| Inside lord-studio's sandbox (`probe`, 640×360, synthetic) | GPU path on: 4.5 ms segmenter, 2.5 ms matte and composite | 4.1 ms and 4.0 ms | — | — |
 
-All of these are **estimates**. They are scaled from published single-thread numbers: libfacedetection's own table on
-an i7-7820X and a Pi 4, and MediaPipe's reported mobile latencies. They need measuring (section 11).
+Not counted above: the camera picture's conversion to BGRA in `lord-studio` (swscale) and the preview slot's scaling,
+about 1–2 ms each at 720p (**Estimate**). So the PC at 720p30 with the GPU spends about 15–17 ms of one core per frame,
+within the 33 ms budget but about 45 % of one core (about 2–3 % of the whole i9): the "10 % of the CPU" goal holds for
+the whole machine, not for one core. 1080p30 fits only with the GPU (about 27 ms with decode and conversion), which
+confirms D10. The CPU path fits 720p30 on the PC (about 22 ms).
+
+What phase 0 learned:
+- Our own inference is **1.9× slower than ONNX Runtime** on the segmenter and 2× on BlazeFace, single-threaded, with no
+  hand-written kernels yet (plain C loops that GCC vectorises at `-O3`, x86-64-v3 clones for the hot ones). It must be
+  built with `-O3`: GCC's `-O2` left the channel loops scalar and took 11.3 ms (`server/mk/studio.mk`). Hand-written
+  AVX2/NEON kernels for the 1×1 and depthwise layers remain the plan's next optimisation, not needed for the PC.
+- Accuracy against ONNX Runtime on 10 frames: segmenter mean absolute error 4.7e-7 (max 1.6e-4), BlazeFace relative error
+  1.7e-4 (`build/studio-nn-test`; the required bound is 1e-3). The CPU and GPU composites agree within 0.03 levels on
+  average and never more than 1 level apart (`build/studio-test`).
+- The segmenter's output **is** the person's probability (not the background's, whatever the tensor's name
+  "segment_back" suggests): checked by eye on the 10 CC0 frames and by the tests.
 
 The **Pi 5 policy** follows from those numbers: 720p30 with the GPU, 640×360 at 30 fps on the CPU, and blur and
 picture only (no video backgrounds) when the CPU is above 85 % (as moving wallpapers already pause, `WALLPAPERS.md`).
@@ -556,6 +581,36 @@ The effort is for one developer with the existing patterns. These are **estimate
 | **3. More effects and mic** | Video backgrounds, green screen, Center Stage, Studio Light, colour match, filters, retouch. Voice Isolation drop-in and Mic Mode. Background catalog plus `studio-bg-get`. Curation of about 70 stills and 50 loops. | 3 weeks plus 2 days of curation | each effect checked against reference frames; Mic Mode heard in a Meet call; credits page |
 | **4. PipeWire camera** | Camera portal plus lord-screencast camera mode | 1–2 weeks | OBS Flatpak "Video Capture Device (PipeWire)" and Firefox with the pref on see "LordOS Studio"; the guard hides it from a restricted app |
 | **5. Studio app** | the full app, scenes, overlays from lord-server, recording, user LUTs | 2–3 weeks | screenshots in every theme and language direction |
+
+### 11.1 Phases 0 and 1 as built (2026-11-22, in development)
+
+- **Inference and models.** `server/src/media/studio/nn.c` (our own; the 14 operators the two models use, nothing else),
+  `tools/studio/tflite.mjs` and `tflite2lnn.mjs` (the converter, which refuses any other operator or option),
+  `assets/studio/models/*.lnn` (hashes in `server/src/media/studio/models.h`), the original files and Google's model
+  cards in `third_party/studio-models/`. `tools/studio/ort-ref.c` makes the reference outputs with ONNX Runtime on the
+  dev machine (from `tflite2lnn.mjs --onnx`); it is not built by `server/Makefile`. BlazeFace's decoding (`face.c`) is
+  written and tested but not used by the pipeline yet (Center Stage is phase 3).
+- **The pipeline** (`st.h`, `stfx.c`, `stgf.c`, `stgl.c`): Portrait (blur), Background (a picture), Mirror; the matte's
+  temporal smoothing and the guided filter as in 4.3 (no light wrap yet). The segmenter runs on the frame's own thread
+  (no second thread yet: at 3.7 ms it doesn't need one on the PC).
+- **lord-studio** (`stcam.c`, `LM_STUDIO` in `helper/lm_main.c` and `lm_cam.c`): lord-media's camera job with the effects;
+  `MM_STUDIO`, `MM_STUDIO_BG` and `MM_STUDIO_STATS` in `proto.h`. In phase 1 **each LordOS Studio source starts its own
+  lord-studio** on the real camera (the camera job's existing ring, preview, photo, video and companion link all carry
+  the effects); the single per-session process with the loopback and the idle card is phase 2. A second reader of the
+  same camera therefore fails as with any camera today ("in use"); the popover reuses a native app's running source
+  for its preview instead of opening the camera twice.
+- **lord-server** (`media/mstudio.c`, `ui/js_studio.c`): "LordOS Studio" (device `studio`) in `lord.media.cameras()`
+  and `BOP_CAMERA` with the same camera permission and restriction checks; `lord.studio.status/set/setBackground/preview`
+  in the desktop's own context only. Background pictures: LordOS's wallpapers (`asset:wallpapers/…`) or a picture
+  inside `lord.fs`'s roots; the catalog of section 6 and `studio-bg-get` are phase 3.
+- **The popover** (`sdk/studio.jsx`, `sdk/studiomodel.js`): from the camera capture item by the clock
+  (`sdk/capturestatus.jsx`, "Video effects" when a camera is in use): the live preview, the camera, who uses it, Portrait,
+  Background (None, Blur, Picture; LordOS's wallpapers or "Choose a picture…") and Mirror. Settings in
+  `settings.studio`. The other rows of 9.1 (Studio Light, Center Stage, Filters, Retouch, Mic Mode, Open Studio…) come
+  with their phases.
+- **Not verified yet:** the live camera through lord-studio on real hardware (the dev PC's camera was not opened in this
+  pass; the pipeline, the helper inside its sandbox with the GPU, the popover and the broker path are tested without
+  one), the Pi 5, and the v4l2loopback matrix (phase 2).
 
 Every phase also updates CHANGELOG, the paper (en, es, pt), the site and `THIRD_PARTY.md` (model cards, Apache-2.0
 NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).

@@ -32,6 +32,7 @@ typedef struct {
 
 typedef struct {
     int used, id, kind;
+    int studio;                 /* a LordOS Studio camera (lord-studio, mstudio.c): it gets the effects' settings */
     char app[MEDIA_APP_MAX];
     /* helper (player, camera, recordings) */
     int sock;
@@ -120,6 +121,9 @@ int  media_src_crop_count(MediaSrc *s);
 int  media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
 /* the same with lord-stream (0.8.8.10: network players and M3U lists, src/media/stream; streamurl.h) */
 int  media_spawn_stream(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
+/* lord-studio: LordOS Studio's camera (mstudio.c) */
+int  media_spawn_studio(const char *params, const int *fds, int nfds, pid_t *pid);
+int  media_has_studio(void);
 int  media_pulse_fd(void);              /* socket connected to PipeWire (the user's) or -1 */
 int  media_render_fd(void);             /* render node for VA-API or -1 */
 const char *media_hwaccel(void);        /* "vaapi" | "v4l2request" | "none" (LORD_MEDIA_HWACCEL) */

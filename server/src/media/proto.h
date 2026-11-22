@@ -29,7 +29,8 @@ enum {
     MK_PLAY = 1,        /* player: fds = file, audio ring (aring.h, or -1), render node (or -1) */
     MK_WORKER,          /* standalone queued jobs (MW_*), one per MM_JOB message */
     MK_SCREENREC,       /* screen recording: fds = mp4 output, microphone ring (or -1), render node */
-    MK_CAMERA,          /* V4L2 camera: fds = /dev/videoN, render node */
+    MK_CAMERA,          /* V4L2 camera: fds = /dev/videoN, render node. lord-studio (LM_STUDIO): fds = /dev/videoN, render
+                           node (when render=1), the segmenter's model; with probe=1 no camera (a pipeline self-test) */
     MK_AUDIOREC,        /* audio recorder: fds = wav output, microphone ring */
     MK_HWPROBE,         /* which video codecs VA-API decodes: fds = render node → one MM_RESULT
                            with JSON {"vaapi":bool,"vendor":"…","vp9":bool,"av1":bool,"h264":bool,"hevc":bool} */
@@ -78,6 +79,9 @@ enum {
     MM_KEYFRAME,        /* live encoder: the next frame is a keyframe */
     MM_RATE,            /* live encoder: v[0] = target kbit/s */
     MM_LINK,            /* camera: fd = live link (live.h); v[0] = 1 VP8, 0 H.264; v[1] = kbit/s. Its pictures also go there */
+    /* lord-studio only (LordOS Studio, src/media/studio, docs/CAMERA-STUDIO-PLAN.md); lord-media ignores them */
+    MM_STUDIO,          /* v[0] = mode (ST_MODE_*: 0 none, 1 blur, 2 picture), v[1] = blur 0..100, v[2] = mirror */
+    MM_STUDIO_BG,       /* fd = the background picture (a file lord-server opened and checked); no fd: none */
 
     /* lord-media → lord-server */
     MM_INFO = 64,       /* payload = JSON with the file's information */
@@ -96,6 +100,8 @@ enum {
                            chunk, v[2] = pts (ms for video, 48 kHz samples for audio), v[3] = 1 keyframe */
     MM_BENCH,           /* MK_VBENCH: id = measurement (VB_*); v[0] = VBR_*; v[1] = frames/s ×1000, v[2] = spread ×1000,
                            v[3] = why skipped (VBS_*) */
+    MM_STUDIO_STATS,    /* lord-studio, once a second: v[0] = frames done, v[1] = segmenter µs, v[2] = matte and composite µs,
+                           v[3] = 1 when the GPU composites */
 };
 
 /* MK_VBENCH's measurements, in order; lord-server maps them to its own ids (bench/lbvideo.c) */

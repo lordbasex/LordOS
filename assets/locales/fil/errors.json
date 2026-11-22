@@ -912,5 +912,10 @@
   "vm.gvtFailed": "Hindi magawa ang bahagi ng graphics card",
   "vm.memlockCap": "Magla-lock ang makinang ito ng {need} MB, pero {cap} MB na lang ang bakante ngayon para sa mga makinang may graphics card (Mga Setting → Mga graphics card)",
   "vm.memlockRefused": "Hindi ma-lock ang memory ng makinang ito",
-  "gpu.memlockRange": "Lampas ang halagang iyon sa pinapayagan ng computer na ito na i-lock ng mga makina"
+  "gpu.memlockRange": "Lampas ang halagang iyon sa pinapayagan ng computer na ito na i-lock ng mga makina",
+  "studio.failed": "Hindi nakapagsimula ang LordOS Studio.",
+  "studio.badPicture": "Hindi magagamit bilang background ang larawang iyon.",
+  "studio.invalid": "Hindi valid ang setting na iyon ng LordOS Studio.",
+  "studio.noCamera": "Walang nakakonektang camera.",
+  "studio.unavailable": "Hindi available ang LordOS Studio sa computer na ito."
 }

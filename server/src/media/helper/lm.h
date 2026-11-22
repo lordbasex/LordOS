@@ -26,6 +26,8 @@
 extern int lm_debug;
 #ifdef LM_NET
 #define LM_WHO "lord-stream"
+#elif defined(LM_STUDIO)
+#define LM_WHO "lord-studio"
 #else
 #define LM_WHO "lord-media"
 #endif
@@ -124,5 +126,15 @@ void lm_stream(const char *params, int ring, int render);               /* lm_st
 AVCodecContext *lm_stream_sw_encoder(int vp8, int w, int h, int fps, unsigned kbps);
 void lm_live(const char *params, int link, int ring);                   /* lm_live.c */
 void lm_vbench(const char *params);                                     /* lm_vbench.c */
+#ifdef LM_STUDIO
+/* lord-studio (../studio/stcam.c): LordOS Studio's pipeline on the camera's pictures */
+int  stcam_init(int model_fd, int render);      /* reads and checks the model; the render node stays the caller's */
+void stcam_config(const MediaMsg *m);           /* MM_STUDIO */
+void stcam_background(int fd);                  /* MM_STUDIO_BG: takes the fd */
+AVFrame *stcam_frame(AVFrame *f);               /* the picture with the effects (BGRA), or f itself */
+void stcam_tick(void);                          /* MM_STUDIO_STATS once a second */
+void stcam_probe(void);                         /* probe=1: a self-test without a camera */
+void stcam_free(void);
+#endif
 
 #endif

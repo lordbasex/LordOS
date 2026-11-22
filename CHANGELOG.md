@@ -12,6 +12,66 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **LordOS Studio: background blur and background pictures for the camera of LordOS's apps, in development (phases 0
+  and 1 of `docs/CAMERA-STUDIO-PLAN.md`; the plan and its exceptions E-S1 to E-S7 approved by the maintainer on
+  2026-11-22).** A new camera, "LordOS Studio", appears in `lord.media.cameras()` next to the real ones, so the Camera
+  app, isolated `.lpk` apps (`BOP_CAMERA`) and go-link Desk can choose it; its picture is the real camera's with the
+  effects of the moment, all at once in every app that uses it.
+  - **The popover** (`sdk/studio.jsx`, logic in `sdk/studiomodel.js`, every theme): when a camera is in use, the
+    camera capture item by the clock (`sdk/capturestatus.jsx`) has a "Video effects" row that turns its panel into
+    LordOS Studio's, in the same style: a live preview (shown as a mirror), the camera it takes the picture from
+    (kept by its USB bus id, so a renumbered `/dev/videoN` doesn't lose it), the apps using it now, **Portrait** (the
+    background blurred, with a strength slider), **Background** (None, Blur or Picture: LordOS's own wallpapers or
+    "Choose a picture…" from the person's files) and **Mirror my video**. The preview reuses a LordOS app's running
+    LordOS Studio camera instead of opening the camera a second time; otherwise the popover opens its own, which the
+    capture item shows like any camera, and closes it with the popover. The choices live in `settings.studio` (new
+    keys with defaults; no migration) and reach lord-server at start and on every change. Right to left: chevrons
+    and the back arrow turn, the preview keeps `direction: 'ltr'`. Text in all 35 languages (`studio.*`, and the
+    `errors.studio.*` codes).
+  - **`lord-studio`**, a new sandboxed helper (AGENTS.md, E-S1): lord-media's camera job built with `LM_STUDIO`
+    (`server/src/media/studio/stcam.c`; `MM_STUDIO`, `MM_STUDIO_BG` and `MM_STUDIO_STATS` in `media/proto.h`), so
+    the preview slots, the photo, the video and a companion's link all carry the effects. lord-server opens every
+    file it gets: the real camera, the render node, the segmenter's model (its size and SHA-256 checked against
+    `server/src/media/studio/models.h` before the fd goes out) and the background picture (a LordOS wallpaper or a
+    picture inside `lord.fs`'s roots, at most 32 MB, a `.jpg`, `.png` or `.webp`), and the helper decodes the picture
+    itself. `sandbox_apply_helper` before anything is read (scope `app-lordos-studio`), V4L2 and DRM/dma-buf ioctls
+    only, no network, no PipeWire socket, no exec, no paths. It links what lord-media links plus Mesa's GBM, EGL and
+    GLES (as lord-bench does); lord-server links nothing new.
+  - **Our own inference** (`server/src/media/studio/nn.c`, decision D3): MediaPipe's Selfie Segmenter (landscape,
+    144×256) and BlazeFace short range (Google, Apache-2.0; `third_party/studio-models/` keeps the original files,
+    their hashes and Google's model cards), converted once by `tools/studio/tflite2lnn.mjs` into our flat `.lnn`
+    files (`assets/studio/models/`). Only the 14 operators the two models use exist; the converter refuses anything
+    else, and the loader treats the file as hostile (counts, shapes, offsets and every weight checked; activations in
+    one arena laid out by lifetime). Against ONNX Runtime 1.21 on 10 CC0 frames (the reference made on the dev machine
+    by `tools/studio/ort-ref.c`; ONNX Runtime is never linked): mean absolute error 4.7e-7 for the segmenter, relative
+    error 1.7e-4 for BlazeFace. Measured on an i9-10900, one thread: 3.65 ms for the segmenter (ONNX Runtime 1.97 ms),
+    2.39 ms for BlazeFace (1.16 ms). It needs `-O3` (11.3 ms at GCC's `-O2`), which `server/mk/studio.mk` sets for
+    those files only.
+  - **The pipeline** (`st.h`, `stfx.c`, `stgf.c`, `stgl.c`): the frame's box average into the guide grid and the
+    segmenter's 256×144 input in one pass, the network, temporal smoothing with motion and hysteresis, the fast guided
+    filter (He and Sun) at a quarter of the frame, a background blur that leaves the person's own pixels out (no
+    halo), and the composite with the mirror, on the GPU (OpenGL ES 3 offscreen on the render node: GBM and a
+    surfaceless EGL context, like lord-bench) or on the CPU (always available; `GPU=0` builds it alone). At 1280×720
+    a frame takes 11.3–11.9 ms with the RX 580 and 16.2–17.3 ms on the CPU; 1920×1080 20.1 ms with the GPU and 32.2 ms
+    on the CPU. The plan's section 3.3 now has these measured numbers instead of estimates.
+  - **lord-server** (`server/src/media/mstudio.c`, `server/src/ui/js_studio.c`): `lord.studio.status()`, `set()`,
+    `setBackground()` and `preview()`, registered only in the desktop's own context (AGENTS.md, E-S5); the camera
+    permission and the "no camera" restriction apply to LordOS Studio's camera exactly as to a device, in
+    `js_media.c` and in the broker (`sec/brokercam.c`), and a restriction ends a running one at once. The helper's
+    statistics come back as numbers lord-server checks.
+  - **Tests**: `build/studio-nn-test` (both models against ONNX Runtime's stored outputs on 10 + 10 frames, face
+    decoding, 6000 damaged model files), `build/studio-test` (the pipeline on fixed frames: the matte against ONNX
+    Runtime's at camera size, the person kept, the background blurred or replaced, the exact mirror, a still frame's
+    matte settling, CPU and GPU agreeing within a level), `server/tests/studio_model_test.mjs` (the popover's logic),
+    all in `make test`; `build/studio-helper-test` in `make test-full` (lord-studio inside its sandbox with and without
+    the GPU, a non-camera fd, another job and a damaged model refused); `build/broker-restrict-test` gained LordOS
+    Studio's camera under the "no camera" restriction. `server/tests/studio_headless.sh` takes screenshots of the
+    popover in a headless lord-server without ever opening a camera. The test frames are CC0 photographs from
+    Wikimedia Commons (`server/tests/data/studio/README.md`).
+  - Not in this step: the virtual camera for every Linux app (v4l2loopback, phase 2), the other effects and Mic Mode
+    (phase 3), the PipeWire camera and its portal (phase 4) and the Studio app (phase 5). Each LordOS Studio camera
+    starts its own lord-studio for now, so two apps can't read it at once, as with any camera.
+
 - **`fastfetch` and `neofetch` run LordOS's `lordos-fetch` until the real package is installed, in development**
   (`packaging/fallback-bin/fastfetch`, `packaging/profile.d/lordos-fallback.sh`, `server/src/remote/sess.c`,
   `tools/iso/mkdeb.sh`; `docs/BENCHMARK.md`). People type the command they know and got "command not found". The

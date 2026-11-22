@@ -912,5 +912,10 @@
   "vm.gvtFailed": "The share of the graphics card couldn't be made",
   "vm.memlockCap": "This machine would lock {need} MB, but only {cap} MB are free for machines with a graphics card now (Settings → Graphics cards)",
   "vm.memlockRefused": "This machine's memory couldn't be locked",
-  "gpu.memlockRange": "That amount is outside what this computer allows machines to lock"
+  "gpu.memlockRange": "That amount is outside what this computer allows machines to lock",
+  "studio.failed": "LordOS Studio could not start.",
+  "studio.badPicture": "That picture can't be used as a background.",
+  "studio.invalid": "That LordOS Studio setting isn't valid.",
+  "studio.noCamera": "No camera is connected.",
+  "studio.unavailable": "LordOS Studio is not available on this computer."
 }

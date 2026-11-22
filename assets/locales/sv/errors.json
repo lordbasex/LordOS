@@ -912,5 +912,10 @@
   "vm.gvtFailed": "Andelen av grafikkortet kunde inte skapas",
   "vm.memlockCap": "Den här maskinen skulle låsa {need} MB, men bara {cap} MB är lediga för maskiner med grafikkort just nu (Inställningar → Grafikkort)",
   "vm.memlockRefused": "Maskinens minne kunde inte låsas",
-  "gpu.memlockRange": "Den mängden ligger utanför vad den här datorn låter maskiner låsa"
+  "gpu.memlockRange": "Den mängden ligger utanför vad den här datorn låter maskiner låsa",
+  "studio.failed": "LordOS Studio kunde inte starta.",
+  "studio.badPicture": "Den bilden kan inte användas som bakgrund.",
+  "studio.invalid": "Den inställningen för LordOS Studio är ogiltig.",
+  "studio.noCamera": "Ingen kamera är ansluten.",
+  "studio.unavailable": "LordOS Studio är inte tillgängligt på den här datorn."
 }

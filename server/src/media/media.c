@@ -23,6 +23,7 @@
 #include "../errcode.h"
 #include "../sec/json.h"
 #include "streamurl.h"
+#include "mstudio.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -149,6 +150,18 @@ int media_spawn_stream(int kind, const char *params, const int *fds, int nfds, p
     if (!checked) { checked = helper_path_of("lord-stream", path, sizeof path) ? -1 : 1; if (checked < 0) fprintf(stderr, "media: lord-stream is missing (no cameras or IPTV)\n"); }
     if (checked < 0) return -1;
     return spawn_bin("lord-stream", path, kind, params, fds, nfds, pid);
+}
+/* lord-studio (LordOS Studio, mstudio.c): the camera job only */
+int media_spawn_studio(const char *params, const int *fds, int nfds, pid_t *pid) {
+    static char path[PATH_MAX];
+    static int checked;
+    if (!checked) { checked = helper_path_of("lord-studio", path, sizeof path) ? -1 : 1; if (checked < 0) fprintf(stderr, "media: lord-studio is missing (no LordOS Studio)\n"); }
+    if (checked < 0) return -1;
+    return spawn_bin("lord-studio", path, MK_CAMERA, params, fds, nfds, pid);
+}
+int media_has_studio(void) {
+    char path[PATH_MAX];
+    return helper_path_of("lord-studio", path, sizeof path) == 0;
 }
 static int spawn_bin(const char *bin, const char *path, int kind, const char *params, const int *fds, int nfds, pid_t *pid) {
     int sv[2];
@@ -696,6 +709,9 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
         media_event(s->id, "level", "{\"level\":%lld,\"ms\":%lld,\"a\":%lld,\"b\":%lld}", (long long)m->v[0], (long long)m->v[1],
                     (long long)m->v[2], (long long)m->v[3]);
         break;
+    case MM_STUDIO_STATS:
+        if (s->studio) mstudio_stats(s->id, m->v[0], m->v[1], m->v[2], m->v[3]);
+        break;
     case MM_STATS:
         memcpy(s->stats, m->v, sizeof s->stats);
         media_event(s->id, "stats", "{\"decoded\":%lld,\"shown\":%lld,\"dropped\":%lld,\"hw\":%s,\"underruns\":%lld}", (long long)m->v[0],
@@ -1114,6 +1130,8 @@ int media_cameras(char *json, size_t n) {
         }
         close(fd);
     }
+    /* LordOS Studio: one more camera, over the real ones (docs/CAMERA-STUDIO-PLAN.md) */
+    if (!first && o + 200 < n) { mstudio_camera_entry(json + o, n - o, 0); o += strlen(json + o); }
     snprintf(json + o, n - o, "]");
     return 0;
 }

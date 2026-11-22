@@ -912,5 +912,10 @@
   "vm.gvtFailed": "Der Anteil der Grafikkarte konnte nicht erstellt werden",
   "vm.memlockCap": "Diese Maschine würde {need} MB sperren, aber für Maschinen mit Grafikkarte sind gerade nur {cap} MB frei (Einstellungen → Grafikkarten)",
   "vm.memlockRefused": "Der Arbeitsspeicher dieser Maschine konnte nicht gesperrt werden",
-  "gpu.memlockRange": "Dieser Wert liegt außerhalb dessen, was dieser Computer Maschinen zum Sperren erlaubt"
+  "gpu.memlockRange": "Dieser Wert liegt außerhalb dessen, was dieser Computer Maschinen zum Sperren erlaubt",
+  "studio.failed": "LordOS Studio konnte nicht gestartet werden.",
+  "studio.badPicture": "Dieses Bild kann nicht als Hintergrund verwendet werden.",
+  "studio.invalid": "Diese Einstellung von LordOS Studio ist ungültig.",
+  "studio.noCamera": "Es ist keine Kamera angeschlossen.",
+  "studio.unavailable": "LordOS Studio ist auf diesem Computer nicht verfügbar."
 }

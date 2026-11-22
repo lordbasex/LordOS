@@ -912,5 +912,10 @@
   "vm.gvtFailed": "Het deel van de videokaart kon niet worden gemaakt",
   "vm.memlockCap": "Deze machine zou {need} MB vastzetten, maar er is nu maar {cap} MB vrij voor machines met een videokaart (Instellingen → Videokaarten)",
   "vm.memlockRefused": "Het geheugen van deze machine kon niet worden vastgezet",
-  "gpu.memlockRange": "Die hoeveelheid valt buiten wat deze computer machines laat vastzetten"
+  "gpu.memlockRange": "Die hoeveelheid valt buiten wat deze computer machines laat vastzetten",
+  "studio.failed": "LordOS Studio kon niet starten.",
+  "studio.badPicture": "Die afbeelding kan niet als achtergrond worden gebruikt.",
+  "studio.invalid": "Die instelling van LordOS Studio is ongeldig.",
+  "studio.noCamera": "Er is geen camera aangesloten.",
+  "studio.unavailable": "LordOS Studio is niet beschikbaar op deze computer."
 }

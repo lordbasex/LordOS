@@ -145,6 +145,28 @@ Cameras, streams and TV channels for the desktop's **Video** widget and the Play
   starts with a 1 s analysis, the first frame in about 4 s there; stopping VLC was noticed within a second). Not yet:
   ONVIF discovery; NDI (closed SDK: not possible).
 
+### LordOS Studio: `lord-studio` (in development, phases 0 and 1)
+
+The camera's effects (docs/CAMERA-STUDIO-PLAN.md): background blur, a background picture and the mirror, for every
+LordOS app that picks the "LordOS Studio" camera in `lord.media.cameras()` (device `studio`; isolated apps through
+`BOP_CAMERA`). Opening it starts **`lord-studio`**, lord-media's camera job built with `LM_STUDIO`
+(`server/src/media/studio/`): the same `MK_CAMERA` ring, photo, video and companion link, with each decoded picture
+passed through the pipeline first (`stcam.c` → `stfx.c`).
+
+- **Fds only**, all opened by lord-server (`media/mstudio.c`): the real camera the person chose in the popover (kept by
+  its USB bus id), the render node, the segmenter's model (`assets/studio/models/`, SHA-256 checked against
+  `studio/models.h`) and, with `MM_STUDIO_BG`, a background picture that the helper decodes itself. The effects travel
+  as numbers (`MM_STUDIO`: mode, blur, mirror) to every running source at once; `MM_STUDIO_STATS` comes back once a
+  second (frames, the segmenter's and the composite's µs, GPU or not).
+- **The pipeline**: one pass over the frame for the guide grid (a quarter of the frame) and the segmenter's 256×144 input;
+  MediaPipe's Selfie Segmenter on our own inference (`nn.c`); temporal smoothing; the fast guided filter; a blur that
+  keeps the person's pixels out of the background, or a picture fitted to cover; the composite on the GPU (GLES 3 on
+  the render node, like lord-bench) or on the CPU. Measured numbers: docs/CAMERA-STUDIO-PLAN.md 3.3 (720p: about
+  11 ms a frame with an RX 580, 17 ms on the CPU).
+- **The popover**: `sdk/studio.jsx`, from the camera capture item's "Video effects" (`sdk/capturestatus.jsx`).
+- **Tests**: `build/studio-nn-test`, `build/studio-test`, `tests/studio_model_test.mjs` (`make test`),
+  `build/studio-helper-test` (`make test-full`), `tests/studio_headless.sh` (screenshots, no camera opened).
+
 ### The `lord-media` helper
 
 - **How it's launched:** lord-server launches it on demand (`media_spawn`), with a fixed path:

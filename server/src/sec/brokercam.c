@@ -17,6 +17,7 @@
 #include "../errcode.h"
 #include "json.h"
 #include "../media/media_int.h"
+#include "../media/mstudio.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -290,26 +291,39 @@ void brokercam_handle(int conn, int fd, uint32_t reqid, const char *payload, uin
             return;
         }
         if (!allowed) { brokersrv_reply(fd, reqid, BST_DENIED, NULL, 0, -1); return; }
-        if (!dev_ok(dev)) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+        int studio = !strcmp(dev, STUDIO_DEVICE);          /* LordOS Studio (media/mstudio.c): the same checks */
+        if (!studio && !dev_ok(dev)) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
         if (w < 160 || w > 3840) w = 1280;
         if (h < 120 || h > 2160) h = 720;
         Cam *c = NULL;
         int mine = 0;
         for (int i = 0; i < MAX_CAMS; i++) { if (cams[i].used && cams[i].conn == conn) mine++; if (!cams[i].used && !c) c = &cams[i]; }
         if (!c || mine >= 4) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
-        int dfd = open(dev, O_RDWR | O_NONBLOCK | O_CLOEXEC);
-        if (dfd < 0) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
-        MediaSrc *s = media_src_new(SK_CAMERA, app);
-        if (!s) { close(dfd); brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
-        int render = media_render_fd();
-        char params[96];
-        snprintf(params, sizeof params, "width=%d\nheight=%d\nhw=%d\nhwaccel=%s\n", w, h, render >= 0, media_hwaccel());
-        int fds[2] = { dfd, render };
-        /* the device fd goes to lord-media only */
-        s->sock = media_spawn(MK_CAMERA, params, fds, 2, &s->pid);
-        close(dfd);
-        if (render >= 0) close(render);
-        if (s->sock < 0) { media_src_close(s); brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+        MediaSrc *s;
+        if (studio) {
+            /* the real camera, the render node and the model go to lord-studio only */
+            const char *code = NULL;
+            s = media_src_new(SK_CAMERA, app);
+            if (!s) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+            s->sock = mstudio_spawn(w, h, &s->pid, &code);
+            if (s->sock < 0) { media_src_close(s); brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+            s->studio = 1;
+            mstudio_attach(s->sock);
+        } else {
+            int dfd = open(dev, O_RDWR | O_NONBLOCK | O_CLOEXEC);
+            if (dfd < 0) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+            s = media_src_new(SK_CAMERA, app);
+            if (!s) { close(dfd); brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+            int render = media_render_fd();
+            char params[96];
+            snprintf(params, sizeof params, "width=%d\nheight=%d\nhw=%d\nhwaccel=%s\n", w, h, render >= 0, media_hwaccel());
+            int fds[2] = { dfd, render };
+            /* the device fd goes to lord-media only */
+            s->sock = media_spawn(MK_CAMERA, params, fds, 2, &s->pid);
+            close(dfd);
+            if (render >= 0) close(render);
+            if (s->sock < 0) { media_src_close(s); brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
+        }
         memset(c, 0, sizeof *c);
         c->used = 1;
         c->conn = conn;
