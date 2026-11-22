@@ -163,6 +163,8 @@ const homeCss = minCss(src('home.css').replace('__FONT_MEDIUM__', fontMedium));
 const homeCssUrl = hashed(Buffer.from(homeCss), 'home', 'css');
 const imagerCss = minCss(src('imager.css'));
 const imagerCssUrl = hashed(Buffer.from(imagerCss), 'imager', 'css');
+const waylandCss = minCss(src('wayland.css'));
+const waylandCssUrl = hashed(Buffer.from(waylandCss), 'wayland', 'css');
 const searchJsUrl = hashed(Buffer.from(src('search.js')), 'search', 'js');
 // [[PLACEHOLDER]] markers left by the content agents: highlighted when --allow-placeholders, else the build fails
 const ALLOW_PH = process.argv.includes('--allow-placeholders');
@@ -174,6 +176,7 @@ const phOut = (html) => html.replace(/\u0001([A-Z0-9_]+)\u0001/g, '<mark class="
 const minJs = (j) => j.split('\n').map((x) => x.trim()).filter((x) => x && !x.startsWith('//')).join('\n');
 const jsSrc = minJs(src('site.js'));
 const jsUrl = hashed(Buffer.from(jsSrc), 'site', 'js');
+const waylandJsUrl = hashed(Buffer.from(minJs(src('wayland.js'))), 'wayland', 'js');
 const themeSrc = minJs(src('theme.js'));
 const themeUrl = hashed(Buffer.from(themeSrc), 'theme', 'js');
 
@@ -371,6 +374,10 @@ const HAS_HW = fs.existsSync(hwDir);
 const hwModel = HAS_HW ? buildModel(readReports(hwDir)) : null;
 const verNum = (v) => String(v).split('.').map(Number).reduce((a, x) => a * 1000 + (x || 0), 0);
 const HW_IN_DEV = verNum(PKG.version) < verNum('0.8.7');      // Share on GitHub ships with 0.8.7
+// the Wayland protocol table (/wayland-protocols-table/): tools/gen-wayland-table.mjs writes its data
+const waylandFile = path.join(CONTENT, 'wayland/protocols.json');
+const HAS_WAYLAND = fs.existsSync(waylandFile);
+const WAYLAND = HAS_WAYLAND ? JSON.parse(fs.readFileSync(waylandFile, 'utf8')) : null;
 const faqFile = path.join(CONTENT, 'faq/faq.json');
 const faqJson = fs.existsSync(faqFile) ? readJson(faqFile) : null;
 let faqHeld = 0;
@@ -435,7 +442,7 @@ ${alts}
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preload" href="${fontExtraBold}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="${fontMedium}" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="${cssUrl}">${doc ? `\n<link rel="stylesheet" href="${doc === 'home' ? homeCssUrl : doc === 'imager' ? imagerCssUrl : docCssUrl}">` : ''}
+<link rel="stylesheet" href="${cssUrl}">${doc ? `\n<link rel="stylesheet" href="${doc === 'home' ? homeCssUrl : doc === 'imager' ? imagerCssUrl : docCssUrl}">` : ''}${doc === 'wayland' ? `\n<link rel="stylesheet" href="${waylandCssUrl}">` : ''}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="LordOS">
 <meta property="og:title" content="${esc(title)}">
@@ -559,7 +566,7 @@ function linkBuilt(href) {
 }
 let _built = null;
 function builtPages() {
-  if (!_built) _built = new Set(['', 'explore', 'raspberry-pi', 'apps', 'gallery', 'about', 'language', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
+  if (!_built) _built = new Set(['', 'explore', 'raspberry-pi', 'apps', 'gallery', 'about', 'language', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...(HAS_WAYLAND ? ['wayland-protocols-table'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
   return _built;
 }
 // one-slot language picker: a <details> dropdown of plain links (works without JS; keeps the page)
@@ -724,7 +731,7 @@ ${icons}
 }
 
 const PI_ART = JSON.parse(src('pi-art.json'));   // the three drawings (our own, isometric): argon, pi500, pi5
-const tpl = { imager: src('imager.html'), home: src('home.html'), explore: src('explore.html'), raspberry: src('raspberry.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), language: src('language.html'), hardware: src('hardware.html'), guide: src('guide.html') };
+const tpl = { imager: src('imager.html'), home: src('home.html'), explore: src('explore.html'), raspberry: src('raspberry.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), language: src('language.html'), hardware: src('hardware.html'), guide: src('guide.html'), wayland: src('wayland.html') };
 
 for (const l of LANGS) {
   const t = dict[l];
@@ -1217,6 +1224,7 @@ ${(c.items || []).map((it) => {
     if (HAS_PAPER) add('page', t.pages.navPaper, pageUrl(l, 'paper'), '');
     if (HAS_FAQ) add('page', t.pages.faq.title, pageUrl(l, 'faq'), t.pages.faq.lead);
     if (HAS_HW) add('page', t.pages.hardware.title, pageUrl(l, 'hardware'), t.pages.hardware.lead);
+    if (HAS_WAYLAND) add('page', t.pages.wayland.title, pageUrl(l, 'wayland-protocols-table'), `Wayland KWin Mutter KDE GNOME ${t.pages.wayland.lead}`);
     if (HAS_GUIDE) add('guide', 'LordOS Imager', pageUrl(l, 'imager'), '');
     for (const m of featureList) add('feature', loc(m.title, l), pageUrl(l, 'features/' + m.slug), loc(m.tagline, l));
     for (const g of guidePages) add('guide', loc(g.title, l), pageUrl(l, g.slug), loc(g.description || g.lead, l));
@@ -1234,6 +1242,58 @@ ${(c.items || []).map((it) => {
       ...common('hardware', [`${H.title} · LordOS`, H.lead], true), ...sec,
       status: HW_IN_DEV ? esc(H.statusDev.replace('{release}', `${PKG.version}${CHANNEL}`)) : '',
       newIssue: `${GITHUB}/issues/new?template=hardware-report.yml`,
+    }, t));
+  }
+
+  // the Wayland protocol table (0.8.9.5): every protocol, LordOS against KWin and Mutter. The data is
+  // web/content/wayland/protocols.json, written by tools/gen-wayland-table.mjs from docs/wayland-protocols.json.
+  if (HAS_WAYLAND) {
+    const W = t.pages.wayland, D = WAYLAND, c = D.compared, s = D.stats;
+    const fill = (str, o) => str.replace(/\{(\w+)\}/g, (m, k) => (o[k] != null ? o[k] : m));
+    const fmtD = (iso) => new Date(iso + 'T12:00:00Z').toLocaleDateString(l === 'en' ? 'en-US' : l === 'es' ? 'es-AR' : 'pt-BR', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+    const inDev = (v) => !!v && verNum(v) > verNum(LATEST_RELEASE);
+    const STS = ['supported', 'partial', 'on-purpose', 'missing'];
+    const CATS = ['core', 'stable', 'staging', 'unstable', 'experimental', 'wlr', 'kde', 'other'].filter((k) => D.protocols.some((p) => p.cat === k));
+    const pill = (st) => `<span class="wp-st wp-${st}">${esc(W.status[st])}</span>`;
+    const verCell = (v, who) => (v == null ? `<span class="wp-no" title="${esc(W.notOffered)}">—<span class="vh"> ${esc(W.notOffered)}</span></span>` : `<span class="wp-yes"><span class="vh">${esc(who)} </span>${esc(W.version)} ${v}</span>`);
+    const rows = D.protocols.map((p) => {
+      const L = p.lordos;
+      const dev = inDev(L.since) || inDev(L.bumped);
+      const lc = [pill(L.status)];
+      if (L.version != null) lc.push(`<span class="wp-v">${esc(W.version)} ${L.version}</span>`);
+      if (L.since && !inDev(L.since)) lc.push(`<span class="wp-since">${esc(fill(W.since, { v: L.since }))}</span>`);
+      if (dev) lc.push(`<span class="wp-dev" title="${esc(fill(W.inDevNote, { release: LATEST_RELEASE }))}">${esc(W.inDev)}</span>`);
+      const q = [p.id, p.name, p.summary, ...p.globals, L.note].join(' ').toLowerCase();
+      const both = p.kwin != null && p.mutter != null;
+      return `<tr data-cat="${p.cat}" data-st="${L.status}" data-l="${L.version != null ? 1 : 0}" data-k="${p.kwin != null ? 1 : 0}" data-m="${p.mutter != null ? 1 : 0}" data-dev="${dev ? 1 : 0}" data-q="${esc(q)}" id="p-${esc(p.id)}">
+<th scope="row" data-label="${esc(W.hProtocol)}"><a href="${esc(p.url)}" rel="noopener">${esc(p.name)}</a>${p.deprecated ? ` <span class="wp-depr">${esc(W.deprecated)}</span>` : ''}<code>${esc(p.id)}</code>${p.summary.toLowerCase() !== p.name.toLowerCase() ? `<span class="wp-sumy">${esc(p.summary)}</span>` : ''}${p.globals.length && !(p.globals.length === 1 && p.globals[0] === p.name) ? `<span class="wp-gl">${p.globals.map((g) => `<code>${esc(g)}</code>`).join(' ')}</span>` : ''}</th>
+<td data-label="${esc(W.hCategory)}"><div><span class="wp-cat">${esc(W.cats[p.cat])}</span></div></td>
+<td data-label="LordOS" class="wp-l"><div>${lc.join(' ')}</div></td>
+<td data-label="${esc(W.kde)}"${both ? ' class="wp-both"' : ''}><div>${verCell(p.kwin, 'KWin')}</div></td>
+<td data-label="${esc(W.gnome)}"${both ? ' class="wp-both"' : ''}><div>${verCell(p.mutter, 'Mutter')}</div></td>
+<td data-label="${esc(W.hNote)}" class="wp-note"><div>${L.note ? `<span lang="en">${esc(L.note)}</span>` : ''}<span class="wp-chk">${esc(W.checked)} <span lang="en">${esc(L.checked)}</span>, <time datetime="${esc(L.checkedDate)}">${esc(L.checkedDate)}</time></span></div></td>
+</tr>`;
+    }).join('\n');
+    const opt = (v, label) => `<option value="${esc(v)}">${esc(label)}</option>`;
+    const tile = (n, label) => `<li><strong>${n}</strong><span>${esc(label)}</span></li>`;
+    const nDev = D.protocols.filter((p) => inDev(p.lordos.since) || inDev(p.lordos.bumped)).length;
+    write(path.join(pageUrl(l, 'wayland-protocols-table'), 'index.html'), render(tpl.wayland, {
+      ...common('wayland-protocols-table', [W.metaTitle, W.metaDescription], 'wayland'),
+      date: esc(c.date), dateText: esc(fmtD(c.date)),
+      lordosVer: esc(fill(W.lordosVer, { release: LATEST_RELEASE })) + (nDev ? ` <span class="wp-dev">${esc(fill(W.devCount, { n: nDev }))}</span>` : ''),
+      kwinVer: esc(c.kwin.version), mutterVer: esc(c.mutter.version),
+      source: `<a href="${esc(c.source)}" rel="noopener">wayland.app</a> ${esc(fill(W.sourceDates, { kwin: fmtD(c.kwin.dataDate), mutter: fmtD(c.mutter.dataDate) }))}`,
+      stats: [tile(`${s.lordosOfBoth} / ${s.both}`, W.tileBoth), tile(s.lordos, W.tileLordos), tile(s.onPurpose, W.tilePurpose), tile(s.total, W.tileTotal)].join('\n'),
+      summary: esc(fill(W.summary, { total: s.total, lordos: s.lordos, kwin: s.kwin, mutter: s.mutter, both: s.both, lordosOfBoth: s.lordosOfBoth, onPurpose: s.onPurpose, missing: s.missing, either: s.either, lordosOfEither: s.lordosOfEither })),
+      catOptions: opt('all', W.catAll) + CATS.map((k) => opt(k, W.cats[k])).join(''),
+      statusOptions: opt('all', W.statusAll) + STS.map((k) => opt(k, W.status[k])).join('') + opt('dev', W.inDev),
+      compOptions: opt('all', W.compAll) + ['lordos', 'kwin', 'mutter', 'both', 'gap'].map((k) => opt(k, W.comp[k])).join(''),
+      hKwin: esc(`${W.kde} (KWin ${c.kwin.version})`), hMutter: esc(`${W.gnome} (Mutter ${c.mutter.version})`),
+      rows,
+      legend: [...STS.map((k) => `<div><dt>${pill(k)}</dt><dd>${esc(W.statusText[k])}</dd></div>`),
+        `<div><dt><span class="wp-dev">${esc(W.inDev)}</span></dt><dd>${esc(fill(W.inDevNote, { release: LATEST_RELEASE }))}</dd></div>`,
+        `<div><dt><span class="wp-no">—</span></dt><dd>${esc(W.notOfferedText)}</dd></div>`].join('\n'),
+      waylandJs: waylandJsUrl, docsUrl: `${GITHUB}/blob/main/docs/WAYLAND.md#protocol-table-generated`, jsonUrl: `${GITHUB}/blob/main/docs/wayland-protocols.json`,
     }, t));
   }
 
@@ -1392,7 +1452,7 @@ if (fs.existsSync(secTxt)) {
   else log('security.txt held back: it still has placeholders');
 }
 write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
-const allPages = [...PAGES, ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), 'about', 'language', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
+const allPages = [...PAGES, ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...(HAS_WAYLAND ? ['wayland-protocols-table'] : []), 'about', 'language', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
 const urls = allPages.flatMap((p) => LANGS.map((l) => `  <url>
     <loc>${SITE}${pageUrl(l, p)}</loc>
     <lastmod>${today}</lastmod>
@@ -1429,7 +1489,7 @@ for (const f of html) {
 const jsSize = Buffer.byteLength(jsSrc) + Buffer.byteLength(themeSrc), cssSize = Buffer.byteLength(css);
 if (jsSize > 15 * 1024) throw new Error(`JS is ${jsSize} bytes (limit 15 KB)`);
 if (cssSize > 30 * 1024) throw new Error(`site.css is ${cssSize} bytes (limit 30 KB)`);
-for (const [n, c] of [['doc.css', docCss], ['home.css', homeCss], ['imager.css', imagerCss]]) if (c.length > 30 * 1024) throw new Error(`${n} is ${c.length} bytes (limit 30 KB)`);
+for (const [n, c] of [['doc.css', docCss], ['home.css', homeCss], ['imager.css', imagerCss], ['wayland.css', waylandCss]]) if (c.length > 30 * 1024) throw new Error(`${n} is ${c.length} bytes (limit 30 KB)`);
 log(`built ${html.length} pages into web/dist (js ${jsSize} B, css ${cssSize} B, ${shots.length} gallery images, ${apps.length} apps); install.sh byte-identical`);
 
 // ---------- paper PDFs (headless Chromium prints the built page) ----------
