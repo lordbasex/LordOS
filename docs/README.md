@@ -93,6 +93,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [DOCUMENTS.md](DOCUMENTS.md) | PDFs, archives, fonts and emoji |
 | [PRINTING.md](PRINTING.md) | Printing and scanning |
 | [MEDIA.md](MEDIA.md) | Photos, Player, Screenshots, Camera and Recorder |
+| [CAMERA-STUDIO-PLAN.md](CAMERA-STUDIO-PLAN.md) | Plan: Camera Studio, camera effects for any app (virtual camera, segmentation, backgrounds, mic modes), for the maintainer's review |
 | [VIDEO.md](VIDEO.md) | Video in the browser without hardware decoding (H.264 instead of VP9/AV1) |
 | [MAIL.md](MAIL.md) | Mail, Calendar, Contacts and Reminders |
 | [CLOUD.md](CLOUD.md) | Cloud: the person's cloud storage accounts (rclone) in Files, Settings and Backups (0.8.8.5) |
