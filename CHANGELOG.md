@@ -48,6 +48,37 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Boot key enrolment, Flatpak's GL.nvidia extension, four closed admin actions) and NVIDIA drawing the desktop
     (`nvidia-drm.modeset=1`, GBM/EGL, explicit sync, a boot fallback, a test matrix by generation).
 
+- **Lord Workspaces: each display's quick launch and its usual apps, suggested, in development** (asked by the maintainer;
+  decision 2026-11-22: suggest, never open by itself; `docs/WORKSPACES.md`, "Several displays").
+  - **The record, in the SDK for every theme** (`sdk/displayapps.js`, the rules in `sdk/displayappsmodel.js`): per display,
+    keyed by its connector (`DP-2`, `HDMI-A-1`…, never the model, which identical monitors share), the apps opened there
+    (each app once per half hour, its display read once the theme placed the window) and the apps open there together
+    for a minute and a half, in the theme's tile order with its layout and divider (each set once per session). Small
+    and pruned: at most 8 displays, 12 apps and 6 sets per display, 6 apps per set; use halves every 14 days and is
+    forgotten after 90. Stored in `settings.displayApps` (a new key, no migration), on this computer only; nothing is
+    sent anywhere. No polling: one timer after the apps on a display change.
+  - **The empty-activity card** of each display keeps Add window, Add widget and Open pinned apps, and adds **Used most
+    on this display**: up to five apps, most used there with recent ones first, one click each, opened on that display.
+  - **The usual apps, suggested:** a set seen at least twice on a display shows in its card as "Open your usual apps
+    here?" with each app and the layout's miniature, after 1.2 s with nothing open (windows coming back with the session
+    don't flash it), once per activity and display in a session (when the session starts or a new activity shows
+    there). **Open them** sets the usual layout (not on a locked display) and opens the apps aimed at that display, each
+    window taking its usual tile as it arrives whatever order the apps start in (`openUsual`, `themes/workspaces/tiler.js`);
+    **Not now** hides it for the session; **Don't suggest on this display** is kept for that display only. Nothing opens
+    without a click.
+  - **Keyboard:** the card's controls follow the activity strip in the bars' keyboard (⌃F2, then the arrows, Enter),
+    with the bars' ring. **RTL:** text aligned to start, rows follow the direction (headless screenshots in English and
+    Arabic, 2026-11-22).
+  - **Settings → Desktop style** (with the theme's options; a theme opts in with `"displayApps": true` in its
+    `theme.json`, `sdk/thememeta.js`): "Remember the apps used on each display" (turning it off forgets the record and
+    records nothing) and "Forget the apps of every display" (Clear; displays told not to suggest suggest again).
+  - **Texts** in all 35 languages (`shell.ws.usual.*`, `shell.ws.quick.title`, `shell.displayApps.*`).
+  - **Tests:** `server/tests/display_apps_model_test.mjs` (the record cleaned, pruned and small, fading use, a set
+    suggested only once seen twice, per display, quiet displays, off and clear); `server/tests/workspaces_scene.mjs`
+    (three displays: the card's quick launch per display, no suggestion before the moment or for a set seen once,
+    nothing opened by itself, Open from the keyboard opening the apps on that display in the usual layout and order,
+    offered once, "Don't suggest" kept for that display only, Clear and off); `workspaces_model_test.mjs` (theme.json).
+
 - **Machines from the terminal: the `machines` command, in development** (approved by the maintainer 2026-11-21;
   `docs/VIRTUALIZATION.md` 6.15 "From the terminal"). `machines list [--json]` shows each machine of `~/Machines` with its
   system, state, vCPUs, memory, disk used and graphics; `status NAME [--json]`, `start NAME [--no-window]`, `open NAME`,

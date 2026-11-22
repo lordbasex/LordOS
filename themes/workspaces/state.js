@@ -18,6 +18,15 @@ export const deleting = createStore(null);
 export const launchOrigin = { x: 0, y: 0, t: 0 };
 export function noteLaunch(x, y) { launchOrigin.x = x; launchOrigin.y = y; launchOrigin.t = Date.now(); }
 
+// The suggestion of a display's usual apps (sdk/displayapps.js) is offered once per activity and display in a session:
+// when the session starts or a new activity shows there with nothing open. Answered (opened, "Not now", "Don't
+// suggest"), or the display got a window: not again. `${desk}|${display key}`
+export const offered = createStore(new Set());
+export function markOffered(desk, dk) {
+  const k = `${desk}|${dk}`;
+  if (!offered.get().has(k)) offered.set((o) => new Set([...o, k]));
+}
+
 let started = false;
 export function startActivities() {
   if (started) return;

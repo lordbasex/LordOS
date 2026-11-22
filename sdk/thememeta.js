@@ -11,6 +11,8 @@
 //   wallpaper      { default: <id>, slideshow: true }: the picture of a user who never chose one (settings.wallpaper
 //                  null; the theme's tokens.defaultWallpaper says the same to the SDK), and Settings → Wallpaper's
 //                  slideshow (sdk/slideshowmodel.js). Read as wallpaperDefault and wallpaperSlideshow.
+//   displayApps    true: the theme offers the apps used on each display (sdk/displayapps.js); Settings shows, with its
+//                  options, the switch that records them and "Clear"
 //   community      true: a theme LordOS didn't make; Settings → Appearance marks it "Community · unofficial"
 //   author         who made it (plain text, at most 80 characters; "author pending" or none reads as an unknown author)
 //   license        its license as an SPDX expression ("MIT", "GPL-3.0-or-later", "MIT OR Apache-2.0")
@@ -57,7 +59,7 @@ export function cleanThemeMeta(meta) {
   const sketch = s ? Object.fromEntries(SKETCH.filter((k) => s[k] === true).map((k) => [k, true])) : null;
   const options = Array.isArray(m.options) ? m.options.slice(0, 8).map(cleanOption).filter(Boolean) : [];
   const wp = m.wallpaper && typeof m.wallpaper === 'object' && !Array.isArray(m.wallpaper) ? m.wallpaper : {};
-  return { sketch: sketch && Object.keys(sketch).length ? sketch : null, options, desktopArrows: m.desktopArrows === true,
+  return { sketch: sketch && Object.keys(sketch).length ? sketch : null, options, desktopArrows: m.desktopArrows === true, displayApps: m.displayApps === true,
     wallpaperDefault: typeof wp.default === 'string' && WALLPAPER.test(wp.default) ? wp.default : null, wallpaperSlideshow: wp.slideshow === true,
     community: m.community === true, author: themeAuthor(m.author),
     license: typeof m.license === 'string' && LICENSE.test(m.license) ? m.license : '',
