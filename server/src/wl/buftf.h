@@ -84,4 +84,22 @@ static inline BufBox buftf_union(BufBox a, BufBox b) {
     return (BufBox){ a.x0 < b.x0 ? a.x0 : b.x0, a.y0 < b.y0 ? a.y0 : b.y0, a.x1 > b.x1 ? a.x1 : b.x1, a.y1 > b.y1 ? a.y1 : b.y1 };
 }
 
+/* A box clamped to a w × h buffer (empty when it misses it). */
+static inline BufBox buftf_clamp(BufBox b, int w, int h) {
+    if (b.x0 < 0) b.x0 = 0;
+    if (b.y0 < 0) b.y0 = 0;
+    if (b.x1 > w) b.x1 = w;
+    if (b.y1 > h) b.y1 = h;
+    if (b.x1 <= b.x0 || b.y1 <= b.y0) b = (BufBox){ 0, 0, 0, 0 };
+    return b;
+}
+
+/* May a commit of a w × h buffer over content of the same size copy only the damage box? Only a box that, clamped to the
+ * buffer, is non-empty and smaller than all of it; *out is the clamped box. (Anything else is a whole copy: the copy
+ * loop must never be handed a box past the buffer.) */
+static inline int buftf_partial(BufBox b, int w, int h, BufBox *out) {
+    *out = buftf_clamp(b, w, h);
+    return w > 0 && h > 0 && out->x1 > out->x0 && !(out->x0 == 0 && out->y0 == 0 && out->x1 == w && out->y1 == h);
+}
+
 #endif

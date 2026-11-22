@@ -221,7 +221,16 @@ static int run_damage(int per_sec, int secs) {
         while (now_s() < next) { wl_display_flush(dpy); usleep(1000); wl_display_dispatch_pending(dpy); }
         wl_display_roundtrip(dpy);
     }
-    printf("damage: %d commits of a 10x10 square\n", n);
+    /* the same buffer again with no damage at all (a whole copy), then with damage past its edges (clamped) */
+    wl_surface_attach(surf, b.b, 0, 0);
+    wl_surface_commit(surf);
+    wl_display_roundtrip(dpy);
+    wl_surface_attach(surf, b.b, 0, 0);
+    wl_surface_damage_buffer(surf, 600, 400, 1 << 20, 1 << 20);
+    wl_surface_damage(surf, -100000, -100000, 100010, 100010);
+    wl_surface_commit(surf);
+    wl_display_roundtrip(dpy);
+    printf("damage: %d commits of a 10x10 square, one with no damage, one past the edges\n", n);
     return wl_display_get_error(dpy) ? 1 : 0;
 }
 

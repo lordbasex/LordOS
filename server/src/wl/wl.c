@@ -601,8 +601,7 @@ static void copy_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
     int tf = s->tf, w = buftf_swaps(tf) ? bh : bw, h = buftf_swaps(tf) ? bw : bh;
     int opaque = fmt == WL_SHM_FORMAT_XRGB8888;
     /* a part only into a px of the same size and format, upright already (no transform), with damage inside */
-    int part = s->px && w == s->w && h == s->h && opaque == s->opaque && !tf && s->tf_px == tf && dmg.x1 > dmg.x0 &&
-               !(dmg.x0 == 0 && dmg.y0 == 0 && dmg.x1 == w && dmg.y1 == h);
+    int part = s->px && w == s->w && h == s->h && opaque == s->opaque && !tf && s->tf_px == tf && buftf_partial(dmg, w, h, &dmg);
     if (!part && (w != s->w || h != s->h || !s->px)) {
         uint32_t *np = realloc(s->px, (size_t)w * (size_t)h * 4);
         if (!np) { wl_buffer_send_release(buf); return; }
@@ -839,20 +838,15 @@ static void srf_damage_buffer(struct wl_client *c, struct wl_resource *r, int32_
  * damaged with the state this commit makes current; a full box when it can't be told (a transform, no damage at all
  * with a new buffer, a size that isn't known). */
 static BufBox commit_damage(Surf *s, struct wl_resource *buf) {
-    BufBox none = { 0, 0, 0, 0 }, all = { 0, 0, 1 << 14, 1 << 14 };
+    BufBox none = { 0, 0, 0, 0 };
     struct wl_shm_buffer *b = buf ? wl_shm_buffer_get(buf) : NULL;
-    if (!b || s->p_tf) return all;
+    if (!b) return none;                        /* (not shared memory: take_buffer takes all of it anyway) */
     int uw = wl_shm_buffer_get_width(b), uh = wl_shm_buffer_get_height(b);
-    if (!s->p_ds_on && !s->p_db_on) return all;
+    if (uw <= 0 || uh <= 0) return none;
+    BufBox all = { 0, 0, uw, uh };              /* the whole buffer, never past it (copy_buffer clamps again) */
+    if (s->p_tf || (!s->p_ds_on && !s->p_db_on)) return all;
     BufBox r = none;
-    if (s->p_db_on) {
-        r = s->p_db;
-        if (r.x0 < 0) r.x0 = 0;
-        if (r.y0 < 0) r.y0 = 0;
-        if (r.x1 > uw) r.x1 = uw;
-        if (r.y1 > uh) r.y1 = uh;
-        if (r.x1 <= r.x0 || r.y1 <= r.y0) r = none;
-    }
+    if (s->p_db_on) r = buftf_clamp(s->p_db, uw, uh);
     if (s->p_ds_on) {
         int vp = s->viewport != NULL;
         float cx = vp ? (s->p_vp ? s->p_vsx : s->vsx) : 0, cy = vp ? (s->p_vp ? s->p_vsy : s->vsy) : 0;
@@ -862,6 +856,7 @@ static BufBox commit_damage(Surf *s, struct wl_resource *buf) {
         r = buftf_union(r, buftf_surface_damage(s->p_ds[0], s->p_ds[1], s->p_ds[2], s->p_ds[3], s->p_bscale, uw, uh,
                                                 cx, cy, cw, ch, dw, dh));
     }
+    r = buftf_clamp(r, uw, uh);
     return r.x1 > r.x0 ? r : all;
 }
 

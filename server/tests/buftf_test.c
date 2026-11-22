@@ -88,6 +88,18 @@ int main(void) {
     check("union with an empty box", u.x0 + u.x1, 15);
     u = buftf_union((BufBox){ 0, 0, 4, 4 }, (BufBox){ 5, 5, 10, 10 });
     check("union", u.x0 * 1000L + u.x1 * 10 + u.y1, 110);
+    /* the partial copy's gate (copy_buffer): never a box past the buffer */
+    BufBox o;
+    check("partial: a box inside", buftf_partial((BufBox){ 10, 10, 20, 20 }, 640, 480, &o), 1);
+    check("partial: a box past the buffer is clamped", buftf_partial((BufBox){ 600, 400, 1 << 14, 1 << 14 }, 640, 480, &o) &&
+          o.x1 == 640 && o.y1 == 480 && o.x0 == 600 && o.y0 == 400, 1);
+    check("partial: the old \"all\" sentinel (no damage) is a whole copy", buftf_partial((BufBox){ 0, 0, 1 << 14, 1 << 14 }, 640, 480, &o), 0);
+    check("partial: ... and clamps to the buffer", o.x1 * 1000L + o.y1, 640480);
+    check("partial: no damage (empty) is a whole copy", buftf_partial((BufBox){ 0, 0, 0, 0 }, 640, 480, &o), 0);
+    check("partial: all of it is a whole copy", buftf_partial((BufBox){ 0, 0, 640, 480 }, 640, 480, &o), 0);
+    check("partial: off the buffer is a whole copy", buftf_partial((BufBox){ 700, 500, 800, 600 }, 640, 480, &o), 0);
+    check("partial: negative and huge clamp", buftf_partial((BufBox){ -16384, -16384, 5, 5 }, 640, 480, &o) && o.x0 == 0 && o.y0 == 0, 1);
+    check("clamp: inside a 1x1 buffer", buftf_clamp((BufBox){ -5, -5, 9, 9 }, 1, 1).x1, 1);
     printf("%s\n", fails ? "buftf-test: FAILED" : "buftf-test: ok");
     return fails ? 1 : 0;
 }
