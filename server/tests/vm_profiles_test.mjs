@@ -144,6 +144,24 @@ for (let i = 0; i < 3000; i++) {
 eq('fuzz: never throws', threw, 0);
 eq('fuzz: always valid, reads back the same', unstable, 0);
 
+// ---- an imported profile never widens anything silently (security review 2026-11-22) ----
+const lanP = { format: P.PROFILE_FORMAT, name: 'srv', network: { mode: 'shared', ports: [{ proto: 'tcp', host: 8443, guest: 443, open: 'lan' }, { proto: 'udp', host: 5353, guest: 53 }] },
+  integration: { clipboard: 'both', share: { path: '~/Servidor', writable: true } } };
+const li = P.readProfile(lanP, { host, imported: true });
+eq('import: a LAN port becomes this computer only', li.profile.network.ports.map((x) => x.open), ['this-computer', 'this-computer']);
+eq('import: and it is said', li.adjusted.filter((a) => a.why === 'lan'), [{ field: 'network.ports', from: 'TCP 8443 → 443', to: 'this-computer', why: 'lan' }]);
+eq('the person\'s own profile keeps its LAN port', P.readProfile(lanP, { host, stored: true }).profile.network.ports[0].open, 'lan');
+eq('a written-back import has no LAN port', JSON.parse(P.writeProfile(li.profile, [])).network.ports.every((x) => x.open === 'this-computer'), true);
+eq('what an import opens is listed', P.exposureOf(li.profile), ['clipBoth', 'shareWrite']);
+eq('bridged is listed', P.exposureOf(P.readProfile({ format: P.PROFILE_FORMAT, name: 'b', network: { mode: 'bridged' }, integration: { clipboard: 'off' } }, { imported: true }).profile), ['bridged']);
+eq('nothing listed for a closed profile', P.exposureOf(P.readProfile({ format: P.PROFILE_FORMAT, name: 'c', integration: { clipboard: 'to-guest' } }, { imported: true }).profile), []);
+let widened = 0;
+for (let i = 0; i < 500; i++) {
+  const o = { format: P.PROFILE_FORMAT, name: `x${i}`, network: { mode: pick(M.NET_MODES), ports: Array.from({ length: 1 + (i % 4) }, (_, k) => ({ proto: pick(['tcp', 'udp']), host: 2000 + k + i % 7, guest: 22 + k, open: pick(['lan', 'this-computer', undefined]) })) } };
+  if (P.readProfile(o, { host, imported: true }).profile.network.ports.some((x) => x.open === 'lan')) widened++;
+}
+eq('fuzz: no imported port stays open to the network', widened, 0);
+
 // ---- the person's systems ----
 const sys0 = { name: 'Linux Mint 22', kind: 'linux', color: 'green', profile: 'development', install: 'manual', source: 'url', url: 'https://mirror.example.org/linuxmint-22-cinnamon-64bit.iso', sha256: SHA };
 const vs = S.validateSystem(sys0, { home, newId: 's-00000001' });

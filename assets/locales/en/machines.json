@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Not allowed",
   "set.input.privacy": "Privacy settings",
   "set.input.mouse": "Mouse",
-  "set.input.mouseNote": "New machines take it from their profile (Keyboard and mouse): automatic, or captured on a click."
+  "set.input.mouseNote": "New machines take it from their profile (Keyboard and mouse): automatic, or captured on a click.",
+  "set.imp.adj.lan": "Port {from} was open to your network; now only this computer.",
+  "set.imp.portLocal": "{rule}, this computer only",
+  "set.imp.portLan": "{rule}, open to your network",
+  "set.imp.exposure": "What it opens",
+  "set.imp.bridged": "Bridged network: the machine joins your network as one more computer, on the card set in Machines settings → Network.",
+  "set.imp.clipBoth": "The clipboard goes both ways: what you copy here can be read in the machine.",
+  "set.imp.shareWrite": "The machine can change the files of the shared folder; you choose the folder when you create it.",
+  "set.edit.lanWarn": "Your network: other computers on your network can reach this port."
 }

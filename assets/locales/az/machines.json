@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "İcazə verilməyib",
   "set.input.privacy": "Məxfilik parametrləri",
   "set.input.mouse": "Siçan",
-  "set.input.mouseNote": "Yeni maşınlar bunu profilindən götürür (Klaviatura və siçan): avtomatik və ya kliklə tutulmuş."
+  "set.input.mouseNote": "Yeni maşınlar bunu profilindən götürür (Klaviatura və siçan): avtomatik və ya kliklə tutulmuş.",
+  "set.imp.adj.lan": "{from} portu şəbəkənizə açıq idi; indi yalnız bu kompüter.",
+  "set.imp.portLocal": "{rule}, yalnız bu kompüter",
+  "set.imp.portLan": "{rule}, şəbəkənizə açıq",
+  "set.imp.exposure": "Nəyi açır",
+  "set.imp.bridged": "Körpü şəbəkə: maşın Maşınlar ayarları → Şəbəkə bölməsində seçilmiş kart üzərindən şəbəkənizə daha bir kompüter kimi qoşulur.",
+  "set.imp.clipBoth": "Mübadilə buferi hər iki istiqamətdə işləyir: burada kopyaladığınızı maşında oxumaq olar.",
+  "set.imp.shareWrite": "Maşın paylaşılan qovluğun fayllarını dəyişə bilər; qovluğu yaradarkən özünüz seçirsiniz.",
+  "set.edit.lanWarn": "Şəbəkəniz: şəbəkənizdəki digər kompüterlər bu porta çata bilər."
 }

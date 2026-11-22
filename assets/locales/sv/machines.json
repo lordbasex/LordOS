@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Inte tillåtet",
   "set.input.privacy": "Integritetsinställningar",
   "set.input.mouse": "Mus",
-  "set.input.mouseNote": "Nya maskiner tar det från sin profil (Tangentbord och mus): automatiskt, eller fångad vid ett klick."
+  "set.input.mouseNote": "Nya maskiner tar det från sin profil (Tangentbord och mus): automatiskt, eller fångad vid ett klick.",
+  "set.imp.adj.lan": "Port {from} var öppen mot ditt nätverk; nu bara den här datorn.",
+  "set.imp.portLocal": "{rule}, bara den här datorn",
+  "set.imp.portLan": "{rule}, öppen mot ditt nätverk",
+  "set.imp.exposure": "Vad den öppnar",
+  "set.imp.bridged": "Bryggat nätverk: maskinen går med i ditt nätverk som ännu en dator, via kortet som valts i Maskininställningar → Nätverk.",
+  "set.imp.clipBoth": "Urklippet fungerar åt båda håll: det du kopierar här kan läsas i maskinen.",
+  "set.imp.shareWrite": "Maskinen kan ändra filerna i den delade mappen; mappen väljer du själv när du skapar den.",
+  "set.edit.lanWarn": "Ditt nätverk: andra datorer i ditt nätverk kan nå den här porten."
 }

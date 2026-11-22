@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Tidak diizinkan",
   "set.input.privacy": "Pengaturan privasi",
   "set.input.mouse": "Mouse",
-  "set.input.mouseNote": "Mesin baru mengambilnya dari profilnya (Keyboard dan mouse): otomatis, atau ditangkap saat diklik."
+  "set.input.mouseNote": "Mesin baru mengambilnya dari profilnya (Keyboard dan mouse): otomatis, atau ditangkap saat diklik.",
+  "set.imp.adj.lan": "Port {from} tadinya terbuka ke jaringan Anda; sekarang hanya komputer ini.",
+  "set.imp.portLocal": "{rule}, hanya komputer ini",
+  "set.imp.portLan": "{rule}, terbuka ke jaringan Anda",
+  "set.imp.exposure": "Apa yang dibukanya",
+  "set.imp.bridged": "Jaringan bridge: mesin bergabung ke jaringan Anda sebagai satu komputer lagi, lewat kartu yang dipilih di Pengaturan Mesin → Jaringan.",
+  "set.imp.clipBoth": "Clipboard bekerja dua arah: yang Anda salin di sini dapat dibaca di mesin.",
+  "set.imp.shareWrite": "Mesin dapat mengubah file di folder bersama; Anda memilih foldernya sendiri saat membuat.",
+  "set.edit.lanWarn": "Jaringan Anda: komputer lain di jaringan Anda dapat menjangkau port ini."
 }

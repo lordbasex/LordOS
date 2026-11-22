@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Ei sallittu",
   "set.input.privacy": "Tietosuoja-asetukset",
   "set.input.mouse": "Hiiri",
-  "set.input.mouseNote": "Uudet koneet saavat sen profiilistaan (Näppäimistö ja hiiri): automaattinen tai kaapattu napsautuksella."
+  "set.input.mouseNote": "Uudet koneet saavat sen profiilistaan (Näppäimistö ja hiiri): automaattinen tai kaapattu napsautuksella.",
+  "set.imp.adj.lan": "Portti {from} oli avoinna verkkoosi; nyt vain tämä tietokone.",
+  "set.imp.portLocal": "{rule}, vain tämä tietokone",
+  "set.imp.portLan": "{rule}, avoinna verkkoosi",
+  "set.imp.exposure": "Mitä se avaa",
+  "set.imp.bridged": "Siltaverkko: kone liittyy verkkoosi yhtenä tietokoneena lisää, Koneiden asetuksissa → Verkko valitun kortin kautta.",
+  "set.imp.clipBoth": "Leikepöytä toimii molempiin suuntiin: mitä kopioit tässä, voidaan lukea koneessa.",
+  "set.imp.shareWrite": "Kone voi muuttaa jaetun kansion tiedostoja; valitset kansion itse luodessasi koneen.",
+  "set.edit.lanWarn": "Verkkosi: muut verkkosi tietokoneet voivat tavoittaa tämän portin."
 }

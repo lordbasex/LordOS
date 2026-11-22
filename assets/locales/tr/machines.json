@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "İzin verilmedi",
   "set.input.privacy": "Gizlilik ayarları",
   "set.input.mouse": "Fare",
-  "set.input.mouseNote": "Yeni makineler bunu profillerinden alır (Klavye ve fare): otomatik ya da tıklamayla yakalanmış."
+  "set.input.mouseNote": "Yeni makineler bunu profillerinden alır (Klavye ve fare): otomatik ya da tıklamayla yakalanmış.",
+  "set.imp.adj.lan": "{from} bağlantı noktası ağınıza açıktı; artık yalnızca bu bilgisayar.",
+  "set.imp.portLocal": "{rule}, yalnızca bu bilgisayar",
+  "set.imp.portLan": "{rule}, ağınıza açık",
+  "set.imp.exposure": "Neyi açar",
+  "set.imp.bridged": "Köprü ağ: makine, Makineler ayarları → Ağ’da seçilen kart üzerinden ağınıza bir bilgisayar daha olarak katılır.",
+  "set.imp.clipBoth": "Pano iki yönlü çalışır: burada kopyaladığınız şey makinede okunabilir.",
+  "set.imp.shareWrite": "Makine paylaşılan klasörün dosyalarını değiştirebilir; klasörü oluştururken siz seçersiniz.",
+  "set.edit.lanWarn": "Ağınız: ağınızdaki diğer bilgisayarlar bu bağlantı noktasına erişebilir."
 }

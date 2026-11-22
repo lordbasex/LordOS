@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Nicht erlaubt",
   "set.input.privacy": "Datenschutz-Einstellungen",
   "set.input.mouse": "Maus",
-  "set.input.mouseNote": "Neue Maschinen übernehmen sie aus ihrem Profil (Tastatur und Maus): automatisch oder per Klick gefangen."
+  "set.input.mouseNote": "Neue Maschinen übernehmen sie aus ihrem Profil (Tastatur und Maus): automatisch oder per Klick gefangen.",
+  "set.imp.adj.lan": "Port {from} war für dein Netzwerk offen; jetzt nur noch dieser Computer.",
+  "set.imp.portLocal": "{rule}, nur dieser Computer",
+  "set.imp.portLan": "{rule}, offen für dein Netzwerk",
+  "set.imp.exposure": "Was es öffnet",
+  "set.imp.bridged": "Netzwerkbrücke: Die Maschine tritt deinem Netzwerk als weiterer Computer bei, über die Karte aus Maschinen-Einstellungen → Netzwerk.",
+  "set.imp.clipBoth": "Die Zwischenablage geht in beide Richtungen: Was du hier kopierst, kann in der Maschine gelesen werden.",
+  "set.imp.shareWrite": "Die Maschine kann die Dateien des freigegebenen Ordners ändern; den Ordner wählst du beim Erstellen.",
+  "set.edit.lanWarn": "Dein Netzwerk: Andere Computer in deinem Netzwerk können diesen Port erreichen."
 }

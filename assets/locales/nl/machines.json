@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Niet toegestaan",
   "set.input.privacy": "Privacy-instellingen",
   "set.input.mouse": "Muis",
-  "set.input.mouseNote": "Nieuwe machines nemen het over van hun profiel (Toetsenbord en muis): automatisch, of gevangen met een klik."
+  "set.input.mouseNote": "Nieuwe machines nemen het over van hun profiel (Toetsenbord en muis): automatisch, of gevangen met een klik.",
+  "set.imp.adj.lan": "Poort {from} stond open voor je netwerk; nu alleen deze computer.",
+  "set.imp.portLocal": "{rule}, alleen deze computer",
+  "set.imp.portLan": "{rule}, open voor je netwerk",
+  "set.imp.exposure": "Wat het opent",
+  "set.imp.bridged": "Netwerkbrug: de machine komt als extra computer in je netwerk, via de kaart uit Machines-instellingen → Netwerk.",
+  "set.imp.clipBoth": "Het klembord werkt in beide richtingen: wat je hier kopieert, kan in de machine worden gelezen.",
+  "set.imp.shareWrite": "De machine kan de bestanden van de gedeelde map wijzigen; de map kies je zelf bij het maken.",
+  "set.edit.lanWarn": "Je netwerk: andere computers in je netwerk kunnen deze poort bereiken."
 }

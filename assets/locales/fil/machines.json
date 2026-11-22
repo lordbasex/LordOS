@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Hindi pinapayagan",
   "set.input.privacy": "Mga setting ng privacy",
   "set.input.mouse": "Mouse",
-  "set.input.mouseNote": "Kinukuha ito ng mga bagong makina sa kanilang profile (Keyboard at mouse): awtomatiko, o naka-capture sa pag-click."
+  "set.input.mouseNote": "Kinukuha ito ng mga bagong makina sa kanilang profile (Keyboard at mouse): awtomatiko, o naka-capture sa pag-click.",
+  "set.imp.adj.lan": "Bukas sa network mo ang port {from}; ngayon ay sa computer na ito lang.",
+  "set.imp.portLocal": "{rule}, sa computer na ito lang",
+  "set.imp.portLan": "{rule}, bukas sa network mo",
+  "set.imp.exposure": "Ano ang binubuksan nito",
+  "set.imp.bridged": "Bridged na network: sumasali ang machine sa network mo bilang isa pang computer, sa card na pinili sa Machines settings → Network.",
+  "set.imp.clipBoth": "Dalawang direksyon ang clipboard: ang kinokopya mo rito ay mababasa sa machine.",
+  "set.imp.shareWrite": "Mababago ng machine ang mga file ng shared folder; ikaw ang pipili ng folder kapag ginawa ito.",
+  "set.edit.lanWarn": "Ang network mo: maaabot ng ibang computer sa network mo ang port na ito."
 }

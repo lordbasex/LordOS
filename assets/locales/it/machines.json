@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "Non consentito",
   "set.input.privacy": "Impostazioni della privacy",
   "set.input.mouse": "Mouse",
-  "set.input.mouseNote": "Le nuove macchine lo prendono dal loro profilo (Tastiera e mouse): automatico, o catturato con un clic."
+  "set.input.mouseNote": "Le nuove macchine lo prendono dal loro profilo (Tastiera e mouse): automatico, o catturato con un clic.",
+  "set.imp.adj.lan": "La porta {from} era aperta alla tua rete; ora solo questo computer.",
+  "set.imp.portLocal": "{rule}, solo questo computer",
+  "set.imp.portLan": "{rule}, aperta alla tua rete",
+  "set.imp.exposure": "Cosa apre",
+  "set.imp.bridged": "Rete a ponte: la macchina entra nella tua rete come un computer in più, sulla scheda scelta in Impostazioni di Macchine → Rete.",
+  "set.imp.clipBoth": "Gli appunti vanno in entrambe le direzioni: ciò che copi qui può essere letto nella macchina.",
+  "set.imp.shareWrite": "La macchina può modificare i file della cartella condivisa; la cartella la scegli tu quando la crei.",
+  "set.edit.lanWarn": "La tua rete: altri computer della tua rete possono raggiungere questa porta."
 }

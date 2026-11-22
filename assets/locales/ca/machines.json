@@ -1330,5 +1330,13 @@
   "set.input.perm.deny": "No permès",
   "set.input.privacy": "Configuració de privadesa",
   "set.input.mouse": "Ratolí",
-  "set.input.mouseNote": "Les màquines noves ho agafen del seu perfil (Teclat i ratolí): automàtic, o capturat amb un clic."
+  "set.input.mouseNote": "Les màquines noves ho agafen del seu perfil (Teclat i ratolí): automàtic, o capturat amb un clic.",
+  "set.imp.adj.lan": "El port {from} estava obert a la teva xarxa; ara només aquest ordinador.",
+  "set.imp.portLocal": "{rule}, només aquest ordinador",
+  "set.imp.portLan": "{rule}, obert a la teva xarxa",
+  "set.imp.exposure": "Què obre",
+  "set.imp.bridged": "Xarxa en pont: la màquina s’uneix a la teva xarxa com un ordinador més, a la targeta triada a Configuració de Màquines → Xarxa.",
+  "set.imp.clipBoth": "El porta-retalls va en els dos sentits: el que copies aquí es pot llegir a la màquina.",
+  "set.imp.shareWrite": "La màquina pot canviar els fitxers de la carpeta compartida; la carpeta la tries tu en crear-la.",
+  "set.edit.lanWarn": "La teva xarxa: altres ordinadors de la teva xarxa poden arribar a aquest port."
 }
