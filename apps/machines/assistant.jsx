@@ -15,7 +15,7 @@
 import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
-import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor } from './catalog.js';
+import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, noticeOf, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor } from './catalog.js';
 import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard } from './model.js';
 import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
 import { customUnattended, systemState } from './systems.js';
@@ -97,7 +97,8 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   // card only when one is set up for machines)
   const pv = onHost(prof, host, { gpuReady, no3d: arch !== host.arch ? 'arch' : no3dReason(host, windows, arch) });
   const base = { vcpus: pv.vcpus, memoryMb: pv.memoryMb, diskGb: pv.diskGb, network: pv.network, gfx: prof.resources.graphics };
-  const size = windows ? windowsSize(base, host) : base;
+  // Windows' minimums (4.3); a card that asks for its own machine (Android, 4.2) gets it whatever the profile
+  const size = windows ? windowsSize(base, host) : source === 'download' && dl ? cardSize(CATALOG, dl.id, base, host) : base;
   const home = typeof lord !== 'undefined' && lord.fs?.home ? lord.fs.home() : '';
   const shareDir = pv.share ? shareAbs(pv.share.path, home) : '';
   // a bridged machine joins the card chosen in Machines settings → Network (else the first wired one up): said in the review
@@ -134,6 +135,9 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const resolve = async (id, a) => {
     const e = entryOf(CATALOG, id, a);
     if (!e) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
+    // a pinned image (Android, 4.2): the signed catalog is its list
+    const pin = pinnedImage(e);
+    if (pin) return pin;
     let p = await admin.run('vm-image-list', `${id} ${a}`, null, { quiet: true });
     if (!e.sums) {
       const list = newest(listingNames(fs.read(String(p)), e.sumsPattern), e.sumsPattern);
@@ -407,11 +411,15 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{`${[dl.name, ver].filter(Boolean).join(' ')}, ${arch}`}</Text>
           <Text style={{ fontSize: 12, color: dl.phase === 'error' ? '#ff453a' : p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-            {dl.phase === 'list' ? tr('machines.dl.reading', { name: dl.name }) : dl.phase === 'error' ? dl.err : tr('machines.dl.found', { file: dl.image.name })}</Text>
+            {dl.phase === 'list' ? tr('machines.dl.reading', { name: dl.name }) : dl.phase === 'error' ? dl.err : tr(dl.image.pinned ? 'machines.dl.pinned' : 'machines.dl.found', { file: dl.image.name })}</Text>
         </View>
         {dl.phase === 'error' ? <Btn label={tr('machines.dl.retry')} onClick={() => { const s = systemsFor(CATALOG, arch).find((x) => x.id === dl.id); if (s) pickDownload(s); }} /> : null}
       </View>
     ) : null}
+    {downloading && dl && noticeOf(CATALOG, dl.id) ? (() => { const nt = noticeOf(CATALOG, dl.id); return (
+      <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}>
+        <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{tr(`machines.dl.notice.${nt.key}`, { maker: nt.maker, date: nt.date })}</Text>
+      </View>); })() : null}
     {path && !downloading && !windows ? (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 10, backgroundColor: p.raised }}>
         <OsMark id={sys.id} size={36} />

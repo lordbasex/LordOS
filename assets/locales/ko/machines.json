@@ -770,6 +770,8 @@
   "dl.sizeAbout": "{arch}, 약 {size}",
   "dl.reading": "{name} 사이트에서 이미지 목록을 읽는 중…",
   "dl.found": "{file}, 제작사의 서명된 목록에서(서명 및 SHA-256 확인됨)",
+  "dl.pinned": "{file}, SHA-256이 LordOS의 서명된 카탈로그에 고정됨(다운로드 후 확인)",
+  "dl.notice.archived": "{maker}이(가) 공개 이미지 배포를 중단했습니다. 이것이 {date}의 마지막 이미지이며 더 이상 보안 업데이트를 받지 않습니다. Google 앱은 포함되어 있지 않습니다.",
   "dl.noList": "이미지 목록을 읽을 수 없습니다: {why}",
   "dl.noImage": "현재 목록에 이 아키텍처용 이 릴리스의 이미지가 없습니다",
   "dl.retry": "다시 시도",

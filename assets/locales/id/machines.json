@@ -770,6 +770,8 @@
   "dl.sizeAbout": "{arch}, sekitar {size}",
   "dl.reading": "Membaca daftar image di situs {name}…",
   "dl.found": "{file}, dari daftar bertanda tangan pembuatnya (tanda tangan dan SHA-256 diperiksa)",
+  "dl.pinned": "{file}, SHA-256-nya dipatok di katalog bertanda tangan LordOS (diperiksa setelah unduhan)",
+  "dl.notice.archived": "{maker} menghentikan sementara image publiknya: ini yang terakhir, dari {date}, dan tidak lagi menerima pembaruan keamanan. Tanpa aplikasi Google.",
   "dl.noList": "Daftar image tidak dapat dibaca: {why}",
   "dl.noImage": "daftarnya saat ini tidak memiliki image rilis ini untuk arsitektur ini",
   "dl.retry": "Coba Lagi",

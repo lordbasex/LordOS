@@ -770,6 +770,8 @@
   "dl.sizeAbout": "{arch}, kb. {size}",
   "dl.reading": "A képek listájának beolvasása {name} webhelyéről…",
   "dl.found": "{file}, a készítő aláírt listájából (aláírás és SHA-256 ellenőrizve)",
+  "dl.pinned": "{file}, SHA-256-ja a LordOS aláírt katalógusában rögzítve (a letöltés után ellenőrizve)",
+  "dl.notice.archived": "A(z) {maker} szüneteltette nyilvános lemezképeit: ez az utolsó, {date} dátummal, és már nem kap biztonsági frissítéseket. A Google alkalmazásai nélkül érkezik.",
   "dl.noList": "A képek listáját nem sikerült beolvasni: {why}",
   "dl.noImage": "a listájában jelenleg nincs ennek a kiadásnak a képe ehhez az architektúrához",
   "dl.retry": "Újra",

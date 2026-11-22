@@ -770,6 +770,8 @@
   "dl.sizeAbout": "{arch}, noin {size}",
   "dl.reading": "Luetaan kuvaluetteloa sivustolta {name}…",
   "dl.found": "{file}, tekijänsä allekirjoitetusta luettelosta (allekirjoitus ja SHA-256 tarkistettu)",
+  "dl.pinned": "{file}, SHA-256 kiinnitetty LordOSin allekirjoitettuun luetteloon (tarkistetaan latauksen jälkeen)",
+  "dl.notice.archived": "{maker} on keskeyttänyt julkiset levykuvansa: tämä on viimeinen, päivätty {date}, eikä se saa enää tietoturvapäivityksiä. Mukana ei ole Googlen sovelluksia.",
   "dl.noList": "Kuvaluetteloa ei voitu lukea: {why}",
   "dl.noImage": "sen luettelossa ei ole juuri nyt tämän julkaisun kuvaa tälle arkkitehtuurille",
   "dl.retry": "Yritä uudelleen",

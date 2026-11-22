@@ -770,6 +770,8 @@
   "dl.sizeAbout": "{arch}, ongeveer {size}",
   "dl.reading": "De lijst met schijfkopieën op de site van {name} lezen…",
   "dl.found": "{file}, uit de ondertekende lijst van de maker (handtekening en SHA-256 gecontroleerd)",
+  "dl.pinned": "{file}, de SHA-256 vastgelegd in de ondertekende catalogus van LordOS (gecontroleerd na de download)",
+  "dl.notice.archived": "{maker} heeft zijn openbare images gepauzeerd: dit is de laatste, van {date}, en die krijgt geen beveiligingsupdates meer. Zonder de apps van Google.",
   "dl.noList": "De lijst met schijfkopieën kon niet worden gelezen: {why}",
   "dl.noImage": "de lijst heeft op dit moment geen schijfkopie van deze release voor deze architectuur",
   "dl.retry": "Probeer opnieuw",

@@ -129,7 +129,7 @@ Still open in Phase 2:
 - [ ] Reproducible machines (`lordvm apply dev.toml`, rebuild).
 - [ ] Local MCP server (`lordvm mcp`, off by default; open question 11).
 - [ ] Migrate from another computer (6.11).
-- [ ] Android card, if the image exists (open question 6).
+- [x] Android card (2026-11-22, amd64 only: Bliss OS 16.9.7 FOSS, pinned; 4.2). A newer image and arm64 wait for open question 6.
 
 ### Phase 5, later: decided then
 
@@ -1302,17 +1302,50 @@ Guest tools come from the guest's own repository: `qemu-guest-agent`, `spice-vda
 
 ### 4.2 Android
 
-The roadmap's Android item is a container. As a VM, an Android guest is possible but rougher:
+**Scope (maintainer, 2026-11-22):** Android in Machines is one more installable ISO among the New Machine cards, nothing more. Android
+apps as LordOS windows (a container, the Store) are LordBridge's, later (docs/LORDBRIDGE.md), and are not designed here.
 
-- LineageOS has `virtio_arm64`, `virtio_arm64only` and `virtio_x86_64` targets for QEMU, not officially supported, maintained by individuals, with no OTA
-  (**Reported**, its wiki). A third-party project publishes builds.
-- On CPUs without 32-bit at EL0, `virtio_arm64only` is needed.
-- We would have to build, sign and host our own image to offer a card, and keep it patched.
-- Guest GPU acceleration needs virgl or venus, which the targets use through Mesa. Reported color problems exist with software graphics.
-- Google's services can't be included.
+**Built (2026-11-22, in development): the "Android 13" card, amd64 only.** What exists, checked 2026-11-22:
 
-**Decision:** Android stays a card with "Coming later" until the container item decides the image; building one image for both is the point. Until then,
-"Install from an ISO file" accepts a compatible image.
+| Candidate | Android | State | Image | Trust | Fits |
+|---|---|---|---|---|---|
+| Bliss OS 16.9.7, FOSS edition | 13 | archived: "Public images are paused" (blissos.org, blissos.org/status, as of August 2026); last build 2024-10-11, no more updates | installable ISO, x86_64, 2.18 GiB, SourceForge `blissos-x86/Official/BlissOS16/FOSS/Generic` | a `.sha256` next to the ISO, unsigned; SourceForge's MD5 of the upload | **the card** |
+| Android-x86 9.0-r2 | 9 | dormant since 2020-03-25 (Wikipedia, android-x86.org release note) | ISO | old | no |
+| LineageOS `virtio_x86_64` / `virtio_arm64only` (`_16k` too) | 16 (LineageOS 24.0) | not built by LineageOS ("not officially supported … no OTA", lineage wiki *libvirt-qemu*); `m isoimage-install` makes an ISO for **x86_64 only** | nobody publishes the ISO; jqssun/android-lineage-qemu publishes UTM bundles (two qcow2 disks + EFI vars) monthly (v2026.11.17) | GitHub attestations, asset SHA-256 digests | no card: a prebuilt disk, not an ISO (see below) |
+| AOSP Cuttlefish / Goldfish (SDK images) | current | Google's | crosvm/emulator images, SDK license | — | no: not plain QEMU, not free |
+| Google's GSIs | 16 | Google's | `system.img` for a device's vendor partition | — | no: not bootable alone |
+
+So: **amd64** gets Bliss OS 16.9.7 FOSS, the only maintained-until-recently installable Android ISO; **arm64 has no installable Android
+ISO at all**, so the card isn't shown there (an arm64 host that chooses amd64 sees it, emulated). Bliss OS's GApps edition is not offered:
+Google's apps aren't free software, and the FOSS edition is the default by the maintainer's rule.
+
+**Trust.** Bliss OS signs no list. The catalog pins the one file, its address and SHA-256 (`"pinned"`, like the Windows evaluation and
+virtio-win, 4.3): the project's own `.sha256` file (read 2026-11-22), the same hash computed from a download that day
+(`735cb962…a68e`, 2 342 518 784 bytes), and that download's MD5 equal to the one SourceForge recorded at the upload on 2024-10-12 (the folder's
+RSS). The admin helper keeps the download only with that hash (`vm-image-get`, `vmcat_pin_find`). The address is SourceForge's redirector
+(`downloads.sourceforge.net`), which sends to a mirror; the hash, not the mirror, is what is trusted.
+
+**The machine.** `"machine"` in the entry gives it 4 vCPUs, 4 GB, 32 GB and 3D whatever the profile (`cardSize` in catalog.js, fitted
+to the computer: never more processors than it has or memory than machines may use), on the default devices: q35, UEFI (OVMF), virtio
+disk, the CD/DVD on virtio-scsi, virtio-net, virtio-vga (`virtio-vga-gl` with 3D, virgl), the USB or virtio tablet, Intel HDA. The ISO's
+kernel (6.1.112, read from its `IKCONFIG` on 2026-11-22) has virtio-blk, virtio-scsi, `sr` and AHCI built in and virtio-gpu,
+virtio-input, virtio-net and HDA as modules, so the installer finds its own disc and the disk (**Reported** from the config, not yet
+booted under Machines: **To test** on the dev VM, with a screenshot). Install is Bliss OS's own installer (manual; no unattended mode).
+Google's services are absent; apps come from F-Droid or an APK.
+
+**What the assistant says.** The card reads "Android 13"; choosing it shows the file with "SHA-256 pinned in LordOS's signed catalog"
+(`machines.dl.pinned`) and a warning (`machines.dl.notice.archived`): Bliss OS paused its public images, this is the last one (2024-10-11)
+and it gets no more security updates; no Google apps. The mark is Machines' own green "A" (no Android or Bliss logo).
+
+**Not done, for the maintainer:**
+
+- A newer Android needs a newer image: LineageOS's `virtio_x86_64` ISO built and signed by LordOS (hours of build, ~300 GB, a monthly
+  rebuild for security patches), or a "prebuilt disk" card kind for jqssun's monthly qcow2 bundles (attested by GitHub, both
+  architectures, Android 16), which Machines' import (6.22) could take. Either replaces this card's entry with no app change but the
+  new kind.
+- arm64 (Raspberry Pi 5): only the prebuilt-disk path exists (`virtio_arm64only`, and `virtio_arm64only_16k` in the LineageOS tree,
+  **Reported**); 3D stays off on arm64 hosts (6.10).
+- When Bliss OS publishes images of its new tree, the pin is updated after an install test.
 
 ### 4.3 virtio-win guests
 
@@ -1463,7 +1496,7 @@ A light never carries meaning by color alone: each has a tooltip and the state i
 Steps, each one screen, with Back always available:
 
 1. **Choose:** cards.
-   - Download: Debian, Ubuntu, Fedora, Kali (built 2026-11-06, 3.9, "The Linux download cards"); LordOS once it publishes an ISO; Android (later).
+   - Download: Debian, Ubuntu, Fedora, Kali (built 2026-11-06, 3.9, "The Linux download cards"); LordOS once it publishes an ISO; Android 13 (Bliss OS 16.9.7 FOSS, amd64 only, pinned; built 2026-11-22, 4.2).
    - "Install from an ISO file" (drag a file on it).
    - "Migrate from another app": a machine of another virtualization app (6.22). Built 2026-11-05; it took the tile the mock gave
      "Migrate from another PC" (6.11), which comes later.
@@ -3076,7 +3109,7 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Drivers attached during install, tools at the end | 3 | Yes | Pinned versions |
 | Migrate from a physical PC | 4 | Work | Driver injection is delicate |
 | Import qcow2, VMDK, VDI, VHDX, OVA, other tools' bundles | 3 | Yes | Built (6.22): identity kept (SMBIOS UUID, MACs, serials, firmware, topology); snapshots flattened, saved sessions refused, vTPM lost |
-| Android guest | 4 | Partly | Own image needed |
+| Android guest | 4 | Partly | amd64 card built (archived Bliss OS 13 ISO, 4.2); a maintained image or arm64 needs our own build or a prebuilt-disk card |
 | Guests tied to one maker's hardware | never | No | Not offered: neither licensed nor possible on these hosts |
 
 ### Display and graphics
@@ -3187,7 +3220,7 @@ Decided on 2026-11-01: settings on one screen replaces tabs; Kali is in the cata
 3. Store item (recommended) or preinstalled?
 4. Do we build our own 4K kernel for the Pi if a measurement shows that it removes GICV trapping? Phase 0 didn't measure it; it moves to Phase 1 (13.8).
 5. Keep Debian's QEMU (recommended) or carry our own build for features like newer venus fixes? Phase 0 adds a reason: the arm64 3D abort of 3.2.
-6. Host our own Android image for Machines and the container, or leave Android to ISO?
+6. Host our own Android image for Machines (LineageOS `virtio_x86_64` ISO, or prebuilt `virtio_*` disks for both architectures), or keep the pinned Bliss OS 13 ISO (4.2, built 2026-11-22)? The container is LordBridge's, not Machines'.
 7. ~~Is `passt` or QEMU's user networking the default?~~ Decided on 2026-11-04 by measurement: `passt` (6.5).
 8. Does the first public release include virtio-win guests, or Linux only?
 9. Does the catalog list only systems we can download freely, as recommended?

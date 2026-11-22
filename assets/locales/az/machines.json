@@ -770,6 +770,8 @@
   "dl.sizeAbout": "{arch}, təxminən {size}",
   "dl.reading": "{name} saytındakı obrazların siyahısı oxunur…",
   "dl.found": "{file}, istehsalçının imzalanmış siyahısından (imza və SHA-256 yoxlanılıb)",
+  "dl.pinned": "{file}, SHA-256-sı LordOS-un imzalı kataloqunda sabitlənib (endirmədən sonra yoxlanılır)",
+  "dl.notice.archived": "{maker} ictimai təsvirlərini dayandırıb: bu, {date} tarixli sonuncudur və artıq təhlükəsizlik yeniləmələri almır. Google tətbiqləri olmadan gəlir.",
   "dl.noList": "Obrazların siyahısını oxumaq mümkün olmadı: {why}",
   "dl.noImage": "siyahısında hazırda bu arxitektura üçün bu buraxılışın obrazı yoxdur",
   "dl.retry": "Yenidən cəhd et",

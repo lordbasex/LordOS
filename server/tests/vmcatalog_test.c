@@ -202,6 +202,13 @@ int main(int argc, char **argv) {
     T("fedora-netinst: found, clear-signed", !vmcat_find(cat, n, "fedora-netinst", "amd64", &e) && e.sig_type == VMCAT_SIG_CLEAR &&
       vmcat_match(e.sums_re, "Fedora-Everything-45-1.4-x86_64-CHECKSUM") && vmcat_match(e.file_re, "Fedora-Everything-netinst-x86_64-45-1.4.iso") &&
       !vmcat_match(e.file_re, "Fedora-Workstation-Live-45-1.4.x86_64.iso"));
+    /* Android (docs/VIRTUALIZATION.md 4.2): one pinned ISO for amd64, none for arm64; the helper keeps only that name and hash */
+    T("android: pinned, one ISO", !vmcat_find(cat, n, "android", "amd64", &e) && e.npins == 1 && !e.dir[0] &&
+      !strcmp(e.pin[0].name, "Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso") && e.pin[0].bytes == 2342518784ull && e.max_bytes == 2342518784ull &&
+      !strncmp(e.pin[0].url, "https://downloads.sourceforge.net/project/blissos-x86/", 54));
+    T("android: its hash only", vmcat_pin_find(&e, e.pin[0].name, "735cb962ec6bd92b62eb82a812831a38d79a0dfdf12b7973d2d0f7ab001ba68e") == 0 &&
+      vmcat_pin_find(&e, e.pin[0].name, SHA) < 0 && vmcat_pin_find(&e, "other.iso", "735cb962ec6bd92b62eb82a812831a38d79a0dfdf12b7973d2d0f7ab001ba68e") < 0);
+    T("android: no arm64 image", vmcat_find(cat, n, "android", "arm64", &e));
     T("unknown id", vmcat_find(cat, n, "nothing", "amd64", &e));
     T("unknown arch", vmcat_find(cat, n, "debian", "riscv64", &e));
     T("fedora: its list's name", !vmcat_find(cat, n, "fedora", "amd64", &e) && vmcat_match(e.sums_re, "Fedora-Workstation-45-1.4-x86_64-CHECKSUM") &&

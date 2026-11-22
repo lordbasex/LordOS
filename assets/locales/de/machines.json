@@ -770,6 +770,8 @@
   "dl.sizeAbout": "{arch}, etwa {size}",
   "dl.reading": "Liste der Images auf der Website von {name} wird gelesen …",
   "dl.found": "{file}, aus der signierten Liste seines Herstellers (Signatur und SHA-256 geprüft)",
+  "dl.pinned": "{file}, SHA-256 im signierten Katalog von LordOS festgelegt (nach dem Download geprüft)",
+  "dl.notice.archived": "{maker} veröffentlicht vorerst keine öffentlichen Images mehr: Dies ist das letzte, vom {date}, und es erhält keine Sicherheitsupdates mehr. Ohne Google-Apps.",
   "dl.noList": "Die Liste der Images konnte nicht gelesen werden: {why}",
   "dl.noImage": "ihre Liste enthält derzeit kein Image dieser Version für diese Architektur",
   "dl.retry": "Erneut versuchen",
