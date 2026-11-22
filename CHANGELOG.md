@@ -799,19 +799,49 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - The tools now pick the **shown display**: the only one; else the one they chose before while it stays; else the one
     whose mode is the size the host asked for (a PCI adapter first, then the primary); else the primary on a PCI
     adapter, the first on a PCI adapter, the primary. The size the host asks for is set on it.
+- **Machines: a guest with more than one display shows the right one, in apps mode too, in development** (the guest
+  tools `lordos-guest-win` **w8**; Machines offers the update). On the maintainer's guest with an Intel GVT-g vGPU, the
+  guest system had a 1022 × 724 primary display that isn't on a PCI adapter (a basic or indirect display) next to the
+  vGPU's output, the one the machine's window shows. The tools measured and moved everything on the primary and the
+  virtual desktop: lord-vm kept logging "the guest's display is 1022x724 (not the size asked for)", each apps mode
+  window showed the wrong part of the picture (Explorer about 200 pixels lower, the browser only wallpaper), and after
+  leaving apps mode the guest's windows were on the display nobody sees. w7 (never released) chose by size alone and
+  locked onto the basic display; the real guest's log showed it.
+  - The tools pick the **shown display** (`ag_shown_pick` in `vmagent.c`, tested with that guest's displays as a
+    fixture): the host's picture only ever comes from a PCI GPU (GVT-g, virtio-gpu, QXL, a passed-through card), so a
+    display on a PCI adapter always wins over one that isn't; among those, the one chosen before by size while it
+    stays, else the one whose mode is the size the host asked for (the primary first), else the primary, else the
+    first. A change of which displays there are forgets the choice. The size the host asks for is set on it.
+  - The shown display is made the guest's **primary** (the display configuration, as Settings' "Make this my main
+    display" does, saved): the taskbar, the desktop's icons, new windows and a consent prompt are where the person
+    looks. Once per topology, logged. Nothing is detached: the other display stays, to the shown one's right.
   - Apps mode's rectangles (`LAG_WINDOWS`, a move, a drop's point) are relative to the shown display's corner and kept
     inside it, instead of the primary's and `MonitorFromRect(…, MONITOR_DEFAULTTOPRIMARY)`.
-  - A window on another display is moved onto the shown one when apps mode starts (or when it appears) and again when
-    apps mode ends: the same place relative to the display's corner, its size kept, clamped to the work area; a
-    minimized window stays minimized (only where it comes back moves), a maximized one is maximized there; a window on
-    no display at all is left alone. A minimized window's place is read in screen coordinates now (it was workspace
-    coordinates).
+  - A window on another display is moved onto the shown one as the tools start, after the primary changes, when apps
+    mode starts (or when it appears) and when apps mode ends: the same place relative to the display's corner, its size
+    kept, clamped to the work area; a minimized window stays minimized (only where it comes back moves), a maximized
+    one is maximized there; a window on no display at all, or one that runs as administrator, is left alone. A
+    minimized window's place is read in screen coordinates now (it was workspace coordinates).
   - The guest's displays go to lord-vm's log at hello and on every change (`AGK_DISPLAYS`, 18, guest → host, log only;
     a strict parser: exact length, 1..8 displays, sane rectangles, at most one primary, printable ASCII names of at most
     32 bytes; cases in `vm-test`): `agent: guest displays: \\.\DISPLAY1 1022x724 at 0,0 primary; \\.\DISPLAY2
     1920x1080 at 1022,0 (shown)`. The tools' own log (`%LOCALAPPDATA%\LordOS\lordos-guest-win.log`) lists every adapter
     and monitor, the choice, and each apps mode translation and move.
   - Still to check on the maintainer's guest. Not changed: the guest's taskbar and desktop icons stay on its primary display.
+    32 bytes; cases in `vm-test`): `agent: guest displays: \\.\DISPLAY2 1920x1080 at 0,0 primary (shown);
+    \\.\DISPLAY1 1022x724 at 1920,0 (not a PCI adapter)`. The tools' own log (`%LOCALAPPDATA%\LordOS\lordos-guest-win.log`)
+    lists every adapter and monitor, the choice, the primary made, and each apps mode translation and move.
+- **Machines: a guest window that runs as administrator can't be closed from LordOS, and LordOS is told, in
+  development** (tools w8). The tools run with the person's normal rights, so the guest system drops their close
+  message to a program running as administrator (Computer Management, `mmc.exe`) and refuses its moves; the × in the
+  Running list did nothing. The tools now tell: such a window is flagged in the list (`LAGW_ELEVATED`, 16, set only when
+  the host's hello says `elevated`, so an older host never sees a flag it refuses), a refused close, move, minimize or
+  restore is answered (`LAG_WINREFUSED`, 19: window, action, reason; exactly 6 bytes, strict parser in `vmagent.c`),
+  lord-vm logs it and passes it on (`VM_WINREFUSED`), and lord-server keeps the last refused close per window for the
+  app: `lord.vm.closeRefusals(session)` → `[{ gid, reason: 'elevated' | 'other', at }]`, with `closeRefusedSeq` in the
+  machine's status and `elevated` on each of `lord.vm.windows()`. Apps mode copies it into `guests[dir].closeRefused`
+  (`closeRefusedOf` in `model.js`, tested), where the window says to close it from inside the machine. The tools are
+  never elevated to get around it.
 
 - **Videos and songs with 44.1 kHz sound no longer freeze after about half a minute, in development** (lord-media's
   player, `src/media/helper/lm_aqlevel.h`). The player counted the decoded sound waiting for lord-server in

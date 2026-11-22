@@ -483,6 +483,11 @@ eq('instance', [M.guestInstance('ab12-cd', 4294967295), M.guestInstance('a/../b'
   const q = M.planWindows([W(1, 200, { minimized: true })], new Map([[1, { rect: W(1, 0), minimized: false }]]));
   eq('plan minimize, no follow', [q.minimize.map((w) => w.id), q.follow.length], [[1], 0]);
 }
+eq('close refusals: the guest\'s list as a slot per window', M.closeRefusedOf([{ gid: 70188, reason: 'elevated', at: 1795400000000 }, { gid: 5, reason: 'other', at: 1 }]),
+  { 70188: { reason: 'elevated', at: 1795400000000 }, 5: { reason: 'other', at: 1 } });
+eq('close refusals: anything else left out', M.closeRefusedOf([null, { gid: 0, reason: 'elevated', at: 1 }, { gid: 3, reason: 'admin', at: 1 }, { gid: 4, reason: 'other' }, { gid: '7', reason: 'other', at: 1 }]), {});
+eq('close refusals: the last per window', M.closeRefusedOf([{ gid: 9, reason: 'other', at: 1 }, { gid: 9, reason: 'elevated', at: 2 }]), { 9: { reason: 'elevated', at: 2 } });
+eq('close refusals: not a list', [M.closeRefusedOf(undefined), M.closeRefusedOf({})], [{}, {}]);
 eq('guest apps menu', M.guestAppItems([{ name: 'Zeta', token: 'z' }, { name: 'alpha', token: 'a' }, { name: 'dup', token: 'a' }, { name: '', token: 'x' }, null]).map((a) => a.token), ['a', 'z']);
 {
   // apps mode's Running list: no popups, no owned windows, no slivers; minimized kept; sorted by app, title, id
