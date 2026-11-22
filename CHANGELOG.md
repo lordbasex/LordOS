@@ -44,8 +44,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **For the maintainer's approval, not published:** the issue form `.github/ISSUE_TEMPLATE/gpu-report.yml`, the site
     page draft "Tested graphics cards" (`web/content/hardware/gpus.{en,es,pt}.md`, `gpus.meta.json`; not wired into the
     site build), the call for testers (`docs/drafts/nvidia-call-for-testers.{en,es}.md`) and the designs in
-    `docs/NVIDIA-PLAN.md`: the AI / compute role (Debian's non-free driver through LordOS's package engine, guided Secure
-    Boot key enrolment, Flatpak's GL.nvidia extension, four closed admin actions) and NVIDIA drawing the desktop
+    `docs/NVIDIA-PLAN.md`: NVIDIA's driver as an opt-in from the Store's "Suggested for your computer" card, revised
+    after the maintainer's decision of 2026-11-22 (the free `nouveau` stays the default; Turing and newer, RTX 50
+    included, get NVIDIA's own signed repository for Debian 13 through the existing catalog `pkg-source-add`, with open
+    kernel modules and the branch pinned; GTX 9xx/10 keep Debian 13's 550 driver; CUDA and the toolkit are separate
+    options; Settings → Graphics cards opens that card; flat-repository support in the package engine; guided Secure
+    Boot key enrolment, the only closed admin action still asked for, `gpu-mok-enroll`, the other three dropped;
+    Flatpak's GL.nvidia extension) and NVIDIA drawing the desktop
     (`nvidia-drm.modeset=1`, GBM/EGL, explicit sync, a boot fallback, a test matrix by generation).
 
 - **Lord Workspaces: each display's quick launch and its usual apps, suggested, in development** (asked by the maintainer;
