@@ -1713,8 +1713,8 @@ trusted programs show as not offered). The number is the version of the protocol
 [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/). To change a row, edit `docs/wayland-protocols.json` and run
 `node tools/gen-wayland-table.mjs`; `server/tests/wayland_table_test.mjs` fails when the JSON and `server/src/wl` disagree.
 
-108 protocols. LordOS offers 34; KWin 6.7 63; Mutter 51 40. Of the 37 that both KWin and Mutter offer, LordOS offers 25;
-30 are left out on purpose and 44 are not offered (yet). Offered by both and not by LordOS: `wayland-wl_fixes`, `tablet-v2`, `drm-lease-v1`, `linux-drm-syncobj-v1`, `xdg-toplevel-drag-v1`, `xdg-system-bell-v1`, `color-management-v1`, `color-representation-v1`, `xdg-toplevel-tag-v1`, `pointer-warp-v1`, `ext-background-effect-v1`, `xdg-session-management-v1`.
+108 protocols. LordOS offers 46; KWin 6.7 63; Mutter 51 40. Of the 37 that both KWin and Mutter offer, LordOS offers 37;
+30 are left out on purpose and 32 are not offered (yet).
 
 | Protocol | Category | LordOS | KWin 6.7 | Mutter 51 | Note |
 |---|---|---|---|---|---|
@@ -1725,15 +1725,15 @@ trusted programs show as not offered). The number is the version of the protocol
 | [wayland-wl_seat](https://wayland.app/protocols/wayland#wl_seat) | core | 9 | 10 | 10 |  |
 | [wayland-wl_output](https://wayland.app/protocols/wayland#wl_output) | core | 4 | 4 | 4 |  |
 | [wayland-wl_subcompositor](https://wayland.app/protocols/wayland#wl_subcompositor) | core | 1 | 1 | 1 |  |
-| [wayland-wl_fixes](https://wayland.app/protocols/wayland#wl_fixes) | core | — | 2 | 1 |  |
+| [wayland-wl_fixes](https://wayland.app/protocols/wayland#wl_fixes) | core | 1 (since 0.8.9.5) | 2 | 1 | destroy_registry: a client drops a wl_registry it no longer needs and lord-server stops sending it global events. Debian 13's libwayland is 1.23, so the interface comes from wayland.xml 1.24, vendored. Not yet checked with a real app. |
 | [presentation-time](https://wayland.app/protocols/presentation-time) | stable | 2 (1 before 0.8.9.5) | 2 | 2 | Version 2 (feedback per display) since 0.8.9.5. |
 | [viewporter](https://wayland.app/protocols/viewporter) | stable | 1 | 1 | 1 |  |
 | [xdg-shell](https://wayland.app/protocols/xdg-shell) | stable | 7 (6 before 0.8.9.5) | 6 | 7 | Version 7 (constrained_* states) since 0.8.9.5. |
 | [linux-dmabuf-v1](https://wayland.app/protocols/linux-dmabuf-v1) | stable | 5 (4 before 0.8.9.5) | 5 | 5 | Version 5 (one modifier for every plane) since 0.8.9.5. |
-| [tablet-v2](https://wayland.app/protocols/tablet-v2) | stable | — | 2 | 2 | Planned: pressure, tilt and pen buttons from evdev, without libinput (docs/DESKTOP-PARITY.md, phase 6). |
+| [tablet-v2](https://wayland.app/protocols/tablet-v2) | stable | 2 (since 0.8.9.5) | 2 | 2 | Pens (pressure, tilt, distance, rotation, slider, buttons) and pads (buttons, rings, strips, dials) read from evdev by LordOS's own tablet.c, without libinput or libwacom. Not the tool's wheel or pad modes beyond one. Not yet checked with a real tablet. |
 | [xdg-activation-v1](https://wayland.app/protocols/xdg-activation-v1) | staging | 1 | 1 | 1 |  |
-| [drm-lease-v1](https://wayland.app/protocols/drm-lease-v1) | staging | — | 1 | 1 | In progress (approved by the maintainer 2026-11-22): a VR headset or another non-desktop display leased to an app, gated by a permission; only non-desktop connectors are offered, never the session's displays. |
-| [linux-drm-syncobj-v1](https://wayland.app/protocols/linux-drm-syncobj-v1) | staging | — | 1 | 1 | Explicit sync: designed, waiting for the maintainer's review (docs/SYNCOBJ-PLAN.md). |
+| [drm-lease-v1](https://wayland.app/protocols/drm-lease-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 | Only a connector the kernel marks non-desktop (a VR headset), only to an app the person allowed (the vr permission: Allow once, Always allow, Don't allow), never to a sandboxed or isolated app or Xwayland; revoked on unplug, permission taken back, lock, user switch or text console. Approved by the maintainer 2026-11-22. Not yet checked with a real headset. |
+| [linux-drm-syncobj-v1](https://wayland.app/protocols/linux-drm-syncobj-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 | A dmabuf frame is applied once its acquire point is signalled, without blocking, and its release point is signalled when LordOS is done with it. Offered when a render node has timeline syncobjs and SYNCOBJ_EVENTFD (Linux 6.6), on the GPU and the CPU path (docs/WAYLAND.md, "Explicit sync"). |
 | [ext-session-lock-v1](https://wayland.app/protocols/ext-session-lock-v1) | staging | no, on purpose | — | — | LordOS locks the screen itself; an outside locker would draw over the session (docs/DESKTOP-PARITY.md). |
 | [single-pixel-buffer-v1](https://wayland.app/protocols/single-pixel-buffer-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 |  |
 | [content-type-v1](https://wayland.app/protocols/content-type-v1) | staging | 1 | 1 | — | Kept per surface and applied on commit; nothing uses it yet (docs/WAYLAND.md "Frame timing"). |
@@ -1747,21 +1747,21 @@ trusted programs show as not offered). The number is the version of the protocol
 | [ext-foreign-toplevel-list-v1](https://wayland.app/protocols/ext-foreign-toplevel-list-v1) | staging | no, on purpose | — | — | A program could list and control other apps' windows (third-party docks and taskbars). LordOS's Dock, switcher and window list are part of the desktop (docs/DESKTOP-PARITY.md). |
 | [security-context-v1](https://wayland.app/protocols/security-context-v1) | staging | 1 (since 0.8.8.8) | 1 | — | Built; not yet checked on the VM with a real Flatpak. |
 | [ext-transient-seat-v1](https://wayland.app/protocols/ext-transient-seat-v1) | staging | — | — | — | Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). |
-| [xdg-toplevel-drag-v1](https://wayland.app/protocols/xdg-toplevel-drag-v1) | staging | — | 1 | 1 |  |
+| [xdg-toplevel-drag-v1](https://wayland.app/protocols/xdg-toplevel-drag-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 | Tab tear-off: the window follows the pointer at the app's offset, is never the drag's target and stays where it is let go. |
 | [xdg-toplevel-icon-v1](https://wayland.app/protocols/xdg-toplevel-icon-v1) | staging | 1 (since 0.8.9.5) | 1 | — | Used only when the app has no installed icon; buffers re-encoded and size-limited, icon names ignored. |
 | [xdg-dialog-v1](https://wayland.app/protocols/xdg-dialog-v1) | staging | 1 (since 0.8.8.8) | 1 | 1 |  |
 | [alpha-modifier-v1](https://wayland.app/protocols/alpha-modifier-v1) | staging | 1 (since 0.8.9.5) | 1 | — |  |
 | [commit-timing-v1](https://wayland.app/protocols/commit-timing-v1) | staging | 1 | — | 1 | An update is not shown before its target on wp_presentation's clock: it applies at the latch of the first frame predicted at or after it (docs/WAYLAND.md "Frame timing"). |
 | [ext-data-control-v1](https://wayland.app/protocols/ext-data-control-v1) | staging | no, on purpose | 1 | — | A program could read every copy, or replace the clipboard, without having the focus. LordOS gives the clipboard only to the focused app; GNOME doesn't offer it either (docs/DESKTOP-PARITY.md). |
 | [fifo-v1](https://wayland.app/protocols/fifo-v1) | staging | 1 | 1 | 1 | An update waits until the surface's display has latched a frame since the one that set the barrier: Mesa's Vulkan FIFO mode runs at the display's rate. Held in explicit sync's queue; hidden windows and a screen that is off clear it once a second (docs/WAYLAND.md "Frame timing"). |
-| [xdg-system-bell-v1](https://wayland.app/protocols/xdg-system-bell-v1) | staging | — | 1 | 1 |  |
+| [xdg-system-bell-v1](https://wayland.app/protocols/xdg-system-bell-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 | LordOS's alert sound (not in Do Not Disturb) and a window not in front marked as wanting attention; at most one ring every 250 ms per app. |
 | [ext-workspace-v1](https://wayland.app/protocols/ext-workspace-v1) | staging | — | — | — | Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). |
-| [color-management-v1](https://wayland.app/protocols/color-management-v1) | staging | — | 2 | 2 | Planned: ICC per output first, then HDR (docs/DESKTOP-PARITY.md, phase 6). |
-| [color-representation-v1](https://wayland.app/protocols/color-representation-v1) | staging | — | 1 | 1 |  |
-| [xdg-toplevel-tag-v1](https://wayland.app/protocols/xdg-toplevel-tag-v1) | staging | — | 1 | 1 |  |
-| [pointer-warp-v1](https://wayland.app/protocols/pointer-warp-v1) | staging | — | 1 | 1 |  |
-| [ext-background-effect-v1](https://wayland.app/protocols/ext-background-effect-v1) | staging | — | 1 | 1 |  |
-| [xdg-session-management-v1](https://wayland.app/protocols/xdg-session-management-v1) | staging | — | 1 | 1 |  |
+| [color-management-v1](https://wayland.app/protocols/color-management-v1) | staging | partly, 1 (since 0.8.9.5) | 2 | 2 | Parametric descriptions only (no ICC, no luminances or mastering metadata, no scRGB); pixels are converted to the SDR sRGB / gamma 2.2 every display is driven with. No HDR (docs/WAYLAND.md, "Colour management"). |
+| [color-representation-v1](https://wayland.app/protocols/color-representation-v1) | staging | partly, 1 (since 0.8.9.5) | 1 | 1 | Alpha modes premultiplied electrical, premultiplied optical and straight; coefficients and range identity / full only, since lord-server imports no YUV buffer. |
+| [xdg-toplevel-tag-v1](https://wayland.app/protocols/xdg-toplevel-tag-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 | A window's tag keys its own remembered place; its description names the window while it has no title. |
+| [pointer-warp-v1](https://wayland.app/protocols/pointer-warp-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 | Only within the app's own surface, with the pointer over it, the serial of its enter and the keyboard; never while the pointer is locked or in a drag. Not yet checked with an app on the VM. |
+| [ext-background-effect-v1](https://wayland.app/protocols/ext-background-effect-v1) | staging | partly, 1 (since 0.8.9.5) | 1 | 1 | Blur behind a region of a window, drawn with the UI's own backdrop blur: offered only on the CPU path with transparency and blur on, not on the GPU path. |
+| [xdg-session-management-v1](https://wayland.app/protocols/xdg-session-management-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 | An app's windows come back where they were: random session ids, scoped to the program lord-server checked, kept in ~/.config/lordos/wl-sessions (mode 0600). |
 | [xx-input-method-v2](https://wayland.app/protocols/xx-input-method-v2) | experimental | no, on purpose | — | — | An outside input method would read every key. LordOS's own input methods (server/src/ime.c) compose into apps through text-input-v3 (docs/WAYLAND.md, "Input methods"). |
 | [xx-session-management-v1](https://wayland.app/protocols/xx-session-management-v1) | experimental | — | — | — |  |
 | [xx-cutouts-v1](https://wayland.app/protocols/xx-cutouts-v1) | experimental | — | — | — |  |

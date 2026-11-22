@@ -213,9 +213,13 @@
         "wl_fixes": 1
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "checked": "not in server/src/wl",
+        "status": "supported",
+        "globals": {
+          "wl_fixes": 1
+        },
+        "since": "0.8.9.5",
+        "note": "destroy_registry: a client drops a wl_registry it no longer needs and lord-server stops sending it global events. Debian 13's libwayland is 1.23, so the interface comes from wayland.xml 1.24, vendored. Not yet checked with a real app.",
+        "checked": "headless lord-server: tests/wlfixes_client.c (tests/wlperf_headless.sh)",
         "checkedDate": "2026-11-22"
       }
     },
@@ -357,10 +361,13 @@
         "zwp_tablet_manager_v2": 2
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "note": "Planned: pressure, tilt and pen buttons from evdev, without libinput (docs/DESKTOP-PARITY.md, phase 6).",
-        "checked": "not in server/src/wl",
+        "status": "supported",
+        "globals": {
+          "zwp_tablet_manager_v2": 2
+        },
+        "since": "0.8.9.5",
+        "note": "Pens (pressure, tilt, distance, rotation, slider, buttons) and pads (buttons, rings, strips, dials) read from evdev by LordOS's own tablet.c, without libinput or libwacom. Not the tool's wheel or pad modes beyond one. Not yet checked with a real tablet.",
+        "checked": "build/tablet-test, build/wltablet-test; headless lord-server",
         "checkedDate": "2026-11-22"
       }
     },
@@ -406,10 +413,13 @@
         "wp_drm_lease_device_v1": 1
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "note": "In progress (approved by the maintainer 2026-11-22): a VR headset or another non-desktop display leased to an app, gated by a permission; only non-desktop connectors are offered, never the session's displays.",
-        "checked": "maintainer's decision; not in server/src/wl yet",
+        "status": "supported",
+        "globals": {
+          "wp_drm_lease_device_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "Only a connector the kernel marks non-desktop (a VR headset), only to an app the person allowed (the vr permission: Allow once, Always allow, Don't allow), never to a sandboxed or isolated app or Xwayland; revoked on unplug, permission taken back, lock, user switch or text console. Approved by the maintainer 2026-11-22. Not yet checked with a real headset.",
+        "checked": "build/drmlease-test, drmlease-e2e-test",
         "checkedDate": "2026-11-22"
       }
     },
@@ -430,10 +440,13 @@
         "wp_linux_drm_syncobj_manager_v1": 1
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "note": "Explicit sync: designed, waiting for the maintainer's review (docs/SYNCOBJ-PLAN.md).",
-        "checked": "not in server/src/wl",
+        "status": "supported",
+        "globals": {
+          "wp_linux_drm_syncobj_manager_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "A dmabuf frame is applied once its acquire point is signalled, without blocking, and its release point is signalled when LordOS is done with it. Offered when a render node has timeline syncobjs and SYNCOBJ_EVENTFD (Linux 6.6), on the GPU and the CPU path (docs/WAYLAND.md, \"Explicit sync\").",
+        "checked": "build/syncobj-test, tests/syncobj_headless.sh; vkcube (Mesa 25.0.7 Vulkan) on an AMD RX 580",
         "checkedDate": "2026-11-22"
       }
     },
@@ -756,9 +769,13 @@
         "xdg_toplevel_drag_manager_v1": 1
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "checked": "not in server/src/wl",
+        "status": "supported",
+        "globals": {
+          "xdg_toplevel_drag_manager_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "Tab tear-off: the window follows the pointer at the app's offset, is never the drag's target and stays where it is let go.",
+        "checked": "Chromium 156 on a headless lord-server (tear-off and reattach); tests/shellx_headless.sh",
         "checkedDate": "2026-11-22"
       }
     },
@@ -926,9 +943,13 @@
         "xdg_system_bell_v1": 1
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "checked": "not in server/src/wl",
+        "status": "supported",
+        "globals": {
+          "xdg_system_bell_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "LordOS's alert sound (not in Do Not Disturb) and a window not in front marked as wanting attention; at most one ring every 250 ms per app.",
+        "checked": "tests/shellx_headless.sh; build/shellx-units-test",
         "checkedDate": "2026-11-22"
       }
     },
@@ -969,10 +990,13 @@
         "wp_color_manager_v1": 2
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "note": "Planned: ICC per output first, then HDR (docs/DESKTOP-PARITY.md, phase 6).",
-        "checked": "not in server/src/wl",
+        "status": "partial",
+        "globals": {
+          "wp_color_manager_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "Parametric descriptions only (no ICC, no luminances or mastering metadata, no scRGB); pixels are converted to the SDR sRGB / gamma 2.2 every display is driven with. No HDR (docs/WAYLAND.md, \"Colour management\").",
+        "checked": "tests/color_headless.sh; GTK 4.18.6 (GDK_DEBUG=color-mgmt)",
         "checkedDate": "2026-11-22"
       }
     },
@@ -993,9 +1017,13 @@
         "wp_color_representation_manager_v1": 1
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "checked": "not in server/src/wl",
+        "status": "partial",
+        "globals": {
+          "wp_color_representation_manager_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "Alpha modes premultiplied electrical, premultiplied optical and straight; coefficients and range identity / full only, since lord-server imports no YUV buffer.",
+        "checked": "tests/color_headless.sh",
         "checkedDate": "2026-11-22"
       }
     },
@@ -1016,9 +1044,13 @@
         "xdg_toplevel_tag_manager_v1": 1
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "checked": "not in server/src/wl",
+        "status": "supported",
+        "globals": {
+          "xdg_toplevel_tag_manager_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "A window's tag keys its own remembered place; its description names the window while it has no title.",
+        "checked": "tests/shellx_headless.sh",
         "checkedDate": "2026-11-22"
       }
     },
@@ -1039,9 +1071,13 @@
         "wp_pointer_warp_v1": 1
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "checked": "not in server/src/wl",
+        "status": "supported",
+        "globals": {
+          "wp_pointer_warp_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "Only within the app's own surface, with the pointer over it, the serial of its enter and the keyboard; never while the pointer is locked or in a drag. Not yet checked with an app on the VM.",
+        "checked": "build/wltablet-test",
         "checkedDate": "2026-11-22"
       }
     },
@@ -1062,9 +1098,13 @@
         "ext_background_effect_manager_v1": 1
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "checked": "not in server/src/wl",
+        "status": "partial",
+        "globals": {
+          "ext_background_effect_manager_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "Blur behind a region of a window, drawn with the UI's own backdrop blur: offered only on the CPU path with transparency and blur on, not on the GPU path.",
+        "checked": "tests/shellx_headless.sh (CPU path); build/shellx-units-test",
         "checkedDate": "2026-11-22"
       }
     },
@@ -1085,9 +1125,13 @@
         "xdg_session_manager_v1": 1
       },
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "checked": "not in server/src/wl",
+        "status": "supported",
+        "globals": {
+          "xdg_session_manager_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "An app's windows come back where they were: random session ids, scoped to the program lord-server checked, kept in ~/.config/lordos/wl-sessions (mode 0600).",
+        "checked": "tests/shellx_headless.sh",
         "checkedDate": "2026-11-22"
       }
     },

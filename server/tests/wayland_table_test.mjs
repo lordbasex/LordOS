@@ -16,13 +16,21 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 let fails = 0;
 const bad = (m) => { fails++; console.error('FAIL ' + m); };
 
-// every .c under server/src
-const files = [];
-(function walk(d) { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (p.endsWith('.c')) files.push(p); } })(path.join(REPO, 'server/src'));
+// every .c under server/src, and the .h files that may hold a version macro
+const files = [], headers = [];
+(function walk(d) { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (p.endsWith('.c')) files.push(p); else if (p.endsWith('.h')) headers.push(p); } })(path.join(REPO, 'server/src'));
+
+// a version given as a simple macro: #define NAME 3 (or (3), 3u) in the same file first, then in any other source
+export function defineOf(name, own, others) {
+  const re = new RegExp(`^[ \\t]*#[ \\t]*define[ \\t]+${name}[ \\t]+\\(?[ \\t]*(\\d+)[uU]?[ \\t]*\\)?[ \\t]*(?:/[*/].*)?$`, 'm');
+  for (const s of [own, ...others]) { const m = s.match(re); if (m) return +m[1]; }
+  return null;
+}
 
 // globals in the code: interface name -> {version, where}
-export function codeGlobals(srcs) {
+export function codeGlobals(srcs, extra = []) {
   const out = new Map();
+  const all = [...srcs.map(([, s]) => s), ...extra];
   for (const [f, s] of srcs) {
     const rel = path.relative(REPO, f);
     for (const m of s.matchAll(/wl_global_create\s*\(\s*[^,]+,\s*&(\w+)\s*,\s*([^,]+),/g)) {
@@ -30,9 +38,10 @@ export function codeGlobals(srcs) {
       // a hand-written interface table (static const struct wl_interface kde_mgr_interface = { "org_kde_…", 1, …)
       const own = s.match(new RegExp(`struct\\s+wl_interface\\s+${sym}\\s*=\\s*\\{\\s*"([^"]+)"`));
       const name = own ? own[1] : sym.replace(/_interface$/, '');
-      const v = m[2].trim();
+      let v = m[2].trim();
       const line = s.slice(0, m.index).split('\n').length;
-      if (!/^\d+$/.test(v)) { bad(`${rel}:${line}: ${name}'s version "${v}" is not a number; teach this test to read it`); continue; }
+      if (/^[A-Za-z_]\w*$/.test(v)) { const n = defineOf(v, s, all); if (n != null) v = String(n); }
+      if (!/^\d+$/.test(v)) { bad(`${rel}:${line}: ${name}'s version "${v}" is not a number or a simple #define; teach this test to read it`); continue; }
       if (out.has(name) && out.get(name).version !== +v) bad(`${name} is created with two versions (${out.get(name).where}, ${rel}:${line})`);
       out.set(name, { version: +v, where: `${rel}:${line}` });
     }
@@ -45,7 +54,7 @@ export function codeGlobals(srcs) {
 const d = load();
 for (const e of validate(d)) bad('docs/wayland-protocols.json: ' + e);
 
-const code = codeGlobals(files.map((f) => [f, fs.readFileSync(f, 'utf8')]));
+const code = codeGlobals(files.map((f) => [f, fs.readFileSync(f, 'utf8')]), headers.map((f) => fs.readFileSync(f, 'utf8')));
 const table = new Map();
 for (const p of d.protocols) for (const [g, v] of Object.entries(p.lordos.globals || {})) table.set(g, { version: v, id: p.id, libwayland: !!p.lordos.libwayland });
 
@@ -122,8 +131,8 @@ if (web !== JSON.stringify(webData(d), null, 1) + '\n') bad('web/content/wayland
 
 // the parser itself, on a known snippet
 {
-  const t = codeGlobals([['x.c', 'static const struct wl_interface my_mgr_interface = {\n "org_x_mgr", 2, 0 };\nwl_global_create(dpy, &my_mgr_interface, 2, NULL, b);\n  wl_global_create(dpy, &xdg_wm_base_interface, 7, NULL, bind);\nwl_display_init_shm(dpy);']]);
-  const want = JSON.stringify([['org_x_mgr', 2], ['xdg_wm_base', 7], ['wl_shm', null]]);
+  const t = codeGlobals([['x.c', 'static const struct wl_interface my_mgr_interface = {\n "org_x_mgr", 2, 0 };\nwl_global_create(dpy, &my_mgr_interface, 2, NULL, b);\n  wl_global_create(dpy, &xdg_wm_base_interface, 7, NULL, bind);\nwl_display_init_shm(dpy);\n#define FIX_VERSION 3   /* the protocol */\nwl_global_create(dpy, &wl_fixes_interface, FIX_VERSION, NULL, b);\nwl_global_create(dpy, &wp_x_v1_interface, HDR_V, NULL, b);']], ['#define HDR_V (4u)\n']);
+  const want = JSON.stringify([['org_x_mgr', 2], ['xdg_wm_base', 7], ['wl_fixes', 3], ['wp_x_v1', 4], ['wl_shm', null]]);
   const got = JSON.stringify([...t].map(([k, v]) => [k, v.version]));
   if (got !== want) bad(`codeGlobals parser: ${got} != ${want}`);
 }

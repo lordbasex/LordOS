@@ -207,8 +207,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   KDE Plasma's KWin 6.7 and GNOME's Mutter 51 advertise, compared on 2026-11-22 (KWin's and Mutter's data as
   wayland.app lists it: the globals each advertised to an ordinary client, from 2026-09-04 and 2026-09-06). For LordOS
   each row has a status (offered, partly, left out on purpose, not offered), a note, how it was checked and when, and
-  "in development" when it is in the code after the latest release (0.8.9.4). Today: LordOS offers 30 of the 108,
-  KWin 63 and Mutter 40; of the 37 both KWin and Mutter offer, LordOS offers 24; 30 are left out on purpose, each with
+  "in development" when it is in the code after the latest release (0.8.9.4). Today: LordOS offers 46 of the 108 (3 of them in part),
+  KWin 63 and Mutter 40; of the 37 both KWin and Mutter offer, LordOS offers all 37; 30 are left out on purpose, each with
   its reason (layer-shell, data-control, foreign-toplevel, session-lock, screencopy and image capture, virtual
   keyboard and pointer, input methods, Plasma's own shell protocols). The page has a search, filters by category,
   LordOS's status and who offers it (including "both KDE and GNOME, not LordOS"), kept in the address, a legend, and
