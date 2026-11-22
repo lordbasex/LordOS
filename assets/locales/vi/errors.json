@@ -918,5 +918,10 @@
   "studio.noCamera": "Không có máy ảnh nào được kết nối.",
   "studio.unavailable": "LordOS Studio không có trên máy tính này.",
   "studio.downloadFailed": "Không thể tải xuống hình nền.",
-  "studio.removeFailed": "Không thể xóa hình nền."
+  "studio.removeFailed": "Không thể xóa hình nền.",
+  "dkms.mokInvalid": "Yêu cầu khóa Secure Boot này không hợp lệ.",
+  "dkms.mokNotNeeded": "Máy tính này hiện không cần đăng ký khóa.",
+  "dkms.mokNothingPending": "Không có khóa nào đang chờ đăng ký ở lần khởi động lại tới.",
+  "dkms.mokNoTool": "Chưa cài đặt chương trình mokutil.",
+  "dkms.mokFailed": "Không thể chuẩn bị khóa cho lần khởi động lại tới."
 }

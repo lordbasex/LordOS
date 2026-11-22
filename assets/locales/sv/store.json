@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Ger alla appar, även webbläsare och videosamtal, kameran ”LordOS Studio” med dina effekter: suddig bakgrund eller en bild bakom dig ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} finns inte i den här datorns paketkällor.",
   "suggest.studioCamera.note.dkms": "På en pc byggs kärnmodulen för din kärna på den här datorn (DKMS), vilket tar med cirka 500 MB kompilatorer och kärnhuvuden, och på nytt efter varje kärnuppdatering. På en Raspberry Pi följer den med LordOS-kärnan.",
-  "suggest.studioCamera.note.secureBoot": "Med Secure Boot på måste du registrera modulens signeringsnyckel vid nästa omstart, annars visas inte kameran."
+  "suggest.studioCamera.note.secureBoot": "Med Secure Boot på måste du registrera modulens signeringsnyckel vid nästa omstart, annars visas inte kameran.",
+  "suggest.studioCamera.note.obs": "Lägger också till en andra kameraenhet, ”OBS Virtual Camera”, så att OBS Studios egen virtuella kamera fungerar bredvid LordOS Studio.",
+  "suggest.mok.title": "Ett steg till vid nästa omstart",
+  "suggest.mok.body": "Secure Boot är på, så det som det här objektet installerade läses in först när dess signeringsnyckel har registrerats. LordOS förbereder nyckeln och ger dig ett engångslösenord som du skriver på en blå skärm vid nästa omstart.",
+  "suggest.mok.prepare": "Förbered nyckeln",
+  "suggest.mok.pending": "Nyckeln registreras vid nästa omstart. Om du inte längre har lösenordet kan du hämta ett nytt.",
+  "suggest.mok.passwordTitle": "Ditt engångslösenord",
+  "suggest.mok.passwordHint": "Skriv ner det nu: det visas bara en gång och sparas ingenstans.",
+  "suggest.mok.steps": "Starta om och tryck på valfri tangent inom 10 sekunder när den blå skärmen visas. Välj sedan Enroll MOK → Continue → Yes, skriv lösenordet och välj Reboot.",
+  "suggest.mok.newPassword": "Nytt lösenord",
+  "suggest.mok.cancel": "Avbryt registreringen"
 }

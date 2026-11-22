@@ -81,11 +81,11 @@
   "faceless": "Ini memerlukan model wajah LordOS Studio, yang belum terpasang.",
   "mic": "Mode Mikrofon",
   "micStandard": "Standar",
-  "micVoice": "Isolasi Suara",
-  "micWide": "Spektrum Lebar",
+  "micVoice": "Pengurangan Bising",
+  "micWide": "Rentang Penuh",
   "micHint.standard": "Mikrofon Anda apa adanya.",
   "micHint.voice": "Menghilangkan kebisingan di sekitar Anda sehingga hanya suara Anda yang terdengar. Jika suara Anda terdengar seperti robot, matikan peredam bising milik aplikasi panggilan itu sendiri.",
   "micHint.wide": "Mikrofon Anda tanpa pemrosesan sama sekali: untuk musik dan setiap suara di ruangan.",
-  "micUnavailable": "Isolasi Suara muncul setelah Anda keluar lalu masuk kembali.",
+  "micUnavailable": "Pengurangan Bising muncul setelah Anda keluar lalu masuk kembali.",
   "noMic": "Tidak ada mikrofon yang terhubung."
 }

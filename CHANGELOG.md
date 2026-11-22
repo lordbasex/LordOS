@@ -162,15 +162,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   checked on a VM (open items below).
   - **The Store item `lordos-studio-camera`** (`tools/iso/mkdeb-studiocamera.sh`): two static, root-owned
     configuration files and nothing else. `/etc/modprobe.d/lordos-studio.conf` sets
-    `options v4l2loopback devices=1 video_nr=50 card_label="LordOS Studio" exclusive_caps=1 max_buffers=4` and
+    `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`
+    (the second device for OBS: see the follow-ups below) and
     `/etc/modules-load.d/lordos-studio.conf` loads the module at boot; its postinst loads it at once when nothing
     loaded it yet, its postrm unloads it when nothing uses it. On amd64 it depends on Debian's `v4l2loopback-dkms`
     (main, GPL-2.0, 0.13.0 or later) and `linux-headers-amd64`, so DKMS builds the module for the running kernel; on
     arm64 the module comes prebuilt in the LordOS Raspberry Pi kernel (below), so the package depends on nothing
     else. There is no runtime root action: lord-server never creates or removes loopback devices, and the Store's
     existing package engine installs and removes it. With Secure Boot on, the module's DKMS key has to be enrolled at
-    the next restart, which the card says, as the NVIDIA card does; the guided `dkms-mok-enroll` (NVIDIA plan A.5's
-    `gpu-mok-enroll`, renamed) is still awaiting its own approval and is not built.
+    the next restart, which the card says and now guides (`dkms-mok-enroll`, in the follow-ups below).
   - **The Store card** ("Suggested for your computer", `assets/store/suggestions.json`, rule `studioCamera`): shown
     when a USB camera is plugged in (a new `usbClass` condition in `sdk/suggestengine.js`: an interface of class `0e`,
     video), installs `lordos-studio-camera` through the usual plan and `pkg-install`, and explains in its "What
@@ -257,15 +257,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `studio-bg-remove` (administrators), the twins of `wallpaper-get`: JS names a catalog entry, never a URL or a path,
     the download runs as `nobody` in the Store's scope, and a file whose size or SHA-256 isn't the catalog's is never
     kept (`/var/lib/lordos/studio/<sha256>.jpg` or `.mp4`). A Credits page lists every author and license.
-  - **Mic Mode** (E-S6): Standard, Voice Isolation and Wide Spectrum in the popover. Voice Isolation is one more
-    microphone, "LordOS Voice Isolation", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
+  - **Mic Mode** (E-S6): Standard, Noise Reduction and Full Range in the popover. Noise Reduction is one more
+    microphone, "LordOS Noise Reduction", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
     static drop-in (`/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf`); choosing a mode only sets the default
     microphone through LordOS's existing sound client. There is no echo cancellation (nothing is routed to its echo
-    reference), no module loaded at runtime and no new privilege. Standard and Wide Spectrum both use the microphone
+    reference), no module loaded at runtime and no new privilege. Standard and Full Range both use the microphone
     with no processing. The sound lists hide the filter's own echo reference and streams, and the capture indicator
     no longer counts the filter's own link to the microphone (only when PipeWire itself owns it); the app that records
-    Voice Isolation is shown as before.
-  - **The popover** (`sdk/studio.jsx`, logic in `sdk/studiomodel.js`, downloads in `sdk/studiobg.js`): new rows Studio
+    Noise Reduction is shown as before. The modes carry our own names, Noise Reduction and Full Range, in all 35
+    languages (the locale keys `studio.micVoice` and `studio.micWide` and the PipeWire node names `lordos_voice_*`
+    are unchanged), and the microphone other apps list is "LordOS Noise Reduction".
+  - **The popover** (`sdk/studio.jsx`, logic in `sdk/studiomodel.js`, downloads in `sdk/studiobg.js`): new rows Face
     Light, Auto Framing, Filters and Retouch, each with its page; the Background page has None, Blur, Picture and Video,
     the green screen and colour match, the catalog by category, "Add your own…" (a picture or a short video) and
     Credits. LordOS's Cyberpunk City wallpapers are no longer offered as camera backgrounds (some show people). New
@@ -275,8 +277,46 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `tests/studio_voice_test.mjs` (the drop-in, without touching PipeWire), new cases in `build/studio-hub-test`,
     `tests/pwguard_test.c`, `tests/studio_model_test.mjs` and `build/studio-helper-test` (every look, BlazeFace and a
     looping video inside lord-studio's sandbox).
-  - **Still to verify on a VM:** Voice Isolation loaded by a real PipeWire and heard in a Meet call, and whether the
+  - **Still to verify on a VM:** Noise Reduction loaded by a real PipeWire and heard in a Meet call, and whether the
     microphone stays open while nothing records it. Not built yet: light wrap, the face spotlight, the key-colour eyedropper.
+- **LordOS Studio follow-ups, in development: OBS beside LordOS Studio, a guided Secure Boot step, and our own mic
+  mode names (approved by the maintainer on 2026-11-22; `docs/CAMERA-STUDIO-PLAN.md` 11.4, `docs/NVIDIA-PLAN.md` A.5).**
+  - **OBS's own virtual camera works beside LordOS Studio.** The `lordos-studio-camera` package now makes two
+    v4l2loopback devices: `/dev/video50` "LordOS Studio", as before, and `/dev/video49` "OBS Virtual Camera"
+    (`devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1`). Read in OBS's
+    source (`plugins/linux-v4l2/v4l2-output.c`): with v4l2loopback already loaded OBS loads nothing, takes the first
+    `/dev/video*` in version order that announces video output and never looks at the label; an idle loopback announces
+    output, so OBS's device has to come before ours, or OBS would take LordOS Studio's whenever LordOS Studio's camera
+    is off. That is why it is number 49, not 51 as first proposed. lord-server still opens only `/dev/video50` after the
+    device, driver and card checks, and lord-studio now refuses any loopback whose card isn't "LordOS Studio" too, so
+    nothing in LordOS writes OBS's device. While OBS streams, its device is listed as a camera like any other, and the
+    "no camera" restriction covers both (major 81; `tests/fwlinux/devices.sh` gained step 6b). On an update from the
+    one-device file the postinst reloads the module only when nothing uses it (otherwise the second device appears at
+    the next restart); it never touches a v4l2loopback someone else loaded or a file the person edited. The Store card
+    says so in a new "What changes" note, in all 35 languages.
+  - **Guided Secure Boot enrolment** (`dkms-mok-enroll`, NVIDIA plan A.5's `gpu-mok-enroll` renamed;
+    `server/src/hw/mok_admin.c`): one closed admin action, administrators only, shared by the Store cards whose
+    packages DKMS builds (LordOS Studio Camera and the NVIDIA driver). `status` reads the state with no program run
+    (Secure Boot from its EFI variable; DKMS's certificate searched for byte by byte in shim's `MokListRT*` and
+    `MokNew` variables). `import` makes an 8-digit one-time password from `getrandom` and gives it to the fixed
+    `/usr/bin/mokutil --import /var/lib/dkms/mok.pub` on standard input only, never in argv, a file or a log (mokutil's
+    output is discarded), checks that shim's request really holds the key and only then answers the password, once. A
+    pending request is withdrawn first, so a new password replaces a lost one; `cancel` runs
+    `mokutil --revoke-import`. The key pair must be DKMS's own (regular, root-owned, not links, nobody else can write
+    them or their folder, `mok.pub` one DER certificate). Once the item is installed, its card shows "One more step at
+    the next restart" with **Prepare the Key**, then the password in large type with the blue screen's steps (Enroll
+    MOK, Continue, Yes, the password, Reboot), **Restart Now**, **New Password** and **Cancel Enrolment**; the
+    password lives only in the card. `mokutil` is now a dependency of `lordos-studio-camera` on amd64 and one of the
+    NVIDIA card's packages. Text in all 35 languages.
+  - **Mic Mode's names are our own**: Noise Reduction and Full Range (see the phase 3 entry above).
+  - **Tests**: new `build/mok-admin-test` (fake EFI variables, key and mokutil: each state, refused keys and
+    arguments that run nothing, the password on standard input twice and never in argv, revoke before a new import,
+    digits evenly spread); `studio_package_test.sh` gained the two devices, the order OBS needs, the postinst run
+    against a fake `/sys` in eight cases and checks that OBS's device is named nowhere in the sources but
+    `mstudiohub.h`; `suggest_engine_test.mjs` the new note and package. **To verify on a VM** (never on the
+    maintainer's PC): OBS (Debian's and Flathub's) starting its virtual camera on `/dev/video49` with LordOS Studio's
+    camera off and on, the update reloading the module, and the MOK flow with Secure Boot on, including mokutil reading
+    the password from a pipe.
 - **`fastfetch` and `neofetch` run LordOS's `lordos-fetch` until the real package is installed, in development**
   (`packaging/fallback-bin/fastfetch`, `packaging/profile.d/lordos-fallback.sh`, `server/src/remote/sess.c`,
   `tools/iso/mkdeb.sh`; `docs/BENCHMARK.md`). People type the command they know and got "command not found". The

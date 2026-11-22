@@ -1,7 +1,7 @@
 // studio.jsx — LordOS Studio's popover (docs/CAMERA-STUDIO-PLAN.md 9.1; phases 1 to 3): a live preview, the camera it
 // uses, Portrait (the background blurred), Background (a picture or a short loop behind the person, with a real green
 // screen if there is one, and the colours matched), Face Light, Auto Framing, Filters, Retouch, Mirror, Mic Mode
-// (Standard, Voice Isolation, Wide Spectrum) and "Every app": the "LordOS Studio" camera that browsers, OBS and every
+// (Standard, Noise Reduction, Full Range) and "Every app": the "LordOS Studio" camera that browsers, OBS and every
 // other Linux app see once the Store's LordOS Studio Camera item (the lordos-studio-camera package, v4l2loopback) is
 // installed. It opens from the camera capture item by the clock (sdk/capturestatus.jsx) in every theme, in the same
 // panel and style. The effects reach every app that chose the "LordOS Studio" camera (lord.media.cameras(), device
@@ -198,7 +198,7 @@ function EveryApp({ th, cfg, status }) {
   );
 }
 
-// Mic Mode: the default microphone through lord.sound (sdk/studiomodel.js micPlan); Voice Isolation is the
+// Mic Mode: the default microphone through lord.sound (sdk/studiomodel.js micPlan); Noise Reduction is the
 // lordos-voice.conf filter, there once PipeWire read that file (the next sign-in after the update)
 function MicMode({ th, cfg }) {
   const snd = useSound();

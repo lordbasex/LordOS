@@ -81,11 +81,11 @@
   "faceless": "Ehhez a LordOS Studio arcmodellje kell, amely nincs telepítve.",
   "mic": "Mikrofon mód",
   "micStandard": "Normál",
-  "micVoice": "Hangizoláció",
-  "micWide": "Széles spektrum",
+  "micVoice": "Zajcsökkentés",
+  "micWide": "Teljes tartomány",
   "micHint.standard": "A mikrofonod úgy, ahogy van.",
   "micHint.voice": "Eltávolítja a körülötted lévő zajt, hogy csak a hangod hallatsszon. Ha a hangod robotszerű, kapcsold ki a hívóalkalmazás saját zajszűrését.",
   "micHint.wide": "A mikrofonod mindenféle feldolgozás nélkül: zenéhez és a szoba minden hangjához.",
-  "micUnavailable": "A hangizoláció azután jelenik meg, hogy kijelentkeztél és újra bejelentkeztél.",
+  "micUnavailable": "A zajcsökkentés azután jelenik meg, hogy kijelentkeztél és újra bejelentkeztél.",
   "noMic": "Nincs csatlakoztatva mikrofon."
 }

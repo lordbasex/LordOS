@@ -919,5 +919,10 @@
   "studio.noCamera": "Ingen kamera är ansluten.",
   "studio.unavailable": "LordOS Studio är inte tillgängligt på den här datorn.",
   "studio.downloadFailed": "Bakgrunden kunde inte hämtas.",
-  "studio.removeFailed": "Bakgrunden kunde inte tas bort."
+  "studio.removeFailed": "Bakgrunden kunde inte tas bort.",
+  "dkms.mokInvalid": "Den här begäran om en Secure Boot-nyckel är ogiltig.",
+  "dkms.mokNotNeeded": "Den här datorn behöver inte registrera nyckeln nu.",
+  "dkms.mokNothingPending": "Ingen nyckel väntar på att registreras vid nästa omstart.",
+  "dkms.mokNoTool": "Programmet mokutil är inte installerat.",
+  "dkms.mokFailed": "Nyckeln kunde inte förberedas för nästa omstart."
 }

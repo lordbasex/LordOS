@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Tarayıcılar ve görüntülü aramalar dahil tüm uygulamalara efektlerinizle “LordOS Studio” kamerasını verir: bulanık arka plan veya arkanızda bir resim ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} bu bilgisayarın paket kaynaklarında yok.",
   "suggest.studioCamera.note.dkms": "Bir PC’de çekirdek modülü bu bilgisayarda çekirdeğiniz için derlenir (DKMS); bu, yaklaşık 500 MB derleyici ve çekirdek başlığı getirir ve her çekirdek güncellemesinden sonra yeniden derlenir. Raspberry Pi’de LordOS çekirdeğiyle gelir.",
-  "suggest.studioCamera.note.secureBoot": "Güvenli Önyükleme (Secure Boot) açıksa, bir sonraki yeniden başlatmada modülün imzalama anahtarını kaydetmeniz gerekir, yoksa kamera görünmez."
+  "suggest.studioCamera.note.secureBoot": "Güvenli Önyükleme (Secure Boot) açıksa, bir sonraki yeniden başlatmada modülün imzalama anahtarını kaydetmeniz gerekir, yoksa kamera görünmez.",
+  "suggest.studioCamera.note.obs": "Ayrıca ikinci bir kamera aygıtı, “OBS Virtual Camera”, ekler; böylece OBS Studio’nun kendi sanal kamerası LordOS Studio’nun yanında çalışır.",
+  "suggest.mok.title": "Bir sonraki yeniden başlatmada bir adım daha",
+  "suggest.mok.body": "Secure Boot açık, bu yüzden bu ögenin yüklediği şey ancak imzalama anahtarı kaydedildikten sonra yüklenir. LordOS anahtarı hazırlar ve bir sonraki yeniden başlatmada mavi bir ekranda yazmanız için size tek kullanımlık bir parola verir.",
+  "suggest.mok.prepare": "Anahtarı Hazırla",
+  "suggest.mok.pending": "Anahtar bir sonraki yeniden başlatmada kaydedilecek. Parola artık sizde değilse yenisini alın.",
+  "suggest.mok.passwordTitle": "Tek kullanımlık parolanız",
+  "suggest.mok.passwordHint": "Şimdi not edin: yalnızca bir kez gösterilir ve hiçbir yere kaydedilmez.",
+  "suggest.mok.steps": "Yeniden başlatın ve mavi ekran göründüğünde 10 saniye içinde bir tuşa basın. Ardından Enroll MOK → Continue → Yes seçin, bu parolayı yazın ve Reboot seçin.",
+  "suggest.mok.newPassword": "Yeni Parola",
+  "suggest.mok.cancel": "Kaydı İptal Et"
 }

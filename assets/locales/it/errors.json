@@ -919,5 +919,10 @@
   "studio.noCamera": "Nessuna fotocamera collegata.",
   "studio.unavailable": "LordOS Studio non è disponibile su questo computer.",
   "studio.downloadFailed": "Impossibile scaricare lo sfondo.",
-  "studio.removeFailed": "Impossibile rimuovere lo sfondo."
+  "studio.removeFailed": "Impossibile rimuovere lo sfondo.",
+  "dkms.mokInvalid": "Questa richiesta di chiave Secure Boot non è valida.",
+  "dkms.mokNotNeeded": "Questo computer non ha bisogno di registrare la chiave ora.",
+  "dkms.mokNothingPending": "Nessuna chiave è in attesa di essere registrata al prossimo riavvio.",
+  "dkms.mokNoTool": "Il programma mokutil non è installato.",
+  "dkms.mokFailed": "Non è stato possibile preparare la chiave per il prossimo riavvio."
 }

@@ -919,5 +919,10 @@
   "studio.noCamera": "Hakuna kamera iliyounganishwa.",
   "studio.unavailable": "LordOS Studio haipatikani kwenye kompyuta hii.",
   "studio.downloadFailed": "Mandharinyuma hayakuweza kupakuliwa.",
-  "studio.removeFailed": "Mandharinyuma hayakuweza kuondolewa."
+  "studio.removeFailed": "Mandharinyuma hayakuweza kuondolewa.",
+  "dkms.mokInvalid": "Ombi hili la ufunguo wa Secure Boot si halali.",
+  "dkms.mokNotNeeded": "Kompyuta hii haihitaji kusajili ufunguo sasa.",
+  "dkms.mokNothingPending": "Hakuna ufunguo unaosubiri kusajiliwa wakati wa kuwasha upya ujao.",
+  "dkms.mokNoTool": "Programu ya mokutil haijasakinishwa.",
+  "dkms.mokFailed": "Ufunguo haukuweza kuandaliwa kwa ajili ya kuwasha upya ujao."
 }

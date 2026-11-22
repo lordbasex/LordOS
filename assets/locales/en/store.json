@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Gives every app, browsers and video calls included, the “LordOS Studio” camera with your effects: background blur or a picture behind you ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} isn't in this computer's package sources.",
   "suggest.studioCamera.note.dkms": "On a PC its kernel module is built for your kernel on this computer (DKMS), which brings about 500 MB of compilers and kernel headers, and again after every kernel update. On a Raspberry Pi it comes with the LordOS kernel.",
-  "suggest.studioCamera.note.secureBoot": "With Secure Boot on, you have to enroll the module’s signing key at the next restart, or the camera won’t appear."
+  "suggest.studioCamera.note.secureBoot": "With Secure Boot on, you have to enroll the module’s signing key at the next restart, or the camera won’t appear.",
+  "suggest.studioCamera.note.obs": "It also adds a second camera device, “OBS Virtual Camera”, so OBS Studio’s own virtual camera works beside LordOS Studio.",
+  "suggest.mok.title": "One more step at the next restart",
+  "suggest.mok.body": "Secure Boot is on, so what this item installed loads only after its signing key is enrolled. LordOS prepares the key and gives you a one-time password to type on a blue screen at the next restart.",
+  "suggest.mok.prepare": "Prepare the Key",
+  "suggest.mok.pending": "The key will be enrolled at the next restart. If you no longer have the password, get a new one.",
+  "suggest.mok.passwordTitle": "Your one-time password",
+  "suggest.mok.passwordHint": "Write it down now: it’s shown only once and isn’t saved anywhere.",
+  "suggest.mok.steps": "Restart, and when the blue screen appears, press a key within 10 seconds. Then choose Enroll MOK → Continue → Yes, type this password and choose Reboot.",
+  "suggest.mok.newPassword": "New Password",
+  "suggest.mok.cancel": "Cancel Enrolment"
 }

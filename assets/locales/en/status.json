@@ -171,5 +171,7 @@
   "vm.gvtGone": "Graphics card share removed",
   "gpu.freqSet": "Graphics card's minimum frequency set",
   "gpu.memlockSet": "Memory machines may lock saved",
-  "vm.memlockSet": "Machine's memory locked"
+  "vm.memlockSet": "Machine's memory locked",
+  "dkms.mokState": "Secure Boot key: {state}",
+  "dkms.mokPassword": "The key will be enrolled at the next restart."
 }

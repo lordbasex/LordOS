@@ -81,11 +81,11 @@
   "faceless": "Tính năng này cần mô hình khuôn mặt của LordOS Studio, hiện chưa được cài đặt.",
   "mic": "Chế độ micrô",
   "micStandard": "Tiêu chuẩn",
-  "micVoice": "Tách giọng nói",
-  "micWide": "Phổ rộng",
+  "micVoice": "Giảm tiếng ồn",
+  "micWide": "Toàn dải",
   "micHint.standard": "Micrô của bạn như vốn có.",
   "micHint.voice": "Loại bỏ tiếng ồn xung quanh để chỉ nghe thấy giọng của bạn. Nếu giọng bạn nghe như rô-bốt, hãy tắt tính năng khử ồn của chính ứng dụng gọi.",
   "micHint.wide": "Micrô của bạn hoàn toàn không qua xử lý: dành cho âm nhạc và mọi âm thanh trong phòng.",
-  "micUnavailable": "Tách giọng nói xuất hiện sau khi bạn đăng xuất rồi đăng nhập lại.",
+  "micUnavailable": "Giảm tiếng ồn xuất hiện sau khi bạn đăng xuất rồi đăng nhập lại.",
   "noMic": "Không có micrô nào được kết nối."
 }

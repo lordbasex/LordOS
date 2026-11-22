@@ -180,5 +180,7 @@
   "vm.gvtGone": "Vaizdo plokštės dalis pašalinta",
   "gpu.freqSet": "Nustatytas mažiausias vaizdo plokštės dažnis",
   "gpu.memlockSet": "Atmintis, kurią mašinos gali užrakinti, išsaugota",
-  "vm.memlockSet": "Mašinos atmintis užrakinta"
+  "vm.memlockSet": "Mašinos atmintis užrakinta",
+  "dkms.mokState": "Secure Boot raktas: {state}",
+  "dkms.mokPassword": "Raktas bus užregistruotas kito paleidimo iš naujo metu."
 }

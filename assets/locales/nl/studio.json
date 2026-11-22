@@ -81,11 +81,11 @@
   "faceless": "Hiervoor is het gezichtsmodel van LordOS Studio nodig, dat niet is geïnstalleerd.",
   "mic": "Micmodus",
   "micStandard": "Standaard",
-  "micVoice": "Stemisolatie",
-  "micWide": "Breed spectrum",
+  "micVoice": "Ruisvermindering",
+  "micWide": "Volledig bereik",
   "micHint.standard": "Je microfoon zoals hij is.",
   "micHint.voice": "Verwijdert het geluid om je heen zodat alleen je stem te horen is. Klinkt je stem robotachtig, zet dan de ruisonderdrukking van de bel-app zelf uit.",
   "micHint.wide": "Je microfoon zonder enige bewerking: voor muziek en elk geluid in de ruimte.",
-  "micUnavailable": "Stemisolatie verschijnt nadat je je hebt afgemeld en weer aangemeld.",
+  "micUnavailable": "Ruisvermindering verschijnt nadat je je hebt afgemeld en weer aangemeld.",
   "noMic": "Er is geen microfoon aangesloten."
 }

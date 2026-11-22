@@ -919,5 +919,10 @@
   "studio.noCamera": "Heç bir kamera qoşulmayıb.",
   "studio.unavailable": "LordOS Studio bu kompüterdə mövcud deyil.",
   "studio.downloadFailed": "Fon endirilə bilmədi.",
-  "studio.removeFailed": "Fon silinə bilmədi."
+  "studio.removeFailed": "Fon silinə bilmədi.",
+  "dkms.mokInvalid": "Bu Secure Boot açarı sorğusu etibarlı deyil.",
+  "dkms.mokNotNeeded": "Bu kompüterin indi açarı qeydiyyata salmağa ehtiyacı yoxdur.",
+  "dkms.mokNothingPending": "Növbəti yenidən başlatmada qeydiyyat gözləyən açar yoxdur.",
+  "dkms.mokNoTool": "mokutil proqramı quraşdırılmayıb.",
+  "dkms.mokFailed": "Açarı növbəti yenidən başlatma üçün hazırlamaq alınmadı."
 }

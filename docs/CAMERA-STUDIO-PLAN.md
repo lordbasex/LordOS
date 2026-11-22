@@ -19,7 +19,7 @@ The maintainer's wish (2026-11-22): from the camera status item next to the cloc
 like macOS's Video Effects and Mic Mode menu, whose effects reach the webcam of **any** app: Meet in a browser, OBS,
 go-link Desk and the others. The effects are background blur, background replacement (pictures and short loops),
 chroma key with a real green screen, virtual chroma without one, Auto Framing, light and colour matching, filters,
-retouch and mirror. The mic modes are Standard and Voice Isolation. Then an app, "Studio", in the spirit of Camo
+retouch and mirror. The mic modes are Standard and Noise Reduction. Then an app, "Studio", in the spirit of Camo
 Studio, with our own design and assets.
 
 ## 0. Summary of the recommendation
@@ -32,7 +32,7 @@ Studio, with our own design and assets.
 | Segmentation model | **MediaPipe Selfie Segmenter, landscape 144×256** (Apache-2.0, model card by Google, a 250 KB float16 `.tflite`). Converted offline to our own flat weight file. |
 | Inference runtime | **Our own small inference code in C** for exactly the operators this model and BlazeFace use. There is no new library; output is checked against ONNX Runtime on the dev machine only, the way `hb_compare.py` checks shaping against HarfBuzz. The fallback is Debian's `libonnxruntime1.21` (MIT, in Debian 13 main), linked only by `lord-studio`. That fallback is a decision for the maintainer (D3). |
 | Faces (Auto Framing, Face Light, Retouch) | **BlazeFace short range** (Apache-2.0, 128×128). It uses the same operators as the segmenter, so it runs on the same inference code. |
-| Mic modes | PipeWire's own **`module-echo-cancel` with WebRTC Audio Processing** (BSD-3, already in Debian 13's `libspa-0.2-modules`; **Seen** installed): noise suppression, high-pass filter and AGC as a "Voice Isolation" source. There is no new library. RNNoise (BSD-3) is not packaged in Debian, so it waits for a later phase. |
+| Mic modes | PipeWire's own **`module-echo-cancel` with WebRTC Audio Processing** (BSD-3, already in Debian 13's `libspa-0.2-modules`; **Seen** installed): noise suppression, high-pass filter and AGC as a "Noise Reduction" source. There is no new library. RNNoise (BSD-3) is not packaged in Debian, so it waits for a later phase. |
 | Backgrounds | Only **CC0 and public domain** first (Wikimedia Commons, NASA, Poly Haven, ambientCG), then CC BY and CC BY-SA with credit in the catalog, exactly like `motion.json`. Our own renders are welcome. **Not Unsplash, Pexels or Pixabay** (section 6). The catalog and thumbnails ship in the package; full files download on demand, like moving wallpapers. |
 
 ## 1. What exists today (Read, Seen)
@@ -100,7 +100,8 @@ Fedora already defaults Firefox to it. They also give a cleaner permission story
   the image. Until then, Studio offers only the LordOS ring there.
 - **Configuration, static and root-owned, shipped by an optional package `lordos-studio-camera`.** The module's
   options live in `/etc/modprobe.d/lordos-studio.conf`:
-  `options v4l2loopback devices=1 video_nr=50 card_label="LordOS Studio" exclusive_caps=1 max_buffers=4`. The file
+  `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`
+  (the second device since 11.4: OBS Studio's own virtual camera, which LordOS never writes). The file
   `/etc/modules-load.d/lordos-studio.conf` loads it at boot. There is **no runtime root action** to create or remove
   devices: `/dev/v4l2loopback`'s control ioctls stay unused. Installing and removing the package goes through the
   Store's existing package engine.
@@ -401,18 +402,18 @@ releases, and a background with a brand reads as endorsement.
 | Mode | What it is | How |
 |---|---|---|
 | **Standard** | the microphone as is | the hardware source |
-| **Voice Isolation** | removes steady and impulsive noise, keeps one voice | PipeWire `libpipewire-module-echo-cancel` with `library.name = aec/libspa-aec-webrtc`. WebRTC Audio Processing 1.3 (BSD-3) is in Debian 13 and already installed (**Seen**). Arguments: `webrtc.noise_suppression = true`, `webrtc.high_pass_filter = true`, `webrtc.gain_control = true`, `webrtc.transient_suppression = true`. Echo cancellation needs playback through its sink, so it is off unless the person enables "Echo cancellation" (D8). |
-| **Wide Spectrum** (Apple's third mode, optional) | no processing at all, for music | the hardware source with no filters |
+| **Noise Reduction** | removes steady and impulsive noise, keeps one voice | PipeWire `libpipewire-module-echo-cancel` with `library.name = aec/libspa-aec-webrtc`. WebRTC Audio Processing 1.3 (BSD-3) is in Debian 13 and already installed (**Seen**). Arguments: `webrtc.noise_suppression = true`, `webrtc.high_pass_filter = true`, `webrtc.gain_control = true`, `webrtc.transient_suppression = true`. Echo cancellation needs playback through its sink, so it is off unless the person enables "Echo cancellation" (D8). |
+| **Full Range** (a third mode, optional) | no processing at all, for music | the hardware source with no filters |
 
 - **The source.** A package drop-in, `/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf` (root-owned, static, like
-  `lordos-bluez-profiles.conf` in `SOUND.md`), creates the source "LordOS Voice Isolation" (`media.class` Audio/Source)
+  `lordos-bluez-profiles.conf` in `SOUND.md`), creates the source "LordOS Noise Reduction" (`media.class` Audio/Source)
   and keeps it paused while unused.
 - **Selecting a mode.** It uses lord-server's existing Pulse client (`SOUND.md`): set the default source, or move one
   app's source output, which the Control Center already does for outputs. Moving the echo-cancel capture stream to the
   chosen hardware microphone uses the same move command. There is **no new privilege**, no command run and no module
   loaded at runtime.
 - **Restrictions still hold.** The PipeWire guard hides every `Audio/Source` from a no-mic app, so the virtual source is
-  covered. The orange indicator names the app reading the virtual source, plus "Voice Isolation".
+  covered. The orange indicator names the app reading the virtual source, plus "Noise Reduction".
 - **RNNoise** (Xiph, BSD-3; a 48 kHz recurrent network, very light) is **not in Debian**. The LADSPA wrapper
   `noise-suppression-for-voice` is GPL-3.0 and not packaged either. If WebRTC's suppression isn't enough in tests, a
   later phase could ship our own LADSPA build of RNNoise, but that **runs inside the user's PipeWire daemon**, outside
@@ -483,7 +484,7 @@ shared features in the SDK"). It follows `textAlign: 'start'/'end'` for right-to
 │ ☺ Retouch                              [off]   ›   │
 │ ⇋ Mirror my video                      [off]       │
 │────────────────────────────────────────────────────│
-│ Mic Mode   ( Standard | Voice Isolation | Wide )   │
+│ Mic Mode (Standard | Noise Reduction | Full Range) │
 │────────────────────────────────────────────────────│
 │ Open Studio…                                       │
 └────────────────────────────────────────────────────┘
@@ -525,7 +526,7 @@ Its name is a decision: "Studio" (D6).
 │ ▸ Filters  Warm  │                                              │ ☐ "Be right back" │
 │ ▸ Retouch  ━━    │                                              │                   │
 │ ▸ Microphone     │                                              │                   │
-│   Voice Isolation│                                              │                   │
+│   Noise Reduction│                                              │                   │
 └──────────────────┴──────────────────────────────────────────────┴───────────────────┘
 ```
 
@@ -567,7 +568,7 @@ Its name is a decision: "Studio" (D6).
 | **E-S3** | Pi image: v4l2loopback built in the LordOS Pi kernel script and shipped prebuilt | kernel build only | no DKMS on the Pi |
 | **E-S4** | Admin action **`studio-bg-get "<id> <variant>"`** (and `studio-bg-remove`, admin only), the twin of `wallpaper-get` | same closed rules: catalog id, hash, size, `nobody` fetch, the Store's scope | on-demand backgrounds |
 | **E-S5** | `lord.studio.*` JS API in the desktop context only, plus a "studio" source in `media.cameras()` and `BOP_CAMERA` | camera permission checked as for devices; ACK validation unchanged | LordOS apps and go-link Desk |
-| **E-S6** | PipeWire drop-in `lordos-voice.conf` (module-echo-cancel with WebRTC; Debian's own module) | static file; mode selection through the existing Pulse client | Voice Isolation |
+| **E-S6** | PipeWire drop-in `lordos-voice.conf` (module-echo-cancel with WebRTC; Debian's own module) | static file; mode selection through the existing Pulse client | Noise Reduction |
 | **E-S7** (phase 4) | Serve **`org.freedesktop.portal.Camera`** (`IsCameraPresent`, `AccessCamera`, `OpenPipeWireRemote`), today "never offered", plus `lord-screencast` gaining a **camera mode** (a `Video/Source` with `media.role` Camera fed from Studio's ring; restricted remote with only that node) | prompt per app; the guard and the indicator as above; no persistent grant without the person | Flatpak apps, Firefox and Chromium on PipeWire |
 | (D3) **E-S8**, only if our own inference is refused | `libonnxruntime1.21` linked **only** by `lord-studio` | data: our own pinned models | runtime |
 
@@ -582,7 +583,7 @@ The effort is for one developer with the existing patterns. These are **estimate
 | **0. Measure** | Prototype `nn.c` plus the converter. Time the segmenter and BlazeFace on the i9 and the Pi 5. Compare against ONNX Runtime on the dev machine. Load v4l2loopback on the **VM** (not this PC) and check that Chromium 156, Chrome 158, Firefox ESR and Flatpak OBS see it. | 4–5 days | Real numbers replace section 3.3's estimates, written into this file. |
 | **1. Pipeline and LordOS ring** | `lord-studio`: capture, segmentation, guided filter, blur and picture backgrounds, mirror, GPU and CPU paths. The "LordOS Studio" camera in `media.cameras()` (the Camera app, go-link Desk, `.lpk`). The popover with preview, Portrait and Background. | 2–3 weeks | `build/studio-nn-test`, `build/studio-test` (pipeline on fixed frames), `studio_model_test.mjs`, engine damage tests unchanged |
 | **2. Loopback and "any app"** | `lordos-studio-camera` package, the idle card, the client-usage event, reader attribution, the indicator text, the `dkms-mok-enroll` reuse, Pi kernel module | 1–2 weeks | Meet in Chromium and in Chrome shows the effects. The no-camera restriction blocks `/dev/video50` (`tests/fwlinux/devices.sh`). The camera light goes off with no reader. |
-| **3. More effects and mic** | Video backgrounds, green screen, Auto Framing, Face Light, colour match, filters, retouch. Voice Isolation drop-in and Mic Mode. Background catalog plus `studio-bg-get`. Curation of about 70 stills and 50 loops. | 3 weeks plus 2 days of curation | each effect checked against reference frames; Mic Mode heard in a Meet call; credits page |
+| **3. More effects and mic** | Video backgrounds, green screen, Auto Framing, Face Light, colour match, filters, retouch. Noise Reduction drop-in and Mic Mode. Background catalog plus `studio-bg-get`. Curation of about 70 stills and 50 loops. | 3 weeks plus 2 days of curation | each effect checked against reference frames; Mic Mode heard in a Meet call; credits page |
 | **4. PipeWire camera** | Camera portal plus lord-screencast camera mode | 1–2 weeks | OBS Flatpak "Video Capture Device (PipeWire)" and Firefox with the pref on see "LordOS Studio"; the guard hides it from a restricted app |
 | **5. Studio app** | the full app, scenes, overlays from lord-server, recording, user LUTs | 2–3 weeks | screenshots in every theme and language direction |
 
@@ -625,8 +626,8 @@ The effort is for one developer with the existing patterns. These are **estimate
   architectures. It goes into the APT pool with each release like `lordos-disk-formats` (`docs/RELEASING.md`).
 - **The Store card**: rule `studioCamera` in `assets/store/suggestions.json` (Store → For this computer), shown when a USB
   device has a video-class interface (`usbClass: ["0e"]`, new in `sdk/suggestengine.js`), with the notes `dkms` and
-  `secureBoot`. The guided MOK enrolment (`dkms-mok-enroll`, NVIDIA plan A.5) is **not** built: like the NVIDIA card, the
-  `secureBoot` note explains the manual step until that action is approved.
+  `secureBoot`. The guided MOK enrolment (`dkms-mok-enroll`, NVIDIA plan A.5) was not built in phase 2; it is since
+  11.4.
 - **The hub** (`stcam_hub`, `loopback=1`): one lord-studio per session, fds = render node, model, loopback (opened by
   lord-server after checking major 81, driver `v4l2 loopback` and card "LordOS Studio"); the real camera arrives later by
   `MM_STUDIO_CAM` (v[0] 0 idle card, 1 camera with its fd, 2 off card; v[1] the preview's frames wanted) and leaves the
@@ -652,8 +653,8 @@ The effort is for one developer with the existing patterns. These are **estimate
   sandboxed browser's reader process is visible in `/proc` to the same uid; the Pi kernel with the module (v0.15.0 against
   6.18: if it doesn't build, a later 0.15.x tag).
 - **Known limits**: one streaming reader at a time (v4l2loopback 0.15's tokens), so a LordOS app and a browser can't read
-  LordOS Studio together; OBS's own virtual camera finds the module already loaded with our single device (it would need a
-  second device, `devices=2`, which is a change to E-S2's file); a same-uid process could still open `/dev/video50` as a
+  LordOS Studio together; OBS's own virtual camera found the module already loaded with our single device (fixed in 11.4
+  with a second device); a same-uid process could still open `/dev/video50` as a
   writer before lord-studio does (8.4: lord-studio then fails to set its format and stays off, logged).
 
 ### 11.3 Phase 3 as built (2026-11-22, in development)
@@ -719,14 +720,14 @@ The effort is for one developer with the existing patterns. These are **estimate
   for every look.
 - **Mic Mode** (section 7, E-S6): the drop-in `/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf`
   (`tools/iso/rootfs/usr/share/…`, installed by `mkdeb.sh`) as planned, without echo cancellation (D8); the popover's
-  Standard, Voice Isolation and Wide Spectrum set the default microphone and point the filter's capture at the real
-  microphone through `lord.sound` (`micPlan`). Standard and Wide Spectrum are the same path: the microphone with no
+  Standard, Noise Reduction and Full Range set the default microphone and point the filter's capture at the real
+  microphone through `lord.sound` (`micPlan`). Standard and Full Range are the same path: the microphone with no
   processing. The sound lists hide the filter's own echo reference and streams. The capture indicator would have shown
   the filter's own capture as "an unknown program" for as long as PipeWire runs, so `pwguard.c` skips that one link
-  when the node is really the session daemon's (checked by pid, executable and unit); the app reading Voice Isolation
+  when the node is really the session daemon's (checked by pid, executable and unit); the app reading Noise Reduction
   is reported as before. `server/tests/studio_voice_test.mjs` parses the file and checks it against Debian's module
   and plugin on the dev machine; it never touches this machine's PipeWire. **Not verified yet:** the filter loaded by a
-  real PipeWire (a VM), whether the hardware microphone stays open while nothing reads Voice Isolation, and the sound
+  real PipeWire (a VM), whether the hardware microphone stays open while nothing reads Noise Reduction, and the sound
   heard in a Meet call.
 - **The background catalog** (section 6, E-S4): `assets/studio/backgrounds.json` (the shape of `motion.json`, plus
   `kind`, `category`, `builtin` and `credit`), thumbnails in `assets/studio/backgrounds/`, one built-in picture per
@@ -745,11 +746,40 @@ The effort is for one developer with the existing patterns. These are **estimate
   Mirror, then Mic Mode; detail pages for each (Auto Framing's slider is "Wide ↔ Tight") and the green screen's. All
   35 languages.
 - **Not built in phase 3:** the light wrap and rim light, the face spotlight, the eyedropper for the key colour, the indicator
-  naming "Voice Isolation" next to the app, UVC pan/tilt/zoom, the segmenter on a second thread, and RNNoise (D9).
+  naming "Noise Reduction" next to the app, UVC pan/tilt/zoom, the segmenter on a second thread, and RNNoise (D9).
   Hardware decode of video backgrounds (the Pi's HEVC) is not used: lord-studio decodes in software.
 
 Every phase also updates CHANGELOG, the paper (en, es, pt), the site and `THIRD_PARTY.md` (model cards, Apache-2.0
 NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
+
+### 11.4 Follow-ups (2026-11-22, in development; approved by the maintainer the same day)
+
+- **OBS beside LordOS Studio.** `lordos-studio-camera`'s file now makes two devices:
+  `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`.
+  **Read** in OBS's `plugins/linux-v4l2/v4l2-output.c` (master, 2026-11-22): OBS runs `pkexec modprobe v4l2loopback
+  exclusive_caps=1 card_label='OBS Virtual Camera'` only when no v4l2loopback is loaded, and otherwise takes the first
+  `/dev/video*` in version order (`scandir` with `versionsort`) whose device caps include `V4L2_CAP_VIDEO_OUTPUT`; it never
+  looks at the card label. With `exclusive_caps` an idle loopback announces output, so with OBS's device after ours
+  (`video_nr=50,51`, the first proposal) OBS would take `/dev/video50` whenever LordOS Studio's camera is off, and
+  lord-studio could no longer write it. OBS's device is therefore **49**, before ours; ours stays `/dev/video50`.
+  lord-server still opens only `/dev/video50` after the major, driver and card checks, and lord-studio's `stcam_hub`
+  now checks the card too, so OBS's device is never written by LordOS (`studio_package_test.sh` checks that the number
+  and label appear only as constants in `mstudiohub.h`). While OBS streams, its device announces capture and is listed
+  as a camera like any other; the "no camera" restriction covers both (major 81; `tests/fwlinux/devices.sh` step 6b).
+  The postinst reloads the module on an update from the one-device file only when nothing uses it (`refcnt` 0, and
+  `modprobe -r` itself refuses a module in use); otherwise the second device appears at the next restart.
+- **Guided Secure Boot enrolment** (`dkms-mok-enroll`, NVIDIA plan A.5's `gpu-mok-enroll` renamed;
+  `server/src/hw/mok_admin.c`): one closed admin action, administrators only, `status|import|cancel`, shared by the Store
+  cards with the `secureBoot` note (`studioCamera`, `nvidiaDriver`). Once the item is installed, the card asks `status`;
+  with the key still needed it offers **Prepare the Key**, which makes an 8-digit one-time password root-side, gives it
+  to the fixed `/usr/bin/mokutil --import /var/lib/dkms/mok.pub` on standard input only and shows it once, with the
+  MokManager steps and **Restart Now**. The details are in `NVIDIA-PLAN.md` A.5. `lordos-studio-camera` now depends on
+  `mokutil` on amd64, and the card gained the `obs` note (the second device). Tests: `build/mok-admin-test`.
+- **Mic Mode's names** are our own: Standard, Noise Reduction and Full Range (the locale keys and the PipeWire node
+  names `lordos_voice_*` didn't change; the microphone other apps list is "LordOS Noise Reduction").
+- **To verify on a VM** (never on the maintainer's PC): OBS (Debian's and Flathub's) starting its virtual camera on
+  `/dev/video49` with LordOS Studio's camera both off and on, Meet seeing both cameras, the update reloading the module
+  when unused, and the whole MOK flow with Secure Boot on (OVMF with enrolled keys).
 
 ## 12. Risks
 
@@ -762,7 +792,7 @@ NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
 | Licenses of model weights drift (MODNet history) | legal | pin commits and file hashes; keep copies of model cards in `third_party/studio-models/` |
 | Matting edges on hair and glasses | quality vs Camo/Apple | guided filter, light wrap, optional MODNet on the PC, green screen |
 | Same-uid process feeding the loopback | spoofed video | hold the writer role, warn; documented as the Linux-app trust model |
-| Double noise suppression (Meet's own plus ours) | robotic voice | Voice Isolation off by default; a tip in the popover |
+| Double noise suppression (Meet's own plus ours) | robotic voice | Noise Reduction off by default; a tip in the popover |
 
 ## 13. Decisions for the maintainer
 
@@ -779,7 +809,7 @@ NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
 6. **D6.** Name: "Studio" or "LordOS Studio"? Status item label "Camera"?
 7. **D7.** Backgrounds: CC0/PD plus CC BY and CC BY-SA with credit plus our own; no Unsplash, Pexels or Pixabay. Allow
    our own AI-generated backgrounds, as the wallpapers already do?
-8. **D8.** Voice Isolation with or without echo cancellation (the latter needs playback through the echo-cancel sink)?
+8. **D8.** Noise Reduction with or without echo cancellation (the latter needs playback through the echo-cancel sink)?
 9. **D9.** RNNoise later as a LADSPA plugin inside the user's PipeWire daemon (outside LordOS's sandboxes), only if
    WebRTC NS isn't good enough?
 10. **D10.** Default output 1280×720 at 30 fps, and 1080p offered only with the GPU path?

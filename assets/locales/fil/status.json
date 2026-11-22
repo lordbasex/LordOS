@@ -171,5 +171,7 @@
   "vm.gvtGone": "Inalis ang bahagi ng graphics card",
   "gpu.freqSet": "Naitakda ang pinakamababang frequency ng graphics card",
   "gpu.memlockSet": "Na-save ang memory na puwedeng i-lock ng mga makina",
-  "vm.memlockSet": "Na-lock ang memory ng makina"
+  "vm.memlockSet": "Na-lock ang memory ng makina",
+  "dkms.mokState": "Susi ng Secure Boot: {state}",
+  "dkms.mokPassword": "Ie-enroll ang susi sa susunod na restart."
 }

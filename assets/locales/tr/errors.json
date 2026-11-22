@@ -919,5 +919,10 @@
   "studio.noCamera": "Bağlı kamera yok.",
   "studio.unavailable": "LordOS Studio bu bilgisayarda kullanılamıyor.",
   "studio.downloadFailed": "Arka plan indirilemedi.",
-  "studio.removeFailed": "Arka plan kaldırılamadı."
+  "studio.removeFailed": "Arka plan kaldırılamadı.",
+  "dkms.mokInvalid": "Bu Secure Boot anahtarı isteği geçerli değil.",
+  "dkms.mokNotNeeded": "Bu bilgisayarın şu anda anahtarı kaydetmesi gerekmiyor.",
+  "dkms.mokNothingPending": "Bir sonraki yeniden başlatmada kaydedilmeyi bekleyen anahtar yok.",
+  "dkms.mokNoTool": "mokutil programı yüklü değil.",
+  "dkms.mokFailed": "Anahtar bir sonraki yeniden başlatma için hazırlanamadı."
 }

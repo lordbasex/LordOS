@@ -60,6 +60,8 @@
  *                                      /var/lib/lordos/boot-test, which lord-sessiond follows at
  *                                      each boot; refused in the live session                  admin
  *   boot-test-cancel                   (no arguments) removes that file: no more restarts      anyone
+ *   dkms-mok-enroll status|import|cancel  Secure Boot enrolment of DKMS's own key with mokutil and a one-time
+ *                                      password made here (mok_admin.h)                       admin
  */
 #ifndef LORD_HW_ADMIN_H
 #define LORD_HW_ADMIN_H
@@ -67,6 +69,7 @@
 #include "../admin.h"
 #include "rpifw.h"
 #include "battery_admin.h"   /* battery-thresholds, battery-behaviour (admin only) */
+#include "mok_admin.h"       /* dkms-mok-enroll (admin only): Secure Boot enrolment of DKMS's signing key */
 
 void hw_act_brightness(const AdminReq *r, const char *arg, size_t len);
 void hw_act_keyboard_light(const AdminReq *r, const char *arg, size_t len);
@@ -166,6 +169,7 @@ void hw_act_studio_bg_remove(const AdminReq *r, const char *arg, size_t len);
     { "boot-test", hw_act_boot_test, 0 }, \
     { "boot-test-cancel", hw_act_boot_test_cancel, A_ANYONE }, \
     { "battery-thresholds", hw_act_battery_thresholds, 0 }, \
-    { "battery-behaviour", hw_act_battery_behaviour, 0 },
+    { "battery-behaviour", hw_act_battery_behaviour, 0 }, \
+    MOK_ADMIN_ACTIONS
 
 #endif

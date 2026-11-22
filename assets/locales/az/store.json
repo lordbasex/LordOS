@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Brauzerlər və video zənglər daxil olmaqla bütün tətbiqlərə effektlərinizlə “LordOS Studio” kamerasını verir: bulanıq fon və ya arxanızda şəkil ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} bu kompüterin paket mənbələrində yoxdur.",
   "suggest.studioCamera.note.dkms": "PC-də onun nüvə modulu bu kompüterdə nüvəniz üçün yığılır (DKMS); bu, təxminən 500 MB kompilyator və nüvə başlıqları gətirir və hər nüvə yeniləməsindən sonra yenidən yığılır. Raspberry Pi-də LordOS nüvəsi ilə gəlir.",
-  "suggest.studioCamera.note.secureBoot": "Secure Boot açıq olduqda növbəti yenidən başlatmada modulun imza açarını qeydiyyatdan keçirməlisiniz, əks halda kamera görünməyəcək."
+  "suggest.studioCamera.note.secureBoot": "Secure Boot açıq olduqda növbəti yenidən başlatmada modulun imza açarını qeydiyyatdan keçirməlisiniz, əks halda kamera görünməyəcək.",
+  "suggest.studioCamera.note.obs": "O, həmçinin ikinci kamera cihazı, “OBS Virtual Camera” əlavə edir ki, OBS Studio-nun öz virtual kamerası LordOS Studio ilə yanaşı işləsin.",
+  "suggest.mok.title": "Növbəti yenidən başlatmada daha bir addım",
+  "suggest.mok.body": "Secure Boot aktivdir, ona görə də bu elementin quraşdırdığı şey yalnız imza açarı qeydiyyata salındıqdan sonra yüklənir. LordOS açarı hazırlayır və növbəti yenidən başlatmada mavi ekranda yazmaq üçün sizə birdəfəlik parol verir.",
+  "suggest.mok.prepare": "Açarı hazırla",
+  "suggest.mok.pending": "Açar növbəti yenidən başlatmada qeydiyyata salınacaq. Parol artıq sizdə deyilsə, yenisini alın.",
+  "suggest.mok.passwordTitle": "Birdəfəlik parolunuz",
+  "suggest.mok.passwordHint": "İndi qeyd edin: o yalnız bir dəfə göstərilir və heç yerdə saxlanmır.",
+  "suggest.mok.steps": "Yenidən başladın və mavi ekran görünəndə 10 saniyə ərzində bir düyməyə basın. Sonra Enroll MOK → Continue → Yes seçin, bu parolu yazın və Reboot seçin.",
+  "suggest.mok.newPassword": "Yeni parol",
+  "suggest.mok.cancel": "Qeydiyyatı ləğv et"
 }

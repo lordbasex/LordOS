@@ -919,5 +919,10 @@
   "studio.noCamera": "No hi ha cap càmera connectada.",
   "studio.unavailable": "LordOS Studio no està disponible en aquest ordinador.",
   "studio.downloadFailed": "No s’ha pogut baixar el fons.",
-  "studio.removeFailed": "No s’ha pogut eliminar el fons."
+  "studio.removeFailed": "No s’ha pogut eliminar el fons.",
+  "dkms.mokInvalid": "Aquesta sol·licitud de clau de Secure Boot no és vàlida.",
+  "dkms.mokNotNeeded": "Aquest ordinador no necessita inscriure la clau ara.",
+  "dkms.mokNothingPending": "No hi ha cap clau esperant inscriure’s al proper reinici.",
+  "dkms.mokNoTool": "El programa mokutil no està instal·lat.",
+  "dkms.mokFailed": "No s’ha pogut preparar la clau per al proper reinici."
 }

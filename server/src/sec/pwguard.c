@@ -54,7 +54,7 @@ typedef struct {
     int pid_sec, pid_app, pulse;/* pipewire.sec.pid (kernel), application.process.id (app-reported), a client of the real pipewire-pulse */
     int unverified;             /* who it is can't be established: treated as restricted while restricted apps run */
     int daemon;                 /* pipewire-pulse's own connection: the streams of modules a pulse client loaded */
-    int main_daemon;            /* the session's pipewire itself (its modules: LordOS's Voice Isolation filter) */
+    int main_daemon;            /* the session's pipewire itself (its modules: LordOS's Noise Reduction filter) */
     int sound;                  /* another of the sound system's own processes (PipeWire's filter-chain, WirePlumber) */
     int resolved;               /* app worked out (needs the client's info) */
     int pid_ok;                 /* the PID it was worked out from (resolve_as's pid_out): 0 when none could be */
@@ -67,7 +67,7 @@ typedef struct {
     int live;
 } PgClient;
 
-typedef struct { uint32_t id, client, flag, stream; int live, voice; } PgNode;   /* flag: capture node; stream: capture stream; voice: Voice Isolation's own capture */
+typedef struct { uint32_t id, client, flag, stream; int live, voice; } PgNode;   /* flag: capture node; stream: capture stream; voice: Noise Reduction's own capture */
 typedef struct { uint32_t id, node; int live; } PgPort;
 /* a link from a capture node (a microphone, a camera, a shared screen) into an app's capture stream: what the capture
  * indicator says is in use (pwguard_on_use) */
@@ -760,8 +760,8 @@ static void use_report(void) {
         PgNode *src = node_by_id(l->out), *dst = node_by_id(l->in);
         if (!src || !dst || !src->flag || !dst->stream) continue;
         PgClient *owner = client_by_id(dst->client);
-        /* Voice Isolation's own capture (lordos-voice.conf, a module of the session's pipewire itself): the microphone
-         * goes into the filter, not to an app; the app that reads the "LordOS Voice Isolation" source is the use, and its
+        /* Noise Reduction's own capture (lordos-voice.conf, a module of the session's pipewire itself): the microphone
+         * goes into the filter, not to an app; the app that reads the "LordOS Noise Reduction" source is the use, and its
          * own link (that source is an Audio/Source) is counted. Only when the node really is the daemon's. */
         if (dst->voice && (!dst->client || (owner && owner->main_daemon))) continue;
         if (capture_owner(owner, &u[n])) continue;

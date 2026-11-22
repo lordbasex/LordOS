@@ -81,11 +81,11 @@
   "faceless": "Hii inahitaji modeli ya uso ya LordOS Studio, ambayo haijasakinishwa.",
   "mic": "Hali ya Maikrofoni",
   "micStandard": "Kawaida",
-  "micVoice": "Kutenga Sauti",
-  "micWide": "Wigo Mpana",
+  "micVoice": "Kupunguza Kelele",
+  "micWide": "Masafa Kamili",
   "micHint.standard": "Maikrofoni yako jinsi ilivyo.",
   "micHint.voice": "Huondoa kelele inayokuzunguka ili sauti yako tu isikike. Sauti yako ikisikika kama ya roboti, zima uzuiaji wa kelele wa programu ya simu yenyewe.",
   "micHint.wide": "Maikrofoni yako bila uchakataji wowote: kwa muziki na kila sauti chumbani.",
-  "micUnavailable": "Kutenga Sauti huonekana baada ya kutoka na kuingia tena.",
+  "micUnavailable": "Kupunguza Kelele huonekana baada ya kutoka na kuingia tena.",
   "noMic": "Hakuna maikrofoni iliyounganishwa."
 }

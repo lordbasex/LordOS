@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Antaa kaikille sovelluksille, myös selaimille ja videopuheluille, kameran ”LordOS Studio” tehosteinesi: sumennettu tausta tai kuva takanasi ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} ei ole tämän tietokoneen pakettilähteissä.",
   "suggest.studioCamera.note.dkms": "PC:llä sen ydinmoduuli käännetään ytimellesi tällä tietokoneella (DKMS), mikä tuo noin 500 Mt kääntäjiä ja ytimen otsikkotiedostoja, ja uudelleen jokaisen ydinpäivityksen jälkeen. Raspberry Pi:ssä se tulee LordOS-ytimen mukana.",
-  "suggest.studioCamera.note.secureBoot": "Kun Secure Boot on käytössä, sinun on rekisteröitävä moduulin allekirjoitusavain seuraavalla uudelleenkäynnistyksellä, muuten kamera ei näy."
+  "suggest.studioCamera.note.secureBoot": "Kun Secure Boot on käytössä, sinun on rekisteröitävä moduulin allekirjoitusavain seuraavalla uudelleenkäynnistyksellä, muuten kamera ei näy.",
+  "suggest.studioCamera.note.obs": "Se lisää myös toisen kameralaitteen, ”OBS Virtual Camera”, jotta OBS Studion oma virtuaalikamera toimii LordOS Studion rinnalla.",
+  "suggest.mok.title": "Vielä yksi vaihe seuraavassa uudelleenkäynnistyksessä",
+  "suggest.mok.body": "Secure Boot on käytössä, joten tämän kohteen asentama osa latautuu vasta, kun sen allekirjoitusavain on rekisteröity. LordOS valmistelee avaimen ja antaa sinulle kertakäyttöisen salasanan, jonka kirjoitat siniselle näytölle seuraavassa uudelleenkäynnistyksessä.",
+  "suggest.mok.prepare": "Valmistele avain",
+  "suggest.mok.pending": "Avain rekisteröidään seuraavassa uudelleenkäynnistyksessä. Jos sinulla ei enää ole salasanaa, hae uusi.",
+  "suggest.mok.passwordTitle": "Kertakäyttöinen salasanasi",
+  "suggest.mok.passwordHint": "Kirjoita se muistiin nyt: se näytetään vain kerran eikä sitä tallenneta minnekään.",
+  "suggest.mok.steps": "Käynnistä uudelleen ja paina sinisen näytön tullessa jotain näppäintä 10 sekunnin kuluessa. Valitse sitten Enroll MOK → Continue → Yes, kirjoita tämä salasana ja valitse Reboot.",
+  "suggest.mok.newPassword": "Uusi salasana",
+  "suggest.mok.cancel": "Peruuta rekisteröinti"
 }

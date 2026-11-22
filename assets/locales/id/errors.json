@@ -918,5 +918,10 @@
   "studio.noCamera": "Tidak ada kamera yang terhubung.",
   "studio.unavailable": "LordOS Studio tidak tersedia di komputer ini.",
   "studio.downloadFailed": "Latar belakang tidak dapat diunduh.",
-  "studio.removeFailed": "Latar belakang tidak dapat dihapus."
+  "studio.removeFailed": "Latar belakang tidak dapat dihapus.",
+  "dkms.mokInvalid": "Permintaan kunci Secure Boot ini tidak valid.",
+  "dkms.mokNotNeeded": "Komputer ini tidak perlu mendaftarkan kunci sekarang.",
+  "dkms.mokNothingPending": "Tidak ada kunci yang menunggu didaftarkan pada mulai ulang berikutnya.",
+  "dkms.mokNoTool": "Program mokutil tidak terpasang.",
+  "dkms.mokFailed": "Kunci tidak dapat disiapkan untuk mulai ulang berikutnya."
 }

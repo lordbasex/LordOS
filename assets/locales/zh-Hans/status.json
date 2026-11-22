@@ -162,5 +162,7 @@
   "vm.gvtGone": "已移除显卡份额",
   "gpu.freqSet": "已设置显卡的最低频率",
   "gpu.memlockSet": "已保存虚拟机可锁定的内存",
-  "vm.memlockSet": "已锁定虚拟机的内存"
+  "vm.memlockSet": "已锁定虚拟机的内存",
+  "dkms.mokState": "Secure Boot 密钥：{state}",
+  "dkms.mokPassword": "密钥将在下次重新启动时注册。"
 }

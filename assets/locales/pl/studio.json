@@ -81,11 +81,11 @@
   "faceless": "Do tego potrzebny jest model twarzy LordOS Studio, który nie jest zainstalowany.",
   "mic": "Tryb mikrofonu",
   "micStandard": "Standardowy",
-  "micVoice": "Izolacja głosu",
-  "micWide": "Szerokie spektrum",
+  "micVoice": "Redukcja hałasu",
+  "micWide": "Pełny zakres",
   "micHint.standard": "Twój mikrofon taki, jaki jest.",
   "micHint.voice": "Usuwa hałas wokół ciebie, by słychać było tylko twój głos. Jeśli twój głos brzmi jak robot, wyłącz redukcję szumów w samej aplikacji do rozmów.",
   "micHint.wide": "Twój mikrofon bez żadnego przetwarzania: do muzyki i wszystkich dźwięków w pomieszczeniu.",
-  "micUnavailable": "Izolacja głosu pojawi się, gdy wylogujesz się i zalogujesz ponownie.",
+  "micUnavailable": "Redukcja hałasu pojawi się, gdy wylogujesz się i zalogujesz ponownie.",
   "noMic": "Nie podłączono mikrofonu."
 }

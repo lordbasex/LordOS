@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Gibt allen Apps, auch Browsern und Videoanrufen, die Kamera „LordOS Studio“ mit deinen Effekten: unscharfer Hintergrund oder ein Bild hinter dir ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} ist nicht in den Paketquellen dieses Computers.",
   "suggest.studioCamera.note.dkms": "Auf einem PC wird das Kernelmodul auf diesem Computer für deinen Kernel gebaut (DKMS), was etwa 500 MB an Compilern und Kernel-Headern mitbringt, und nach jedem Kernel-Update erneut. Auf einem Raspberry Pi ist es im LordOS-Kernel enthalten.",
-  "suggest.studioCamera.note.secureBoot": "Mit aktivem Secure Boot musst du den Signaturschlüssel des Moduls beim nächsten Neustart registrieren, sonst erscheint die Kamera nicht."
+  "suggest.studioCamera.note.secureBoot": "Mit aktivem Secure Boot musst du den Signaturschlüssel des Moduls beim nächsten Neustart registrieren, sonst erscheint die Kamera nicht.",
+  "suggest.studioCamera.note.obs": "Fügt außerdem ein zweites Kameragerät hinzu, „OBS Virtual Camera“, damit die eigene virtuelle Kamera von OBS Studio neben LordOS Studio funktioniert.",
+  "suggest.mok.title": "Noch ein Schritt beim nächsten Neustart",
+  "suggest.mok.body": "Secure Boot ist aktiv, daher wird, was dieses Element installiert hat, erst geladen, wenn sein Signaturschlüssel registriert ist. LordOS bereitet den Schlüssel vor und gibt dir ein Einmalpasswort, das du beim nächsten Neustart auf einem blauen Bildschirm eingibst.",
+  "suggest.mok.prepare": "Schlüssel vorbereiten",
+  "suggest.mok.pending": "Der Schlüssel wird beim nächsten Neustart registriert. Wenn du das Passwort nicht mehr hast, hol dir ein neues.",
+  "suggest.mok.passwordTitle": "Dein Einmalpasswort",
+  "suggest.mok.passwordHint": "Schreib es jetzt auf: Es wird nur einmal angezeigt und nirgends gespeichert.",
+  "suggest.mok.steps": "Starte neu und drücke, wenn der blaue Bildschirm erscheint, innerhalb von 10 Sekunden eine Taste. Wähle dann Enroll MOK → Continue → Yes, gib dieses Passwort ein und wähle Reboot.",
+  "suggest.mok.newPassword": "Neues Passwort",
+  "suggest.mok.cancel": "Registrierung abbrechen"
 }

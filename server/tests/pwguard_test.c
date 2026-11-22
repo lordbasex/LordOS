@@ -187,7 +187,7 @@ int main(void) {
     CHECK(pwguard_node_flag("Video/Source", NULL, NULL) == FW_R_NO_CAMERA);
     CHECK(pwguard_node_flag("Audio/Source", "Screen", "lordos-screencast-0") == FW_R_NO_MIC);   /* only a video source is a screen */
     CHECK(pwguard_node_flag("Audio/Sink", NULL, NULL) == 0);
-    /* LordOS Studio's Voice Isolation: only its audio capture stream, by that exact name (and pwguard.c also requires
+    /* LordOS Studio's Noise Reduction: only its audio capture stream, by that exact name (and pwguard.c also requires
      * the daemon's own client); its source is an ordinary microphone, hidden from no-mic apps and counted when read */
     CHECK(pwguard_voice_capture("Stream/Input/Audio", "lordos_voice_capture") == 1);
     CHECK(pwguard_voice_capture("Stream/Input/Audio", "lordos_voice_capture2") == 0);

@@ -919,5 +919,10 @@
   "studio.noCamera": "Aucune caméra n’est branchée.",
   "studio.unavailable": "LordOS Studio n’est pas disponible sur cet ordinateur.",
   "studio.downloadFailed": "Impossible de télécharger l’arrière-plan.",
-  "studio.removeFailed": "Impossible de supprimer l’arrière-plan."
+  "studio.removeFailed": "Impossible de supprimer l’arrière-plan.",
+  "dkms.mokInvalid": "Cette demande de clé Secure Boot n’est pas valide.",
+  "dkms.mokNotNeeded": "Cet ordinateur n’a pas besoin d’inscrire la clé maintenant.",
+  "dkms.mokNothingPending": "Aucune clé n’attend d’être inscrite au prochain redémarrage.",
+  "dkms.mokNoTool": "Le programme mokutil n’est pas installé.",
+  "dkms.mokFailed": "La clé n’a pas pu être préparée pour le prochain redémarrage."
 }

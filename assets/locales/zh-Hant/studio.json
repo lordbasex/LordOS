@@ -81,11 +81,11 @@
   "faceless": "這需要 LordOS Studio 的臉部模型，但尚未安裝。",
   "mic": "麥克風模式",
   "micStandard": "標準",
-  "micVoice": "人聲隔離",
-  "micWide": "寬頻譜",
+  "micVoice": "降噪",
+  "micWide": "全頻段",
   "micHint.standard": "保持麥克風的原始聲音。",
   "micHint.voice": "去除你周圍的噪音，只讓你的聲音被聽到。如果你的聲音聽起來像機器人，請關閉通話 App 本身的降噪功能。",
   "micHint.wide": "完全不經處理的麥克風聲音：適合音樂和房間裡的所有聲音。",
-  "micUnavailable": "登出再重新登入後會出現「人聲隔離」。",
+  "micUnavailable": "登出再重新登入後會出現「降噪」。",
   "noMic": "沒有連接麥克風。"
 }

@@ -336,5 +336,15 @@
   "suggest.studioCamera.detail": "Suteikia visoms programoms, įskaitant naršykles ir vaizdo skambučius, kamerą „LordOS Studio“ su jūsų efektais: sulietas fonas arba paveikslėlis už jūsų ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} nėra šio kompiuterio paketų šaltiniuose.",
   "suggest.studioCamera.note.dkms": "Kompiuteryje jo branduolio modulis sukompiliuojamas jūsų branduoliui šiame kompiuteryje (DKMS), o tai atneša apie 500 MB kompiliatorių ir branduolio antraščių, ir iš naujo po kiekvieno branduolio atnaujinimo. Raspberry Pi jis pateikiamas su LordOS branduoliu.",
-  "suggest.studioCamera.note.secureBoot": "Kai įjungtas Secure Boot, kito paleidimo metu turite užregistruoti modulio pasirašymo raktą, kitaip kamera nepasirodys."
+  "suggest.studioCamera.note.secureBoot": "Kai įjungtas Secure Boot, kito paleidimo metu turite užregistruoti modulio pasirašymo raktą, kitaip kamera nepasirodys.",
+  "suggest.studioCamera.note.obs": "Taip pat prideda antrą kameros įrenginį, „OBS Virtual Camera“, kad pačios OBS Studio virtuali kamera veiktų šalia LordOS Studio.",
+  "suggest.mok.title": "Dar vienas žingsnis kito paleidimo iš naujo metu",
+  "suggest.mok.body": "Secure Boot įjungtas, todėl tai, ką įdiegė šis elementas, įkeliama tik užregistravus jo pasirašymo raktą. LordOS paruošia raktą ir duoda jums vienkartinį slaptažodį, kurį kito paleidimo iš naujo metu įvesite mėlyname ekrane.",
+  "suggest.mok.prepare": "Paruošti raktą",
+  "suggest.mok.pending": "Raktas bus užregistruotas kito paleidimo iš naujo metu. Jei nebeturite slaptažodžio, gaukite naują.",
+  "suggest.mok.passwordTitle": "Jūsų vienkartinis slaptažodis",
+  "suggest.mok.passwordHint": "Užsirašykite jį dabar: jis rodomas tik kartą ir niekur neišsaugomas.",
+  "suggest.mok.steps": "Paleiskite iš naujo ir, kai pasirodys mėlynas ekranas, per 10 sekundžių paspauskite bet kurį klavišą. Tada pasirinkite Enroll MOK → Continue → Yes, įveskite šį slaptažodį ir pasirinkite Reboot.",
+  "suggest.mok.newPassword": "Naujas slaptažodis",
+  "suggest.mok.cancel": "Atšaukti registraciją"
 }

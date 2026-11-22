@@ -79,7 +79,7 @@ CC BY 2.0/3.0/4.0 and CC BY-SA 4.0; the share-alike applies to those files only)
 `tools/studio/gen-studio-loops.py`). The record of each file's license check is `tools/studio/bg-sources.json`. Nothing
 from Unsplash, Pexels or Pixabay (`docs/CAMERA-STUDIO-PLAN.md` 6.1).
 
-LordOS Studio's Voice Isolation uses PipeWire's own echo-cancel module with WebRTC Audio Processing (BSD-3-Clause), both
+LordOS Studio's Noise Reduction uses PipeWire's own echo-cancel module with WebRTC Audio Processing (BSD-3-Clause), both
 Debian packages LordOS already installs (`libspa-0.2-modules`, `libwebrtc-audio-processing-1-3`); LordOS ships only the
 configuration file that loads them.
 

@@ -918,5 +918,10 @@
   "studio.noCamera": "未連接相機。",
   "studio.unavailable": "這部電腦無法使用 LordOS Studio。",
   "studio.downloadFailed": "無法下載背景。",
-  "studio.removeFailed": "無法移除背景。"
+  "studio.removeFailed": "無法移除背景。",
+  "dkms.mokInvalid": "此 Secure Boot 金鑰要求無效。",
+  "dkms.mokNotNeeded": "這台電腦現在不需要登錄金鑰。",
+  "dkms.mokNothingPending": "沒有金鑰在等待下次重新啟動時登錄。",
+  "dkms.mokNoTool": "未安裝 mokutil 程式。",
+  "dkms.mokFailed": "無法為下次重新啟動準備金鑰。"
 }

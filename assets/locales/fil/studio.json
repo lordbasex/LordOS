@@ -81,11 +81,11 @@
   "faceless": "Kailangan nito ang face model ng LordOS Studio, na hindi naka-install.",
   "mic": "Mode ng Mic",
   "micStandard": "Karaniwan",
-  "micVoice": "Paghihiwalay ng Boses",
-  "micWide": "Malawak na Spectrum",
+  "micVoice": "Pagbawas ng Ingay",
+  "micWide": "Buong Saklaw",
   "micHint.standard": "Ang mikropono mo kung ano ito.",
   "micHint.voice": "Tinatanggal ang ingay sa paligid mo para boses mo lang ang marinig. Kung parang robot ang boses mo, i-off ang sariling noise suppression ng app sa pagtawag.",
   "micHint.wide": "Ang mikropono mo nang walang anumang pagproseso: para sa musika at bawat tunog sa silid.",
-  "micUnavailable": "Lalabas ang Paghihiwalay ng Boses pagkatapos mong mag-sign out at mag-sign in ulit.",
+  "micUnavailable": "Lalabas ang Pagbawas ng Ingay pagkatapos mong mag-sign out at mag-sign in ulit.",
   "noMic": "Walang nakakonektang mikropono."
 }

@@ -919,5 +919,10 @@
   "studio.noCamera": "Er is geen camera aangesloten.",
   "studio.unavailable": "LordOS Studio is niet beschikbaar op deze computer.",
   "studio.downloadFailed": "De achtergrond kon niet worden gedownload.",
-  "studio.removeFailed": "De achtergrond kon niet worden verwijderd."
+  "studio.removeFailed": "De achtergrond kon niet worden verwijderd.",
+  "dkms.mokInvalid": "Dit verzoek voor een Secure Boot-sleutel is ongeldig.",
+  "dkms.mokNotNeeded": "Deze computer hoeft de sleutel nu niet te registreren.",
+  "dkms.mokNothingPending": "Er wacht geen sleutel om bij de volgende herstart geregistreerd te worden.",
+  "dkms.mokNoTool": "Het programma mokutil is niet geïnstalleerd.",
+  "dkms.mokFailed": "De sleutel kon niet worden voorbereid voor de volgende herstart."
 }

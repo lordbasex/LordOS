@@ -2,7 +2,8 @@
 # devices.sh — "no camera" and "no USB" for Linux apps: lord-netperm's cgroup/dev program
 # (docs/FIREWALL.md, "Linux apps"). Needs a video device (v4l2loopback is enough) and
 # v4l2-ctl. Applies immediately: the next open() of an app that is already running. With the lordos-studio-camera
-# package it also checks LordOS Studio's camera, /dev/video50 (step 6).
+# package it also checks LordOS Studio's camera, /dev/video50, and the package's device for OBS's virtual camera,
+# /dev/video49 (step 6).
 #
 #   bash server/tests/fwlinux/devices.sh [/dev/videoN]
 . "$(dirname "$0")/lib.sh"
@@ -75,5 +76,15 @@ if [ -c "$LB" ] && v4l2-ctl -d "$LB" --info 2>/dev/null | grep -q "LordOS Studio
     expect ok "$(op "$LB")" "open $LB once lifted"
 else
     echo "6. skipped: no LordOS Studio camera ($LB; install lordos-studio-camera on the VM)"
+fi
+OB=/dev/video49
+if [ -c "$OB" ] && v4l2-ctl -d "$OB" --info 2>/dev/null | grep -q "OBS Virtual Camera"; then
+    echo "6b. no-camera also refuses OBS's virtual camera device ($OB)"
+    restrict $APP no-camera
+    expect EPERM "$(op "$OB")" "open $OB (OBS Virtual Camera)"
+    restrict $APP ""
+    expect ok "$(op "$OB")" "open $OB once lifted"
+else
+    echo "6b. skipped: no OBS Virtual Camera device ($OB; lordos-studio-camera with two devices)"
 fi
 fwlinux_done

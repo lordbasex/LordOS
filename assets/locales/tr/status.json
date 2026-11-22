@@ -171,5 +171,7 @@
   "vm.gvtGone": "Ekran kartı payı kaldırıldı",
   "gpu.freqSet": "Ekran kartının en düşük frekansı ayarlandı",
   "gpu.memlockSet": "Makinelerin kilitleyebileceği bellek kaydedildi",
-  "vm.memlockSet": "Makinenin belleği kilitlendi"
+  "vm.memlockSet": "Makinenin belleği kilitlendi",
+  "dkms.mokState": "Secure Boot anahtarı: {state}",
+  "dkms.mokPassword": "Anahtar bir sonraki yeniden başlatmada kaydedilecek."
 }

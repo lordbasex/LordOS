@@ -918,5 +918,10 @@
   "studio.noCamera": "ไม่มีกล้องเชื่อมต่ออยู่",
   "studio.unavailable": "LordOS Studio ไม่พร้อมใช้งานบนคอมพิวเตอร์เครื่องนี้",
   "studio.downloadFailed": "ไม่สามารถดาวน์โหลดพื้นหลังได้",
-  "studio.removeFailed": "ไม่สามารถลบพื้นหลังได้"
+  "studio.removeFailed": "ไม่สามารถลบพื้นหลังได้",
+  "dkms.mokInvalid": "คำขอคีย์ Secure Boot นี้ไม่ถูกต้อง",
+  "dkms.mokNotNeeded": "คอมพิวเตอร์เครื่องนี้ยังไม่จำเป็นต้องลงทะเบียนคีย์ตอนนี้",
+  "dkms.mokNothingPending": "ไม่มีคีย์ที่รอลงทะเบียนในการรีสตาร์ทครั้งถัดไป",
+  "dkms.mokNoTool": "ไม่ได้ติดตั้งโปรแกรม mokutil",
+  "dkms.mokFailed": "ไม่สามารถเตรียมคีย์สำหรับการรีสตาร์ทครั้งถัดไปได้"
 }

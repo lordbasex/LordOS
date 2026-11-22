@@ -171,5 +171,7 @@
   "vm.gvtGone": "Quota della scheda grafica rimossa",
   "gpu.freqSet": "Frequenza minima della scheda grafica impostata",
   "gpu.memlockSet": "Memoria bloccabile dalle macchine salvata",
-  "vm.memlockSet": "Memoria della macchina bloccata"
+  "vm.memlockSet": "Memoria della macchina bloccata",
+  "dkms.mokState": "Chiave Secure Boot: {state}",
+  "dkms.mokPassword": "La chiave sarà registrata al prossimo riavvio."
 }

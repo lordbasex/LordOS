@@ -171,5 +171,7 @@
   "vm.gvtGone": "Sehemu ya kadi ya michoro imeondolewa",
   "gpu.freqSet": "Masafa ya chini ya kadi ya michoro yamewekwa",
   "gpu.memlockSet": "Kumbukumbu ambayo mashine zinaweza kufunga imehifadhiwa",
-  "vm.memlockSet": "Kumbukumbu ya mashine imefungwa"
+  "vm.memlockSet": "Kumbukumbu ya mashine imefungwa",
+  "dkms.mokState": "Ufunguo wa Secure Boot: {state}",
+  "dkms.mokPassword": "Ufunguo utasajiliwa wakati wa kuwasha upya ujao."
 }

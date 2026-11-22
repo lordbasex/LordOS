@@ -171,5 +171,7 @@
   "vm.gvtGone": "Näytönohjaimen osuus poistettu",
   "gpu.freqSet": "Näytönohjaimen vähimmäistaajuus asetettu",
   "gpu.memlockSet": "Koneiden lukittavissa oleva muisti tallennettu",
-  "vm.memlockSet": "Koneen muisti lukittu"
+  "vm.memlockSet": "Koneen muisti lukittu",
+  "dkms.mokState": "Secure Boot -avain: {state}",
+  "dkms.mokPassword": "Avain rekisteröidään seuraavassa uudelleenkäynnistyksessä."
 }

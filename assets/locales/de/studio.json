@@ -81,11 +81,11 @@
   "faceless": "Dafür wird das Gesichtsmodell von LordOS Studio benötigt, das nicht installiert ist.",
   "mic": "Mikrofonmodus",
   "micStandard": "Standard",
-  "micVoice": "Stimmisolation",
-  "micWide": "Breites Spektrum",
+  "micVoice": "Rauschminderung",
+  "micWide": "Voller Bereich",
   "micHint.standard": "Dein Mikrofon, wie es ist.",
   "micHint.voice": "Entfernt die Geräusche um dich herum, sodass nur deine Stimme zu hören ist. Wenn deine Stimme roboterhaft klingt, schalte die Rauschunterdrückung der Anruf-App selbst aus.",
   "micHint.wide": "Dein Mikrofon ganz ohne Bearbeitung: für Musik und jeden Klang im Raum.",
-  "micUnavailable": "Die Stimmisolation erscheint, nachdem du dich ab- und wieder angemeldet hast.",
+  "micUnavailable": "Die Rauschminderung erscheint, nachdem du dich ab- und wieder angemeldet hast.",
   "noMic": "Kein Mikrofon angeschlossen."
 }

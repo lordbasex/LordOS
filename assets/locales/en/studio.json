@@ -81,11 +81,11 @@
   "faceless": "This needs LordOS Studio’s face model, which isn’t installed.",
   "mic": "Mic Mode",
   "micStandard": "Standard",
-  "micVoice": "Voice Isolation",
-  "micWide": "Wide Spectrum",
+  "micVoice": "Noise Reduction",
+  "micWide": "Full Range",
   "micHint.standard": "Your microphone as it is.",
   "micHint.voice": "Removes the noise around you so only your voice is heard. If your voice sounds robotic, turn off the call app’s own noise suppression.",
   "micHint.wide": "Your microphone with no processing at all: for music and every sound in the room.",
-  "micUnavailable": "Voice Isolation appears after you sign out and in again.",
+  "micUnavailable": "Noise Reduction appears after you sign out and in again.",
   "noMic": "No microphone is connected."
 }

@@ -16,6 +16,14 @@ build/settings-hw-test: tests/settings_hw_test.c src/hw/rpifw.c src/hw/edid.c sr
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/settings_hw_test.c src/hw/rpifw.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/hw_admin.c src/hw/battery_admin.c src/hw/tabletpower.c src/bench/boottest.c src/hw/hwscan.c src/sysreport/smbios.c src/hw/jbuf.c src/sec/json.c -lm
 	./$@ || { rm -f $@; exit 1; }
+# the guided Secure Boot enrolment of DKMS's key, dkms-mok-enroll (hw/mok_admin.c), with fake firmware variables, a fake
+# key and a fake mokutil under build/mok-test (tests/run_suites.sh runs it from server/)
+test: build/mok-admin-test
+build/mok-admin-test: tests/mok_admin_test.c src/hw/mok_admin.c src/hw/mok_admin.h src/admin.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D'MOK_EFIVARS="build/mok-test/efivars"' -D'MOK_DKMS_DIR="build/mok-test/dkms"' \
+	    -D'MOK_UTIL="build/mok-test/mokutil"' -D'MOK_OWNER_OK(st)=((st).st_uid == getuid())' \
+	    -o $@ tests/mok_admin_test.c src/hw/mok_admin.c
 # kernel uevents (hw/uevent.c): subsystems, and drm uevents of a card lord-server doesn't drive ignored
 test: build/uevent-test
 build/uevent-test: tests/uevent_test.c src/hw/uevent.c src/hw/uevent.h

@@ -919,5 +919,10 @@
   "studio.noCamera": "कोई कैमरा जुड़ा नहीं है।",
   "studio.unavailable": "इस कंप्यूटर पर LordOS Studio उपलब्ध नहीं है।",
   "studio.downloadFailed": "बैकग्राउंड डाउनलोड नहीं हो सका।",
-  "studio.removeFailed": "बैकग्राउंड हटाया नहीं जा सका।"
+  "studio.removeFailed": "बैकग्राउंड हटाया नहीं जा सका।",
+  "dkms.mokInvalid": "Secure Boot कुंजी का यह अनुरोध मान्य नहीं है।",
+  "dkms.mokNotNeeded": "इस कंप्यूटर को अभी कुंजी नामांकित करने की ज़रूरत नहीं है।",
+  "dkms.mokNothingPending": "अगले रीस्टार्ट पर नामांकन के लिए कोई कुंजी इंतज़ार नहीं कर रही है।",
+  "dkms.mokNoTool": "mokutil प्रोग्राम इंस्टॉल नहीं है।",
+  "dkms.mokFailed": "अगले रीस्टार्ट के लिए कुंजी तैयार नहीं की जा सकी।"
 }

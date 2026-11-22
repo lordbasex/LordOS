@@ -919,5 +919,10 @@
   "studio.noCamera": "هیچ دوربینی وصل نیست.",
   "studio.unavailable": "LordOS Studio در این رایانه در دسترس نیست.",
   "studio.downloadFailed": "بارگیری پس‌زمینه ممکن نشد.",
-  "studio.removeFailed": "حذف پس‌زمینه ممکن نشد."
+  "studio.removeFailed": "حذف پس‌زمینه ممکن نشد.",
+  "dkms.mokInvalid": "این درخواست کلید Secure Boot معتبر نیست.",
+  "dkms.mokNotNeeded": "این رایانه اکنون نیازی به ثبت کلید ندارد.",
+  "dkms.mokNothingPending": "هیچ کلیدی منتظر ثبت در راه‌اندازی مجدد بعدی نیست.",
+  "dkms.mokNoTool": "برنامه mokutil نصب نیست.",
+  "dkms.mokFailed": "آماده کردن کلید برای راه‌اندازی مجدد بعدی ممکن نشد."
 }

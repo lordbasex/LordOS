@@ -81,11 +81,11 @@
   "faceless": "Tämä vaatii LordOS Studion kasvomallin, jota ei ole asennettu.",
   "mic": "Mikrofonitila",
   "micStandard": "Tavallinen",
-  "micVoice": "Äänen eristys",
-  "micWide": "Laaja spektri",
+  "micVoice": "Melunvaimennus",
+  "micWide": "Koko taajuusalue",
   "micHint.standard": "Mikrofonisi sellaisenaan.",
   "micHint.voice": "Poistaa ympäristösi melun, jotta vain äänesi kuuluu. Jos äänesi kuulostaa robottimaiselta, poista puhelusovelluksen oma kohinanvaimennus käytöstä.",
   "micHint.wide": "Mikrofonisi ilman mitään käsittelyä: musiikille ja kaikille huoneen äänille.",
-  "micUnavailable": "Äänen eristys tulee näkyviin, kun kirjaudut ulos ja takaisin sisään.",
+  "micUnavailable": "Melunvaimennus tulee näkyviin, kun kirjaudut ulos ja takaisin sisään.",
   "noMic": "Mikrofonia ei ole liitetty."
 }
