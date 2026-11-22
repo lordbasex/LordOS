@@ -14,12 +14,12 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
 import { ClipAskBar } from './clipask.jsx';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps, guestPlace, offsetRect, minimizedByUs, AGENT_CAPS, copyLine, placeBatch } from './model.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, AGENT_CAPS, copyLine, placeBatch } from './model.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
 export const CLIP_HOLD_MS = 150;
-// dir → { sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], leave() }
+// dir → { dir, sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], wins: { gid: LordOS window id }, leave() }
 export const guests = createStore({});
 // dir → the LordOS window id of that machine's guest window in front, if one is: the machine counts as in use then (its
 // clipboard's gate, 6.8)
@@ -77,7 +77,7 @@ export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTou
     const [gw, gh] = appsGuestSize(display());
     lord.vm.resize(sid, gw, gh);
     seen.current = { w: -1, i: -1, a: -1 };
-    publish(dir, { sid, name, mid, leave: onLeave, touch: onTouch, list: [], apps: [] });
+    publish(dir, { dir, sid, name, mid, leave: onLeave, touch: onTouch, list: [], apps: [], wins: {} });
     return () => {
       if (sent.current) lord.vm.apps(sid, false);
       sent.current = false;
@@ -147,13 +147,39 @@ function sync(dir, sid, mid, name, list, gw, gh) {
     x.followed = r;
   }
   for (const w of list) { const x = have.get(w.id); if (x) { x.rect = w; if (!w.minimized) x.minimized = false; } }
+  // which LordOS window shows each guest window (the controller's Running rows: their icons, the one to bring forward)
+  const wins = {};
+  for (const [gid, x] of have) wins[gid] = x.winId;
+  const was = guests.get()[dir]?.wins || {};
+  if (Object.keys(was).length !== have.size || Object.keys(wins).some((k) => was[k] !== wins[k])) publish(dir, { wins });
 }
 
-// The Applications menu's items: the guest's apps, each launched in the guest (lord.vm.launch sends only a token the
-// guest listed itself)
+// A guest window brought to the front from the Running list: its LordOS window (focused, brought back if minimized: the
+// guest's window follows, as from the Dock); one minimized in the guest before apps mode began has none yet, so the guest
+// is asked to bring it back and its window opens from the guest's next list
+export function focusGuest(dir, gid) {
+  const g = guests.get()[dir];
+  const winId = trackOf(dir).get(gid)?.winId || 0;
+  if (winId) { wm.focus(winId); return; }
+  if (g?.sid) { lord.vm.winAct(g.sid, gid, 'restore'); lord.vm.winAct(g.sid, gid, 'focus'); }
+}
+// A guest window closed from the Running list: asked of the guest, as the window's own close button does (it may ask
+// about unsaved work); its LordOS window goes once the guest's list says so
+export function closeGuest(dir, gid) {
+  const g = guests.get()[dir];
+  if (g?.sid) lord.vm.winAct(g.sid, gid, 'close');
+}
+
+// The Applications menu's items: the guest's windows (Running: a click brings one to the front), then the guest's apps,
+// each launched in the guest (lord.vm.launch sends only a token the guest listed itself). The section's title is a
+// disabled row: every theme's menu draws those.
 export function appsMenuItems(g) {
-  if (!g?.apps?.length) return [{ label: tr('machines.apps.noApps'), disabled: true }];
-  return g.apps.map((a) => ({ label: a.name, onClick: () => lord.vm.launch(g.sid, a.token) }));
+  const running = runningWindows(g?.list);
+  const head = running.length ? [{ label: tr('machines.apps.running'), disabled: true },
+    ...running.map((w) => ({ label: w.title || tr('machines.apps.untitled'), checked: w.focused, onClick: () => focusGuest(g.dir, w.id) })),
+    '-', { label: tr('machines.apps.launch'), disabled: true }] : [];
+  if (!g?.apps?.length) return [...head, { label: tr('machines.apps.noApps'), disabled: true }];
+  return [...head, ...g.apps.map((a) => ({ label: a.name, onClick: () => lord.vm.launch(g.sid, a.token) }))];
 }
 
 // One guest window as a LordOS window: its part of the picture, the pointer and keyboard to the guest, and what the
@@ -171,6 +197,8 @@ export function GuestWindow({ dir, gid }) {
   const meRef = useRef(me);
   meRef.current = me;
   const minimized = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.minimized);
+  // the Applications menu's Running rows, set again only when they change (not on every move of a window)
+  const running = runningKey(runningWindows(g?.list));
   const title = me ? (me.title || me.app || '') : '';
   // the guest's title, with the machine's name: a guest's window is always told apart from this computer's (7.2)
   useEffect(() => { if (g) wm.setTitle(winId, tr('machines.apps.windowTitle', { title, machine: g.name || '' })); }, [title, g?.name]);
@@ -186,7 +214,7 @@ export function GuestWindow({ dir, gid }) {
       { label: tr('machines.apps.menu'), items: appsMenuItems(g) },
       { label: g.name || tr('machines.title'), items: [{ label: tr('machines.apps.leave'), onClick: () => g.leave?.() }] },
     ]);
-  }, [g?.apps, g?.name]);
+  }, [g?.apps, g?.name, running]);
   // in front: the machine is in use (the clipboard's gate)
   useEffect(() => {
     if (!focused) return undefined;

@@ -12,6 +12,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Machines: apps mode's controller is a panel of the guest's windows and apps, in development** (the maintainer's
+  request, like VMware Fusion's Unity mode; `docs/VIRTUALIZATION.md` 7.2). While a machine is in apps mode, its small
+  window was only a hint and **Leave Apps Mode**; it now opens at about 420 × 520 with two scrolling lists:
+  - **Running:** the guest's windows in apps mode (its own windows; popups, menus and windows another one owns are left
+    out), each with the icon the guest sent for it (the same one the Dock shows, not fetched again) and its title. A click
+    brings that window to the front (restored if it was minimized; the guest's window follows, as from the Dock); one the
+    guest minimized before apps mode began is asked back from the guest. **×** asks the guest to close it, as the
+    window's own close button does, so the guest can still ask about unsaved work.
+  - **Open an app:** the guest's apps list with a search field (every word must appear; accents and case are ignored;
+    names that start with the search come first; Enter opens the first one). The guest lists no icons for its apps, so
+    each row shows a plain tile with its initial; the guest protocol is unchanged.
+  - **Leave Apps Mode** stays at the top, and Esc still leaves (in the search field, Esc clears the search first). The
+    long hint is gone. The menu bar's **Applications** menu (on the machine's window and on every guest window) now
+    lists the same **Running** windows above the apps; it is set again only when that list changes, not on every move.
+  - The lists' logic is in `apps/machines/model.js` (`runningWindows`, `runningKey`, `appsMatching`, `appInitial`),
+    tested in `server/tests/vm_model_test.mjs`. New texts in all 35 languages.
+
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).

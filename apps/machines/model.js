@@ -1043,6 +1043,40 @@ export function guestAppItems(apps) {
   return (apps || []).filter((a) => a && a.token && a.name && !seen.has(a.token) && seen.add(a.token)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Apps mode's Running list (the controller panel, the Applications menu): the guest's own windows, not its popups or the
+// windows another one owns (a menu, a dialog: they come with their owner), nor a sliver no window opens for. Sorted by
+// app, then title, then id: the guest's list is in stacking order, and a list that reordered on every click would jump.
+export function runningWindows(list) {
+  const out = [];
+  for (const w of list || []) {
+    if (!w || !Number.isFinite(w.id) || w.owner > 0 || isPopup(w)) continue;
+    if (!w.minimized && !(w.w >= 8 && w.h >= 8)) continue;
+    out.push({ id: w.id, title: String(w.title || w.app || ''), app: String(w.app || ''), minimized: !!w.minimized, focused: !!w.focused });
+  }
+  return out.sort((a, b) => a.app.localeCompare(b.app) || a.title.localeCompare(b.title) || a.id - b.id);
+}
+// what the Running rows show, as one string: menus are set again only when it changes, not on every move of a window
+export const runningKey = (rows) => (rows || []).map((r) => `${r.id}\u0001${r.title}\u0001${r.minimized ? 1 : 0}${r.focused ? 1 : 0}`).join('\u0002');
+
+// text as compared by a search: lower case, accents off ("Pequeño" matches "pequeno")
+const folded = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+// The guest's apps that match a search (each word somewhere in the name), the ones whose name starts with it first; an
+// empty search keeps them all, in their order
+export function appsMatching(apps, query) {
+  const words = folded(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return apps || [];
+  const hits = [];
+  for (const a of apps || []) {
+    const n = folded(a?.name);
+    if (!words.every((w) => n.includes(w))) continue;
+    const rank = n.startsWith(words[0]) ? 0 : n.split(/[\s\-_.]+/).some((p) => p.startsWith(words[0])) ? 1 : 2;
+    hits.push({ a, rank });
+  }
+  return hits.sort((x, y) => x.rank - y.rank).map((h) => h.a);
+}
+// the letter a guest app's row shows (the guest lists no icons for its apps): its first character, upper case
+export const appInitial = (name) => (Array.from(String(name || '').trim())[0] || '?').toUpperCase();
+
 // Where a machine starts from (Configure → Boot; machine.json's boot_order): "auto" (the system disk, then the CD/DVD
 // drive) or the devices the firmware tries, in order, as lord-vm takes them ("network,disk").
 export const BOOT_DEVS = ['disk', 'cd', 'network'];
