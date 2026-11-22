@@ -243,6 +243,9 @@ export function readProfile(input, ctx = {}) {
   return { ok: true, error: '', profile: p, adjusted, ignored, image, imageErrors };
 }
 
+// a system's signature as a profile carries it: the addresses, the fingerprint and the key; never this computer's pin
+const exportSignature = (g) => ({ url: g.url, sums: g.sums, fingerprint: g.fingerprint, ...(g.key ? { key: g.key } : {}) });
+
 // A profile as its file (.lordprofile, or the person's own under ~/.config/lordos/machines/profiles): values only, and
 // a system it suggests that the person added by an address goes with it (address and SHA-256, never the image)
 export function writeProfile(p, systems = [], { withId = false } = {}) {
@@ -252,7 +255,7 @@ export function writeProfile(p, systems = [], { withId = false } = {}) {
     name: p.name, author: p.author || '', description: p.description || '', color: p.color,
     system: { kind: p.system.kind, suggested: [...(p.system.suggested || [])],
       ...(image && !withId ? { image: { id: image.id, name: image.name, kind: image.kind, color: image.color, install: image.install, url: image.url, sha256: image.sha256,
-        ...(image.size ? { size: image.size } : {}), ...(image.signature ? { signature: image.signature } : {}), ...(image.logo ? { logo: image.logo } : {}) } } : {}) },
+        ...(image.size ? { size: image.size } : {}), ...(image.signature ? { signature: exportSignature(image.signature) } : {}), ...(image.logo ? { logo: image.logo } : {}) } } : {}) },
     resources: { ...p.resources },
     network: { mode: p.network.mode, ports: (p.network.ports || []).map(portRule) },
     integration: { ...p.integration, share: p.integration.share ? { ...p.integration.share } : null },

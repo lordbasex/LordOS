@@ -96,7 +96,7 @@ for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
          lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-appstream:"" \
-         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lordos-guest:""; do
+         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-pgpv:"" lordos-guest:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
     case " ${ALLOW_MISSING:-} " in *" $b "*) echo "mkdeb: leaving out $b (ALLOW_MISSING)" >&2; continue ;; esac
@@ -244,6 +244,10 @@ fi
 # lord-sql (0.8.8.7): the Databases app's MySQL / MariaDB client, sandboxed (docs/DATABASES.md)
 [ -x server/build/lord-sql ] && install -m 755 server/build/lord-sql "$L/bin/lord-sql"
 [ -x "$L/bin/lord-sql" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-sql" 2>/dev/null || true; }
+# lord-pgpv (0.8.9, approved 2026-11-22): checks the OpenPGP signature of a system the person added to Machines, in its
+# sandbox, on memfds lord-server hands it (docs/VIRTUALIZATION.md 5.6.1)
+[ -x server/build/lord-pgpv ] && install -m 755 server/build/lord-pgpv "$L/bin/lord-pgpv"
+[ -x "$L/bin/lord-pgpv" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-pgpv" 2>/dev/null || true; }
 # lord-sftp (0.8.8.7): the Terminal's Files mode, SFTP over the tab's own ssh session, sandboxed (docs/TERMINAL.md)
 [ -x server/build/lord-sftp ] && install -m 755 server/build/lord-sftp "$L/bin/lord-sftp"
 [ -x "$L/bin/lord-sftp" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-sftp" 2>/dev/null || true; }

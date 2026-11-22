@@ -7,6 +7,7 @@ import { admin, fs, t as tr } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { entryOf, listingNames, newest, pickImage, progressOf, unattendedOf, downloadedImages, IMAGES_DIR } from './catalog.js';
 import { windowsEntry, evalFor } from './windows.js';
+import { userGetArg, sigVerdict } from './systems.js';
 
 // the newest image of a catalog entry, from its maker's list (checked by the helper): { name, sha, size }
 export async function resolveImage(id, arch) {
@@ -38,6 +39,32 @@ export async function downloadSystem(id, arch, locale, onProgress) {
   return get(eid, await resolveImage(eid, arch));
 }
 export const stopDownload = () => admin.run('vm-image-cancel', '', null, { quiet: true }).catch(() => {});
+
+// A system the person added (Machines settings → Systems): the admin helper's vm-image-get-user downloads its image, and
+// its signature files when it has a key, from the address the person gave (checked again in C: https, a public name,
+// port 443, at most 16 GiB, room left on the store) into the same image store, kept only with its SHA-256. An
+// administrator's action. onProgress gets { done, total }. Resolves with the image's path.
+export async function downloadUserSystem(s, onProgress) {
+  const arg = userGetArg(s);
+  if (!arg) throw new Error(tr('machines.set.sys.err.url'));
+  return String(await admin.run('vm-image-get-user', arg, (l) => { const g = progressOf(l); if (g) onProgress?.(g); }, { quiet: true }));
+}
+
+// Its signature, checked by lord-pgpv (lord.vm.sigCheck) with the system's key; then the image's SHA-256 must be in the
+// checksum file that signature covers. Resolves with { valid, fingerprint } or { valid: false, reason }.
+export function checkSignature(s) {
+  const g = s?.signature;
+  const job = g?.key && typeof lord.vm?.sigCheck === 'function' ? lord.vm.sigCheck(s.sha256, g.key, g.fingerprint) : 0;
+  if (!job) return Promise.resolve({ valid: false, reason: 'noHelper' });
+  return new Promise((resolve) => {
+    const timer = setInterval(() => {
+      const r = lord.vm.job(job);
+      if (r && !r.done) return;
+      clearInterval(timer);
+      resolve(r ? sigVerdict(r.out) : { valid: false, reason: 'noHelper' });
+    }, 150);
+  });
+}
 
 // the catalog's ids with a whole image here (for "Downloaded"): an image of the card itself or of the one its unattended
 // install boots

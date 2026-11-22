@@ -102,10 +102,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     machinery as the assistant), and "Added by you" (`~/.config/lordos/machines/systems.json`): name, kind, icon color,
     default profile, manual install or without questions the way the catalog's preseed, autoinstall or kickstart installers
     do, and the image: an ISO from the home folder (hashed at once) or an https address with its SHA-256 (required).
-    An address opens in the browser after a sheet with the full address and hash; the file in Downloads is hashed by
-    lord-vm and used only if it matches, and hashed again before a machine is made from it. An optional detached OpenPGP
-    signature and key fingerprint are kept and shown as "Signature: not checked by this version" (the design of a
-    sandboxed check is in the docs, not built). Added systems show in New Machine under "Added by you".
+    "Download…" (administrators) shows a sheet with the full address, size, SHA-256 and the signature check, then the
+    new closed admin action `vm-image-get-user` (approved by the maintainer on 2026-11-22) downloads it into the shared
+    image store with the catalog's own downloader, with progress and Stop Download: root checks the address again in C
+    (`vmurl.c`, `pkg/pubhost.c`: https, a public DNS name, never an IP literal, localhost or a local suffix such as
+    `.local`, `.lan`, `.internal`, `.home.arpa`; port 443 only, no user name or password, plain path characters with no
+    `%00` or dot segment, no fragment, at most 1000 bytes), the SHA-256 (required) and the size (at most 16 GiB), keeps
+    2 GiB free on the store, and the downloader connects only to public addresses and follows redirects only to addresses
+    that pass the same rules (`FetchItem.public_only`, `pkg.http.notPublic`). The image is kept only with that SHA-256 and
+    hashed again before a machine is made from it; its description keeps the address without its query (`vmurl_redact`),
+    and Storage shows it as "file · site". The first build's browser fallback (open the address, watch Downloads) is
+    gone; "Use a file I already downloaded…" stays. An optional detached OpenPGP signature now has the project's public
+    key too (armored, pasted or from a file, at most 32 KB): `vm-image-get-user` also fetches the signature and the checksum
+    file, and the new sandboxed helper **`lord-pgpv`** (approved by the maintainer on 2026-11-22; `server/src/vm/lordpgpv.c`,
+    LordOS's own `pkg/pgp.c`, libc only, no network and no files: three sealed memfds) verifies it with only the primary key
+    of that fingerprint and answers one line that lord-server reads strictly; then the image's SHA-256 must be in that
+    checksum file. Settings → Systems says "Signature: verified by ‹fingerprint›" or "Signature: invalid — not used". The
+    key's fingerprint is pinned for the system on its first good check; a later key with another fingerprint is held until
+    the person presses "Trust the New Key". A profile carries the addresses, fingerprint and key, never the pin. Without a
+    key the signature is kept and shown as "Signature: not checked". Added systems show in New Machine under "Added by you".
   - **Official logos, opt-in** (maintainer's approval 2026-11-22): Machines settings → General → "Official logos of the
     systems", off by default, with a confirmation notice; "Remove downloaded logos". PNG only (at most 512 KB and
     1024 × 1024), pinned in the catalog with its SHA-256 and downloaded by the admin helper's existing `vm-image-get`, then
@@ -116,7 +131,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     fallback. About shows a trademark notice. All new text in all 35 languages.
   - Tests: `server/tests/vm_profiles_test.mjs` (profile reading, clamping and import with a fuzz pass, export round trip,
     system validation: https only, 64-hex SHA-256, paths under the home; PNG header checks; the catalog's logos; chips,
-    search, the numbers line); `vm_catalog_test.mjs` checks logo entries.
+    search, the numbers line; the address rules with a fuzz pass, redaction, the public key, the pin, the helper's
+    argument and verdict); `vm_catalog_test.mjs` checks logo entries and a person's image in Storage;
+    `server/build/vmurl-test` (addresses, public names and IPv4/IPv6 blocks, sizes, free space, redaction, 200 000 mutated
+    addresses) and `server/build/vmsig-test` (keys and signatures made by the test: good, changed, another key, a key block
+    with two keys, a wrong fingerprint, a future signature, armored keys, every truncation; the answer read strictly; the
+    checksum lookup; then `lord-pgpv` itself on memfds in its sandbox).
 
 - **Machines: Capture mouse, in development** (`docs/VIRTUALIZATION.md` 6.25; approved by the maintainer 2026-11-21). A
   machine window's toolbar has a *Capture mouse* button (and *Actions → Capture mouse*): Automatic, as before (an absolute

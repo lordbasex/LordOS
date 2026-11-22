@@ -31,6 +31,7 @@
 #include "../vm/vmagent.h"
 #include "../vm/vmnet.h"
 #include "../vm/vmgpu.h"
+#include "../vm/vmsig.h"
 #include "../wl/wl.h"
 #include "../gpu/gpu.h"
 #include "../gpu/dmaread.h"
@@ -521,7 +522,12 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 /* ---- creating (lord-vm --create, in the background) ---- */
 
 #define MAX_JOBS 4
-typedef struct { int used, fd, done, ok, exit; pid_t pid; char out[16384]; size_t n; char dir[PATH_MAX + 80]; char hash[160]; char creds[PATH_MAX]; } Job;
+typedef struct {
+    int used, fd, done, ok, exit; pid_t pid; char out[16384]; size_t n; char dir[PATH_MAX + 80]; char hash[160]; char creds[PATH_MAX];
+    /* a lord-pgpv job (f_sig_check): the fingerprint asked for, the image's SHA-256 and the checksum file's bytes the
+     * helper was given, to look for that SHA-256 in once it says valid */
+    int sigcheck; char sig_fpr[41]; char sig_sha[65]; char *sums; size_t sums_n;
+} Job;
 static Job jobs[MAX_JOBS];
 
 /* the folder's name from the machine's: letters, digits, space, '-', '_', '.'; others become '-' */
@@ -1201,6 +1207,146 @@ static JSValue f_isoinfo(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return o;
 }
 
+/* ---- a person's system: its OpenPGP signature (lord-pgpv; docs/VIRTUALIZATION.md 5.6.1, AGENTS.md "lord-pgpv") ---- */
+
+#define VM_USER_LISTS "/var/lib/lordos/machines/lists/"
+
+/* a root-owned regular file of the image store, read whole (at most max bytes) */
+static char *store_file(const char *path, size_t max, size_t *len) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return NULL;
+    struct stat st;
+    char *b = NULL;
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && !(st.st_mode & 022) && st.st_size > 0 &&
+        (size_t)st.st_size <= max && (b = malloc((size_t)st.st_size + 1))) {
+        size_t n = 0;
+        while (n < (size_t)st.st_size) {
+            ssize_t r = read(fd, b + n, (size_t)st.st_size - n);
+            if (r < 0 && errno == EINTR) continue;
+            if (r <= 0) break;
+            n += (size_t)r;
+        }
+        if (n != (size_t)st.st_size) { free(b); b = NULL; } else { b[n] = 0; *len = n; }
+    }
+    close(fd);
+    return b;
+}
+
+/* bytes into a sealed memfd at offset 0 (-1 on failure) */
+static int sealed_fd(const char *name, const void *b, size_t n) {
+    int fd = memfd_create(name, MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    if (fd < 0) return -1;
+    size_t o = 0;
+    while (o < n) {
+        ssize_t w = write(fd, (const char *)b + o, n - o);
+        if (w < 0 && errno == EINTR) continue;
+        if (w <= 0) { close(fd); return -1; }
+        o += (size_t)w;
+    }
+    if (fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) || lseek(fd, 0, SEEK_SET)) { close(fd); return -1; }
+    return fd;
+}
+
+/* sigCheck(sha256, key, fingerprint) → job id (0 when it can't start): checks the detached signature that
+ * vm-image-get-user stored for that image (lists/u-<sha256>.sig, over lists/u-<sha256>.sums) with the armored public
+ * key of the system's definition, of which only the primary key with that v4 fingerprint (or its subkeys) counts.
+ * lord-pgpv does the OpenPGP part in its sandbox on sealed memfds; then, only when it answered valid with that very
+ * fingerprint, the image's SHA-256 must be a line of the checksum file it checked. lord.vm.job(id).out is then
+ * {"valid":true,"fingerprint":"<40 hex>"} or {"valid":false,"reason":"<word>"} (VMSIG_REASONS, notListed, noFiles). */
+static JSValue f_sig_check(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 3 || !JS_IsString(argv[0]) || !JS_IsString(argv[1]) || !JS_IsString(argv[2])) return JS_NewInt32(c, 0);
+    int slot = -1;
+    for (int i = 0; i < MAX_JOBS; i++) if (!jobs[i].used) { slot = i; break; }
+    char bin[PATH_MAX];
+    if (slot < 0 || bin_path("lord-pgpv", bin, sizeof bin)) return JS_NewInt32(c, 0);
+    size_t kl = 0;
+    const char *sha = JS_ToCString(c, argv[0]), *fpr = JS_ToCString(c, argv[2]), *key = JS_ToCStringLen(c, &kl, argv[1]);
+    char s[65] = "", f[41] = "";
+    int ok = sha && fpr && key && strlen(sha) == 64 && vmsig_fpr_ok(fpr) && kl > 0 && kl <= VMSIG_KEY_MAX;
+    for (int i = 0; ok && i < 64; i++) {
+        char ch = sha[i];
+        if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))) ok = 0;
+        s[i] = ch;
+    }
+    for (int i = 0; ok && i < 40; i++) f[i] = (char)(fpr[i] >= 'a' && fpr[i] <= 'f' ? fpr[i] - 32 : fpr[i]);
+    int kfd = ok ? sealed_fd("lordos-pgpv-key", key, kl) : -1;
+    if (sha) JS_FreeCString(c, sha);
+    if (fpr) JS_FreeCString(c, fpr);
+    if (key) JS_FreeCString(c, key);
+    if (kfd < 0) return JS_NewInt32(c, 0);
+    char p[160];
+    size_t sl = 0, gl = 0;
+    snprintf(p, sizeof p, VM_USER_LISTS "u-%s.sums", s);
+    char *sums = store_file(p, VMSIG_SUMS_MAX, &sl);
+    snprintf(p, sizeof p, VM_USER_LISTS "u-%s.sig", s);
+    char *sig = store_file(p, VMSIG_SIG_MAX, &gl);
+    int sfd = sums ? sealed_fd("lordos-pgpv-sums", sums, sl) : -1, gfd = sig ? sealed_fd("lordos-pgpv-sig", sig, gl) : -1;
+    int have_files = sums && sig;
+    free(sig);
+    int in[2] = { -1, -1 }, out[2] = { -1, -1 };
+    pid_t pid = -1;
+    if (sfd >= 0 && gfd >= 0 && !pipe2(in, O_CLOEXEC) && !pipe2(out, O_CLOEXEC)) {
+        pid = fork();
+        if (!pid) {
+            /* fds 0 (the request), 1 (the answer), 2 (/dev/null), 3 key, 4 checksum file, 5 signature; nothing else */
+            int a = fcntl(in[0], F_DUPFD, 10), b = fcntl(out[1], F_DUPFD, 10), k = fcntl(kfd, F_DUPFD, 10),
+                m = fcntl(sfd, F_DUPFD, 10), g = fcntl(gfd, F_DUPFD, 10), null = open("/dev/null", O_WRONLY);
+            if (a < 0 || b < 0 || k < 0 || m < 0 || g < 0 || null < 0 || dup2(a, 0) != 0 || dup2(b, 1) != 1 || dup2(null, 2) != 2 ||
+                dup2(k, 3) != 3 || dup2(m, 4) != 4 || dup2(g, 5) != 5) _exit(127);
+            syscall(SYS_close_range, 6, ~0u, 0);
+            sigset_t none;
+            sigemptyset(&none);
+            sigprocmask(SIG_SETMASK, &none, NULL);
+            char *const args[] = { "lord-pgpv", NULL }, *const envp[] = { NULL };
+            execve(bin, args, envp);
+            _exit(127);
+        }
+    }
+    close(kfd);
+    if (sfd >= 0) close(sfd);
+    if (gfd >= 0) close(gfd);
+    if (in[0] >= 0) close(in[0]);
+    if (out[1] >= 0) close(out[1]);
+    if (pid <= 0) {
+        if (in[1] >= 0) close(in[1]);
+        if (out[0] >= 0) close(out[0]);
+        free(sums);
+        /* no signature files stored for that image (downloaded before, or a failed fetch): a finished job that says so */
+        if (!have_files) {
+            jobs[slot] = (Job){ .used = 1, .fd = -1, .done = 1, .ok = 0, .exit = 1, .pid = 0 };
+            jobs[slot].n = (size_t)snprintf(jobs[slot].out, sizeof jobs[slot].out, "{\"valid\":false,\"reason\":\"noFiles\"}");
+            return JS_NewInt32(c, slot + 1);
+        }
+        return JS_NewInt32(c, 0);
+    }
+    char req[64];
+    int rl = snprintf(req, sizeof req, "%s %lld\n", f, (long long)time(NULL));
+    if (write(in[1], req, (size_t)rl) != rl) { /* the helper answers malformed */ }
+    close(in[1]);
+    fcntl(out[0], F_SETFL, O_NONBLOCK);
+    jobs[slot] = (Job){ .used = 1, .fd = out[0], .pid = pid, .sigcheck = 1, .sums = sums, .sums_n = sl };
+    memcpy(jobs[slot].sig_fpr, f, 41);
+    memcpy(jobs[slot].sig_sha, s, 65);
+    return JS_NewInt32(c, slot + 1);
+}
+
+/* the verdict of a finished lord-pgpv job, built here: never the helper's text */
+static void sig_verdict(Job *j) {
+    char why[32] = "";
+    int rep = vmsig_reply(j->out, j->n, j->sig_fpr, why, sizeof why);
+    int listed = rep == 1 && j->sums && vmsig_sums_has_hash(j->sums, j->sums_n, j->sig_sha);
+    char fpr[41];
+    memcpy(fpr, j->sig_fpr, sizeof fpr);
+    if (rep == 1 && listed)
+        j->n = (size_t)snprintf(j->out, sizeof j->out, "{\"valid\":true,\"fingerprint\":\"%s\"}", fpr);
+    else
+        j->n = (size_t)snprintf(j->out, sizeof j->out, "{\"valid\":false,\"reason\":\"%s\"}", rep == 1 ? "notListed" : why[0] ? why : "badSignature");
+    j->ok = rep == 1 && listed;
+    free(j->sums);
+    j->sums = NULL;
+}
+
 static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     int i = ival(c, argv[0]);
@@ -1236,6 +1382,7 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
             }
             explicit_bzero(j->hash, sizeof j->hash);
             if (j->creds[0]) unlink(j->creds);
+            if (j->sigcheck) sig_verdict(j);
         }
     }
     JSValue o = JS_NewObject(c);
@@ -4146,7 +4293,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
-    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),

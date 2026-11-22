@@ -21,6 +21,18 @@
  *              SHA-256 is that one. A cut or stopped download stays as <sha256>.iso.part and the next try continues
  *              it with a Range request (the hash is still over the whole file). Also writes <sha256>.json (what
  *              the image is). Answers the path. Progress: "progress download <done> <total>"                 anyone
+ *   vm-image-get-user "<https URL> <sha256> <size|-> [<signature URL> <checksum file URL>]"   a system the person
+ *              added (Machines settings → Systems; approved by the maintainer on 2026-11-22, AGENTS.md "Machines'
+ *              downloads of your own systems"). Each address must pass vmurl_check (vmurl.h): https://, a public DNS
+ *              name (pkg/pubhost.h: no IP literal, localhost, .local, .internal, .lan…), port 443 only, no user name or
+ *              password, a plain path to a file, at most 1000 bytes; the downloader (pkg/http.c, public_only) connects
+ *              only to public addresses and follows a redirect only to an address that passes the same rules. The
+ *              SHA-256 is required (64 hex digits); the size, when given, is 1 B to 16 GiB and is the most it may be
+ *              (else 16 GiB); the image store must keep 2 GiB free after it (vm.noSpace need= free=). Into
+ *              images/<sha256>.iso like vm-image-get (resumed from its .part, kept only with that SHA-256, progress
+ *              lines, vm-image-cancel stops it), with <sha256>.json {"id": "user", "file", "from": the address without
+ *              its query}. The optional signature files (64 KB, 1 MB) go to lists/u-<sha256>.sig and .sums, root's;
+ *              root never reads them: lord-server hands them to lord-pgpv. Refused: vm.urlRefused             admin
  *   vm-image-cancel ""                               stops this user's download (its part is kept)           anyone
  *   vm-image-remove "<sha256>"                       deletes a downloaded image, or the part of a stopped
  *              download (every account's machines share it); refused while it downloads or any running machine
@@ -74,6 +86,7 @@ void vm_act_enable(const AdminReq *r, const char *arg, size_t len);
 void vm_act_kvm(const AdminReq *r, const char *arg, size_t len);
 void vm_act_image_list(const AdminReq *r, const char *arg, size_t len);
 void vm_act_image_get(const AdminReq *r, const char *arg, size_t len);
+void vm_act_image_get_user(const AdminReq *r, const char *arg, size_t len);
 void vm_act_image_cancel(const AdminReq *r, const char *arg, size_t len);
 void vm_act_image_remove(const AdminReq *r, const char *arg, size_t len);
 void vm_act_net_bridge(const AdminReq *r, const char *arg, size_t len);
@@ -98,6 +111,7 @@ int vm_missing_packages(int arches, char *out, size_t n);
     { "vm-kvm", vm_act_kvm, 0 }, \
     { "vm-image-list", vm_act_image_list, A_FORK | A_ANYONE }, \
     { "vm-image-get", vm_act_image_get, A_FORK | A_ANYONE }, \
+    { "vm-image-get-user", vm_act_image_get_user, A_FORK }, \
     { "vm-image-cancel", vm_act_image_cancel, A_ANYONE }, \
     { "vm-image-remove", vm_act_image_remove, 0 }, \
     { "vm-net-bridge", vm_act_net_bridge, 0 }, \

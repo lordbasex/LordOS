@@ -4,7 +4,7 @@
 // as .lordprofile), Systems (the catalog with its state, and the systems the person adds: an ISO on this computer or an
 // https address with its SHA-256), Network (the card bridged machines join), Graphics cards (what Settings → Graphics
 // cards set up) and Keyboard and mouse. docs/VIRTUALIZATION.md "Profiles and your own systems".
-import { View, Text, TextInput, Toggle, Segmented, Slider, ScrollView, FilePicker, ConfirmDialog, useAppWindow, useSettings, useStore, settings, fs, wm, openUrl,
+import { View, Text, TextInput, TextArea, Toggle, Segmented, Slider, ScrollView, FilePicker, ConfirmDialog, useAppWindow, useSettings, useStore, settings, fs, wm,
   perms, useNarrow, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
@@ -12,10 +12,10 @@ import { systemsFor, unattendedOf } from './catalog.js';
 import { LIB_VIEWS, LIB_SORTS, libView, NET_MODES, GPU_CHOICES, PORT_HOST_MIN, newPortRule, portProblems, portInput, usesPorts, CLOSE_CHOICES, gvtGpu, no3dReason, missingFor } from './model.js';
 import { BUILTIN, DEFAULT_PROFILE, CLIPBOARDS, MOUSE, SHORTCUTS, allProfiles, builtinProfile, blankProfile, readProfile, writeProfile, onHost, cpuCap, memCap,
   defaultProfileId, exportName, shareRel, exposureOf, PROFILE_FILE_MAX } from './profiles.js';
-import { CARD_COLORS, COLOR_HEX, SYSTEM_KINDS, INSTALLS, validateSystem, newId, systemState, downloadCandidates, fileOfUrl, hostOf } from './systems.js';
+import { CARD_COLORS, COLOR_HEX, SYSTEM_KINDS, INSTALLS, validateSystem, newId, systemState, signatureState, fileOfUrl, hostOf, keyOf, KEY_MAX } from './systems.js';
 import { loadProfiles, saveProfile, deleteProfile, loadSystems, saveSystems, defaultsOf, setDefaults, removeLogos, storeRev, profileTitle } from './store.js';
 import { fetchAllLogos, logoSystems } from './logos.js';
-import { downloadSystem, downloadedIds, stopDownload } from './download.js';
+import { downloadSystem, downloadedIds, stopDownload, downloadUserSystem, checkSignature } from './download.js';
 import { usePal, has, gb, bytes, Btn, Bar, MenuBtn, OsMark } from './ui.jsx';
 import { Sheet, SheetHeader, Pill, Section, Round } from './kit.jsx';
 import { Requirements, openStorage } from './library.jsx';
@@ -24,6 +24,8 @@ const SECTIONS = ['general', 'profiles', 'systems', 'network', 'gpus', 'input'];
 const readGpus = () => { try { return typeof lord.vm?.gpus === 'function' ? lord.vm.gpus() : null; } catch (e) { return null; } };
 const hostOf0 = () => (has() ? lord.vm.host() : null);
 const nowIso = () => new Date().toISOString();
+// a fingerprint as projects print it: groups of four
+const fprText = (f) => String(f || '').replace(/(.{4})(?=.)/g, '$1 ');
 
 // a row of a card: label at the start, value at the end, an optional note and control under them
 function Row({ label, value, children, note, last }) {
@@ -534,7 +536,7 @@ function ImportSummary({ file, r, host, onCancel, onImport }) {
             </View>
             {kv(tr('machines.set.imp.from'), im.url, true)}
             {kv(tr('machines.set.imp.sha'), im.sha256, true)}
-            {kv(tr('machines.set.imp.signature'), im.signature ? `${fileOfUrl(im.signature.url) || hostOf(im.signature.url)} · ${tr('machines.set.imp.key', { fpr: im.signature.fingerprint })} — ${tr('machines.set.sys.sigNotChecked')}` : tr('machines.set.imp.none'), !!im.signature)}
+            {kv(tr('machines.set.imp.signature'), im.signature ? `${fileOfUrl(im.signature.url) || hostOf(im.signature.url)} · ${tr('machines.set.imp.key', { fpr: fprText(im.signature.fingerprint) })} — ${tr(im.signature.key ? 'machines.set.sys.sigWithKey' : 'machines.set.sys.sigNotChecked')}` : tr('machines.set.imp.none'), !!im.signature)}
             <Text style={{ marginTop: 6, fontSize: 12, lineHeight: 1.4, color: p.dim, textAlign: 'start' }}>{tr('machines.set.imp.httpsOnly')}</Text>
           </View>
         ) : null}
@@ -596,7 +598,8 @@ function Systems({ host }) {
   const [dl, setDl] = useState(null);                // { id, got: { done, total }, err }
   const [edit, setEdit] = useState(null);            // a system (new: { fresh: true })
   const [get, setGet] = useState(null);              // a system whose download the person confirms
-  const [watch, setWatch] = useState(null);          // { id, phase: 'wait' | 'hashing', job, path, pct, err }
+  const [udl, setUdl] = useState(null);              // a system's download: { id, got: { done, total }, phase: 'sig', err }
+  const [watch, setWatch] = useState(null);          // a file the person chose, hashed: { id, phase: 'hashing', job, path, pct, err }
   const [pickFor, setPickFor] = useState(null);
   const own = loadProfiles();
   const cards = systemsFor(CATALOG, host.arch);
@@ -607,25 +610,38 @@ function Systems({ host }) {
       setDl(null); setHave(downloadedIds());
     } catch (e) { setDl({ id: s.id, err: e.code === 'admin.unavailable' ? tr('machines.dl.noHelper') : e.message || tr('machines.dl.failed') }); }
   };
-  // an image the person downloaded from the address (in Downloads) or chose: hashed by lord-vm, kept only if it matches
+  // an image the person already downloaded and chose: hashed by lord-vm, kept only if it matches
   const check = (s, path) => {
     const job = lord.vm.hash(path);
-    if (!job) { setWatch({ id: s.id, phase: 'wait', err: tr('machines.win.cantRead', { file: path.split('/').pop() }) }); return; }
+    if (!job) { setWatch({ id: s.id, err: tr('machines.win.cantRead', { file: path.split('/').pop() }) }); return; }
     setWatch({ id: s.id, phase: 'hashing', job, path, pct: 0 });
   };
+  // the image from the system's address, by the admin helper (vm-image-get-user: kept only with its SHA-256), then its
+  // signature by lord-pgpv when the system has a key: verified only when both hold; the key's fingerprint is pinned
+  // for this system on its first good check
+  const getUser = async (s) => {
+    setUdl({ id: s.id, got: { done: 0, total: s.size || 0 } });
+    try {
+      const path = await downloadUserSystem(s, (got) => setUdl((d) => (d && d.id === s.id && !d.err ? { ...d, got } : d)));
+      let sigOk = null;
+      if (signatureState(s.signature) === 'check') {
+        setUdl({ id: s.id, phase: 'sig' });
+        const v = await checkSignature(s);
+        if (!v.valid) { setUdl({ id: s.id, err: tr(v.reason === 'notListed' ? 'machines.set.sys.sigNotListed' : 'machines.set.sys.sigBad') }); return; }
+        sigOk = { fingerprint: v.fingerprint, at: nowIso() };
+      }
+      saveSystems(loadSystems().map((x) => (x.id === s.id ? { ...x, verified: { path, at: nowIso() },
+        ...(sigOk && x.signature ? { sigOk, signature: { ...x.signature, pinned: x.signature.pinned || sigOk.fingerprint } } : {}) } : x)));
+      setUdl(null);
+    } catch (e) { setUdl({ id: s.id, err: e.code === 'admin.unavailable' ? tr('machines.dl.noHelper') : e.message || tr('machines.dl.failed') }); }
+  };
+  const trustKey = (s) => saveSystems(loadSystems().map((x) => (x.id === s.id && x.signature ? { ...x, signature: { ...x.signature, pinned: undefined }, sigOk: undefined } : x)));
   useEffect(() => {
     if (!watch) return undefined;
     const s = mine.find((x) => x.id === watch.id);
     if (!s) return undefined;
+    if (watch.phase !== 'hashing') return undefined;
     const timer = setInterval(() => {
-      if (watch.phase === 'wait') {
-        try {
-          const dir = `${fs.home()}/Downloads`;
-          const f = downloadCandidates(s, (lord.fs.list(dir) || []).map((e) => ({ name: e.name, size: e.size, mtime: e.mtime, dir: e.dir || e.isDir, link: e.link })))[0];
-          if (f) check(s, `${dir}/${f.name}`);
-        } catch (e) { /* no Downloads */ }
-        return;
-      }
       const r = lord.vm.job(watch.job);
       if (!r) return;
       let pct = 0, sha = '';
@@ -634,14 +650,14 @@ function Systems({ host }) {
       if (r.ok && sha && sha.toLowerCase() === s.sha256) {
         saveSystems(loadSystems().map((x) => (x.id === s.id ? { ...x, verified: { path: watch.path, at: nowIso() } } : x)));
         setWatch(null);
-      } else setWatch({ id: s.id, phase: 'wait', err: tr('machines.set.sys.shaMismatch', { file: watch.path.split('/').pop() }) });
-    }, watch.phase === 'wait' ? 2000 : 400);
+      } else setWatch({ id: s.id, err: tr('machines.set.sys.shaMismatch', { file: watch.path.split('/').pop() }) });
+    }, 400);
     return () => clearInterval(timer);
   }, [watch?.id, watch?.phase, watch?.job, mine]);
   const profName = (id) => { const x = allProfiles(own, host).find((y) => y.id === id); return x ? profileTitle(x) : profileTitle(builtinProfile(DEFAULT_PROFILE, host)); };
   const subOf = (s) => [tr(s.source === 'file' ? 'machines.set.sys.fromIso' : 'machines.set.sys.fromUrl', { host: hostOf(s.url) }),
     s.verified ? tr('machines.set.sys.verified') : tr('machines.set.sys.notVerified'), tr(`machines.set.sys.install.${s.install}`),
-    s.signature ? tr('machines.set.sys.sigNotChecked') : null].filter(Boolean).join(' · ');
+    s.sigOk ? tr('machines.set.sys.sigOk', { fpr: fprText(s.sigOk.fingerprint) }) : s.signature ? tr('machines.set.sys.sigNotChecked') : null].filter(Boolean).join(' · ');
   return <>
     <Head title={tr('machines.set.nav.systems')} text={tr('machines.set.sys.text')}>
       <Btn primary label={tr('machines.set.sys.add')} onClick={() => setEdit({ fresh: true })} />
@@ -661,11 +677,19 @@ function Systems({ host }) {
       {mine.map((s) => {
         const st = systemState(s);
         const w = watch?.id === s.id ? watch : null;
+        const u = udl?.id === s.id ? udl : null;
+        const busy = !!u && !u.err;
+        const changed = signatureState(s.signature) === 'keyChanged';
+        const sub = u?.err ? u.err : u?.phase === 'sig' ? tr('machines.set.sys.sigChecking') : busy ? (u.got?.total ? tr('machines.dl.progress', { a: bytes(u.got.done), b: bytes(u.got.total) }) : tr('machines.dl.downloading', { name: s.name }))
+          : w?.err ? w.err : w?.phase === 'hashing' ? tr('machines.set.sys.hashing', { pct: w.pct || 0 })
+          : changed && st === 'download' ? tr('machines.set.sys.keyChanged', { fpr: fprText(s.signature.pinned) }) : subOf(s);
         return <SysRow key={s.id} mark={<OsMark id="other" color={s.color} letter={s.name} size={36} />} title={s.name}
-          sub={w?.err ? w.err : w?.phase === 'hashing' ? tr('machines.set.sys.hashing', { pct: w.pct || 0 }) : w?.phase === 'wait' ? tr('machines.set.sys.waiting', { file: fileOfUrl(s.url) }) : subOf(s)}
+          sub={sub}
           right={<View style={{ flexDirection: 'row', gap: 8 }}>
-            {st === 'download' && !w ? <Btn label={tr('machines.set.sys.downloadUrl')} onClick={() => setGet(s)} /> : null}
-            {st !== 'ready' ? <Btn label={tr('machines.set.sys.chooseFile')} onClick={() => setPickFor(s)} /> : null}
+            {busy && u.phase !== 'sig' ? <Btn label={tr('machines.dl.cancel')} onClick={() => { stopDownload(); setUdl(null); }} /> : null}
+            {changed && !busy ? <Btn label={tr('machines.set.sys.keyTrust')} onClick={() => trustKey(s)} /> : null}
+            {st === 'download' && !busy && !w?.phase && !changed ? <Btn label={tr('machines.set.sys.downloadUrl')} disabled={!!udl && !udl.err} onClick={() => setGet(s)} /> : null}
+            {st !== 'ready' && !busy ? <Btn label={tr('machines.set.sys.chooseFile')} onClick={() => setPickFor(s)} /> : null}
             <Btn label={tr('machines.set.sys.edit')} onClick={() => setEdit(s)} />
           </View>} />;
       })}
@@ -681,11 +705,12 @@ function Systems({ host }) {
           {get.size ? <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{bytes(get.size)}</Text> : null}
           <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.set.imp.sha')}</Text>
           <Text style={{ fontSize: 13, color: p.text, textAlign: 'start', direction: 'ltr', fontFamily: 'monospace', overflowWrap: 'anywhere' }}>{get.sha256}</Text>
-          {get.signature ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.set.sys.sigNotChecked')}</Text> : null}
+          {get.signature ? <Text style={{ fontSize: 12, lineHeight: 1.4, color: p.dim, textAlign: 'start' }}>{signatureState(get.signature) === 'check'
+            ? tr('machines.set.sys.sigWillCheck', { fpr: fprText(get.signature.fingerprint) }) : tr('machines.set.sys.sigNotChecked')}</Text> : null}
         </ScrollView>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderColor: p.line }}>
           <Pill label={tr('machines.cancel')} onClick={() => setGet(null)} />
-          <Pill primary label={tr('machines.set.sys.getOk')} onClick={() => { const s = get; setGet(null); openUrl(s.url); setWatch({ id: s.id, phase: 'wait' }); }} />
+          <Pill primary label={tr('machines.set.sys.getOk')} onClick={() => { const s = get; setGet(null); getUser(s); }} />
         </View>
       </View>
     </Sheet> : null}
@@ -703,9 +728,10 @@ function Systems({ host }) {
 // https address with the SHA-256 its maker publishes); optional signature fields and logo
 function SystemEdit({ start, host, profiles, taken, onClose, onSave, onDelete }) {
   const p = usePal();
-  const [s, setS] = useState(() => start ? { ...start, sig: start.signature || { url: '', sums: '', fingerprint: '' }, logo0: start.logo || { url: '', sha256: '' } }
-    : { name: '', kind: 'linux', color: 'blue', profile: DEFAULT_PROFILE, install: 'manual', source: 'file', path: '', url: '', sha256: '', sig: { url: '', sums: '', fingerprint: '' }, logo0: { url: '', sha256: '' } });
+  const [s, setS] = useState(() => start ? { ...start, sig: { key: '', ...(start.signature || { url: '', sums: '', fingerprint: '' }) }, logo0: start.logo || { url: '', sha256: '' } }
+    : { name: '', kind: 'linux', color: 'blue', profile: DEFAULT_PROFILE, install: 'manual', source: 'file', path: '', url: '', sha256: '', sig: { url: '', sums: '', fingerprint: '', key: '' }, logo0: { url: '', sha256: '' } });
   const [picking, setPicking] = useState(false);
+  const [pickKey, setPickKey] = useState(false);
   const [hash, setHash] = useState(null);            // { job, pct }
   const [errs, setErrs] = useState([]);
   const put = (patch) => { setErrs([]); setS((x) => ({ ...x, ...patch })); };
@@ -723,11 +749,14 @@ function SystemEdit({ start, host, profiles, taken, onClose, onSave, onDelete })
     return () => clearInterval(timer);
   }, [hash?.job]);
   const build = () => {
-    const sig = s.sig.url || s.sig.sums || s.sig.fingerprint ? s.sig : null;
+    const sig = s.sig.url || s.sig.sums || s.sig.fingerprint || s.sig.key ? s.sig : null;
     const logo = s.logo0.url || s.logo0.sha256 ? s.logo0 : null;
     const o = { id: start?.id, name: s.name, kind: s.kind, color: s.color, profile: s.profile, install: s.kind === 'linux' ? s.install : 'manual', source: s.source,
       ...(s.source === 'file' ? { path: s.path } : { url: s.url }), sha256: s.sha256, ...(s.size ? { size: s.size } : {}), signature: sig, logo, added: start?.added || nowIso(),
-      ...(s.source === 'file' && s.verified ? { verified: s.verified } : start?.source === 'url' && s.url === start.url && s.sha256 === start.sha256 && start.verified ? { verified: start.verified } : {}) };
+      ...(s.source === 'file' && s.verified ? { verified: s.verified } : start?.source === 'url' && s.url === start.url && s.sha256 === start.sha256 && start.verified ? { verified: start.verified } : {}),
+      // a signature that verified stays only while its addresses, key and fingerprint are the same
+      ...(start?.sigOk && start.signature && sig && sig.url === start.signature.url && sig.sums === start.signature.sums && sig.key === (start.signature.key || '')
+        && sig.fingerprint === start.signature.fingerprint ? { sigOk: start.sigOk } : {}) };
     return validateSystem(o, { home: fs.home(), profiles: profiles.map((x) => x.id), newId: start?.id || newId('s', taken) });
   };
   const save = () => { const r = build(); if (!r.ok) { setErrs(r.errors); return; } onSave(r.system); };
@@ -771,6 +800,11 @@ function SystemEdit({ start, host, profiles, taken, onClose, onSave, onDelete })
           {field(tr('machines.set.sys.sigUrl'), s.sig.url, (v) => put({ sig: { ...s.sig, url: v.trim() } }), { placeholder: 'https://', mono: true })}
           {field(tr('machines.set.sys.sumsUrl'), s.sig.sums, (v) => put({ sig: { ...s.sig, sums: v.trim() } }), { placeholder: 'https://', mono: true })}
           {field(tr('machines.set.sys.fpr'), s.sig.fingerprint, (v) => put({ sig: { ...s.sig, fingerprint: v } }), { mono: true })}
+          <Field label={tr('machines.set.sys.key')}>
+            <TextArea value={s.sig.key || ''} minRows={4} size={12} placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----" style={{ direction: 'ltr', fontFamily: 'monospace' }}
+              onChange={(v) => put({ sig: { ...s.sig, key: v.slice(0, KEY_MAX + 200) } })} />
+            <View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.set.sys.keyFile')} onClick={() => setPickKey(true)} /></View>
+          </Field>
           <Text style={{ fontSize: 12, lineHeight: 1.4, color: p.dim, textAlign: 'start' }}>{tr('machines.set.sys.sigNote')}</Text>
         </>}
         <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.set.sys.logoTitle')}</Text>
@@ -785,6 +819,14 @@ function SystemEdit({ start, host, profiles, taken, onClose, onSave, onDelete })
         <Pill label={tr('machines.cancel')} onClick={onClose} />
         <Pill primary label={tr('machines.set.sys.save')} disabled={!!hash} onClick={save} />
       </View>
+      {pickKey ? <FilePicker title={tr('machines.set.sys.keyFile')} filter={/\.(asc|txt|key|pub)$/i} onClose={() => setPickKey(false)} onPick={(x) => {
+        setPickKey(false);
+        const pth = Array.isArray(x) ? x[0] : x;
+        let text = '';
+        try { text = pth ? fs.read(pth) : ''; } catch (e) { text = ''; }
+        const key = keyOf(typeof text === 'string' && text.length <= KEY_MAX + 200 ? text : '');
+        if (key) put({ sig: { ...s.sig, key } }); else setErrs(['key']);
+      }} /> : null}
       {picking ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPicking(false)} onPick={(x) => {
         setPicking(false);
         const pth = Array.isArray(x) ? x[0] : x;

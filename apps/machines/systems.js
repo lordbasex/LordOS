@@ -2,8 +2,11 @@
 // docs/VIRTUALIZATION.md "Profiles and your own systems") and the optional official logos (PNG only): pure functions,
 // tested by server/tests/vm_profiles_test.mjs. A system is only data: a name, a kind, a color, a default profile, how
 // it installs, and its image, either an ISO the person picked on this computer or an https address with the image's
-// SHA-256 (required). Nothing here downloads, opens or runs anything; an image is usable only once its SHA-256 matched
-// (verified), and the New Machine assistant hashes it again before a machine is made from it.
+// SHA-256 (required), optionally with an OpenPGP signature over a checksum file and the project's public key. Nothing
+// here downloads, opens or runs anything: the admin helper downloads (vm-image-get-user, which checks the address again
+// in C: vmurl.c) and lord-pgpv checks the signature (vmsig.c). An image is usable only once its SHA-256 matched and, when
+// the system has a key, its signature verified (verified), and the New Machine assistant hashes it again before a
+// machine is made from it.
 
 export const SYSTEMS_FORMAT = 'lordos-machine-systems/1';
 export const SYSTEM_KINDS = ['linux', 'windows', 'other'];
@@ -16,8 +19,11 @@ export const COLOR_HEX = { blue: ['#1f6aa5', '#7cc4e8'], green: ['#2f6b2c', '#a3
 export const INSTALLS = ['manual', 'preseed', 'autoinstall', 'kickstart'];
 export const SYSTEMS_MAX = 64;
 export const NAME_MAX = 64;
-export const URL_MAX = 2048;
-export const IMAGE_MAX = 64 * 1024 * 1024 * 1024;       // 64 GiB: no installer is larger
+export const URL_MAX = 1000;                           // the admin helper's limit (vmurl.h VMURL_MAX)
+export const IMAGE_MAX = 16 * 1024 * 1024 * 1024;       // 16 GiB: no installer is larger (vmurl.h VMURL_IMAGE_MAX)
+export const KEY_MAX = 32 * 1024;                     // an armored public key (vmsig.h VMSIG_KEY_MAX)
+// where the admin helper keeps downloaded images (one copy for every account, named by its SHA-256)
+export const STORE_IMAGES = '/var/lib/lordos/machines/images';
 export const ID_RE = /^[a-z][a-z0-9-]{0,31}$/;
 const SHA_RE = /^[0-9a-f]{64}$/;
 // an OpenPGP fingerprint: v4 (40 hex digits) or v6 (64), spaces allowed as people copy them
@@ -29,24 +35,50 @@ export const cleanText = (v, max) => (typeof v === 'string' && !CTRL.test(v) ? v
 export const shaOf = (v) => { const s = str(v).trim().toLowerCase(); return SHA_RE.test(s) ? s : ''; };
 export const fprOf = (v) => { const s = str(v).replace(/\s+/g, '').toUpperCase(); return FPR_RE.test(s) ? s : ''; };
 
-// An https address a download may come from: https only, a host name (no user name or password in it, no spaces, no
-// control characters), at most URL_MAX characters. → the address, or '' with why in err.code ('http', 'url').
+// suffixes that only mean something on a LAN or in a test (pkg/pubhost.c LOCAL_TLDS)
+const LOCAL_TLDS = ['local', 'localhost', 'localdomain', 'internal', 'intranet', 'lan', 'home', 'corp', 'private', 'arpa', 'test', 'invalid', 'example', 'onion', 'alt'];
+// a public DNS name, as the admin helper checks it (pubhost_name_ok): 2+ labels of letters, digits and '-', at most 253
+// bytes, the last one letters only (or an IDN xn-- label), never an IP literal, localhost or a local suffix
+export function publicHost(h) {
+  const s = str(h).toLowerCase();
+  if (s.length < 4 || s.length > 253) return false;
+  const labels = s.split('.');
+  if (labels.length < 2 || labels.length > 127) return false;
+  if (!labels.every((l) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(l))) return false;
+  const tld = labels[labels.length - 1];
+  if (!/^xn--[a-z0-9-]+$/.test(tld) && !/^[a-z]{2,63}$/.test(tld)) return false;
+  return !LOCAL_TLDS.includes(tld);
+}
+
+// An https address a download may come from, the rules of the admin helper's vm-image-get-user (vmurl.h): https only,
+// a public DNS name (no IP address, localhost or local network name), no user name or password, port 443 only, a path
+// of plain URL characters with %XX escapes (never %00) and no "." or ".." part, no fragment, at most URL_MAX characters.
+// → the address (host in lower case, without :443), or '' with why in err.code ('http', 'host', 'url').
 export function httpsUrl(v, err = {}) {
   const s = str(v).trim();
   err.code = '';
-  if (!s || s.length > URL_MAX || /[\s\u0000-\u001f\u007f<>"\\^`{|}]/.test(s)) { err.code = 'url'; return ''; }
+  if (!s || s.length > URL_MAX || /[^\x21-\x7e]/.test(s) || /[<>"\\^`{|}#]/.test(s)) { err.code = 'url'; return ''; }
   if (/^http:/i.test(s)) { err.code = 'http'; return ''; }
-  const m = /^https:\/\/([^/?#]+)(\/[^?#]*)?(\?[^#]*)?$/i.exec(s);
+  const m = /^https:\/\/([^/?#]+)(\/[^?#]*)(\?[^#]*)?$/i.exec(s);
   if (!m) { err.code = 'url'; return ''; }
-  const host = m[1];
-  if (host.includes('@') || !/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}(:[0-9]{1,5})?$/i.test(host)) { err.code = 'url'; return ''; }
-  const port = /:([0-9]+)$/.exec(host);
-  if (port && (Number(port[1]) < 1 || Number(port[1]) > 65535)) { err.code = 'url'; return ''; }
-  return `https://${host.toLowerCase()}${m[2] || '/'}${m[3] || ''}`;
+  const auth = m[1];
+  if (auth.includes('@')) { err.code = 'url'; return ''; }
+  const hp = /^([^:]+)(:443)?$/.exec(auth);
+  if (!hp) { err.code = 'url'; return ''; }
+  if (!publicHost(hp[1])) { err.code = 'host'; return ''; }
+  const pchar = /^(?:[A-Za-z0-9\-._~!$&'()*+,;=:@]|%(?!00)[0-9A-Fa-f]{2})*$/;
+  const segs = m[2].slice(1).split('/');
+  if (!segs[segs.length - 1] || segs.some((x) => !pchar.test(x) || /^(?:\.|%2e){1,2}$/i.test(x))) { err.code = 'url'; return ''; }
+  if (m[3] && !/^\?(?:[A-Za-z0-9\-._~!$&'()*+,;=:@/?]|%(?!00)[0-9A-Fa-f]{2})*$/.test(m[3])) { err.code = 'url'; return ''; }
+  return `https://${hp[1].toLowerCase()}${m[2]}${m[3] || ''}`;
+}
+// an address for a log or a message: never its query (it may hold a token), nor a user name or password
+export function redactUrl(url) {
+  const m = /^([a-z][a-z0-9+.-]*:\/\/)?(?:[^/@?#]*@)?([^?#]*)([?#][^]*)?$/i.exec(str(url));
+  return m ? `${m[1] || ''}${m[2].replace(/[\u0000-\u001f\u007f]/g, '?')}${m[3] ? '?…' : ''}` : '';
 }
 export const hostOf = (url) => (/^https:\/\/([^/:?#]+)/.exec(str(url)) || ['', ''])[1];
-// the file an address names (its last path part, decoded): what a browser saves it as in Downloads, '' when it isn't a
-// plain name
+// the file an address names (its last path part, decoded), '' when it isn't a plain name
 export function fileOfUrl(url) {
   const m = /^https:\/\/[^/]+\/(?:[^?#]*\/)?([^/?#]+)$/.exec(str(url).replace(/\?.*$/, ''));
   if (!m) return '';
@@ -77,24 +109,72 @@ export function logoOf(o, err = {}) {
   return { url, sha256: sha };
 }
 
-// An optional signature: a detached OpenPGP signature over a checksum file, and the project's key fingerprint. This
-// version stores it and says "not checked" (no OpenPGP verifier usable for a key the person gives: the admin helper's
-// checks only the catalog's pinned keys; docs/VIRTUALIZATION.md "A signature on your own system").
-export function signatureOf(o, err = {}) {
+// An armored OpenPGP public key block, as the person pastes it from the project's page: the armor's first and last
+// lines and only base64 between them, at most KEY_MAX characters. → the text, or ''.
+export function keyOf(v) {
+  const s = str(v).replace(/\r\n?/g, '\n').trim();
+  if (!s || s.length > KEY_MAX) return '';
+  const m = /^-----BEGIN PGP PUBLIC KEY BLOCK-----\n((?:[A-Za-z][\w-]*: [^\n]*\n)*)\n?([A-Za-z0-9+/=\n]+)-----END PGP PUBLIC KEY BLOCK-----$/.exec(s);
+  return m ? `${s}\n` : '';
+}
+
+// An optional signature: a detached OpenPGP signature over a checksum file, the project's key fingerprint and, to check
+// it, the project's public key (armored). The admin helper downloads the two files with the image (vm-image-get-user);
+// lord-pgpv checks them with that key, of which only the primary key with that fingerprint counts (v4, 40 hex: a v6 one
+// is stored but can't be checked); the image's SHA-256 must then be a line of the checksum file. pinned: the fingerprint
+// the first good check used, kept for that system (never from a profile): a later key with another fingerprint isn't
+// used until the person trusts it.
+export function signatureOf(o, err = {}, opts = {}) {
   err.code = '';
   if (o == null) return null;
   if (typeof o !== 'object' || Array.isArray(o)) { err.code = 'signature'; return null; }
   const e = {};
   const url = httpsUrl(o.url, e), sums = httpsUrl(o.sums, e), fpr = fprOf(o.fingerprint);
   if (!url || !sums || !fpr) { err.code = 'signature'; return null; }
-  return { url, sums, fingerprint: fpr };
+  const out = { url, sums, fingerprint: fpr };
+  if (o.key != null && o.key !== '') {
+    const key = keyOf(o.key);
+    if (!key) { err.code = 'key'; return null; }
+    out.key = key;
+  }
+  const pin = fprOf(o.pinned);
+  if (pin && !opts.fromProfile) out.pinned = pin;
+  return out;
+}
+// what a signature allows now: 'none' (no signature), 'noKey' (stored, not checked: no key), 'unsupported' (a v6
+// fingerprint), 'keyChanged' (the key isn't the one pinned for this system), 'check'
+export function signatureState(sig) {
+  if (!sig) return 'none';
+  if (!sig.key) return 'noKey';
+  if (sig.fingerprint.length !== 40) return 'unsupported';
+  if (sig.pinned && sig.pinned !== sig.fingerprint) return 'keyChanged';
+  return 'check';
+}
+// the admin helper's argument for a system's download: "<url> <sha256> <size|-> [<signature url> <checksum file url>]"
+export function userGetArg(s) {
+  const e = {};
+  const url = httpsUrl(s?.url, e), sha = shaOf(s?.sha256);
+  if (!url || !sha) return '';
+  const size = Number.isSafeInteger(s.size) && s.size > 0 && s.size <= IMAGE_MAX ? String(s.size) : '-';
+  const sig = s.signature && signatureState(s.signature) === 'check' ? ` ${httpsUrl(s.signature.url)} ${httpsUrl(s.signature.sums)}` : '';
+  return `${url} ${sha} ${size}${sig}`;
+}
+// lord.vm.job(id).out of a signature check (lord-server builds it: ui/js_vm.c sig_verdict) → { valid, fingerprint } or
+// { valid: false, reason }
+export function sigVerdict(out) {
+  let o = null;
+  try { o = JSON.parse(str(out)); } catch (e) { o = null; }
+  if (o && o.valid === true && fprOf(o.fingerprint).length === 40) return { valid: true, fingerprint: fprOf(o.fingerprint) };
+  const reason = o && typeof o.reason === 'string' && /^[a-zA-Z]{1,24}$/.test(o.reason) ? o.reason : 'badSignature';
+  return { valid: false, reason };
 }
 
-const SYSTEM_KEYS = ['id', 'name', 'kind', 'color', 'profile', 'install', 'source', 'path', 'url', 'sha256', 'size', 'signature', 'logo', 'added', 'verified'];
+const SYSTEM_KEYS = ['id', 'name', 'kind', 'color', 'profile', 'install', 'source', 'path', 'url', 'sha256', 'size', 'signature', 'logo', 'added', 'verified', 'sigOk'];
 
 // A system as the person or a profile gives it → { ok, system, errors: [code], ignored: [field] }. Codes: 'name',
 // 'kind', 'install', 'source', 'path', 'url', 'http', 'sha', 'size', 'signature', 'logoUrl', 'logoSha', 'id'. Unknown
-// fields are ignored and listed. opts: { home, profiles: [ids], fromProfile (only an https image), newId }.
+// fields are ignored and listed. opts: { home, profiles: [ids], fromProfile (only an https image), newId }. Codes also
+// 'host' (not a public name) and 'key' (not an armored public key).
 export function validateSystem(o, opts = {}) {
   const errors = [], ignored = [];
   if (!o || typeof o !== 'object' || Array.isArray(o)) return { ok: false, system: null, errors: ['invalid'], ignored };
@@ -127,15 +207,22 @@ export function validateSystem(o, opts = {}) {
     if (!Number.isSafeInteger(o.size) || o.size <= 0 || o.size > IMAGE_MAX) errors.push('size'); else s.size = o.size;
   }
   const se = {};
-  s.signature = signatureOf(o.signature, se);
+  s.signature = signatureOf(o.signature, se, { fromProfile: opts.fromProfile });
   if (se.code) errors.push(se.code);
   const le = {};
   s.logo = logoOf(o.logo, le);
   if (le.code) errors.push(le.code);
   if (typeof o.added === 'string' && /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/.test(o.added) && !opts.fromProfile) s.added = o.added;
-  // verified: where the image is that matched its SHA-256, and when (a local file's own path; a download in Downloads)
-  if (!opts.fromProfile && o.verified && typeof o.verified === 'object' && isoPathOk(o.verified.path, opts.home)
-    && typeof o.verified.at === 'string' && o.verified.at.length <= 40) s.verified = { path: o.verified.path, at: o.verified.at };
+  // verified: where the image is that matched its SHA-256, and when (a local file's own path, or the admin helper's
+  // image store for a download: images/<its sha256>.iso)
+  const v = o.verified;
+  const vpath = v && typeof v === 'object' ? str(v.path) : '';
+  if (!opts.fromProfile && vpath && (isoPathOk(vpath, opts.home) || (s.sha256 && vpath === `${STORE_IMAGES}/${s.sha256}.iso`))
+    && typeof v.at === 'string' && v.at.length <= 40) s.verified = { path: vpath, at: v.at };
+  // sigOk: the signature that verified the downloaded image, by which key
+  const g = o.sigOk;
+  if (!opts.fromProfile && s.verified && s.signature && g && typeof g === 'object' && fprOf(g.fingerprint) === s.signature.fingerprint
+    && typeof g.at === 'string' && g.at.length <= 40) s.sigOk = { fingerprint: s.signature.fingerprint, at: g.at };
   return { ok: errors.length === 0, system: errors.length ? null : s, errors: [...new Set(errors)], ignored };
 }
 
@@ -178,17 +265,6 @@ export function customUnattended(s, cat, arch) {
     }
   }
   return null;
-}
-
-// A downloaded file in Downloads that may be a system's image: the address's own name first, then a browser's renamed
-// copy ("name (1).iso"); only regular files. entries: fs.list of Downloads.
-export function downloadCandidates(s, entries) {
-  const f = fileOfUrl(s?.url);
-  if (!f) return [];
-  const stem = f.replace(/\.iso$/i, '');
-  const re = new RegExp(`^${stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( ?\\(\\d{1,3}\\)|-\\d{1,3})?\\.iso$`, 'i');
-  return (Array.isArray(entries) ? entries : []).filter((e) => e && !e.dir && !e.link && typeof e.name === 'string' && re.test(e.name)
-    && (!s.size || !e.size || e.size === s.size)).sort((a, b) => (a.name === f ? -1 : b.name === f ? 1 : (b.mtime || 0) - (a.mtime || 0)));
 }
 
 // ---- official logos (PNG only; opt-in: settings machinesLogos) ----
