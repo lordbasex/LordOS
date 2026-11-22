@@ -367,17 +367,46 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Measured** at 1280×720 on an i9-10900 with an RX 580 (`build/studio-fx-test time`): each single effect fits one
     frame at 30 fps on both paths (10–12 ms with the GPU, 4–21 ms on the CPU); all of them at once take 24 ms with the
     GPU and 36 ms on the CPU. A 720p H.264 loop decodes in 1.8 ms a picture.
-  - **The background catalog** (`assets/studio/backgrounds.json`, E-S4): 121 backgrounds in seven categories (Office,
-    Home, Studio, Nature, City, Abstract, Space), 72 pictures and 49 loops. Each license was checked on the file's own
-    page: Poly Haven and ambientCG (CC0), NASA (public domain), Wikimedia Commons (CC0, public domain, CC BY and
-    CC BY-SA with credit) and LordOS's own renders (MIT). Nothing comes from Unsplash, Pexels or Pixabay, and nothing
-    shows people, logos or readable text. The thumbnails and one picture per category ship in the package (2.6 MB);
+  - **The background catalog** (`assets/studio/backgrounds.json`, E-S4): 109 backgrounds in seven categories (Office,
+    Home, Studio, Nature, City, Abstract, Space), 72 pictures and 37 loops (every loop at 3840×2160 and 1920×1080). Each
+    license was checked on the file's own page: Poly Haven and ambientCG (CC0), NASA (public domain), Wikimedia Commons
+    (CC0, CC BY and CC BY-SA with credit) and LordOS's own renders (MIT). Nothing comes from Unsplash, Pexels or
+    Pixabay, and nothing shows people, logos or readable text. The thumbnails and one picture per category ship in the
+    package (3.2 MB);
     the rest download when chosen through two new closed admin actions, `studio-bg-get "<id> <variant>"` (anyone) and
     `studio-bg-remove` (administrators), the twins of `wallpaper-get`: JS names a catalog entry, never a URL or a path,
     the download runs as `nobody` in the Store's scope, and a file whose size or SHA-256 isn't the catalog's is never
     kept (`/var/lib/lordos/studio/<sha256>.jpg` or `.mp4`). A Credits page lists every author and license.
   - **Mic Mode** (E-S6): Standard, Noise Reduction and Full Range in the popover. Noise Reduction is one more
     microphone, "LordOS Noise Reduction", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
+  - **The loops at 4K** (the maintainer asked for at least 4K on 2026-11-22; the pictures are a set of their own and are
+    unchanged here; `docs/CAMERA-STUDIO-PLAN.md` 6.2, "Loops at 4K"). Every loop now has a 3840×2160 variant and a
+    1920×1080 one, both made from an original at least 3840×2160; nothing is upscaled. Our 16 renders are rendered again
+    at 3840×2160 with a bicubic field and dithered, with a light grain on luma at encode so slow gradients don't band.
+    Loops are H.264 High (2160p at level 5.1), the biggest 43.7 MB. Of the 33 Wikimedia Commons loops, 22 had only a
+    1920×1080 (or 1920×1440) original and three couldn't be closed without a visible dissolve
+    (`loop-sunset-afterglow`, `loop-granite-dusk`, `loop-sardine-school`): all 25 were dropped and 13 new 4K clips
+    (mountains, creeks, snowfall, a lake, a beach, an aquarium tank, sea jellies, gulls, rooftops at dusk, stars over
+    an observatory) replace them, each with its credit. Each loop starts where its two ends look alike
+    (`tools/studio/pick-loop-start.py`, new) and closes with a 1.5 s crossfade. The 720p loops are gone; loop
+    thumbnails are 640×360.
+    - **Which file is fetched:** a loop always at 1920×1080. Measured on the development PC, a 4K H.264 loop costs about
+      19 ms a camera picture to decode and scale in software (two threads), against 8 ms at 1920×1080, which no 30 fps
+      budget with effects leaves room for; the 4K loops stay in the catalog. A picture with a 3840×2160 variant would be
+      fetched at that size when LordOS Studio composites on the GPU (`bgPick` in `sdk/studiomodel.js`, which also
+      falls back to a built-in picture if a download fails).
+    - **lord-studio** keeps a still background at up to 3840×2160 (it was cut to 1920×1080) and cover-fits it to the
+      camera's size with an area average, again whenever that size changes, so a 4K camera gets a sharp background and
+      a 720p one a clean average instead of a bilinear one.
+    - **Staged** for the `LordOS-wallpapers` repository's `studio/videos/`: 74 files, 1028 MB, with their own README
+      (credits and each original's size) and a `MANIFEST.txt` of sizes and SHA-256s.
+    - **Tests:** `tests/studio_catalog_test.mjs` (new; every entry accepted, licenses and credits, both loop variants,
+      each loop's original at least 3840×2160 from the curation record, thumbnails, built-ins identical to their 1080
+      variant, and with `LORDOS_STUDIO_STAGE` every staged loop's size, hash and real resolution read from the MP4),
+      new cases in `tests/studio_model_test.mjs` (`bgPick`) and `build/studio-helper-test` (a 3840×2160 picture inside
+      lord-studio's sandbox).
+  - **Mic Mode** (E-S6): Standard, Voice Isolation and Wide Spectrum in the popover. Voice Isolation is one more
+    microphone, "LordOS Voice Isolation", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
     static drop-in (`/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf`); choosing a mode only sets the default
     microphone through LordOS's existing sound client. There is no echo cancellation (nothing is routed to its echo
     reference), no module loaded at runtime and no new privilege. Standard and Full Range both use the microphone

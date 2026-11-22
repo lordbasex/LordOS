@@ -8,18 +8,21 @@ import catalog from '../assets/studio/backgrounds.json';
 import { settings } from './settings.js';
 import { createStore } from './store.js';
 import { admin } from './admin.js';
-import { normalizeStudio, bgVariant, bgSrc, bgReady } from './studiomodel.js';
+import { normalizeStudio, bgPick, bgSrc } from './studiomodel.js';
 
 export const studioCatalog = catalog;
 export const bgDownloads = createStore({});          // id → percent while downloading
 
 const setStudio = (fn) => settings.set((s) => ({ ...s, studio: fn(normalizeStudio(s.studio)) }));
 
-// The item's file, downloaded first when it isn't there yet; resolves to the path lord.studio.setBackground takes
+// The item's file, downloaded first when it isn't there yet; resolves to the path lord.studio.setBackground takes.
+// `big`: lord-studio composites on the GPU, so a picture's 3840×2160 variant (bgPick); a built-in picture is shown as it is if
+// that download fails.
 export function fetchBackground(it, { big = false } = {}) {
   const files = normalizeStudio(settings.get().studio).bgFiles;
-  if (bgReady(it, files)) return Promise.resolve(bgSrc(it, files[it.id] || (it.variants?.[0]?.name || '')));
-  const v = bgVariant(it, { big });
+  const pick = bgPick(it, files, { big });
+  if (pick.src) return Promise.resolve(pick.src);
+  const v = pick.fetch;
   if (!v) return Promise.reject(new Error('studio.downloadFailed'));
   bgDownloads.set((d) => ({ ...d, [it.id]: 0 }));
   const done = () => bgDownloads.set((d) => { const x = { ...d }; delete x[it.id]; return x; });
@@ -30,7 +33,7 @@ export function fetchBackground(it, { big = false } = {}) {
     done();
     setStudio((c) => ({ ...c, bgFiles: { ...c.bgFiles, [it.id]: v.name } }));
     return bgSrc(it, v.name);
-  }, (e) => { done(); throw e; });
+  }, (e) => { done(); if (pick.fallback) return pick.fallback; throw e; });
 }
 
 // A downloaded item removed (an administrator's action); a background showing it goes back to the blur

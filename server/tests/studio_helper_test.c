@@ -119,6 +119,36 @@ static void video_probe(void) {
     unlink(clip);
 }
 
+/* a 3840×2160 still (the catalog's 4K pictures): decoded, kept and cover-fitted inside the sandbox, not taken as a video */
+static void still_probe(void) {
+    const char *pic = "build/studio-helper-test-4k.jpg";
+    unlink(pic);
+    if (system("ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=3840x2160 -frames:v 1 build/studio-helper-test-4k.jpg "
+               "</dev/null >/dev/null 2>&1") != 0) {
+        printf("4K picture background: skipped: needs ffmpeg\n");
+        return;
+    }
+    pid_t pid;
+    int s = spawn(&pid);
+    int model = open_model(), bg = open(pic, O_RDONLY | O_CLOEXEC);
+    const char *params = "probe=1\nrender=0\nbg=1\n";
+    int fds[2] = { model, bg };
+    int64_t v[6] = { MK_CAMERA, 0, 0, 0, 0, 0 };
+    CHECK(s >= 0 && model >= 0 && bg >= 0 && !mp_send(s, MM_JOB, 0, v, params, strlen(params), fds, 2), "4K picture probe: send");
+    close(model);
+    close(bg);
+    static char payload[MP_PAYLOAD_MAX + 1];
+    MediaMsg m;
+    int got = 0;
+    while (next(s, &m, payload, 20000)) if (m.type == MM_RESULT) { got = 1; break; }
+    CHECK(got && m.v[0] == 0, "4K picture probe: no result (%s)", got ? payload : "nothing");
+    if (got) printf("4K picture background: %s\n", payload);
+    CHECK(got && strstr(payload, "\"video\":false"), "the picture was taken as a video");
+    CHECK(reap(pid, 5000) == 0, "4K picture probe: the helper did not end well");
+    close(s);
+    unlink(pic);
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) { fprintf(stderr, "usage: studio-helper-test build/lord-studio\n"); return 2; }
     bin = argv[1];
@@ -133,6 +163,7 @@ int main(int argc, char **argv) {
     if (render >= 0) { probe(render); close(render); }
     else printf("probe with a render node: skipped (none)\n");
     video_probe();
+    still_probe();
     static char payload[MP_PAYLOAD_MAX + 1];
     MediaMsg m;
     {   /* not a camera */
