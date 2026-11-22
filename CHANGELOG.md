@@ -777,6 +777,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   plays in software at 59.9 frames a second past 75 s (it stopped at 31.5 s before), and `build/aqlevel-test` checks
   that the level comes back to zero after 70 s of 44.1 kHz chunks split as the ring takes them.
 
+- **GTK apps from Flathub use LordOS's font, in development** (`docs/FLATPAK.md`, "Fonts"). A GTK 3 app such as CPU-X
+  drew its text in DejaVu Sans 11, bigger, wider and softer than the desktop's: the settings portal gave GTK no font
+  keys, so it fell back to its built-in `Adwaita Sans 11`, which isn't installed, and the sandbox couldn't see Inter
+  (it sees only the host's `/usr/share/fonts`). Checked offline inside CPU-X's sandbox (`ReadAll` gave no font key;
+  `fc-match` of both names gave DejaVu Sans). lord-server's settings portal (`server/src/ui/portal.c`) now serves
+  `font-name` and `document-font-name` `Inter 10`, `monospace-font-name` `JetBrains Mono 10`, `font-antialiasing`
+  `grayscale` (as LordOS draws its own text), `font-hinting` `slight`, `font-rgba-order` `rgb`, `text-scaling-factor`
+  `1.0` and `icon-theme` `Adwaita` in `org.gnome.desktop.interface`, the three antialiasing keys also in
+  `org.gnome.settings-daemon.plugins.xsettings` for older runtimes, with `SettingChanged` when the fonts appear or go;
+  without LordOS's fonts it names fontconfig's `Sans 10` and `Monospace 10`. The same keys go to the GSettings keyfile
+  for GTK 3 apps outside Flatpak. The lordos package also installs Inter and JetBrains Mono in
+  `/usr/share/fonts/truetype/lordos` (copies; fontconfig's dpkg trigger refreshes its cache; new files, no migration),
+  and the SBOM lists each font's checksum once. No new privilege: the portal only answers with fixed values. Cursor
+  theme and size aren't served: GTK asks for cursors by shape and LordOS draws them. Tests: `build/portal-gs-test`
+  (every key through `ReadOne` and `ReadAll`, and the keyfile) and `tests/gtk_defaults_test.mjs` (the font folder
+  against `mkdeb.sh`, the values against Debian's schema).
 - **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
   copied its whole buffer, uploaded the whole texture and, on the CPU path, repainted the whole window, whatever it

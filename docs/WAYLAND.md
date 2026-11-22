@@ -665,7 +665,10 @@ What a window with its own bar still gets from LordOS (both themes, `WINDOWS.md`
   on the session bus, without xdg-desktop-portal, with Passwords' own D-Bus client
   (`server/src/vault/dbus.c`). Keys:
   - `org.freedesktop.appearance`: `color-scheme`, `accent-color`, `contrast`;
-  - `org.gnome.desktop.interface`: `color-scheme`, `accent-color`, `gtk-theme`;
+  - `org.gnome.desktop.interface`: `color-scheme`, `accent-color`, `gtk-theme`, `gtk-im-module`, and the text:
+    `font-name`, `document-font-name`, `monospace-font-name`, `font-antialiasing`, `font-hinting`, `font-rgba-order`,
+    `text-scaling-factor`, `icon-theme` (docs/FLATPAK.md, "Fonts");
+  - `org.gnome.settings-daemon.plugins.xsettings`: `antialiasing`, `hinting`, `rgba-order` (older GTKs);
   - `org.gnome.desktop.wm.preferences`: `button-layout`.
 
   When they change, `SettingChanged` is sent. If another program already owns the name
