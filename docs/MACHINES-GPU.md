@@ -1,6 +1,7 @@
 # Machines: a smoother picture, and a real GPU for a machine (plan)
 
-Status: **plan, approved in principle by the maintainer on 2026-11-21**. Nothing here is built yet. Each step that needs
+Status: **plan, approved in principle by the maintainer on 2026-11-21**. Part 1 steps 1, 2, 3 and 6 are built (in
+development, 2026-11-21: "Part 1 — done" below); the rest is not built yet. Each step that needs
 root or widens a sandbox goes through the maintainer's review and an AGENTS.md entry before it is built. Design and
 status of Machines as a whole: [VIRTUALIZATION.md](VIRTUALIZATION.md).
 
@@ -26,6 +27,44 @@ Not useful (checked or known): virtio-gpu `blob=true` with udmabuf (viogpudo has
 (Basic Display Adapter, slower), QXL-DOD (deprecated). viogpudo stays the best 2D driver for Windows.
 
 **Order:** 1, 2, 3 first (about a week; most of the felt smoothness), then 4 and 6, then 5.
+
+### Part 1 — done (2026-11-21, in development; the latest release is 0.8.9.4)
+
+- **Step 1, frames in lord-server's loop.** Each machine's lord-vmdisplay socket (and a 3D frame's dmabuf while its
+  fence is pending) is in the main `poll()` (`js_vm_pollfds` / `js_vm_dispatch`, `server/src/ui/js_vm.c`, `main.c`);
+  `VD_FRAME_DONE` goes right after the render that painted the frame (`js_vm_painted`). `lord.vm.poll` only reports state.
+- **Step 3, only the changed rectangle.** `media_src_damage_rect` maps the frame's rectangle into the MediaView through
+  where its last paint put the picture (`map_*` in `MediaSrc`, fractions of the content box, one pixel wider for the
+  filter; whole node when rotated, mirrored or of another size). A change outside the shown part counts as painted at
+  once. `engine-test` (damage fuzz and pipeline) and `mview-test` pass.
+- **Step 2, the hardware pointer.** The Windows tools (w5) say `pointer` in their hello; lord-vm then runs one fixed
+  script as SYSTEM through qemu-guest-agent (`PTR_PS`) that sets `HWCursor` on each present `VioGpuDod` adapter's
+  driver key and restarts only an adapter whose value changed (`pnputil /restart-device`). The tools run as the person
+  and can't write that key, so the write is lord-vm's (AGENTS.md's guest-tools entry records it). lord-server draws the
+  handed-over shape and drops `cursor_guest_draws` once one arrives. Configure → Display → *Pointer drawn by*: LordOS
+  (faster, default) / The machine (machine.json schema 10 `"pointer": "guest"`, HWCursor 0, applied at the next start).
+- **Step 6, Monitor.** `monitor.processes` no longer reads `/proc/<pid>/cgroup` on the screen's thread (the monitor's
+  thread reads each process's scope once) and no longer parses JSON: the thread hands over rows (`MonProcs`) and the
+  call builds the objects with pre-made atoms.
+
+**Measured** (Windows 11 clone `win-tools`, viogpudo 100.100.104.27100, QEMU 10.0.13; a WinForms window moving a bar,
+61 frames a second at the guest; picture 1400 × 1050 at 1:1; headless lord-server, CPU path, 60 Hz software vblank;
+same method before and after, two runs each; pointer with `lordvm-dev lat`, 100 moves 200 ms apart; Monitor with the
+perf driver's `monitorProcs` plan):
+
+| | Before | After |
+|---|---|---|
+| Frames a second shown | 29.4 / 29.6 | **60.0 / 60.0** |
+| Paint per frame | 1.76 / 1.65 ms | **0.11 / 0.14 ms** |
+| lord-server CPU while it plays | 54 % of a core | **16–18 %** |
+| Pointer move → visible | guest round trip 35–39 ms median, 45–47 p90, 75–97 max, then up to one app poll (16 ms) | **drawn by lord-server on the next frame** (≤ 16.7 ms at 60 Hz); moves make 0 frames, the guest's position answer in 1 ms |
+| `monitor.processes`, 382 processes | 4.0 ms | **1.3 ms** |
+| `monitor.processes`, 1,900 processes | 19.6 ms (a slow-call stall line every second) | **4.5 ms** (under the 20 ms line) |
+| Stall lines during the picture runs | 0 | 0 |
+
+Still open from step 6: the Processes tab's own React update (150 rows re-rendered each second) costs 50–120 ms of JS
+per second here (`__lordTick` lines), independent of the native call; memoized or virtualized rows in the SDK's `Table`
+would fix it. A real-display (KMS) screenshot with the handed-over pointer is still to do on the dev VM.
 
 ## Part 2 — a real GPU for a machine
 

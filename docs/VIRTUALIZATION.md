@@ -493,7 +493,7 @@ compromised QEMU can't change `machine.json` (and through it, what the next star
 
 | File | What |
 |---|---|
-| `machine.json` | The description, schema 1 (`machine.h`; schema 2 added `base`, `agent`, `clipboard`, schema 3 an imported machine's hardware, 6.22; 4 `shares`; 5 `secure_boot`, `tpm`, `hyperv`, `drivers`, `graphics`; 6 the network's modes, `bridge`, `ports`, `resolution`, `sound`, `volume`, `microphone`, `boot_order`, `boot_menu`; 7 `transfer`; 8 `sound_out`, `sound_in`, 6.9; 9 `clipboard_ask`, 6.8): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
+| `machine.json` | The description, schema 1 (`machine.h`; schema 2 added `base`, `agent`, `clipboard`, schema 3 an imported machine's hardware, 6.22; 4 `shares`; 5 `secure_boot`, `tpm`, `hyperv`, `drivers`, `graphics`; 6 the network's modes, `bridge`, `ports`, `resolution`, `sound`, `volume`, `microphone`, `boot_order`, `boot_menu`; 7 `transfer`; 8 `sound_out`, `sound_in`, 6.9; 9 `clipboard_ask`, 6.8; 10 `pointer`, 7.1.2): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
 | `disks/system.qcow2` | System disk, made by `qemu-img` at creation (empty, or converted from an image with `--import`) |
 | `disks/nvram.qcow2` | UEFI variables as qcow2, converted from the firmware's template (6.2). arm64 always uses UEFI (`AAVMF_CODE.no-secboot.fd`); amd64 uses UEFI (`OVMF_CODE_4M.fd`) when the `ovmf` package is there and SeaBIOS otherwise, which is what a Pi gets for an emulated amd64 guest |
 | `log/lord-vm.log` | This run: lord-vm's lines, QEMU's and passt's stderr, the command line (credentials named, never their values); 4 MB at most. `lord-vm.1.log` and `lord-vm.2.log` are the two runs before (6.19) |
@@ -547,6 +547,14 @@ lord-server ──fd 3, VdMsg──▶ lord-vmdisplay <id> (lordos-vmdisplay-<id
   (`vmkeys.h`), absolute pointer (relative while the guest's tablet driver isn't up; `IsAbsolute` is asked again while the pointer
   moves), buttons, wheel steps, release-all on focus loss, and `SetUIInfo` at most every 100 ms for the window's size. The cursor
   (`CursorDefine`) goes to lord-server in its own sealed memfd.
+- **lord-server's side of the picture** (since 2026-11-21, docs/MACHINES-GPU.md Part 1): each machine's lord-vmdisplay socket is in
+  lord-server's main `poll()` (`js_vm_pollfds` / `js_vm_dispatch` in `ui/js_vm.c`, beside the media helpers'), with a 3D frame's
+  dmabuf while its fence is pending. A frame is taken when it arrives and damages only the part of the MediaView where the picture
+  changed (`media_src_damage_rect`: where the last paint put the picture, as fractions of the node's box; the whole node when
+  rotated, mirrored or of another size); `VD_FRAME_DONE` goes right after the render that painted it (`js_vm_painted`). The
+  Machines app's poll (`lord.vm.poll`, every 16 ms) only reports the state. Before, the frames waited for that poll and the
+  acknowledgement for the poll after the next: a guest drawing 61 frames a second was shown at 29.5, now at 60.0, with 0.1 ms
+  of paint a frame instead of 1.7 (**Measured**, the table in docs/MACHINES-GPU.md).
 
 **Messages** (`server/src/vm/vmproto.h`, the full contract is its header comment). Both channels are `SOCK_SEQPACKET`, one fixed
 struct per packet, at most one descriptor per message; anything of another length or version drops the peer.
@@ -564,7 +572,7 @@ struct per packet, at most one descriptor per message; anything of another lengt
 |---|---|---|
 | `VD_READY`, `VD_STATE`, `VD_STATS` | from lord-vmdisplay | Console size; connected / no picture / lost; counts every 5 s |
 | `VD_SIZE` → `VD_SHM` | both | The helper asks for a picture of w × h; lord-server answers with a memfd of w × h × 4 sealed against shrinking and growing (`vm_picture_memfd`) |
-| `VD_FRAME` → `VD_FRAME_DONE` | both | Damage x, y, w, h and a frame number; lord-server answers after it read the picture |
+| `VD_FRAME` → `VD_FRAME_DONE` | both | Damage x, y, w, h and a frame number; lord-server answers right after the paint that showed it |
 | `VD_CURSOR`, `VD_POINTER` | from lord-vmdisplay | Cursor image in a memfd sealed against writing (`vm_cursor_check`), hotspot; pointer position |
 | `VD_KEY`, `VD_MOTION`, `VD_BUTTON`, `VD_WHEEL`, `VD_RELEASE_ALL`, `VD_RESIZE`, `VD_RATE`, `VD_CLOSE` | to lord-vmdisplay | Input and window changes |
 
@@ -575,7 +583,9 @@ lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus 
                      [--firmware uefi|bios] [--display window|none] [--network shared|isolated] [--import IMAGE] [--iso FILE]
 lord-vm --start DIR [--paused] [--detach] [--keep-running] [--credentials-file FILE] [--dev-qmp]
 lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR
-lordvm-dev run|attach DIR      plays lord-server: picture memfd, frames, PNG, typing, pointer, resize (server/tests/vm_dev.c)
+lordvm-dev run|attach DIR      plays lord-server: picture memfd, frames, PNG, typing, pointer, resize (server/tests/vm_dev.c);
+                               lat (pointer move → frame / position times), fps; LORDVM_DEV_NODISPLAY=1 (commands only, while
+                               lord-server shows the picture), LORDVM_DEV_CURSOR_PNG=FILE (the pointer shape the guest hands over)
 ```
 
 **What is enforced, and where it stops.**
@@ -2249,7 +2259,25 @@ parsers (`vmagent.c`) and never runs anything the host names.
   task (their Interactive logon; the task goes at once). vioserial lets only SYSTEM and Administrators open a port: the
   installer gives Interactive users (IU) read and write on `org.lordos.agent`'s port alone (found by what
   `\\.\Global\org.lordos.agent` points to; the device's own security property, kept across restarts) and restarts
-  that port. After the install nothing runs as SYSTEM: no service.
+  that port. After the install nothing runs as SYSTEM but the pointer's script below, once per run: no service.
+- **The pointer, drawn by LordOS** (w5, 2026-11-21; docs/MACHINES-GPU.md Part 1 step 2). viogpudo draws the pointer into
+  the picture unless its `HWCursor` value is 1 (upstream ships 0), so every pointer move was a round trip through the
+  guest before it showed: 35 to 39 ms median, 45 to 47 ms p90, up to 97 ms (**Measured**, `lordvm-dev lat`, 100 moves).
+  Once per run, when the tools say `pointer` in their hello, lord-vm runs one fixed script as SYSTEM through
+  qemu-guest-agent (`PTR_PS` in `lordvm.c`): for each present `VioGpuDod` display adapter it sets the DWORD `HWCursor`
+  on its driver key (`HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}\NNNN`, found
+  through `DEVPKEY_Device_Driver` and checked by pattern) to the machine's choice and restarts only an adapter whose value
+  changed (`pnputil /restart-device`: the guest's screen blinks once). The tools themselves can't write that key (they run
+  as the person) and still never run elevated. With 1 the driver hands the shape over (QEMU's `CursorDefine`, `VD_CURSOR`;
+  Windows' 64 × 64 arrow), lord-server draws it where the host's pointer is and stops treating the machine as one that
+  draws its own (`cursor_guest_draws`); a move makes no frame (0 of 100) and its position comes back in 1 ms.
+  Configure → Display → *Pointer drawn by*: **LordOS (faster)** (the default) or **The machine** (machine.json schema 10
+  `"pointer": "guest"`, written only then; `lord-vm --set --pointer lordos|guest`), applied at the next start; with
+  *The machine*, a shape QEMU still holds from a saved state isn't drawn over the guest's own. Machines whose tools are
+  older than w5 are offered the update. **Checked** on `win-tools` (viogpudo 100.100.104.27100): w5 installed → "LordOS
+  draws it (HWCursor 1, already so)"; *The machine* and a start → HWCursor 0, adapter restarted, every move a frame again;
+  back → HWCursor 1, restarted, the arrow handed over. Not tested: a guest with two viogpudo adapters, an older viogpudo
+  without the value.
 - **Log**: `%LOCALAPPDATA%\LordOS\lordos-guest-win.log`, the person's own, started again past 256 KB.
 
 Measured on 2026-11-20 on a Windows 11 clone of the unattended install (`win-tools.lordvm` from `win-base.lordvm`;
@@ -2312,7 +2340,7 @@ start an off machine asks first. Other files just list the machine under Open wi
 **Which machines.** The ones whose tools said `open` in their hello (`AG_HELLO_OPEN`; lord-vm sets `VAC_OPEN`, 8192, in
 `VM_AGENT_STATE`). The machine's window writes that into `app.json` (`opens: 'windows'`) when it sees it, so an off
 machine is listed too (`apps/machines/openwith.js`, tested by `server/tests/vm_openwith_test.mjs`). Today that is
-Windows guests with `lordos-guest-win` w3 or later (w4 also takes files on its windows, 7.2.1): install or update the tools from the agent's popover. **Linux
+Windows guests with `lordos-guest-win` w3 or later (w4 also takes files on its windows, 7.2.1; w5 lets LordOS draw the pointer, 7.1.2): install or update the tools from the agent's popover. **Linux
 guests are not listed:** `lordos-guest` is approved to start only the clipboard tools (`xclip`, `wl-clipboard`) and
 `systemctl --user show-environment`; opening a sent file there would mean `xdg-open` or `gio open` in the person's
 session, with its own rules for executables and launchers, and needs its own review first.

@@ -12,6 +12,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Machines: LordOS draws the pointer of a machine with the VirtIO GPU display-only driver, in development** (`docs/VIRTUALIZATION.md` 7.1.2,
+  `docs/MACHINES-GPU.md` Part 1 step 2). The LordOS guest tools (`lordos-guest-win`) are now w5 and say `pointer`; lord-vm then sets
+  viogpudo's `HWCursor` value through qemu-guest-agent with one fixed SYSTEM script (`PTR_PS`: only `VioGpuDod`
+  adapters' driver keys, restarting only an adapter whose value changed) and lord-server draws the shape the guest
+  hands over where the mouse is. A pointer move no longer waits for a round trip through the guest (measured 35–39 ms
+  median, up to 97 ms): moves make no frames. Configure → Display → *Pointer drawn by*: LordOS (faster) / The machine,
+  machines with that device set only, in all 35 languages; machine.json schema 10 `"pointer": "guest"`; `lord-vm --set --pointer
+  lordos|guest`. Machines with older tools are offered the update. `lordvm-dev`: `lat`, `fps`,
+  `LORDVM_DEV_NODISPLAY`, `LORDVM_DEV_CURSOR_PNG`.
+
 - **Machines: LordOS's own UEFI GOP option ROM for Intel GVT-g vGPUs, in development** (`firmware/gvt-gop`,
   `tools/firmware/build-gvt-gop.sh`, `docs/MACHINES-GPU.md` "Our own GVT-g GOP driver"). An EDK2 UEFI driver, MIT,
   written from public, licensed sources only (MIT-licensed Linux i915/GVT-g files, QEMU's IGD and fw_cfg documents,
@@ -546,6 +556,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **Machines: "Needs xclip" reached the app** (`server/src/vm/vmproto.h`): lord-server refused every agent state that
   carried the "no clipboard tool" bit (2048, at the limit of the check), so the hint and Install's xclip step never
   showed. The check now allows every known bit.
+
+### Changed
+
+- **Machines: a machine's picture at the guest's full rate, in development** (`docs/MACHINES-GPU.md` Part 1 steps 1
+  and 3). lord-server reads each machine's frames in its own loop and acknowledges a frame right after the paint that
+  showed it, instead of at the Machines app's poll after next; a frame repaints only the rectangle that changed, not
+  the whole picture. Measured on a viogpudo guest drawing 61 frames a second: 29.5 → 60.0 frames a second shown,
+  1.7 → 0.1 ms of paint a frame, lord-server 54 % → 17 % of a core.
+- **Monitor: the process list no longer stalls the desktop, in development** (`docs/MACHINES-GPU.md` Part 1 step 6).
+  `lord.monitor.processes` read every process's cgroup file and parsed a JSON list on lord-server's only thread
+  (~20 ms a second on a busy desktop, a third of the maintainer's stall lines). The monitor's thread now reads each
+  scope once and hands over rows that become objects directly: 382 processes 4.0 → 1.3 ms, 1,900 processes
+  19.6 → 4.5 ms a call.
 
 ## [0.8.9.4-beta] - 2026-11-20
 
