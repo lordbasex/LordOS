@@ -202,6 +202,8 @@ EOF
     # (0.8.8.9) the Chromium-based browsers' initial preferences (src/pkg/browserprefs.c) and migration 009
     run "browserprefs-test" build/browserprefs-test
     run "migration 009 chromium-family" sh tests/migration_chromium_family_test.sh
+    # fastfetch / neofetch fall back to lordos-fetch; the real package wins (packaging/fallback-bin)
+    run "fetch-fallback (fastfetch, neofetch)" sh tests/fetch_fallback_test.sh
     run "mmdb-test" build/mmdb-test
     run "canvas-test" build/canvas-test
     run "imgops-test" build/imgops-test

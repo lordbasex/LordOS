@@ -12,6 +12,48 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **`fastfetch` and `neofetch` run LordOS's `lordos-fetch` until the real package is installed, in development**
+  (`packaging/fallback-bin/fastfetch`, `packaging/profile.d/lordos-fallback.sh`, `server/src/remote/sess.c`,
+  `tools/iso/mkdeb.sh`; `docs/BENCHMARK.md`). People type the command they know and got "command not found". The
+  `lordos` package now ships `/usr/lib/lordos/fallback-bin/fastfetch` (a small sh wrapper) and `neofetch` (a link
+  to it), and that folder goes at the END of PATH: `/etc/profile.d/lordos-fallback.sh` appends it once, only when it
+  exists, for login shells (the Terminal's bash reads `/etc/profile`, which resets PATH), and lord-sessiond's
+  session PATH is now `/usr/local/bin:/usr/bin:/bin:/usr/games:/usr/lib/lordos/fallback-bin`, which the Terminal's
+  zsh and fish keep. Installing Debian's `fastfetch` or `neofetch` puts the real command in `/usr/bin`, which comes
+  first: different paths, so no dpkg file conflict, no alias and nothing to remove; and a shell that already ran
+  the fallback (its command hash still points there) is sent on to the real one, because the wrapper looks for
+  another command of its name in PATH before anything else. lordos-fetch only knows `--share` and
+  `--color=auto|always|never`: those pass, `--pipe` (fastfetch) and `--stdout` (neofetch) become `--color=never`,
+  and any other option is dropped with one line on stderr: "lordos-fetch: this is LordOS's fetch; install the
+  fastfetch package for its options" (or neofetch). New test `server/tests/fetch_fallback_test.sh` in
+  `make test` (21 checks: the fallback with no real command, option filtering and the hint, the real one winning
+  from `/usr/bin` and from a stale hash, the profile.d snippet appending last, once, and not at all without the
+  folder, under dash and bash, and the session PATH). The new PATH reaches a session at its next sign-in; no
+  migration (new files plus a session environment value).
+- **`lordos-fetch` shows what fastfetch shows and what About shows, in development** (`server/src/sysreport/fetch.c`,
+  `fetch.h`, `cli.c`, `server/mk/sysreport.mk`, `server/Makefile`; `docs/BENCHMARK.md`). New lines, all read locally
+  without root or network (about 30 ms on a 20-thread desktop): **DE** (the LordOS desktop in use, settings.json's
+  `theme` named by its `theme.json`: Lord Flow, Lord Classic, Lord Workspaces, Lord Celeste), **Compositor**
+  (`lord-server <version> (C · DRM/KMS · evdev) · Wayland`, plus `Xwayland <version>` from dpkg's status when
+  Xwayland runs for this user), **Terminal** (LordOS Terminal, `$TERM_PROGRAM` and its version, SSH, the Linux console,
+  or the nearest ancestor process that is not a shell, su or sudo), **Swap** (used / total, or "none"), **Local IP**
+  (the default route's interface from `/proc/net/route` with its IPv4 from `getifaddrs` and its first global, non-tentative
+  IPv6 from `/proc/net/if_inet6`; never with `--share`), **Locale** (`LC_ALL` or `LANG` and the interface language
+  from settings.json, "from LANG" when unset), **UI engine** (`QuickJS 2025-04-26 + React 19.3.1`: the Makefile now
+  writes `LORD_REACT_VERSION` from package.json and `LORD_QJS_VERSION` from `third_party/quickjs/VERSION` into
+  `lord_version.h`), **Build** (the build id and the system code's state: "signed by LordOS · N components" when
+  `code-manifest.json` verifies with the key this build trusts, through `codesig_parse`, which `lordos-sysreport` now
+  links with `src/pkg/crypto.c`; otherwise "development build", or "system code modified" for a bad manifest),
+  **Boot time** (this boot's line in `/var/lib/lordos/boot-times.jsonl`, only from a root-owned file nobody else can
+  write, as About reads it) and **Server RAM** (VmRSS of this user's session lord-server, skipping isolated
+  `--app` ones; the JS heap is only known inside lord-server, so it is left out). **Computer** is now **Host**,
+  as in fastfetch (the title stays `user@host`); identical monitors share one line ("3 × S27F350, 1920 × 1080,
+  27""); the Wayland/X11 note moved from Shell to Compositor; the label column is 12 wide; swap or memory under
+  1 GB reads in MB. Labels stay in English (the command was never translated) and there is no `--json` yet.
+  `tests/sysreport_test.c` gains `test_fetch_helpers` (swap, settings with a null or unsafe theme id, theme name,
+  dpkg versions without epoch or revision and only for installed packages, the lowest-metric default route, global
+  and tentative IPv6 addresses, this boot's last boot-times line, VmRSS, the terminal's name in each case, the
+  collapsed displays and the new rows), and each fixture machine now checks that `--share` leaves out the address.
 - **Machines updates the LordOS tools in a machine by itself, in development** (`apps/machines/model.js`
   `toolsAutoStep`/`toolsLine`/`toolsAutoOn`, `vmwindow.jsx`, `configure.jsx`, `settingswin.jsx`, `store.js`, `meta.js`;
   `server/src/ui/js_vm.c`, `server/src/vm/lordvm.c`; `docs/VIRTUALIZATION.md` 7.1.3). A guest ran older

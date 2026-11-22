@@ -324,7 +324,10 @@ static void spawn(const struct passwd *pw, const char *rt, const char *lang, int
          * turns it off in all of them */
         char *env[10 + SD_TUNE_N];
         int ne = 0;
-        env[ne++] = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/games";
+        /* fallback-bin last: fastfetch and neofetch run lordos-fetch until the real package is installed
+         * (packaging/fallback-bin/fastfetch); the Terminal's zsh and fish keep this PATH, bash re-adds it from
+         * /etc/profile.d/lordos-fallback.sh */
+        env[ne++] = "PATH=/usr/local/bin:/usr/bin:/bin:/usr/games:/usr/lib/lordos/fallback-bin";
         env[ne++] = (char *)lang;
         env[ne++] = xdg;
         env[ne++] = home;

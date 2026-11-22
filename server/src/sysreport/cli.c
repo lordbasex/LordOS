@@ -24,7 +24,9 @@
 #include "../bench/lbrun.h"
 #include "../sec/sandbox.h"
 #include "../sec/json.h"
+#include "../sec/codesig.h"
 
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,6 +52,43 @@ static int usage(int fetch) {
                         "  gpu prints the graphics compatibility report: the cards, their drivers, which one draws\n"
                         "  the desktop, NVIDIA's driver and CUDA, Mesa, Vulkan and video decoding, Secure Boot.\n");
     return 2;
+}
+
+/* lordos-fetch's lines from the build, as About shows them: the compositor's version, the UI engine, and the build
+ * with the state of the system code. That state is the signature of <LordOS folder>/code-manifest.json with the key
+ * this build trusts (what lord-server checks first, sec/codesig.h; the folder is this binary's ../, so
+ * /usr/lib/lordos when installed); lord-server also checks each file's hash when it loads it. */
+static void fetch_build_facts(FetchLive *l) {
+    snprintf(l->server, sizeof l->server, "lord-server %s", LORD_VERSION);
+    if (LORD_REACT_VERSION[0])
+        snprintf(l->engine, sizeof l->engine, "QuickJS%s%s + React %s", LORD_QJS_VERSION[0] ? " " : "", LORD_QJS_VERSION, LORD_REACT_VERSION);
+    char dir[PATH_MAX], path[PATH_MAX + 32];
+    ssize_t k = readlink("/proc/self/exe", dir, sizeof dir - 1);
+    dir[k > 0 ? k : 0] = 0;
+    char *slash = strrchr(dir, '/');
+    if (slash) *slash = 0;
+    const char *state = "development build";
+    char extra[48] = "";
+    FILE *f;
+    snprintf(path, sizeof path, "%s/../" CODE_MANIFEST, dir);
+    if (dir[0] && (f = fopen(path, "rb"))) {
+        char *m = malloc(CODE_MANIFEST_MAX + 1), sig[4097];
+        size_t ml = m ? fread(m, 1, CODE_MANIFEST_MAX, f) : 0, sl = 0;
+        fclose(f);
+        snprintf(path, sizeof path, "%s/../" CODE_SIGNATURE, dir);
+        FILE *s = fopen(path, "rb");
+        if (s) { sl = fread(sig, 1, sizeof sig - 1, s); fclose(s); }
+        CodeManifest cm;
+        char err[128];
+        if (!m) state = "unknown";
+        else if (codesig_parse(m, ml, s ? sig : NULL, sl, codesig_key(), &cm, err, sizeof err)) state = "system code modified (bad manifest)";
+        else {
+            if (cm.signed_ok) { state = "signed by LordOS"; snprintf(extra, sizeof extra, " · %d components", cm.nfiles); }
+            codesig_free(&cm);
+        }
+        free(m);
+    }
+    snprintf(l->build, sizeof l->build, "%s · %s%s", LORD_BUILD[0] ? LORD_BUILD : "?", state, extra);
 }
 
 static volatile sig_atomic_t interrupted;
@@ -211,6 +250,7 @@ int main(int argc, char **argv) {
     if (fetch) {
         FetchLive l;
         fetch_live(&l, root, share);
+        fetch_build_facts(&l);
         out = fetch_render(r, &l, fetch_color_mode(color, isatty(1)));
     } else {
         out = !strcmp(mode, "json") ? sysreport_json(r) : sysreport_markdown(r);
