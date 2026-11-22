@@ -245,6 +245,11 @@ static int self_sig_ok(const PgpKey *signer, const Sig *s, const uint8_t *key, s
     return dig[0] == s->left16[0] && dig[1] == s->left16[1] && verify_sig(signer, s, dig);
 }
 
+/* A revocation the primary key issued counts unless it can be checked and fails: one with a hash this code doesn't
+ * verify (SHA-1, SHA-224, SHA-384, ...) or without a creation time revokes (fail closed); only a checkable one that
+ * doesn't verify is ignored as forged. */
+static int rev_checkable(const Sig *s) { return (s->hashalg == HASH_SHA256 || s->hashalg == HASH_SHA512) && s->has_created; }
+
 /* A self-signature of untrusted key material that may count: made by the key, not before it, not from the future, not
  * expired. */
 static int self_sig_time_ok(const Sig *s, const PgpKey *k, int64_t now) {
@@ -311,7 +316,8 @@ static int keyring_add(PgpKeyring *kr, const char *data, size_t len, int strict,
             const PgpKey *pk = &kr->keys[primary];
             if (cur == primary) {
                 if (s.type == 0x20) {
-                    if (!strict || (self_sig_ok(pk, &s, pkb, pkl, NULL, 0, 0, NULL, 0) && s.created >= k->created)) k->revoked = 1;
+                    if (!strict || !rev_checkable(&s) || (self_sig_ok(pk, &s, pkb, pkl, NULL, 0, 0, NULL, 0) && s.created >= k->created))
+                        k->revoked = 1;
                 } else if ((s.type >= 0x10 && s.type <= 0x13) || s.type == 0x1f) {
                     if (s.created >= best_self &&
                         (!strict || (self_sig_time_ok(&s, k, now) && (s.type == 0x1f || uid) &&
@@ -324,7 +330,8 @@ static int keyring_add(PgpKeyring *kr, const char *data, size_t len, int strict,
                 }
             } else {
                 if (s.type == 0x28) {
-                    if (!strict || (self_sig_ok(pk, &s, pkb, pkl, skb, skl, 0, NULL, 0) && s.created >= k->created)) k->revoked = 1;
+                    if (!strict || !rev_checkable(&s) || (self_sig_ok(pk, &s, pkb, pkl, skb, skl, 0, NULL, 0) && s.created >= k->created))
+                        k->revoked = 1;
                 } else if (s.type == 0x18 && s.created >= best_bind &&
                            (!strict || (self_sig_time_ok(&s, k, now) && self_sig_ok(pk, &s, pkb, pkl, skb, skl, 0, NULL, 0)))) {
                     best_bind = s.created;
