@@ -13,6 +13,8 @@
  *   move X Y            pointer, picture coordinates     click X Y [B]     move, press and release button B (0)
  *   wheel N             N steps (+ up)                   resize W H        ask the guest for a size
  *   rate HZ             copy rate                        release           let go of everything
+ *   capture 0|1         "Capture mouse" (6.25): VM_CAPTURE to lord-vm, VD_CAPTURE to lord-vmdisplay
+ *   rel DX DY           relative motion while captured (VD_REL, as lord-server's pointer lock sends it)
  *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON | qmpf FILE (a longer command, from a file)
  *   noack 0|1           stop acknowledging frames (tests the 250 ms fallback)
  *   agent install       the guest agent's Install (VAG_INSTALL: lordos-guest, or the LordOS guest tools on Windows)
@@ -698,6 +700,8 @@ static int handle(char *line) {
         out("{\"ok\":true,\"cmd\":\"clip-answer\",\"answer\":%d}", offer_answer);
     }
     else if (sscanf(line, "rate %d", &x) == 1) { vdsend(VD_RATE, x, 0); out("{\"ok\":true,\"cmd\":\"rate\"}"); }
+    else if (sscanf(line, "capture %d", &x) == 1) { vdsend(VD_CAPTURE, x ? 1 : 0, 0); ask(VM_CAPTURE, x ? 1 : 0, NULL); }
+    else if (sscanf(line, "rel %d %d", &x, &y) == 2) { vdsend(VD_REL, x, y); out("{\"ok\":true,\"cmd\":\"rel\"}"); }
     else if (sscanf(line, "noack %d", &x) == 1) { noack = x; out("{\"ok\":true,\"cmd\":\"noack\"}"); }
     else if (sscanf(line, "sound play %d", &x) >= 0 && !strncmp(line, "sound play", 10)) {
         if (sscanf(line, "sound play %d", &x) < 1) x = 0;

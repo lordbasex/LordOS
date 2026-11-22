@@ -10,7 +10,9 @@ import { DiscreteEventPriority, ContinuousEventPriority, DefaultEventPriority } 
 import { translate, nativeKey, modifiers } from './keymap.js';
 
 const instances = new Map();          // native id → reconciler instance
-const listeners = { pointermove: new Set(), pointerdown: new Set(), pointerup: new Set(), keydown: new Set(), keyup: new Set(), swipe: new Set(), pinch: new Set() };
+// pointerlock: lord.input.lockPointer's motion ({ type: 'lockmove', dx, dy }, once a frame) and its end ({ type: 'lockend',
+// why }: 0 asked, 1 ❖Esc or Ctrl+Alt, 2 the node went away, 3 the input did, 4 another lock took its place)
+const listeners = { pointermove: new Set(), pointerdown: new Set(), pointerup: new Set(), keydown: new Set(), keyup: new Set(), swipe: new Set(), pinch: new Set(), pointerlock: new Set() };
 
 export const register = (inst) => instances.set(inst.id, inst);
 
@@ -108,6 +110,11 @@ globalThis.__lordEvent = (type, id, x, y, button) => {
   // A mouse's back and forward buttons (3 and 4, issue #159) go to the Linux app under the pointer, not to the
   // desktop's own handlers: most onMouseDown handlers (title bars, buttons, sliders) don't look at ev.button.
   if ((type === 'down' || type === 'up') && button > 2) return;
+  if (type === 'lockmove' || type === 'lockend') {
+    const ev = type === 'lockmove' ? { type, node: id, dx: x, dy: y } : { type, node: id, why: x };
+    run(type === 'lockmove' ? ContinuousEventPriority : DiscreteEventPriority, () => { for (const fn of listeners.pointerlock) fn(ev); });
+    return;
+  }
   const chain = chainOf(id);
   const target = chain[0] || null;
   const fire = (set, ev) => { for (const fn of listeners[set]) fn(ev); };

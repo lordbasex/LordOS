@@ -97,6 +97,10 @@ static struct {
     /* input */
     int motion_pending, mx, my, last_mx, last_my;
     int abs_mouse;
+    /* "Capture mouse" (VD_CAPTURE, VD_REL): relative motion gathered until the next send, and until when IsAbsolute is
+     * asked again sooner (lord-vm switches the guest's mouse at the same time) */
+    int capture, rel_pending, rdx, rdy;
+    long long abs_fast_until;
     uint8_t keys[768];
     uint8_t buttons[16];
     int resize_pending, rw, rh;
@@ -839,12 +843,31 @@ static int on_abs(sd_bus_message *m, void *u, sd_bus_error *e) {
     return 0;
 }
 static void ask_abs(long long now) {
-    if (now - abs_asked_ms < 1000) return;
+    if (now - abs_asked_ms < (now < D.abs_fast_until ? 100 : 1000)) return;
     abs_asked_ms = now;
     sd_bus_call_method_async(bus, NULL, NULL, CONSOLE_PATH, "org.freedesktop.DBus.Properties", "Get", on_abs, NULL, "ss", "org.qemu.Display1.Mouse", "IsAbsolute");
 }
 
 static void send_input(long long now) {
+    /* just captured or released: the mouse QEMU uses is asked again without waiting for a move (lord-vm switches it at the
+     * same time), so the first move after it goes the right way */
+    if (now < D.abs_fast_until) ask_abs(now);
+    if (D.rel_pending && D.w && D.h) {
+        D.rel_pending = 0;
+        ask_abs(now);
+        if (!D.abs_mouse) call_noreply("org.qemu.Display1.Mouse", "RelMotion", "ii", D.rdx, D.rdy);
+        else {
+            /* the guest's mouse is still the tablet (lord-vm's switch on its way, or no relative mouse there): the
+             * pointer moves by the motion inside the picture, as it would on a desktop */
+            int x = D.last_mx + D.rdx, y = D.last_my + D.rdy;
+            x = x < 0 ? 0 : x >= (int)D.w ? (int)D.w - 1 : x;
+            y = y < 0 ? 0 : y >= (int)D.h ? (int)D.h - 1 : y;
+            call_noreply("org.qemu.Display1.Mouse", "SetAbsPosition", "uu", (uint32_t)x, (uint32_t)y);
+            D.last_mx = x; D.last_my = y;
+        }
+        D.rdx = D.rdy = 0;
+    }
+    if (D.motion_pending && D.capture) D.motion_pending = 0;     /* captured: only relative motion moves it */
     if (D.motion_pending && D.w && D.h) {
         D.motion_pending = 0;
         ask_abs(now);
@@ -913,6 +936,19 @@ static int from_server(void) {
         case VD_MOTION: D.mx = m.a; D.my = m.b; D.motion_pending = 1; break;
         case VD_BUTTON: button(m.a, m.b); break;
         case VD_WHEEL: if (m.a) wheel(m.a, 3, 4); if (m.b) wheel(m.b, 8, 7); break;
+        case VD_REL:
+            if (!D.capture) break;
+            D.rdx = D.rdx + m.a > 65535 ? 65535 : D.rdx + m.a < -65535 ? -65535 : D.rdx + m.a;
+            D.rdy = D.rdy + m.b > 65535 ? 65535 : D.rdy + m.b < -65535 ? -65535 : D.rdy + m.b;
+            D.rel_pending = 1;
+            break;
+        case VD_CAPTURE:
+            D.capture = m.a;
+            D.rdx = D.rdy = 0; D.rel_pending = 0;
+            D.abs_fast_until = now_ms() + 3000;
+            abs_asked_ms = 0;
+            fprintf(stderr, "lord-vmdisplay %s: the mouse is %s\n", me, m.a ? "captured (relative)" : "free (absolute)");
+            break;
         case VD_RELEASE_ALL: release_all(); break;
         case VD_RESIZE: D.rw = m.a; D.rh = m.b; D.resize_pending = 1; break;
         case VD_RATE: D.rate = m.a; break;
@@ -1132,6 +1168,7 @@ int main(int argc, char **argv) {
         if (D.upd) { int tu = (int)(D.upd_ms + ACK_WAIT_MS - now); if (tu < 0) tu = 0; if (to < 0 || tu < to) to = tu; }
         if (D.resize_pending) { int tr = (int)(D.resize_ms + RESIZE_GAP_MS - now); if (tr < 0) tr = 0; if (to < 0 || tr < to) to = tr; }
         if (D.stats_changed) { int ts = (int)(D.stats_ms + STATS_MS - now); if (ts < 0) ts = 0; if (to < 0 || ts < to) to = ts; }
+        if (now < D.abs_fast_until && (to < 0 || to > 100)) to = 100;     /* send_input asks IsAbsolute again meanwhile */
         if (poll(p, 5, to) < 0 && errno != EINTR) break;
         if (p[2].revents & (POLLHUP | POLLERR) && !(p[2].revents & POLLIN)) break;
         if (p[2].revents & POLLIN && from_server()) break;

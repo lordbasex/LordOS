@@ -100,6 +100,10 @@
  *     VM_WINACT     a window of the guest: a = its id (as the guest named it), b = LAGA_* (focus, close, minimize,
  *                   restore, move); move: text = "x y w h" (decimal, the new area in the guest's pixels, lag_rect_ok)
  *                   → VM_REPLY. lord-vm builds the LAG_WINACT frame itself (lag_act_write)
+ *     VM_CAPTURE    "Capture mouse" (docs/VIRTUALIZATION.md 6.25): a = 1, the guest's pointer becomes a relative mouse (QMP
+ *                   query-mice, then human-monitor-command "mouse_set N" with the USB or virtio mouse lord-vm adds beside
+ *                   the tablet); a = 0, the absolute tablet again. lord-vm checks every second while the machine runs that
+ *                   the one wanted is still the active one (a guest's driver that starts later takes it) → VM_REPLY
  *     VM_LAUNCH     a = an app's place in the guest's list, b = that list's generation (VM_WINDATA c): lord-vm sends the
  *                   guest that app's token from its own copy of the list; refused when the list changed since → VM_REPLY
  *   from lord-vm (events and replies)
@@ -166,6 +170,10 @@
  *
  *   Input (server → helper): VD_KEY a = Linux evdev key code (KEY_*), b = 1 down / 0 up.
  *   VD_MOTION a, b = absolute position in picture coordinates (clamped). VD_BUTTON a = VDB_*, b = 1 / 0.
+ *   VD_REL a, b = relative motion (each within ±VD_REL_MAX), only while captured (VD_CAPTURE a = 1: "Capture mouse",
+ *   lord-vm made the guest's mouse relative, VM_CAPTURE): sent as Mouse.RelMotion; while QEMU still says the mouse is
+ *   absolute, the helper moves its own position by it and sends that. VD_CAPTURE a = 1 / 0: VD_MOTION is ignored while
+ *   captured, and IsAbsolute is asked again sooner for the next 3 s.
  *   VD_WHEEL a = vertical steps (+ up, − down), b = horizontal steps (+ right). VD_RELEASE_ALL lets go of every
  *   key and button held (window lost focus). VD_RESIZE a, b = the window's size in pixels: the guest is asked
  *   to use it (Console.SetUIInfo), at most every 100 ms. VD_RATE a = the display's refresh rate (1..240; 60 by
@@ -208,8 +216,8 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
-    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY,
-    VM_REQ_LAST = VM_CLIP_DENY,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE,
+    VM_REQ_LAST = VM_CAPTURE,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ,
 };
@@ -299,7 +307,7 @@ typedef struct {
 enum {
     VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS, VD_DMABUF, VD_GUEST_AUDIO,   /* helper → server */
     VD_SHM = 64, VD_FRAME_DONE, VD_KEY, VD_MOTION, VD_BUTTON, VD_WHEEL, VD_RELEASE_ALL,       /* server → helper */
-    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC, VD_AUDIO_OUT, VD_MIC,
+    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC, VD_AUDIO_OUT, VD_MIC, VD_REL, VD_CAPTURE,
 };
 /* VD_GUEST_AUDIO a: which of the guest's streams */
 enum { VDG_OUT = 0, VDG_IN = 1 };
@@ -321,6 +329,7 @@ typedef struct {
 #define VD_MAX_DIM      8192u
 #define VD_MAX_BYTES    (256u * 1024 * 1024)
 #define VD_MAX_CURSOR   256
+#define VD_REL_MAX      8192        /* VD_REL: the most one message moves, each way */
 #define VD_POLL_MAX     256         /* messages lord-server takes per poll, as Remote Desk */
 /* VD_DMABUF */
 #define VD_DMABUF_FLIP        0x40000000    /* in c: the first row in memory is the picture's bottom */
@@ -417,6 +426,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                                                (m->d >> 16) >= 1 && (m->d & 0xff) >= 1 && (m->d & 0xff) <= 8 && ((m->d >> 8) & 0xff) < (m->d & 0xff))))) &&
                       (m->type != VM_DISPLAY_SIZE || (m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM)) &&
                       (m->type != VM_APPS || m->a == 0 || m->a == 1) &&
+                      (m->type != VM_CAPTURE || m->a == 0 || m->a == 1) &&
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
                       (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0));
     switch (m->type) {
@@ -449,6 +459,8 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_WHEEL: return m->a >= -32 && m->a <= 32 && m->b >= -32 && m->b <= 32;
     case VD_RESIZE: return m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VD_RATE: return m->a >= 1 && m->a <= 240;
+    case VD_REL: return m->a >= -VD_REL_MAX && m->a <= VD_REL_MAX && m->b >= -VD_REL_MAX && m->b <= VD_REL_MAX;
+    case VD_CAPTURE: return m->a == 0 || m->a == 1;
     case VD_AUDIO_REC: case VD_AUDIO_OUT: case VD_MIC: return m->a == 0 || m->a == 1;
     default: return 0;
     }

@@ -67,7 +67,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "12", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "13", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -110,7 +110,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":12,\"whatever\":true}";
+    const char newer[] = "{\"schema\":13,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -449,6 +449,69 @@ static void test_schema(void) {
                 free(jj);
             }
             CHECK(VM_SCHEMA >= 11);
+        }
+        /* schema 12: capture_fullscreen ("Capture mouse", 6.25), true or false, written only when true, never below 12 */
+        {
+            struct { const char *add; int schema, want, on; } s12[] = {
+                { "\"capture_fullscreen\":true", 12, VM_OK, 1 }, { "\"capture_fullscreen\":false", 12, VM_OK, 0 }, { "\"agent\":true", 12, VM_OK, 0 },
+                { "\"capture_fullscreen\":1", 12, VM_E_FIELD, 0 }, { "\"capture_fullscreen\":\"yes\"", 12, VM_E_FIELD, 0 },
+                { "\"capture_fullscreen\":true", 11, VM_E_FIELD, 0 }, { "\"capture_fullscreen\":false", 11, VM_OK, 0 },
+            };
+            for (size_t i = 0; i < sizeof s12 / sizeof s12[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s12[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s12[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s12[i].want) fprintf(stderr, "  schema 12 %s (%d): got %d (%s)\n", s12[i].add, s12[i].schema, r, err);
+                CHECK(r == s12[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.capture_fullscreen == s12[i].on);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"capture_fullscreen\": true") == s12[i].on && !strstr(jj, "\"capture_fullscreen\": false"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            /* written by an older lord-vm's rules: refused below schema 12 even when set in memory */
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.capture_fullscreen);
+            m.capture_fullscreen = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.capture_fullscreen = 2; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 12);
+        }
+        /* which of QEMU's mice "Capture mouse" makes the active one (query-mice's answer, untrusted) */
+        {
+            struct { const char *json; int rel, want, cur, added; } mp[] = {
+                /* amd64: the PS/2 mouse and the tablet */
+                { "[{\"name\":\"QEMU PS/2 Mouse\",\"index\":0,\"current\":false,\"absolute\":false},"
+                  "{\"name\":\"QEMU USB Tablet\",\"index\":2,\"current\":true,\"absolute\":true}]", 1, 0, 0, 0 },
+                { "[{\"name\":\"QEMU PS/2 Mouse\",\"index\":0,\"current\":false,\"absolute\":false},"
+                  "{\"name\":\"QEMU USB Tablet\",\"index\":2,\"current\":true,\"absolute\":true}]", 0, 2, 1, 0 },
+                { "[{\"name\":\"QEMU PS/2 Mouse\",\"index\":0,\"current\":true,\"absolute\":false},"
+                  "{\"name\":\"QEMU Virtio Tablet\",\"index\":1,\"current\":false,\"absolute\":true}]", 0, 1, 0, 0 },
+                /* arm64: an added mouse took over by itself: the tablet again, and it says so */
+                { "[{\"name\":\"QEMU USB Tablet\",\"index\":1,\"current\":false,\"absolute\":true},"
+                  "{\"name\":\"QEMU USB Mouse\",\"index\":2,\"current\":true,\"absolute\":false}]", 0, 1, 0, 1 },
+                /* relative: the USB or virtio mouse before PS/2 */
+                { "[{\"name\":\"QEMU PS/2 Mouse\",\"index\":0,\"current\":false,\"absolute\":false},"
+                  "{\"name\":\"QEMU Virtio Mouse\",\"index\":3,\"current\":true,\"absolute\":false}]", 1, 3, 1, 1 },
+                /* none of the kind wanted; malformed entries skipped */
+                { "[{\"name\":\"QEMU USB Tablet\",\"index\":1,\"current\":true,\"absolute\":true}]", 1, -1, 0, 0 },
+                { "[{\"name\":\"x\",\"index\":-1,\"absolute\":false},{\"name\":\"y\",\"index\":1.5,\"absolute\":false},"
+                  "{\"name\":\"z\",\"index\":\"3\",\"absolute\":false},{\"index\":4,\"absolute\":\"no\"},7]", 1, -1, 0, 0 },
+                { "{\"name\":\"QEMU PS/2 Mouse\"}", 1, -1, 0, 0 },
+                { "[]", 0, -1, 0, 0 },
+            };
+            for (size_t i = 0; i < sizeof mp / sizeof mp[0]; i++) {
+                JDoc d;
+                CHECK(json_parse(mp[i].json, strlen(mp[i].json), &d, err, sizeof err) == 0);
+                int cur = -1, added = -1, got = vm_mouse_pick(d.root, mp[i].rel, &cur, &added);
+                if (got != mp[i].want || cur != mp[i].cur || added != mp[i].added) fprintf(stderr, "  mouse pick %zu: got %d %d %d\n", i, got, cur, added);
+                CHECK(got == mp[i].want && cur == mp[i].cur && added == mp[i].added);
+                json_free(&d);
+            }
+            CHECK(vm_mouse_pick(NULL, 1, &(int){ 0 }, &(int){ 0 }) == -1);
         }
         /* exactly VM_SOUND_DEV_MAX fits */
         longn[VM_SOUND_DEV_MAX] = 0;

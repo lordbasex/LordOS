@@ -18,6 +18,7 @@ import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
 import { opensOf, openStep, withoutAsks, askStale } from './openwith.js';
 import { Configure } from './configure.jsx';
 import { Sheet, Pill } from './kit.jsx';
+import { captureOffer, captureStep, captureEndedByServer, captureLabelKey, CAPTURE_IDLE, CAPTURE_NOTICE_MS } from './capture.js';
 
 const BAR = 48;
 // the window widths the machine's bar needs: all of it with the name and state, and compact (5.3)
@@ -28,7 +29,7 @@ const THUMB_MS = 5000;
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.tools}.${g.install}.${g.transfer}` : '');
 const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}.${x.output}.${x.input}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq'].every((k) => a[k] === b[k])
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq', 'captured', 'captureEnds'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
@@ -185,6 +186,9 @@ function Tools({ ctl, floating, compact, tiny }) {
     </> : null}
     <BarGroup>
       <IconMenuBtn sym="display" label={resLabel} items={res} disabled={!a.keys} on={!follow} />
+      {/* Capture mouse (6.25): Automatic (the tablet, the pointer free) or Captured; never in apps mode, which says why */}
+      <IconBtn sym="capture" label={tr(captureLabelKey({ on: ctl.capOn, why: ctl.capOffer.why }))} on={ctl.capOn}
+        disabled={!ctl.capOffer.offered && !ctl.capOn} onClick={ctl.toggleCapture} />
       <IconMenuBtn sym="eject" label={tr('machines.tb.devices')} items={ctl.devices} />
       {/* the machine's sound (6.9): its menu mutes it or turns it back on and picks the output and input; the microphone
           shows while the guest hears it */}
@@ -608,6 +612,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const held = useRef(0);
   const down = (e, fresh) => {
     if (!live) return;
+    if (!capRef.current.on && full) capDo({ type: 'click', full, autoFs: !!cfgRef.current?.captureFullscreen });
     move(e);
     buttons.current.add(e.button);
     const b = e.button, id = sid;
@@ -670,6 +675,50 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
   useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch }); } }, [sid, st?.state]);
+  // "Capture mouse" (capture.js, docs/VIRTUALIZATION.md 6.25): lord-server locks the pointer inside the picture and the
+  // guest gets relative motion; ❖Esc or Ctrl+Alt (lord-server's, before any app), focus loss, apps mode or the machine
+  // stopping give it back. The state belongs to the window: full screen rebuilds it, and the lock moves to the new picture
+  const [cap, setCap] = useWindowState('vm.capture', CAPTURE_IDLE);
+  const capRef = useRef(cap);
+  const capEnds = useRef(null);
+  const [capFull, setCapFull] = useWindowState('vm.captureFull', full);
+  const [capNotice, setCapNotice] = useState(false);
+  const capOffer = captureOffer({ appsOn: appsOn || appsRef.current, live });
+  const capDo = (ev) => {
+    const r = captureStep(capRef.current, ev, capOffer.offered && focused);
+    let next = r.st;
+    if (r.cmd === 'capture') {
+      const ok = !!box.current && !!sid && lord.vm.capture(sid, true, box.current.id);
+      if (!ok) next = captureStep(next, { type: 'failed' }).st;
+      else if (r.notice) setCapNotice(true);
+    } else if (r.cmd === 'release' && sid) lord.vm.capture(sid, false);
+    capRef.current = next;
+    setCap(next);
+  };
+  // a window rebuilt while captured (full screen): the lock moves to its picture, once that has been laid out (lord-server
+  // keeps the lock half a second for it, pointerlock.h)
+  useEffect(() => {
+    if (!capRef.current.on) return undefined;
+    const t2 = setTimeout(() => { if (capRef.current.on && sid && box.current && !lord.vm.capture(sid, true, box.current.id)) capDo({ type: 'failed' }); }, 120);
+    return () => clearTimeout(t2);
+  }, []);
+  useEffect(() => { if (!focused) capDo({ type: 'blur' }); }, [focused]);
+  useEffect(() => { if (!capOffer.offered) capDo({ type: 'unavailable' }); }, [capOffer.offered]);
+  useEffect(() => {
+    if (full === capFull) return undefined;
+    setCapFull(full);
+    // after the rebuilt window's first layout: the lock needs the picture's box
+    const t2 = setTimeout(() => capDo({ type: 'fullscreen', full, autoFs: !!cfgRef.current?.captureFullscreen }), 150);
+    return () => clearTimeout(t2);
+  }, [full]);
+  // lord-server ended it (❖Esc, Ctrl+Alt, the picture gone): seen in the poll
+  useEffect(() => {
+    if (!st) return;
+    if (captureEndedByServer(capRef.current, capEnds.current, st)) capDo({ type: 'ended' });
+    capEnds.current = st.captureEnds;
+  }, [st?.captureEnds, st?.captured]);
+  useEffect(() => { if (!capNotice) return undefined; const t2 = setTimeout(() => setCapNotice(false), CAPTURE_NOTICE_MS); return () => clearTimeout(t2); }, [capNotice]);
+  const capOn = !!cap.on && !!st?.captured;
   const clipSent = useRef('');
   // The clipboard's gate: in use while this window, or one of the machine's apps mode windows, is in front (and a few
   // seconds after, held by lord-server). Only then does the guest get the host's clipboard, and only then is its own
@@ -915,6 +964,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     shell, toggleShell: () => { setShell(!shell); setShellKeys(!shell); },
     rec: !!rec, recTime: `${String(Math.floor(recSecs / 60)).padStart(2, '0')}:${String(recSecs % 60).padStart(2, '0')}`, record,
     st, a, full, follow, cmd,
+    capOn, capOffer, toggleCapture: () => capDo({ type: 'toggle' }),
     setFull: (on) => wm.setFullscreen(winId, on),
     setFollow: (on) => { setFollow(on); sized.current.last = null; },
     fixed: (w, h) => { setFollow(false); if (sid) lord.vm.resize(sid, w, h); },
@@ -960,6 +1010,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         '-',
         { label: tr('machines.tb.screenshot'), disabled: !a.keys, onClick: shot },
         { label: full ? tr('machines.cmd.exitFullscreen') : tr('machines.cmd.fullscreen'), onClick: () => wm.setFullscreen(winId, !full) },
+        { label: tr('machines.tb.capture'), checked: capOn, disabled: !capOffer.offered, hint: capOffer.why === 'apps' ? tr('machines.tb.captureApps') : '', onClick: () => capDo({ type: 'toggle' }) },
         { label: tr('machines.cmd.logs'), onClick: () => openLogs(m0) },
         { label: tr('machines.cmd.configure'), onClick: () => setCfgSheet({}) },
         '-',
@@ -968,7 +1019,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       { label: tr('machines.menu.devices'), items: ctl.devices.filter((x) => x !== '-') },
       ...(appsActive ? [{ label: tr('machines.apps.menu'), items: appsMenuItems(gApps) }] : []),
     ]);
-  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, cfg.transfer, xstate]);
+  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, cfg.transfer, xstate, capOn, capOffer.offered, focused]);
   // Esc in the controller leaves apps mode (in a guest's window, Esc is the guest's)
   useEffect(() => (appsActive && focused && !askClose ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open) setApps(false); }) : undefined), [appsActive, focused, askClose]);
   // Esc on the close question is Cancel (in apps mode too, where it would otherwise leave apps mode behind the card)
@@ -1069,7 +1120,15 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         note={drop.over && !blocker && drop.over.files.length ? `${drop.over.skipped ? `${tr('machines.drop.skipped', { count: drop.over.skipped })} · ` : ''}${tr(`machines.drop.way.${dropWay(cfg, st)}`)}` : ''} />
       {pickCd ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPickCd(false)}
         onPick={(x) => { setPickCd(false); cdTo(Array.isArray(x) ? x[0] : x); }} /> : null}
-      {appsActive ? null : full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}
+      {capNotice && capOn && !card && !failed ? (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: (full ? 0 : BAR) + 18, alignItems: 'center', pointerEvents: 'none' }}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 9, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.72)' }}>
+            <Text style={{ fontSize: 13, fontWeight: 600, color: '#f2f2f5' }}>{tr('machines.capture.notice')}</Text>
+          </View>
+        </View>
+      ) : null}
+      {/* captured, the pointer can't reach the floating bar (and the guest's pointer at the top edge mustn't open it) */}
+      {appsActive || (full && capOn) ? null : full ? <FloatingBar ctl={ctl} name={name} /> : <View style={{ position: 'absolute', left: 0, right: 0, top: 0 }}><Header ctl={ctl} name={name} /></View>}
       {cfgSheet ? <Sheet width={1000} height={700} modal onClose={() => setCfgSheet(null)}>
         <Configure dir={dir} section={cfgSheet.section} onClose={() => setCfgSheet(null)} />
       </Sheet> : null}

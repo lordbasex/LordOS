@@ -92,7 +92,7 @@ SRC += $(TP_SRC)
 # cursor-shape-v1 needs the tablet-v2 interfaces (they're only linked, not advertised).
 # GTK/GNOME/Qt apps: our own org.freedesktop.portal.Settings (src/ui/portal.c) with the D-Bus client from
 # Passwords (src/vault/dbus.c, docs/PASSWORDS.md).
-WM_SRC := src/cursor.c src/shake.c src/ui/grab.c src/ui/js_wm.c src/ui/portal.c src/ui/portalcheck.c src/ui/gshort.c src/vault/dbus.c
+WM_SRC := src/cursor.c src/shake.c src/pointerlock.c src/ui/grab.c src/ui/js_wm.c src/ui/portal.c src/ui/portalcheck.c src/ui/gshort.c src/vault/dbus.c
 # the tray of Linux apps: org.kde.StatusNotifierWatcher and dbusmenu (src/ui/sni.c, docs/WAYLAND.md "Tray icons")
 WM_SRC += src/ui/sni.c src/ui/snimodel.c
 SRC += $(WM_SRC)
@@ -980,6 +980,14 @@ build/cursor-test: tests/cursor_test.c src/cursor.c src/cursor.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/cursor_test.c src/cursor.c -lm
+	./$@ || { rm -f $@; exit 1; }
+
+# the pointer lock of LordOS's own windows (src/pointerlock.c; Machines' "Capture mouse"). Wayland clients' is src/wl/ptrlock.h
+test: build/pointerlock-test
+build/pointerlock-test: tests/pointerlock_test.c src/pointerlock.c src/pointerlock.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -D_GNU_SOURCE -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/pointerlock_test.c src/pointerlock.c -lm
 	./$@ || { rm -f $@; exit 1; }
 
 build/shake-test: tests/shake_test.c src/shake.c src/shake.h

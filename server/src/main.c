@@ -68,6 +68,7 @@
 #include "sec/broker.h"
 #include "cursor.h"
 #include "shake.h"
+#include "pointerlock.h"
 #include "ui/grab.h"
 #include "ui/js_wm.h"
 #include "ui/portal.h"
@@ -241,7 +242,7 @@ typedef struct {
     int cursor_tex_w, cursor_tex_h;
     /* session without a monitor (lord-sessiond shows it on the monitor or the remote desktop): it is
      * drawn in memory, without DRM or evdev; greeter = the login screen */
-    int headless, greeter, shift;
+    int headless, greeter, shift, meta;
     double last_render;
     /* GPU paused because someone is watching over the network: it comes back when nobody is left */
     int gpu_paused;
@@ -327,11 +328,25 @@ static int out_rects(const Server *s, ORect *r, int *idx) {
         if (s->out[i].on) { const OutView *v = &s->out[i].v; idx[n] = i; r[n++] = (ORect){ v->x, v->y, v->w, v->h }; }
     return n;
 }
-/* the display under the pointer (-1 headless or none) */
+/* where the pointer's image is drawn: at the pointer, or where a pointer lock's owner shows it (pointerlock.h: a
+ * machine's guest pointer, inside its picture; the pointer itself stays put) */
+static void cursor_at(const Server *s, int *x, int *y) {
+    if (!ptrlock_cursor(x, y)) { *x = s->cx; *y = s->cy; }
+}
+/* the display under the pointer's image (-1 headless or none) */
 static int out_at_pointer(const Server *s) {
     ORect r[OUT_MAX];
-    int idx[OUT_MAX], n = out_rects(s, r, idx), k = out_at(r, n, s->cx, s->cy);
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    int idx[OUT_MAX], n = out_rects(s, r, idx), k = out_at(r, n, cx, cy);
     return k >= 0 ? idx[k] : -1;
+}
+/* a pointer lock's node, where it is now (pointerlock.h) */
+static int ptrlock_rect(int node, float r[4]) {
+    const Node *n = node_get(node);
+    if (!n) return -1;
+    r[0] = n->ax; r[1] = n->ay; r[2] = n->w; r[3] = n->h;
+    return 0;
 }
 /* The pointer never lands outside the displays (nor in the gap next to a shorter one). */
 static void clamp_pointer(Server *s) {
@@ -385,6 +400,8 @@ static unsigned cursor_gen_of(int shape, int pct) {
 }
 
 static void cursor_now(const Server *s, Cur *c, int pct) {
+    /* a pointer lock with no pointer shown (pointerlock.h): hidden */
+    if (ptrlock_hidden()) { *c = (Cur){ 2, NULL, 0, 0, 0, 0, 0xd0000000u }; return; }
     c->mode = wl_cursor(&c->px, &c->w, &c->h, &c->hx, &c->hy, &c->gen);
     int grabbing = grab_active();
     if (c->mode && !grabbing && (s->over_app || wl_pointer_locked())) return;   /* the app chose its own (or hid it) */
@@ -412,7 +429,9 @@ static void cursor_local(const Server *s, Cur *c, int pct) {
 /* The pointer in a display's physical pixels. */
 static void pointer_phys(const Server *s, const Out *o, int *x, int *y) {
     double px, py;
-    out_to_phys(&o->v, s->cx, s->cy, &px, &py);
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    out_to_phys(&o->v, cx, cy, &px, &py);
     *x = (int)lround(px);
     *y = (int)lround(py);
 }
@@ -626,6 +645,12 @@ static void remote_pointer(int fx, int fy) {
     double lx, ly;                          /* frame pixels of the feed → logical */
     out_to_logical(&feed_out(s)->v, fx, fy, &lx, &ly);
     int x = (int)lround(lx), y = (int)lround(ly);
+    /* a pointer lock (pointerlock.h): the viewer's pointer moves by what it moved since its last position */
+    static int rx = -1, ry = -1;
+    int had = rx >= 0;
+    int ddx = x - rx, ddy = y - ry;
+    rx = x; ry = y;
+    if (ptrlock_active()) { if (had) ptrlock_motion(ddx, ddy); return; }
     if (x == s->cx && y == s->cy) return;
     s->rdx += x - s->cx;
     s->rdy += y - s->cy;
@@ -639,12 +664,14 @@ static void remote_pointer(int fx, int fy) {
 
 static void remote_button(int button, int down) {
     Server *s = remote_server;
+    if (ptrlock_button(button, down)) return;
     if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
     remote_settle(s);
 }
 
 static void remote_wheel(int steps) {
     Server *s = remote_server;
+    if (ptrlock_wheel(steps, 0)) return;
     s->wheel += steps;
     remote_settle(s);
 }
@@ -1176,7 +1203,8 @@ static void display_detach(void) {
     for (int i = 0; i < OUT_MAX; i++) s->out[i].gpu = -1;
     input_close(&s->input);
     kb_reset_state();                           /* a key held now (the ❖ of ❖L) is released where we can't see it */
-    s->ctrl = s->alt = s->shift = 0;            /* Ctrl and Alt of Ctrl+Alt+F2 are released on the text console */
+    s->ctrl = s->alt = s->shift = s->meta = 0;  /* Ctrl and Alt of Ctrl+Alt+F2 are released on the text console */
+    ptrlock_end(PTRLOCK_END_INPUT);             /* a pointer lock goes with the input (pointerlock.h) */
     for (int i = OUT_MAX - 1; i >= 0; i--) {        /* the second displays first: out[0] owns the fd */
         Out *o = &s->out[i];
         if (!o->on && i) continue;
@@ -1274,6 +1302,12 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         }
         /* ruedas: la de alta resolución y la horizontal van como scroll fino (tp/tp_route.c, value120);
          * los pasos enteros de siempre, solo si el mouse no tiene la de alta resolución */
+        /* a pointer lock with a wheel sink: whole steps straight to it (pointerlock.h) */
+        if (ptrlock_wants_wheel()) {
+            if (ev->code == REL_WHEEL) ptrlock_wheel(tp_config()->mouse_natural ? -ev->value : ev->value, 0);
+            if (ev->code == REL_HWHEEL) ptrlock_wheel(0, ev->value);
+            break;
+        }
         if (ev->code == REL_WHEEL && !d->wheel_hires) s->wheel += tp_config()->mouse_natural ? -ev->value : ev->value;
         if (ev->code == REL_WHEEL_HI_RES) tp_route_wheel120(tp_config()->mouse_natural ? -ev->value : ev->value, 0);
         if (ev->code == REL_HWHEEL_HI_RES) tp_route_wheel120(0, ev->value);
@@ -1305,6 +1339,7 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->code == KEY_LEFTCTRL || ev->code == KEY_RIGHTCTRL) s->ctrl = ev->value != 0;
         if (ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) s->alt = ev->value != 0;
         if (ev->code == KEY_LEFTSHIFT || ev->code == KEY_RIGHTSHIFT) s->shift = ev->value != 0;
+        if (ev->code == KEY_LEFTMETA || ev->code == KEY_RIGHTMETA) s->meta = ev->value != 0;
         /* Ctrl+Alt+Backspace ends the session at once. The modifiers are tracked from every keyboard and a release can
          * be lost (another console, a keyboard that sleeps or reconnects), so the kernel is asked whether Ctrl and Alt
          * are really held on this keyboard: a stale state must never end a session on a lone Backspace. */
@@ -1323,10 +1358,14 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->code == KEY_ESC && ev->value == 1 && s->ctrl && s->alt && s->shift && share_user_stop()) break;
         /* Ctrl+Alt+F1…F12: a text console (taken here, so no app or theme gets the key) */
         if (ev->value == 1 && s->ctrl && s->alt && !s->shift && input_vt_key(ev->code)) { vt_request(input_vt_key(ev->code)); break; }
+        /* a pointer lock (Machines' "Capture mouse") ends with ❖Esc or Ctrl+Alt, before any app sees the key (pointerlock.h) */
+        if (ev->code < BTN_MISC && ptrlock_key(ev->code, ev->value, s->meta, s->ctrl, s->alt)) break;
         /* Buttons in the DOM's numbering: 0 left, 1 middle, 2 right, 3 back, 4 forward (inputkind.h, issue #159) */
         int button = input_dom_button(ev->code);
         /* Settings → Mouse & Trackpad, primary button on the right: a mouse's (not a touchpad's) */
         if ((button == 0 || button == 2) && !d->tp && d->fd >= 0 && tp_config()->mouse_left_handed) button = 2 - button;
+        /* a pointer lock with a button sink takes them straight, with no hit test (pointerlock.h) */
+        if (button >= 0 && ev->value != 2 && ptrlock_button(button, ev->value == 1)) break;
         if (button >= 0 && ev->value != 2 && s->nbuttons < MAX_BUTTONS)
             s->buttons[s->nbuttons++] = (ButtonEvent){ ev->value == 1, button };
         else if (ev->code < BTN_MISC) {
@@ -1338,7 +1377,13 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         break;
     }
     case EV_SYN:
-        if (s->moved) {
+        if (s->moved && ptrlock_active()) {
+            /* LordOS's own pointer lock (pointerlock.h): the motion goes to its owner and the pointer stays where it is */
+            ptrlock_motion(s->rdx, s->rdy);
+            s->rdx = s->rdy = 0;
+            s->cx = s->lx; s->cy = s->ly;
+            s->moved = 0;
+        } else if (s->moved) {
             /* juegos: movimiento relativo crudo; con el puntero bloqueado el cursor no se mueve */
             wl_pointer_relative(s->rdx, s->rdy);
             s->rdx = s->rdy = 0;
@@ -1391,6 +1436,7 @@ static void tp_warp(double x, double y) {
 }
 static void tp_button(int button, int down) {
     Server *s = remote_server;
+    if (ptrlock_button(button, down)) return;
     if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
 }
 static void tp_position(double *x, double *y, int *w, int *h) {
@@ -1611,7 +1657,9 @@ static Rect cursor_rect(const Server *s, const Out *o, const Cur *k) {
     if (r.x1 <= 0 || r.y1 <= 0 || r.x0 >= o->v.pw || r.y0 >= o->v.ph) return (Rect){ 0, 0, 0, 0 };
     /* in a gap next to it the pointer belongs to another display */
     ORect me = { o->v.x, o->v.y, o->v.w, o->v.h };
-    if (out_at(&me, 1, s->cx, s->cy) < 0 && !(o->v.dx || o->v.dy)) return (Rect){ 0, 0, 0, 0 };
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    if (out_at(&me, 1, cx, cy) < 0 && !(o->v.dx || o->v.dy)) return (Rect){ 0, 0, 0, 0 };
     return r;
 }
 
@@ -1935,7 +1983,9 @@ static int out_needs(const Server *s, const Out *o) {
     if (!o->cdirty) return 0;
     if (o->cur_on) return 1;
     ORect me = { o->v.x, o->v.y, o->v.w, o->v.h };
-    return out_at(&me, 1, s->cx, s->cy) >= 0 || o->v.dx || o->v.dy;
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    return out_at(&me, 1, cx, cy) >= 0 || o->v.dx || o->v.dy;
 }
 static int outs_have_work(const Server *s) {
     for (int i = 0; i < OUT_MAX; i++) if (!s->out[i].kms.flip_pending && out_needs(s, &s->out[i])) return 1;
@@ -2759,6 +2809,7 @@ int main(int argc, char **argv) {
     ui.height = (float)s.H;
     s.cx = s.lx = s.W / 2;
     s.cy = s.ly = s.H / 2;
+    ptrlock_init(ptrlock_rect);
 
     int vt = -1;
     if (!s.headless) {
@@ -2901,6 +2952,26 @@ int main(int argc, char **argv) {
             if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
             wdog_expect(0);
         }
+        {   /* a pointer lock started, ended, or its owner moved the pointer image it shows (pointerlock.h) */
+            static unsigned plk;
+            int px, py;
+            /* checked each time round: the node may have moved, or gone (then the lock ends here) */
+            if (ptrlock_active() && ptrlock_where(&px, &py) && (px != s.cx || py != s.cy)) {
+                s.cx = px; s.cy = py;
+                clamp_pointer(&s);
+                s.lx = s.cx; s.ly = s.cy;
+                s.moved = 1;
+                s.motion_pending = 1;
+                if (s.hw_cursor) hw_cursor_move(&s);
+            }
+            if (ptrlock_serial() != plk) {
+                plk = ptrlock_serial();
+                s.cursor_dirty = 1;
+                if (gpu_active()) update_cursor(&s);
+                if (s.hw_cursor) hw_cursor_move(&s);     /* the shown image moved, or the lock ended */
+            }
+            js_pointer_lock_flush();        /* JavaScript's lock: its motion, once a frame (js_input.c) */
+        }
         /* El movimiento del puntero juntado: una vez por cuadro, cuando terminó el page flip. Así un
          * mouse de 1000 Hz no llama a JS (ni a las apps Linux) mil veces por segundo. */
         if (s.motion_pending && !out_blocked(&s, main_out(&s))) {
@@ -2949,6 +3020,7 @@ int main(int argc, char **argv) {
         double td = term_timeout(now);
         if (td >= 0 && (delay < 0 || td < delay)) delay = td;
         tp_tick(now);                       /* touchpad: tocar, arrastrar, inercia (tp/tp.c) */
+        if (ptrlock_waiting() && (delay < 0 || delay > 50)) delay = 50;     /* a pointer lock whose node went away */
         /* shake to find it: the cursor grows and shrinks back (a new size serial redraws it below) */
         cursor_set_boost(cursor_shake() ? shake_level(&pointer_shake, now) : 0);
         double shd0 = cursor_shake() ? shake_timeout(&pointer_shake, now) : -1;

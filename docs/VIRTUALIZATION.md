@@ -545,7 +545,7 @@ lord-server ──fd 3, VdMsg──▶ lord-vmdisplay <id> (lordos-vmdisplay-<id
   QEMU's memory. Plain `Scanout`/`Update` arrays are still copied (QEMU uses them for surfaces it can't share); `ScanoutDMABUF`
   is taken for 3D machines (3.2, "3D graphics (built)"). Input goes out as D-Bus calls that expect no reply: evdev key codes mapped to QEMU's numbers
   (`vmkeys.h`), absolute pointer (relative while the guest's tablet driver isn't up; `IsAbsolute` is asked again while the pointer
-  moves), buttons, wheel steps, release-all on focus loss, and `SetUIInfo` at most every 100 ms for the window's size. The cursor
+  moves; relative motion only while the mouse is captured, 6.25), buttons, wheel steps, release-all on focus loss, and `SetUIInfo` at most every 100 ms for the window's size. The cursor
   (`CursorDefine`) goes to lord-server in its own sealed memfd.
 - **lord-server's side of the picture** (since 2026-11-21, docs/MACHINES-GPU.md Part 1): each machine's lord-vmdisplay socket is in
   lord-server's main `poll()` (`js_vm_pollfds` / `js_vm_dispatch` in `ui/js_vm.c`, beside the media helpers'), with a 3D frame's
@@ -732,7 +732,8 @@ it to the size the picture is shown at (the factor `media_paint` used, at most 6
 main.c remembers which media node the pointer is over (`over_media`, from the same hit test that picks the CSS cursor) and `cursor_now`
 shows the guest's image there instead of the host's arrow, in the CPU composition, the GPU's texture and the cursor plane alike. Where
 the guest puts its pointer (VD_POINTER's position) isn't used: the host's pointer drives the absolute tablet, so the image is drawn at
-the host's pointer. VD_POINTER's *hidden* (the guest turned its cursor plane off: a text console, or X just quit) brings the host's arrow
+the host's pointer (except while the mouse is captured, 6.25: then only the image is drawn where the guest reports its pointer,
+inside the picture; the host's pointer itself never moves by what the guest says). VD_POINTER's *hidden* (the guest turned its cursor plane off: a text console, or X just quit) brings the host's arrow
 back, so there's always a pointer to aim with; a fully transparent image (an app hiding it on purpose) hides it. A new display helper
 starts with the host's arrow until QEMU defines the cursor again. `tests/mcursor_test.c` (21 checks). Seen on VM 125: the installed
 Debian 13 guest (below) running X with an xterm showed X's I-beam over the xterm and its X-shaped root cursor elsewhere, with the hotspot
@@ -2333,6 +2334,59 @@ From another computer, a running machine is offered by LordOS's own remote deskt
 ### 6.24 Reproducible machines
 
 `lordvm apply dev.toml` creates or updates a machine from a short text file kept beside a project: system, resources, forwarded ports, folders, packages to install through the agent. A team gets the same environment by running one command, `lordvm rebuild` starts over from it, and the file is reviewed like code. Shared folders and root access in such a file still ask the person on screen: a file from a repository is untrusted. Phase 4.
+
+### 6.25 Capture mouse (built 2026-11-22, in development; approved by the maintainer 2026-11-21)
+
+A machine gets the pointer as an absolute tablet: the pointer moves freely in and out of its picture (**Automatic**, the default).
+Games and programs that read relative motion (first-person views, 3D editors that turn the camera with the mouse) need it the other
+way: **Captured**. The machine window's toolbar has a *Capture mouse* button (and *Actions → Capture mouse*); captured, the host's
+pointer is hidden and held inside the picture, and the guest gets relative motion that never stops at a screen's edge.
+
+- **Release**: ❖Esc or Ctrl+Alt (both, taken by lord-server before any app or the guest sees them as a release key; Ctrl+Alt still
+  reaches the guest), the button, and always when the window loses the keyboard, the machine stops, its picture goes away, a dialog
+  takes the window, apps mode starts or the session leaves its screen. On capturing, *Mouse captured — ❖Esc to release* shows over
+  the picture for four seconds. ❖Esc is taken only while captured: the next ❖Esc gives the desktop's shortcuts back as before
+  (`sdk/kbinhibit.js`), and the shell hears the lock's end (`'pointerlock'` `lockend`), so ❖'s release isn't taken for a tap
+  that opens the launcher.
+- **Full screen**: Configure → Display → *Capture automatically in full screen* (machine.json `capture_fullscreen`, schema 12, off
+  by default; `lord-vm --set --capture-fullscreen on|off`) captures on entering full screen and releases on leaving it; after ❖Esc
+  there, a click in the picture captures again. A capture asked for with the button stays across full screen (the lock moves to the
+  rebuilt window's picture). The floating bar doesn't open while captured.
+- **Apps mode**: not offered (the button says why): the guest's windows are LordOS windows that share this computer's pointer.
+- **The pointer lock** (`server/src/pointerlock.c`, generic, not Machines'): while held the pointer stays at the centre of the
+  owner's node and nothing the owner says moves it; the evdev motion (after Settings → Mouse's speed, before clamping to the screen)
+  goes to the owner's sink. An owner with a button sink (Machines) gets buttons and wheel steps straight, with no hit test; others
+  get them at the centre. An owner may show a pointer image somewhere in its node (`ptrlock_show`, kept inside it): only the image
+  is drawn there. It ends on ❖Esc or Ctrl+Alt (`on_input`, before JavaScript), when its owner ends it, when its node has been gone for
+  half a second (a rebuilt window names its new node meanwhile), or when the input goes (another console, the display detached). One
+  lock at a time. Other native apps and games get it as `lord.input.lockPointer(node)` / `unlockPointer()` with the motion as
+  `'pointerlock'` listener events once a frame; isolated apps don't have it (no broker call). Wayland clients keep their own
+  (`zwp_pointer_constraints_v1`, `wl/ptrlock.h`). `tests/pointerlock_test.c`.
+- **The machine's side**: `lord.vm.capture(sid, on, node)` (js_vm.c) takes the lock with a sink that sends each motion straight to
+  lord-vmdisplay (`VD_REL`, no JavaScript in between) and tells lord-vm (`VM_CAPTURE`). lord-vm makes a relative mouse QEMU's active
+  one (QMP `query-mice`, then `human-monitor-command` `mouse_set N` with an index it read and formats itself; QMP has no command for
+  it) and the tablet again on release. Every machine with a window now has that relative mouse beside its tablet: a `usb-mouse`
+  (compat and Windows devices) or a `virtio-mouse-pci` on slot 0x14. Not amd64's PS/2 mouse: a Linux guest drives it as VMware's
+  VMMouse (QEMU's `vmport`), which drops plain relative packets (seen on the Debian 13 guest below). QEMU makes active the mouse
+  whose guest driver started last, and the new mouse's starts after the tablet's at each boot, so lord-vm checks every second while
+  the machine runs (`query-mice`) and makes the tablet active again when it isn't captured (seen: the virtio mouse took over 7 s into
+  the boot and was set back within a second). A saved state or snapshot from before this change loads with the new mouse in its
+  reset state (**to test**: reverting a running machine to such a snapshot). lord-vmdisplay sends `Mouse.RelMotion`; until QEMU says the mouse is relative it moves its own
+  position by the motion and sends that, so the pointer still works without a relative mouse. With a guest that hands its pointer over
+  (`MouseSet`), its image is drawn where the guest has it, kept inside the picture; otherwise none shows (games draw their own).
+  **Security** (the commit review, 2026-11-22): a guest's reported position never moves the host's pointer: clicks and the wheel go
+  straight to lord-vmdisplay (`VD_BUTTON`, `VD_WHEEL`) from lord-server's input path, so a guest can't steer a click onto anything
+  of this computer's; at the end lord-vmdisplay lets go of everything held (`VD_RELEASE_ALL`) and the pointer is where the lock put
+  it, the picture's centre. `pointerlock_test` checks that no guest position takes the pointer, or its image, out of the picture.
+  A touchpad's two-finger scroll is a gesture and still reaches the window's `onWheel` while captured. `tests/vm_capture_test.mjs` (the window's decisions), `vm_test` (machine.json schema 12, the choice among
+  QEMU's mice). `lordvm-dev`: `capture 0|1`, `rel DX DY`.
+- **Measured** on 2026-11-22 (amd64, KVM, a Debian 13 nocloud guest under `lordvm-dev` with a unit that prints every mouse's evdev
+  events to the serial line): with virtio devices, captured, `rel 10 5` moves arrived on the guest's *QEMU Virtio Mouse* as REL_X /
+  REL_Y with exactly those values, `rel -3000 0` as −3000 (no edge); released, `move` arrived on *QEMU Virtio Tablet* as ABS again
+  and `rel` was ignored. With compat devices the same on *QEMU USB Mouse* and *QEMU USB Tablet*. The first move after a switch goes
+  the right way (lord-vmdisplay asks `IsAbsolute` again every 100 ms for 3 s). Not yet seen: the lord-server window itself (the
+  pointer lock, the button, the notice, full screen), Windows guests and arm64.
+- Hotkeys are fixed for now (❖Esc and Ctrl+Alt); choosing them is for later.
 
 ## 7. Guest tools
 
