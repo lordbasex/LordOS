@@ -107,5 +107,6 @@
   "updates.button": "I-update ang mga app ng Flathub",
   "updates.text": "Naka-install mula sa Flathub: {count}. Sinusuri ng Flatpak ang bawat isa at ini-install ang nagbago; matatapos ang pag-update ng nakabukas na app kapag binuksan mo ulit ito.",
   "updates.title": "Mga app ng Flathub",
-  "verified": "Verified: inilathala ng {developer}"
+  "verified": "Verified: inilathala ng {developer}",
+  "note.obsVideos": "Sa LordOS, sine-save ng OBS Studio ang mga recording sa iyong folder na Videos: read-only para sa mga app ng Flathub ang iba pang folder ng iyong home."
 }

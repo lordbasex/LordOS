@@ -107,5 +107,6 @@
   "updates.button": "Flathub 앱 업데이트",
   "updates.text": "Flathub에서 설치됨: {count}. Flatpak이 각 앱을 확인하고 변경된 내용을 설치합니다. 열려 있는 앱은 다시 열 때 업데이트가 완료됩니다.",
   "updates.title": "Flathub 앱",
-  "verified": "확인됨: {developer} 게시"
+  "verified": "확인됨: {developer} 게시",
+  "note.obsVideos": "LordOS에서 OBS Studio는 녹화를 비디오 폴더에 저장합니다. 홈의 다른 폴더는 Flathub 앱에서 읽기 전용입니다."
 }

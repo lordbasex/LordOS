@@ -107,5 +107,6 @@
   "updates.button": "Perbarui aplikasi Flathub",
   "updates.text": "Terinstal dari Flathub: {count}. Flatpak memeriksa masing-masing dan menginstal yang berubah; aplikasi yang sedang terbuka selesai diperbarui saat Anda membukanya lagi.",
   "updates.title": "Aplikasi Flathub",
-  "verified": "Terverifikasi: diterbitkan oleh {developer}"
+  "verified": "Terverifikasi: diterbitkan oleh {developer}",
+  "note.obsVideos": "Di LordOS, OBS Studio menyimpan rekaman di folder Video Anda: folder lain di folder rumah Anda hanya-baca bagi aplikasi Flathub."
 }

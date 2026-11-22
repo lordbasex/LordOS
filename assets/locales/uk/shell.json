@@ -916,5 +916,14 @@
   "celeste.side.night": "Нічне світло",
   "celeste.side.notifications": "Сповіщення",
   "celeste.side.remove": "Прибрати",
-  "celeste.side.volume": "Гучність"
+  "celeste.side.volume": "Гучність",
+  "shot.title": "«{app}» хоче зробити знімок екрана",
+  "shot.titleUnknown": "Невідома програма хоче зробити знімок екрана",
+  "shot.body": "Виберіть екран чи вікно або виділіть область. Застосунок отримає лише цей знімок.",
+  "shot.area": "Виділити область…",
+  "shot.take": "Зробити знімок",
+  "shot.areaHint": "Проведіть по області, яку отримає {app}. Esc — скасувати.",
+  "shot.colorHint": "Клацніть колір, який отримає {app}. Esc — скасувати.",
+  "share.shotTaken": "{app} зробив знімок екрана",
+  "share.colorPicked": "{app} узяв колір з вашого екрана"
 }

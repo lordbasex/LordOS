@@ -603,7 +603,53 @@ static JSValue f_portal_cast_stop(JSContext *c, JSValueConst t, int argc, JSValu
     return JS_UNDEFINED;
 }
 
+/* lord.portal.shot(id, source | null, path): the person's pick for an app's Screenshot request: { display } (a screen),
+ * { node, also } (a window) or { display, area: { x, y, width, height } } (logical px), written as a new PNG at path (in
+ * the home folder); null is Cancel */
+static JSValue f_portal_shot(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1) return JS_UNDEFINED;
+    int id = arg_int(c, argv[0], -1);
+    CastSource src;
+    if (argc < 3 || !JS_IsObject(argv[1]) || cast_source(c, argv[1], &src)) { portal_shot_chosen(id, NULL, NULL, NULL); return JS_UNDEFINED; }
+    int area[4], has = 0;
+    JSValue a = JS_GetPropertyStr(c, argv[1], "area");
+    if (JS_IsObject(a)) {
+        static const char *const k[4] = { "x", "y", "width", "height" };
+        has = 1;
+        for (int i = 0; i < 4; i++) {
+            JSValue v = JS_GetPropertyStr(c, a, k[i]);
+            double d = 0;
+            if (!JS_IsNumber(v) || JS_ToFloat64(c, &d, v) || !(d > -65536 && d < 65536)) has = -1;
+            area[i] = (int)d;
+            JS_FreeValue(c, v);
+        }
+    }
+    JS_FreeValue(c, a);
+    const char *path = JS_ToCString(c, argv[2]);
+    if (has < 0 || !path) portal_shot_chosen(id, NULL, NULL, NULL);
+    else portal_shot_chosen(id, &src, has ? area : NULL, path);
+    if (path) JS_FreeCString(c, path);
+    return JS_UNDEFINED;
+}
+
+/* lord.portal.color(id, { display, x, y } | null): the point picked for an app's PickColor (logical px), or Cancel */
+static JSValue f_portal_color(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1) return JS_UNDEFINED;
+    int id = arg_int(c, argv[0], -1);
+    CastSource src;
+    if (argc < 2 || !JS_IsObject(argv[1]) || cast_source(c, argv[1], &src)) { portal_color_chosen(id, NULL, 0, 0); return JS_UNDEFINED; }
+    JSValue xv = JS_GetPropertyStr(c, argv[1], "x"), yv = JS_GetPropertyStr(c, argv[1], "y");
+    portal_color_chosen(id, &src, arg_int(c, xv, -100000), arg_int(c, yv, -100000));
+    JS_FreeValue(c, xv);
+    JS_FreeValue(c, yv);
+    return JS_UNDEFINED;
+}
+
 static const JSCFunctionListEntry portal_funcs[] = {
+    JS_CFUNC_DEF("shot", 3, f_portal_shot),
+    JS_CFUNC_DEF("color", 2, f_portal_color),
     JS_CFUNC_DEF("chosen", 2, f_portal_chosen),
     JS_CFUNC_DEF("opened", 2, f_portal_opened),
     JS_CFUNC_DEF("still", 1, f_portal_still),

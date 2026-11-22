@@ -52,6 +52,8 @@ int apps_launch_flatpak(const char *id);
 /* Who takes the lord-server end of a Flatpak app's Spawn helper (fpspawner.h): fpspawn_add_view in lord-server. Without
  * one, a Flatpak app starts with no helper (its Spawn calls are refused). */
 void apps_set_spawn_hook(void (*hook)(int fd, const char *id));
+/* each Flatpak view's lending socket (fplend.h): lord-server's end and the app id; the hook owns the fd */
+void apps_set_lend_hook(void (*hook)(int fd, const char *id));
 int apps_launch_flatpak_with(const char *id, const char *path);
 int apps_flatpak_installed(const char *id);
 /* The installed Flatpak apps (id = the Flatpak id) from their exported .desktop files: name, comment, categories,

@@ -107,5 +107,6 @@
   "updates.button": "Flathub のアプリをアップデート",
   "updates.text": "Flathub からインストール済み：{count}。Flatpak がそれぞれを確認して変更点をインストールします。開いているアプリは、次に開いたときにアップデートが完了します。",
   "updates.title": "Flathub のアプリ",
-  "verified": "確認済み：{developer} が公開"
+  "verified": "確認済み：{developer} が公開",
+  "note.obsVideos": "LordOS では、OBS Studio は録画を“ビデオ”フォルダに保存します。ホームのほかのフォルダは Flathub のアプリからは読み取り専用です。"
 }

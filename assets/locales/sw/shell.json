@@ -909,5 +909,14 @@
   "celeste.side.night": "Mwanga wa Usiku",
   "celeste.side.notifications": "Arifa",
   "celeste.side.remove": "Ondoa",
-  "celeste.side.volume": "Sauti"
+  "celeste.side.volume": "Sauti",
+  "shot.title": "“{app}” inataka kupiga picha ya skrini",
+  "shot.titleUnknown": "Programu isiyojulikana inataka kupiga picha ya skrini",
+  "shot.body": "Chagua skrini au dirisha, au chagua eneo. Programu inapata picha hiyo tu.",
+  "shot.area": "Chagua Eneo…",
+  "shot.take": "Piga Picha ya Skrini",
+  "shot.areaHint": "Buruta juu ya eneo la kumpa {app}. Esc inaghairi.",
+  "shot.colorHint": "Bofya rangi ya kumpa {app}. Esc inaghairi.",
+  "share.shotTaken": "{app} imepiga picha ya skrini",
+  "share.colorPicked": "{app} imechukua rangi kutoka kwenye skrini yako"
 }

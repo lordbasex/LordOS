@@ -909,5 +909,14 @@
   "celeste.side.night": "Night Light",
   "celeste.side.notifications": "Notifications",
   "celeste.side.remove": "Remove",
-  "celeste.side.volume": "Volume"
+  "celeste.side.volume": "Volume",
+  "shot.title": "“{app}” wants to take a screenshot",
+  "shot.titleUnknown": "An unknown program wants to take a screenshot",
+  "shot.body": "Pick a screen or a window, or select an area. The app gets only that picture.",
+  "shot.area": "Select Area…",
+  "shot.take": "Take Screenshot",
+  "shot.areaHint": "Drag over the area to give to {app}. Esc cancels.",
+  "shot.colorHint": "Click the color to give to {app}. Esc cancels.",
+  "share.shotTaken": "{app} took a screenshot",
+  "share.colorPicked": "{app} picked a color from your screen"
 }

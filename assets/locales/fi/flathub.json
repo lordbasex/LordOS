@@ -107,5 +107,6 @@
   "updates.button": "Päivitä Flathub-sovellukset",
   "updates.text": "Asennettu Flathubista: {count}. Flatpak tarkistaa jokaisen ja asentaa muuttuneet osat; avoinna oleva sovellus päivittyy loppuun, kun avaat sen uudelleen.",
   "updates.title": "Flathub-sovellukset",
-  "verified": "Vahvistettu: julkaisija {developer}"
+  "verified": "Vahvistettu: julkaisija {developer}",
+  "note.obsVideos": "LordOSissa OBS Studio tallentaa tallenteet Videot-kansioosi: kotikansiosi muut kansiot ovat Flathub-sovelluksille vain luku -tilassa."
 }

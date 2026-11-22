@@ -153,6 +153,10 @@ const day = 24 * 3600e3, now = 1_800_000_000_000;
 eq('stale', [M.appstreamStale(0, now), M.appstreamStale(now - day - 1, now), M.appstreamStale(now - 1000, now), M.appstreamStale(now + day, now)], [true, true, false, true]);
 eq('prefs', [M.prefsOf(null), M.prefsOf({ on: 1, showAll: 0, appstreamAt: '5' })], [{ on: false, showAll: false, appstreamAt: 0 }, { on: true, showAll: false, appstreamAt: 5 }]);
 
+// a note on an app's page: OBS Studio's recordings go to Videos (the home is read-only in a Flatpak app's view)
+eq('note: OBS', M.appNote('com.obsproject.Studio'), 'obsVideos');
+eq('note: none', [M.appNote('org.gnome.Calculator'), M.appNote('toString'), M.appNote(null)], [null, null, null]);
+
 // ---- every row's text in every language ----
 const perms = new Set(), changes = new Set();
 for (const md of [mt, M.parseMetadata(obs), big]) for (const r of M.permissionRows(md)) { perms.add(r.perm); if (r.change) changes.add(r.change); }
@@ -160,7 +164,7 @@ const dir = path.join(root, 'assets/locales');
 for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, d)).isDirectory())) {
   const f = path.join(dir, lang, 'flathub.json');
   const cat2 = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {};
-  const missing = [...[...perms].map((p) => `perm.${p}`), ...[...changes].map((c) => `change.${c}`)].filter((k) => typeof cat2[k] !== 'string' && typeof cat2[k] !== 'object');
+  const missing = [...[...perms].map((p) => `perm.${p}`), ...[...changes].map((c) => `change.${c}`), 'note.obsVideos'].filter((k) => typeof cat2[k] !== 'string' && typeof cat2[k] !== 'object');
   eq(`rows translated in ${lang}`, missing, []);
 }
 

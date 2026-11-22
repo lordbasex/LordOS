@@ -909,5 +909,14 @@
   "celeste.side.night": "Night Light",
   "celeste.side.notifications": "Mga Notification",
   "celeste.side.remove": "Alisin",
-  "celeste.side.volume": "Volume"
+  "celeste.side.volume": "Volume",
+  "shot.title": "Gustong kumuha ng “{app}” ng screenshot",
+  "shot.titleUnknown": "May hindi kilalang program na gustong kumuha ng screenshot",
+  "shot.body": "Pumili ng screen o window, o pumili ng bahagi. Iyon lang na larawan ang matatanggap ng app.",
+  "shot.area": "Pumili ng Bahagi…",
+  "shot.take": "Kumuha ng Screenshot",
+  "shot.areaHint": "I-drag sa bahaging ibibigay sa {app}. Kinakansela ng Esc.",
+  "shot.colorHint": "I-click ang kulay na ibibigay sa {app}. Kinakansela ng Esc.",
+  "share.shotTaken": "Kumuha ang {app} ng screenshot",
+  "share.colorPicked": "Kumuha ang {app} ng kulay mula sa iyong screen"
 }

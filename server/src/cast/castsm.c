@@ -136,3 +136,45 @@ int csm_gate(int identified, int restricted, int restricted_running) {
     if (identified) return restricted ? CSM_GATE_REFUSE : CSM_GATE_APP;
     return restricted_running ? CSM_GATE_REFUSE : CSM_GATE_UNKNOWN;
 }
+
+/* ---- restore tokens ---- */
+
+int csm_token_ok(const char *t) {
+    if (!t || strlen(t) != 32) return 0;
+    for (const char *c = t; *c; c++) if (!((*c >= '0' && *c <= '9') || (*c >= 'a' && *c <= 'f'))) return 0;
+    return 1;
+}
+
+int csm_token_issue(CastSm *m, const char *who, const void *blob, int len, uint64_t now_ms, const unsigned char rnd[16], char out[33]) {
+    if (!who || !who[0] || strlen(who) >= sizeof m->tok[0].who || !blob || len <= 0 || len > CSM_TOKEN_BLOB || !rnd) return CSM_E_ARGS;
+    CsToken *t = NULL;
+    for (int i = 0; i < CSM_TOKENS; i++) {
+        CsToken *c = &m->tok[i];
+        if (c->token[0] && c->expires <= now_ms) memset(c, 0, sizeof *c);         /* expired: gone */
+        if (!c->token[0]) { if (!t || t->token[0]) t = c; }
+        else if (!t || (t->token[0] && c->expires < t->expires)) t = c;           /* else the oldest */
+    }
+    memset(t, 0, sizeof *t);
+    for (int i = 0; i < 16; i++) snprintf(t->token + 2 * i, 3, "%02x", rnd[i]);
+    snprintf(t->who, sizeof t->who, "%s", who);
+    t->expires = now_ms + CSM_TOKEN_MS;
+    t->len = len;
+    memcpy(t->blob, blob, (size_t)len);
+    memcpy(out, t->token, 33);
+    return CSM_OK;
+}
+
+int csm_token_take(CastSm *m, const char *who, const char *token, uint64_t now_ms, void *blob, int cap) {
+    if (!who || !who[0] || !csm_token_ok(token) || !blob) return -1;
+    for (int i = 0; i < CSM_TOKENS; i++) {
+        CsToken *c = &m->tok[i];
+        if (!c->token[0] || strcmp(c->token, token)) continue;
+        if (c->expires <= now_ms) { memset(c, 0, sizeof *c); return -1; }
+        if (strcmp(c->who, who) || c->len > cap) return -1;
+        int len = c->len;
+        memcpy(blob, c->blob, (size_t)len);
+        memset(c, 0, sizeof *c);                                                    /* once */
+        return len;
+    }
+    return -1;
+}

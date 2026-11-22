@@ -902,5 +902,14 @@
   "celeste.side.night": "夜间模式",
   "celeste.side.notifications": "通知",
   "celeste.side.remove": "移除",
-  "celeste.side.volume": "音量"
+  "celeste.side.volume": "音量",
+  "shot.title": "“{app}”想要截取屏幕",
+  "shot.titleUnknown": "一个未知程序想要截取屏幕",
+  "shot.body": "选择一个屏幕或窗口，或选择一个区域。应用只会得到那张图像。",
+  "shot.area": "选择区域…",
+  "shot.take": "截取屏幕",
+  "shot.areaHint": "拖动选择要给 {app} 的区域。按 Esc 取消。",
+  "shot.colorHint": "点按要给 {app} 的颜色。按 Esc 取消。",
+  "share.shotTaken": "{app} 截取了屏幕",
+  "share.colorPicked": "{app} 从你的屏幕上取了一种颜色"
 }

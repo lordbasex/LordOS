@@ -107,5 +107,6 @@
   "updates.button": "Sasisha programu za Flathub",
   "updates.text": "Zilizosakinishwa kutoka Flathub: {count}. Flatpak hukagua kila moja na kusakinisha kilichobadilika; programu iliyo wazi humaliza kusasishwa utakapoifungua tena.",
   "updates.title": "Programu za Flathub",
-  "verified": "Imethibitishwa: imechapishwa na {developer}"
+  "verified": "Imethibitishwa: imechapishwa na {developer}",
+  "note.obsVideos": "Katika LordOS, OBS Studio huhifadhi rekodi kwenye folda yako ya Video: folda nyingine za nyumbani kwako ni za kusoma tu kwa programu za Flathub."
 }

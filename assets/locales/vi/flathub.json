@@ -107,5 +107,6 @@
   "updates.button": "Cập nhật ứng dụng Flathub",
   "updates.text": "Đã cài từ Flathub: {count}. Flatpak kiểm tra từng ứng dụng và cài những gì đã thay đổi; ứng dụng đang mở sẽ hoàn tất cập nhật khi bạn mở lại.",
   "updates.title": "Ứng dụng Flathub",
-  "verified": "Đã xác minh: phát hành bởi {developer}"
+  "verified": "Đã xác minh: phát hành bởi {developer}",
+  "note.obsVideos": "Trong LordOS, OBS Studio lưu bản ghi vào thư mục Video của bạn: các thư mục khác trong thư mục nhà chỉ đọc đối với ứng dụng Flathub."
 }

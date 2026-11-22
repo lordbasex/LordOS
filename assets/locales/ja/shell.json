@@ -902,5 +902,14 @@
   "celeste.side.night": "夜間モード",
   "celeste.side.notifications": "通知",
   "celeste.side.remove": "削除",
-  "celeste.side.volume": "音量"
+  "celeste.side.volume": "音量",
+  "shot.title": "“{app}” がスクリーンショットを撮ろうとしています",
+  "shot.titleUnknown": "不明なプログラムがスクリーンショットを撮ろうとしています",
+  "shot.body": "画面またはウインドウを選ぶか、範囲を選択してください。アプリが受け取るのはその画像だけです。",
+  "shot.area": "範囲を選択…",
+  "shot.take": "スクリーンショットを撮る",
+  "shot.areaHint": "{app} に渡す範囲をドラッグしてください。Esc でキャンセルします。",
+  "shot.colorHint": "{app} に渡す色をクリックしてください。Esc でキャンセルします。",
+  "share.shotTaken": "{app} がスクリーンショットを撮りました",
+  "share.colorPicked": "{app} が画面から色を取得しました"
 }

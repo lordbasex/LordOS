@@ -902,5 +902,14 @@
   "celeste.side.night": "Ánh sáng ban đêm",
   "celeste.side.notifications": "Thông báo",
   "celeste.side.remove": "Gỡ",
-  "celeste.side.volume": "Âm lượng"
+  "celeste.side.volume": "Âm lượng",
+  "shot.title": "“{app}” muốn chụp màn hình",
+  "shot.titleUnknown": "Một chương trình không rõ muốn chụp màn hình",
+  "shot.body": "Chọn một màn hình hoặc một cửa sổ, hoặc chọn một vùng. Ứng dụng chỉ nhận được ảnh đó.",
+  "shot.area": "Chọn vùng…",
+  "shot.take": "Chụp màn hình",
+  "shot.areaHint": "Kéo qua vùng sẽ đưa cho {app}. Esc để hủy.",
+  "shot.colorHint": "Bấm vào màu sẽ đưa cho {app}. Esc để hủy.",
+  "share.shotTaken": "{app} đã chụp màn hình",
+  "share.colorPicked": "{app} đã lấy một màu trên màn hình của bạn"
 }

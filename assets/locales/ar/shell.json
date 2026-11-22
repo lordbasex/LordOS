@@ -937,5 +937,14 @@
   "celeste.side.night": "الإضاءة الليلية",
   "celeste.side.notifications": "الإشعارات",
   "celeste.side.remove": "إزالة",
-  "celeste.side.volume": "مستوى الصوت"
+  "celeste.side.volume": "مستوى الصوت",
+  "shot.title": "يريد «{app}» التقاط صورة للشاشة",
+  "shot.titleUnknown": "يريد برنامج غير معروف التقاط صورة للشاشة",
+  "shot.body": "اختر شاشة أو نافذة، أو حدّد منطقة. لا يحصل التطبيق إلا على تلك الصورة.",
+  "shot.area": "تحديد منطقة…",
+  "shot.take": "التقاط صورة الشاشة",
+  "shot.areaHint": "اسحب فوق المنطقة التي تريد إعطاءها لـ {app}. يلغي Esc.",
+  "shot.colorHint": "انقر على اللون الذي تريد إعطاءه لـ {app}. يلغي Esc.",
+  "share.shotTaken": "التقط {app} صورة للشاشة",
+  "share.colorPicked": "أخذ {app} لونًا من شاشتك"
 }

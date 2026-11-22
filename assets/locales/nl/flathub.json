@@ -107,5 +107,6 @@
   "updates.button": "Werk Flathub-apps bij",
   "updates.text": "Geïnstalleerd vanaf Flathub: {count}. Flatpak controleert elke app en installeert wat er veranderd is; een geopende app is klaar met bijwerken wanneer je hem opnieuw opent.",
   "updates.title": "Flathub-apps",
-  "verified": "Geverifieerd: gepubliceerd door {developer}"
+  "verified": "Geverifieerd: gepubliceerd door {developer}",
+  "note.obsVideos": "In LordOS bewaart OBS Studio opnames in je map Video's: de andere mappen van je thuismap zijn alleen-lezen voor Flathub-apps."
 }

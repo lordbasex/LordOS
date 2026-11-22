@@ -107,5 +107,6 @@
   "updates.button": "Atnaujinti Flathub programas",
   "updates.text": "Įdiegta iš Flathub: {count}. Flatpak patikrina kiekvieną ir įdiegia tai, kas pasikeitė; atidaryta programa baigia atsinaujinti, kai ją vėl atidarote.",
   "updates.title": "Flathub programos",
-  "verified": "Patikrinta: paskelbė {developer}"
+  "verified": "Patikrinta: paskelbė {developer}",
+  "note.obsVideos": "„LordOS“ sistemoje „OBS Studio“ įrašus išsaugo aplanke „Vaizdo įrašai“: kiti namų aplanko aplankai „Flathub“ programoms yra tik skaitomi."
 }

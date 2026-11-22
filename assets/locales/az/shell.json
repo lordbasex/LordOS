@@ -909,5 +909,14 @@
   "celeste.side.night": "Gecə işığı",
   "celeste.side.notifications": "Bildirişlər",
   "celeste.side.remove": "Sil",
-  "celeste.side.volume": "Səs"
+  "celeste.side.volume": "Səs",
+  "shot.title": "“{app}” ekran şəkli çəkmək istəyir",
+  "shot.titleUnknown": "Naməlum proqram ekran şəkli çəkmək istəyir",
+  "shot.body": "Ekran və ya pəncərə seçin, yaxud sahə seçin. Tətbiq yalnız həmin şəkli alır.",
+  "shot.area": "Sahə seçin…",
+  "shot.take": "Ekran şəkli çək",
+  "shot.areaHint": "{app} tətbiqinə vermək istədiyiniz sahənin üzərindən sürükləyin. Esc ləğv edir.",
+  "shot.colorHint": "{app} tətbiqinə vermək istədiyiniz rəngə klikləyin. Esc ləğv edir.",
+  "share.shotTaken": "{app} ekran şəkli çəkdi",
+  "share.colorPicked": "{app} ekranınızdan rəng götürdü"
 }

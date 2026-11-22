@@ -1,6 +1,7 @@
 // screencast_model_test.mjs — the ScreenCast chooser's choices (sdk/screencastmodel.js): what is offered for what the
 // app asked, picking one or several, and what lord.portal.cast gets.
-import { castChoices, castToggle, castSources, castAskerName, castWindowOf, CAST_MAX } from '../../sdk/screencastmodel.js';
+import { castChoices, castToggle, castSources, castAskerName, castWindowOf, CAST_MAX, shotSource, shotDisplayAt, shotDragRect, shotArea, shotStamp,
+  shotFreeName, shotPills, SHOT_PILL_MS } from '../../sdk/screencastmodel.js';
 
 let ok = 0, bad = 0;
 const eq = (label, got, want) => {
@@ -59,6 +60,27 @@ eq('asker: none', castAskerName(undefined, look), '');
 const live = [{ id: 'linux#8', app: 'linux', args: { appId: 'org.chromium.Chromium' } }];
 eq('window of a choice', castWindowOf({ id: 'linux#8', title: 'x' }, live), live[0]);
 eq('window gone: the choice', castWindowOf({ id: 'linux#9', title: 'x' }, live), { id: 'linux#9', title: 'x' });
+
+// the Screenshot portal (approved 2026-11-22): one source, an area dragged on one display, the file's name, the pills
+eq('shot: one source, the first picked', shotSource(['d:77', 'w:linux#4'], both, frameOf), { display: 77 });
+eq('shot: a window', shotSource(['w:linux#4'], both, frameOf), { node: 812, also: [900, 901] });
+eq('shot: nothing picked', shotSource([], both, frameOf), null);
+eq('shot: a window gone meanwhile', shotSource(['w:files'], both, frameOf), null);
+const ds = [{ id: 51, x: 0, y: 0, w: 1440, h: 900 }, { id: 77, x: 1440, y: 0, w: 1920, h: 1080 }];
+eq('shot: the display under a point', shotDisplayAt(ds, 1500, 10)?.id, 77);
+eq('shot: a gap between displays is none', shotDisplayAt(ds, 100, 1000), null);
+eq('shot: a drag, any direction', shotDragRect({ x: 300, y: 200 }, 100, 50, ds[0]), { x: 100, y: 50, w: 200, h: 150 });
+eq('shot: a drag stays on its display', shotDragRect({ x: 1400, y: 100 }, 1700, 120, ds[0]), { x: 1400, y: 100, w: 40, h: 20 });
+eq('shot: the area lord.portal.shot gets, whole pixels outwards', shotArea({ x: 10.5, y: 20.2, w: 100.2, h: 50 }, ds[1]),
+  { display: 77, area: { x: 10, y: 20, width: 101, height: 51 } });
+eq('shot: a click is no area', shotArea({ x: 10, y: 10, w: 0, h: 0 }, ds[0]), null);
+eq('shot: no display, no area', shotArea({ x: 10, y: 10, w: 5, h: 5 }, null), null);
+eq('shot: the stamp', shotStamp(new Date(2026, 10, 22, 9, 5, 7)), '2026-11-22 09.05.07');
+const taken = new Set(['/h/Pictures/Screenshots/Shot.png', '/h/Pictures/Screenshots/Shot (2).png']);
+eq('shot: a free name, never over a file', shotFreeName('/h/Pictures/Screenshots', 'Shot', (p) => taken.has(p)), '/h/Pictures/Screenshots/Shot (3).png');
+eq('shot: the first name when free', shotFreeName('/d', 'A', () => false), '/d/A.png');
+eq('shot: pills last SHOT_PILL_MS', shotPills([{ key: 'a', at: 1000 }, { key: 'b', at: 1000 + SHOT_PILL_MS }], 1000 + SHOT_PILL_MS + 1).map((p) => p.key), ['b']);
+eq('shot: no list', shotPills(null, 5), []);
 
 console.log(`screencast-model-test: ${ok}/${ok + bad}`);
 process.exit(bad ? 1 : 0);

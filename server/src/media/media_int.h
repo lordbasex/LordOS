@@ -126,7 +126,10 @@ void media_json_str(char *out, size_t n, const char *s);
 const char *media_home(void);
 
 /* worker jobs */
-enum { JP_EVENT = 0, JP_THUMB, JP_IMAGE, JP_PIXELS, JP_FILE, JP_CLIP, JP_SVG };    /* JP_SVG: svgicon.c (params = its key) */
+enum { JP_EVENT = 0, JP_THUMB, JP_IMAGE, JP_PIXELS, JP_FILE, JP_CLIP, JP_SVG, JP_PORTAL };    /* JP_SVG: svgicon.c (params = its key) */
+/* JP_PORTAL: a picture for the Screenshot portal (ui/portalshot.c): when the file is in place (or not), this is called
+ * with the job's src (the portal's request) and the final path (NULL when it failed) */
+extern void (*media_portal_saved)(int tag, int ok, const char *path);
 int  media_job(int bg, int kind, int purpose, const int *fds, int nfds, int64_t a, int64_t b, const char *params,
                const char *tmp, const char *dst, int src);
 /* Pixels of a ready poster (lord.media.take): returns RGBA in *out (malloc) or -1. */

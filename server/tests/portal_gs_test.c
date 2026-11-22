@@ -34,6 +34,11 @@ void cast_end(int id) { (void)id; }
 int cast_remote(int id, uint32_t req) { (void)id; (void)req; return -1; }
 void cast_shown(int id) { (void)id; }
 int cast_thumb(const CastSource *src, int max) { (void)src; (void)max; return 0; }
+/* lending to Flatpak apps (fplend.c, its own tests): nobody here is one */
+int fplend_lend(unsigned pid, const char *path, int kind, char *out, size_t n) { (void)pid; (void)path; (void)kind; (void)out; (void)n; return 1; }
+/* the Screenshot portal's pictures (portalshot.c; tests/portal_cast_test.c covers the portal's side) */
+int portal_shot_capture(int tag, const CastSource *src, const int *area, const char *path) { (void)tag; (void)src; (void)area; (void)path; return -1; }
+int portal_shot_pixel(const CastSource *src, int x, int y, double rgb[3]) { (void)src; (void)x; (void)y; (void)rgb; return -1; }
 /* web apps' questions share the connection (src/ui/webask.c, its own tests): none here */
 void webask_attach(DConn *c) { (void)c; }
 void webask_call(DConn *c, const DMsg *m) { (void)c; (void)m; }

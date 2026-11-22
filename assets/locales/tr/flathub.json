@@ -107,5 +107,6 @@
   "updates.button": "Flathub uygulamalarını güncelle",
   "updates.text": "Flathub’dan yüklenen: {count}. Flatpak her birini denetler ve değişeni yükler; açık bir uygulamanın güncellemesi onu yeniden açtığınızda tamamlanır.",
   "updates.title": "Flathub uygulamaları",
-  "verified": "Doğrulandı: {developer} tarafından yayımlandı"
+  "verified": "Doğrulandı: {developer} tarafından yayımlandı",
+  "note.obsVideos": "LordOS’ta OBS Studio kayıtları Videolar klasörünüze kaydeder: ana klasörünüzdeki diğer klasörler Flathub uygulamaları için salt okunurdur."
 }
