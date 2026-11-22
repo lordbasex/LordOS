@@ -47,7 +47,9 @@ eq('at most 8 sheets', castSources(['w:linux#4'], both, () => many)[0].also.leng
 
 // the asking app's name: from lord-server's verified identity only (a Flatpak app by its Flathub name, not "flatpak:<id>")
 const look = { linux: (id) => (id === 'gimp' ? 'GIMP' : ''), flatpak: (id) => (id === 'org.chromium.Chromium' ? 'Chromium' : '') };
-eq('asker: flatpak named', castAskerName('flatpak:org.chromium.Chromium', look), 'Chromium');
+eq('asker: flatpak named, with its verified id', castAskerName('flatpak:org.chromium.Chromium', look), 'Chromium \u00b7 org.chromium.Chromium');
+// an app's name is its own metadata: one calling itself "Firefox" still shows the id lord-server verified
+eq('asker: a spoofed name keeps the real id', castAskerName('flatpak:org.evil.App', { flatpak: () => 'Firefox' }), 'Firefox \u00b7 org.evil.App');
 eq('asker: flatpak unknown keeps its id', castAskerName('flatpak:org.example.App', look), 'org.example.App');
 eq('asker: desktop named', castAskerName('desktop:gimp', look), 'GIMP');
 eq('asker: desktop unknown', castAskerName('desktop:foo', look), 'foo');

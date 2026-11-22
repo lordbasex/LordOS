@@ -478,7 +478,8 @@ function asker(p) {
 function castAsker(p) {
   return castAskerName(p?.who, {
     linux: (id) => { const app = linuxAppFor(id); return app ? shortAppName(app) : ''; },
-    flatpak: (id) => flatpakAppFor(id)?.name || '',
+    // by the verified Flatpak id only (flatpakAppFor also matches a window class the app chooses)
+    flatpak: (id) => { const a = flatpakAppFor(id); return a && a.flatpakId === id ? a.name : ''; },
   });
 }
 castNames({ app: castAsker, window: windowAppName });

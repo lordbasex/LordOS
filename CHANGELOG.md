@@ -469,8 +469,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **The screen-share chooser and its indicator name a Flatpak app, and each window's app** (`sdk/screencastmodel.js`
   `castAskerName`, `castWindowOf`; `sdk/hardware.jsx`, `sdk/screencast.jsx`). They said
   "flatpak:org.chromium.Chromium wants to see your screen", and every Linux window in the list was labelled "Linux".
-  Still only from lord-server's verified identity (the app's root-owned scope), never from a name the app gives itself.
-  Test: `tests/screencast_model_test.mjs`.
+  Still only from lord-server's verified identity (the app's root-owned scope): a Flatpak app's name comes from its own
+  metadata, so it is always shown with that verified id ("Chromium · org.chromium.Chromium"; an app calling itself
+  "Firefox" still shows its real id), and it is looked up by that exact id only, never by a window class.
+  Test: `tests/screencast_model_test.mjs` (a spoofed name included).
 - **Flatpak apps built on Chromium or Electron no longer die at start** (Whatsie from Flathub: it showed its tray icon
   and quit, with `trap int3` in libQt6WebEngineCore at every launch). Chromium (QtWebEngine, CEF, the browser) and zypak
   (Electron) ask Flatpak's Spawn for a sub-sandbox that joins the app's own user and PID namespaces (EXPOSE_PIDS /
