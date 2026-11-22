@@ -1,8 +1,10 @@
-// studio.jsx — LordOS Studio's popover (docs/CAMERA-STUDIO-PLAN.md 9.1; phase 1): a live preview, the camera it uses,
-// Portrait (the background blurred) and Background (a picture behind the person), and Mirror. It opens from the camera
-// capture item by the clock (sdk/capturestatus.jsx) in every theme, in the same panel and style. The effects reach
-// every LordOS app that chose the "LordOS Studio" camera (lord.media.cameras(), device "studio": the Camera app,
-// isolated .lpk apps, go-link Desk), all at once; lord-server runs them in the sandboxed lord-studio helper.
+// studio.jsx — LordOS Studio's popover (docs/CAMERA-STUDIO-PLAN.md 9.1; phases 1 and 2): a live preview, the camera it
+// uses, Portrait (the background blurred) and Background (a picture behind the person), Mirror, and "Every app": the
+// "LordOS Studio" camera that browsers, OBS and every other Linux app see once the Store's LordOS Studio Camera item
+// (the lordos-studio-camera package, v4l2loopback) is installed. It opens from the camera capture item by the clock
+// (sdk/capturestatus.jsx) in every theme, in the same panel and style. The effects reach every app that chose the
+// "LordOS Studio" camera (lord.media.cameras(), device "studio": the Camera app, isolated .lpk apps, go-link Desk; and
+// /dev/video50 for Linux apps), all at once; lord-server runs them in the sandboxed lord-studio helper.
 // Plain logic: sdk/studiomodel.js. Settings: settings.studio, applied to lord-server at start and on every change.
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, Image, MediaView } from '@lordos/runtime';
@@ -14,11 +16,12 @@ import { Layer } from './layers.js';
 import { FilePicker } from './filepicker.jsx';
 import { media } from './media.js';
 import { markDeviceUse } from './privacy.js';
-import { getApp } from './windows.js';
+import { getApp, wm } from './windows.js';
+import { castAppName } from './screencast.jsx';
 import { lordosWallpapers } from './wallpapers.js';
 import {
   normalizeStudio, realCameras, chosenCamera, cameraKey, serverConfig, portraitOn, backgroundOn, withPortrait, withBackground,
-  withPicture, withMode, previewSize, usersOf, previewSource, perfLine,
+  withPicture, withMode, previewSize, usersOf, previewSource, perfLine, loopbackState,
 } from './studiomodel.js';
 
 const has = () => typeof lord !== 'undefined' && !!lord.studio;
@@ -56,12 +59,13 @@ function useStatus() {
 }
 
 // The preview: a native app's LordOS Studio source when one runs (no second open of the camera), else the popover's own,
-// closed when the popover closes. The capture indicator shows the popover's own like any camera.
+// closed when the popover closes: the frames of the loopback's writer while it runs (lord.studio.endPreview lets go of
+// them; it isn't ours to close), else a source of its own. The capture indicator shows the popover's own like any camera.
 function usePreview(status) {
   const shared = previewSource(status);
   const [own, setOwn] = useState(null);
   const [err, setErr] = useState(null);
-  const ref = useRef({ id: null, off: null });
+  const ref = useRef({ id: null, off: null, hub: false });
   useEffect(() => {
     if (shared || ref.current.id || !has() || !status?.available) return;
     let id = null;
@@ -70,6 +74,7 @@ function usePreview(status) {
       id = lord.studio.preview(width, height);
     } catch (e) { setErr(String(e?.code || e?.message || e)); return; }
     ref.current.id = id;
+    ref.current.hub = id === status.hub || id === lord.studio.status()?.hub;
     ref.current.off = media.on(id, (type, d) => {
       if (type === 'error') setErr(d?.message || 'busy');
       else if (type === 'closed' || (type === 'state' && d.state === 'failed')) setErr((e) => e || 'busy');
@@ -81,7 +86,8 @@ function usePreview(status) {
     const r = ref.current;
     if (!r.id) return;
     if (r.off) r.off();
-    media.close(r.id);
+    if (r.hub) lord.studio.endPreview();
+    else media.close(r.id);
     markDeviceUse('studio', 'camera', false);
     r.id = null;
   }, []);
@@ -140,10 +146,35 @@ function Preview({ th, status, pv }) {
   );
 }
 
+// LordOS Studio's camera for every app: on or off, or where to get it (the Store's "For this computer" card)
+function EveryApp({ th, cfg, status }) {
+  const st = loopbackState(status, cfg);
+  if (st === 'missing') {
+    return (
+      <View style={{ gap: 4 }}>
+        <Row th={th} label={t('studio.everyApp')} detail={t('studio.notInstalled')} />
+        <Hint th={th}>{t('studio.everyAppHint')}</Hint>
+        <View onClick={() => wm.open('store', { args: { page: 'suggested', nonce: Date.now() } })} focusable accessibilityLabel={t('studio.getCamera')}>
+          <Text style={{ fontSize: 12, color: th.accent, textAlign: 'start' }}>{t('studio.getCamera')}</Text>
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={{ gap: 4 }}>
+      <Row th={th} label={t('studio.everyApp')} toggle={cfg.on} onToggle={(v) => update((c) => ({ ...c, on: !!v }))} />
+      <Hint th={th}>{t(st === 'stopped' ? 'studio.stopped' : st === 'off' ? 'studio.everyAppOff' : 'studio.everyAppOn')}</Hint>
+    </View>
+  );
+}
+
+const linuxId = (a) => /^(desktop|flatpak):/.test(a);
+const userName = (a) => (a === 'studio' ? '' : linuxId(a) ? castAppName({ who: a }) : appName(getApp(a)) || a);
+
 function MainPage({ th, cfg, status, pv, go, onBack }) {
   const cams = realCameras(cameras());
   const cam = chosenCamera(cfg.camera, cams);
-  const users = usersOf(status, (a) => (a === 'studio' ? '' : appName(getApp(a)) || a));
+  const users = usersOf(status, userName, t('shell.cast.unknownApp'));
   return (
     <View style={{ gap: 10 }}>
       <Header th={th} title={t('studio.title')} onBack={onBack} />
@@ -156,6 +187,7 @@ function MainPage({ th, cfg, status, pv, go, onBack }) {
         onOpen={() => go('background')} />
       <Row th={th} label={t('studio.mirror')} toggle={cfg.mirror} onToggle={(v) => update((c) => ({ ...c, mirror: !!v }))} />
       <Sep th={th} />
+      <EveryApp th={th} cfg={cfg} status={status} />
       <Hint th={th}>{t('studio.howTo')}</Hint>
     </View>
   );

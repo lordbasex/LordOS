@@ -931,5 +931,9 @@
   "shot.area": "Alan Seç…",
   "shot.take": "Ekran Görüntüsü Al",
   "shot.areaHint": "{app} uygulamasına verilecek alanın üzerinde sürükleyin. Esc vazgeçer.",
-  "shot.colorHint": "{app} uygulamasına verilecek renge tıklayın. Esc vazgeçer."
+  "shot.colorHint": "{app} uygulamasına verilecek renge tıklayın. Esc vazgeçer.",
+  "capture.what.viaStudio": "LordOS Studio üzerinden kamera ({camera})",
+  "capture.what.viaStudioPlain": "LordOS Studio üzerinden kamera",
+  "capture.what.effectsOn": "efektler açık",
+  "capture.what.effectsOff": "efekt yok"
 }

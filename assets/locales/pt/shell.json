@@ -931,5 +931,9 @@
   "shot.area": "Selecionar área…",
   "shot.take": "Capturar",
   "shot.areaHint": "Arraste sobre a área que deseja dar a {app}. Esc cancela.",
-  "shot.colorHint": "Clique na cor que deseja dar a {app}. Esc cancela."
+  "shot.colorHint": "Clique na cor que deseja dar a {app}. Esc cancela.",
+  "capture.what.viaStudio": "Câmera via LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Câmera via LordOS Studio",
+  "capture.what.effectsOn": "efeitos ativados",
+  "capture.what.effectsOff": "sem efeitos"
 }

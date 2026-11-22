@@ -55,6 +55,10 @@
 # lordos-disk-formats (0.8.7, docs/FILES.md): the Store's Disk Formats item, from tools/iso/mkdeb-diskformats.sh, one
 # package per architecture, added like any .deb with the release. Its entry in apt/catalog.json has "section": "commercial".
 #
+# lordos-studio-camera (docs/CAMERA-STUDIO-PLAN.md 11.2): the Store's LordOS Studio Camera card (assets/store/
+# suggestions.json, studioCamera), from tools/iso/mkdeb-studiocamera.sh <folder> <arch>, one package per architecture,
+# added like any .deb with the release; never inside the images.
+#
 # lordos-web (0.8.8.8, docs/WEBAPPS.md): the LordOS Web Runtime, lord-web with WPE WebKit, from tools/iso/mkdeb-web.sh,
 # one package per architecture built with that release's lordos (it depends on that exact version), added like any .deb.
 #

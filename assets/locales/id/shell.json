@@ -924,5 +924,9 @@
   "shot.area": "Pilih Area…",
   "shot.take": "Ambil Tangkapan Layar",
   "shot.areaHint": "Seret di atas area yang akan diberikan ke {app}. Esc membatalkan.",
-  "shot.colorHint": "Klik warna yang akan diberikan ke {app}. Esc membatalkan."
+  "shot.colorHint": "Klik warna yang akan diberikan ke {app}. Esc membatalkan.",
+  "capture.what.viaStudio": "Kamera melalui LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Kamera melalui LordOS Studio",
+  "capture.what.effectsOn": "efek aktif",
+  "capture.what.effectsOff": "tanpa efek"
 }

@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "Android ایپس",
   "soon": "جلد",
-  "sub.all": "سب"
+  "sub.all": "سب",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "ہمیں ایک کیمرا ملا۔",
+  "suggest.studioCamera.detail": "تمام ایپس کو، بشمول براؤزر اور ویڈیو کالز، آپ کے اثرات کے ساتھ «LordOS Studio» کیمرا دیتا ہے: دھندلا پس منظر یا آپ کے پیچھے کوئی تصویر ({packages})۔",
+  "suggest.studioCamera.unavailable": "{packages} اس کمپیوٹر کے پیکج ذرائع میں نہیں ہے۔",
+  "suggest.studioCamera.note.dkms": "PC پر اس کا کرنل ماڈیول اسی کمپیوٹر پر آپ کے کرنل کے لیے بنایا جاتا ہے (DKMS)، جو تقریباً 500 MB کمپائلر اور کرنل ہیڈرز لاتا ہے، اور ہر کرنل اپ ڈیٹ کے بعد دوبارہ بنتا ہے۔ Raspberry Pi پر یہ LordOS کرنل کے ساتھ آتا ہے۔",
+  "suggest.studioCamera.note.secureBoot": "Secure Boot آن ہونے پر اگلی ری اسٹارٹ پر ماڈیول کی دستخطی کلید رجسٹر کرنی ہوگی، ورنہ کیمرا ظاہر نہیں ہوگا۔"
 }

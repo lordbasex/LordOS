@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "Android-appar",
   "soon": "Snart",
-  "sub.all": "Alla"
+  "sub.all": "Alla",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Vi hittade en kamera.",
+  "suggest.studioCamera.detail": "Ger alla appar, även webbläsare och videosamtal, kameran ”LordOS Studio” med dina effekter: suddig bakgrund eller en bild bakom dig ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} finns inte i den här datorns paketkällor.",
+  "suggest.studioCamera.note.dkms": "På en pc byggs kärnmodulen för din kärna på den här datorn (DKMS), vilket tar med cirka 500 MB kompilatorer och kärnhuvuden, och på nytt efter varje kärnuppdatering. På en Raspberry Pi följer den med LordOS-kärnan.",
+  "suggest.studioCamera.note.secureBoot": "Med Secure Boot på måste du registrera modulens signeringsnyckel vid nästa omstart, annars visas inte kameran."
 }

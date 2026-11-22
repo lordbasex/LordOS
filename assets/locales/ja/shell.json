@@ -924,5 +924,9 @@
   "shot.area": "範囲を選択…",
   "shot.take": "スクリーンショットを撮る",
   "shot.areaHint": "{app} に渡す範囲をドラッグしてください。Esc でキャンセルします。",
-  "shot.colorHint": "{app} に渡す色をクリックしてください。Esc でキャンセルします。"
+  "shot.colorHint": "{app} に渡す色をクリックしてください。Esc でキャンセルします。",
+  "capture.what.viaStudio": "LordOS Studio 経由のカメラ（{camera}）",
+  "capture.what.viaStudioPlain": "LordOS Studio 経由のカメラ",
+  "capture.what.effectsOn": "エフェクトオン",
+  "capture.what.effectsOff": "エフェクトなし"
 }

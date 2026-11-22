@@ -314,5 +314,11 @@
   "src.wine": "Wine",
   "src.android": "Android 應用程式",
   "soon": "即將推出",
-  "sub.all": "全部"
+  "sub.all": "全部",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "我們偵測到一部相機。",
+  "suggest.studioCamera.detail": "讓所有 App（包括瀏覽器和視訊通話）都能使用套用你效果的「LordOS Studio」相機：背景模糊或身後的圖片（{packages}）。",
+  "suggest.studioCamera.unavailable": "這部電腦的套件來源中沒有 {packages}。",
+  "suggest.studioCamera.note.dkms": "在 PC 上，它的核心模組會在這部電腦上為你的核心編譯（DKMS），這會帶來約 500 MB 的編譯器和核心標頭檔，並在每次核心更新後重新編譯。在 Raspberry Pi 上，它隨 LordOS 核心提供。",
+  "suggest.studioCamera.note.secureBoot": "啟用安全開機（Secure Boot）時，需要在下次重新開機時登錄該模組的簽章金鑰，否則相機不會出現。"
 }

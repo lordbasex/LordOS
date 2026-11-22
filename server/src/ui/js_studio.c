@@ -3,11 +3,17 @@
  * Registered only in the desktop's own JS context (js.c session_context), never in an isolated app's: apps see
  * "LordOS Studio" as one more camera (lord.media.cameras(), device "studio") under the camera permission, and never
  * control it. Every value is a number, a mode name or a path that lord-server checks itself (media/mstudio.c).
- *   status()                       → { available, camera, mode, blur, mirror, background, fps, segMs, fxMs, gpu, sources }
- *   set({ camera, mode, blur, mirror })   mode 'none' | 'blur' | 'picture'; camera '/dev/videoN' or '' (the first one)
+ *   status()                       → { available, on, camera, mode, blur, mirror, background, fps, segMs, fxMs, gpu,
+ *                                      loopback: 'missing'|'ready'|'running', hub, readers, cameraOpen, shows, cameraName,
+ *                                      stopped, apps: [linux app ids reading the loopback], sources }
+ *   set({ on, camera, mode, blur, mirror })   on: LordOS Studio's camera for every app (the loopback; phase 2);
+ *                                  mode 'none' | 'blur' | 'picture'; camera '/dev/videoN' or '' (the first one)
  *   setBackground(path | null)     'asset:wallpapers/…' or a picture inside lord.fs's roots; throws studio.badPicture
- *   preview(width, height) → id    the popover's own live preview: a LordOS Studio camera source of the desktop (the
- *                                  "no camera" restriction for LordOS's apps still applies) */
+ *   preview(width, height) → id    the popover's own live preview: the loopback writer's own frames while it runs (the
+ *                                  real camera opened for it), else a LordOS Studio camera source of the desktop (the
+ *                                  "no camera" restriction for LordOS's apps applies to both)
+ *   endPreview()                   the popover closed: the loopback writer's preview frames end (the camera closes when
+ *                                  no app reads either) */
 #include "js_studio.h"
 #include "js_err.h"
 #include "../media/media_int.h"
@@ -56,9 +62,9 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     }
     JS_FreeValue(c, v);
     if (mode < 0) return js_throw_code(c, "studio.invalid", NULL);
-    int blur = opt_int(c, o, "blur", 50), mirror = opt_int(c, o, "mirror", 0);
+    int blur = opt_int(c, o, "blur", 50), mirror = opt_int(c, o, "mirror", 0), on = opt_int(c, o, "on", 1);
     if (blur < 0 || blur > 100) return js_throw_code(c, "studio.invalid", NULL);
-    if (mstudio_set(have_cam ? camera : NULL, mode, blur, mirror)) return js_throw_code(c, "studio.invalid", NULL);
+    if (mstudio_set(on, have_cam ? camera : NULL, mode, blur, mirror)) return js_throw_code(c, "studio.invalid", NULL);
     return JS_TRUE;
 }
 
@@ -81,14 +87,19 @@ static JSValue f_preview(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     if (argc > 0 && JS_IsNumber(argv[0])) JS_ToInt32(c, &w, argv[0]);
     if (argc > 1 && JS_IsNumber(argv[1])) JS_ToInt32(c, &h, argv[1]);
     if (restrict_blocks("lordos", FW_R_NO_CAMERA)) return js_throw_code(c, restrict_code(FW_R_NO_CAMERA), "app", "studio", NULL);
+    int hub = mstudio_preview_hub();
+    if (hub > 0) return JS_NewInt32(c, hub);
     MediaSrc *s = media_src_new(SK_CAMERA, "studio");
     if (!s) return js_throw_code(c, "media.tooMany", NULL);
     const char *code = NULL;
-    s->sock = mstudio_spawn(w, h, &s->pid, &code);
-    if (s->sock < 0) { media_src_close(s); return js_throw_code(c, code ? code : "studio.unavailable", NULL); }
-    s->studio = 1;
-    mstudio_attach(s->sock);
+    if (mstudio_open(s, w, h, &code)) { media_src_close(s); return js_throw_code(c, code ? code : "studio.unavailable", NULL); }
     return JS_NewInt32(c, s->id);
+}
+
+static JSValue f_end_preview(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)c; (void)t; (void)argc; (void)argv;
+    mstudio_preview_end();
+    return JS_UNDEFINED;
 }
 
 static const JSCFunctionListEntry studio_funcs[] = {
@@ -96,6 +107,7 @@ static const JSCFunctionListEntry studio_funcs[] = {
     JS_CFUNC_DEF("set", 1, f_set),
     JS_CFUNC_DEF("setBackground", 1, f_set_background),
     JS_CFUNC_DEF("preview", 2, f_preview),
+    JS_CFUNC_DEF("endPreview", 0, f_end_preview),
 };
 
 void js_studio_register(JSContext *c, JSValue lord) {

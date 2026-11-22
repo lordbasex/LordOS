@@ -931,5 +931,9 @@
   "shot.area": "Bereich auswählen …",
   "shot.take": "Bildschirmfoto machen",
   "shot.areaHint": "Ziehe über den Bereich, den {app} bekommen soll. Esc bricht ab.",
-  "shot.colorHint": "Klicke auf die Farbe, die {app} bekommen soll. Esc bricht ab."
+  "shot.colorHint": "Klicke auf die Farbe, die {app} bekommen soll. Esc bricht ab.",
+  "capture.what.viaStudio": "Kamera über LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Kamera über LordOS Studio",
+  "capture.what.effectsOn": "Effekte an",
+  "capture.what.effectsOff": "ohne Effekte"
 }

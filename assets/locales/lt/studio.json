@@ -24,5 +24,12 @@
   "perfGpu": "{fps} kadrų per sekundę · vaizdo plokštė",
   "perfCpu": "{fps} kadrų per sekundę · procesorius",
   "howTo": "Programos, kurios pasirenka kamerą „LordOS Studio“, gauna šiuos efektus.",
-  "cameraHint": "Kamera, iš kurios LordOS Studio ima vaizdą."
+  "cameraHint": "Kamera, iš kurios LordOS Studio ima vaizdą.",
+  "everyApp": "Visos programos",
+  "everyAppHint": "Įdiekite LordOS Studio Camera iš Parduotuvės, kad naršyklės ir kitos programos taip pat galėtų pasirinkti kamerą „LordOS Studio“.",
+  "everyAppOn": "Naršyklės ir kitos programos gali pasirinkti kamerą „LordOS Studio“. Jūsų kamera įsijungia tik tol, kol kuri nors iš jų ją naudoja.",
+  "everyAppOff": "Programos, pasirinkusios „LordOS Studio“, mato vaizdą „kamera išjungta“, niekada jūsų kameros.",
+  "notInstalled": "Neįdiegta",
+  "getCamera": "Gauti Parduotuvėje…",
+  "stopped": "LordOS Studio kamera kelis kartus sustojo ir buvo išjungta. Išjunkite ir vėl įjunkite, kad bandytumėte dar kartą."
 }

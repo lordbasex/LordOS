@@ -24,5 +24,12 @@
   "perfGpu": "{fps} bingkai sesaat · kad grafik",
   "perfCpu": "{fps} bingkai sesaat · pemproses",
   "howTo": "Apl yang memilih kamera “LordOS Studio” mendapat kesan ini.",
-  "cameraHint": "Kamera tempat LordOS Studio mengambil gambar."
+  "cameraHint": "Kamera tempat LordOS Studio mengambil gambar.",
+  "everyApp": "Semua apl",
+  "everyAppHint": "Pasang LordOS Studio Camera dari Kedai supaya pelayar dan apl lain juga boleh memilih kamera “LordOS Studio”.",
+  "everyAppOn": "Pelayar dan apl lain boleh memilih kamera “LordOS Studio”. Kamera anda hanya hidup semasa salah satunya menggunakannya.",
+  "everyAppOff": "Apl yang memilih “LordOS Studio” melihat gambar “kamera dimatikan”, bukan kamera anda.",
+  "notInstalled": "Tidak dipasang",
+  "getCamera": "Dapatkan di Kedai…",
+  "stopped": "Kamera LordOS Studio berhenti beberapa kali dan telah dimatikan. Matikan dan hidupkan semula untuk mencuba lagi."
 }

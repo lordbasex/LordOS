@@ -931,5 +931,9 @@
   "shot.area": "انتخاب ناحیه…",
   "shot.take": "گرفتن عکس صفحه",
   "shot.areaHint": "روی ناحیه‌ای که می‌خواهید به {app} بدهید بکشید. Esc لغو می‌کند.",
-  "shot.colorHint": "روی رنگی که می‌خواهید به {app} بدهید کلیک کنید. Esc لغو می‌کند."
+  "shot.colorHint": "روی رنگی که می‌خواهید به {app} بدهید کلیک کنید. Esc لغو می‌کند.",
+  "capture.what.viaStudio": "دوربین از طریق LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "دوربین از طریق LordOS Studio",
+  "capture.what.effectsOn": "جلوه‌ها روشن",
+  "capture.what.effectsOff": "بدون جلوه"
 }

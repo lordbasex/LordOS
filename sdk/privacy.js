@@ -162,6 +162,9 @@ const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p 
 // The capture indicator by the clock draws them (sdk/capturestatus.jsx); Settings → Privacy lists them (useIndicators).
 export const brokerDevices = createStore([]);    // [{ app, kind: 'camera'|'microphone', media? }]
 export const linuxCapture = createStore([]);     // [{ app, name, mic, camera, screen }]: app '' an unknown program
+// the Linux apps reading LordOS Studio's camera device (hw event "studio-use", server/src/media/mstudio.c):
+// { apps: [id], camera, effects } (sdk/studiomodel.js studioUseOf)
+export const studioUse = createStore({ apps: [], camera: '', effects: false });
 
 // media: a native app's camera source (lord.media), so the indicator can show what it sees
 export function markDeviceUse(app, kind, on, media = null) {

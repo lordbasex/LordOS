@@ -314,5 +314,11 @@
   "src.wine": "Wine",
   "src.android": "Android 앱",
   "soon": "곧 제공",
-  "sub.all": "전체"
+  "sub.all": "전체",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "카메라를 감지했습니다.",
+  "suggest.studioCamera.detail": "브라우저와 화상 통화를 포함한 모든 앱에 효과가 적용된 “LordOS Studio” 카메라를 제공합니다: 배경 흐림 또는 뒤쪽 사진 ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages}이(가) 이 컴퓨터의 패키지 소스에 없습니다.",
+  "suggest.studioCamera.note.dkms": "PC에서는 커널 모듈이 이 컴퓨터에서 사용 중인 커널에 맞게 빌드되며(DKMS), 약 500MB의 컴파일러와 커널 헤더가 함께 설치되고 커널을 업데이트할 때마다 다시 빌드됩니다. Raspberry Pi에서는 LordOS 커널에 포함되어 있습니다.",
+  "suggest.studioCamera.note.secureBoot": "보안 부팅(Secure Boot)이 켜져 있으면 다음 재시작 때 모듈의 서명 키를 등록해야 합니다. 그렇지 않으면 카메라가 나타나지 않습니다."
 }

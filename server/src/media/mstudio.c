@@ -1,10 +1,14 @@
 /* mstudio.c — LordOS Studio from lord-server (see mstudio.h and docs/CAMERA-STUDIO-PLAN.md). */
 #include "mstudio.h"
+#include "mstudiohub.h"
 #include "media_int.h"
 #include "proto.h"
 #include "studio/models.h"
 #include "../fsops.h"
 #include "../pkg/crypto.h"
+#include "../sec/appid.h"
+#include "../sec/restrict.h"
+#include "../fw/rules.h"
 #include "../ui/js_sys.h"
 
 #include <ctype.h>
@@ -17,20 +21,44 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <time.h>
 #include <unistd.h>
 
 #define BG_MAX (32 << 20)            /* bytes of a background picture */
 
 static struct {
+    int on;                          /* LordOS Studio's camera for every app (the loopback's hub) */
     char camera[32];                 /* "/dev/videoN" or "" (the first camera) */
     int mode, blur, mirror;
     char bg[PATH_MAX];               /* the checked real path, or "" */
     char bg_name[PATH_MAX];          /* as JS gave it (status) */
-} cfg = { "", 1, 50, 0, "", "" };
+} cfg = { 1, "", 1, 50, 0, "", "" };
 
 static struct { long long frames, seg_us, fx_us; int gpu; double fps; double at; long long at_frames; } stats;
 static int model_state;              /* 0 unknown, 1 good, -1 refused */
+
+/* the hub: the session's one lord-studio writing the loopback */
+#define HUB_MAX_READERS 32
+static struct {
+    int id;                          /* its MediaSrc, 0 none */
+    int ready;                       /* it set the format and wrote the first card (its first MM_STUDIO_READERS) */
+    int events;                      /* the module sends the client-usage event */
+    int readers;                     /* streaming readers (-1 unknown) */
+    int scanned;                     /* openers lord-server found (the attribution, and the count without events) */
+    int cam_open, shows;             /* what the hub says it does */
+    int sent_show, sent_preview;     /* the last MM_STUDIO_CAM */
+    double sent_at;
+    int preview;                     /* the popover's preview wants its frames */
+    dev_t rdev;                      /* the loopback's device number */
+    int device;                      /* the loopback is there (last look) */
+    double device_at, tick_at, scan_at;
+    double spawns[3];                /* the last starts: at most 3 a minute */
+    int spawn_i, gave_up;
+    char camera_name[64];            /* the real camera it uses (the indicator) */
+    char use_last[2048];
+} hub = { .readers = -1, .sent_show = -1, .use_last = "" };
+static void (*use_emit)(const char *kind, const char *json);
 
 static double now_s(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec + t.tv_nsec / 1e9; }
 
@@ -42,8 +70,10 @@ static int dev_ok(const char *d) {
     return 1;
 }
 
-/* a V4L2 device that captures and streams (not LordOS Studio's own loopback, later) */
-static int is_camera(const char *dev) {
+int mstudio_is_loopback_card(const char *card) { return card && !strcmp(card, STUDIO_LOOPBACK_CARD); }
+
+/* a V4L2 device that captures and streams, and isn't LordOS Studio's own loopback; name: its card (or NULL) */
+static int is_camera_named(const char *dev, char *name, size_t n) {
     int fd = open(dev, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) return 0;
     struct v4l2_capability cap;
@@ -51,11 +81,13 @@ static int is_camera(const char *dev) {
     int ok = 0;
     if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
         uint32_t caps = (cap.capabilities & V4L2_CAP_DEVICE_CAPS) ? cap.device_caps : cap.capabilities;
-        ok = (caps & V4L2_CAP_VIDEO_CAPTURE) && (caps & V4L2_CAP_STREAMING) && strcmp((const char *)cap.card, "LordOS Studio");
+        ok = (caps & V4L2_CAP_VIDEO_CAPTURE) && (caps & V4L2_CAP_STREAMING) && !mstudio_is_loopback_card((const char *)cap.card);
+        if (ok && name) snprintf(name, n, "%s", (const char *)cap.card);
     }
     close(fd);
     return ok;
 }
+static int is_camera(const char *dev) { return is_camera_named(dev, NULL, 0); }
 
 static int first_camera(char *out, size_t n) {
     for (int i = 0; i < 64; i++) {
@@ -64,6 +96,33 @@ static int first_camera(char *out, size_t n) {
         if (is_camera(dev)) { snprintf(out, n, "%s", dev); return 0; }
     }
     return -1;
+}
+
+/* the chosen real camera (or the first one), opened for a helper; name: its card. -1 with code */
+static int open_real_camera(char *name, size_t n, const char **code) {
+    char dev[32];
+    if (cfg.camera[0] && is_camera_named(cfg.camera, name, n)) snprintf(dev, sizeof dev, "%s", cfg.camera);
+    else if (first_camera(dev, sizeof dev) || !is_camera_named(dev, name, n)) { *code = "studio.noCamera"; return -1; }
+    int fd = open(dev, O_RDWR | O_NONBLOCK | O_CLOEXEC);
+    if (fd < 0) *code = "camera.openFailed";
+    return fd;
+}
+
+/* The loopback: /dev/video50, a V4L2 character device (major 81) whose driver is v4l2loopback and whose card is
+ * "LordOS Studio" (the package's modprobe.d file). Opened read-write for its one writer or a reader; -1 otherwise. */
+static int loopback_open(void) {
+    int fd = open(STUDIO_LOOPBACK_DEV, O_RDWR | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) return -1;
+    struct stat st;
+    struct v4l2_capability cap;
+    memset(&cap, 0, sizeof cap);
+    if (fstat(fd, &st) || !S_ISCHR(st.st_mode) || major(st.st_rdev) != STUDIO_V4L2_MAJOR || ioctl(fd, VIDIOC_QUERYCAP, &cap) ||
+        strcmp((const char *)cap.driver, STUDIO_LOOPBACK_DRIVER) || !mstudio_is_loopback_card((const char *)cap.card)) {
+        close(fd);
+        return -1;
+    }
+    hub.rdev = st.st_rdev;
+    return fd;
 }
 
 /* The model: opened read-only, its size and SHA-256 checked against models.h on every open (the helper reads the
@@ -162,22 +221,21 @@ static void send_background(int sock) {
     if (fd >= 0) close(fd);
 }
 
-void mstudio_attach(int sock) {
+static void attach(int sock) {
     if (sock < 0) return;
     send_config(sock);
     if (cfg.bg[0]) send_background(sock);
 }
 
-int mstudio_spawn(int w, int h, pid_t *pid, const char **code) {
+/* phase 1: an app's own lord-studio on the real camera */
+static int spawn_own(int w, int h, pid_t *pid, const char **code) {
     *code = "studio.unavailable";
     if (!mstudio_available()) return -1;
-    char dev[32];
-    if (cfg.camera[0] && is_camera(cfg.camera)) snprintf(dev, sizeof dev, "%s", cfg.camera);
-    else if (first_camera(dev, sizeof dev)) { *code = "studio.noCamera"; return -1; }
-    int cam = open(dev, O_RDWR | O_NONBLOCK | O_CLOEXEC);
-    if (cam < 0) { *code = "camera.openFailed"; return -1; }
+    char name[64];
+    int cam = open_real_camera(name, sizeof name, code);
+    if (cam < 0) return -1;
     int model = open_model();
-    if (model < 0) { close(cam); return -1; }
+    if (model < 0) { close(cam); *code = "studio.unavailable"; return -1; }
     int render = media_render_fd();
     if (w < 160 || w > 3840) w = 1280;
     if (h < 120 || h > 2160) h = 720;
@@ -196,20 +254,64 @@ int mstudio_spawn(int w, int h, pid_t *pid, const char **code) {
     return sock;
 }
 
+static MediaSrc *hub_src(void) {
+    MediaSrc *s = hub.id ? media_src_get(hub.id) : NULL;
+    if (s && s->studio != STUDIO_SRC_HUB) s = NULL;
+    if (!s) hub.id = 0;
+    return s;
+}
+
+/* the hub runs, wrote its first card and LordOS Studio is on: apps read the loopback */
+static int hub_serving(void) {
+    MediaSrc *s = hub_src();
+    return s && s->sock >= 0 && hub.ready && cfg.on;
+}
+
+int mstudio_open(void *src, int w, int h, const char **code) {
+    MediaSrc *s = src;
+    if (hub_serving()) {
+        /* phase 2: one more reader of the "LordOS Studio" device, through lord-media like any camera */
+        int lfd = loopback_open();
+        if (lfd >= 0) {
+            int render = media_render_fd();
+            char params[96];
+            snprintf(params, sizeof params, "width=%d\nheight=%d\nhw=%d\nhwaccel=%s\n", w, h, render >= 0, media_hwaccel());
+            int fds[2] = { lfd, render };
+            s->sock = media_spawn(MK_CAMERA, params, fds, 2, &s->pid);
+            close(lfd);
+            if (render >= 0) close(render);
+            if (s->sock < 0) { *code = "media.noHelper"; return -1; }
+            s->studio = STUDIO_SRC_LOOP;
+            hub.tick_at = 0;                        /* the hub hears the new reader; look again soon */
+            *code = NULL;
+            return 0;
+        }
+    }
+    s->sock = spawn_own(w, h, &s->pid, code);
+    if (s->sock < 0) return -1;
+    s->studio = STUDIO_SRC_OWN;
+    attach(s->sock);
+    return 0;
+}
+
+/* the sources that run the effects: each own lord-studio and the hub (a loopback reader gets them through the hub) */
 static void each_source(void (*fn)(int sock)) {
     for (int i = 0; i < MEDIA_MAX_SRC; i++) {
         MediaSrc *s = media_src_at(i);
-        if (s && s->studio && s->sock >= 0) fn(s->sock);
+        if (s && (s->studio == STUDIO_SRC_OWN || s->studio == STUDIO_SRC_HUB) && s->sock >= 0) fn(s->sock);
     }
 }
 
-int mstudio_set(const char *camera, int mode, int blur, int mirror) {
+int mstudio_set(int on, const char *camera, int mode, int blur, int mirror) {
     if (camera && *camera && !dev_ok(camera)) return -1;
     if (camera) snprintf(cfg.camera, sizeof cfg.camera, "%s", camera);
+    if ((on != 0) != cfg.on) { hub.gave_up = 0; memset(hub.spawns, 0, sizeof hub.spawns); }   /* turned on again: tries again */
+    cfg.on = on != 0;
     cfg.mode = mode < 0 || mode > 2 ? 0 : mode;
     cfg.blur = blur < 0 ? 0 : blur > 100 ? 100 : blur;
     cfg.mirror = mirror != 0;
     each_source(send_config);
+    hub.tick_at = 0;                                /* on/off: the hub follows at the next turn of the loop */
     return 0;
 }
 
@@ -243,19 +345,195 @@ void mstudio_stats(int src_id, long long frames, long long seg_us, long long fx_
     media_event(src_id, "studio", "{\"fps\":%.1f,\"segMs\":%.2f,\"fxMs\":%.2f,\"gpu\":%s}", stats.fps, seg_us / 1000.0, fx_us / 1000.0, gpu ? "true" : "false");
 }
 
+/* ---- the hub -------------------------------------------------------------------------------------------------- */
+
+void mstudio_on_use(void (*emit)(const char *kind, const char *json)) { use_emit = emit; }
+
+static void use_send(const char *json) {
+    if (!strcmp(json, hub.use_last)) return;
+    snprintf(hub.use_last, sizeof hub.use_last, "%s", json);
+    if (use_emit) use_emit("studio-use", json);
+}
+
+static void hub_reset(void) {
+    hub.id = 0;
+    hub.ready = 0;
+    hub.events = 0;
+    hub.readers = -1;
+    hub.scanned = 0;
+    hub.cam_open = hub.shows = 0;
+    hub.sent_show = -1;
+    hub.sent_preview = 0;
+    if (hub.use_last[0]) use_send("{\"apps\":[],\"camera\":\"\",\"effects\":false}");
+}
+
+void mstudio_readers(int src_id, long long readers, long long cam_open, long long what) {
+    MediaSrc *s = hub_src();
+    if (!s || s->id != src_id) return;
+    if (readers < -1 || readers > 1024 || (cam_open != 0 && cam_open != 1) || what < 0 || what > STUDIO_SHOW_OFF) return;
+    if (!hub.ready) hub.events = readers >= 0;
+    hub.ready = 1;
+    hub.readers = (int)readers;
+    hub.cam_open = (int)cam_open;
+    hub.shows = (int)what;
+    hub.tick_at = 0;                                /* decide now: a reader came or went */
+}
+
+static MediaSrc *hub_spawn(double t) {
+    /* at most 3 starts a minute; after that LordOS Studio's camera for apps stays off until the settings change */
+    if (hub.gave_up) return NULL;
+    double oldest = hub.spawns[hub.spawn_i];
+    if (oldest > 0 && t - oldest < 60) {
+        hub.gave_up = 1;
+        fprintf(stderr, "studio: lord-studio for the loopback stopped 3 times in a minute; LordOS Studio's camera for apps is off\n");
+        return NULL;
+    }
+    int lfd = loopback_open();
+    if (lfd < 0) return NULL;
+    int model = open_model();
+    if (model < 0) { close(lfd); return NULL; }
+    MediaSrc *s = media_src_new(SK_CAMERA, STUDIO_DEVICE);
+    if (!s) { close(lfd); close(model); return NULL; }
+    int render = media_render_fd();
+    int w = 1280, h = 720;
+#if defined(__aarch64__)
+    if (render < 0) { w = 640; h = 360; }           /* a Raspberry Pi compositing on its CPU (plan 3.3) */
+#endif
+    char params[128];
+    snprintf(params, sizeof params, "loopback=1\nwidth=%d\nheight=%d\nhw=0\nrender=%d\n", w, h, render >= 0);
+    int fds[3], n = 0;
+    if (render >= 0) fds[n++] = render;
+    fds[n++] = model;
+    fds[n++] = lfd;
+    s->sock = media_spawn_studio(params, fds, n, &s->pid);
+    close(lfd);
+    close(model);
+    if (render >= 0) close(render);
+    if (s->sock < 0) { media_src_close(s); return NULL; }
+    s->studio = STUDIO_SRC_HUB;
+    hub.spawns[hub.spawn_i] = t;
+    hub.spawn_i = (hub.spawn_i + 1) % 3;
+    hub_reset();
+    hub.id = s->id;
+    attach(s->sock);
+    return s;
+}
+
+static void hub_stop(MediaSrc *s) {
+    media_src_close(s);
+    hub_reset();
+}
+
+/* what the loopback should show now, and the camera for it */
+static void hub_drive(MediaSrc *s, double t) {
+    int preview = hub.preview && !restrict_blocks("lordos", FW_R_NO_CAMERA);
+    int show = studio_hub_show(cfg.on, hub.readers, hub.scanned, preview);
+    /* asked for the camera but the hub couldn't open it (another app holds it): again every 3 s */
+    int retry = show == STUDIO_SHOW_CAMERA && hub.sent_show == STUDIO_SHOW_CAMERA && !hub.cam_open && t - hub.sent_at > 3;
+    if (show == hub.sent_show && preview == hub.sent_preview && !retry) return;
+    int fd = -1;
+    if (show == STUDIO_SHOW_CAMERA && (hub.sent_show != STUDIO_SHOW_CAMERA || retry)) {
+        const char *code = NULL;
+        fd = open_real_camera(hub.camera_name, sizeof hub.camera_name, &code);
+        if (fd < 0) { show = STUDIO_SHOW_IDLE; hub.camera_name[0] = 0; }
+    }
+    int64_t v[6] = { show, preview, 0, 0, 0, 0 };
+    mp_send(s->sock, MM_STUDIO_CAM, 0, v, NULL, 0, fd >= 0 ? &fd : NULL, fd >= 0 ? 1 : 0);
+    if (fd >= 0) close(fd);
+    hub.sent_show = show;
+    hub.sent_preview = preview;
+    hub.sent_at = t;
+}
+
+/* who has the loopback open, for the indicator (and the count when the module sends no event) */
+static void hub_scan(void) {
+    pid_t pids[HUB_MAX_READERS];
+    int n = studio_scan_readers("/proc", hub.rdev, getpid(), getuid(), pids, HUB_MAX_READERS);
+    hub.scanned = n;
+    if (n > HUB_MAX_READERS) n = HUB_MAX_READERS;
+    static char apps[HUB_MAX_READERS][FW_APP_MAX];
+    for (int i = 0; i < n; i++) if (appid_of_pid((unsigned)pids[i], apps[i], sizeof apps[i])) apps[i][0] = 0;
+    char json[sizeof hub.use_last];
+    if (studio_use_format(&apps[0][0], FW_APP_MAX, n, hub.camera_name, cfg.mode != 0, json, sizeof json))
+        snprintf(json, sizeof json, "{\"apps\":[\"\"],\"camera\":\"\",\"effects\":%s}", cfg.mode ? "true" : "false");
+    use_send(json);
+}
+
+void mstudio_tick(void) {
+    double t = now_s();
+    if (t < hub.tick_at) return;
+    hub.tick_at = t + 1.0;
+    MediaSrc *s = hub_src();
+    if (s && s->sock < 0) { media_src_close(s); hub_reset(); s = NULL; }        /* it ended: started again below */
+    if (!s && t >= hub.device_at) {
+        int fd = loopback_open();
+        hub.device = fd >= 0;
+        if (fd >= 0) close(fd);
+        hub.device_at = t + 5;
+    }
+    int device = s ? 1 : hub.device;
+    /* the readers: named (the indicator) while the hub says somebody streams, or always when it can't say */
+    if (s && hub.ready && (hub.readers != 0 || !hub.events)) {
+        if (t >= hub.scan_at) { hub_scan(); hub.scan_at = t + 2; }
+    } else {
+        hub.scanned = 0;
+        if (hub.use_last[0]) use_send("{\"apps\":[],\"camera\":\"\",\"effects\":false}");
+    }
+    int want = device && studio_hub_wanted(cfg.on, mstudio_available(), device, hub.readers, hub.scanned);
+    if (!s && want) s = hub_spawn(t);
+    else if (s && !want) { hub_stop(s); s = NULL; }
+    if (s && hub.ready && s->sock >= 0) hub_drive(s, t);
+}
+
+/* only while the hub runs: without it nothing here needs the loop to wake (a newly loaded module is seen at the next
+ * turn of the loop for any other reason, at most every 5 s) */
+double mstudio_timeout(void) {
+    if (!hub_src()) return -1;
+    double left = (hub.tick_at - now_s()) * 1000;
+    return left < 0 ? 0 : left;
+}
+
+int mstudio_preview_hub(void) {
+    if (!hub_serving()) return 0;
+    hub.preview = 1;
+    hub.tick_at = 0;
+    mstudio_tick();
+    return hub.id;
+}
+
+void mstudio_preview_end(void) {
+    hub.preview = 0;
+    hub.tick_at = 0;
+}
+
+int mstudio_is_hub(int src_id) { return src_id > 0 && hub.id == src_id && hub_src() != NULL; }
+
 void mstudio_status(char *json, size_t n) {
     static const char *const modes[] = { "none", "blur", "picture" };
-    char bg[PATH_MAX * 2 + 8], cam[80];
+    static const char *const shows[] = { "idle", "camera", "off" };
+    char bg[PATH_MAX * 2 + 8], cam[80], camname[160];
     media_json_str(bg, sizeof bg, cfg.bg_name);
     media_json_str(cam, sizeof cam, cfg.camera);
-    size_t o = (size_t)snprintf(json, n, "{\"available\":%s,\"camera\":%s,\"mode\":\"%s\",\"blur\":%d,\"mirror\":%s,\"background\":%s,"
-                                "\"fps\":%.1f,\"segMs\":%.2f,\"fxMs\":%.2f,\"gpu\":%s,\"sources\":[",
-                                mstudio_available() ? "true" : "false", cam, modes[cfg.mode], cfg.blur, cfg.mirror ? "true" : "false", bg,
-                                stats.fps, stats.seg_us / 1000.0, stats.fx_us / 1000.0, stats.gpu ? "true" : "false");
+    media_json_str(camname, sizeof camname, hub.camera_name);
+    MediaSrc *h = hub_src();
+    /* the apps reading the loopback, as the indicator names them (use_last's list, which studio_use_format made) */
+    char apps[sizeof hub.use_last] = "[]";
+    const char *a = strstr(hub.use_last, "\"apps\":["), *e = a ? strchr(a, ']') : NULL;
+    if (a && e) snprintf(apps, sizeof apps, "%.*s", (int)(e - (a + 7)) + 1, a + 7);
+    /* loopback: 'missing' (no device: the package isn't installed or its module isn't loaded), 'ready', 'running' */
+    const char *lb = h && hub.ready ? "running" : (h || hub.device) ? "ready" : "missing";
+    size_t o = (size_t)snprintf(json, n, "{\"available\":%s,\"on\":%s,\"camera\":%s,\"mode\":\"%s\",\"blur\":%d,\"mirror\":%s,\"background\":%s,"
+                                "\"fps\":%.1f,\"segMs\":%.2f,\"fxMs\":%.2f,\"gpu\":%s,"
+                                "\"loopback\":\"%s\",\"hub\":%d,\"readers\":%d,\"cameraOpen\":%s,\"shows\":\"%s\",\"cameraName\":%s,\"stopped\":%s,"
+                                "\"apps\":%s,\"sources\":[",
+                                mstudio_available() ? "true" : "false", cfg.on ? "true" : "false", cam, modes[cfg.mode], cfg.blur,
+                                cfg.mirror ? "true" : "false", bg, stats.fps, stats.seg_us / 1000.0, stats.fx_us / 1000.0, stats.gpu ? "true" : "false",
+                                lb, h ? h->id : 0, hub.readers < 0 ? hub.scanned : hub.readers, hub.cam_open ? "true" : "false",
+                                shows[hub.shows < 0 || hub.shows > 2 ? 0 : hub.shows], camname, hub.gave_up ? "true" : "false", apps);
     int first = 1;
     for (int i = 0; i < MEDIA_MAX_SRC && o + 160 < n; i++) {
         MediaSrc *s = media_src_at(i);
-        if (!s || !s->studio || s->sock < 0) continue;
+        if (!s || !s->studio || s->studio == STUDIO_SRC_HUB || s->sock < 0) continue;
         char app[MEDIA_APP_MAX * 2 + 8];
         media_json_str(app, sizeof app, s->app);
         o += (size_t)snprintf(json + o, n - o, "%s{\"id\":%d,\"app\":%s,\"isolated\":%s}", first ? "" : ",", s->id, app, s->bk ? "true" : "false");

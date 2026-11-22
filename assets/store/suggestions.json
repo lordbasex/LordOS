@@ -36,6 +36,14 @@
       "ifUnavailable": "explain"
     },
     {
+      "id": "studioCamera",
+      "when": { "usbClass": ["0e"] },
+      "packages": ["lordos-studio-camera"],
+      "free": true,
+      "notes": ["dkms", "secureBoot"],
+      "icon": "camera"
+    },
+    {
       "id": "rpi5Tools",
       "when": { "compatible": ["raspberrypi,5-model-b", "raspberrypi,500", "raspberrypi,5-compute-module"] },
       "packages": ["rpi-eeprom", "raspi-utils", "gpiod"],

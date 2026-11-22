@@ -24,5 +24,12 @@
   "perfGpu": "초당 {fps}프레임 · 그래픽 카드",
   "perfCpu": "초당 {fps}프레임 · 프로세서",
   "howTo": "“LordOS Studio” 카메라를 선택한 앱에 이 효과가 적용됩니다.",
-  "cameraHint": "LordOS Studio가 화면을 가져오는 카메라입니다."
+  "cameraHint": "LordOS Studio가 화면을 가져오는 카메라입니다.",
+  "everyApp": "모든 앱",
+  "everyAppHint": "스토어에서 LordOS Studio Camera를 설치하면 브라우저와 다른 앱에서도 “LordOS Studio” 카메라를 선택할 수 있습니다.",
+  "everyAppOn": "브라우저와 다른 앱에서 “LordOS Studio” 카메라를 선택할 수 있습니다. 카메라는 그중 하나가 사용하는 동안에만 켜집니다.",
+  "everyAppOff": "“LordOS Studio”를 선택한 앱에는 “카메라 꺼짐” 이미지가 표시되며, 실제 카메라는 보이지 않습니다.",
+  "notInstalled": "설치되지 않음",
+  "getCamera": "스토어에서 받기…",
+  "stopped": "LordOS Studio 카메라가 여러 번 멈춰서 꺼졌습니다. 다시 시도하려면 껐다가 다시 켜세요."
 }

@@ -924,5 +924,9 @@
   "shot.area": "Chọn vùng…",
   "shot.take": "Chụp màn hình",
   "shot.areaHint": "Kéo qua vùng sẽ đưa cho {app}. Esc để hủy.",
-  "shot.colorHint": "Bấm vào màu sẽ đưa cho {app}. Esc để hủy."
+  "shot.colorHint": "Bấm vào màu sẽ đưa cho {app}. Esc để hủy.",
+  "capture.what.viaStudio": "Camera qua LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Camera qua LordOS Studio",
+  "capture.what.effectsOn": "đang bật hiệu ứng",
+  "capture.what.effectsOff": "không hiệu ứng"
 }

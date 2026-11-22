@@ -314,5 +314,11 @@
   "src.wine": "Wine",
   "src.android": "Android アプリ",
   "soon": "近日対応",
-  "sub.all": "すべて"
+  "sub.all": "すべて",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "カメラを検出しました。",
+  "suggest.studioCamera.detail": "ブラウザやビデオ通話を含むすべてのアプリで、エフェクト付きの「LordOS Studio」カメラを使えるようにします：背景のぼかしや背景画像（{packages}）。",
+  "suggest.studioCamera.unavailable": "{packages} はこのコンピュータのパッケージソースにありません。",
+  "suggest.studioCamera.note.dkms": "PC ではカーネルモジュールがこのコンピュータ上でお使いのカーネル向けにビルドされ（DKMS）、約 500 MB のコンパイラとカーネルヘッダーが追加されます。カーネルを更新するたびに再ビルドされます。Raspberry Pi では LordOS のカーネルに含まれています。",
+  "suggest.studioCamera.note.secureBoot": "セキュアブートが有効な場合は、次回の再起動時にモジュールの署名鍵を登録する必要があります。登録しないとカメラは表示されません。"
 }

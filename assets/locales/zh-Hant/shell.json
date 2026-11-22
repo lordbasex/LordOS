@@ -924,5 +924,9 @@
   "shot.area": "選取區域…",
   "shot.take": "擷取螢幕畫面",
   "shot.areaHint": "拖過要給 {app} 的區域。按 Esc 取消。",
-  "shot.colorHint": "按一下要給 {app} 的顏色。按 Esc 取消。"
+  "shot.colorHint": "按一下要給 {app} 的顏色。按 Esc 取消。",
+  "capture.what.viaStudio": "透過 LordOS Studio 的相機（{camera}）",
+  "capture.what.viaStudioPlain": "透過 LordOS Studio 的相機",
+  "capture.what.effectsOn": "效果已開啟",
+  "capture.what.effectsOff": "無效果"
 }

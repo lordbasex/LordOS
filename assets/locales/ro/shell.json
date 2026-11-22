@@ -938,5 +938,9 @@
   "shot.area": "Selectați o zonă…",
   "shot.take": "Fă captura",
   "shot.areaHint": "Trageți peste zona de dat lui {app}. Esc anulează.",
-  "shot.colorHint": "Faceți clic pe culoarea de dat lui {app}. Esc anulează."
+  "shot.colorHint": "Faceți clic pe culoarea de dat lui {app}. Esc anulează.",
+  "capture.what.viaStudio": "Cameră prin LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Cameră prin LordOS Studio",
+  "capture.what.effectsOn": "efecte activate",
+  "capture.what.effectsOff": "fără efecte"
 }

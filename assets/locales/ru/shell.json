@@ -938,5 +938,9 @@
   "shot.area": "Выделить область…",
   "shot.take": "Сделать снимок",
   "shot.areaHint": "Проведите по области, которую получит {app}. Esc — отмена.",
-  "shot.colorHint": "Нажмите на цвет, который получит {app}. Esc — отмена."
+  "shot.colorHint": "Нажмите на цвет, который получит {app}. Esc — отмена.",
+  "capture.what.viaStudio": "Камера через LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Камера через LordOS Studio",
+  "capture.what.effectsOn": "эффекты включены",
+  "capture.what.effectsOff": "без эффектов"
 }

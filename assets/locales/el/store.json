@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "Εφαρμογές Android",
   "soon": "Σύντομα",
-  "sub.all": "Όλες"
+  "sub.all": "Όλες",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Εντοπίσαμε κάμερα.",
+  "suggest.studioCamera.detail": "Δίνει σε όλες τις εφαρμογές, μαζί με τα προγράμματα περιήγησης και τις βιντεοκλήσεις, την κάμερα «LordOS Studio» με τα εφέ σας: θολό φόντο ή μια εικόνα πίσω σας ({packages}).",
+  "suggest.studioCamera.unavailable": "Το {packages} δεν υπάρχει στις πηγές πακέτων αυτού του υπολογιστή.",
+  "suggest.studioCamera.note.dkms": "Σε PC η λειτουργική μονάδα πυρήνα μεταγλωττίζεται για τον πυρήνα σας σε αυτόν τον υπολογιστή (DKMS), κάτι που φέρνει περίπου 500 MB μεταγλωττιστών και κεφαλίδων πυρήνα, και ξανά μετά από κάθε ενημέρωση του πυρήνα. Σε Raspberry Pi περιλαμβάνεται στον πυρήνα του LordOS.",
+  "suggest.studioCamera.note.secureBoot": "Με ενεργό το Secure Boot πρέπει να καταχωρίσετε το κλειδί υπογραφής της μονάδας στην επόμενη επανεκκίνηση, αλλιώς η κάμερα δεν θα εμφανιστεί."
 }

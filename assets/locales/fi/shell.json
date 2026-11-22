@@ -931,5 +931,9 @@
   "shot.area": "Valitse alue…",
   "shot.take": "Ota kuvakaappaus",
   "shot.areaHint": "Vedä sen alueen yli, jonka annat sovellukselle {app}. Esc peruuttaa.",
-  "shot.colorHint": "Napsauta väriä, jonka annat sovellukselle {app}. Esc peruuttaa."
+  "shot.colorHint": "Napsauta väriä, jonka annat sovellukselle {app}. Esc peruuttaa.",
+  "capture.what.viaStudio": "Kamera LordOS Studion kautta ({camera})",
+  "capture.what.viaStudioPlain": "Kamera LordOS Studion kautta",
+  "capture.what.effectsOn": "tehosteet käytössä",
+  "capture.what.effectsOff": "ei tehosteita"
 }

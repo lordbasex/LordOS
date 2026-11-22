@@ -4,16 +4,23 @@
  * picture passed through LordOS Studio's pipeline (st.h) before it goes to the preview slots, the photo, the video
  * and a companion's link. It receives only fds that lord-server opened: the camera, the render node (or none), the
  * segmenter's model (hash already checked) and, later, a background picture. Its messages are numbers: MM_STUDIO
- * (mode, blur, mirror), MM_STUDIO_BG (an fd, or none to clear) and, back, MM_STUDIO_STATS once a second. */
+ * (mode, blur, mirror), MM_STUDIO_BG (an fd, or none to clear) and, back, MM_STUDIO_STATS once a second.
+ * With loopback=1 (phase 2, stcam_hub below) it is instead the session's one writer of the "LordOS Studio" V4L2
+ * device: no camera at the start, the loopback's fd, and the camera only when lord-server sends it (MM_STUDIO_CAM). */
 #ifdef LM_STUDIO
 #include "../helper/lm.h"
 #include "st.h"
+#include "stout.h"
 #include "models.h"
 
 #include <errno.h>
+#include <linux/videodev2.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
@@ -147,6 +154,168 @@ void stcam_probe(void) {
     lm_result(0, ok ? 0 : -1, ok ? j : "studio.failed", -1);
     free(in);
     free(out);
+}
+
+/* ---- the loopback: LordOS Studio's camera for every app (phase 2; docs/CAMERA-STUDIO-PLAN.md 2.2 and 8) ----------
+ * One lord-studio per session writes the "LordOS Studio" device (v4l2loopback, /dev/video50, an fd lord-server opened
+ * and checked). With nobody reading it writes the idle card once a second and has no camera at all; when a reader
+ * starts streaming, v4l2loopback's client-usage event says so, lord-studio tells lord-server (MM_STUDIO_READERS), and
+ * lord-server decides and sends the real camera's fd (MM_STUDIO_CAM). The camera is closed again as soon as lord-server
+ * says so, which it does when the last reader and the popover's preview are gone: the camera's light tells the truth. */
+
+static void hub_report(int readers, int cam_open, int what) {
+    mp_sendv(LM_SOCK, MM_STUDIO_READERS, 0, readers, cam_open, what, 0);
+}
+
+static int hub_write(int loop, const uint8_t *p, size_t n) {
+    ssize_t r;
+    do r = write(loop, p, n);
+    while (r < 0 && errno == EINTR);
+    return r == (ssize_t)n ? 0 : -1;
+}
+
+void stcam_hub(const char *params, int loop, int render) {
+    (void)render;                                   /* the GPU composite already has it (stcam_init) */
+    int W = (int)mp_param_int(params, "width", 1280), H = (int)mp_param_int(params, "height", 720);
+    st_out_size(&W, &H);
+    struct v4l2_capability cap;
+    memset(&cap, 0, sizeof cap);
+    /* lord-server checked it already; the helper doesn't trust that either */
+    if (loop < 0 || ioctl(loop, VIDIOC_QUERYCAP, &cap) || strcmp((const char *)cap.driver, "v4l2 loopback")) {
+        LM_LOG("not a v4l2loopback device");
+        lm_error("studio.failed");
+        mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0);
+        return;
+    }
+    struct v4l2_format f;
+    memset(&f, 0, sizeof f);
+    f.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+    f.fmt.pix.width = (uint32_t)W;
+    f.fmt.pix.height = (uint32_t)H;
+    f.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+    f.fmt.pix.field = V4L2_FIELD_NONE;
+    f.fmt.pix.bytesperline = (uint32_t)W * 2;
+    f.fmt.pix.sizeimage = (uint32_t)st_yuyv_size(W, H);
+    f.fmt.pix.colorspace = V4L2_COLORSPACE_SMPTE170M;
+    if (ioctl(loop, VIDIOC_S_FMT, &f) || f.fmt.pix.pixelformat != V4L2_PIX_FMT_YUYV || (int)f.fmt.pix.width != W || (int)f.fmt.pix.height != H) {
+        LM_LOG("the loopback refused YUYV %dx%d (another writer?)", W, H);
+        lm_error("studio.failed");
+        mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0);
+        return;
+    }
+    /* the readers: v4l2loopback 0.13.0 and later; the initial event gives the count now */
+    struct v4l2_event_subscription sub;
+    memset(&sub, 0, sizeof sub);
+    sub.type = ST_EVENT_CLIENT_USAGE;
+    sub.flags = V4L2_EVENT_SUB_FL_SEND_INITIAL;
+    int events = ioctl(loop, VIDIOC_SUBSCRIBE_EVENT, &sub) == 0;
+    if (!events) LM_LOG("no client-usage event from this v4l2loopback: lord-server counts the readers itself");
+    size_t fsz = st_yuyv_size(W, H);
+    uint8_t *cards[2] = { malloc(fsz), malloc(fsz) }, *out = malloc(fsz), *tmp = malloc((size_t)W * H * 4);
+    if (!cards[0] || !cards[1] || !out || !tmp) { lm_error("studio.failed"); mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0); goto done; }
+    for (int k = 0; k < 2; k++) { st_card_bgra(k, tmp, W, H); st_bgra_to_yuyv(tmp, W * 4, W, H, cards[k]); }
+    free(tmp);
+    tmp = NULL;
+    lm_out_init(0);
+    {
+        char info[160];
+        snprintf(info, sizeof info, "{\"loopback\":true,\"width\":%d,\"height\":%d,\"events\":%s}", W, H, events ? "true" : "false");
+        mp_send(LM_SOCK, MM_INFO, 0, NULL, info, strlen(info), NULL, 0);
+        mp_sendv(LM_SOCK, MM_STATE, 0, MS_PLAYING, 0, 0, 0);
+    }
+    static char payload[MP_PAYLOAD_MAX + 1];
+    AVFrame *frame = av_frame_alloc();
+    struct SwsContext *osws = NULL;
+    LmCam *cam = NULL;
+    int cam_fd = -1, what = 0, preview = 0, readers = events ? 0 : -1, stop = 0;
+    double next_card = 0, t_start = lm_now_ms();
+    /* the first card at once: from now on v4l2loopback announces a camera that captures */
+    if (hub_write(loop, cards[0], fsz)) LM_LOG("the first card wasn't written: %s", strerror(errno));
+    next_card = lm_now_ms() + 1000;
+    hub_report(readers, 0, 0);
+    while (!stop) {
+        double now = lm_now_ms();
+        int timeout = cam ? 500 : (int)(next_card > now ? next_card - now : 0);
+        struct pollfd pf[3] = { { LM_SOCK, POLLIN, 0 }, { loop, POLLPRI, 0 }, { cam ? cam_fd : -1, POLLIN, 0 } };
+        if (poll(pf, 3, timeout) < 0 && errno != EINTR) break;
+        if (pf[0].revents & (POLLHUP | POLLERR)) break;
+        int changed = 0;
+        if (pf[0].revents & POLLIN) {
+            MediaMsg m;
+            int fds[MP_MAX_FDS], r;
+            while ((r = mp_recv(LM_SOCK, &m, payload, sizeof payload, fds, 0)) != -1) {
+                if (r == 0 || m.type == MM_STOP) { stop = 1; for (int i = 0; i < MP_MAX_FDS; i++) if (fds[i] >= 0) close(fds[i]); break; }
+                if (m.type == MM_ACK) lm_out_ack(m.id);
+                else if (m.type == MM_SIZE) lm_out_box((int)m.v[0], (int)m.v[1]);
+                else if (m.type == MM_STUDIO) stcam_config(&m);
+                else if (m.type == MM_STUDIO_BG) { stcam_background(fds[0]); fds[0] = -1; }
+                else if (m.type == MM_STUDIO_CAM) {
+                    preview = m.v[1] == 1;
+                    int want = m.v[0] == 1 ? 1 : m.v[0] == 2 ? 2 : 0;
+                    if (want == 1 && fds[0] >= 0) {
+                        if (cam) { lm_cam_close(cam); cam = NULL; close(cam_fd); cam_fd = -1; }
+                        const char *code = NULL;
+                        cam = lm_cam_open(fds[0], W, H, &code);
+                        if (cam) { cam_fd = fds[0]; fds[0] = -1; what = 1; if (fx) stfx_reset(fx); }
+                        else { lm_error("%s", code); what = 0; next_card = 0; }
+                    } else if (want != 1) {
+                        if (cam) { lm_cam_close(cam); cam = NULL; close(cam_fd); cam_fd = -1; }
+                        what = want;
+                        next_card = 0;                      /* the card at once, not the camera's last frame */
+                    }
+                    changed = 1;
+                }
+                for (int i = 0; i < MP_MAX_FDS; i++) if (fds[i] >= 0) close(fds[i]);
+            }
+        }
+        if (pf[1].revents & POLLPRI) {
+            struct v4l2_event ev;
+            for (int k = 0; k < 16; k++) {
+                memset(&ev, 0, sizeof ev);
+                if (ioctl(loop, VIDIOC_DQEVENT, &ev)) break;
+                int n = st_client_usage(ev.type, ev.u.data, sizeof ev.u.data);
+                if (n >= 0 && n != readers) { readers = n; changed = 1; }
+            }
+        }
+        if (changed) hub_report(readers, cam != NULL, what);
+        stcam_tick();
+        if (cam && (pf[2].revents & (POLLIN | POLLERR | POLLHUP))) {
+            int got = lm_cam_read(cam, frame);
+            if (got < 0) {                                  /* unplugged: the card again, and lord-server hears it */
+                LM_LOG("the camera went away");
+                lm_cam_close(cam);
+                cam = NULL;
+                close(cam_fd);
+                cam_fd = -1;
+                what = 0;
+                next_card = 0;
+                lm_error("camera.failed");
+                hub_report(readers, 0, what);
+            } else if (got) {
+                AVFrame *shown = stcam_frame(frame);
+                osws = sws_getCachedContext(osws, shown->width, shown->height, shown->format, W, H, AV_PIX_FMT_YUYV422, SWS_BILINEAR, NULL, NULL, NULL);
+                if (osws) {
+                    uint8_t *dst[4] = { out, NULL, NULL, NULL };
+                    int dls[4] = { W * 2, 0, 0, 0 };
+                    sws_scale(osws, (const uint8_t *const *)shown->data, shown->linesize, 0, shown->height, dst, dls);
+                    if (hub_write(loop, out, fsz) && errno != EAGAIN) LM_DBG("loopback write: %s", strerror(errno));
+                }
+                if (preview) lm_out_present(shown, (int64_t)(lm_now_ms() - t_start));
+            }
+        }
+        if (!cam && lm_now_ms() >= next_card) {
+            if (hub_write(loop, cards[what == 2 ? 1 : 0], fsz) && errno != EAGAIN) LM_DBG("loopback write: %s", strerror(errno));
+            next_card = lm_now_ms() + 1000;
+        }
+    }
+    if (cam) { lm_cam_close(cam); close(cam_fd); }
+    sws_freeContext(osws);
+    av_frame_free(&frame);
+done:
+    free(cards[0]);
+    free(cards[1]);
+    free(out);
+    free(tmp);
 }
 
 void stcam_free(void) {

@@ -314,5 +314,11 @@
   "src.wine": "Wine",
   "src.android": "แอป Android",
   "soon": "เร็ว ๆ นี้",
-  "sub.all": "ทั้งหมด"
+  "sub.all": "ทั้งหมด",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "เราตรวจพบกล้อง",
+  "suggest.studioCamera.detail": "ให้ทุกแอป รวมถึงเบราว์เซอร์และการโทรวิดีโอ ใช้กล้อง “LordOS Studio” พร้อมเอฟเฟกต์ของคุณ: พื้นหลังเบลอหรือภาพด้านหลังคุณ ({packages})",
+  "suggest.studioCamera.unavailable": "{packages} ไม่อยู่ในแหล่งแพ็กเกจของคอมพิวเตอร์นี้",
+  "suggest.studioCamera.note.dkms": "บนพีซี โมดูลเคอร์เนลของมันจะถูกคอมไพล์สำหรับเคอร์เนลของคุณบนคอมพิวเตอร์นี้ (DKMS) ซึ่งนำคอมไพเลอร์และเฮดเดอร์เคอร์เนลมาราว 500 MB และคอมไพล์ใหม่หลังอัปเดตเคอร์เนลทุกครั้ง บน Raspberry Pi มาพร้อมเคอร์เนลของ LordOS",
+  "suggest.studioCamera.note.secureBoot": "เมื่อเปิด Secure Boot คุณต้องลงทะเบียนคีย์ลงนามของโมดูลเมื่อรีสตาร์ตครั้งถัดไป มิฉะนั้นกล้องจะไม่ปรากฏ"
 }

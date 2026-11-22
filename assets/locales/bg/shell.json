@@ -931,5 +931,9 @@
   "shot.area": "Избор на област…",
   "shot.take": "Направи снимка",
   "shot.areaHint": "Плъзнете върху областта, която да дадете на {app}. Esc отказва.",
-  "shot.colorHint": "Щракнете върху цвета, който да дадете на {app}. Esc отказва."
+  "shot.colorHint": "Щракнете върху цвета, който да дадете на {app}. Esc отказва.",
+  "capture.what.viaStudio": "Камера чрез LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Камера чрез LordOS Studio",
+  "capture.what.effectsOn": "ефектите са включени",
+  "capture.what.effectsOff": "без ефекти"
 }

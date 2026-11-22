@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "Android tətbiqləri",
   "soon": "Tezliklə",
-  "sub.all": "Hamısı"
+  "sub.all": "Hamısı",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Kamera aşkarladıq.",
+  "suggest.studioCamera.detail": "Brauzerlər və video zənglər daxil olmaqla bütün tətbiqlərə effektlərinizlə “LordOS Studio” kamerasını verir: bulanıq fon və ya arxanızda şəkil ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} bu kompüterin paket mənbələrində yoxdur.",
+  "suggest.studioCamera.note.dkms": "PC-də onun nüvə modulu bu kompüterdə nüvəniz üçün yığılır (DKMS); bu, təxminən 500 MB kompilyator və nüvə başlıqları gətirir və hər nüvə yeniləməsindən sonra yenidən yığılır. Raspberry Pi-də LordOS nüvəsi ilə gəlir.",
+  "suggest.studioCamera.note.secureBoot": "Secure Boot açıq olduqda növbəti yenidən başlatmada modulun imza açarını qeydiyyatdan keçirməlisiniz, əks halda kamera görünməyəcək."
 }

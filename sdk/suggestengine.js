@@ -46,6 +46,8 @@ export function matches(cond, facts) {
     case 'virtio': return arr(facts.virtio).some((n) => arr(v).includes(n));
     case 'compatible': return arr(facts.compatible).some((n) => arr(v).includes(n));
     case 'arch': return arr(v).includes(str(facts.arch));
+    // a USB device with an interface of one of these classes (two hex digits: "0e" video, a webcam)
+    case 'usbClass': return arr(facts.usb).some((d) => arr(d.ifaces).some((i) => arr(v).includes(str(i).slice(0, 2))));
     default: return false;                       // an unknown condition never matches
   }
 }

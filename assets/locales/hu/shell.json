@@ -931,5 +931,9 @@
   "shot.area": "Terület kijelölése…",
   "shot.take": "Képernyőkép készítése",
   "shot.areaHint": "Húzza végig a területen, amelyet {app} megkap. Az Esc megszakítja.",
-  "shot.colorHint": "Kattintson a színre, amelyet {app} megkap. Az Esc megszakítja."
+  "shot.colorHint": "Kattintson a színre, amelyet {app} megkap. Az Esc megszakítja.",
+  "capture.what.viaStudio": "Kamera a LordOS Studión keresztül ({camera})",
+  "capture.what.viaStudioPlain": "Kamera a LordOS Studión keresztül",
+  "capture.what.effectsOn": "effektusok be",
+  "capture.what.effectsOff": "effektusok nélkül"
 }

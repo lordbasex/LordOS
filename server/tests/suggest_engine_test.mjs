@@ -27,7 +27,7 @@ const facts = (patch) => ({ ...base(), ...patch });
 
 // ---- fake index: name → { installed } ; absent = not in the configured sources ----
 const MAIN = ['open-vm-tools', 'qemu-guest-agent', 'linux-headers-amd64', 'hplip', 'libsane-hpaio', 'printer-driver-escpr', 'printer-driver-brlaser',
-  'printer-driver-splix', 'printer-driver-gutenprint', 'ipp-usb', 'gpiod'];
+  'printer-driver-splix', 'printer-driver-gutenprint', 'ipp-usb', 'gpiod', 'lordos-studio-camera'];
 const NONFREE = ['nvidia-driver', 'firmware-misc-nonfree', 'firmware-realtek', 'firmware-iwlwifi', 'firmware-atheros', 'firmware-brcm80211',
   'firmware-mediatek', 'firmware-amd-graphics', 'firmware-intel-graphics', 'bluez-firmware', 'firmware-libertas', 'firmware-nvidia-graphics'];
 const RPI = ['rpi-eeprom', 'raspi-utils'];
@@ -104,6 +104,17 @@ eq('unknown vendor printer: only ipp-usb', ids(run(facts({ usb: [{ vendor: '1234
 eq('two HP printers: one suggestion', ids(run(facts({ usb: [hp.usb[0], { ...hp.usb[0], product: '1234' }] }))), ['printer:03f0=install', 'ippUsb=install']);
 eq('a keyboard (class 03): nothing', ids(run(facts({ usb: [{ vendor: '046d', product: 'c31c', class: '00', ifaces: ['030101'], driver: 'usbhid', sane: false }] }))), []);
 eq('bad vendor id ignored', ids(run(facts({ usb: [{ vendor: '03F0x', product: '1', class: '00', ifaces: ['070102'], driver: '', sane: false }] }))), []);
+
+// ---- a webcam (USB video class 0e): LordOS Studio's camera for every app (docs/CAMERA-STUDIO-PLAN.md 2.2) ----
+const webcam = facts({ usb: [{ vendor: '046d', product: '0843', class: 'ef', ifaces: ['0e0100', '0e0200', '010100', '010200'], driver: 'uvcvideo', sane: false }] });
+eq('webcam: LordOS Studio Camera', ids(run(webcam)), ['studioCamera=install']);
+eq('webcam: our own package, free', [one(run(webcam), 'studioCamera').install, one(run(webcam), 'studioCamera').free], [['lordos-studio-camera'], true]);
+eq('webcam: its notes', one(run(webcam), 'studioCamera').notes, ['dkms', 'secureBoot']);
+eq('webcam: installed', ids(run(webcam, { installed: ['lordos-studio-camera'] })), ['studioCamera=installed']);
+eq('webcam on the Pi too (the module is in the LordOS kernel)', ids(run({ ...webcam, arch: 'aarch64' })), ['studioCamera=install']);
+eq('webcam: not in the sources yet → no card', ids(evaluate(DATA, webcam, { info: (n) => (n === 'lordos-studio-camera' ? null : { name: n }) })), []);
+eq('usb audio only (class 01): no camera card', ids(run(facts({ usb: [{ vendor: '0d8c', product: '0014', class: '00', ifaces: ['010100', '010200'], driver: 'snd-usb-audio', sane: false }] }))), []);
+eq('usbClass condition', [matches({ usbClass: ['0e'] }, webcam), matches({ usbClass: ['0e'] }, base())], [true, false]);
 
 // ---- missing firmware ----
 const fw = (missing) => facts({ firmware: { readable: true, missing } });

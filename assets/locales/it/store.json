@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "App Android",
   "soon": "Presto",
-  "sub.all": "Tutte"
+  "sub.all": "Tutte",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Abbiamo rilevato una fotocamera.",
+  "suggest.studioCamera.detail": "Dà a tutte le app, browser e videochiamate compresi, la fotocamera «LordOS Studio» con i tuoi effetti: sfondo sfocato o un’immagine dietro di te ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} non è tra le sorgenti dei pacchetti di questo computer.",
+  "suggest.studioCamera.note.dkms": "Su un PC il suo modulo del kernel viene compilato per il tuo kernel su questo computer (DKMS), il che porta circa 500 MB di compilatori e intestazioni del kernel, e di nuovo dopo ogni aggiornamento del kernel. Su un Raspberry Pi è incluso nel kernel di LordOS.",
+  "suggest.studioCamera.note.secureBoot": "Con Secure Boot attivo devi registrare la chiave di firma del modulo al prossimo riavvio, altrimenti la fotocamera non comparirà."
 }

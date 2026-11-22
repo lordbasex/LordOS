@@ -931,5 +931,9 @@
   "shot.area": "Markera område…",
   "shot.take": "Ta skärmbild",
   "shot.areaHint": "Dra över området som {app} ska få. Esc avbryter.",
-  "shot.colorHint": "Klicka på färgen som {app} ska få. Esc avbryter."
+  "shot.colorHint": "Klicka på färgen som {app} ska få. Esc avbryter.",
+  "capture.what.viaStudio": "Kamera via LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Kamera via LordOS Studio",
+  "capture.what.effectsOn": "effekter på",
+  "capture.what.effectsOff": "inga effekter"
 }

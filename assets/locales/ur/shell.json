@@ -931,5 +931,9 @@
   "shot.area": "حصہ منتخب کریں…",
   "shot.take": "اسکرین شاٹ لیں",
   "shot.areaHint": "{app} کو دینے والے حصے پر گھسیٹیں۔ Esc منسوخ کرتا ہے۔",
-  "shot.colorHint": "{app} کو دینے والے رنگ پر کلک کریں۔ Esc منسوخ کرتا ہے۔"
+  "shot.colorHint": "{app} کو دینے والے رنگ پر کلک کریں۔ Esc منسوخ کرتا ہے۔",
+  "capture.what.viaStudio": "LordOS Studio کے ذریعے کیمرا ({camera})",
+  "capture.what.viaStudioPlain": "LordOS Studio کے ذریعے کیمرا",
+  "capture.what.effectsOn": "اثرات آن",
+  "capture.what.effectsOff": "کوئی اثر نہیں"
 }

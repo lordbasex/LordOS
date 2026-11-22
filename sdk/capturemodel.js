@@ -8,8 +8,11 @@
 //            broker): [{ app, kind: 'camera'|'microphone', media? }]
 //   linux    what Linux and Flatpak apps capture through PipeWire, as lord-server's PipeWire guard sees it
 //            (server/src/sec/pwguard.c, hw event "capture-use"): [{ app, mic, camera, screen }], app '' an unknown program
+//   studio   the Linux apps reading LordOS Studio's camera device (/dev/video50; server/src/media/mstudio.c, hw event
+//            "studio-use", sdk/studiomodel.js studioUseOf): { apps: [id], camera, effects } | null; each is a camera row
+//            whose via says the real camera behind it and whether effects are on
 //
-//   captureRows(src, { name, enforceable })  → [{ key, app, name, screen, camera, mic, castIds, share, control, own, linux, media }]
+//   captureRows(src, { name, enforceable })  → [{ key, app, name, screen, camera, mic, castIds, share, control, own, linux, media, via }]
 //     screen: null | 'screen' | 'window' | 'both' | 'shot' | 'color'; own: the camera/microphone is LordOS's (a native or
 //     .lpk app: Turn off = its permission); linux: a Linux app's (Turn off = its firewall restriction), and only an app
 //     the firewall can name; media: a native app's camera source, for the preview
@@ -33,12 +36,12 @@ function widerScreen(a, b) {
 // One key per app, however each source spells it: "lpk:<id>" and the bare id of an .lpk app are one app
 const keyOf = (app) => (typeof app === 'string' && app.startsWith('lpk:') ? app.slice(4) : String(app || ''));
 
-export function captureRows({ share = null, casts = [], shots = [], devices = [], linux = [] } = {}, { name = (a) => a, enforceable = () => false } = {}) {
+export function captureRows({ share = null, casts = [], shots = [], devices = [], linux = [], studio = null } = {}, { name = (a) => a, enforceable = () => false } = {}) {
   const rows = new Map();
   const row = (app, label, unknownKey) => {
     const key = app ? keyOf(app) : unknownKey;
     if (!rows.has(key)) {
-      rows.set(key, { key, app: app || '', name: label || '', screen: null, camera: false, mic: false, castIds: [], share: false, control: false, ownApp: '', own: { camera: false, mic: false }, linux: { camera: false, mic: false, screen: false }, media: null });
+      rows.set(key, { key, app: app || '', name: label || '', screen: null, camera: false, mic: false, castIds: [], share: false, control: false, ownApp: '', own: { camera: false, mic: false }, linux: { camera: false, mic: false, screen: false }, media: null, via: null });
     }
     const r = rows.get(key);
     if (!r.name && label) r.name = label;
@@ -79,6 +82,14 @@ export function captureRows({ share = null, casts = [], shots = [], devices = []
     if (u.camera) { r.camera = true; if (named) r.linux.camera = true; }
     // a share the portal already shows (its Stop ends it) isn't said twice; one it doesn't know is the PipeWire guard's
     if (u.screen && !r.castIds.length && !r.share) { r.screen = widerScreen(r.screen, 'screen'); if (named) r.linux.screen = true; }
+  }
+  for (const a of studio && Array.isArray(studio.apps) ? studio.apps : []) {
+    if (typeof a !== 'string') continue;
+    // as above: every program LordOS can't name is one row
+    const r = row(a, a ? name(a) : '', 'unknown');
+    r.camera = true;
+    r.via = { camera: typeof studio.camera === 'string' ? studio.camera : '', effects: studio.effects === true };
+    if (a && enforceable(a)) r.linux.camera = true;
   }
   // the screen first, then the camera, then the microphone; by name within each
   const weight = (r) => (r.screen && r.screen !== 'shot' && r.screen !== 'color' ? 0 : r.camera ? 1 : r.mic ? 2 : 3);

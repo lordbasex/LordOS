@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "Mga app ng Android",
   "soon": "Malapit na",
-  "sub.all": "Lahat"
+  "sub.all": "Lahat",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "May nakita kaming camera.",
+  "suggest.studioCamera.detail": "Binibigyan ang lahat ng app, kasama ang mga browser at video call, ng camera na “LordOS Studio” na may mga effect mo: malabong background o larawan sa likod mo ({packages}).",
+  "suggest.studioCamera.unavailable": "Wala ang {packages} sa mga package source ng computer na ito.",
+  "suggest.studioCamera.note.dkms": "Sa PC, binubuo ang kernel module nito para sa kernel mo sa computer na ito (DKMS), na may kasamang mga 500 MB na compiler at kernel header, at muli pagkatapos ng bawat update ng kernel. Sa Raspberry Pi, kasama na ito sa kernel ng LordOS.",
+  "suggest.studioCamera.note.secureBoot": "Kapag naka-on ang Secure Boot, kailangan mong i-enroll ang signing key ng module sa susunod na restart, o hindi lalabas ang camera."
 }

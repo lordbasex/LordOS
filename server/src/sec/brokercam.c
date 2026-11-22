@@ -305,10 +305,7 @@ void brokercam_handle(int conn, int fd, uint32_t reqid, const char *payload, uin
             const char *code = NULL;
             s = media_src_new(SK_CAMERA, app);
             if (!s) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
-            s->sock = mstudio_spawn(w, h, &s->pid, &code);
-            if (s->sock < 0) { media_src_close(s); brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
-            s->studio = 1;
-            mstudio_attach(s->sock);
+            if (mstudio_open(s, w, h, &code)) { media_src_close(s); brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }
         } else {
             int dfd = open(dev, O_RDWR | O_NONBLOCK | O_CLOEXEC);
             if (dfd < 0) { brokersrv_reply(fd, reqid, BST_ERROR, NULL, 0, -1); return; }

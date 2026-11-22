@@ -71,7 +71,7 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
 MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
-MEDIA_SRC := src/media/mstudio.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
+MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
