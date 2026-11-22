@@ -81,7 +81,13 @@ enum { XA_PRIMARY = 1, XA_ATOM = 4, XA_CARDINAL = 6, XA_RESOURCE_MANAGER = 23, X
     X(XdndAware, "XdndAware") X(XdndSelection, "XdndSelection") X(XdndTypeList, "XdndTypeList") X(XdndEnter, "XdndEnter") \
     X(XdndPosition, "XdndPosition") X(XdndStatus, "XdndStatus") X(XdndLeave, "XdndLeave") X(XdndDrop, "XdndDrop") \
     X(XdndFinished, "XdndFinished") X(XdndActionCopy, "XdndActionCopy") X(XdndActionMove, "XdndActionMove") \
-    X(XdndActionAsk, "XdndActionAsk")
+    X(XdndActionAsk, "XdndActionAsk") \
+    X(WL_SURFACE_SERIAL, "WL_SURFACE_SERIAL") X(NET_WM_STATE_ABOVE, "_NET_WM_STATE_ABOVE") \
+    X(NET_WM_STATE_DEMANDS_ATTENTION, "_NET_WM_STATE_DEMANDS_ATTENTION") X(NET_WM_STATE_MODAL, "_NET_WM_STATE_MODAL") \
+    X(NET_WM_STATE_SKIP_TASKBAR, "_NET_WM_STATE_SKIP_TASKBAR") X(NET_WM_STATE_SKIP_PAGER, "_NET_WM_STATE_SKIP_PAGER") \
+    X(NET_WM_WINDOW_TYPE_UTILITY, "_NET_WM_WINDOW_TYPE_UTILITY") X(NET_WM_WINDOW_TYPE_TOOLBAR, "_NET_WM_WINDOW_TYPE_TOOLBAR") \
+    X(NET_CLIENT_LIST_STACKING, "_NET_CLIENT_LIST_STACKING") X(NET_WM_ICON, "_NET_WM_ICON") \
+    X(NET_REQUEST_FRAME_EXTENTS, "_NET_REQUEST_FRAME_EXTENTS") X(NET_WORKAREA, "_NET_WORKAREA") X(NET_CLOSE_WINDOW, "_NET_CLOSE_WINDOW")
 
 #define AE(id, name) A_##id,
 enum { ATOM_LIST(AE) A_COUNT };
@@ -96,6 +102,7 @@ struct XWin {
     int x, y, w, h;                     /* X geometry (root coordinates) */
     int override, managed, viewable;
     uint32_t surface_res;               /* WL_SURFACE_ID */
+    uint64_t serial;                    /* WL_SURFACE_SERIAL (xwayland-shell-v1, xwshell.c) */
     int sid;                            /* wl.c surface (0: not attached) */
     char title[256], cls[128], inst[128];
     int net_name;                       /* _NET_WM_NAME seen: WM_NAME no longer counts */
@@ -104,6 +111,11 @@ struct XWin {
     XSizeHints hints;
     int want_fs;                        /* asked for fullscreen before it had a surface */
     int fullscreen, maximized, minimized, focused;
+    int above, attention, modal, skip_taskbar, skip_pager;  /* _NET_WM_STATE kept for the app (see on_client_message) */
+    int urgent;                         /* WM_HINTS urgency */
+    uint32_t pid;                       /* _NET_WM_PID as the app wrote it: diagnostics only, never trusted */
+    uint32_t map_seq, stack_seq;        /* order of first mapping; place in the stacking order (bottom first) */
+    int stack_low;                      /* stacking: below every raised one (minimized) */
     int px, py, pw, ph, placed;         /* last position/size we configured */
     unsigned state_sig;
     uint32_t xdnd_aware;                /* XdndAware: the XDND version it takes drops with (0: none) */
@@ -150,6 +162,8 @@ static struct {
     unsigned ph, pn;
     XWin *wins;
     XWin *focus;
+    uint32_t map_ctr, stack_ctr;        /* _NET_CLIENT_LIST and _NET_CLIENT_LIST_STACKING order */
+    int wa[4], wa_set;                  /* _NET_WORKAREA as last written (X pixels) */
     Sel sel[NSEL];
     Xfer *xfers;
 } X = { .fd = -1 };
@@ -281,11 +295,52 @@ static int is_popup_type(uint32_t t) {
                  t == AT(NET_WM_WINDOW_TYPE_DND));
 }
 
+/* _NET_CLIENT_LIST in the order the windows were first mapped, _NET_CLIENT_LIST_STACKING bottom to top (EWMH). The
+ * focused window is raised (xwm_focus), a minimized one goes to the bottom (xwm_set_state). */
+#define NLIST 256
+static void sort_by(XWin **v, uint32_t n, int stacking) {
+    for (uint32_t i = 1; i < n; i++) {
+        XWin *k = v[i];
+        uint32_t j = i;
+        for (; j > 0; j--) {
+            XWin *o = v[j - 1];
+            int after = stacking ? (o->stack_low != k->stack_low ? o->stack_low < k->stack_low : o->stack_seq > k->stack_seq)
+                                 : o->map_seq > k->map_seq;
+            if (!after) break;
+            v[j] = o;
+        }
+        v[j] = k;
+    }
+}
 static void update_client_list(void) {
-    uint32_t ids[256];
+    XWin *v[NLIST];
+    uint32_t ids[NLIST];
     uint32_t n = 0;
-    for (XWin *w = X.wins; w && n < 256; w = w->next) if (w->managed) ids[n++] = w->id;
+    for (XWin *w = X.wins; w && n < NLIST; w = w->next) if (w->managed) v[n++] = w;
+    sort_by(v, n, 0);
+    for (uint32_t i = 0; i < n; i++) ids[i] = v[i]->id;
     change_prop(X.su.root, AT(NET_CLIENT_LIST), XA_WINDOW, 32, ids, n);
+    sort_by(v, n, 1);
+    for (uint32_t i = 0; i < n; i++) ids[i] = v[i]->id;
+    change_prop(X.su.root, AT(NET_CLIENT_LIST_STACKING), XA_WINDOW, 32, ids, n);
+}
+static void stack_top(XWin *w) { w->stack_low = 0; w->stack_seq = ++X.stack_ctr; }
+static void stack_bottom(XWin *w) { w->stack_low = 1; w->stack_seq = ++X.stack_ctr; }
+
+/* _NET_WORKAREA (one desktop): the first display's work area as the theme computes it, in X pixels; written when it
+ * changes (checked every loop, xwm_tick) */
+static void update_workarea(void) {
+    int x, y, w, h;
+    if (!wlx_work_area(&x, &y, &w, &h)) { x = y = 0; w = xws_from_x(X.su.width, wlx_scale()); h = xws_from_x(X.su.height, wlx_scale()); }
+    int sc = wlx_scale();
+    int v[4] = { xws_to_x(x, sc), xws_to_x(y, sc), xws_to_x(w, sc), xws_to_x(h, sc) };
+    if (v[0] < 0) v[0] = 0;
+    if (v[1] < 0) v[1] = 0;
+    if (X.wa_set && !memcmp(v, X.wa, sizeof v)) return;
+    memcpy(X.wa, v, sizeof v);
+    X.wa_set = 1;
+    uint32_t u[4] = { (uint32_t)v[0], (uint32_t)v[1], (uint32_t)(v[2] > 0 ? v[2] : 1), (uint32_t)(v[3] > 0 ? v[3] : 1) };
+    change_prop(X.su.root, AT(NET_WORKAREA), XA_CARDINAL, 32, u, 4);
 }
 
 static void set_wm_state(XWin *w, uint32_t state) {
@@ -294,13 +349,19 @@ static void set_wm_state(XWin *w, uint32_t state) {
 }
 
 static void write_net_state(XWin *w) {
-    uint32_t v[6];
+    uint32_t v[12];
     uint32_t n = 0;
     if (w->fullscreen) v[n++] = AT(NET_WM_STATE_FULLSCREEN);
     if (w->maximized) { v[n++] = AT(NET_WM_STATE_MAXIMIZED_VERT); v[n++] = AT(NET_WM_STATE_MAXIMIZED_HORZ); }
     if (w->minimized) v[n++] = AT(NET_WM_STATE_HIDDEN);
     if (w->focused) v[n++] = AT(NET_WM_STATE_FOCUSED);
-    unsigned sig = (unsigned)(w->fullscreen | w->maximized << 1 | w->minimized << 2 | w->focused << 3) + 1;
+    if (w->above) v[n++] = AT(NET_WM_STATE_ABOVE);
+    if (w->attention) v[n++] = AT(NET_WM_STATE_DEMANDS_ATTENTION);
+    if (w->modal) v[n++] = AT(NET_WM_STATE_MODAL);
+    if (w->skip_taskbar) v[n++] = AT(NET_WM_STATE_SKIP_TASKBAR);
+    if (w->skip_pager) v[n++] = AT(NET_WM_STATE_SKIP_PAGER);
+    unsigned sig = (unsigned)(w->fullscreen | w->maximized << 1 | w->minimized << 2 | w->focused << 3 | w->above << 4 |
+                              w->attention << 5 | w->modal << 6 | w->skip_taskbar << 7 | w->skip_pager << 8) + 1;
     if (sig == w->state_sig) return;
     w->state_sig = sig;
     change_prop(w->id, AT(NET_WM_STATE), XA_ATOM, 32, v, n);
@@ -314,8 +375,13 @@ static const char *origin_of(uint32_t owner) {
     return w && w->cls[0] ? w->cls : "x11";
 }
 
+static void get_icon(XWin *w);
+static int sid_of(uint32_t id) { XWin *o = id ? find(id) : NULL; return o && o->managed ? o->sid : 0; }
+/* the window it belongs to (WM_TRANSIENT_FOR) and whether it is modal, to wl.c */
+static void tell_parent(XWin *w) { if (w->sid) wlx_set_parent(w->sid, sid_of(w->transient), w->modal); }
+
 static void try_attach(XWin *w) {
-    if (!w->surface_res || w->sid) return;
+    if (w->sid || (!w->surface_res && !w->serial)) return;
     XWinInfo info = {
         .title = w->title, .app_id = w->cls, .app_alt = w->inst,
         .csd = w->decorated == 0 || w->wtype == AT(NET_WM_WINDOW_TYPE_SPLASH),
@@ -323,28 +389,41 @@ static void try_attach(XWin *w) {
         .x = xws_from_x(w->x, wlx_scale()), .y = xws_from_x(w->y, wlx_scale()),
         .width = xws_from_x(w->w, wlx_scale()), .height = xws_from_x(w->h, wlx_scale()),
     };
-    int sid = wlx_attach(w->surface_res, w, &info);
+    int sid = 0;
+    if (w->serial) {                                        /* xwayland-shell-v1: the surface that committed it */
+        int target = xwshell_surface_for(w->serial);
+        sid = target ? wlx_attach_id(target, w, &info) : 0;
+    } else sid = wlx_attach(w->surface_res, w, &info);
     if (!sid) return;
     w->sid = sid;
-    if (X.debug) fprintf(stderr, "xwm: 0x%x is surface %d (%s, class %s, %dx%d%s)\n", w->id, sid,
-                         info.popup ? "popup" : "window", w->cls, w->w, w->h, info.csd ? ", own frame" : "");
+    if (!info.popup) {
+        tell_parent(w);
+        for (XWin *o = X.wins; o; o = o->next) if (o != w && o->transient == w->id) tell_parent(o);   /* its dialogs */
+        get_icon(w);
+    }
+    if (X.debug) fprintf(stderr, "xwm: 0x%x is surface %d by %s (%s, class %s, _NET_WM_PID %u, %dx%d%s)\n", w->id, sid, w->serial ? "xwayland-shell-v1" : "WL_SURFACE_ID",
+                         info.popup ? "popup" : "window", w->cls, w->pid, w->w, w->h, info.csd ? ", own frame" : "");
     if (w->want_fs && !info.popup) { w->want_fs = 0; wlx_request(sid, XREQ_FULLSCREEN, 0); }
 }
 
 static void detach(XWin *w) {
     if (w->sid) { int sid = w->sid; w->sid = 0; wlx_detach(sid); }
     w->surface_res = 0;
+    w->serial = 0;
 }
 
 static void free_win(XWin *w) {
     for (XWin **p = &X.wins; *p; p = &(*p)->next) if (*p == w) { *p = w->next; break; }   /* first: detach calls out */
     detach(w);
     if (X.focus == w) X.focus = NULL;
+    for (XWin *o = X.wins; o; o = o->next)                  /* its id may be reused by another client: forgotten */
+        if (o->transient == w->id) { o->transient = 0; tell_parent(o); }
     free(w);
 }
 
 /* ---- properties ---- */
 
+static int known_type(int a);
 static void prop_reply(const uint8_t *r, size_t n, uint32_t id, uint32_t prop) {
     XWin *w = find(id);
     if (!w || !r || n < 32) return;
@@ -373,16 +452,48 @@ static void prop_reply(const uint8_t *r, size_t n, uint32_t id, uint32_t prop) {
         }
     } else if (prop == XA_WM_HINTS) {
         w->input = x11_wm_hints_input(nl ? longs : NULL, nl);
+        int urgent = x11_wm_hints_urgent(nl ? longs : NULL, nl);   /* ICCCM urgency: the window wants attention */
+        if (urgent != w->urgent) {
+            w->urgent = urgent;
+            if (w->managed && urgent != w->attention && (!urgent || w != X.focus)) {
+                w->attention = urgent;
+                write_net_state(w);
+                if (urgent && w->sid) wlx_attention(w->sid, 0);
+            }
+        }
     } else if (prop == XA_WM_NORMAL_HINTS) {
         x11_size_hints(nl ? longs : NULL, nl, &w->hints);
+        if (w->managed && !w->override && !is_popup_type(w->wtype) && !w->maximized && !w->fullscreen) {
+            /* new limits: its size (the last one asked of X, which may not have come back yet) kept within them */
+            int cw = w->pw > 0 ? w->pw : w->w, ch = w->ph > 0 ? w->ph : w->h, nw = cw, nh = ch;
+            x11_size_clamp(&w->hints, &nw, &nh);
+            if (nw != cw || nh != ch) { int32_t s2[2] = { nw, nh }; configure(w->id, XCF_W | XCF_H, s2, 2); w->pw = nw; w->ph = nh; }
+        }
     } else if (prop == AT(NET_WM_WINDOW_TYPE)) {
-        w->wtype = nl ? longs[0] : 0;
+        w->wtype = 0;                                       /* the first type in the list that is known (EWMH) */
+        for (size_t i = 0; i < nl && !w->wtype; i++)
+            for (int a = A_NET_WM_WINDOW_TYPE_NORMAL; a < A_COUNT; a++)
+                if (longs[i] && longs[i] == atom[a] && known_type(a)) { w->wtype = longs[i]; break; }
     } else if (prop == XA_WM_TRANSIENT_FOR) {
-        w->transient = nl ? longs[0] : 0;
+        uint32_t t = nl ? longs[0] : 0;
+        if (t == w->id) t = 0;
+        if (t != w->transient) { w->transient = t; tell_parent(w); }
+    } else if (prop == AT(NET_WM_PID)) {
+        w->pid = type == XA_CARDINAL && nl ? longs[0] : 0;
     } else if (prop == AT(MOTIF_WM_HINTS)) {
         w->decorated = x11_motif_decorated(nl ? longs : NULL, nl);
     } else if (prop == AT(NET_WM_STATE)) {
         for (size_t i = 0; i < nl; i++) if (longs[i] == AT(NET_WM_STATE_FULLSCREEN) && !w->sid) w->want_fs = 1;
+        if (!w->managed) {                                  /* what it asks for before it is mapped (EWMH); later ones
+                                                             * come as client messages, and the property is then ours */
+            for (size_t i = 0; i < nl; i++) {
+                if (longs[i] == AT(NET_WM_STATE_ABOVE)) w->above = 1;
+                if (longs[i] == AT(NET_WM_STATE_MODAL)) w->modal = 1;
+                if (longs[i] == AT(NET_WM_STATE_SKIP_TASKBAR)) w->skip_taskbar = 1;
+                if (longs[i] == AT(NET_WM_STATE_SKIP_PAGER)) w->skip_pager = 1;
+                if (longs[i] == AT(NET_WM_STATE_DEMANDS_ATTENTION)) w->attention = 1;
+            }
+        }
     } else if (prop == AT(XdndAware)) {
         w->xdnd_aware = type == XA_ATOM && nl ? longs[0] : 0;
     }
@@ -390,7 +501,19 @@ static void prop_reply(const uint8_t *r, size_t n, uint32_t id, uint32_t prop) {
 
 static const int watched[] = { XA_WM_CLASS, XA_WM_NAME, -1 /* _NET_WM_NAME */, -2 /* WM_PROTOCOLS */, XA_WM_HINTS,
                                XA_WM_NORMAL_HINTS, -3 /* window type */, XA_WM_TRANSIENT_FOR, -4 /* Motif */, -5 /* state */,
-                               -6 /* XdndAware */ };
+                               -6 /* XdndAware */, -7 /* _NET_WM_PID */ };
+/* window types xwm knows (the first of these in _NET_WM_WINDOW_TYPE counts) */
+static int known_type(int a) {
+    switch (a) {
+    case A_NET_WM_WINDOW_TYPE_NORMAL: case A_NET_WM_WINDOW_TYPE_DIALOG: case A_NET_WM_WINDOW_TYPE_SPLASH:
+    case A_NET_WM_WINDOW_TYPE_MENU: case A_NET_WM_WINDOW_TYPE_DROPDOWN_MENU: case A_NET_WM_WINDOW_TYPE_POPUP_MENU:
+    case A_NET_WM_WINDOW_TYPE_TOOLTIP: case A_NET_WM_WINDOW_TYPE_NOTIFICATION: case A_NET_WM_WINDOW_TYPE_COMBO:
+    case A_NET_WM_WINDOW_TYPE_DND: case A_NET_WM_WINDOW_TYPE_UTILITY: case A_NET_WM_WINDOW_TYPE_TOOLBAR:
+        return 1;
+    default: return 0;
+    }
+}
+
 static uint32_t watched_atom(int i) {
     switch (watched[i]) {
     case -1: return AT(NET_WM_NAME);
@@ -399,6 +522,7 @@ static uint32_t watched_atom(int i) {
     case -4: return AT(MOTIF_WM_HINTS);
     case -5: return AT(NET_WM_STATE);
     case -6: return AT(XdndAware);
+    case -7: return AT(NET_WM_PID);
     default: return (uint32_t)watched[i];
     }
 }
@@ -407,6 +531,25 @@ static uint32_t watched_atom(int i) {
 static void read_props(XWin *w) {
     for (int i = 0; i < NWATCHED; i++) get_prop(w->id, watched_atom(i), 0, 1024, prop_reply, w->id, watched_atom(i));
 }
+
+/* _NET_WM_ICON: an X app's own icon, for the Dock when its app has no installed one (as xdg-toplevel-icon for Wayland).
+ * Read once the window has a surface, and again when the app changes it; at most ICON_LONGS words are read, the image
+ * is picked and checked by x11_net_wm_icon_pick and copied by wl.c within wlicon.h's limits. */
+#define ICON_LONGS (1u << 18)                   /* 1 MiB: every usual size from 16 to 256 px fits */
+#define ICON_SIDE_MAX 256                       /* wlicon.h WLICON_MAX */
+#define ICON_SIDE_WANT 128                      /* wlicon.h WLICON_WANT */
+static void icon_reply(const uint8_t *r, size_t n, uint32_t id, uint32_t b) {
+    (void)b;
+    XWin *w = find(id);
+    if (!w || !w->sid || !r || n < 32) return;
+    size_t bytes = (size_t)x11_get32(r + 16) * 4;
+    if (r[1] != 32 || x11_get32(r + 8) != XA_CARDINAL || bytes > n - 32) { wlx_set_icon(w->sid, NULL, 0, 0); return; }
+    size_t first = 0;
+    int iw = 0, ih = 0;
+    if (x11_net_wm_icon_pick(r + 32, bytes / 4, ICON_SIDE_MAX, ICON_SIDE_WANT, &first, &iw, &ih)) wlx_set_icon(w->sid, r + 32 + first * 4, iw, ih);
+    else wlx_set_icon(w->sid, NULL, 0, 0);
+}
+static void get_icon(XWin *w) { if (w->sid) get_prop(w->id, AT(NET_WM_ICON), 0, ICON_LONGS, icon_reply, w->id, 0); }
 
 /* ---- the clipboard bridge ---- */
 
@@ -1386,7 +1529,10 @@ static void on_map_request(const uint8_t *p) {
         uint32_t ext[4] = { 0, 0, 0, 0 };
         change_prop(id, AT(NET_FRAME_EXTENTS), XA_CARDINAL, 32, ext, 4);
         set_wm_state(w, 1);                                 /* NormalState */
+        if (!w->map_seq) w->map_seq = ++X.map_ctr;
+        stack_top(w);
         update_client_list();
+        if (w->above || w->attention || w->modal || w->skip_taskbar || w->skip_pager) { w->state_sig = 0; write_net_state(w); }
     }
     req(X_MapWindow, 0);
     xo_u32(&X.out, id);
@@ -1398,7 +1544,12 @@ static void on_unmap(const uint8_t *p) {
     if (!w) return;
     w->viewable = 0;
     detach(w);
-    if (w->managed) { w->managed = 0; set_wm_state(w, 0); update_client_list(); }   /* WithdrawnState */
+    if (w->managed) {                                       /* WithdrawnState */
+        w->managed = 0;
+        set_wm_state(w, 0);
+        update_client_list();
+        for (XWin *o = X.wins; o; o = o->next) if (o->transient == w->id) tell_parent(o);   /* its dialogs: no owner shown */
+    }
     if (X.focus == w) X.focus = NULL;
 }
 
@@ -1424,6 +1575,7 @@ static void on_configure_request(const uint8_t *p) {
     /* a LordOS window: it may change its size (not while maximized or fullscreen), never its place */
     int nw = (mask & XCF_W) && !w->maximized && !w->fullscreen ? w_ : w->w;
     int nh = (mask & XCF_H) && !w->maximized && !w->fullscreen ? h : w->h;
+    if (!w->maximized && !w->fullscreen) x11_size_clamp(&w->hints, &nw, &nh);   /* WM_NORMAL_HINTS minimum and maximum */
     if (nw != w->w || nh != w->h) {
         int32_t v[2] = { nw, nh };
         configure(id, XCF_W | XCF_H, v, 2);
@@ -1470,6 +1622,7 @@ static void on_property(const uint8_t *p) {
     if (deleted && xfer_step(id, a)) return;                /* a paste in chunks asks for more */
     XWin *w = find(id);
     if (!w) return;
+    if (a == AT(NET_WM_ICON)) { get_icon(w); return; }
     for (int i = 0; i < NWATCHED; i++)
         if (watched_atom(i) == a) { get_prop(id, a, 0, 1024, prop_reply, id, a); break; }
 }
@@ -1482,11 +1635,29 @@ static void on_client_message(const uint8_t *p) {
         if (p[1] == 32) dnd_message(id, type, d);
         return;
     }
+    if (type == AT(NET_REQUEST_FRAME_EXTENTS) && id) {    /* before it maps: the frame LordOS's X windows have */
+        uint32_t ext[4] = { 0, 0, 0, 0 };                   /* the theme's frame is outside the X window */
+        change_prop(id, AT(NET_FRAME_EXTENTS), XA_CARDINAL, 32, ext, 4);
+        return;
+    }
     XWin *w = find(id);
     if (!w) return;
     if (type == AT(WL_SURFACE_ID)) {
         w->surface_res = d[0];
         try_attach(w);
+    } else if (type == AT(WL_SURFACE_SERIAL)) {
+        uint64_t serial = (uint64_t)d[1] << 32 | d[0];
+        if (serial && !w->sid) { w->serial = serial; try_attach(w); }
+    } else if (type == AT(NET_CLOSE_WINDOW)) {             /* a pager or taskbar closes it: as LordOS's close */
+        if (w->managed) xwm_close(w);
+    } else if (type == AT(NET_ACTIVE_WINDOW)) {
+        /* No focus stealing: a request is granted only from a pager (source 2) while the person works in an X app, or
+         * from the app whose window has the keyboard (moving between its own windows); any other just asks for
+         * attention, like an xdg_activation_v1 request with a token LordOS didn't issue. */
+        if (!w->managed || !w->sid || w == X.focus) return;
+        int granted = X.focus && ((d[0] == 2) || same_client(X.focus->id, w->id));
+        if (!granted && !w->attention) { w->attention = 1; write_net_state(w); }
+        wlx_attention(w->sid, granted);
     } else if (type == AT(NET_WM_STATE)) {
         int action = (int)d[0];                             /* 0 remove, 1 add, 2 toggle */
         for (int i = 1; i <= 2; i++) {
@@ -1499,8 +1670,22 @@ static void on_client_message(const uint8_t *p) {
                 if (w->sid) wlx_request(w->sid, on ? XREQ_MAXIMIZE : XREQ_UNMAXIMIZE, 0);
             } else if (d[i] == AT(NET_WM_STATE_HIDDEN) && action == 1 && w->sid) {
                 wlx_request(w->sid, XREQ_MINIMIZE, 0);
+            } else if (d[i] && (d[i] == AT(NET_WM_STATE_ABOVE) || d[i] == AT(NET_WM_STATE_DEMANDS_ATTENTION) || d[i] == AT(NET_WM_STATE_MODAL) ||
+                                d[i] == AT(NET_WM_STATE_SKIP_TASKBAR) || d[i] == AT(NET_WM_STATE_SKIP_PAGER))) {
+                int *f = d[i] == AT(NET_WM_STATE_ABOVE) ? &w->above : d[i] == AT(NET_WM_STATE_DEMANDS_ATTENTION) ? &w->attention
+                       : d[i] == AT(NET_WM_STATE_MODAL) ? &w->modal : d[i] == AT(NET_WM_STATE_SKIP_TASKBAR) ? &w->skip_taskbar : &w->skip_pager;
+                int on = action == 1 || (action == 2 && !*f);
+                if (action > 2 || on == *f) continue;
+                *f = on;
+                /* demands attention: the Dock marks it (cleared when it gets the keyboard); modal: it takes its
+                 * owner's input; skip taskbar: no Dock entry of its own. Above and skip pager are kept for the app
+                 * only: LordOS has no always-on-top layer and no pager (not in _NET_SUPPORTED). */
+                if (f == &w->attention && on) { if (w == X.focus) w->attention = 0; else if (w->sid) wlx_attention(w->sid, 0); }
+                if (f == &w->modal) tell_parent(w);
+                if (f == &w->skip_taskbar && w->sid) wlx_skip_taskbar(w->sid, on);
             }
         }
+        write_net_state(w);
     } else if (type == AT(NET_WM_MOVERESIZE)) {
         int e = x11_moveresize_edges(d[2]);
         if (w->sid && e) wlx_request(w->sid, e < 0 ? XREQ_MOVE : XREQ_RESIZE, e < 0 ? 0 : e);
@@ -1662,7 +1847,11 @@ static void init_done(void) {
                        AT(NET_CLIENT_LIST), AT(NET_SUPPORTING_WM_CHECK), AT(NET_WM_NAME), AT(NET_FRAME_EXTENTS),
                        AT(NET_WM_WINDOW_TYPE), AT(NET_WM_WINDOW_TYPE_NORMAL), AT(NET_WM_WINDOW_TYPE_DIALOG),
                        AT(NET_WM_WINDOW_TYPE_SPLASH), AT(NET_WM_WINDOW_TYPE_MENU), AT(NET_WM_WINDOW_TYPE_POPUP_MENU),
-                       AT(NET_WM_WINDOW_TYPE_DROPDOWN_MENU), AT(NET_WM_WINDOW_TYPE_TOOLTIP), AT(NET_WM_WINDOW_TYPE_COMBO) };
+                       AT(NET_WM_WINDOW_TYPE_DROPDOWN_MENU), AT(NET_WM_WINDOW_TYPE_TOOLTIP), AT(NET_WM_WINDOW_TYPE_COMBO),
+                       AT(NET_WM_WINDOW_TYPE_NOTIFICATION), AT(NET_WM_WINDOW_TYPE_DND), AT(NET_WM_WINDOW_TYPE_UTILITY),
+                       AT(NET_WM_WINDOW_TYPE_TOOLBAR), AT(NET_WM_STATE_DEMANDS_ATTENTION), AT(NET_WM_STATE_MODAL),
+                       AT(NET_WM_STATE_SKIP_TASKBAR), AT(NET_CLIENT_LIST_STACKING), AT(NET_WM_PID), AT(NET_WM_ICON),
+                       AT(NET_REQUEST_FRAME_EXTENTS), AT(NET_WORKAREA), AT(NET_CLOSE_WINDOW) };
     change_prop(root, AT(NET_SUPPORTED), XA_ATOM, 32, sup, (uint32_t)(sizeof sup / sizeof sup[0]));
     uint32_t none = 0;
     change_prop(root, AT(NET_ACTIVE_WINDOW), XA_WINDOW, 32, &none, 1);
@@ -1671,6 +1860,8 @@ static void init_done(void) {
     size_t nres = xws_resources(wlx_scale(), res, sizeof res);
     if (nres) change_prop(root, XA_RESOURCE_MANAGER, XA_STRING, 8, res, (uint32_t)nres);
     update_client_list();
+    X.wa_set = 0;
+    update_workarea();
     if (X.xfixes_op) {
         req(X.xfixes_op, 0); xo_u32(&X.out, 5); xo_u32(&X.out, 0); xo_end(&X.out);   /* XFixesQueryVersion */
         expect(ignore_reply, 0, 0);
@@ -1860,10 +2051,19 @@ void xwm_surface_created(uint32_t res_id) {
 
 void xwm_surface_gone(XWin *w) {
     if (!w) return;
-    for (XWin *o = X.wins; o; o = o->next) if (o == w) { w->sid = 0; w->surface_res = 0; return; }
+    for (XWin *o = X.wins; o; o = o->next) if (o == w) { w->sid = 0; w->surface_res = 0; w->serial = 0; return; }
 }
 
-int xwm_is_dialog(const XWin *w) { return w->transient || w->wtype == AT(NET_WM_WINDOW_TYPE_DIALOG); }
+void xwm_surface_serial(int sid, uint64_t serial) {
+    for (XWin *w = X.wins; w; w = w->next) if (w->serial == serial && !w->sid) { (void)sid; try_attach(w); flush(); break; }
+}
+
+/* a dialog, or a utility window (a palette, a toolbox): placed where the app asks and not remembered */
+int xwm_is_dialog(const XWin *w) {
+    return w->transient || w->wtype == AT(NET_WM_WINDOW_TYPE_DIALOG) || w->wtype == AT(NET_WM_WINDOW_TYPE_UTILITY) ||
+           w->wtype == AT(NET_WM_WINDOW_TYPE_TOOLBAR);
+}
+int xwm_skip_taskbar(const XWin *w) { return w->skip_taskbar; }
 int xwm_is_fixed(const XWin *w) { return w->hints.min_w > 0 && w->hints.min_w == w->hints.max_w && w->hints.min_h > 0 && w->hints.min_h == w->hints.max_h; }
 
 void xwm_place(XWin *w, int x, int y) {
@@ -1902,7 +2102,9 @@ void xwm_set_state(XWin *w, int maximized, int fullscreen, int minimized) {
         if (minimized) {                                    /* at the bottom: it never catches the pointer */
             int32_t v[1] = { X_Below };
             configure(w->id, XCF_StackMode, v, 1);
+            stack_bottom(w);
         } else w->placed = 0;
+        update_client_list();
     }
     write_net_state(w);
     flush();
@@ -1923,7 +2125,10 @@ void xwm_focus(XWin *w) {
         }
         int32_t v[1] = { X_Above };
         configure(w->id, XCF_StackMode, v, 1);
+        stack_top(w);
+        update_client_list();
         w->focused = 1;
+        w->attention = 0;                                   /* it has the person's attention now */
         write_net_state(w);
     } else set_focus(0);
     change_prop(X.su.root, AT(NET_ACTIVE_WINDOW), XA_WINDOW, 32, &id, 1);
@@ -1947,6 +2152,7 @@ void xwm_close(XWin *w) {
 void xwm_tick(void) {
     if (!X.ready) return;
     clip_sync();
+    update_workarea();
     time_t now = time(NULL);
     for (Xfer *t = X.xfers, *nx; t; t = nx) { nx = t->next; if (now - t->t0 > 30) xfer_free(t); }   /* a paste nobody reads */
     dnd_tick(now);

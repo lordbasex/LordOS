@@ -236,14 +236,21 @@ static void bind_mgr(struct wl_client *c, void *data, uint32_t ver, uint32_t id)
 
 /* Which globals a client sees: the manager only outside a context and when may_create agrees; the
  * trusted-only interfaces never inside one */
-static int (*gate_fn)(struct wl_client *c, const char *iface);
-void secctx_set_gate(int (*gate)(struct wl_client *c, const char *iface)) { gate_fn = gate; }
+#define NGATES 4
+static int (*gate_fn[NGATES])(struct wl_client *c, const char *iface);
+void secctx_set_gate(int (*gate)(struct wl_client *c, const char *iface)) {
+    for (int i = 0; i < NGATES; i++) {
+        if (gate_fn[i] == gate) return;
+        if (!gate_fn[i]) { gate_fn[i] = gate; return; }
+    }
+}
 
 static bool global_filter(const struct wl_client *client, const struct wl_global *g, void *data) {
     (void)data;
     struct wl_client *c = (struct wl_client *)client;
     const struct wl_interface *i = wl_global_get_interface(g);
-    if (gate_fn && !gate_fn(c, i->name)) return false;     /* hidden from this client for another reason (drmlease.c) */
+    for (int k = 0; k < NGATES && gate_fn[k]; k++)          /* hidden from this client for another reason (drmlease.c, xwshell.c) */
+        if (!gate_fn[k](c, i->name)) return false;
     int in_ctx = secctx_of(c) != NULL;
     if (i == &wp_security_context_manager_v1_interface) return !in_ctx && (!may_create_fn || may_create_fn(c));
     return !(in_ctx && secctx_hidden(i->name));

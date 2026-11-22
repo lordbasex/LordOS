@@ -45,6 +45,8 @@ WL_MORE += staging/fifo/fifo-v1 staging/commit-timing/commit-timing-v1 staging/t
            staging/content-type/content-type-v1
 # shell extras (src/wl/wlshell.h, docs/WAYLAND.md "Shell extras"): tab tear-off, window tags, the bell
 WL_MORE += staging/xdg-toplevel-drag/xdg-toplevel-drag-v1 staging/xdg-toplevel-tag/xdg-toplevel-tag-v1 staging/xdg-system-bell/xdg-system-bell-v1
+# Xwayland's windows matched to their surfaces by serial (src/wl/xwshell.c), offered to Xwayland only
+WL_MORE += staging/xwayland-shell/xwayland-shell-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
 # Newer than Debian 13's wayland-protocols (1.44): the XML is kept in protocols/, unmodified (THIRD_PARTY.md):
@@ -101,6 +103,7 @@ SRC += src/wl/wlcolor.c src/wl/colorconv.c
 # Shell extras (src/wl/wlshell.h): xdg-toplevel-drag, xdg-toplevel-tag, xdg-system-bell, xdg-session-management,
 # ext-background-effect, one file each
 SRC += src/wl/wlshell.c src/wl/tldrag.c src/wl/tltag.c src/wl/sysbell.c src/wl/xsession.c src/wl/xsstore.c src/wl/bgeffect.c
+SRC += src/wl/xwshell.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)

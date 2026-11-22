@@ -4312,8 +4312,9 @@ static void emit_map(Surf *s, int w, int h) {
     if (s->xw) {                    /* X11: WM_CLASS class, and its instance for the .desktop match */
         char alt[260];
         json_str(alt, sizeof alt, s->app_alt);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s}",
-             t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false");
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"skipTaskbar\":%s}",
+             t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false",
+             s->owner ? s->owner->id : 0, s->modal ? "true" : "false", xwm_skip_taskbar(s->xw) ? "true" : "false");
     } else {
         int fixed = s->min_w > 0 && s->min_w == s->max_w && s->min_h > 0 && s->min_h == s->max_h;
         /* a Flatpak app's window: the app lord-server knows from the client's root-owned scope (or its security context),
@@ -7446,6 +7447,7 @@ int wl_start(void) {
     sysbell_globals(dpy);               /* the bell, */
     xsession_globals(dpy);              /* windows back where they were, */
     bgeffect_globals(dpy);              /* and blur behind a window where it can be drawn */
+    xwshell_globals(dpy);               /* xwayland-shell-v1: Xwayland's windows matched to their surfaces (xwshell.c) */
     secctx_init(dpy, may_secctx);       /* a sandbox's own socket per app (secctx.c) */
     wlfixes_init(dpy);                  /* wl_fixes: a client destroys a registry it no longer needs (wlfixes.c) */
     wlt_globals(dpy, timing_slot);      /* fifo, commit timing, tearing control, content type (timing.c) */
@@ -7652,11 +7654,25 @@ int wlx_begin_scale(int self) {
 int wlx_scale(void) { return xw_pct; }
 float wl__client_scale(struct wl_client *c) { return xw_scaled(c) ? xw_pct / 100.0f : 1.0f; }
 
+static int xattach(Surf *s, XWin *w, const XWinInfo *in);
 int wlx_attach(uint32_t res_id, XWin *w, const XWinInfo *in) {
     if (!dpy || !xwl_client) return 0;
     struct wl_resource *r = wl_client_get_object(xwl_client, res_id);
     if (!r || !wl_resource_instance_of(r, &wl_surface_interface, &surface_impl)) return 0;
-    Surf *s = wl_resource_get_user_data(r);
+    return xattach(wl_resource_get_user_data(r), w, in);
+}
+/* xwayland-shell-v1 (xwshell.c): the surface its serial named */
+int wlx_attach_id(int sid, XWin *w, const XWinInfo *in) {
+    Surf *s = dpy && xwl_client ? find(sid) : NULL;
+    return s && s->client == xwl_client ? xattach(s, w, in) : 0;
+}
+/* A wl_surface of Xwayland's with no role yet (xwayland_shell_v1.get_xwayland_surface takes only those). */
+int wlx_surface_free(struct wl_resource *surface) {
+    if (!surface || !wl_resource_instance_of(surface, &wl_surface_interface, &surface_impl)) return 0;
+    Surf *s = wl_resource_get_user_data(surface);
+    return s && xwl_client && s->client == xwl_client && s->role == R_NONE && !s->xw;
+}
+static int xattach(Surf *s, XWin *w, const XWinInfo *in) {
     if (!s || s->role != R_NONE || s->xw) return 0;
     s->xw = w;
     s->sent_configure = 1;                                  /* no xdg configure: X sizes it */
@@ -7684,6 +7700,54 @@ void wlx_detach(int sid) {
     s->xw = NULL;
     s->xpop = 0;
     s->role = R_NONE;
+}
+
+/* WM_TRANSIENT_FOR and _NET_WM_STATE_MODAL: the window it belongs to (0: none), as xdg_toplevel.set_parent and
+ * xdg-dialog-v1 do for a Wayland window ("parent" event; a modal one takes its owner's input). Only another X
+ * window's toplevel can be the owner; a loop is ignored (set_owner). */
+void wlx_set_parent(int sid, int parent_sid, int modal) {
+    Surf *s = find(sid), *p = parent_sid ? find(parent_sid) : NULL;
+    if (!s || !s->xw || s->role != R_TOPLEVEL) return;
+    if (p && (!p->xw || p->role != R_TOPLEVEL || p == s)) p = NULL;
+    set_owner(s, p, NULL);
+    set_modal(s, modal);
+}
+/* WM_HINTS urgency or _NET_WM_STATE_DEMANDS_ATTENTION ("attention"), or a _NET_ACTIVE_WINDOW request LordOS grants
+ * ("activate"): what xdg_activation_v1.activate tells the theme for a Wayland window (sdk/desktopmodel.js). */
+void wlx_attention(int sid, int granted) {
+    Surf *s = find(sid);
+    if (!s || !s->xw || s->role != R_TOPLEVEL || !s->mapped) return;
+    emit(s, granted ? "activate" : "attention", "{}");
+}
+/* _NET_WM_STATE_SKIP_TASKBAR changed while it is shown (the map carries it the first time). */
+void wlx_skip_taskbar(int sid, int skip) {
+    Surf *s = find(sid);
+    if (!s || !s->xw || s->role != R_TOPLEVEL || !s->mapped) return;
+    emit(s, "taskbar", "{\"skip\":%s}", skip ? "true" : "false");
+}
+/* _NET_WM_ICON: the image xwm.c picked (x11_net_wm_icon_pick), copied here within wlicon.h's limits and budget, as
+ * the window's own icon (what xdg_toplevel_icon_v1 gives a Wayland window); NULL clears it. */
+void wlx_set_icon(int sid, const uint8_t *argb_le, int w, int h) {
+    Surf *s = find(sid);
+    if (!s || !s->xw || s->role != R_TOPLEVEL) return;
+    WlIcon *ic = argb_le ? wlicon_from_net(argb_le, w, h) : NULL;
+    if (argb_le && !ic) return;                             /* past the limits: the old one stays */
+    if (!ic && !s->icon) return;
+    wlicon_unref(s->icon);
+    s->icon = ic;
+    if (s->mapped) emit(s, "icon", "{\"size\":%d}", ic ? ic->size : 0);
+}
+/* _NET_WORKAREA: the work area of the first display (logical; the menu bar and Dock out, wl_set_work_areas), or
+ * the display itself while the theme hasn't said. 0 if there is no display. */
+int wlx_work_area(int *x, int *y, int *w, int *h) {
+    for (int i = 0; i < OUT_MAX; i++) {
+        if (!oslots[i].used) continue;
+        const WlOutput *o = &oslots[i].o;
+        if (warea[i].w > 0 && warea[i].h > 0) { *x = warea[i].x; *y = warea[i].y; *w = warea[i].w; *h = warea[i].h; }
+        else { *x = o->x; *y = o->y; *w = o->w; *h = o->h; }
+        return 1;
+    }
+    return 0;
 }
 
 void wlx_set_title(int sid, const char *t) {

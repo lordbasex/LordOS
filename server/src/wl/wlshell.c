@@ -9,4 +9,5 @@ void wlshell_mapped(int id) {
 
 void wlshell_commit(int id) {
     bgeffect_commit(id);                /* ext_background_effect_surface_v1.set_blur_region is double-buffered */
+    xwshell_commit(id);                 /* xwayland_surface_v1.set_serial too */
 }

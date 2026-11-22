@@ -102,6 +102,18 @@ void x11_size_hints(const uint32_t *v, size_t n, XSizeHints *h);    /* WM_NORMAL
 
 /* WM_HINTS: 1 if the window takes keyboard focus (input hint true or absent). */
 int x11_wm_hints_input(const uint32_t *v, size_t n);
+/* WM_HINTS: 1 if the urgency hint (XUrgencyHint, 1 << 8) is set: the window wants the person's attention. */
+int x11_wm_hints_urgent(const uint32_t *v, size_t n);
+/* A size the window manager grants: *w × *h kept within the WM_NORMAL_HINTS minimum and maximum (a maximum below
+ * the minimum counts as none, as do 0s), and within 1..32767. */
+void x11_size_clamp(const XSizeHints *h, int *w, int *h_);
+
+/* _NET_WM_ICON: CARDINALs (32-bit, little endian on this wire), each image its width, its height and then
+ * width × height ARGB words (straight alpha). The image to use: every width and height is checked against what
+ * is left of the property, images larger than max a side or not 1 px are skipped, and of the rest the one
+ * whose larger side is closest to want (the larger on a tie). 1 with its first pixel word's index in *first and
+ * its size, 0 if none. nwords: the property's length in 32-bit words. */
+int x11_net_wm_icon_pick(const uint8_t *v, size_t nwords, int max, int want, size_t *first, int *w, int *h);
 
 /* _NET_WM_MOVERESIZE direction → what the theme does: -1 move, 0 nothing (cancel, keyboard),
  * otherwise the resize edges (1 top, 2 bottom, 4 left, 8 right, like xdg_toplevel.resize). */

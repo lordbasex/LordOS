@@ -4,6 +4,7 @@
  *   sysbell.c   xdg-system-bell-v1        the bell: LordOS's alert sound and the window marked, rate-limited
  *   xsession.c  xdg-session-management-v1 each window back where it was when its app restarts
  *   bgeffect.c  ext-background-effect-v1  blur behind part of a window, only where it can really be drawn
+ *   xwshell.c   xwayland-shell-v1         Xwayland's windows matched to their surfaces by serial (only Xwayland)
  *   wlshell.c   the hooks shared by several of them
  * wl.c calls the few hooks below and lends them the wl__ helpers; nothing here reaches into its structures. */
 #ifndef LORD_WLSHELL_H
@@ -23,6 +24,7 @@ void tltag_globals(struct wl_display *dpy);
 void sysbell_globals(struct wl_display *dpy);
 void xsession_globals(struct wl_display *dpy);
 void bgeffect_globals(struct wl_display *dpy);
+void xwshell_globals(struct wl_display *dpy);  /* xwayland-shell-v1, for Xwayland only (xwshell.c) */
 void wlshell_mapped(int id);                    /* a toplevel was announced to JS (emit_map) */
 void wlshell_commit(int id);                    /* a surface's commit, after its own state was applied */
 /* the drag: wl_data_device.start_drag took this source (NULL for a drag inside one client); the drag ended */
@@ -40,6 +42,7 @@ void bgeffect_caps_changed(void);               /* the GPU came or went: blur ca
 void tldrag_mapped(int id);
 void tltag_mapped(int id);
 void bgeffect_commit(int id);
+void xwshell_commit(int id);
 void bgeffect_mapped(int id);
 
 /* ---- for JS (lord.wayland, ui/js_sys.c) ---- */
