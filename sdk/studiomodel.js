@@ -192,6 +192,8 @@ export function bgCredit(it) {
   if (!it) return '';
   return [it.name, it.credit || it.author, it.license, it.source].filter(Boolean).join(' — ');
 }
+// an item generated with AI (the catalog's "ai"), which the credits page says in the person's language
+export const bgAi = (it) => !!(it && it.ai === true);
 // which catalog item a background path is (null for the person's own files)
 export function bgItemOf(catalog, path) {
   if (typeof path !== 'string') return null;

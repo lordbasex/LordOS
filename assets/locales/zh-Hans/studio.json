@@ -47,6 +47,7 @@
   "pickAny": "选择图片或短视频",
   "credits": "致谢",
   "creditsHint": "每个背景的标题、作者、许可证和来源。",
+  "aiGenerated": "由 AI 生成",
   "remove": "移除下载",
   "greenScreen": "绿幕",
   "greenHint": "适用于你身后真实的绿色或蓝色幕布：与没有幕布时相比，能更精确地抠除它的颜色。",

@@ -47,6 +47,7 @@
   "pickAny": "Tria una imatge o un vídeo curt",
   "credits": "Crèdits",
   "creditsHint": "El títol, l’autor, la llicència i la font de cada fons.",
+  "aiGenerated": "Generada amb IA",
   "remove": "Elimina la baixada",
   "greenScreen": "Pantalla verda",
   "greenHint": "Per a una pantalla verda o blava real darrere teu: el seu color es retalla amb més precisió que sense.",

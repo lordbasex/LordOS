@@ -47,6 +47,7 @@
   "pickAny": "Choose a picture or a short video",
   "credits": "Credits",
   "creditsHint": "Each background’s title, author, license and source.",
+  "aiGenerated": "Generated with AI",
   "remove": "Remove the download",
   "greenScreen": "Green screen",
   "greenHint": "For a real green or blue screen behind you: its colour is cut out more precisely than without one.",

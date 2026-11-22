@@ -7,18 +7,19 @@
    "kind": "picture",
    "category": "office",
    "name": "Bright lounge",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/aft_lounge",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/office-bright-lounge.1080.jpg",
-     "size": 265355,
-     "sha256": "2073575c760c4d1c440a5865d79a82e553087292f892043b34b6b423bc860e97"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/office-bright-lounge.jpg",
+     "size": 535347,
+     "sha256": "aa031638131758441dd68d438be719c3743f19f7fbe56c57904c990af4455328"
     }
    ]
   },
@@ -27,18 +28,19 @@
    "kind": "picture",
    "category": "office",
    "name": "Brick loft hall",
-   "author": "Dimitrios Savva, Jarod Guest",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/events_hall_interior",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/office-brick-hall.1080.jpg",
-     "size": 413089,
-     "sha256": "63751d607175f7ddd8363fe781c67a8f80faa84b331e42ce34fb173f4a97a3ab"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/office-brick-hall.jpg",
+     "size": 773326,
+     "sha256": "90aa2ca2531eebe10ab46d7f05086307636b39fdefa7cbe24e1ee002279f6f0b"
     }
    ]
   },
@@ -47,18 +49,19 @@
    "kind": "picture",
    "category": "office",
    "name": "Pine attic",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/pine_attic",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/office-pine-attic.1080.jpg",
-     "size": 284090,
-     "sha256": "63a920a28eb0719d3178ba2d5b6c499396a62c4f26a0e83dc3d65b0ec7c48cb7"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/office-pine-attic.jpg",
+     "size": 791230,
+     "sha256": "383c120d837be986f1f7d86509e6eb2e7cf48ca80c4c058be1b739bbb087eda9"
     }
    ]
   },
@@ -67,18 +70,19 @@
    "kind": "picture",
    "category": "office",
    "name": "Palm lobby",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/cinema_lobby",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/office-palm-lobby.1080.jpg",
-     "size": 406543,
-     "sha256": "63240362b4875e42ce1ad6fbbcb94d5a68c473bd3be4934caffeb44f6a95758b"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/office-palm-lobby.jpg",
+     "size": 819513,
+     "sha256": "8c9cda0368c48c2e81a3d2d3111ecb528c50c17ea6ef07df5e7035aafbe90193"
     }
    ]
   },
@@ -87,18 +91,19 @@
    "kind": "picture",
    "category": "office",
    "name": "Reading room",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/reading_room",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/office-reading-room.1080.jpg",
-     "size": 302793,
-     "sha256": "07e70d636dd8a762faeef1e8801fcf563c87de44e9bc24d4306ee1cac99c6a36"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/office-reading-room.jpg",
+     "size": 766671,
+     "sha256": "22825b8d5373cf37172add6de28be7f6381931e4811e2e4d0a0b5e39368ca76f"
     }
    ],
    "builtin": true
@@ -108,18 +113,19 @@
    "kind": "picture",
    "category": "office",
    "name": "Classic hall",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/entrance_hall",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/office-classic-hall.1080.jpg",
-     "size": 256781,
-     "sha256": "15916abd53bd1bd297d4ae9e57b229ec928be92bc55b8c1dfe41539f393da93a"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/office-classic-hall.jpg",
+     "size": 625865,
+     "sha256": "f8ad11541329feb71b112c78cce6c0a442e2580f9ae2c96a4ef3a132dd0d4bae"
     }
    ]
   },
@@ -128,18 +134,19 @@
    "kind": "picture",
    "category": "office",
    "name": "Brick cafe",
-   "author": "Greg Zaal, Jarod Guest",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/warm_restaurant",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/office-brick-cafe.1080.jpg",
-     "size": 476429,
-     "sha256": "0f3c02b625940fc11747363ae7bb9b891ae515cb0e743d053fdb63a1535cce58"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/office-brick-cafe.jpg",
+     "size": 792966,
+     "sha256": "ba8d016910794e91cdb7ac0e84e09267347761e80776eeb028d8770837d4c6a1"
     }
    ]
   },
@@ -148,18 +155,19 @@
    "kind": "picture",
    "category": "home",
    "name": "Curtained window",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/anniversary_lounge",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/home-curtained-window.1080.jpg",
-     "size": 374067,
-     "sha256": "22951613f396a08ab3485df71fa989ad8f4f86dfb7567c9dececdfb37e0c2e3e"
+     "name": "full",
+     "w": 1672,
+     "h": 940,
+     "file": "pictures/home-curtained-window.jpg",
+     "size": 601602,
+     "sha256": "9aad1c69e94a556d075fb1fe228aed122518de5d3582131c52184ca60c380417"
     }
    ]
   },
@@ -168,18 +176,19 @@
    "kind": "picture",
    "category": "home",
    "name": "Cream sofa",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/brown_photostudio_01",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/home-cream-sofa.1080.jpg",
-     "size": 317326,
-     "sha256": "384ccb4fef15969a575d5dd3abc41a1965113c0c82949c787918514d26b5b95d"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/home-cream-sofa.jpg",
+     "size": 628434,
+     "sha256": "f3b59fd5eaec042acbaa343fb6e05842cfaf55a70246037f68d32768b417cbbd"
     }
    ]
   },
@@ -188,18 +197,19 @@
    "kind": "picture",
    "category": "home",
    "name": "White fireplace",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/brown_photostudio_03",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/home-white-fireplace.1080.jpg",
-     "size": 259530,
-     "sha256": "de3a13ec5a3170c1170a06e2bc3c1472244350a83380cd74cd1c86d333fa1a4c"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/home-white-fireplace.jpg",
+     "size": 634616,
+     "sha256": "60c527bf54fab5ea88f9a26fbccb70e6348743ca26eff05cbe68d081e64ba1c7"
     }
    ]
   },
@@ -208,18 +218,19 @@
    "kind": "picture",
    "category": "home",
    "name": "Brick loft",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/brown_photostudio_07",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/home-brick-loft.1080.jpg",
-     "size": 420035,
-     "sha256": "d6ed4a303ebe242876f5649892e42b33bd75139ee84d23bbcce9647713acab82"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/home-brick-loft.jpg",
+     "size": 787042,
+     "sha256": "94a293dbb4cb4b7b79e6c935f03567e7bce2fc1bbe5359e8fee986e36143883d"
     }
    ]
   },
@@ -228,18 +239,19 @@
    "kind": "picture",
    "category": "home",
    "name": "Glasshouse view",
-   "author": "Dario Barresi",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/glasshouse_interior",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/home-glasshouse.1080.jpg",
-     "size": 366826,
-     "sha256": "58b75eb81a953c41b32e4ae9207ec7f2da38872bde3d9a26a76791270930684a"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/home-glasshouse.jpg",
+     "size": 930319,
+     "sha256": "c108216c3c50a7210b10a3155408d440f7501c2b1f1dd9657f4923cf528d77b0"
     }
    ]
   },
@@ -248,18 +260,19 @@
    "kind": "picture",
    "category": "home",
    "name": "Sunny lounge",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/lythwood_lounge",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/home-sunny-lounge.1080.jpg",
-     "size": 274628,
-     "sha256": "0e4a43b6ce2e5c80ef46f82bdc90783068c8b10460c69dc6c0f57d614380c74b"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/home-sunny-lounge.jpg",
+     "size": 719035,
+     "sha256": "06dfb78470eaea4a95d600a8bbd187e73accc5f8080d21f168dcfcebfb9eb5b9"
     }
    ],
    "builtin": true
@@ -269,18 +282,19 @@
    "kind": "picture",
    "category": "home",
    "name": "Garden window",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/lythwood_room",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/home-garden-window.1080.jpg",
-     "size": 302627,
-     "sha256": "08154ab2b97de8d2e2103bfd1096fa7895a02e4dbdaf69b526ffcf8f02c48a1e"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/home-garden-window.jpg",
+     "size": 746777,
+     "sha256": "d216fecb1907e73bd782bb5932a8848f730f25de6b94dbcd3fb650a3198da3f1"
     }
    ]
   },
@@ -289,18 +303,19 @@
    "kind": "picture",
    "category": "home",
    "name": "Plant corner",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/photo_studio_london_hall",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/home-plant-corner.1080.jpg",
-     "size": 234075,
-     "sha256": "01fef2f5a2027b037df284a29be50837592eb720838988b300805e1e74960e8a"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/home-plant-corner.jpg",
+     "size": 776208,
+     "sha256": "f9af5e9d50478f8360b832a93d793bfd4b69b4f8a46d3d3a30160ac4058d4d35"
     }
    ]
   },
@@ -309,18 +324,19 @@
    "kind": "picture",
    "category": "home",
    "name": "Country kitchen",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/studio_country_hall",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/home-country-kitchen.1080.jpg",
-     "size": 259115,
-     "sha256": "9787ea46b02628adcc7eb438e7a0568ce87ab8d290fac8c7517dabc2558ee976"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/home-country-kitchen.jpg",
+     "size": 688148,
+     "sha256": "4c416350998c9aee3951393c2d481b09725ecd1ccf8b1dbaf345e96e870ec52c"
     }
    ]
   },
@@ -329,18 +345,103 @@
    "kind": "picture",
    "category": "home",
    "name": "Blue room",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/blue_photo_studio",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/home-blue-room.1080.jpg",
-     "size": 173964,
-     "sha256": "fd232fcc5e84d5f412e20e0df5314bd1b71866bd4a90875a82332f2c95035fbf"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/home-blue-room.jpg",
+     "size": 732689,
+     "sha256": "089be84a0cedc85f84c73272bfffd3819fd70af64f898d57fccb9396320b3b67"
+    }
+   ]
+  },
+  {
+   "id": "still-fireplace",
+   "kind": "picture",
+   "category": "home",
+   "name": "Fireplace",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-fireplace.jpg",
+     "size": 610068,
+     "sha256": "457d55499d4fbab9c3762a460b337689350c10a4a24501d013df64a3708be150"
+    }
+   ]
+  },
+  {
+   "id": "still-fire-pit",
+   "kind": "picture",
+   "category": "home",
+   "name": "Fire pit",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-fire-pit.jpg",
+     "size": 736971,
+     "sha256": "388e27608a0c3eabc1396bd776c18be8b4923486d049a7e757d5f9ecc59f7fdd"
+    }
+   ]
+  },
+  {
+   "id": "still-candle",
+   "kind": "picture",
+   "category": "home",
+   "name": "Candle",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-candle.jpg",
+     "size": 518568,
+     "sha256": "fa495150eaebcb2e6c3cba11d55e45372ab6d708b222d0cefb56e0b7984757b7"
+    }
+   ]
+  },
+  {
+   "id": "still-snow-fence",
+   "kind": "picture",
+   "category": "home",
+   "name": "Snow by the fence",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-snow-fence.jpg",
+     "size": 912843,
+     "sha256": "530291548392514f540568d0ba3cdc95df63e7823992cc6d6e2404b48c0526b7"
     }
    ]
   },
@@ -349,18 +450,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "White arches",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/blocky_photo_studio",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-white-arches.1080.jpg",
-     "size": 170910,
-     "sha256": "3d782b4175e4cdb32b09cfbd71b689053ddb1f147209e9d9b52badfc545d867b"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-white-arches.jpg",
+     "size": 468438,
+     "sha256": "9e0a532a45bc6c0b143d876baa32b577e3e358f47fb89efc32274df25b048355"
     }
    ]
   },
@@ -369,18 +471,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "Yellow sofa",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/colorful_studio",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-yellow-sofa.1080.jpg",
-     "size": 257881,
-     "sha256": "804e60762a38d687f8f07950b26d20273ecfbe93b6ea9c505c8ca96fa2441db3"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-yellow-sofa.jpg",
+     "size": 538296,
+     "sha256": "6b669b89743e93731e7cea094479648f5cec2f2ff80bec476ee2a9bd57c44151"
     }
    ]
   },
@@ -389,18 +492,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "Paneled window",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/brown_photostudio_04",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-paneled-window.1080.jpg",
-     "size": 216558,
-     "sha256": "1d82434c21c244deeec1a8ab90f1c8c6c3795250a0185fc6e71f5f617227c3b8"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-paneled-window.jpg",
+     "size": 778080,
+     "sha256": "16e6241a6d298aee409b2d5181fbcb3f3bfc16b686ad9225dc270597b3177ee5"
     }
    ]
   },
@@ -409,18 +513,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "Blue armchairs",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/brown_photostudio_05",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-blue-armchairs.1080.jpg",
-     "size": 150319,
-     "sha256": "8ff961a0dadc0c4031ff82779eb0d1e68e1e9a15c8272f50040562a2bd4d5ccd"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-blue-armchairs.jpg",
+     "size": 617953,
+     "sha256": "aab8165d2772d7b85cda74e97130b9b1f7b55a42352908e036675be132f6a060"
     }
    ]
   },
@@ -429,18 +534,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "Neon wall",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/neon_photostudio",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-neon-wall.1080.jpg",
-     "size": 251243,
-     "sha256": "bb50d5d5aad43769cd75beee354934fcc611b710d9b7afa41d40c7ca1f0ad820"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-neon-wall.jpg",
+     "size": 493659,
+     "sha256": "481403b00b546a148bb4c36df586d188e4b39f590d84762e8da4f0268b738eab"
     }
    ]
   },
@@ -449,18 +555,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "Grey studio",
-   "author": "Grzegorz Wronkowski",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/monochrome_studio_01",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-grey-room.1080.jpg",
-     "size": 170712,
-     "sha256": "ee4fb760b869bf5d485f1b30da0e804d0b3ce449562ea2610984a6aaf70df7e6"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-grey-room.jpg",
+     "size": 380464,
+     "sha256": "64f64a5e7ab51a8de3f55ea0160f708e28188e2188b61287e0be77876622b3cd"
     }
    ]
   },
@@ -469,18 +576,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "White curtain",
-   "author": "Grzegorz Wronkowski",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/pav_studio_01",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-white-curtain.1080.jpg",
-     "size": 100681,
-     "sha256": "27170f3dca05c9c78f6cf262ea3507e2fbd1223a6364c737b017b6f835dd2c99"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-white-curtain.jpg",
+     "size": 406843,
+     "sha256": "c22122e9959edae32ccc6d4c7d6f0832aaf4942174a821c7fefef5893553366e"
     }
    ]
   },
@@ -489,18 +597,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "Green wall",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/photo_studio_loft_hall",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-green-wall.1080.jpg",
-     "size": 139597,
-     "sha256": "7769c70f5e99e0ef5a23e725f7e7d9e3581ecfa0c12925b26b43380d5ecf5f83"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-green-wall.jpg",
+     "size": 440670,
+     "sha256": "e0afe931bfcb720a2ca0366a6fb1688478d8c2050e84e60714aaf9e373f1c4ba"
     }
    ]
   },
@@ -509,18 +618,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "Moulded wall",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/photo_studio_broadway_hall",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-moulded-wall.1080.jpg",
-     "size": 255931,
-     "sha256": "aedd023990b49da6ad288edffdd4511ebcd54f9da004279ba514718f1aa86491"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-moulded-wall.jpg",
+     "size": 418713,
+     "sha256": "96bfb2752bcb350a4f569088f6a42d6910a4f10360f0d8867f2fd5a81964d5f1"
     }
    ]
   },
@@ -529,18 +639,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "White loft",
-   "author": "Grzegorz Wronkowski",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/white_studio_01",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-white-loft.1080.jpg",
-     "size": 118243,
-     "sha256": "baac354cadcfa0dc30ac80f055f932184b289d8c6645fe69cc772d7a2f8fc268"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-white-loft.jpg",
+     "size": 505988,
+     "sha256": "34d093e7c53a4e27b604a30e1fa9542d796355dbfb65cf880ac3cad059314c51"
     }
    ]
   },
@@ -549,18 +660,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "Blue drapes",
-   "author": "Sergej Majboroda",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/small_empty_room_3",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-blue-drapes.1080.jpg",
-     "size": 278499,
-     "sha256": "6cf3b4213341041ed99729ca24a5829e69f47d1f9f30200390e03a009802d326"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-blue-drapes.jpg",
+     "size": 555362,
+     "sha256": "bcc3de02072a0efc081b51aa2cd7d6a4b7cdbd19cd50bcc95731828554453b47"
     }
    ]
   },
@@ -569,18 +681,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Alpine valley",
-   "author": "Andreas Mischok",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/alps_field",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-alpine-valley.1080.jpg",
-     "size": 607171,
-     "sha256": "32cfbe120a082771025f458cfb4a7f6f95512a1865845666c5439ca64a0a129d"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-alpine-valley.jpg",
+     "size": 893954,
+     "sha256": "825e59e842cd31af26f0bceb7d6197c699f38b919b6b555cf8d10ecec657bc33"
     }
    ]
   },
@@ -589,18 +702,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Autumn forest",
-   "author": "Andreas Mischok",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/autumn_forest_01",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-autumn-forest.1080.jpg",
-     "size": 801983,
-     "sha256": "10e37ba9b0ae6d15435671e5a9991dabbcdee848e46167e40c8c4ad754502358"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-autumn-forest.jpg",
+     "size": 1164572,
+     "sha256": "a296bcd7bb59e5c4324a25a34dc00c909c7145be2c8ebeeed887d5c692eb87e4"
     }
    ]
   },
@@ -609,18 +723,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Chinese garden",
-   "author": "Andreas Mischok",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/chinese_garden",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-chinese-garden.1080.jpg",
-     "size": 464496,
-     "sha256": "990756b2300438d23ff5d693a1ec70812247a9a570c913dd68ebeec3a86ad056"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-chinese-garden.jpg",
+     "size": 1054894,
+     "sha256": "effc311970f3f5b2cc23fa397dd16225b30c4f7da82c36239f4aef122db0d956"
     }
    ]
   },
@@ -629,18 +744,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Highland ridge",
-   "author": "Dimitrios Savva, Jarod Guest",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/drakensberg_solitary_mountain",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-highland-ridge.1080.jpg",
-     "size": 372950,
-     "sha256": "a5027a22e7cc4c5a07a6cf8f77d0c0a4d034fa29b73fc328ba514329664c5297"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-highland-ridge.jpg",
+     "size": 740141,
+     "sha256": "a27cd9473ed42630443b11d99f002dc2cb73e73354b984e9bb39027027ac83a9"
     }
    ]
   },
@@ -649,18 +765,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Pond and trees",
-   "author": "Alexander Scholten",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/frozen_lake",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-pond-trees.1080.jpg",
-     "size": 626784,
-     "sha256": "833fcccc1b4fe743c2007b1502e3a80a02e10f352afae9986453477b76235b5f"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-pond-trees.jpg",
+     "size": 1027484,
+     "sha256": "fa0f93c511ad1d47f83f08ad0ca7f24f3edee63060867772e179292e448f0d70"
     }
    ]
   },
@@ -669,18 +786,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Golden hills",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/kiara_8_sunset",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-golden-hills.1080.jpg",
-     "size": 364923,
-     "sha256": "54ebfc5c9cbc03cf6ea118e4c035089c5c662f3840ebe6a03d81e3d4af0210da"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-golden-hills.jpg",
+     "size": 940944,
+     "sha256": "c119abcee2db3bce301d2970f42789e424981fffc1695d6450e614c10f7feffa"
     }
    ]
   },
@@ -689,18 +807,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Lake horizon",
-   "author": "Alexander Scholten",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/lake_pier",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-lake-horizon.1080.jpg",
-     "size": 336154,
-     "sha256": "d4ffdb3f0cc8f81cc07efe04bf63ab1ae30b8e6cde0b1e7f30d67ae69b314059"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-lake-horizon.jpg",
+     "size": 628699,
+     "sha256": "ecae7b51feff02bba3cdc83cba4b2546f9731a66e335851e4fc36b150b57ea06"
     }
    ]
   },
@@ -709,18 +828,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Lake sunrise",
-   "author": "Greg Zaal, Jarod Guest",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/lakeside_sunrise",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-lake-sunrise.1080.jpg",
-     "size": 334250,
-     "sha256": "093c4cadf502ca90d7882a1dede1bdb218568d44eaf087afa635155d49879554"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-lake-sunrise.jpg",
+     "size": 750002,
+     "sha256": "d49709fe8bb9d61ffc09fedb345643f0c236b274833e3da309f8b1fa54caa3e1"
     }
    ]
   },
@@ -729,18 +849,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Forest stream",
-   "author": "Andreas Mischok",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/lauter_waterfall",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-forest-stream.1080.jpg",
-     "size": 691038,
-     "sha256": "8922072a016d43953f8b8ec24aa34d26939f04f8e2e280980d7e308429024490"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-forest-stream.jpg",
+     "size": 1025757,
+     "sha256": "e2bafdb39fdf8f81eabd8e2c71b8e7e410330c350554dbaf879d25a8986b3257"
     }
    ]
   },
@@ -749,18 +870,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Misty pines",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/misty_pines",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-misty-pines.1080.jpg",
-     "size": 410955,
-     "sha256": "cd9f24f4e93753d1520ef2ef023dd2645b9ae677bf93b4c3a276ca8927796817"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-misty-pines.jpg",
+     "size": 664456,
+     "sha256": "e78254e816a002ec7a1426fad3e76b2477671e9c3b1bfb5680fbea11ef9a986b"
     }
    ],
    "builtin": true
@@ -770,18 +892,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Mossy forest",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/mossy_forest",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-mossy-forest.1080.jpg",
-     "size": 588108,
-     "sha256": "aefd5c240380c5f75518b07394000f10a6ee4708865be77e8ea07ab3fd066d7c"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-mossy-forest.jpg",
+     "size": 958945,
+     "sha256": "5a500bc2a1501ef5d242e4028d51960ae3bc8f9fecf4d3dcff58c58140197aff"
     }
    ]
   },
@@ -790,18 +913,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Rocky beach",
-   "author": "Greg Zaal, Rico Cilliers",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/secluded_beach",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-rocky-beach.1080.jpg",
-     "size": 293376,
-     "sha256": "0f998c9b75ce67456b5555bc13e056c9c9a9643cc05637188a6b62d4c6f3dfe0"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-rocky-beach.jpg",
+     "size": 708598,
+     "sha256": "2f73a6d73f0800098bb361e0420e0d6506d860502e9cdd2abeadbcd788219db0"
     }
    ]
   },
@@ -810,18 +934,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Meadow sunset",
-   "author": "Elvis Posa",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/sunset_meadow_path",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-meadow-sunset.1080.jpg",
-     "size": 371543,
-     "sha256": "acf2821d47320684b4362b0e63bde4cb13d3deadf93c05d728f87109d3d5f99d"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-meadow-sunset.jpg",
+     "size": 831740,
+     "sha256": "cd4a482f4b1fd636a79d8cf061d9f2bb4cd54c89087a27ae31075c3db655ed7d"
     }
    ]
   },
@@ -830,18 +955,19 @@
    "kind": "picture",
    "category": "nature",
    "name": "Beach sunrise",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/umhlanga_sunrise",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-beach-sunrise.1080.jpg",
-     "size": 213238,
-     "sha256": "cd32e5d777152a9cccbae0756b126e5b4a301acf1f39dfcc4fc86f809cdc9616"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-beach-sunrise.jpg",
+     "size": 604541,
+     "sha256": "d50220b83b129379f4b2fd244fb7a70729bc269b9edfa90593368f377c8d4e2b"
     }
    ]
   },
@@ -850,18 +976,502 @@
    "kind": "picture",
    "category": "nature",
    "name": "Fountain garden",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/symmetrical_garden",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/nature-fountain-garden.1080.jpg",
-     "size": 400343,
-     "sha256": "dd11ba6319f287a0592c66ab27f5098c8241fdcb98d7c5c7068dbbc0ce94b172"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/nature-fountain-garden.jpg",
+     "size": 951186,
+     "sha256": "60e3868f40197d05f396dfa9d6c573d50b57743474cbf1b8f135cd539e4d1038"
+    }
+   ]
+  },
+  {
+   "id": "still-wetland-clouds",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Wetland big sky",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-wetland-clouds.jpg",
+     "size": 514944,
+     "sha256": "887e4d73d08f91c671d9658da9dea66037b0160ba0996cab3fbacdf79fee3275"
+    }
+   ]
+  },
+  {
+   "id": "still-iceland-waves",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Black sand waves",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-iceland-waves.jpg",
+     "size": 579537,
+     "sha256": "5994cd3a8b89d4eba18072ec98129a76c20561401c50439ba758737bafad5431"
+    }
+   ]
+  },
+  {
+   "id": "still-sea-nettle",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Sea nettle",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-sea-nettle.jpg",
+     "size": 382558,
+     "sha256": "49f9f39459a49356bcebd18febc899762770825953c88e3d8ff6d7f0808a20c0"
+    }
+   ]
+  },
+  {
+   "id": "still-snowy-woods",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Snowy woods",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-snowy-woods.jpg",
+     "size": 996052,
+     "sha256": "0c76d5f4bfa547a700322953e329c89e6569c22e3745de6a5b03369544ee9a04"
+    }
+   ]
+  },
+  {
+   "id": "still-sunset-afterglow",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Sunset afterglow",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-sunset-afterglow.jpg",
+     "size": 537162,
+     "sha256": "567c57e443797635dc6af85a5d5d1d512e6ecd4bef0b54c1cc971f76c6118e0c"
+    }
+   ]
+  },
+  {
+   "id": "still-cumulus",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Cumulus clouds",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-cumulus.jpg",
+     "size": 405179,
+     "sha256": "17ee38b24cdbb2fd1995462e689175a0d4feb4a6bce5e8163e576214cacb67f5"
+    }
+   ]
+  },
+  {
+   "id": "still-lake-sunrise",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Lake sunrise",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-lake-sunrise.jpg",
+     "size": 463468,
+     "sha256": "48eed664e3a0f5e05155b4c9ee83246d4ed5e1f8593280a695be10a73ed015c0"
+    }
+   ]
+  },
+  {
+   "id": "still-mossy-river",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Mossy river",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-mossy-river.jpg",
+     "size": 902151,
+     "sha256": "e075960ceb8ff115f493f4c46786ab871e0b9cb1ba88345d5561e7ae30cbed59"
+    }
+   ]
+  },
+  {
+   "id": "still-valley-pasture",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Valley pasture",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-valley-pasture.jpg",
+     "size": 752739,
+     "sha256": "3dec37dc0a70a3ef2018cda6179cb06187645ec531dbf0aad3ee48445641f8cc"
+    }
+   ]
+  },
+  {
+   "id": "still-shore-waves",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Shore waves",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-shore-waves.jpg",
+     "size": 637140,
+     "sha256": "30c77ec6354e5b39e2156c77dfd2493afd0f597e56f91cf41b81ef74edfc44c9"
+    }
+   ]
+  },
+  {
+   "id": "still-freezing-fog",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Freezing fog",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-freezing-fog.jpg",
+     "size": 529568,
+     "sha256": "5410ed2e6948065b99acac3a76854ba2895790ea66638e2c456dfb6f0f35cb4f"
+    }
+   ]
+  },
+  {
+   "id": "still-mountain-clouds",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Mountain clouds",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-mountain-clouds.jpg",
+     "size": 505766,
+     "sha256": "7bee3c5794e50b95702fb7ba1f0717fc67dc51f169d7261e378149770d4841b4"
+    }
+   ]
+  },
+  {
+   "id": "still-foggy-forest",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Foggy forest",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-foggy-forest.jpg",
+     "size": 883017,
+     "sha256": "76480baed31f0c2a74b79fdaab83bc1f39f9028c62e655f3dfb2842c4164a5c5"
+    }
+   ]
+  },
+  {
+   "id": "still-snowy-evergreens",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Snowy evergreens",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-snowy-evergreens.jpg",
+     "size": 798017,
+     "sha256": "e72d9659dfae19eefd9807c6131ee4b72e6a9fe11073a78494e9c58c395932c7"
+    }
+   ]
+  },
+  {
+   "id": "still-wetland-creek",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Wetland creek",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-wetland-creek.jpg",
+     "size": 818073,
+     "sha256": "721ceacafaa19e69b7d7b9d229a2a94679e202bc6be3af406e454d11dab3f680"
+    }
+   ]
+  },
+  {
+   "id": "still-comb-jelly",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Comb jelly",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-comb-jelly.jpg",
+     "size": 348514,
+     "sha256": "5e7c04a3e47918ccd329dbc424f425e1ea26474acb49c74c1d830e068372c75c"
+    }
+   ]
+  },
+  {
+   "id": "still-powder-creek",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Powder creek",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-powder-creek.jpg",
+     "size": 918616,
+     "sha256": "15aa390660a4ed392fb9325c46a959c0239d82f3fe04abfb9c259f956b4c3f53"
+    }
+   ]
+  },
+  {
+   "id": "still-big-aquarium",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Big aquarium",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-big-aquarium.jpg",
+     "size": 560772,
+     "sha256": "84818536c9d7d5d40170b41913ac4d2359fd5532ebea51f96d08c0be07e56992"
+    }
+   ]
+  },
+  {
+   "id": "still-granite-dusk",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Granite dusk",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-granite-dusk.jpg",
+     "size": 638202,
+     "sha256": "0ff5725a75451ad16f9a6001739566bc9a6e265bd2c0a092c728459e2a68d4f1"
+    }
+   ]
+  },
+  {
+   "id": "still-cliff-waterfall",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Cliff waterfall",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-cliff-waterfall.jpg",
+     "size": 649470,
+     "sha256": "06d3589f7c80fcb904aeb11eefa98508f49c880c463b288b7ccf763b2db2fab4"
+    }
+   ]
+  },
+  {
+   "id": "still-sardine-school",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Sardine school",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-sardine-school.jpg",
+     "size": 788185,
+     "sha256": "c67753db95a2dee403f442befde5bfaab3550f0a59de4059a5fcb226aa852e99"
+    }
+   ]
+  },
+  {
+   "id": "still-snowy-creek",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Snowy creek",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-snowy-creek.jpg",
+     "size": 951609,
+     "sha256": "4c3bbf2fe45331300c967745cb6929380c6493ca60f9339c23570e29f9cb770a"
+    }
+   ]
+  },
+  {
+   "id": "still-snow-sky",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Snow against sky",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-snow-sky.jpg",
+     "size": 605071,
+     "sha256": "f005f802fd6de84c9c0adca23beb0cc26f7190ab8d400ecebccf5e4a6bdf3800"
     }
    ]
   },
@@ -870,18 +1480,19 @@
    "kind": "picture",
    "category": "city",
    "name": "Lakeside city",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/binnenalster",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/city-lakeside.1080.jpg",
-     "size": 164701,
-     "sha256": "c098e89a219a144f544efbd0d9cfed13fc56f9da9fb2526927ec88155258f550"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/city-lakeside.jpg",
+     "size": 781737,
+     "sha256": "e0aada4bcea3fa39610d2e6380ba5b8185d48013d5421932da6f1a9164f66a45"
     }
    ]
   },
@@ -890,18 +1501,19 @@
    "kind": "picture",
    "category": "city",
    "name": "River harbour",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/dusseldorf_bridge",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/city-river-harbour.1080.jpg",
-     "size": 212121,
-     "sha256": "61292aee3725dbfeacc8fa8cb606e16b16229fcb703a98ba95143496930a5deb"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/city-river-harbour.jpg",
+     "size": 828326,
+     "sha256": "d321ad0a835be89561a070848ef386b218b5ac5d7a0ec9ad24cf3fc545ff2d73"
     }
    ]
   },
@@ -910,18 +1522,19 @@
    "kind": "picture",
    "category": "city",
    "name": "Brick canal",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/hamburg_canal",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/city-brick-canal.1080.jpg",
-     "size": 389642,
-     "sha256": "b6374cb4232d09ea06e0e7af1e6a53d8dbf5313d499f8f90a6bb139fec2e31be"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/city-brick-canal.jpg",
+     "size": 1060270,
+     "sha256": "d69cd8e49364dd090baa9a9844c266afcefd7c9622cf7073d3cf44cfe7b4537a"
     }
    ]
   },
@@ -930,18 +1543,19 @@
    "kind": "picture",
    "category": "city",
    "name": "Rooftop view",
-   "author": "Dimitrios Savva, Jarod Guest",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/hotel_rooftop_balcony",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/city-rooftop-view.1080.jpg",
-     "size": 221832,
-     "sha256": "3a28af352eb043b7e7c1d9c41bfb0752b4bf84f867882e3e0696703005ecdbaa"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/city-rooftop-view.jpg",
+     "size": 699680,
+     "sha256": "3c95c2dad59033771759b72bf724b4f942e6c28a698235c02b38dfb0fbd3de91"
     }
    ]
   },
@@ -950,18 +1564,19 @@
    "kind": "picture",
    "category": "city",
    "name": "Riverside glass",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/modern_buildings",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/city-riverside-glass.1080.jpg",
-     "size": 304824,
-     "sha256": "71e030961470aea0c3918977c9aee2f2babc1513b4cd9501b4f3521e16ec113e"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/city-riverside-glass.jpg",
+     "size": 550143,
+     "sha256": "8b0c098a1a1495e45b63a520aea3ab1f7bd56f4aba0f6ce682bf76560b08a503"
     }
    ]
   },
@@ -970,18 +1585,19 @@
    "kind": "picture",
    "category": "city",
    "name": "Night bridge",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/modern_buildings_night",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/city-night-bridge.1080.jpg",
-     "size": 287955,
-     "sha256": "6bfebff59e0b5085507cafbf883245573974a62736dc68866ccd6819703cf2fd"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/city-night-bridge.jpg",
+     "size": 596519,
+     "sha256": "9af0b80ebaca16f654fb307686128bba1a906871f010997fea34dc5a64ff9822"
     }
    ]
   },
@@ -990,18 +1606,19 @@
    "kind": "picture",
    "category": "city",
    "name": "Lagoon at dawn",
-   "author": "Greg Zaal, Rico Cilliers",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/venice_dawn_1",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/city-lagoon-dawn.1080.jpg",
-     "size": 158413,
-     "sha256": "889ce4aa817ea77cee14ce3e5baff51dd3781d6254175c0a04a6dc91266f1cf0"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/city-lagoon-dawn.jpg",
+     "size": 648607,
+     "sha256": "a20e933f6a334f34972614ed4160f0af8adf4c0f7629851ee7a2128ab80c3b24"
     }
    ],
    "builtin": true
@@ -1011,18 +1628,19 @@
    "kind": "picture",
    "category": "city",
    "name": "Lagoon sunset",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/venice_sunset",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/city-lagoon-sunset.1080.jpg",
-     "size": 220522,
-     "sha256": "0225b2dab93839f46c37370c2fc48a00dc02ee3ee0e20694b509bbbeb83daeaf"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/city-lagoon-sunset.jpg",
+     "size": 716069,
+     "sha256": "5e7f0137e57cea7069fa4af7c1fce456a2805f993927e321be7cfb237aa6adee"
     }
    ]
   },
@@ -1031,18 +1649,19 @@
    "kind": "picture",
    "category": "city",
    "name": "Palace at night",
-   "author": "Greg Zaal",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/zwinger_night",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/city-palace-night.1080.jpg",
-     "size": 356365,
-     "sha256": "80e3af9ba5b09e3c22a5cb8e5a0c2e8935f3ccae75e620b30430c20b18d45059"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/city-palace-night.jpg",
+     "size": 874426,
+     "sha256": "b8dcd4903dfb51d38ac70789e3298b2d9a7d6a9cdd92f3180c8f877f34b8c81b"
     }
    ]
   },
@@ -1051,18 +1670,82 @@
    "kind": "picture",
    "category": "city",
    "name": "Rooftops at dusk",
-   "author": "Greg Zaal, Dimitrios Savva",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://polyhaven.com/a/sunset_jhbcentral",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/city-rooftops-dusk.1080.jpg",
-     "size": 302529,
-     "sha256": "001377bac713d78df6debc8b19431bce58607aca78f5f7df65b0ec8537f54c9c"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/city-rooftops-dusk.jpg",
+     "size": 606946,
+     "sha256": "9df2a7d69d6df86a390205d4e6a98d96cc044017cf69d1fa91e1a70ac6e9bfb8"
+    }
+   ]
+  },
+  {
+   "id": "still-roof-clouds",
+   "kind": "picture",
+   "category": "city",
+   "name": "Clouds over roofs",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-roof-clouds.jpg",
+     "size": 547050,
+     "sha256": "9e55c5cc506bf2d911d2aa12c935a38f9b135632debb44c5c222a7a84134b287"
+    }
+   ]
+  },
+  {
+   "id": "still-river-city-dusk",
+   "kind": "picture",
+   "category": "city",
+   "name": "River city dusk",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-river-city-dusk.jpg",
+     "size": 551637,
+     "sha256": "15a4d6c83f3ac9166ba7ca88916ef7233062fa8d9dee1f984075aac68709e09a"
+    }
+   ]
+  },
+  {
+   "id": "still-bokeh-city",
+   "kind": "picture",
+   "category": "city",
+   "name": "City lights bokeh",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-bokeh-city.jpg",
+     "size": 720331,
+     "sha256": "bd8f9339e050f7ca9143dcd0f76cd171c1838da8d40f99fd4f20cd931b9fdd46"
     }
    ]
   },
@@ -1071,18 +1754,19 @@
    "kind": "picture",
    "category": "abstract",
    "name": "Grey concrete",
-   "author": "ambientCG (Lennart Demes)",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://ambientcg.com/a/Concrete036",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/abstract-concrete.1080.jpg",
-     "size": 486212,
-     "sha256": "c7cf1a5d7ca33bb99b4b36470f75e1a25323751066204eccf3b9b8a0ba12ef80"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/abstract-concrete.jpg",
+     "size": 547092,
+     "sha256": "44134c26cbaa6535d67fef12754d22e3db209d3e72f5a84a542b020e1695391a"
     }
    ]
   },
@@ -1091,18 +1775,19 @@
    "kind": "picture",
    "category": "abstract",
    "name": "White plaster",
-   "author": "ambientCG (Lennart Demes)",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://ambientcg.com/a/Plaster002",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/abstract-plaster.1080.jpg",
-     "size": 472954,
-     "sha256": "defac42e041bb770ed472a769f28a08948e299b58717cdfdc2a0f93a2a022d84"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/abstract-plaster.jpg",
+     "size": 478974,
+     "sha256": "36a759048299044abef7cbd0e944ed83974607a9ae63e6a1dc3551a9025ca7ff"
     }
    ]
   },
@@ -1111,18 +1796,19 @@
    "kind": "picture",
    "category": "abstract",
    "name": "Light bricks",
-   "author": "ambientCG (Lennart Demes)",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://ambientcg.com/a/Bricks105",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/abstract-bricks.1080.jpg",
-     "size": 455286,
-     "sha256": "bf1fe9a6079f72f6d21d95578785757eacfb78e11ec47bc3c84a687f3824a2bf"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/abstract-bricks.jpg",
+     "size": 770219,
+     "sha256": "54a3e7b623605d7dd21162125ce85a5c74341c68c39eab808faf09955c8928b4"
     }
    ]
   },
@@ -1131,18 +1817,19 @@
    "kind": "picture",
    "category": "abstract",
    "name": "Terrazzo",
-   "author": "ambientCG (Lennart Demes)",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://ambientcg.com/a/Terrazzo013",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/abstract-terrazzo.1080.jpg",
-     "size": 319579,
-     "sha256": "531b531347615b252c97c0a2d8e8705982a16386b321b44870bd944376078222"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/abstract-terrazzo.jpg",
+     "size": 678088,
+     "sha256": "514b1480d176198ab78f9a958fad02c38864ad5ebd96e17b095b014e6c36b8e6"
     }
    ]
   },
@@ -1151,18 +1838,19 @@
    "kind": "picture",
    "category": "abstract",
    "name": "White marble",
-   "author": "ambientCG (Lennart Demes)",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://ambientcg.com/a/Marble012",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/abstract-marble.1080.jpg",
-     "size": 608493,
-     "sha256": "fc4028546c40e2a9b4a24fe262a8678965a455d2b8f36d6138e8e478c68fc0e9"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/abstract-marble.jpg",
+     "size": 234221,
+     "sha256": "fcfc2181254ecd6aeb8229acc262305ad9bd1f08a260f8a1ba9daf8a9824be70"
     }
    ]
   },
@@ -1171,18 +1859,19 @@
    "kind": "picture",
    "category": "abstract",
    "name": "Warm wood",
-   "author": "ambientCG (Lennart Demes)",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://ambientcg.com/a/Wood098",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/abstract-wood.1080.jpg",
-     "size": 252845,
-     "sha256": "755feb3f8b1dbe58308e0a512529ae37a9753362bba31a893ce6415985859230"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/abstract-wood.jpg",
+     "size": 616097,
+     "sha256": "f1a83e7447df79c49c7d8d2d4c8736a3ff18a6cde8826a83559cb79877225cfb"
     }
    ]
   },
@@ -1191,18 +1880,19 @@
    "kind": "picture",
    "category": "abstract",
    "name": "White linen",
-   "author": "ambientCG (Lennart Demes)",
+   "author": "Generated with ChatGPT for LordOS",
    "license": "CC0",
    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://ambientcg.com/a/Fabric086",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/abstract-linen.1080.jpg",
-     "size": 401029,
-     "sha256": "79ece32935eb690ca420bc1ce71f58c31d42965ee6a537e1744cfa696829d1bf"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/abstract-linen.jpg",
+     "size": 594251,
+     "sha256": "5c53ea52ef58ff06b529a5ec9f3a59843866ee3945d3254b1b5ccc5e4012f3db"
     }
    ]
   },
@@ -1211,18 +1901,19 @@
    "kind": "picture",
    "category": "space",
    "name": "Aurora over Canada",
-   "author": "NASA",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://images.nasa.gov/details/iss072e159172",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/space-aurora-manitoba.1080.jpg",
-     "size": 299871,
-     "sha256": "551ba251a22c1cb8a02d3cd7af728c1b44c609dd362f240c11c1c388105128d4"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/space-aurora-manitoba.jpg",
+     "size": 445086,
+     "sha256": "996d66aa70a7647f757e0292dcd67837286c21e062f8ce6dd4b63c370dbbe343"
     }
    ]
   },
@@ -1231,18 +1922,19 @@
    "kind": "picture",
    "category": "space",
    "name": "Aurora and stars",
-   "author": "NASA",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://images.nasa.gov/details/iss071e564695",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/space-aurora-stars.1080.jpg",
-     "size": 389872,
-     "sha256": "9ced30f960c51fb231c6dd8c2f7cdee70a910f1d2b0d31828c30a052ab23c26f"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/space-aurora-stars.jpg",
+     "size": 488728,
+     "sha256": "c73276ec7b4cb46aa41b3659c766b1a7e2ebf922b15d58a9ad602b0d84e3cd68"
     }
    ]
   },
@@ -1251,18 +1943,19 @@
    "kind": "picture",
    "category": "space",
    "name": "Red aurora",
-   "author": "NASA",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://images.nasa.gov/details/iss072e451023",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/space-aurora-red.1080.jpg",
-     "size": 420249,
-     "sha256": "a211c5d7d17ac1c7479255682344807903eed7fa159a5a7266c351653926f3b6"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/space-aurora-red.jpg",
+     "size": 399331,
+     "sha256": "b8bcef871739bb3d528237630ed4e65524ce654709d5fbd9e4c7be5bd41ce985"
     }
    ]
   },
@@ -1271,18 +1964,19 @@
    "kind": "picture",
    "category": "space",
    "name": "Aurora swirl",
-   "author": "NASA",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://images.nasa.gov/details/iss073e0256896",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/space-aurora-swirl.1080.jpg",
-     "size": 422129,
-     "sha256": "2beda593b6d156cf2675205a537981698d458b14cbca5673655e6fde6f8d077c"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/space-aurora-swirl.jpg",
+     "size": 382584,
+     "sha256": "c0d3185e4fe491f111861b5469b9e1fe3ecf17113b37f335f17309e95dcce672"
     }
    ]
   },
@@ -1291,18 +1985,19 @@
    "kind": "picture",
    "category": "space",
    "name": "City lights",
-   "author": "NASA",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://images.nasa.gov/details/iss073e0685684",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/space-city-lights.1080.jpg",
-     "size": 723607,
-     "sha256": "9640e9f6c44757b0860b1659d7fe9ae2ca34af5729cbac67940e9e79bc1872f6"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/space-city-lights.jpg",
+     "size": 410825,
+     "sha256": "1b3f5fc2414cca2494936b8cc3bf151b2bb9e965e315cd8675e44255280838fb"
     }
    ]
   },
@@ -1311,18 +2006,19 @@
    "kind": "picture",
    "category": "space",
    "name": "Milky Way airglow",
-   "author": "NASA",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://images.nasa.gov/details/iss073e0982679",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/space-milky-way.1080.jpg",
-     "size": 657326,
-     "sha256": "15292f7d30057b788d2f27e9712c91c6466b571570377cc7b2f17677ba3c109f"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/space-milky-way.jpg",
+     "size": 611089,
+     "sha256": "f4100929f7be36561c31470238fcb24472b34ed4c8c44f04424cea29d62f2551"
     }
    ]
   },
@@ -1331,18 +2027,19 @@
    "kind": "picture",
    "category": "space",
    "name": "Orbital sunset",
-   "author": "NASA/Chris Williams",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://images.nasa.gov/details/iss074e0046371",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/space-orbital-sunset.1080.jpg",
-     "size": 201869,
-     "sha256": "3b68f7e7e7b97f9edc973439bf6fce0a116d13cdcedd773dcb51a87f62c97498"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/space-orbital-sunset.jpg",
+     "size": 471360,
+     "sha256": "8ff69de05d868b3efb7eb999d37f0348d774d30f6b0fdb508b6054998daf8b16"
     }
    ],
    "builtin": true
@@ -1352,18 +2049,19 @@
    "kind": "picture",
    "category": "space",
    "name": "Orbital sunrise",
-   "author": "NASA/Jessica Meir",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://images.nasa.gov/details/iss074e0796544",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/space-orbital-sunrise.1080.jpg",
-     "size": 116721,
-     "sha256": "541a6c0377cb5a770c4d199baa6d45102a0ff2042f46d1dd6b0d92692981a686"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/space-orbital-sunrise.jpg",
+     "size": 497662,
+     "sha256": "e1957670b3cc67ef94a058def81af9c23ec8cd706fcbd0baf8633cc53cd42f9b"
     }
    ]
   },
@@ -1372,18 +2070,145 @@
    "kind": "picture",
    "category": "space",
    "name": "Horizon glow",
-   "author": "NASA/Chris Williams",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://images.nasa.gov/details/iss074e0722845",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/space-horizon-glow.1080.jpg",
-     "size": 107854,
-     "sha256": "b84d3b8f647dfc5d095814231d328f6bd2aa88b328934f34d7c9afaf20f5aa7e"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/space-horizon-glow.jpg",
+     "size": 483317,
+     "sha256": "4ef3ddd2b3ea2bdf74a3804064d91e8cfd6f2537368d5f7ba9e0c7e33cac7123"
+    }
+   ]
+  },
+  {
+   "id": "still-aurora-iceland",
+   "kind": "picture",
+   "category": "space",
+   "name": "Aurora over Iceland",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-aurora-iceland.jpg",
+     "size": 456330,
+     "sha256": "2426deb580c41643158abb622caaf692b12226f221bb096875e629166fca0371"
+    }
+   ]
+  },
+  {
+   "id": "still-desert-stars",
+   "kind": "picture",
+   "category": "space",
+   "name": "Desert stars",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-desert-stars.jpg",
+     "size": 633249,
+     "sha256": "1331960e67fa27f713236fe28ea93ace885fec36eb668ae67495003674b4463d"
+    }
+   ]
+  },
+  {
+   "id": "still-earth-solar-array",
+   "kind": "picture",
+   "category": "space",
+   "name": "Earth from orbit",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-earth-solar-array.jpg",
+     "size": 635043,
+     "sha256": "d22dd69d048109378627e25be014abc8258679baddb440bc8e42ce53176044c6"
+    }
+   ]
+  },
+  {
+   "id": "still-aurora-green",
+   "kind": "picture",
+   "category": "space",
+   "name": "Green aurora",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-aurora-green.jpg",
+     "size": 406531,
+     "sha256": "897abe8d211433408a16340f123b6ba71d973e4d8c66d89d14a360f93fc60216"
+    }
+   ]
+  },
+  {
+   "id": "still-aurora-violet",
+   "kind": "picture",
+   "category": "space",
+   "name": "Violet aurora",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-aurora-violet.jpg",
+     "size": 433222,
+     "sha256": "515028fad5835be976d9dfed834c3ab4c43070b9d5238ddf2575d74229634c68"
+    }
+   ]
+  },
+  {
+   "id": "still-starfield",
+   "kind": "picture",
+   "category": "space",
+   "name": "Starfield nebula",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-starfield.jpg",
+     "size": 661195,
+     "sha256": "13b788f1f50a58886cf64caf703787e334e2c0fc7e193c197c9f647261ec0518"
     }
    ]
   },
@@ -1392,18 +2217,19 @@
    "kind": "picture",
    "category": "studio",
    "name": "Warm backdrop",
-   "author": "LordOS",
-   "license": "MIT",
-   "licenseUrl": "https://opensource.org/license/mit",
-   "source": "https://lordos.org",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-backdrop-warm.1080.jpg",
-     "size": 32180,
-     "sha256": "0471f9be73a65399141fc7726e7c12328fb3f4e608b03f5392ce3f963b8ee7e2"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-backdrop-warm.jpg",
+     "size": 346726,
+     "sha256": "3972cb876d103eba93b5d101bb14a51c52cac06649a4dfd1e783dd6650cd804d"
     }
    ],
    "builtin": true
@@ -1413,18 +2239,61 @@
    "kind": "picture",
    "category": "studio",
    "name": "Navy backdrop",
-   "author": "LordOS",
-   "license": "MIT",
-   "licenseUrl": "https://opensource.org/license/mit",
-   "source": "https://lordos.org",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/studio-backdrop-navy.1080.jpg",
-     "size": 22724,
-     "sha256": "a5f728eacf3d2d55d45cc3a945a564a58688f3d41d48f38d9d90ebf0cce0f750"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/studio-backdrop-navy.jpg",
+     "size": 322754,
+     "sha256": "8f0644d6e46ba642d47165661123b6e14b8c75659ecc803fea70e189a6402024"
+    }
+   ]
+  },
+  {
+   "id": "still-backdrop-grey",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Grey backdrop",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-backdrop-grey.jpg",
+     "size": 374854,
+     "sha256": "318101acb1859da34b199f456649fa6c4eb27c553b6f78884241e9c5275c3c63"
+    }
+   ]
+  },
+  {
+   "id": "still-backdrop-teal",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Teal backdrop",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-backdrop-teal.jpg",
+     "size": 548903,
+     "sha256": "cbdce40b924e440798ae2bfb6a558a392eeaa5a96513d35997a8a565c45019bd"
     }
    ]
   },
@@ -1433,21 +2302,253 @@
    "kind": "picture",
    "category": "abstract",
    "name": "Dawn gradient",
-   "author": "LordOS",
-   "license": "MIT",
-   "licenseUrl": "https://opensource.org/license/mit",
-   "source": "https://lordos.org",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
    "variants": [
     {
-     "name": "1080",
-     "w": 1920,
-     "h": 1080,
-     "file": "pictures/abstract-dawn-gradient.1080.jpg",
-     "size": 27412,
-     "sha256": "9f88960b3262cf68efb9b4c28f28ee4c1cb677ee1c311f65faaf957138e2376d"
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/abstract-dawn-gradient.jpg",
+     "size": 151916,
+     "sha256": "36c4740b1a305b8da61e2b54382495373462aafff63f5a0a29e029723a3dd8d9"
     }
    ],
    "builtin": true
+  },
+  {
+   "id": "still-rain-drops",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Rain drops",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-rain-drops.jpg",
+     "size": 779605,
+     "sha256": "1079697a9aebbd29db47c565cc8b7f3fb2c88379c2fa16c729a6aa69471a14e3"
+    }
+   ]
+  },
+  {
+   "id": "still-flow-ocean",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Ocean flow",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-flow-ocean.jpg",
+     "size": 673605,
+     "sha256": "da11f199cd49bcdc57ae30dc3d087574e7ce5654e6b8340b9a13c31c9c71cbd1"
+    }
+   ]
+  },
+  {
+   "id": "still-flow-peach",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Peach flow",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-flow-peach.jpg",
+     "size": 576629,
+     "sha256": "4fdd1cdf0aa43fd9659992191fb979b1d92511359e85b4e1dae79f3494ac90fe"
+    }
+   ]
+  },
+  {
+   "id": "still-flow-violet",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Violet flow",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-flow-violet.jpg",
+     "size": 303390,
+     "sha256": "de896cee026fa99c8e5114f00e2539b710fec18db41391b5a6f8d3cce69672ce"
+    }
+   ]
+  },
+  {
+   "id": "still-flow-mint",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Mint flow",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-flow-mint.jpg",
+     "size": 556726,
+     "sha256": "c64b133ae75bd5ba53be422f1f12cc5fb6be93953f91fbf2edb620314185e801"
+    }
+   ]
+  },
+  {
+   "id": "still-flow-graphite",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Graphite flow",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-flow-graphite.jpg",
+     "size": 531043,
+     "sha256": "0df415dd21758bd52bab681b6da7d9e1af539056a82b72569f760b0f150d8163"
+    }
+   ]
+  },
+  {
+   "id": "still-bokeh-amber",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Amber bokeh",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-bokeh-amber.jpg",
+     "size": 187727,
+     "sha256": "b654089821aeded214332f84889981c0be84a55016d0cd18e74c8104186fba90"
+    }
+   ]
+  },
+  {
+   "id": "still-bokeh-blue",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Blue bokeh",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-bokeh-blue.jpg",
+     "size": 202014,
+     "sha256": "a533ec999e6d11ff970ae6aacf65dcb7aeed1ac4ddcd3592a7385ad06a7bcb22"
+    }
+   ]
+  },
+  {
+   "id": "still-waves-dusk",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Dusk waves",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-waves-dusk.jpg",
+     "size": 250376,
+     "sha256": "ce1cf1730cea506f03c6c89582628460f575d2ac2e976f2e4222cd49c5f0ac49"
+    }
+   ]
+  },
+  {
+   "id": "still-waves-mint",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Mint waves",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-waves-mint.jpg",
+     "size": 182693,
+     "sha256": "3444c35ac443e01822f44b9f5102cc563ea5c9f02558404c2e6c0842c3de56c8"
+    }
+   ]
+  },
+  {
+   "id": "still-floating-dust",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Floating dust",
+   "author": "Generated with ChatGPT for LordOS",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://github.com/lordbasex/LordOS-wallpapers/tree/main/studio",
+   "ai": true,
+   "variants": [
+    {
+     "name": "full",
+     "w": 1672,
+     "h": 941,
+     "file": "pictures/still-floating-dust.jpg",
+     "size": 452367,
+     "sha256": "1e9e39c4c1a679e5ce61860a4db5bec39468003644b4e28b510b3a51115de2a0"
+    }
+   ]
   },
   {
    "id": "loop-wetland-clouds",

@@ -70,15 +70,22 @@ works; see `docs/WALLPAPERS.md`. The built-in clip is the project's own.
 
 ## LordOS Studio's backgrounds
 
-The catalog `assets/studio/backgrounds.json` lists 121 backgrounds (72 pictures, 49 short loops) with each one's title,
+The catalog `assets/studio/backgrounds.json` lists 170 backgrounds (121 pictures, 49 short loops) with each one's title,
 author, license, license URL, source page and, for CC BY and CC BY-SA works, its credit line; the camera popover shows
 them under Background → Credits. Their thumbnails and seven pictures (one per category) ship in
 `assets/studio/backgrounds/`; the full files are downloaded on demand from the `LordOS-wallpapers` repository's
-`studio/` folder, whose README credits every file. Sources: Poly Haven HDRIs rendered to flat views and ambientCG
-textures (CC0), NASA ISS photographs (public domain; no insignia), Wikimedia Commons clips (CC0, public domain,
-CC BY 2.0/3.0/4.0 and CC BY-SA 4.0; the share-alike applies to those files only) and the project's own renders (MIT,
-`tools/studio/gen-studio-loops.py`). The record of each file's license check is `tools/studio/bg-sources.json`. Nothing
-from Unsplash, Pexels or Pixabay (`docs/CAMERA-STUDIO-PLAN.md` 6.1).
+`studio/` folder, whose README credits every file.
+
+The 121 pictures (72 backgrounds and 49 stills that match the loops) were generated with ChatGPT for LordOS from the
+project's own prompts on 2026-11-22 and approved by the maintainer the same day. OpenAI's terms assign the output to
+the user; the LordOS project releases them under CC0 1.0 (`"ai": true` in the catalog; the credits page says
+"Generated with AI"). No photograph, person, logo or readable text was used or asked for. They are made by
+`tools/studio/build-ai-backgrounds.py`.
+
+The loops come from Wikimedia Commons (CC0, public domain, CC BY 2.0/3.0/4.0 and CC BY-SA 4.0; the share-alike applies
+to those files only), NASA (public domain; no insignia) and the project's own renders (MIT,
+`tools/studio/gen-studio-loops.py`). The record of each loop's license check is `tools/studio/bg-sources.json`.
+Nothing from Unsplash, Pexels or Pixabay (`docs/CAMERA-STUDIO-PLAN.md` 6.1).
 
 LordOS Studio's Noise Reduction uses PipeWire's own echo-cancel module with WebRTC Audio Processing (BSD-3-Clause), both
 Debian packages LordOS already installs (`libspa-0.2-modules`, `libwebrtc-audio-processing-1-3`); LordOS ships only the

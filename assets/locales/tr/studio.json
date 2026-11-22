@@ -47,6 +47,7 @@
   "pickAny": "Bir resim veya kısa bir video seçin",
   "credits": "Emeği geçenler",
   "creditsHint": "Her arka planın başlığı, yazarı, lisansı ve kaynağı.",
+  "aiGenerated": "Yapay zekâ ile oluşturuldu",
   "remove": "İndirileni kaldır",
   "greenScreen": "Yeşil perde",
   "greenHint": "Arkanızda gerçek bir yeşil veya mavi perde için: rengi, perde olmadan olduğundan daha hassas biçimde kesilir.",

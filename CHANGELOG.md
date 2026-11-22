@@ -371,7 +371,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Home, Studio, Nature, City, Abstract, Space), 72 pictures and 49 loops. Each license was checked on the file's own
     page: Poly Haven and ambientCG (CC0), NASA (public domain), Wikimedia Commons (CC0, public domain, CC BY and
     CC BY-SA with credit) and LordOS's own renders (MIT). Nothing comes from Unsplash, Pexels or Pixabay, and nothing
-    shows people, logos or readable text. The thumbnails and one picture per category ship in the package (2.6 MB);
+    shows people, logos or readable text (the pictures were then replaced by AI-generated ones; see "Changed"). The
+    thumbnails and one picture per category ship in the package (2.6 MB);
     the rest download when chosen through two new closed admin actions, `studio-bg-get "<id> <variant>"` (anyone) and
     `studio-bg-remove` (administrators), the twins of `wallpaper-get`: JS names a catalog entry, never a URL or a path,
     the download runs as `nobody` in the Store's scope, and a file whose size or SHA-256 isn't the catalog's is never
@@ -2555,6 +2556,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   showed. The check now allows every known bit.
 
 ### Changed
+
+- **LordOS Studio's pictures are AI-generated, in development (the latest release is 0.8.9.4; approved by the
+  maintainer on 2026-11-22, decision D7 of `docs/CAMERA-STUDIO-PLAN.md`).** Every picture of the background catalog
+  (`assets/studio/backgrounds.json`) is now a new picture generated with ChatGPT for LordOS from the project's own
+  prompts (empty scenes: no people, animals in the foreground, logos, brands or readable text).
+  - **What changed in the catalog:** the 72 pictures keep their ids, names and categories, so a choice made before
+    still points at the same scene; 49 new pictures, `still-<loop>`, match the loops in the same categories and with
+    the same names. The catalog has 170 items: 121 pictures and the 49 loops, which are unchanged. Each picture has one
+    file, `pictures/<id>.jpg` (variant `full`): JPEG quality 92 with 4:4:4 chroma at the size the generator made,
+    1672×941 (one is 1672×940; nothing is upscaled or padded), about 0.63 MB on average and 75.8 MB for all 121.
+  - **License:** OpenAI's terms assign the output to the user, and LordOS releases the pictures under **CC0 1.0**.
+    Each entry has the author "Generated with ChatGPT for LordOS", the source `LordOS-wallpapers/studio` and
+    `"ai": true`; Background → Credits adds the line **"Generated with AI"** under them, translated into all 35
+    languages (`studio.aiGenerated`; `bgAi` in `sdk/studiomodel.js`). The ChatGPT conversations are not published:
+    they stay in a private manifest outside the repository. The old photographs' credits (Poly Haven, ambientCG and
+    NASA) are gone from `THIRD_PARTY.md` and from `tools/studio/bg-sources.json`, which now records only the loops.
+  - **In the package:** the thumbnails are now 640×360 (quality 85, about 64 KB each) and the seven built-in pictures
+    (one per category, same ids) are the AI ones in full: `assets/studio/backgrounds/` grows from 2.5 MB to 11.9 MB.
+    The full files are published in the `LordOS-wallpapers` repository's `studio/pictures/` folder, with a README
+    (AI-generated, CC0, by LordOS) and `MANIFEST.json` (size and SHA-256 of each file), and download through
+    `studio-bg-get` as before.
+  - **Tools and tests:** `tools/studio/build-ai-backgrounds.py` makes every file from the originals after checking each
+    PNG's SHA-256; `tools/studio/build-backgrounds.py` now rebuilds only the loops and keeps the catalog's pictures.
+    `build/studio-bg-admin-test` accepts every shipped entry, allows 640×360 thumbnails and requires an `"ai"` entry to
+    be `true` and CC0; `tests/studio_model_test.mjs` covers `bgAi`.
 
 - **What is captured now: one green pill by the clock, in development** (`sdk/capturestatus.jsx`, `sdk/capturemodel.js`,
   `sdk/privacy.js`, `sdk/share.js`, `sdk/media.js`, `sdk/hardware.jsx`, `server/src/sec/pwguard.c`,

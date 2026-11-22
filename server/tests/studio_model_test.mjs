@@ -5,7 +5,7 @@ import {
   normalizeStudio, STUDIO_DEFAULTS, realCameras, hasStudioCamera, deviceFor, chosenCamera, serverConfig, portraitOn, backgroundOn,
   withPortrait, withBackground, withPicture, withMode, previewSize, usersOf, previewSource, perfLine,
   loopbackState, studioUseOf, studioWhat, MATCH_MAX, STUDIO_FILTERS, effectsOn, filterOf, isVideoPath, isPicturePath, activeBackground,
-  BG_CATEGORIES, bgItems, bgThumb, bgVariant, bgSrc, bgReady, bgItemOf, bgCredit, VOICE_SOURCE, VOICE_CAPTURE, voiceAvailable, hardwareMics,
+  BG_CATEGORIES, bgItems, bgThumb, bgVariant, bgSrc, bgReady, bgItemOf, bgCredit, bgAi, VOICE_SOURCE, VOICE_CAPTURE, voiceAvailable, hardwareMics,
   micModeOf, micPlan, withoutVoiceInternals,
 } from '../../sdk/studiomodel.js';
 import { captureRows, rowStops, captureGlyph } from '../../sdk/capturemodel.js';
@@ -222,6 +222,10 @@ t('phase 3: the background catalog', () => {
   assert.equal(bgItemOf(cat, '/home/a/me.jpg'), null);
   assert.equal(bgCredit(cat.items[1]), 'B — Video: Y, CC BY 4.0 — CC BY 4.0 — https://commons.wikimedia.org/x');
   assert.equal(bgCredit(cat.items[0]), 'A — X — CC0 — https://polyhaven.com/a/x');
+  assert.equal(bgAi(cat.items[0]), false);
+  assert.equal(bgAi({ ...cat.items[0], ai: true }), true);
+  assert.equal(bgAi({ ...cat.items[0], ai: 'yes' }), false);
+  assert.equal(bgAi(null), false);
   assert.deepEqual(normalizeStudio({ bgFiles: { 'sky-b': '720.h264', '../x': 'y', ok: 'a b' } }).bgFiles, { 'sky-b': '720.h264' });
   assert.ok(BG_CATEGORIES.includes('office') && BG_CATEGORIES.includes('space'));
 });

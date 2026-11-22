@@ -47,6 +47,7 @@
   "pickAny": "Välj en bild eller en kort video",
   "credits": "Upphov",
   "creditsHint": "Titel, upphovsperson, licens och källa för varje bakgrund.",
+  "aiGenerated": "Skapad med AI",
   "remove": "Ta bort nedladdningen",
   "greenScreen": "Green screen",
   "greenHint": "För en riktig grön eller blå skärm bakom dig: dess färg skärs bort mer exakt än utan.",

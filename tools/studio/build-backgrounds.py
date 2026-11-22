@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Build the LordOS Studio background catalog from tools/studio/bg-sources.json.
+"""Build the LordOS Studio background catalog's loops from tools/studio/bg-sources.json.
+
+Since 2026-11-22 the pictures are AI-generated and made by tools/studio/build-ai-backgrounds.py; this script keeps the
+catalog's picture items as they are and rebuilds the loops (kind video).
 
 Inputs are the downloads kept outside the repository (one folder per source):
   <src>/polyhaven/jpg/<asset>.jpg      Poly Haven tonemapped equirectangular panoramas
@@ -315,6 +318,9 @@ def main():
         print("built", it["id"], [v["size"] for v in rec["variants"]], flush=True)
     if only:
         return
+    # the pictures are AI-generated since 2026-11-22 (tools/studio/build-ai-backgrounds.py): keep the catalog's
+    cur = json.load(open(os.path.join(REPO, "assets/studio/backgrounds.json"), encoding="utf-8"))
+    out_items = [i for i in cur["items"] if i["kind"] == "picture"] + [i for i in out_items if i["kind"] != "picture"]
     for old in glob.glob(os.path.join(thumbs, "*.jpg")):
         base = os.path.basename(old)
         ok = {i["id"] + ".thumb.jpg" for i in out_items} | {i["id"] + ".jpg" for i in out_items if i.get("builtin")}

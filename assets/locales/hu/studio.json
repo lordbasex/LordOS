@@ -47,6 +47,7 @@
   "pickAny": "Kép vagy rövid videó kiválasztása",
   "credits": "Közreműködők",
   "creditsHint": "Minden háttér címe, szerzője, licence és forrása.",
+  "aiGenerated": "MI-vel készült",
   "remove": "Letöltés eltávolítása",
   "greenScreen": "Zöld háttér",
   "greenHint": "Valódi zöld vagy kék háttérhez mögötted: a színe pontosabban kivágható, mint nélküle.",

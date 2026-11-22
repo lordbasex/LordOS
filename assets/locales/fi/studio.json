@@ -47,6 +47,7 @@
   "pickAny": "Valitse kuva tai lyhyt video",
   "credits": "Tekijätiedot",
   "creditsHint": "Kunkin taustan nimi, tekijä, lisenssi ja lähde.",
+  "aiGenerated": "Luotu tekoälyllä",
   "remove": "Poista lataus",
   "greenScreen": "Vihreä tausta",
   "greenHint": "Oikealle vihreälle tai siniselle taustalle takanasi: sen väri leikataan pois tarkemmin kuin ilman sitä.",
