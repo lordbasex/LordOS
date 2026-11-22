@@ -535,6 +535,20 @@ question 2); since the Spawn helper ("Sub-sandboxes") they install like any othe
 `org.freedesktop.portal.Flatpak` is not a "never" row any more: it is LordOS's own Spawn, which only starts the same
 app in a sub-sandbox. Checked on VM 127 with GNOME Calculator and MarkText.
 
+**Display and toolkit (in development, after 0.8.9.4; `apps/store/fhlook.js`, `flathubmodel.displayOf`/`toolkitOf`):**
+an app's page also says, from the same metadata and before it is installed, how the app shows its windows and what it
+is built with. Display follows Flatpak 1.16's own rule (Debian 13's; `common/flatpak-run-sockets.c`: with
+`fallback-x11`, X11 only when the app got no Wayland): `wayland` alone is **Wayland**; `wayland` with `fallback-x11` is
+**Wayland (X11 only without Wayland)**, and since LordOS always gives a Flatpak app its Wayland socket such an app gets
+no X11 at all (Spotify's case under "Results"); `wayland` with `x11` gets **both** and its toolkit chooses; `x11` alone
+(or `fallback-x11` without `wayland`) is **X11, through Xwayland**, and the page says it gets no X11, so no windows,
+while its files or a device are blocked for it (the "X display" row of Problem 1's table). The toolkit comes from the
+base app (`org.electronjs.Electron2.BaseApp`, `io.atom.electron.BaseApp` → Electron; `org.chromium.Chromium.BaseApp` →
+Chromium) or the runtime (`org.gnome.Platform`, `io.elementary.Platform` → GTK; `org.kde.Platform` or an `io.qt.*`
+base → Qt; anything else → "its own"), with the runtime's id and branch shown under it. Only the app's page shows it:
+the catalog (AppStream) doesn't carry the metadata, and a column in the lists would mean one `remote-info` per app.
+Tested in `server/tests/flathub_model_test.mjs` with the real metadata samples there.
+
 ## Problem 4: installing
 
 ### Facts

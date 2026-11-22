@@ -12,6 +12,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **The Store's long lists load as you scroll, in development** (`apps/store/endless.js`, `index.jsx`,
+  `flathubpages.js`, `debian.js`). Flathub's catalog (thousands of apps) and each Debian category no longer end in
+  "Show more (2183 left)": the next 60 cards are drawn when the list is scrolled within a screen of its end, and a tall
+  window fills itself. Only the new cards are drawn (stable keys, memoized cards with a stable `onOpen`), so the grid is
+  never redrawn whole per page. A small "Show more" stays at the end for the keyboard. Back from an app's page, the list
+  is as long as it was, so it returns to where it was. Tested by `server/tests/store_endless_scene.mjs` (run by
+  `run_suites.sh`).
+- **A Flathub app's page says how it shows its windows and what it is built with, before installing, in
+  development** (`apps/store/fhlook.js`, `sdk/flathubmodel.js` `displayOf`/`toolkitOf`, `docs/FLATPAK.md`). A new
+  **Display and toolkit** box, from the metadata the page already fetches: **Display** is Wayland, Wayland with X11
+  only where there is no Wayland (`fallback-x11`: in LordOS it always gets Wayland, so no X11), Wayland and X11 (the
+  toolkit chooses), or X11 through Xwayland (with the note that it gets no X11, so no windows, while its files or a
+  device are blocked for it), following Flatpak 1.16's own rule; **Toolkit** is GTK, Qt, Electron, Chromium or "its
+  own", from the base app and the runtime, with the runtime and its branch under it. Only on the app's page: the
+  catalog doesn't carry the metadata. Text in every language (real English, Spanish and Portuguese). Tested in
+  `server/tests/flathub_model_test.mjs` with real Flathub metadata.
+
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).
