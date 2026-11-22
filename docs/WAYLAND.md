@@ -56,6 +56,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `zwp_tablet_manager_v2` (tablet-v2) | 2 | graphics tablets (in development, 2026-11-22): pens with pressure, tilt, distance, rotation, slider and their buttons, pads with buttons, rings, strips and dials (2: `bustype`, dials), read from evdev by our own `tablet.c` (no libinput or libwacom). Supported: everything the protocol has but the tool's `wheel` (a Wacom mouse's) and pad modes beyond one. Checked by `build/tablet-test` (synthetic evdev sequences) and `build/wltablet-test` (libwayland clients on the wire); the global and Xwayland's `get_tablet_seat` seen with a headless lord-server; **not yet with a real tablet or on the VM**. See "Graphics tablets" |
 | `wp_pointer_warp_v1` (pointer-warp) | 1 | an app moves the pointer to a point of its own window (in development, 2026-11-22): only with the pointer over it, the serial of the enter it got and the keyboard, inside the surface, never while the pointer is locked or in a drag (`pwarp.h`). The XML is wayland-protocols 1.45's, kept in `server/protocols/`. Checked by `build/wltablet-test`; **not yet with an app on the VM**. See "Pointer warp" |
 | `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
+| `wp_linux_drm_syncobj_manager_v1` (explicit sync) | 1 | a dmabuf frame comes with an acquire point (its rendering is done) and a release point (LordOS is done with it): the frame is applied once its acquire point is signalled, without blocking, and the release point is signalled after the CPU copy or after the frame that replaced it on the GPU path; every protocol error, per-client limits. Offered when a render node has timeline syncobjs and `SYNCOBJ_EVENTFD` (Linux 6.6), on the GPU and the CPU path (0.8.9.5, in development; checked 2026-11-22 with `tests/syncobj_client.c` against a headless lord-server on the CPU path, and Mesa 25.0.7's Vulkan WSI, `vkcube`, on an AMD RX 580: 600 frames at 60 fps in FIFO and 1500 at 330 fps in mailbox, every one with `set_acquire_point`/`set_release_point`; see "Explicit sync") |
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
 `linux#<surface>`): the theme sees them like any other, with their title, focus, maximize,
@@ -1579,9 +1580,61 @@ advertised (`server/src/wl/wlcolor.c`, the conversion in `colorconv.c`).
   real display's EDID primaries (to check on the dev VM, whose virtio display reports sRGB's).
 
 ## Pending
+## Explicit sync (`linux-drm-syncobj-v1`, 0.8.9.5, approved by the maintainer 2026-11-22, in development)
 
-- **Explicit sync (`linux-drm-syncobj-v1`)**: designed, not built, waiting for the maintainer's review: see
-  [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md).
+With implicit sync a GPU buffer's own fences (its dma-resv) make LordOS's reading of it wait for the app's rendering.
+With explicit sync the app hands over two timeline points with each buffer instead: NVIDIA's driver needs it (it has no
+reliable implicit sync), and Mesa's Vulkan WSI (24.1 and later) and Xwayland 24.1 and later use it whenever the
+compositor offers it. The design and what differs from it: [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md).
+
+- **The global:** `wp_linux_drm_syncobj_manager_v1` version 1, created only when lord-server can open a render node
+  with `DRM_CAP_SYNCOBJ_TIMELINE` and `DRM_IOCTL_SYNCOBJ_EVENTFD` (`syncobj.c`, raw ioctls with the kernel's headers, no
+  libdrm, no DRM master). It is offered on the GPU path and on the CPU path, and inside security contexts.
+  `LORD_SYNCOBJ=0` turns it off. The log says which node it uses (`wayland: explicit sync (linux-drm-syncobj-v1) on
+  /dev/dri/renderD129`) or why it isn't offered.
+- **A commit:** with a `wp_linux_drm_syncobj_surface_v1`, a commit with a buffer must have both points and a commit
+  without one neither (`no_acquire_point`, `no_release_point`, `no_buffer`; a null buffer counts as none), the buffer
+  must be a dmabuf (`unsupported_buffer`), and on one timeline the acquire point must be below the release point
+  (`conflicting_points`); a second object for a surface is `surface_exists`, a point after its surface is gone
+  `no_surface`, a timeline fd that isn't a syncobj `invalid_timeline`. If the acquire point is already signalled (the
+  usual case) the commit is applied at once; otherwise all of the commit's state (buffer, damage, frame callbacks,
+  presentation feedback, viewport, scale, transform, input region, icon…) waits in the surface's queue and the Wayland
+  event loop polls an eventfd the kernel signals with the point. Later commits of that surface wait behind it, in order,
+  with or without points. Nothing ever blocks: other surfaces, other apps, the shell and the cursor go on.
+- **Release:** the release point is signalled when LordOS stops using the buffer: at once after the CPU copy (or for a
+  buffer it refused), on the GPU path after the frame that replaced it is done or its direct scanout ends, carrying
+  the buffer's own fences (the GPU's last read is waited for in the kernel). A frame never shown (its surface destroyed
+  while it waited) is released too, so the app never waits on LordOS forever. `wl_buffer.release` is still sent as
+  before.
+- **A point that never signals:** only that surface freezes on its last frame (its frame callbacks wait with it). After 5
+  s lord-server logs it once per surface (`wayland: <app>: a frame waits for its acquire point for 5 s`); closing the
+  window or the app frees everything.
+- **Limits** (past one the client is disconnected with `no_memory`): 64 timelines per client, one object per surface
+  (at most 256 per client), 8 commits waiting per surface, 32 eventfds per connection. The session has 128 eventfds;
+  when they are taken, only a client whose process already holds 32 of them is disconnected, and any other client's
+  waiting frame is checked every 4 ms on a timer instead, so one app can't get others disconnected.
+- **Mixing:** an app may use it on some surfaces and not others, or destroy the object and go back to implicit sync;
+  apps that don't bind it (Mesa's EGL in 25.0, GTK, Qt, Chromium, Firefox on Mesa) are unchanged.
+- **Tests:** `build/syncobj-test` (the error rules, what a commit does, the queue, the limits; in `make test`),
+  `build/syncobj-kernel-test` (`syncobj.c` on this machine's render node: import, eventfd, release at once and through a
+  udmabuf's exported fences) and `tests/syncobj_headless.sh` (`build/syncobj-client` against a headless lord-server, in `tests/run_suites.sh`; skipped
+  without a render node with timelines or `/dev/udmabuf`): a frame held until its acquire point is signalled from the
+  CPU and then applied and presented, the replaced buffer released; a ready commit waiting behind a waiting one and both
+  applied in order; a point never signalled freezing only its surface while another window of the same client gets
+  about 90 frames in 1.5 s, and destroying it releasing both points; a ninth waiting commit disconnecting the client; one app
+  holding the session's 128 waits from 4 connections while another process's explicit-sync frames still work and it
+  stays connected, and the flooding app refused one more;
+  every protocol error; implicit sync again after the object is destroyed.
+- **Checked 2026-11-22** on the development PC (Debian 13, Linux 6.12, Mesa 25.0.7), headless lord-server on the CPU
+  path: the suite above passes; `vkcube --wsi wayland` (RADV, AMD RX 580) binds the global and commits every frame with
+  `set_acquire_point` and `set_release_point` (`WAYLAND_DEBUG`): 600 frames at 60.1 fps in FIFO and 1500 at 330 fps in
+  mailbox, no protocol error, no stall; `eglgears_wayland` (Mesa's EGL doesn't use it yet) unchanged; an ASan build of
+  lord-server ran the suite with no error. On VM 116 the suite passes headless and with GPU composition on the monitor
+  (llvmpipe on virtio-gpu, `LORD_GPU=1`); there virtio-gpu refuses udmabufs in EGL, so buffers are copied on that path
+  too. Not checked yet: a buffer sampled in place by a real GPU and released after the next frame with its fences,
+  NVIDIA's driver (LordOS doesn't support it), Xwayland 24.1's own use.
+
+## Pending
 
 - **Firefox ESR 153 ignored mouse clicks on VM 119** (October 19, QEMU's USB tablet through QMP):
   the pointer reaches it (`enter`, `motion`, `button` on its content subsurface, checked with

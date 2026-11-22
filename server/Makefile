@@ -35,7 +35,8 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            staging/security-context/security-context-v1 \
            unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
            staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
-           staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1
+           staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1 \
+           staging/linux-drm-syncobj/linux-drm-syncobj-v1
 # color-management-v1 and color-representation-v1 (src/wl/wlcolor.c, docs/WAYLAND.md "Colour management")
 WL_MORE += staging/color-management/color-management-v1 staging/color-representation/color-representation-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
@@ -67,7 +68,7 @@ MEDIA_SRC := src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/m
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/osk.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/syncobj.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/osk.c \
        src/ui/wave.c src/sound/spectrum.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c \
@@ -333,7 +334,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/popup-client build/wlperf-client build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/popup-client build/wlperf-client build/syncobj-client build/syncobj-kernel-test build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -878,7 +879,8 @@ CLIENT_PROTO := stable/xdg-shell/xdg-shell unstable/xdg-decoration/xdg-decoratio
                 staging/security-context/security-context-v1 \
                 unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
                 staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
-                staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1
+                staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1 \
+                staging/linux-drm-syncobj/linux-drm-syncobj-v1
 CLIENT_GEN := $(foreach p,$(CLIENT_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 define wl_client_proto
 build/gen/client/$(notdir $(1))-client-protocol.h: $(WLPROTO)/$(1).xml
@@ -918,6 +920,19 @@ $(foreach p,$(COLOR_PROTO),$(eval $(call wl_client_proto,$(p))))
 COLOR_GEN := $(foreach p,$(COLOR_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 build/color-client: tests/color_client.c $(CLIENT_GEN) $(COLOR_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/color_client.c $(filter %.c,$(CLIENT_GEN) $(COLOR_GEN)) -lwayland-client
+# Explicit sync (linux-drm-syncobj-v1, src/wl/syncobj.h, docs/SYNCOBJ-PLAN.md): tests/syncobj_client.c, run by
+# tests/syncobj_headless.sh against a headless lord-server; the pure part in tests/syncobj_test.c
+build/syncobj-client: tests/syncobj_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/syncobj_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+test: build/syncobj-test
+build/syncobj-test: tests/syncobj_test.c src/wl/syncobj.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/syncobj_test.c
+	./$@ || { rm -f $@; exit 1; }
+# the kernel side on this machine's render node (run by tests/run_suites.sh; exit 77 without timeline syncobjs)
+build/syncobj-kernel-test: tests/syncobj_kernel_test.c src/wl/syncobj.c src/wl/syncobj.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/syncobj_kernel_test.c src/wl/syncobj.c
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag
