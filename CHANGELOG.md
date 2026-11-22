@@ -90,7 +90,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   ❖Esc to release* shows for four seconds. Configure → Display → *Capture automatically in full screen* (off by default;
   machine.json schema 12 `capture_fullscreen`, `lord-vm --set --capture-fullscreen on|off`): captured on entering full
   screen, released on leaving it, and a click in the picture captures again after ❖Esc. Not offered in apps mode (the button
-  says why). In all 35 languages.
+  says why). In all 35 languages. A machine made with a profile honours its keyboard and mouse choices: *Mouse: capture*
+  captures whenever the window comes to the front (and on a click after ❖Esc), *Shortcuts: never* never takes LordOS's
+  shortcuts, and *Capture in full screen* is written to machine.json (`capture_fullscreen`, its only home) when the machine
+  is made.
   - **A pointer lock in lord-server** (`server/src/pointerlock.c`): the pointer stays inside the owner's node, the mouse's
     motion goes to the owner instead, buttons and wheel still go where the pointer is; it ends on ❖Esc or Ctrl+Alt, when the
     node is gone for half a second, or when the session loses its input. Generic: native apps and games get it as
@@ -101,8 +104,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `mouse_set` (and the tablet again on release). Every machine with a window now has a `usb-mouse` (compat and USB-tablet
     devices) or a `virtio-mouse-pci` (slot 0x14) beside its tablet; lord-vm checks every second that the tablet stays the active
     one when not captured (the new mouse's driver takes over at each boot otherwise). amd64's PS/2 mouse isn't used: Linux drives
-    it as VMware's VMMouse, which drops relative packets. A guest that hands its pointer over has its own shape shown where it
-    puts it. Seen on a Debian 13 guest with virtio and with compat devices: relative motion arrives exactly (−3000 px in one move,
+    it as VMware's VMMouse, which drops relative packets. A guest that hands its pointer over has its own image drawn where it
+    puts it, inside the picture only: the host's pointer stays at the picture's centre and clicks and wheel go straight to the
+    guest with no hit test, so a guest can't steer a click onto the host's desktop (from the commit's security review). Seen on a Debian 13 guest with virtio and with compat devices: relative motion arrives exactly (−3000 px in one move,
     no edge), the tablet works again after release. Not yet tried in the lord-server window, with a guest of another family or on arm64.
   - Tests: `tests/vm_capture_test.mjs` (the window's decisions), `vm_test` (schema 12, the choice among QEMU's mice);
     `lordvm-dev` `capture 0|1` and `rel DX DY`.

@@ -49,6 +49,14 @@ eq('a click in a window: nothing', run(CAPTURE_IDLE, [{ ...CLICK, full: false }]
 eq('a click in full screen without the option: nothing', run(CAPTURE_IDLE, [{ ...CLICK, autoFs: false }]).cmds, [null]);
 eq('re-captured by a click, released by leaving full screen', run(CAPTURE_IDLE, [FS, { type: 'ended' }, CLICK, WIN]).cmds, ['capture', null, 'capture', 'release']);
 
+// the profile's mouse 'capture' (app.json input.mouse): captured when the window comes to the front, and by a click after ❖Esc
+eq('focus with mouse capture', run(CAPTURE_IDLE, [{ type: 'focus', mouse: 'capture' }]), { st: { on: true, auto: false }, cmds: ['capture'], notices: 1 });
+eq('focus with mouse auto: nothing', run(CAPTURE_IDLE, [{ type: 'focus', mouse: 'auto' }]).cmds, [null]);
+eq('focus not offered (apps mode): nothing', run(CAPTURE_IDLE, [{ type: 'focus', mouse: 'capture' }], false).cmds, [null]);
+eq('mouse capture: ❖Esc, a click captures again, in a window too', run(CAPTURE_IDLE, [{ type: 'focus', mouse: 'capture' }, { type: 'ended' }, { type: 'click', full: false, autoFs: false, mouse: 'capture' }]).cmds, ['capture', null, 'capture']);
+eq('mouse capture: blur releases, focus again captures', run(CAPTURE_IDLE, [{ type: 'focus', mouse: 'capture' }, { type: 'blur' }, { type: 'focus', mouse: 'capture' }]).cmds, ['capture', 'release', 'capture']);
+eq('mouse capture survives leaving full screen (not automatic)', run(CAPTURE_IDLE, [{ type: 'focus', mouse: 'capture' }, { type: 'fullscreen', full: true, autoFs: true }, { type: 'fullscreen', full: false, autoFs: true }]).st, { on: true, auto: false });
+
 // the poll: lord-server's count of ended captures moved while the window held one
 eq('poll: ended by lord-server', captureEndedByServer({ on: true }, 2, { captured: false, captureEnds: 3 }), true);
 eq('poll: still captured', captureEndedByServer({ on: true }, 2, { captured: true, captureEnds: 2 }), false);

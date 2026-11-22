@@ -116,6 +116,9 @@ eq('set after create', P.setPatch(v, { bridge: 'enp3s0', shareAbsPath: '/home/an
   { network: 'hostonly', ports: v.ports, transfer: true, shares: [{ tag: 'share', path: '/home/ana/Servidor', writable: true }] });
 eq('productivity needs only the transfer folder', P.setPatch(prod), { transfer: true });
 eq('bridged with its card', P.setPatch({ ...prod, network: 'bridged', transfer: false }, { bridge: 'eno1' }), { network: 'bridged', bridge: 'eno1' });
+// capturing in full screen goes to machine.json (lord.vm.set captureFullscreen), only when the profile asks for it
+eq('games: captured in full screen', P.setPatch({ ...prod, input: { mouse: 'capture', shortcuts: 'ask', captureFullscreen: true } }), { transfer: true, captureFullscreen: true });
+eq('not asked: not set', P.setPatch({ ...prod, input: { mouse: 'auto', shortcuts: 'ask', captureFullscreen: false } }), { transfer: true });
 
 // ---- fuzz: random profiles never throw; what they give reads back the same ----
 let seed = 7;

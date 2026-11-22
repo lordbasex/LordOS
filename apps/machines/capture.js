@@ -23,7 +23,10 @@ export const CAPTURE_IDLE = Object.freeze({ on: false, auto: false });
 // One step: st { on, auto (this capture came from full screen, so it ends with it) } and an event:
 //   { type: 'toggle' }                       the button or the menu
 //   { type: 'fullscreen', full, autoFs }     the window entered or left full screen
-//   { type: 'click', full, autoFs }          a press in the picture (in full screen with the option: captures again)
+//   { type: 'click', full, autoFs, mouse }   a press in the picture: captures again in full screen with the option, or
+//                                            always with the profile's mouse 'capture' (app.json input.mouse)
+//   { type: 'focus', mouse }                 the window came to the front (or the machine's picture came up while it was):
+//                                            the profile's mouse 'capture' captures
 //   { type: 'blur' }                         the window lost the keyboard
 //   { type: 'unavailable' }                  not offered any more (apps mode, the machine stopped, no picture)
 //   { type: 'ended' }                        lord-server ended it (❖Esc, Ctrl+Alt, the picture went away)
@@ -39,7 +42,8 @@ export function captureStep(st0, ev, offered = true) {
     // entering full screen captures when the machine asks for it; leaving ends an automatic capture (one asked for with
     // the button stays)
     case 'fullscreen': return ev.full ? (ev.autoFs ? take(true) : same) : st.on && st.auto ? free() : same;
-    case 'click': return ev.full && ev.autoFs ? take(true) : same;
+    case 'click': return (ev.full && ev.autoFs) || ev.mouse === 'capture' ? take(ev.mouse !== 'capture') : same;
+    case 'focus': return ev.mouse === 'capture' ? take(false) : same;
     case 'blur': case 'unavailable': return free();
     case 'ended': case 'failed': return { st: { ...CAPTURE_IDLE }, cmd: null, notice: false };
     default: return same;

@@ -244,7 +244,9 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       setJob(0);
       if (r.ok) {
         // a Windows machine sets up its transfer folder (WinFsp) by itself once its guest tools are in (6.7.1)
-        writeMeta(r.dir, { os: sys.id, osName: [sys.name, ver].filter(Boolean).join(' '), profile, onClose: pv.onClose, appsMode: pv.appsMode, input: pv.input,
+        writeMeta(r.dir, { os: sys.id, osName: [sys.name, ver].filter(Boolean).join(' '), profile, onClose: pv.onClose, appsMode: pv.appsMode,
+          // the mouse and shortcuts choices; capturing in full screen is machine.json's (setPatch below)
+          input: { mouse: pv.input.mouse, shortcuts: pv.input.shortcuts },
           ...(source === 'custom' && custom?.kind === 'linux' ? { family: 'linux' } : {}), ...(windows ? { transferSetup: true } : {}) });
         const m = lord.vm.list().find((x) => x.dir === r.dir);
         const done = () => { if (customize) onConfigure(m || null); else onCreated(m || null); };

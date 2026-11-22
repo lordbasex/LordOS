@@ -22,11 +22,11 @@ export function readMeta(dir) {
       if (typeof j.appsMode === 'boolean') meta.appsMode = j.appsMode;      // apps mode (7.2): the machine's window opens in it
       // the profile it was made with: LordOS's ('productivity'…) or the person's own ('u-…', profiles.js)
       if (typeof j.profile === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(j.profile)) meta.profile = j.profile;
-      // keyboard and mouse from its profile (profiles.js): the pointer captured on a click or automatic, LordOS's
-      // shortcuts asked for or never taken, captured in full screen
+      // keyboard and mouse from its profile (profiles.js): the pointer captured when the window is in front (and on a click
+      // in its picture) or automatic, LordOS's shortcuts asked for or never taken. Capturing in full screen is machine.json's
+      // capture_fullscreen (Configure, lord.vm.set), never kept here
       if (j.input && typeof j.input === 'object') {
-        meta.input = { mouse: j.input.mouse === 'capture' ? 'capture' : 'auto', shortcuts: j.input.shortcuts === 'never' ? 'never' : 'ask',
-          captureFullscreen: j.input.captureFullscreen === true };
+        meta.input = { mouse: j.input.mouse === 'capture' ? 'capture' : 'auto', shortcuts: j.input.shortcuts === 'never' ? 'never' : 'ask' };
       }
       if (typeof j.cloneOf === 'string' && /^[0-9a-f-]{36}$/.test(j.cloneOf)) meta.cloneOf = j.cloneOf;
       if (typeof j.importedFrom === 'string') meta.importedFrom = j.importedFrom.slice(0, 1024);

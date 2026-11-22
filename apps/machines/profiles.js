@@ -286,7 +286,9 @@ export function onHost(p, host, opts = {}) {
 
 // The changes lord.vm.set makes after lord.vm.create (which takes only CPU, memory, disk, shared or isolated network,
 // the clipboard both ways and 3D): the network mode and its ports, the bridged card, the clipboard's way, the transfer
-// folder, a shared folder (already a full path the person confirmed), the graphics card
+// folder, a shared folder (already a full path the person confirmed), the graphics card, and "Capture automatically in
+// full screen" (machine.json capture_fullscreen is its one home, the field Configure changes; app.json keeps only the
+// mouse and shortcuts choices)
 export function setPatch(v, { bridge = '', shareAbsPath = '' } = {}) {
   const out = {};
   if (v.network === 'bridged' || v.network === 'hostonly') out.network = v.network;
@@ -295,6 +297,7 @@ export function setPatch(v, { bridge = '', shareAbsPath = '' } = {}) {
   if (v.clipboard !== 'off' && v.clipboard !== 'both') out.clipboard = v.clipboard;
   if (v.transfer) out.transfer = true;
   if (v.gpu) out.gpu = v.gpu;
+  if (v.input?.captureFullscreen) out.captureFullscreen = true;
   if (shareAbsPath && v.share) out.shares = [{ tag: 'share', path: shareAbsPath, writable: !!v.share.writable }];
   return out;
 }
