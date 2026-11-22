@@ -1176,6 +1176,59 @@ export function closeRefusedOf(list) {
   return out;
 }
 
+// Launch feedback (the launcher's rows): an app opened in the guest may take seconds to show a window, or show it where
+// the person doesn't look, so its row says "Opening…" and a click on it again is ignored until a new window of that app
+// is listed or LAUNCH_WAIT_MS pass. The guest lists its apps by name and its windows by program file name, so a window
+// belongs to an app when its program's name (without the extension) holds a word of the app's name (3 letters or more;
+// "Microsoft Edge" → msedge.exe, "Word" → WINWORD.EXE) or its title holds the app's whole name.
+export const LAUNCH_WAIT_MS = 5000;
+export function windowOfApp(name, w) {
+  const n = folded(name).trim();
+  if (!n || !w) return false;
+  const exe = folded(w.app).replace(/\.[a-z0-9]{1,4}$/, '');
+  if (exe && n.split(/[^\p{L}\p{N}]+/u).some((p) => p.length >= 3 && exe.includes(p))) return true;
+  return folded(w.title).includes(n);
+}
+// launches (token → { at, name, seen: the guest window ids listed when it was clicked }) with this one started
+export function launchStart(launches, a, list, now) {
+  return { ...(launches || {}), [a.token]: { at: now, name: String(a.name || ''), seen: (list || []).map((w) => w.id) } };
+}
+// the id of the new window that answered a launch, or 0
+export function launchAnswered(entry, list) {
+  if (!entry) return 0;
+  const seen = new Set(entry.seen || []);
+  const w = (list || []).find((x) => x && !seen.has(x.id) && !(x.owner > 0) && windowOfApp(entry.name, x));
+  return w ? w.id : 0;
+}
+// whether an app's row still waits (shows "Opening…" and ignores clicks)
+export const launchPending = (entry, list, now) => !!entry && now - entry.at < LAUNCH_WAIT_MS && !launchAnswered(entry, list);
+// the launches still waiting (the others dropped)
+export function launchPrune(launches, list, now) {
+  const out = {};
+  for (const [k, e] of Object.entries(launches || {})) if (launchPending(e, list, now)) out[k] = e;
+  return out;
+}
+
+// Close feedback (Running's ×): the guest may refuse (Windows doesn't let a normal program close a window that runs as
+// administrator). After ×, the row says "Closing…"; when the window is still listed CLOSE_WAIT_MS later, or the guest
+// says it refused (refusal: { reason, at }, at ≥ the click), a note on the row says why. Gone from the list: nothing.
+export const CLOSE_WAIT_MS = 3000;
+export const closeStart = (closes, gid, now) => ({ ...(closes || {}), [gid]: { gid, at: now } });
+// null, { state: 'closing' } or { state: 'refused', reason: 'elevated' | '' }
+export function closeView(entry, list, refusal, now) {
+  if (!entry) return null;
+  if (!(list || []).some((w) => w && w.id === entry.gid)) return null;
+  if (refusal && refusal.at >= entry.at) return { state: 'refused', reason: refusal.reason === 'elevated' ? 'elevated' : '' };
+  return now - entry.at >= CLOSE_WAIT_MS ? { state: 'refused', reason: '' } : { state: 'closing' };
+}
+// the closes worth keeping: their window is still listed
+export function closePrune(closes, list) {
+  const ids = new Set((list || []).map((w) => w && w.id));
+  const out = {};
+  for (const [k, e] of Object.entries(closes || {})) if (ids.has(e.gid)) out[k] = e;
+  return out;
+}
+
 // Where a machine starts from (Configure → Boot; machine.json's boot_order): "auto" (the system disk, then the CD/DVD
 // drive) or the devices the firmware tries, in order, as lord-vm takes them ("network,disk").
 export const BOOT_DEVS = ['disk', 'cd', 'network'];

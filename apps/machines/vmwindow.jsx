@@ -12,7 +12,7 @@ import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
 import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
-import { ListHead, AppsSearch, RunningList, LaunchList } from './appslist.jsx';
+import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { ClipAskBar } from './clipask.jsx';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
@@ -358,7 +358,6 @@ function AppsController({ name, g, onLeave }) {
   const p = usePal();
   const [query, setQuery] = useState('');
   const apps = launcherApps(g?.apps || [], query, g?.appIcons);
-  const launch = (a) => { if (g?.sid && a) lord.vm.launch(g.sid, a.token); };
   return (
     <View style={{ flex: 1, padding: 16, gap: 10, backgroundColor: p.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -371,9 +370,9 @@ function AppsController({ name, g, onLeave }) {
         <RunningList g={g} />
       </ScrollView>
       <ListHead label={tr('machines.apps.launch')} />
-      <AppsSearch value={query} onChange={setQuery} onSubmit={() => launch(apps[0])} onCancel={onLeave} />
+      <AppsSearch value={query} onChange={setQuery} onSubmit={() => launchFirst(g, apps)} onCancel={onLeave} />
       <ScrollView style={{ flex: 1, borderRadius: 10, backgroundColor: p.raised }} contentStyle={{ padding: 4 }}>
-        <LaunchList g={g} apps={apps} onLaunch={launch} />
+        <LaunchList g={g} apps={apps} />
       </ScrollView>
     </View>
   );

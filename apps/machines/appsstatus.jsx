@@ -7,10 +7,10 @@
 import { View, Text, ScrollView, Overlay, addListener, useStore, wm, registerStatusItem, statusPanelAt, statusPanelRoom, t as tr } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { guests } from './appsmode.jsx';
-import { ListHead, AppsSearch, RunningList, LaunchList } from './appslist.jsx';
+import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { usePal, OsMark, menus } from './ui.jsx';
 import { readMeta } from './meta.js';
-import { launcherApps, appsStatusDiff, machineOsId } from './model.js';
+import { launcherApps, launchAnswered, appsStatusDiff, machineOsId } from './model.js';
 
 const ORDER = 7.5;             // after the Linux apps' tray icons (7), before the isolated apps' items (8)
 const items = new Map();       // dir → unregister
@@ -31,19 +31,23 @@ function Menu({ g, os, room, close }) {
   const p = usePal();
   const [query, setQuery] = useState('');
   const apps = launcherApps(g.apps || [], query, g.appIcons);
-  const launch = (a) => { if (g.sid && a) { lord.vm.launch(g.sid, a.token); close(); } };
+  // an app opened from here: the menu stays, its row saying "Opening…", until the app's window is listed (then it's in
+  // front and the menu goes, so the keys reach it)
+  const [opened, setOpened] = useState(null);
+  const launched = (a) => setOpened(a.token);
+  useEffect(() => { if (opened && launchAnswered(g.launches?.[opened], g.list)) close(); }, [opened, g.list]);
   const edge = p.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)';
   // the head (search) and the foot always show; the lists scroll between them
   const lists = room ? Math.max(120, room - 150) : 420;
   return (
     <View style={{ width: 320, padding: 8, gap: 6, borderRadius: 12, backgroundColor: p.card, border: `1px solid ${edge}`, boxShadow: '0 12px 32px rgba(0,0,0,0.4)' }}>
-      <AppsSearch value={query} onChange={setQuery} autoFocus onSubmit={() => launch(apps[0])} onCancel={close} />
+      <AppsSearch value={query} onChange={setQuery} autoFocus onSubmit={() => launchFirst(g, apps, launched)} onCancel={close} />
       <ScrollView style={{ maxHeight: lists }} contentStyle={{ gap: 4 }}>
         {/* while searching, only the apps (as a Start menu does) */}
         {query.trim() ? null : <ListHead label={tr('machines.apps.running')} />}
         {query.trim() ? null : <RunningList g={g} after={close} />}
         <ListHead label={tr('machines.apps.launch')} />
-        <LaunchList g={g} apps={apps} onLaunch={launch} />
+        <LaunchList g={g} apps={apps} onLaunched={launched} />
       </ScrollView>
       <View style={{ height: 1, backgroundColor: p.line }} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: 2 }}>

@@ -60,6 +60,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Open an app**, the guest's apps, launched in the guest with the token it listed (`lord.vm.launch`). Each row shows
     the app's initial; the row already takes a real icon per app (`appIcons` by token) for when the guest sends them;
   - at the bottom the machine's name, **Show the Machine's Window** (the controller panel) and **Leave Apps Mode**.
+  - **Launch feedback** (from the maintainer's test: a window that opened where he didn't look led to the app opened six
+    times). After a click, the app's row shows **Opening…** with a spinner, and further clicks on it (and Enter, and the
+    Applications menu) are ignored until a new guest window of that app is listed (its program's name holds a word of the
+    app's name, or its title the whole name) or 5 seconds pass. The status menu stays open while it waits and closes when
+    the app's window appears, so the keys reach it.
+  - **Close feedback.** After **×**, the row shows **Closing…**; if the window is still listed 3 seconds later, or the guest
+    reports that it refused, the row says why: "Can't close from here: it runs as administrator" (the guest's own words
+    for an elevated window), or "The machine didn't close it". The refusal hook (`closeRefused` per window in the machine's
+    apps mode state) is ready for the guest tools' report; until it arrives, the note comes from the timeout.
+  - Both also in the controller panel (the same components). Logic in `model.js` (`windowOfApp`, `launchStart`,
+    `launchPending`, `launchAnswered`, `launchPrune`, `closeStart`, `closeView`, `closePrune`), tested in
+    `vm_model_test.mjs`; four more texts in all 35 languages.
   - One item per machine; it goes when apps mode ends. It is an SDK status item, so it appears in every theme with a
     status area (Lord Flow's menu bar, the Classic taskbar when horizontal, Workspaces' top bar) and on each display's
     bar; the menu opens on the bar that was clicked. While it is open, a guest window in front doesn't take the keys.
