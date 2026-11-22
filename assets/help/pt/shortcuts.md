@@ -19,7 +19,7 @@ tema em uso.
 | ❖. | Emoji e símbolos |
 | ❖⇧3 · Print Screen | Captura da tela inteira |
 | ❖⇧4 | Captura de uma área (Espaço: de uma janela) |
-| ❖⇧5 | Painel de capturas e gravação de tela |
+| ❖⇧5 | Barra de capturas e gravação de tela |
 | ❖L · ❖⌃Q | Bloquear a tela |
 | ❖Q | Sair do app |
 | Teclas de mídia | Tocar, pausar, próxima e anterior no Player |

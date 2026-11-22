@@ -1733,6 +1733,41 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Screenshots: a thin floating toolbar instead of the panel window, in development** (`apps/screenshots/toolbar.jsx`,
+  `toolbarmodel.js`, `state.js`; `docs/MEDIA.md`). ❖⇧5 (or opening Screenshots) no longer opens the big "Screenshots"
+  window that covered the screen: a compact dark bar shows near the bottom center, as macOS's ⇧⌘5 bar, translucent and
+  blurred where the theme has blur (Settings' effects on), with a soft shadow and a hairline border. Left to right: a
+  grip (drag it anywhere, to any display; it opens there next time, as the reading-aloud player), Close, the capture
+  modes (Entire Screen, Selected Window, Selected Portion), the recording modes (Record Entire Screen, Record Selected
+  Portion), Color and Text (OCR) as small icons, Options ⌄ and the primary Capture or Record button. Icons only, each
+  with a tooltip (the ❖⇧3 and ❖⇧4 shortcuts in theirs); the chosen mode is lit and kept. Options follows macOS's menu:
+  dimmed section headers and separators: **Save to** Desktop, Documents, Pictures (the Screenshots folder, the
+  default), Clipboard, Mail (a new message with the capture attached, when Mail is installed), Markup Editor (opens
+  on the capture at once) and Other Location… (a folder chosen in the file dialog, remembered); **Timer** None, 5 or
+  10 seconds; **Microphone** None or a device, for recordings; **Options** Show Floating Thumbnail, Remember Last
+  Selection, Show Mouse Pointer in Recordings; then "Protect the front window from captures" (was the panel's Privacy
+  menu) and **Recent**, a page of its own instead of the panel's list. Keys while the bar shows: Esc closes it, Enter
+  captures, ← → go through its items (Enter or Space presses one), ↓ on Options opens it and ↑ ↓ go through its rows.
+  ❖⇧3, ❖⇧4, Print Screen, Space/C/T/Esc in the selection and ❖⇧5 to stop a recording are unchanged.
+  - **Record Selected Portion is new**: `media.screenRecord` takes `region` (logical pixels; lord-server records only
+    that part of the main display, even-sized) and `cursor` (0 leaves the pointer out of the video;
+    `server/src/media/capture.c`, `ui/js_media.c`). The area is drawn over a still and confirmed with Record or Enter.
+  - **Remember Last Selection**: ❖⇧4 and the toolbar's Selected Portion bring back the last area with eight handles to
+    resize it and its inside to move it; Enter or its Capture button takes it. Without the option, a drag takes the
+    area at once, as before.
+  - The floating thumbnail stays in the main display's bottom-right corner for a few seconds and a click opens the
+    markup editor; Show Floating Thumbnail off skips it. Dragging the thumbnail to save it elsewhere is not done.
+  - The older settings' "Only copy to the clipboard" reads as Save to → Clipboard, and the old key follows the choice,
+    so nothing is lost either way (no settings migration). The panel's texts (its mode labels, shortcut line,
+    "Record the microphone", "Only copy…") are removed from every language; the toolbar's are in all 35.
+  - SDK: a bare picture-in-picture window (`wm.setPip(id, { …, bare: true })`) is drawn without the black box, drag
+    and resize handle, so an app can draw its own floating shape; menus, popovers and tooltips opened from a floating
+    window place themselves on its display instead of inside its small box (`sdk/controls.jsx`); `Enter` can be named
+    in `addShortcuts`; `placeFloatingBar`/`rememberFloatingBar` export the reading-aloud player's placement.
+  - Tests: `screenshots_toolbar_model_test.mjs` (56 checks: options read back and kept, the old key, modes, the keys'
+    order, Save to's folders, the remembered area and its handles) and `screenshots_toolbar_scene.mjs` (25: modes lit
+    and chosen, Capture/Record, the Options sections and their choices saved, Recent, Close/Color/Text).
+
 - **Chromium and Electron apps from Flathub install and work; the Store no longer marks them "not yet supported"**
   (`apps/store/flathubpages.js`, `sdk/flathubmodel.js`, `docs/FLATPAK.md`). Their helpers' sub-sandboxes are now served
   (see Fixed). Checked with Whatsie (QtWebEngine), the Chromium browser and FreeTube (Electron/zypak). The Store's

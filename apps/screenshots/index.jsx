@@ -1,27 +1,25 @@
-// Screenshots: screen captures and screen recording (a floating capture panel,
-// with our own design).
+// Screenshots: screen captures and screen recording (a thin floating toolbar, toolbar.jsx, with our own design).
 //
 // Shortcuts (global, also with a Linux app in front):
 //   ❖⇧3 / Print Screen  entire screen        ❖⇧4  area (or window, with Space)
-//   ❖⇧5                 the Screenshots panel (and stop a recording in progress)
+//   ❖⇧5                 the Screenshots toolbar (and stop a recording in progress)
 // Protected windows (wm.setProtected) come out black: the server does that, not this app.
 // After each capture a floating thumbnail shows up; a click opens the markup editor (editor.jsx: arrow,
 // box, line, text, blur, pixelate and solid-fill redaction, crop, resize, turns). Photos and Files'
 // Quick Preview open the same editor on any picture (media.js openMarkup). Captures are saved in
-// ~/Pictures/Screenshots or to the clipboard.
+// ~/Pictures/Screenshots by default; the toolbar's Options choose another place (toolbarmodel.js saveDirFor).
 import {
-  View, Text, Image, MediaView, Toggle, Segmented, GroupBox, FormRow, clipboard,
-  useTheme, useAppWindow, useStore, useWindows, wm, windows, typeScale,
-  t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, useSettings, notify, toast, errorText, dndActive, appNotifyPrefs,
+  View, Text, Image, MediaView, FilePicker, clipboard,
+  useAppWindow, useStore, useWindows, wm, windows, getApp,
+  t as tr, media, userDirs, fs, addListener, addShortcuts, createStore, windowTitle, settings, notify, microphones, soundState, toast, errorText, dndActive, appNotifyPrefs, direction,
 } from '@lordos/sdk';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { captureRect, displaysToCapture, displayAt, dragRect, capturePixel, magnify, middleColor, LOUPE_PX, LOUPE_ZOOM } from './geometry.js';
 import { ocrLangs, cleanText } from './ocr.js';
 import { Editor } from './editor.jsx';
-
-const APP = 'screenshots';
-const recording = createStore(null);   // { id, path, start }
-const recent = createStore([]);       // [{ path, time }]
+import { APP, recording, recent, bar, options, setOptions, addRecent } from './state.js';
+import { saveDirFor, barStops, stepStop, keepRect, restoreRect, hitHandle, adjustRect, handlePoints } from './toolbarmodel.js';
+import { Toolbar, barFrame, menuRows, selectable } from './toolbar.jsx';
 
 export function Icon({ size: s }) {
   const corner = (l, tp, w, hh) => <View style={{ position: 'absolute', left: s * l, top: s * tp, width: s * w, height: s * hh, backgroundColor: '#fff', borderRadius: s * 0.02 }} />;
@@ -53,6 +51,14 @@ function captureDir() {
   try { fs.mkdir(dir); } catch (e) { /* already there */ }
   return dir;
 }
+// where this capture (or recording) goes, per Options → Save to; null: the clipboard alone
+function saveDir(o, video = false) {
+  const dir = saveDirFor(o.saveTo, userDirs(), tr('screenshots.folder'), video, o.otherDir);
+  if (!dir) return null;
+  if (dir === `${userDirs().pictures}/${tr('screenshots.folder')}`) return captureDir();
+  try { fs.mkdir(dir); } catch (e) { /* already there */ }
+  return dir;
+}
 function freeName(dir, base, ext) {
   for (let n = 1; n < 1000; n++) {
     const p = `${dir}/${base}${n > 1 ? ` (${n})` : ''}.${ext}`;
@@ -60,7 +66,7 @@ function freeName(dir, base, ext) {
   }
   return `${dir}/${base} ${Date.now()}.${ext}`;
 }
-const opts = () => ({ timer: 0, clipboard: false, mic: false, ...(settings.get().screenshots || {}) });
+const opts = options;
 
 // ---- capture ----
 
@@ -70,15 +76,25 @@ const opts = () => ({ timer: 0, clipboard: false, mic: false, ...(settings.get()
 async function finish(handle, { copy = true } = {}) {
   if (!handle) return;
   const o = opts();
+  const dir = saveDir(o);
   let path = null, failed = null;
-  if (copy || o.clipboard) { const c = await media.copyImage(handle); if (!c.ok) failed = { what: 'copy', error: c.error }; }
-  if (!o.clipboard) {
-    const r = await media.saveImage(handle, freeName(captureDir(), tr('screenshots.fileName', { date: stamp() }), 'png'));
-    if (r.ok) { path = r.path; recent.set((l) => [{ path, time: Date.now() }, ...l].slice(0, 20)); }
+  if (copy || !dir) { const c = await media.copyImage(handle); if (!c.ok) failed = { what: 'copy', error: c.error }; }
+  if (dir) {
+    const r = await media.saveImage(handle, freeName(dir, tr('screenshots.fileName', { date: stamp() }), 'png'));
+    if (r.ok) { path = r.path; addRecent({ path, time: Date.now() }); }
     else failed = { what: failed ? 'both' : 'save', error: r.error };
   }
   if (failed) notSaved(failed);
-  showThumb(handle, path, failed ? failed.what : null);
+  // Save to Mail: a new message with the file attached; Save to the editor: it opens on the capture at once
+  if (path && copy && o.saveTo === 'mail' && getApp('mail')) wm.open('mail', { new: true, args: { compose: { attachments: [path] } } });
+  if (copy && o.saveTo === 'editor' && !failed) { openEditor(handle, path); return; }
+  if (o.thumbnail) showThumb(handle, path, failed ? failed.what : null, dir);
+  else if (!windows.get().some((w) => w.args?.handle === handle)) media.close(handle);
+}
+
+function openEditor(handle, path) {
+  const w = Math.min(1000, lord.screen.width - 80), h = Math.min(680, lord.screen.height - 140);
+  wm.open(APP, { instance: `edit${handle}`, args: { handle, path }, frame: { x: Math.round((lord.screen.width - w) / 2), y: 60, w, h } });
 }
 
 // The capture was taken but couldn't be saved or copied (lord-media missing, a full disk…): said, never silent
@@ -89,10 +105,13 @@ function notSaved({ what, error }) {
   if (!banner || dndActive() || appNotifyPrefs(APP).style === 'none') toast.set(`${title}: ${body}`);
 }
 
-function showThumb(handle, path, failed = null) {
-  const id = wm.open(APP, { instance: 'thumb', args: { handle, path, failed } });
+// the floating thumbnail, a few seconds in the bottom corner of the main display (Options → Show Floating Thumbnail)
+function showThumb(handle, path, failed = null, dir = null) {
+  const folder = dir ? dir.split('/').pop() : '';
+  const id = wm.open(APP, { instance: 'thumb', args: { handle, path, failed, folder } });
   const w = 240, h = 150;
-  wm.setPip(id, { x: lord.screen.width - w - 20, y: lord.screen.height - h - 90, w, h });
+  const d = (lord.screen.displays || []).find((x) => x.main) || { x: 0, y: 0, w: lord.screen.width, h: lord.screen.height };
+  wm.setPip(id, { x: d.x + d.w - w - 20, y: d.y + d.h - h - 90, w, h });
 }
 
 // takes the screen once a frame without our windows was drawn (it closes them first)
@@ -157,6 +176,8 @@ async function areaDone(r, at) {
   let shot = a.shots.find((sh) => !sh.display || (at && sh.display.id === at.id)) || a.shots[0];
   endArea(shot.handle);
   if (!r || r.w < 3 || r.h < 3) { media.close(shot.handle); return; }
+  if (a.mode !== 'window' && opts().remember) setOptions({ lastRect: keepRect(r, at || displayAt(lord.screen.displays, r.x + r.w / 2, r.y + r.h / 2)) });
+  if (a.mode === 'record') { media.close(shot.handle); capture.record(r); return; }
   if (a.mode === 'window') {
     const alone = await windowAlone(r, shot);
     if (alone) { media.close(shot.handle); shot = { ...shot, handle: alone }; }
@@ -206,15 +227,22 @@ export const capture = {
     let first = true;
     for (const d of displaysToCapture(lord.screen)) { const h = await grab(d); if (!h) return; await finish(h, { copy: first }); first = false; }
   })),
-  area: (mode = 'area') => afterHide(() => withTimer(async () => {
+  // mode: 'area', 'window', 'color', 'text' or 'record' (the area to record: on the main display, which is what is
+  // recorded). With Remember Last Selection the last area comes back with its handles, and Enter or the button takes
+  // it; an area to record is always confirmed so.
+  area: (mode = 'area') => afterHide(() => (mode === 'record' ? (f) => f() : withTimer)(async () => {
     endArea();
     const shots = [];
-    for (const d of displaysToCapture(lord.screen)) {
+    const main = (lord.screen.displays || []).length > 1 && !lord.screen.mirror ? lord.screen.displays.find((d) => d.main) || null : null;
+    for (const d of (mode === 'record' ? [main] : displaysToCapture(lord.screen))) {
       const h = await grab(d);
       if (!h) { shots.forEach((sh) => media.close(sh.handle)); return; }
       shots.push({ handle: h, display: d });
     }
-    area.set({ shots, mode, start: null, rect: null, hover: null, pointer: null });
+    const o = opts();
+    const kept = (mode === 'area' || mode === 'record' || mode === 'text') && o.remember ? restoreRect(o.lastRect, lord.screen.displays, lord.screen) : null;
+    const usable = kept && (mode !== 'record' || !main || displayAt([main], kept.x, kept.y));
+    area.set({ shots, mode, start: null, rect: usable ? kept : null, hover: null, pointer: null, adjust: mode === 'record' || !!usable, grab: null });
     // in the capture layer, above every other: a sheet, menu, prompt or Live Speech that was open is part of the
     // still, and the selection is drawn over it and gets the pointer there as well
     shots.forEach((sh, i) => {
@@ -223,12 +251,15 @@ export const capture = {
       wm.setFullscreen(id, true, { capture: true });
     });
   })),
-  async record() {
+  // region: an area of the main display (logical pixels), or the whole screen
+  async record(region = null) {
     const cur = recording.get();
     if (cur) { media.stop(cur.id); return; }
     afterHide(() => withTimer(async () => {
-      const path = freeName(captureDir(), tr('screenshots.recName', { date: stamp() }), 'mp4');
-      const id = await allowed(() => media.screenRecord(APP, path, { mic: opts().mic, appName: tr('apps.screenshots') }));
+      const o = opts();
+      const path = freeName(saveDir(o, true), tr('screenshots.recName', { date: stamp() }), 'mp4');
+      const id = await allowed(() => media.screenRecord(APP, path, { mic: o.mic, ...(o.mic && o.micSource ? { source: o.micSource } : null),
+        appName: tr('apps.screenshots'), cursor: o.pointer ? 1 : 0, ...(region ? { region: { x: region.x, y: region.y, w: region.w, h: region.h } } : null) }));
       if (!id) return;
       recording.set({ id, path, start: Date.now() });
       const off = media.on(id, (type, d) => {
@@ -236,7 +267,7 @@ export const capture = {
           off();
           recording.set(null);
           wm.close(`${APP}#rec`, true);
-          if (type === 'done' && d.ok) recent.set((l) => [{ path: d.path, time: Date.now(), video: true }, ...l].slice(0, 20));
+          if (type === 'done' && d.ok) addRecent({ path: d.path, time: Date.now(), video: true });
           media.close(id);
         }
       });
@@ -255,11 +286,102 @@ const toggleWindowMode = () => area.set((x) => (x ? { ...x, mode: x.mode === 'ar
 const copyUnderPointer = () => { const l = area.get()?.loupe; if (l) { copyColor(l.color); endArea(); } };
 const captureFull = () => capture.full();
 const captureArea = () => capture.area('area');
-const openPanelOrStop = () => { if (recording.get()) capture.record(); else wm.open(APP); };
+
+// ---- the toolbar (toolbar.jsx) ----
+
+export function openToolbar() {
+  if (recording.get()) { capture.record(); return; }
+  bar.set({ ring: null, menu: false, page: 'main', lit: -1 });
+  const frame = barFrame(opts().barPos);
+  if (wm.get(APP)) wm.setPip(APP, frame); else wm.open(APP, { pip: frame });
+}
+const closeToolbar = () => { bar.set({ menu: false, page: 'main', lit: -1 }); wm.close(APP, true); };
+const barShown = () => !!wm.get(APP)?.pip && !area.get();
+const front = () => windows.get().filter((w) => w.app !== APP && !w.minimized && !w.pip && w.desktop === wm.desktop()).pop() || null;
+
+const barActions = {
+  get hasMail() { return !!getApp('mail'); },
+  close: closeToolbar,
+  primary() {
+    const m = opts().mode;
+    if (m === 'full') capture.full();
+    else if (m === 'window') capture.area('window');
+    else if (m === 'recordFull') capture.record();
+    else if (m === 'recordArea') capture.area('record');
+    else capture.area('area');
+  },
+  color: () => capture.area('color'),
+  text: () => capture.area('text'),
+  protectFront() { const f = front(); if (f) wm.setProtected(f.id, !f.protected); },
+  openRecent(r) { closeToolbar(); wm.open(r.video ? 'player' : 'photos', { new: true, args: { path: r.path } }); },
+  // Other Location…: a folder chosen in the system's file dialog, in a window of its own; it is remembered
+  // (the toolbar goes meanwhile, so its keys are the dialog's, and comes back after)
+  chooseFolder() {
+    closeToolbar();
+    const w = Math.min(820, lord.screen.width - 80), h = Math.min(540, lord.screen.height - 120);
+    wm.open(APP, { instance: 'folder', frame: { x: Math.round((lord.screen.width - w) / 2), y: Math.round((lord.screen.height - h) / 2), w, h } });
+  },
+};
+
+// the keys while the toolbar shows: the Options menu's rows when it is open, else the bar's items
+const rowsNow = () => {
+  const ws = windows.get();
+  return menuRows(opts(), bar.get().page, { mics: microphones(soundState.get()), recents: recent.get(), front: front(), protectedCount: ws.filter((w) => w.protected).length, actions: barActions });
+};
+function pressStop(id) {
+  if (id === 'close') closeToolbar();
+  else if (id === 'color' || id === 'text') barActions[id]();
+  else if (id === 'options') bar.set({ menu: true, page: 'main', lit: firstRow(rowsNow(), -1, 1) });
+  else if (id === 'primary') barActions.primary();
+  else { setOptions({ mode: id }); }
+}
+function firstRow(rows, from, step) {
+  for (let i = from + step; i >= 0 && i < rows.length; i += step) if (selectable(rows[i])) return i;
+  return from;
+}
+function barKey(name) {
+  const b = bar.get();
+  if (b.menu) {
+    const rows = rowsNow();
+    if (name === 'Escape') { bar.set(b.page !== 'main' ? { page: 'main', lit: 0 } : { menu: false, lit: -1 }); return; }
+    if (name === 'ArrowDown' || name === 'ArrowUp') { bar.set({ lit: firstRow(rows, b.lit, name === 'ArrowDown' ? 1 : -1) }); return; }
+    if ((name === 'Enter' || name === 'Space') && selectable(rows[b.lit])) {
+      const row = rows[b.lit];
+      row.run();
+      if (!row.keep) bar.set({ menu: false, page: 'main', lit: -1 });
+    }
+    return;
+  }
+  if (name === 'Escape') { closeToolbar(); return; }
+  if (name === 'ArrowLeft' || name === 'ArrowRight') {
+    const step = (name === 'ArrowRight' ? 1 : -1) * (direction() === 'rtl' ? -1 : 1);
+    bar.set({ ring: stepStop(barStops(), b.ring, step) });
+    return;
+  }
+  if (name === 'ArrowDown' && b.ring === 'options') { pressStop('options'); return; }
+  if (name === 'Enter' || name === 'Space') { if (b.ring) pressStop(b.ring); else if (name === 'Enter') barActions.primary(); }
+}
+const ringOrMenu = () => barShown() && (!!bar.get().ring || bar.get().menu);
+
+// While a selection waits with its handles (Remember Last Selection, an area to record), Enter takes it
+const adjusting = () => !!area.get()?.adjust && !!area.get()?.rect;
+function confirmArea() {
+  const a = area.get();
+  if (a?.rect) areaDone(a.rect, displayAt((a.shots || []).map((sh) => sh.display).filter(Boolean), a.rect.x + a.rect.w / 2, a.rect.y + a.rect.h / 2));
+}
+
 addShortcuts([
   { id: 'capture.full', keys: ['Meta+Shift+3', 'PrintScreen'], when: hasMedia, run: captureFull, label: 'shell.shortcuts.captureFull', group: 'system' },
   { id: 'capture.area', keys: ['Meta+Shift+4'], when: hasMedia, run: captureArea, label: 'shell.shortcuts.captureArea', group: 'system' },
-  { id: 'capture.panel', keys: ['Meta+Shift+5'], when: hasMedia, run: openPanelOrStop, label: 'shell.shortcuts.capturePanel', group: 'system' },
+  { id: 'capture.panel', keys: ['Meta+Shift+5'], when: hasMedia, run: () => { if (barShown()) closeToolbar(); else openToolbar(); }, label: 'shell.shortcuts.capturePanel', group: 'system' },
+  { id: 'capture.confirm', keys: ['Enter'], when: adjusting, run: confirmArea, listed: () => false },
+  { id: 'capture.bar.escape', keys: ['Escape'], when: barShown, run: () => barKey('Escape'), listed: () => false },
+  { id: 'capture.bar.enter', keys: ['Enter'], when: barShown, run: () => barKey('Enter'), listed: () => false },
+  { id: 'capture.bar.space', keys: ['Space'], when: ringOrMenu, run: () => barKey('Space'), listed: () => false },
+  { id: 'capture.bar.left', keys: ['ArrowLeft'], when: barShown, run: () => barKey('ArrowLeft'), listed: () => false },
+  { id: 'capture.bar.right', keys: ['ArrowRight'], when: barShown, run: () => barKey('ArrowRight'), listed: () => false },
+  { id: 'capture.bar.down', keys: ['ArrowDown'], when: ringOrMenu, run: () => barKey('ArrowDown'), listed: () => false },
+  { id: 'capture.bar.up', keys: ['ArrowUp'], when: ringOrMenu, run: () => barKey('ArrowUp'), listed: () => false },
   { id: 'capture.cancel', keys: ['Escape'], when: selecting, run: () => endArea(), listed: () => false },
   { id: 'capture.windowMode', keys: ['Space'], when: selecting, run: toggleWindowMode, listed: () => false },
   { id: 'capture.copyColor', keys: ['c', 'Shift+c'], when: selecting, run: copyUnderPointer, listed: () => false },
@@ -282,6 +404,12 @@ function Overlay({ index }) {
       const cur = area.get();
       if (!cur) return;
       const loupe = cur.mode !== 'window' ? loupeAt(cur, e.x, e.y) : null;
+      // a handle or the inside of a selection that waits (adjust): it is resized or moved inside its display
+      if (cur.grab) {
+        const g = cur.grab;
+        area.set({ ...cur, pointer: { x: e.x, y: e.y }, loupe, rect: adjustRect(g.rect, g.what, e.x - g.x, e.y - g.y, g.bounds) });
+        return;
+      }
       if (cur.start) { area.set({ ...cur, pointer: { x: e.x, y: e.y }, loupe, rect: dragRect(cur.start, e.x, e.y, cur.start.display) }); return; }
       // the window under the pointer (the topmost one), for the window mode
       const vis = list.filter((w) => !w.minimized && w.app !== APP && (w.pip || w.desktop == null || w.desktop === wm.desktop()));
@@ -291,15 +419,28 @@ function Overlay({ index }) {
     });
     const offUp = addListener('pointerup', (e) => {
       const cur = area.get();
+      if (cur?.grab) { area.set({ ...cur, grab: null }); return; }
       if (!cur?.start) return;
-      areaDone(dragRect(cur.start, e.x, e.y, cur.start.display), cur.start.display);
+      const r = dragRect(cur.start, e.x, e.y, cur.start.display);
+      // one that waits is taken with Enter or its button; a click without a drag keeps the one there was
+      if (cur.adjust) { area.set({ ...cur, start: null, rect: r.w >= 3 && r.h >= 3 ? r : cur.prev || null, prev: null }); return; }
+      areaDone(r, cur.start.display);
     });
     return () => { offMove(); offUp(); };
   }, [list, index]);
   if (!a || !shot) return null;
   const down = (e) => {
     if (a.mode === 'color') { if (a.loupe) copyColor(a.loupe.color); endArea(); return; }
-    if (a.mode === 'area' || a.mode === 'text') area.set({ ...a, start: { x: e.x, y: e.y, display: displayAt((a.shots || []).map((sh) => sh.display).filter(Boolean), e.x, e.y) } });
+    const shown = (a.shots || []).map((sh) => sh.display).filter(Boolean);
+    const what = a.adjust && a.rect ? hitHandle(a.rect, e.x, e.y) : null;
+    if (what) {
+      const dd = displayAt(shown, a.rect.x + a.rect.w / 2, a.rect.y + a.rect.h / 2);
+      const bounds = dd ? { x: dd.x, y: dd.y, w: dd.w, h: dd.h } : { x: 0, y: 0, w: lord.screen.width, h: lord.screen.height };
+      area.set({ ...a, grab: { what, x: e.x, y: e.y, rect: a.rect, bounds } });
+      return;
+    }
+    if (a.mode === 'record' && shown.length && !displayAt(shown, e.x, e.y)) return;
+    if (a.mode === 'area' || a.mode === 'text' || a.mode === 'record') area.set({ ...a, prev: a.rect, start: { x: e.x, y: e.y, display: displayAt((a.shots || []).map((sh) => sh.display).filter(Boolean), e.x, e.y) } });
     else if (a.hover) areaDone(a.hover, a.hover.display);
   };
   const dim = 'rgba(0,0,0,0.35)';
@@ -308,6 +449,10 @@ function Overlay({ index }) {
   const p = a.pointer ? { x: a.pointer.x - ox, y: a.pointer.y - oy } : null;
   const here = p && (!d || (p.x >= 0 && p.y >= 0 && p.x < d.w && p.y < d.h));
   const guide = 'rgba(255,255,255,0.55)';
+  // the waiting selection is on this overlay's display
+  const mine = !!r && (!d || (r.x + r.w / 2 >= 0 && r.y + r.h / 2 >= 0 && r.x + r.w / 2 < d.w && r.y + r.h / 2 < d.h));
+  const hint = a.mode === 'window' ? 'screenshots.hintWindow' : a.mode === 'color' ? 'screenshots.hintColor' : a.mode === 'text' ? 'screenshots.hintText'
+    : a.adjust && a.rect ? (a.mode === 'record' ? 'screenshots.hintAdjustRecord' : 'screenshots.hintAdjust') : a.mode === 'record' ? 'screenshots.hintRecord' : 'screenshots.hintArea';
   return (
     <View style={{ flex: 1, direction: 'ltr', cursor: 'crosshair' }} onMouseDown={down}>
       <MediaView media={shot.handle} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} />
@@ -322,6 +467,20 @@ function Overlay({ index }) {
           <View style={{ position: 'absolute', left: r.x + r.w + 6, top: r.y + r.h + 6, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.7)' }}>
             <Text style={{ fontSize: 11, color: '#fff' }}>{a.mode === 'window' ? r.title : `${Math.round(r.w)} × ${Math.round(r.h)}`}</Text>
           </View>
+          {/* a selection that waits: its eight handles and the button that takes it (Enter does too) */}
+          {a.adjust && !a.start && mine ? (
+            <>
+              {handlePoints(r).map((hp) => (
+                <View key={hp.id} style={{ position: 'absolute', left: hp.x - 5, top: hp.y - 5, width: 10, height: 10, borderRadius: 5, backgroundColor: '#fff',
+                  border: '1px solid rgba(0,0,0,0.45)', boxShadow: '0 1px 3px rgba(0,0,0,0.4)', pointerEvents: 'none' }} />
+              ))}
+              <View onMouseDown={(e) => { e.stopPropagation?.(); }} onClick={confirmArea} accessibilityLabel={tr(a.mode === 'record' ? 'screenshots.record' : 'screenshots.capture')}
+                style={{ position: 'absolute', left: r.x + r.w / 2 - 60, top: r.y + r.h + 46 > (d ? d.h : lord.screen.height) ? r.y + r.h - 44 : r.y + r.h + 12, width: 120, height: 32,
+                  borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: a.mode === 'record' ? '#ff453a' : '#0a84ff', boxShadow: '0 6px 18px rgba(0,0,0,0.45)' }}>
+                <Text style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{tr(a.mode === 'record' ? 'screenshots.record' : 'screenshots.capture')}</Text>
+              </View>
+            </>
+          ) : null}
         </>
       ) : <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: dim }} />}
       {/* the crosshair: guides through the pointer across this display and its coordinates on the display */}
@@ -356,7 +515,7 @@ function Overlay({ index }) {
       {(index === 0 || (here && !a.start)) && (
         <View style={{ position: 'absolute', left: 0, right: 0, top: 18, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ paddingHorizontal: 14, height: 30, justifyContent: 'center', borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.7)' }}>
-            <Text style={{ fontSize: 12, color: '#fff' }}>{tr(a.mode === 'window' ? 'screenshots.hintWindow' : a.mode === 'color' ? 'screenshots.hintColor' : a.mode === 'text' ? 'screenshots.hintText' : 'screenshots.hintArea')}</Text>
+            <Text style={{ fontSize: 12, color: '#fff' }}>{tr(hint)}</Text>
           </View>
         </View>
       )}
@@ -364,7 +523,7 @@ function Overlay({ index }) {
   );
 }
 
-function Thumb({ handle, path, failed }) {
+function Thumb({ handle, path, failed, folder }) {
   const win = useAppWindow();
   const [hover, setHover] = useState(false);
   useEffect(() => {
@@ -375,14 +534,14 @@ function Thumb({ handle, path, failed }) {
   useEffect(() => () => { if (!windows.get().some((w) => w.args?.handle === handle && w.id !== win.id)) media.close(handle); }, []);
   return (
     <View style={{ flex: 1 }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      accessibilityLabel={tr('screenshots.thumbOpen')} title={tr('screenshots.thumbOpen')}
       onClick={() => {
-        const w = Math.min(1000, lord.screen.width - 80), h = Math.min(680, lord.screen.height - 140);
-        wm.open(APP, { instance: `edit${handle}`, args: { handle, path }, frame: { x: Math.round((lord.screen.width - w) / 2), y: 60, w, h } });
+        openEditor(handle, path);
         setTimeout(() => wm.close(win.id, true), 50);
       }}>
       <MediaView media={handle} style={{ flex: 1 }} />
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: 'rgba(0,0,0,0.55)' }}>
-        <Text style={{ fontSize: 11, color: '#fff' }}>{path ? tr('screenshots.savedTo', { folder: tr('screenshots.folder') }) : failed === 'copy' ? tr('screenshots.notCopied') : failed === 'both' ? tr('screenshots.notKept') : tr('screenshots.copied')}</Text>
+        <Text style={{ fontSize: 11, color: '#fff' }}>{path ? tr('screenshots.savedTo', { folder: folder || tr('screenshots.folder') }) : failed === 'copy' ? tr('screenshots.notCopied') : failed === 'both' ? tr('screenshots.notKept') : tr('screenshots.copied')}</Text>
       </View>
     </View>
   );
@@ -418,72 +577,28 @@ function RecBadge() {
 // ---- markup editor (editor.jsx) ----
 
 // a capture right after it was taken (handle, and its file if it was saved), or a picture file (path).
-// New Screenshot brings the panel back for another capture, with no need to close this window first (GitHub #166);
-// a capture hides the panel but leaves the markup windows open (afterHide).
+// New Screenshot brings the toolbar back for another capture, with no need to close this window first (GitHub #166);
+// a capture hides the toolbar but leaves the markup windows open (afterHide).
 function MarkupWindow({ handle, path }) {
-  return <Editor handle={handle} path={path} app={APP} onNewCapture={() => wm.open(APP)} newCapturePath={() => freeName(captureDir(), tr('screenshots.fileName', { date: stamp() }), 'png')}
-    onSaved={(p) => { if (p.startsWith(`${captureDir()}/`)) recent.set((l) => [{ path: p, time: Date.now() }, ...l.filter((x) => x.path !== p)].slice(0, 20)); }} />;
+  const dir = () => saveDir(opts()) || captureDir();
+  return <Editor handle={handle} path={path} app={APP} onNewCapture={openToolbar} newCapturePath={() => freeName(dir(), tr('screenshots.fileName', { date: stamp() }), 'png')}
+    onSaved={(p) => { if (p.startsWith(`${dir()}/`) || p.startsWith(`${captureDir()}/`)) addRecent({ path: p, time: Date.now() }); }} />;
 }
 
-// ---- the panel (main window) ----
-
-function Panel() {
-  const th = useTheme();
+// Options → Save to → Other Location…: the folder, chosen in the system's file dialog; it is kept for the next captures
+function FolderWindow() {
   const win = useAppWindow();
-  const [s, update] = useSettings();
-  const o = { ...opts(), ...(s.screenshots || {}) };
-  const set = (p) => update({ screenshots: { ...o, ...p } });
-  const rec = useStore(recording);
-  const list = useStore(recent);
-  useEffect(() => {
-    wm.setMenus(win.id, [{ label: tr('screenshots.menu.window'), items: [
-      { label: tr('screenshots.menu.protect'), onClick: () => {
-        const others = windows.get().filter((w) => w.app !== APP && !w.minimized && w.desktop === wm.desktop());
-        const front = others[others.length - 1];
-        if (front) wm.setProtected(front.id, !front.protected);
-      } },
-    ] }]);
-  }, []);
-  const Mode = ({ glyph, label, onClick, danger }) => (
-    <View onClick={onClick} style={{ flex: 1, minWidth: 0, height: 82, borderRadius: 10, alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingTop: 16,
-      backgroundColor: danger ? 'rgba(255,59,48,0.14)' : th.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', border: `1px solid ${th.separator}` }}>
-      <Text style={{ fontSize: 22, color: danger ? '#ff3b30' : th.text }}>{glyph}</Text>
-      <Text style={{ fontSize: typeScale.caption, fontWeight: 500, color: th.text, textAlign: 'center', lineHeight: 1.2 }}>{label}</Text>
-    </View>
-  );
-  const prot = windows.get().filter((w) => w.protected).length;
+  const o = opts();
   return (
-    <View style={{ flex: 1, padding: 20, gap: 16 }}>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Mode glyph="▣" label={tr('screenshots.mode.full')} onClick={() => capture.full()} />
-        <Mode glyph="⧈" label={tr('screenshots.mode.window')} onClick={() => capture.area('window')} />
-        <Mode glyph="⬚" label={tr('screenshots.mode.area')} onClick={() => capture.area('area')} />
-        <Mode glyph="◉" label={tr('screenshots.mode.color')} onClick={() => capture.area('color')} />
-        <Mode glyph="T" label={tr('screenshots.mode.text')} onClick={() => capture.area('text')} />
-        <Mode glyph={rec ? '■' : '●'} danger label={tr(rec ? 'screenshots.mode.stop' : 'screenshots.mode.record')} onClick={() => capture.record()} />
-      </View>
-      <GroupBox footer={null}>
-        <FormRow label={tr('screenshots.timer')}>
-          <Segmented small value={o.timer} onChange={(v) => set({ timer: v })} options={[[0, tr('screenshots.timerNone')], [5, '5 s'], [10, '10 s']]} />
-        </FormRow>
-        <FormRow label={tr('screenshots.toClipboard')}><Toggle on={!!o.clipboard} onChange={(v) => set({ clipboard: v })} /></FormRow>
-        <FormRow label={tr('screenshots.mic')}><Toggle on={!!o.mic} onChange={(v) => set({ mic: v })} /></FormRow>
-      </GroupBox>
-      <Text style={{ fontSize: typeScale.caption, color: th.textDim, lineHeight: 1.45, paddingHorizontal: 8 }}>{tr('screenshots.shortcuts')}</Text>
-      {prot > 0 && <Text style={{ fontSize: typeScale.caption, color: th.textDim, paddingHorizontal: 8 }}>{tr('screenshots.protectedNote', { count: prot })}</Text>}
-      {list.length > 0 && (
-        <GroupBox title={tr('screenshots.recent')}>
-          {list.slice(0, 5).map((r) => (
-            <View key={r.path} onClick={() => wm.open(r.video ? 'player' : 'photos', { new: true, args: { path: r.path } })}
-              style={{ minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ width: 16, fontSize: 12, color: th.accent, textAlign: 'center' }}>{r.video ? '▶' : '◫'}</Text>
-              <View style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                <Text style={{ fontSize: typeScale.callout, color: th.text, whiteSpace: 'nowrap' }}>{r.path.split('/').pop()}</Text>
-              </View>
-            </View>
-          ))}
-        </GroupBox>
-      )}
+    <View style={{ flex: 1 }}>
+      <FilePicker mode="folder" title={tr('screenshots.opt.chooseFolder')} start={o.otherDir || userDirs().pictures}
+        onClose={() => { wm.close(win.id, true); openToolbar(); }}
+        onPick={(x) => {
+          const dir = Array.isArray(x) ? x[0] : x;
+          if (dir) setOptions({ saveTo: 'other', otherDir: String(dir).replace(/\/+$/, '') });
+          wm.close(win.id, true);
+          openToolbar();
+        }} />
     </View>
   );
 }
@@ -493,9 +608,10 @@ export default function Screenshots() {
   const inst = String(win.id).split('#')[1] || '';
   const a = win.args || {};
   if (String(inst).startsWith('overlay') && a.index != null) return <Overlay index={a.index} />;
-  if (inst === 'thumb' && a.handle) return <Thumb handle={a.handle} path={a.path} failed={a.failed} />;
+  if (inst === 'thumb' && a.handle) return <Thumb handle={a.handle} path={a.path} failed={a.failed} folder={a.folder} />;
   if (inst === 'count') return <Countdown secs={a.secs} start={a.start} />;
   if (inst === 'rec') return <RecBadge />;
+  if (inst === 'folder') return <FolderWindow />;
   if (inst.startsWith('edit') && (a.handle || a.path)) return <MarkupWindow handle={a.handle} path={a.path} />;
-  return <Panel />;
+  return <Toolbar actions={barActions} />;
 }

@@ -19,7 +19,7 @@ del tema que estás usando.
 | ❖. | Emoji y símbolos |
 | ❖⇧3 · Impr Pant | Captura de toda la pantalla |
 | ❖⇧4 | Captura de un área (Espacio: de una ventana) |
-| ❖⇧5 | Panel de capturas y grabación de pantalla |
+| ❖⇧5 | Barra de capturas y grabación de pantalla |
 | ❖L · ❖⌃Q | Bloquear la pantalla |
 | ❖Q | Salir de la app |
 | Teclas multimedia | Reproducir, pausar, siguiente y anterior en Reproductor |

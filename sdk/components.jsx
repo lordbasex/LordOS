@@ -1364,7 +1364,13 @@ export function FloatingWindows() {
   if (!fs.length && !pips.length) return null;
   return (
     <>
-      {pips.map((w) => (
+      {pips.map((w) => (w.pip.bare ? (
+        // a bare one (Screenshots' toolbar, wm.setPip(id, { …, bare: true })): the app draws its own shape, shadow and
+        // grip, and moves it itself; nothing here paints, drags or resizes it
+        <View key={w.id} style={{ position: 'absolute', left: w.pip.x, top: w.pip.y, width: w.pip.w, height: w.pip.h, pointerEvents: 'box-none' }}>
+          <AppHost id={w.id} focused={false} />
+        </View>
+      ) : (
         <View key={w.id} style={{ position: 'absolute', left: w.pip.x, top: w.pip.y, width: w.pip.w, height: w.pip.h, borderRadius: 10,
           overflow: 'hidden', backgroundColor: '#000', boxShadow: '0 18px 48px rgba(0,0,0,0.55)', pointerEvents: 'auto' }}
           onMouseDown={(e) => { drag.current = { id: w.id, x: e.x, y: e.y, frame: w.pip }; }}>
@@ -1372,7 +1378,7 @@ export function FloatingWindows() {
           <View onMouseDown={(e) => { e.stopPropagation?.(); drag.current = { id: w.id, x: e.x, y: e.y, frame: w.pip, resize: true }; }}
             style={{ position: 'absolute', right: 0, bottom: 0, width: 18, height: 18 }} />
         </View>
-      ))}
+      )))}
       {fs.map((w) => {
         const d = displayFor(w);              // the display the window was on (docs/DISPLAYS.md)
         const here = onDesktop(w, desktop);
