@@ -27,7 +27,7 @@ WL_OBJ  := build/gen/xdg-shell-protocol.o build/gen/xdg-decoration-unstable-v1-p
 WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presentation-time stable/viewporter/viewporter \
            unstable/relative-pointer/relative-pointer-unstable-v1 unstable/pointer-constraints/pointer-constraints-unstable-v1 \
            unstable/pointer-gestures/pointer-gestures-unstable-v1 \
-           staging/cursor-shape/cursor-shape-v1 unstable/tablet/tablet-unstable-v2 \
+           staging/cursor-shape/cursor-shape-v1 stable/tablet/tablet-v2 \
            staging/fractional-scale/fractional-scale-v1 unstable/xdg-output/xdg-output-unstable-v1 \
            unstable/primary-selection/primary-selection-unstable-v1 unstable/idle-inhibit/idle-inhibit-unstable-v1 \
            unstable/text-input/text-input-unstable-v3 staging/xdg-activation/xdg-activation-v1 \
@@ -40,6 +40,10 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
 WL_MORE += staging/color-management/color-management-v1 staging/color-representation/color-representation-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
+# Newer than Debian 13's wayland-protocols (1.44): the XML is kept in protocols/, unmodified (THIRD_PARTY.md)
+WL_LOCAL := pointer-warp-v1
+WL_GEN  += $(foreach p,$(WL_LOCAL),build/gen/$(p)-protocol.h)
+WL_OBJ  += $(foreach p,$(WL_LOCAL),build/gen/$(p)-protocol.o)
 
 # GPU compositing (src/gpu): Mesa (GBM + EGL + GLES2) if its -dev packages are present; otherwise (or with
 # GPU=0) it's built without GPU and lord-server always composites on the CPU. See docs/GPU.md.
@@ -95,6 +99,9 @@ HDR += $(wildcard src/*/*.h)
 # Wayland apps (src/wl/wl_input.c) and lord.input (src/ui/js_input.c). See docs/TRACKPAD.md.
 TP_SRC := src/tp/tp.c src/tp/tp_route.c src/wl/wl_input.c src/wl/wl_textinput.c src/wl/tiutf8.c src/ui/js_input.c
 SRC += $(TP_SRC)
+# Graphics tablets from evdev (src/tablet.c, no libinput or libwacom) for the apps by tablet-v2 (src/wl/wl_tablet.c),
+# and pointer-warp-v1 (src/wl/wl_warp.c). See docs/WAYLAND.md, "Graphics tablets" and "Pointer warp".
+SRC += src/tablet.c src/wl/wl_tablet.c src/wl/wl_warp.c
 # Window management: dragging in C, a layer for the window being moved and our own cursors (docs/WINDOWS.md).
 # cursor-shape-v1 needs the tablet-v2 interfaces (they're only linked, not advertised).
 # GTK/GNOME/Qt apps: our own org.freedesktop.portal.Settings (src/ui/portal.c) with the D-Bus client from
@@ -390,6 +397,27 @@ build/startlogin-test: tests/startlogin_test.c src/remote/startlogin.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ tests/startlogin_test.c
 	./$@
+
+# Graphics tablets from evdev: which devices are pens and pads, and the frames of synthetic event sequences (src/tablet.c)
+test: build/tablet-test
+build/tablet-test: tests/tablet_test.c src/tablet.c src/tablet.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/tablet_test.c src/tablet.c -lm
+	./$@ || { rm -f $@; exit 1; }
+# tablet-v2 and pointer-warp-v1 on the wire: libwayland clients against src/wl/wl_tablet.c and src/wl/wl_warp.c
+# (tests/wltablet_test.c, the compositor side in tests/wltablet_srv.c)
+test: build/wltablet-test
+WLTAB_GEN := build/gen/tablet-v2-protocol.h build/gen/tablet-v2-protocol.c build/gen/pointer-warp-v1-protocol.h \
+             build/gen/pointer-warp-v1-protocol.c build/gen/client/tablet-v2-client-protocol.h \
+             build/gen/client/pointer-warp-v1-client-protocol.h
+build/wltablet-test: tests/wltablet_test.c tests/wltablet_srv.c tests/wltablet_srv.h src/tablet.c src/tablet.h src/wl/wl_tablet.c \
+                     src/wl/wl_tablet.h src/wl/wl_warp.c src/wl/wl_warp.h src/wl/pwarp.h $(WLTAB_GEN)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -Ibuild/gen/client -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all \
+	    -fno-omit-frame-pointer -o $@ tests/wltablet_test.c tests/wltablet_srv.c src/tablet.c src/wl/wl_tablet.c src/wl/wl_warp.c \
+	    build/gen/tablet-v2-protocol.c build/gen/pointer-warp-v1-protocol.c -lwayland-server -lwayland-client -lm
+	./$@ || { rm -f $@; exit 1; }
 
 test: build/inputkind-test
 build/inputkind-test: tests/inputkind_test.c src/inputkind.h
@@ -818,8 +846,8 @@ build/tp-test: tests/tp_test.c src/tp/tp.c src/tp/tp.h ../tests/touchpad-sim/ges
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/tp_test.c src/tp/tp.c ../tests/touchpad-sim/gestures.c -lm
 # the on-screen keyboard: devices, allowed keys, the queue and XKB labels; the lock lights (input.c)
 test: build/osk-test
-build/osk-test: tests/osk_test.c src/osk.c src/osk.h src/keyboard.c src/keyboard.h src/input.c src/input.h src/tp/tp.c src/tp/tp.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/osk_test.c src/osk.c src/keyboard.c src/input.c src/tp/tp.c -lxkbcommon -lm
+build/osk-test: tests/osk_test.c src/osk.c src/osk.h src/keyboard.c src/keyboard.h src/input.c src/input.h src/tp/tp.c src/tp/tp.h src/tablet.c src/tablet.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/osk_test.c src/osk.c src/keyboard.c src/input.c src/tp/tp.c src/tablet.c -lxkbcommon -lm
 	./$@ || (rm -f $@; exit 1)
 
 build/ime-test: tests/ime_test.c src/ime.c src/ime.h src/keyboard.h
@@ -1092,6 +1120,21 @@ build/gen/$(notdir $(1))-protocol.c: $(WLPROTO)/$(1).xml
 	wayland-scanner private-code $$< $$@
 endef
 $(foreach p,$(WL_MORE),$(eval $(call wl_proto,$(p))))
+define wl_local_proto
+build/gen/$(1)-protocol.h: protocols/$(1).xml
+	@mkdir -p build/gen
+	wayland-scanner server-header $$< $$@
+build/gen/$(1)-protocol.c: protocols/$(1).xml
+	@mkdir -p build/gen
+	wayland-scanner private-code $$< $$@
+build/gen/client/$(1)-client-protocol.h: protocols/$(1).xml
+	@mkdir -p build/gen/client
+	wayland-scanner client-header $$< $$@
+build/gen/client/$(1)-protocol.c: protocols/$(1).xml
+	@mkdir -p build/gen/client
+	wayland-scanner private-code $$< $$@
+endef
+$(foreach p,$(WL_LOCAL),$(eval $(call wl_local_proto,$(p))))
 
 build/gen/%.o: build/gen/%.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -w -c -o $@ $<

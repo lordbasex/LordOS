@@ -12,6 +12,7 @@ the components below, each under its own license.
 | Monocypher 4 | vault and keyring cryptography | CC0-1.0 or BSD-2-Clause (`third_party/monocypher/LICENCE.md`) |
 | Wayland's `wl_fixes` interface (wayland.xml 1.24) | the core `wl_fixes` global on a libwayland older than 1.24 (`server/mk/wlfixes.mk`) | MIT (in `third_party/wayland/wl-fixes.xml`) |
 | EFF large wordlist, SecLists common passwords | passphrase generator, weak-password check | CC BY 3.0 (EFF), MIT (SecLists, `third_party/wordlists/LICENSE-SecLists`) |
+| `pointer-warp-v1.xml` from wayland-protocols 1.45 (`staging/pointer-warp`, commit `b3f29d8a41320a9231587835ee5e485f4a5f6eba`; Debian 13 ships 1.44 without it), in `server/protocols/`, unmodified | `wp_pointer_warp_v1` (wayland-scanner generates the code) | MIT (copyright notice in the file) |
 
 ## Fetched at build time (`third_party/audiocpp`, ignored by git)
 

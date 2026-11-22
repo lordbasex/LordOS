@@ -2,6 +2,7 @@
 #include "input.h"
 #include "osk.h"
 #include "tp/tp.h"
+#include "tablet.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -26,12 +27,16 @@ static void add_device(Input *in, int fd, const char *path) {
     ioctl(fd, EVIOCGBIT(EV_ABS, sizeof abs), abs);
     unsigned long props[NLONGS(INPUT_PROP_MAX + 1)] = {0};
     ioctl(fd, EVIOCGPROP(sizeof props), props);
+    unsigned long rel[NLONGS(REL_MAX + 1)] = {0};
+    ioctl(fd, EVIOCGBIT(EV_REL, sizeof rel), rel);
 
     int keyboard = HAS(ev, EV_KEY) && HAS(keys, KEY_A) && HAS(keys, KEY_ENTER);
     int mouse    = HAS(ev, EV_REL) && HAS(keys, BTN_LEFT);
-    int tablet   = input_is_abs_pointer(ev, abs, keys, props);
-    int syskeys  = !keyboard && !mouse && !tablet && input_is_system_keys(ev, keys);
-    if ((!keyboard && !mouse && !tablet && !syskeys) || in->count >= INPUT_MAX_DEVICES) { close(fd); return; }
+    /* a graphics tablet's pen or pad (tablet.c): a pad is no pointer, even with the X and Y an old Wacom one has */
+    int tabkind  = tablet_kind(ev, abs, keys, props, rel);
+    int tablet   = tabkind != TAB_KIND_PAD && input_is_abs_pointer(ev, abs, keys, props);
+    int syskeys  = !keyboard && !mouse && !tablet && !tabkind && input_is_system_keys(ev, keys);
+    if ((!keyboard && !mouse && !tablet && !tabkind && !syskeys) || in->count >= INPUT_MAX_DEVICES) { close(fd); return; }
 
     InputDevice *d = &in->dev[in->count++];
     memset(d, 0, sizeof *d);                /* the slot may have belonged to one that was unplugged */
@@ -49,8 +54,6 @@ static void add_device(Input *in, int fd, const char *path) {
         return;
     }
     d->keyboard = keyboard && osk_full_keyboard(keys, NLONGS(KEY_MAX + 1), d->name);
-    unsigned long rel[NLONGS(REL_MAX + 1)] = {0};
-    ioctl(fd, EVIOCGBIT(EV_REL, sizeof rel), rel);
     d->wheel_hires = HAS(rel, REL_WHEEL_HI_RES);
     d->hwheel_hires = HAS(rel, REL_HWHEEL_HI_RES);
     unsigned long led[NLONGS(LED_MAX + 1)] = {0};
@@ -65,12 +68,14 @@ static void add_device(Input *in, int fd, const char *path) {
         ioctl(fd, EVIOCGABS(ABS_X), &d->ax);
         ioctl(fd, EVIOCGABS(ABS_Y), &d->ay);
     }
+    /* a pen or pad: tablet-v2 for the apps, and a pen is still a pointer where none takes it (main.c) */
+    if (!d->tp && tabkind) d->tab = tablet_open(fd, d->name);
     /* Exclusive: keys do not reach the text console underneath. */
     if (ioctl(fd, EVIOCGRAB, 1))
         fprintf(stderr, "input: could not grab %s: %s\n", d->name, strerror(errno));
     fprintf(stderr, "input: %s -> %s%s%s\n", path, d->name,
             keyboard ? " [keyboard]" : "", d->tp ? (tp_kind(d->tp) == TP_KIND_TOUCHSCREEN ? " [touchscreen]" : " [touchpad]")
-            : mouse ? " [mouse]" : (tablet ? " [tablet]" : ""));
+            : mouse ? " [mouse]" : d->tab ? (tabkind == TAB_KIND_PAD ? " [tablet pad]" : " [tablet pen]") : (tablet ? " [tablet]" : ""));
 }
 
 int input_open(Input *in) {
@@ -109,6 +114,7 @@ void input_remove(Input *in, int idx) {
     fprintf(stderr, "input: %s is gone; closing it\n", d->name);
     close(d->fd);
     tp_free(d->tp);
+    tablet_free(d->tab);
     memmove(&in->dev[idx], &in->dev[idx + 1], sizeof in->dev[0] * (size_t)(in->count - idx - 1));
     in->count--;
 }
@@ -119,6 +125,8 @@ void input_close(Input *in) {
         close(in->dev[i].fd);
         tp_free(in->dev[i].tp);
         in->dev[i].tp = NULL;
+        tablet_free(in->dev[i].tab);
+        in->dev[i].tab = NULL;
     }
     in->count = 0;
 }

@@ -59,6 +59,9 @@
 #include "tp/tp.h"
 #include "tp/tp_route.h"
 #include "wl/wl_input.h"
+#include "wl/wl_tablet.h"
+#include "wl/wl_warp.h"
+#include "tablet.h"
 #include "wl/xwayland.h"
 #include "vault/dbus.h"
 #include "media/media.h"
@@ -1191,6 +1194,7 @@ static void display_attach(const int *fds, int n, int flags) {
     fprintf(stderr, "monitor: the session is shown (%d display(s), %dx%d, %s)\n", out_count(s), s->W, s->H, gpu_active() ? "GPU" : "CPU");
 }
 
+static unsigned tab_emul;               /* DOM buttons a pen holds down as a mouse (graphics tablets, below) */
 static void display_detach(void) {
     Server *s = remote_server;
     parked_drop();
@@ -1204,6 +1208,7 @@ static void display_detach(void) {
     gpu_shutdown();
     for (int i = 0; i < OUT_MAX; i++) s->out[i].gpu = -1;
     input_close(&s->input);
+    tab_emul = 0;                               /* a pen pressing as a mouse: let go with its device */
     kb_reset_state();                           /* a key held now (the ❖ of ❖L) is released where we can't see it */
     s->ctrl = s->alt = s->shift = s->meta = 0;  /* Ctrl and Alt of Ctrl+Alt+F2 are released on the text console */
     ptrlock_end(PTRLOCK_END_INPUT);             /* a pointer lock goes with the input (pointerlock.h) */
@@ -1280,11 +1285,13 @@ static int zap_held(int fd, int *ctrl, int *alt) {
     return 1;
 }
 
+static void tablet_input(Server *s, const InputDevice *d, const struct input_event *ev);
 static void on_input(void *ud, const InputDevice *d, const struct input_event *ev) {
     Server *s = ud;
     if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) display_input(now_ms());
     if (s->debug && ev->type != EV_SYN)
         fprintf(stderr, "ev %s type=%u code=%u value=%d\n", d->name, ev->type, ev->code, ev->value);
+    if (d->tab) { tablet_input(s, d, ev); return; }     /* a graphics tablet's pen or pad (tablet.c) */
     if (d->tp) {                        /* touchpad o pantalla táctil: driver propio (tp/tp.c) */
         tp_event(d->tp, ev);
         if (ev->type != EV_SYN || ev->code != SYN_REPORT) return;
@@ -1409,6 +1416,93 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         tp_route_wheel_flush();                 /* rueda de alta resolución u horizontal */
         break;
     }
+}
+
+/* ---- graphics tablets (tablet.c; docs/WAYLAND.md, "Graphics tablets") ----
+ * A pen goes to the app under it by tablet-v2 when that app takes it (wl/wl_tablet.c): the pointer image follows and
+ * no pointer event is sent, and the theme still sees the tip's presses (to raise and focus the window). Anywhere
+ * else it is a mouse: the tip is the left button, BTN_STYLUS the right, BTN_STYLUS2 the middle, BTN_STYLUS3 back.
+ * A press as a mouse stays one until released (a stroke never moves into an app half-way), and so does one an app had
+ * while a window move it began (xdg_toplevel.move) runs. Where on screen: a pen display (INPUT_PROP_DIRECT) covers the
+ * main display, a tablet every display (as the mouse sees them), both turned with a rotated display. */
+static void tablet_place(Server *s, const TabCaps *c, double nx, double ny, double *x, double *y) {
+    Out *m = c->direct ? main_out(s) : out_count(s) == 1 ? &s->out[0] : NULL;
+    if (m && m->d.rot) {
+        double lx, ly;
+        display_unrotate_point(m->d.rot, nx, ny, &lx, &ly);
+        nx = lx; ny = ly;
+    }
+    if (c->direct) { *x = m->v.x + nx * (m->v.w - 1); *y = m->v.y + ny * (m->v.h - 1); }
+    else { *x = nx * (s->W - 1); *y = ny * (s->H - 1); }
+}
+static void tablet_mouse_button(Server *s, int button, int down) {
+    if (button < 0 || ((tab_emul >> button) & 1) == (unsigned)(down != 0)) return;
+    if (down) tab_emul |= 1u << button; else tab_emul &= ~(1u << button);
+    if (ptrlock_button(button, down)) return;
+    if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
+}
+static void tablet_pen(Server *s, const InputDevice *d, const TabFrame *f) {
+    static const InputDevice none = { .fd = -1 };
+    double x, y;
+    tablet_place(s, tablet_caps(d->tab), f->x, f->y, &x, &y);
+    int ix = (int)x, iy = (int)y;
+    if (!tab_emul && !grab_active() && !ptrlock_active() && !wl_pointer_locked() && !wl__dragging()) {
+        if (wl_tablet_tool(d->tab, f, (float)x, (float)y)) {
+            s->cx = ix; s->cy = iy;
+            clamp_pointer(s);
+            s->lx = s->cx; s->ly = s->cy;
+            if (s->hw_cursor) hw_cursor_move(s);
+            s->cursor_dirty = 1;                /* the app's cursor for the tool, or LordOS's */
+            s->over_app = 1;
+            if (f->flags & (TF_DOWN | TF_UP)) {
+                Node *hit = hit_test(ui.root, (float)s->cx, (float)s->cy);
+                js_pointer(f->flags & TF_DOWN ? "down" : "up", hit ? hit->id : 0, (float)s->cx, (float)s->cy, 0);
+            }
+            return;
+        }
+    } else wl_tablet_tool_away(d->tab, f);
+    if (f->flags & (TF_MOTION | TF_PROX_IN)) {
+        s->rdx += ix - s->lx; s->rdy += iy - s->ly;
+        s->cx = ix; s->cy = iy;
+        s->moved = 1;
+    }
+    /* a press an app had, now a window move's (or a lock's): the left button stays down until the tip comes up */
+    if (f->down && !(f->flags & TF_DOWN) && !(tab_emul & 1)) { tab_emul |= 1; s->held |= 1; }
+    if (f->flags & (TF_DOWN | TF_UP)) tablet_mouse_button(s, 0, f->down);
+    for (int i = 0; i < f->nbtn; i++) {
+        unsigned c = f->btn[i].code;
+        tablet_mouse_button(s, c == BTN_STYLUS ? 2 : c == BTN_STYLUS2 ? 1 : c == BTN_STYLUS3 ? 3 : -1, f->btn[i].down);
+    }
+    struct input_event syn = { .type = EV_SYN, .code = SYN_REPORT };
+    on_input(s, &none, &syn);                   /* as a mouse's report */
+}
+static void tablet_input(Server *s, const InputDevice *d, const struct input_event *ev) {
+    TabFrame f[2];
+    TabPadFrame p;
+    int n = tablet_event(d->tab, ev, f, &p);
+    if (tablet_caps(d->tab)->kind == TAB_KIND_PAD) { if (n) wl_tablet_pad(d->tab, &p); return; }
+    for (int i = 0; i < n; i++) tablet_pen(s, d, &f[i]);
+}
+/* A pen unplugged near the tablet: it leaves, and lets go of what it pressed (as an app's tool or as a mouse). */
+static void tablet_gone(Server *s, const InputDevice *d) {
+    TabFrame f;
+    if (d->tab && tablet_caps(d->tab)->kind == TAB_KIND_PEN && tablet_leave(d->tab, &f)) tablet_pen(s, d, &f);
+}
+
+/* pointer-warp-v1 (wl/wl_warp.c): the app in front moves the pointer on its window. No relative motion: a game sees
+ * a jump, not a move. */
+static int warp_move(float x, float y) {
+    Server *s = remote_server;
+    if (ptrlock_active() || grab_active() || tab_emul) return 0;
+    s->cx = (int)(x + 0.5f);
+    s->cy = (int)(y + 0.5f);
+    clamp_pointer(s);
+    wl_pointer_confine(&s->cx, &s->cy);
+    s->lx = s->cx; s->ly = s->cy;
+    s->moved = 1;
+    s->motion_pending = 1;                      /* the app's motion goes with the next frame (dispatch_pointer) */
+    if (s->hw_cursor) hw_cursor_move(s); else s->cursor_dirty = 1;
+    return 1;
 }
 
 /* ---- touchpad y pantalla táctil (tp/): mueven el puntero de siempre y pasan por dispatch_pointer ---- */
@@ -2837,6 +2931,7 @@ int main(int argc, char **argv) {
     s.cx = s.lx = s.W / 2;
     s.cy = s.ly = s.H / 2;
     ptrlock_init(ptrlock_rect);
+    wl_tablet_init();                           /* before the devices open: tablets are announced to the apps */
 
     int vt = -1;
     if (!s.headless) {
@@ -2906,6 +3001,7 @@ int main(int argc, char **argv) {
     if (getenv("LORD_DAMAGE") && !strcmp(getenv("LORD_DAMAGE"), "one")) paint_multi_damage = 0;    /* one box per frame, as before 0.8.8.10 (paint.c) */
     remote_server = &s;
     tp_route_init(&tp_host);
+    wl_warp_set_host(warp_move);                /* pointer-warp-v1 (wl/wl_warp.c) */
     static const MirrorInput mirror_in = { remote_pointer, remote_button, remote_wheel, remote_key, remote_clip, remote_clients,
                                            remote_refresh, remote_resize, remote_greeter, display_attach, display_detach,
                                            remote_scroll, remote_pinch, remote_input_add, remote_notice };
@@ -3288,7 +3384,7 @@ int main(int argc, char **argv) {
         }
         /* un dispositivo que dejó de servir (desenchufado, o revocado al cambiar de sesión): se cierra
          * solo ese. Dejar el monitor lo decide únicamente lord-sessiond (RP_UNDISPLAY), nunca un error */
-        for (int k = nlost - 1; k >= 0; k--) input_remove(&s.input, lost[k]);
+        for (int k = nlost - 1; k >= 0; k--) { tablet_gone(&s, &s.input.dev[lost[k]]); input_remove(&s.input, lost[k]); }
         if (nlost) wl_input_devices_changed();
         if (s.input.count || nlost) keyboards_check(&s);
         input_set_leds(&s.input, kb_leds());   /* Caps Lock and Num Lock lights follow the keyboard state */
