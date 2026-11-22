@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Keine App passt zur Suche",
   "apps.closeWindow": "Dieses Fenster in der Maschine schließen",
   "apps.untitled": "Fenster ohne Titel",
+  "apps.statusTip": "{name} im App-Modus",
+  "apps.showWindow": "Fenster der Maschine zeigen",
   "cfg.resolutionFollowNote": "Die Maschine startet in Fenstergröße und folgt ihr, soweit ihr System es zulässt. Die Leiste des Fensters kann trotzdem eine andere Größe wählen.",
   "cfg.resolutionFixedNote": "Die Maschine startet in dieser Größe: Jedes System übernimmt sie beim Start, auch solche, die dem Fenster nicht folgen. Die Leiste des Fensters kann während des Betriebs trotzdem eine andere wählen.",
   "cfg.gpu": "Grafikkarte",

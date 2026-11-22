@@ -12,6 +12,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Machines: a status item by the clock for each machine in apps mode, in development** (the maintainer's request, like
+  VMware Fusion's Unity menu in the menu bar; `docs/VIRTUALIZATION.md` 7.2). While a machine is in apps mode, the bar's
+  status area shows its mark (the machine's system mark, as in the Control Center), with the machine's name as its tooltip.
+  A click opens a menu that works like the guest's Start menu:
+  - a search field at the top (focused when the menu opens; Enter opens the first match; Esc clears it, then closes);
+  - **Running**, the guest's windows with their icons and titles (a click brings one to the front, **×** asks the guest
+    to close it), hidden while searching;
+  - **Open an app**, the guest's apps, launched in the guest with the token it listed (`lord.vm.launch`). Each row shows
+    the app's initial; the row already takes a real icon per app (`appIcons` by token) for when the guest sends them;
+  - at the bottom the machine's name, **Show the Machine's Window** (the controller panel) and **Leave Apps Mode**.
+  - One item per machine; it goes when apps mode ends. It is an SDK status item, so it appears in every theme with a
+    status area (Lord Flow's menu bar, the Classic taskbar when horizontal, Workspaces' top bar) and on each display's
+    bar; the menu opens on the bar that was clicked. While it is open, a guest window in front doesn't take the keys.
+  - The controller panel and the menu share the same list components (`apps/machines/appslist.jsx`); the SDK now
+    exports `statusPanelAt` and `statusPanelRoom` for an app's own status item. Pure logic in `apps/machines/model.js`
+    (`launcherApps`, `appsStatusList`, `appsStatusDiff`, `machineOsId`), tested in `server/tests/vm_model_test.mjs`.
+    Two new texts in all 35 languages.
+
 - **Machines: apps mode's controller is a panel of the guest's windows and apps, in development** (the maintainer's
   request, like VMware Fusion's Unity mode; `docs/VIRTUALIZATION.md` 7.2). While a machine is in apps mode, its small
   window was only a hint and **Leave Apps Mode**; it now opens at about 420 × 520 with two scrolling lists:

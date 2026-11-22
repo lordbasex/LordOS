@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Không có ứng dụng nào khớp với tìm kiếm",
   "apps.closeWindow": "Đóng cửa sổ này trong máy",
   "apps.untitled": "Cửa sổ không tên",
+  "apps.statusTip": "{name} ở chế độ ứng dụng",
+  "apps.showWindow": "Hiện cửa sổ của máy",
   "cfg.resolutionFollowNote": "Máy khởi động theo kích thước cửa sổ và đi theo nó khi hệ thống cho phép. Thanh công cụ của cửa sổ vẫn có thể chọn kích thước khác.",
   "cfg.resolutionFixedNote": "Máy khởi động với kích thước này: mọi hệ thống đều nhận nó khi khởi động, kể cả hệ thống không đi theo cửa sổ. Khi đang chạy, thanh công cụ của cửa sổ vẫn có thể chọn kích thước khác.",
   "cfg.gpu": "Card đồ họa",

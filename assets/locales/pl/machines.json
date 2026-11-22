@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Żadna aplikacja nie pasuje do wyszukiwania",
   "apps.closeWindow": "Zamknij to okno w maszynie",
   "apps.untitled": "Okno bez tytułu",
+  "apps.statusTip": "{name} w trybie aplikacji",
+  "apps.showWindow": "Pokaż okno maszyny",
   "cfg.resolutionFollowNote": "Maszyna startuje w rozmiarze okna i podąża za nim, dopóki pozwala na to jej system. Pasek okna nadal może wybrać inny rozmiar.",
   "cfg.resolutionFixedNote": "Maszyna startuje w tym rozmiarze: każdy system przyjmuje go przy starcie, także te, które nie podążają za oknem. Podczas pracy pasek okna nadal może wybrać inny.",
   "cfg.gpu": "Karta graficzna",

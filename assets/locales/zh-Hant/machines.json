@@ -1036,6 +1036,8 @@
   "apps.noMatch": "沒有符合搜尋的應用程式",
   "apps.closeWindow": "在機器中關閉此視窗",
   "apps.untitled": "未命名視窗",
+  "apps.statusTip": "{name}(應用程式模式)",
+  "apps.showWindow": "顯示虛擬機視窗",
   "cfg.resolutionFollowNote": "機器以視窗的大小啟動，並在系統允許時跟隨視窗。視窗的工具列仍可選擇其他大小。",
   "cfg.resolutionFixedNote": "機器以此大小啟動：每個系統在啟動時都會採用它，包括不跟隨視窗的系統。執行時仍可在視窗的工具列選擇其他大小。",
   "cfg.gpu": "顯示卡",

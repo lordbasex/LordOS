@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Aucune application ne correspond à la recherche",
   "apps.closeWindow": "Fermer cette fenêtre dans la machine",
   "apps.untitled": "Fenêtre sans titre",
+  "apps.statusTip": "{name} en mode applications",
+  "apps.showWindow": "Afficher la fenêtre de la machine",
   "cfg.resolutionFollowNote": "La machine démarre à la taille de la fenêtre et la suit tant que son système le permet. La barre de la fenêtre peut toujours choisir une autre taille.",
   "cfg.resolutionFixedNote": "La machine démarre à cette taille : tout système la prend au démarrage, même ceux qui ne suivent pas la fenêtre. La barre de la fenêtre peut toujours en choisir une autre pendant qu'elle tourne.",
   "cfg.gpu": "Carte graphique",

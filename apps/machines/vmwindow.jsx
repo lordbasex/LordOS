@@ -6,19 +6,20 @@
 import {
   View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath, openFolder,
   inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, admin, t as tr, useSound, microphones,
-  TextInput, LetterIcon, windowPixelIcons, hasTextFocus,
+  hasTextFocus,
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, appsMatching, appInitial } from './model.js';
-import { useAppsMode, appsMenuItems, focusGuest, closeGuest, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps } from './model.js';
+import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
+import { ListHead, AppsSearch, RunningList, LaunchList } from './appslist.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { ClipAskBar } from './clipask.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, startPrep, needsPrep, soundDevItems } from './ui.jsx';
 import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
 import { opensOf, openStep, withoutAsks, askStale } from './openwith.js';
 import { Configure } from './configure.jsx';
-import { Sheet, Pill, Sym } from './kit.jsx';
+import { Sheet, Pill } from './kit.jsx';
 import { captureOffer, captureStep, captureEndedByServer, captureLabelKey, CAPTURE_IDLE, CAPTURE_NOTICE_MS } from './capture.js';
 
 const BAR = 48;
@@ -348,14 +349,13 @@ function Failed({ name, v, st, log, onStart, onSettings, onAnyway, onDiscard }) 
 
 // Apps mode's controller (7.2): what's left of the machine's window while its apps are windows of their own, as a panel
 // (like a Unity mode's launcher): Running, the guest's windows (a click brings one to the front, × asks the guest to close
-// it), then the guest's apps to open, with a search; and the way back to its desktop (Esc too)
+// it), then the guest's apps to open, with a search; and the way back to its desktop (Esc too). The same lists are in the
+// machine's status item by the clock (appsstatus.jsx); both come from appslist.jsx.
 function AppsController({ name, g, onLeave }) {
   const p = usePal();
   const [query, setQuery] = useState('');
-  const running = runningWindows(g?.list);
-  const apps = appsMatching(g?.apps || [], query);
+  const apps = launcherApps(g?.apps || [], query, g?.appIcons);
   const launch = (a) => { if (g?.sid && a) lord.vm.launch(g.sid, a.token); };
-  const head = (label) => <Text style={{ fontSize: 11, fontWeight: 700, color: p.dim, textAlign: 'start', paddingHorizontal: 4 }}>{label}</Text>;
   return (
     <View style={{ flex: 1, padding: 16, gap: 10, backgroundColor: p.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -363,56 +363,15 @@ function AppsController({ name, g, onLeave }) {
         <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{name}</Text>
         <Btn label={tr('machines.apps.leave')} onClick={onLeave} />
       </View>
-      {head(tr('machines.apps.running'))}
+      <ListHead label={tr('machines.apps.running')} />
       <ScrollView style={{ maxHeight: 176, borderRadius: 10, backgroundColor: p.raised }} contentStyle={{ padding: 4 }}>
-        {running.length ? running.map((w) => <RunningRow key={w.id} w={w} winId={g?.wins?.[w.id] || 0} onFront={() => focusGuest(g.dir, w.id)} onClose={() => closeGuest(g.dir, w.id)} />)
-          : <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', padding: 8 }}>{tr('machines.apps.noWindows')}</Text>}
+        <RunningList g={g} />
       </ScrollView>
-      {head(tr('machines.apps.launch'))}
-      <View style={{ height: 34, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderRadius: 9, backgroundColor: p.raised }}>
-        <Sym name="search" size={16} color={p.dim} />
-        <TextInput value={query} onChange={setQuery} placeholder={tr('machines.apps.search')} size={13}
-          onSubmit={() => launch(apps[0])} onCancel={() => (query ? setQuery('') : onLeave())}
-          style={{ flex: 1, minWidth: 0, backgroundColor: 'transparent', borderWidth: 0, border: 'none' }} />
-      </View>
+      <ListHead label={tr('machines.apps.launch')} />
+      <AppsSearch value={query} onChange={setQuery} onSubmit={() => launch(apps[0])} onCancel={onLeave} />
       <ScrollView style={{ flex: 1, borderRadius: 10, backgroundColor: p.raised }} contentStyle={{ padding: 4 }}>
-        {apps.length ? apps.map((a) => <LaunchRow key={a.token} a={a} onClick={() => launch(a)} />)
-          : <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', padding: 8 }}>{tr(g?.apps?.length ? 'machines.apps.noMatch' : 'machines.apps.noApps')}</Text>}
+        <LaunchList g={g} apps={apps} onLaunch={launch} />
       </ScrollView>
-    </View>
-  );
-}
-
-// a guest window in the controller's Running list: its icon (the guest's, as the Dock shows it) and title; a click
-// brings it to the front, × asks the guest to close it
-function RunningRow({ w, winId, onFront, onClose }) {
-  const p = usePal();
-  const [hover, setHover] = useState(false);
-  const px = useStore(windowPixelIcons, (m) => (winId ? m[winId] || null : null));
-  const title = w.title || tr('machines.apps.untitled');
-  return (
-    <View onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ height: 34, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, borderRadius: 7, backgroundColor: hover ? p.hover : 'transparent' }}>
-      <View onClick={onFront} title={title} style={{ flex: 1, minWidth: 0, height: 34, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {px ? <Image pixels={px} style={{ width: 20, height: 20 }} /> : <LetterIcon size={20} name={w.app || title} />}
-        <Text style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: w.focused ? 700 : 400, color: w.minimized ? p.dim : p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{title}</Text>
-      </View>
-      <IconBtn glyph="×" size={15} label={tr('machines.apps.closeWindow')} onClick={onClose} />
-    </View>
-  );
-}
-
-// one of the guest's apps to open: the guest lists no icons for them, so a plain tile with its initial
-function LaunchRow({ a, onClick }) {
-  const p = usePal();
-  const [hover, setHover] = useState(false);
-  return (
-    <View onClick={onClick} title={a.name} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6, borderRadius: 7, backgroundColor: hover ? p.hover : 'transparent' }}>
-      <View style={{ width: 20, height: 20, borderRadius: 5, alignItems: 'center', justifyContent: 'center', backgroundColor: p.btn }}>
-        <Text style={{ fontSize: 11, fontWeight: 700, color: p.dim }}>{appInitial(a.name)}</Text>
-      </View>
-      <Text style={{ flex: 1, minWidth: 0, fontSize: 13, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{a.name}</Text>
     </View>
   );
 }
@@ -989,7 +948,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     writeMeta(dir, { appsMode: on });
     if (!on) sized.current.last = null;            // the guest takes this window's size again (Follow)
   };
-  const appsActive = useAppsMode({ dir, sid, st, name, mid: m0.id || dir.split('/').pop(), on: appsOn, ready: !appsBlocked, onLeave: () => setApps(false), onTouch: () => sendClipRef.current(true) });
+  const appsActive = useAppsMode({ dir, sid, st, name, mid: m0.id || dir.split('/').pop(), home: winId, on: appsOn, ready: !appsBlocked, onLeave: () => setApps(false), onTouch: () => sendClipRef.current(true) });
   // apps mode: the guest window in front shows the bar instead
   useEffect(() => { if (appsActive) guests.set((g) => (g[dir] ? { ...g, [dir]: { ...g[dir], ask: askBar, askAnswer } } : g)); }, [appsActive, askSt]);
   appsRef.current = appsActive;

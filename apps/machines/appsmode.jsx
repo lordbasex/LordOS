@@ -14,12 +14,14 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
 import { ClipAskBar } from './clipask.jsx';
+import { menus } from './ui.jsx';
 import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, AGENT_CAPS, copyLine, placeBatch } from './model.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
 export const CLIP_HOLD_MS = 150;
-// dir → { dir, sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], wins: { gid: LordOS window id }, leave() }
+// dir → { dir, sid, name, mid, home (the machine's own window), gw, gh, media, list: [guest window], apps: [{ name, token }],
+// appIcons (token → pixels, once the guest sends them), wins: { gid: LordOS window id }, leave() }
 export const guests = createStore({});
 // dir → the LordOS window id of that machine's guest window in front, if one is: the machine counts as in use then (its
 // clipboard's gate, 6.8)
@@ -65,7 +67,7 @@ function placeOf(x, w, sid, k, d, have) {
 
 // The machine's window side: turns apps mode on and off in the guest, and keeps the LordOS windows in step with the
 // guest's list. on: the person wants it; ready: the agent says the guest's helper lists its windows.
-export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTouch }) {
+export function useAppsMode({ dir, sid, st, name, mid, home, on, ready, onLeave, onTouch }) {
   const sent = useRef(false);
   const seen = useRef({ w: -1, i: -1, a: -1 });
   // a pause keeps the windows (their pictures stay as they were); stopping, or the agent going, ends it
@@ -77,7 +79,7 @@ export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTou
     const [gw, gh] = appsGuestSize(display());
     lord.vm.resize(sid, gw, gh);
     seen.current = { w: -1, i: -1, a: -1 };
-    publish(dir, { dir, sid, name, mid, leave: onLeave, touch: onTouch, list: [], apps: [], wins: {} });
+    publish(dir, { dir, sid, name, mid, home, leave: onLeave, touch: onTouch, list: [], apps: [], wins: {} });
     return () => {
       if (sent.current) lord.vm.apps(sid, false);
       sent.current = false;
@@ -273,8 +275,8 @@ export function GuestWindow({ dir, gid }) {
   useEffect(() => {
     if (!focused || !g?.sid) return undefined;
     const sid = g.sid;
-    // while the clipboard's bar asks, the keys are the bar's
-    const ka = addListener('keydown', (e) => { if (!(e.code > 0) || gref.current?.ask) return; e.preventDefault?.(); lord.vm.key(sid, e.code, 1); });
+    // while the clipboard's bar asks, the keys are the bar's; while a menu of ours is open (the status item's search), the menu's
+    const ka = addListener('keydown', (e) => { if (!(e.code > 0) || gref.current?.ask || menus.open > 0) return; e.preventDefault?.(); lord.vm.key(sid, e.code, 1); });
     const kb = addListener('keyup', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 0); });
     const kc = addListener('pointerup', (e) => {
       if (!buttons.current.has(e.button)) return;

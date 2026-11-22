@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Mikään sovellus ei vastaa hakua",
   "apps.closeWindow": "Sulje tämä ikkuna koneessa",
   "apps.untitled": "Nimetön ikkuna",
+  "apps.statusTip": "{name} sovellustilassa",
+  "apps.showWindow": "Näytä koneen ikkuna",
   "cfg.resolutionFollowNote": "Kone käynnistyy ikkunan kokoisena ja seuraa sitä niin kuin järjestelmä sallii. Ikkunan työkalupalkista voi silti valita toisen koon.",
   "cfg.resolutionFixedNote": "Kone käynnistyy tämän kokoisena: jokainen järjestelmä ottaa sen käynnistyessään, myös ne, jotka eivät seuraa ikkunaa. Ikkunan työkalupalkista voi silti valita toisen koon käytön aikana.",
   "cfg.gpu": "Näytönohjain",

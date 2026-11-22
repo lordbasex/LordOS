@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Axtarışa uyğun tətbiq yoxdur",
   "apps.closeWindow": "Bu pəncərəni maşında bağla",
   "apps.untitled": "Adsız pəncərə",
+  "apps.statusTip": "{name} tətbiqlər rejimində",
+  "apps.showWindow": "Maşının pəncərəsini göstər",
   "cfg.resolutionFollowNote": "Maşın pəncərənin ölçüsü ilə başlayır və sistemi imkan verdikcə onu izləyir. Pəncərənin alət paneli yenə başqa ölçü seçə bilər.",
   "cfg.resolutionFixedNote": "Maşın bu ölçü ilə başlayır: hər sistem onu başlayanda götürür, pəncərəni izləməyənlər də. Pəncərənin alət paneli işləyərkən yenə başqa ölçü seçə bilər.",
   "cfg.gpu": "Qrafik kart",

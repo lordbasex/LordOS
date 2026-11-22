@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Nicio aplicație nu se potrivește căutării",
   "apps.closeWindow": "Închide această fereastră în mașină",
   "apps.untitled": "Fereastră fără titlu",
+  "apps.statusTip": "{name} în modul aplicații",
+  "apps.showWindow": "Arată fereastra mașinii",
   "cfg.resolutionFollowNote": "Mașina pornește la dimensiunea ferestrei și o urmează cât îi permite sistemul. Bara ferestrei poate alege totuși altă dimensiune.",
   "cfg.resolutionFixedNote": "Mașina pornește la această dimensiune: orice sistem o preia la pornire, chiar și cele care nu urmează fereastra. În timpul rulării, bara ferestrei poate alege totuși alta.",
   "cfg.gpu": "Placă video",

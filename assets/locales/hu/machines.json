@@ -1036,6 +1036,8 @@
   "apps.noMatch": "Egy alkalmazás sem felel meg a keresésnek",
   "apps.closeWindow": "Az ablak bezárása a gépen",
   "apps.untitled": "Névtelen ablak",
+  "apps.statusTip": "{name} alkalmazásmódban",
+  "apps.showWindow": "A gép ablakának megjelenítése",
   "cfg.resolutionFollowNote": "A gép az ablak méretével indul, és követi, amíg a rendszere engedi. Az ablak eszköztárán így is választható más méret.",
   "cfg.resolutionFixedNote": "A gép ezzel a mérettel indul: minden rendszer átveszi induláskor, azok is, amelyek nem követik az ablakot. Futás közben az ablak eszköztárán így is választható más.",
   "cfg.gpu": "Videokártya",
