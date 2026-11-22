@@ -109,6 +109,8 @@ export default function About() {
         <Lumo pose="avatar" size={24} />
         <Text style={{ flex: 1, fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('about.credits')}</Text>
       </View>
+      {/* trademarks (maintainer, 2026-11-22): the names and the logos Machines may download on request (docs/TRADEMARKS.md) */}
+      <Text style={{ alignSelf: 'stretch', paddingHorizontal: 24, fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.4 }}>{tr('about.trademarks')}</Text>
     </View>
     </ScrollView>
     </View>

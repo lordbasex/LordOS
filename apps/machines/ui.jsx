@@ -1,6 +1,9 @@
 // Pieces the Machines windows share: the state dot, the system marks, the three lights, bars, a context menu and the
 // surfaces of the Control Center (docs/VIRTUALIZATION.md, "The app"; the approved mocks, Main and Toolbar).
-import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, t as tr } from '@lordos/sdk';
+import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, useSettings, useStore, t as tr } from '@lordos/sdk';
+import { logoFor } from './logos.js';
+import { storeRev } from './store.js';
+import { COLOR_HEX } from './systems.js';
 import { bridgeArg, soundDevChoices, gvtGpu, gvtType, gvtArg, memlockFits } from './model.js';
 import { useEffect, useRef, useState } from 'react';
 
@@ -47,34 +50,37 @@ export function usePal() {
 
 export function StateDot({ tone, size = 8 }) { return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: TONE[tone] || TONE.off }} />; }
 
-// Our own marks for the systems we recognize: a colored rounded tile with a letter (LOGOS below where a system's own is used).
+// Our own marks for the systems we recognize: a colored rounded tile with a letter. LordOS ships no system's logo
+// (docs/TRADEMARKS.md): with "Official logos of the systems" on (Machines settings → General, off by default) a system
+// whose owner's policy allows it shows the logo the person downloaded (logos.js), on a light tile; any other time ours.
 const MARKS = {
   lordos: ['#5aa9ff', '#1f5fbf', 'L'], debian: ['#e0668c', '#8c2146', 'D'], ubuntu: ['#f28a55', '#a83a1a', 'U'], fedora: ['#6a8fd8', '#2b4478', 'F'],
   mint: ['#8bd17c', '#3c7a32', 'M'], arch: ['#5fb4e0', '#1d6a91', 'A'], alpine: ['#4fa3c7', '#1a4f6a', 'A'], opensuse: ['#7fcf6a', '#2f6b25', 'S'],
   kali: ['#5b7fd6', '#22305a', 'K'], rocky: ['#4fc6a0', '#1f6a52', 'R'], alma: ['#e2b04a', '#8a5a14', 'A'], centos: ['#b07ad6', '#5a2d7a', 'C'],
   windows: ['#4aa3f0', '#1a56a8', 'W'], freebsd: ['#e05a5a', '#7a1f1f', 'B'], raspios: ['#d6567a', '#7a1f3a', 'P'], other: ['#8a93a6', '#3b4252', '▣'],
 };
-// The systems' own logos, unmodified, where their makers allow it to name the system (assets/machines/logos/README.md);
-// on a light tile so each keeps its own colors. Ubuntu (written permission) and Windows (Microsoft's mark) keep ours.
 // Machines' own marks for systems whose makers don't let their logos be shown (Canonical asks for written permission;
 // Microsoft allows no use of its logos or of designs like them): drawn for LordOS, nothing like either logo
 const DRAWN = { ubuntu: 'ubuntu', windows: 'windows' };
-const LOGOS = { debian: 'asset:machines/logos/debian.svg', fedora: 'asset:machines/logos/fedora.svg', kali: 'asset:machines/logos/kali.svg' };
 
-export function OsMark({ id, size = 40 }) {
-  // Machines' own drawn marks (assets/machines/marks): a whole tile, colors included
-  if (DRAWN[id]) {
-    const px = Math.max(32, Math.min(256, Math.ceil(size * 2)));
-    return <Image src={`svg:${px}:-:asset:machines/marks/${DRAWN[id]}.svg`} style={{ width: size, height: size }} />;
-  }
-  if (LOGOS[id]) {
+// id: a system's; color and letter: a system the person added (systems.js COLOR_HEX)
+export function OsMark({ id, size = 40, color, letter }) {
+  const [s0] = useSettings();
+  useStore(storeRev);
+  const logo = s0.machinesDefaults?.logos === true && !color ? logoFor(id) : '';
+  if (logo) {
     return (
       <View style={{ width: size, height: size, borderRadius: size * 0.22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', border: '1px solid rgba(0,0,0,0.08)' }}>
-        <Image src={LOGOS[id]} style={{ width: size * 0.74, height: size * 0.74, objectFit: 'contain' }} />
+        <Image src={logo} style={{ width: size * 0.74, height: size * 0.74, objectFit: 'contain' }} />
       </View>
     );
   }
-  const [a, b, ch] = MARKS[id] || MARKS.other;
+  // Machines' own drawn marks (assets/machines/marks): a whole tile, colors included
+  if (DRAWN[id] && !color) {
+    const px = Math.max(32, Math.min(256, Math.ceil(size * 2)));
+    return <Image src={`svg:${px}:-:asset:machines/marks/${DRAWN[id]}.svg`} style={{ width: size, height: size }} />;
+  }
+  const [a, b, ch] = color && COLOR_HEX[color] ? [COLOR_HEX[color][1], COLOR_HEX[color][0], (letter || '▣').slice(0, 1).toUpperCase()] : MARKS[id] || MARKS.other;
   return (
     <View style={{ width: size, height: size, borderRadius: size * 0.22, alignItems: 'center', justifyContent: 'center', background: `linear-gradient(180deg, ${a}, ${b})` }}>
       <Text style={{ fontSize: size * 0.5, fontWeight: 700, color: '#fff' }}>{ch}</Text>

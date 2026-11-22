@@ -459,6 +459,32 @@
           "maxMb": 4096
         }
       }
+    },
+    {
+      "id": "logo-debian",
+      "name": "Debian",
+      "kind": "logo",
+      "for": "debian",
+      "hidden": true,
+      "homepage": "https://www.debian.org/logos/",
+      "policy": "https://www.debian.org/trademark (Trademark Policy v2.0, Guidelines for Using Logos) and https://www.debian.org/logos/: the Open Use Logo is under LGPL-3.0-or-later or CC BY-SA 3.0 and may identify Debian; checked 2026-11-22 (docs/TRADEMARKS.md)",
+      "license": "Debian Open Use Logo (c) 1999 Software in the Public Interest, Inc., LGPL-3.0-or-later or CC BY-SA 3.0. Debian is a registered trademark of Software in the Public Interest, Inc. LordOS ships only this address and hash: the image is downloaded only by the person's own choice (Machines settings, Official logos of the systems) and kept on that computer.",
+      "hashSource": "downloaded once on 2026-11-22 from www.debian.org (HTTP 200, no redirect): a 101 x 124 PNG, its SHA-256 computed and pinned here",
+      "checked": "2026-11-22",
+      "arch": {
+        "amd64": {
+          "pinned": [
+            { "name": "openlogo-nd-100.png", "url": "https://www.debian.org/logos/openlogo-nd-100.png", "sha256": "92aad0be9b2be94420cfb6c1daf5985338e402110353b4fa051fb429f4cde2b8", "bytes": 1444 }
+          ],
+          "approxMb": 1
+        },
+        "arm64": {
+          "pinned": [
+            { "name": "openlogo-nd-100.png", "url": "https://www.debian.org/logos/openlogo-nd-100.png", "sha256": "92aad0be9b2be94420cfb6c1daf5985338e402110353b4fa051fb429f4cde2b8", "bytes": 1444 }
+          ],
+          "approxMb": 1
+        }
+      }
     }
   ]
 }

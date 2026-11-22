@@ -3,11 +3,12 @@
 // while the machine is off; what the app keeps (system, notes) is saved at once.
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
+import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
   portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
+import { BUILTIN, builtinProfile, onHost } from './profiles.js';
 
 const SECTIONS = ['general', 'startup', 'cpu', 'display', 'network', 'sound', 'disks', 'sharing', 'agent', 'boot', 'security'];
 // each section's glyph (assets/machines/symbols)
@@ -174,7 +175,9 @@ export function Configure({ dir, section: section0, onClose }) {
     volTimer.current = setTimeout(() => setSound({ volume: v }), 250);
   };
   const emulated = m.accel === 'tcg';
-  const prof = profileOf({ ...m, ...draft }, host, meta.profile);
+  // the profile it was made with, while its CPU, memory and network are still that profile's here
+  const profFor = (k) => onHost(builtinProfile(k, host), host, { gpuReady: true, no3d: no3dReason(host, m.windowsDevices, m.arch) });
+  const prof = (() => { const k = meta.profile, x = { ...m, ...draft }; if (!BUILTIN.includes(k)) return ''; const s = profFor(k); return s.vcpus === x.vcpus && s.memoryMb === x.memoryMb && s.network === x.network ? k : ''; })();
   const summary = {
     general: [meta.osName || systemOf(m.name).name, m.arch, prof ? tr(`machines.as.profile.${prof}`) : null].filter(Boolean).join(', '),
     startup: tr(`machines.cfg.close.${closeChoice(meta)}`) + (m.suspended ? `, ${tr('machines.doing.suspended')}` : ''),
@@ -215,9 +218,9 @@ export function Configure({ dir, section: section0, onClose }) {
       </Row>
       <Row label={tr('machines.cfg.profile')} note={tr('machines.cfg.profileNote') + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><MenuBtn label={prof ? tr(`machines.as.profile.${prof}`) : tr('machines.cfg.profileCustom')}
-          items={PROFILES.map((k) => { const s = profileSize(k, host); return { label: tr(`machines.as.profile.${k}`), checked: prof === k,
-            hint: tr('machines.as.spec', { cpus: s.vcpus, mem: gb(s.memoryMb), gfx: tr(`machines.as.gfx.${s.gfx}`) }),
-            onClick: () => { const g = gfxFor(s.gfx, host, m.windowsDevices, m.arch); set({ vcpus: s.vcpus, memoryMb: s.memoryMb, network: s.network, graphics: g, ...(g === '3d' ? { gpu: '' } : {}) }); writeMeta(dir, { profile: k }); setMeta(readMeta(dir)); } }; })} /></View></Off>
+          items={BUILTIN.map((k) => { const s = profFor(k); const gfx = builtinProfile(k, host).resources.graphics; return { label: tr(`machines.as.profile.${k}`), checked: prof === k,
+            hint: tr('machines.as.spec', { cpus: s.vcpus, mem: gb(s.memoryMb), gfx: tr(`machines.as.gfx.${gfx}`) }),
+            onClick: () => { const g = gfxFor(gfx, host, m.windowsDevices, m.arch); set({ vcpus: s.vcpus, memoryMb: s.memoryMb, network: s.network, graphics: g, ...(g === '3d' ? { gpu: '' } : {}) }); writeMeta(dir, { profile: k }); setMeta(readMeta(dir)); } }; })} /></View></Off>
       </Row>
       <Row label={tr('machines.cfg.arch')} value={emulated ? `${m.arch}, ${tr('machines.emulatedLower')}` : m.arch} />
       <Row label={tr('machines.cfg.created')} value={(m.created || '').replace('T', ' ').replace('Z', ' UTC')} />

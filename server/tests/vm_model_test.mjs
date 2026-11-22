@@ -248,7 +248,8 @@ eq('unique names', [M.uniqueName('Work', []), M.uniqueName('Work', ['Work']), M.
 
 // the library's toolbar: view, order, Show and search (0.8.8.7)
 eq('lib view defaults', M.libView(null), { view: 'grid', sort: 'name', show: 'all' });
-eq('lib view kept', M.libView({ view: 'list', sort: 'disk', show: 'off' }), { view: 'list', sort: 'disk', show: 'off' });
+eq('lib view kept', M.libView({ view: 'list', sort: 'disk', show: 'linux' }), { view: 'list', sort: 'disk', show: 'linux' });
+eq('lib view: the old Off filter reads as all', M.libView({ show: 'off' }).show, 'all');
 eq('lib view junk', M.libView({ view: 'x', sort: 1, show: 'running' }), { view: 'grid', sort: 'name', show: 'running' });
 const lib = [
   { name: 'Zeta', state: 'stopped', thumbTime: 50, diskBytes: 9, arch: 'amd64' },

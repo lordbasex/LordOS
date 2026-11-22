@@ -307,10 +307,11 @@ export function doingOf(m, windowed = true) {
   return v.key;
 }
 
-// The library's view (settings.machinesView, 0.8.8.7): pictures or a list, the order, which machines show
+// The library's view (settings.machinesView, 0.8.8.7; the chips of the 0.8.9 redesign): pictures or a list, the order,
+// which machines show (all, running, Linux, the other system's); 'off' of before is read as all
 export const LIB_VIEWS = ['grid', 'list'];
 export const LIB_SORTS = ['name', 'state', 'last', 'disk'];
-export const LIB_SHOWS = ['all', 'running', 'off'];
+export const LIB_SHOWS = ['all', 'running', 'linux', 'windows'];
 export function libView(v) {
   const o = v && typeof v === 'object' ? v : {};
   return {
@@ -319,17 +320,53 @@ export function libView(v) {
     show: LIB_SHOWS.includes(o.show) ? o.show : 'all',
   };
 }
-// the machines a search and the Show filter leave: the query matches the name, the system or the architecture
+// the systems a machine may run, as the chips group them: 'windows', 'linux' or 'other'
+const LINUX = ['lordos', 'debian', 'ubuntu', 'fedora', 'mint', 'arch', 'alpine', 'opensuse', 'kali', 'rocky', 'alma', 'centos', 'raspios', 'linux'];
+export function familyOf(m) {
+  if (isWindowsMachine(m) || m?.meta?.os === 'windows') return 'windows';
+  const id = m?.meta?.os || systemOf(m?.meta?.osName, m?.name).id;
+  if (id === 'windows') return 'windows';
+  return LINUX.includes(id) || m?.meta?.family === 'linux' ? 'linux' : 'other';
+}
+const shows = (m, show) => (show === 'running' ? stateView(m.state, m.reason).active : show === 'linux' || show === 'windows' ? familyOf(m) === show
+  : show === 'off' ? !stateView(m.state, m.reason).active : true);
+// the machines a search and the chip leave: the query matches the name, the system or the architecture
 export function filterMachines(list, { query, show } = {}) {
   const q = (query || '').trim().toLowerCase();
   return (list || []).filter((m) => {
-    const on = stateView(m.state, m.reason).active;
-    if (show === 'running' && !on) return false;
-    if (show === 'off' && on) return false;
+    if (!shows(m, show)) return false;
     if (!q) return true;
     const sys = m.meta?.osName || systemOf(m.name).name || '';
     return [m.name, sys, m.arch].some((s) => (s || '').toLowerCase().includes(q));
   });
+}
+// how many machines each chip shows (the search applies to all of them)
+export function chipCounts(list, query) {
+  const out = {};
+  for (const k of LIB_SHOWS) out[k] = filterMachines(list, { query, show: k }).length;
+  return out;
+}
+// A card's one line of numbers (the approved mock "Main"): "10 CPU · 8 GB · 64 GB · Bridged · Intel card" as parts —
+// [{ k: key under machines.lib.spec, n }] the app words; 3D and a graphics card only when the machine has them
+export function specParts(m) {
+  const out = [{ k: 'cpu', n: m?.vcpus | 0 }, { k: 'mem', mb: m?.memoryMb | 0 }, { k: 'disk', n: m?.diskGb | 0 },
+    { k: `net.${NET_MODES.includes(m?.network) ? m.network : 'shared'}` }];
+  if (m?.gpu) out.push({ k: 'gpu' });
+  else if (m?.graphics === '3d') out.push({ k: '3d' });
+  return out;
+}
+// What a list row says beside a machine that isn't running: since when it's off (its card picture is written while it
+// runs), that it resumes, or its profile. → { k, n } (n: minutes, hours or days ago)
+export function restLine(m, now = Date.now()) {
+  if (m?.suspended) return { k: 'resumes' };
+  const t = (m?.thumbTime || 0) * (m?.thumbTime > 1e12 ? 1 : 1000);
+  if (t > 0 && t <= now) {
+    const min = Math.floor((now - t) / 60000);
+    if (min < 60) return { k: 'lastMin', n: Math.max(1, min) };
+    if (min < 48 * 60) return { k: 'lastHours', n: Math.floor(min / 60) };
+    return { k: 'lastDays', n: Math.floor(min / 1440) };
+  }
+  return m?.meta?.profile ? { k: 'profile', id: m.meta.profile } : null;
 }
 // in order: by name, running first, last used first (the card picture is written while it runs), or the most disk first;
 // ties by name

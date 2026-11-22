@@ -44,5 +44,6 @@
   "version": "{v} verzió",
   "versionChannel": "{v} verzió · {channel}",
   "case": "Ház",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "A terméknevek és logók a megfelelő tulajdonosaik védjegyei; a LordOS nem áll kapcsolatban velük, és ők nem hagyták jóvá. A logók csak kérésre töltődnek le, az egyes tulajdonosok webhelyéről, és csak ezen a számítógépen jelennek meg."
 }

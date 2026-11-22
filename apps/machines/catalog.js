@@ -117,6 +117,8 @@ export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m)
     let info = null;
     try { info = infoOf(m[1]); } catch (x) { info = null; }
     const sys = (cat?.systems || []).find((s) => s?.id === info?.id);
+    // an official logo (opt-in, logos.js) is no system image: the Storage window doesn't list it
+    if (sys?.kind === 'logo' || /^logo-/.test(String(info?.id || ''))) continue;
     const file = typeof info?.file === 'string' && NAME.test(info.file) ? info.file : '';
     const version = sys && file ? versionIn(file, sys.release) : '';
     const users = [], dirs = [], running = [];
@@ -167,4 +169,16 @@ export function hostnameFor(name) {
 export function userFor(home) {
   const u = String(home || '').split('/').filter(Boolean).pop() || '';
   return /^[a-z_][a-z0-9_-]{0,31}$/.test(u) && !RESERVED.includes(u) ? u : 'user';
+}
+
+// ---- official logos (opt-in; logos.js) ----
+// the catalog's logo of a system (an entry of kind "logo" whose "for" names it), pinned like any download: { id, file,
+// sha, bytes } or null. Only systems whose owners' policies allow it to identify them are listed (docs/TRADEMARKS.md);
+// a system of the other kind never has one.
+export function logoEntry(cat, sysId, arch) {
+  if (!sysId || sysId === 'windows') return null;
+  const s = (cat?.systems || []).find((x) => x?.kind === 'logo' && x.for === sysId && typeof x.id === 'string' && /^logo-[a-z0-9-]+$/.test(x.id));
+  const pin = s?.arch?.[arch]?.pinned?.[0];
+  if (!pin || !/^[0-9a-f]{64}$/.test(pin.sha256 || '') || !/\.png$/.test(pin.name || '') || !/^https:\/\//.test(pin.url || '')) return null;
+  return { id: s.id, file: pin.name, sha: pin.sha256, bytes: pin.bytes | 0 };
 }

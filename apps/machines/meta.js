@@ -20,7 +20,14 @@ export function readMeta(dir) {
       if (['ask', 'suspend', 'shutdown', 'keep'].includes(j.onClose)) meta.onClose = j.onClose;
       if (typeof j.keepAwake === 'boolean') meta.keepAwake = j.keepAwake;
       if (typeof j.appsMode === 'boolean') meta.appsMode = j.appsMode;      // apps mode (7.2): the machine's window opens in it
-      if (typeof j.profile === 'string' && /^[a-z]{1,16}$/.test(j.profile)) meta.profile = j.profile;
+      // the profile it was made with: LordOS's ('productivity'…) or the person's own ('u-…', profiles.js)
+      if (typeof j.profile === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(j.profile)) meta.profile = j.profile;
+      // keyboard and mouse from its profile (profiles.js): the pointer captured on a click or automatic, LordOS's
+      // shortcuts asked for or never taken, captured in full screen
+      if (j.input && typeof j.input === 'object') {
+        meta.input = { mouse: j.input.mouse === 'capture' ? 'capture' : 'auto', shortcuts: j.input.shortcuts === 'never' ? 'never' : 'ask',
+          captureFullscreen: j.input.captureFullscreen === true };
+      }
       if (typeof j.cloneOf === 'string' && /^[0-9a-f-]{36}$/.test(j.cloneOf)) meta.cloneOf = j.cloneOf;
       if (typeof j.importedFrom === 'string') meta.importedFrom = j.importedFrom.slice(0, 1024);
       if (typeof j.transferSetup === 'boolean') meta.transferSetup = j.transferSetup;   // set up the transfer folder once (Windows)

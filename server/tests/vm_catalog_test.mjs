@@ -33,8 +33,14 @@ eq('every folder is https', CAT.systems.filter((s) => !pinnedOf(s)).every((s) =>
 for (const s of CAT.systems.filter(pinnedOf)) {
   const files = Object.values(s.arch).flatMap((a) => a.pinned || []);
   eq(`${s.id}: pinned files`, [files.length > 0, files.every((f) => /^https:\/\/[^/\s"<>\\]+\/\S+$/.test(f.url) && /^[0-9a-f]{64}$/.test(f.sha256) && Number.isInteger(f.bytes) && f.bytes > 0 &&
-    /^[A-Za-z0-9_+~][A-Za-z0-9._+~-]{0,94}$/.test(f.name)), new Set(files.map((f) => f.name)).size === files.length,
+    /^[A-Za-z0-9_+~][A-Za-z0-9._+~-]{0,94}$/.test(f.name)), Object.values(s.arch).every((a) => new Set((a.pinned || []).map((f) => f.name)).size === (a.pinned || []).length),
     typeof s.hashSource === 'string' && typeof s.license === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.checked)], [true, true, true, true]);
+}
+// an official logo (opt-in, apps/machines/logos.js): a PNG of at most 512 KB, for a listed system, never the other system's
+for (const s of CAT.systems.filter((x) => x.kind === 'logo')) {
+  const files = Object.values(s.arch).flatMap((a) => a.pinned || []);
+  eq(`${s.id}: a logo is a small PNG of a listed system`, [s.hidden === true, /^logo-[a-z0-9-]+$/.test(s.id), s.for !== 'windows' && CAT.systems.some((x) => x.id === s.for && x.kind !== 'logo'),
+    files.every((f) => /\.png$/.test(f.name) && f.bytes <= 512 * 1024), typeof s.policy === 'string'], [true, true, true, true, true]);
 }
 const WIN = CAT.systems.find((s) => s.id === 'windows');
 eq('windows: every language of the page, hashes unique', [WIN.arch.amd64.isos.length >= 38, WIN.arch.amd64.isos.every((i) => /^[a-z]{2}(-Latn)?-[A-Z]{2}$/.test(i.lang) && /^[0-9a-f]{64}$/.test(i.sha256)),
