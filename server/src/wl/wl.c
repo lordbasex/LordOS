@@ -127,6 +127,7 @@ struct Surf {
     int title_pending;              /* a new title not told to JS yet (titles_flush: at most one event a frame) */
     unsigned title_ms;              /* when its last title event went */
     int maximized, fullscreen, activated, csd;
+    int tiled;                      /* snapped by the theme: the edges against its work area (1 left, 2 right, 4 top, 8 bottom) */
     int min_w, min_h, max_w, max_h;             /* xdg_toplevel: its size limits */
     /* the window it belongs to: xdg_toplevel.set_parent, or xdg-foreign's set_parent_of (owner_by =
      * the zxdg_imported_v2 that set it); modal (xdg-dialog-v1): the owner takes no input while it is up */
@@ -234,6 +235,8 @@ static int nrelease;
 static int oslots_used(int slot);
 static void oslot_rect(int slot, float *x, float *y, float *w, float *h);
 static Surf *fs_surf;
+static int fs_refused;                  /* wl_fullscreen_allow: a screen share refuses fullscreen */
+static void send_caps(Surf *s);
 static int fs_slot = -1;                /* the display it covers (output slot), -1 = the whole space */
 
 /* Logical rect of the display the fullscreen window covers. */
@@ -488,6 +491,7 @@ static void x_configure(Surf *s) {
     s->sent_configure = 1;
 }
 
+static void work_bounds(Surf *s, int *w, int *h);
 static void send_toplevel_configure(Surf *s) {
     if (s->xw) { x_configure(s); return; }
     if (!s->top || !s->xdg) return;
@@ -500,10 +504,23 @@ static void send_toplevel_configure(Surf *s) {
     /* minimized, on a hidden desktop or covered: the app may stop drawing (framegate.h) */
     s->sent_suspended = (s->xmin || s->parked || s->covered) && wl_resource_get_version(s->top) >= XDG_TOPLEVEL_STATE_SUSPENDED_SINCE_VERSION;
     if (s->sent_suspended && (p = wl_array_add(&states, sizeof *p))) *p = XDG_TOPLEVEL_STATE_SUSPENDED;
-    if (s->maximized && wl_resource_get_version(s->top) >= 2) {
+    /* maximized: every edge against the work area's; snapped (wl_set_tiled): the edges the theme says. Tiled from
+     * xdg-shell 2, and from 7 also constrained (the app should not offer a resize from that edge) */
+    int ver = wl_resource_get_version(s->top), edges = s->maximized ? 15 : s->tiled;
+    if (edges && ver >= 2) {
         static const uint32_t tiled[] = { XDG_TOPLEVEL_STATE_TILED_LEFT, XDG_TOPLEVEL_STATE_TILED_RIGHT,
                                           XDG_TOPLEVEL_STATE_TILED_TOP, XDG_TOPLEVEL_STATE_TILED_BOTTOM };
-        for (int i = 0; i < 4; i++) if ((p = wl_array_add(&states, sizeof *p))) *p = tiled[i];
+        static const uint32_t constrained[] = { XDG_TOPLEVEL_STATE_CONSTRAINED_LEFT, XDG_TOPLEVEL_STATE_CONSTRAINED_RIGHT,
+                                                XDG_TOPLEVEL_STATE_CONSTRAINED_TOP, XDG_TOPLEVEL_STATE_CONSTRAINED_BOTTOM };
+        for (int i = 0; i < 4; i++) if ((edges >> i & 1) && (p = wl_array_add(&states, sizeof *p))) *p = tiled[i];
+        if (ver >= XDG_TOPLEVEL_STATE_CONSTRAINED_LEFT_SINCE_VERSION)
+            for (int i = 0; i < 4; i++) if ((edges >> i & 1) && (p = wl_array_add(&states, sizeof *p))) *p = constrained[i];
+    }
+    /* the largest a window can be: the work area (menu bar and Dock out, wl_set_work_areas) of its display */
+    if (ver >= XDG_TOPLEVEL_CONFIGURE_BOUNDS_SINCE_VERSION) {
+        int bw, bh;
+        work_bounds(s, &bw, &bh);
+        if (bw > 0 && bh > 0) xdg_toplevel_send_configure_bounds(s->top, bw, bh);
     }
     xdg_toplevel_send_configure(s->top, s->conf_w, s->conf_h, &states);
     wl_array_release(&states);
@@ -1321,6 +1338,45 @@ static unsigned surf_keys(Surf *top) {
     return k;
 }
 
+/* The work area of each display (logical, the menu bar and the Dock left out), as the theme computes it
+ * (sdk/wayland.js → lord.wayland.workAreas); w 0: not known, the display's whole rect is used. */
+static struct { int x, y, w, h; } warea[OUT_MAX];
+
+void wl_set_work_areas(const int (*r)[4], int n) {
+    memset(warea, 0, sizeof warea);
+    for (int j = 0; j < n; j++) {
+        if (r[j][2] <= 0 || r[j][3] <= 0) continue;
+        for (int i = 0; i < OUT_MAX; i++) {              /* the display holding its middle */
+            const WlOutput *o = &oslots[i].o;
+            int cx = r[j][0] + r[j][2] / 2, cy = r[j][1] + r[j][3] / 2;
+            if (!oslots[i].used || cx < o->x || cy < o->y || cx >= o->x + o->w || cy >= o->y + o->h) continue;
+            warea[i].x = r[j][0]; warea[i].y = r[j][1];
+            warea[i].w = r[j][2] < o->w ? r[j][2] : o->w;
+            warea[i].h = r[j][3] < o->h ? r[j][3] : o->h;
+            break;
+        }
+    }
+}
+
+/* the display under the pointer (where a new window opens), -1 before the pointer moved */
+static int pointer_slot(void) {
+    if (ptr_last_x < 0) return -1;
+    OutPickSlot p[OUT_MAX];
+    pick_slots(p);
+    return outpick_main(p, OUT_MAX, ptr_last_x, ptr_last_y, ptr_last_x + 1, ptr_last_y + 1);
+}
+
+/* configure_bounds: the work area of the window's display (a new window's: the one under the pointer, where it opens),
+ * in the window's own coordinates (an X11 window's are X pixels; Xwayland gets no xdg_toplevel, so none here) */
+static void work_bounds(Surf *s, int *w, int *h) {
+    int slot = s->fslot >= 0 && oslots[s->fslot].used ? s->fslot : pointer_slot();
+    if (slot < 0 || !oslots[slot].used) slot = out_main;
+    *w = *h = 0;
+    if (slot < 0 || slot >= OUT_MAX || !oslots[slot].used) return;
+    *w = warea[slot].w > 0 ? warea[slot].w : oslots[slot].o.w;
+    *h = warea[slot].h > 0 ? warea[slot].h : oslots[slot].o.h;
+}
+
 void wl_set_outputs(const WlOutput *list, int n, int main) {
     if (!dpy) return;
     int keep[OUT_MAX] = { 0 };
@@ -1444,7 +1500,8 @@ static void res_release(struct wl_client *c, struct wl_resource *r) { (void)c; w
 static unsigned cursor_shape;
 static void csd_set_shape(struct wl_client *c, struct wl_resource *r, uint32_t serial, uint32_t shape) {
     (void)serial;
-    if (shape < 1 || shape > 36) {
+    /* 1 default … 34 zoom_out; version 2 adds 35 dnd_ask and 36 all_resize */
+    if (shape < 1 || shape > (wl_resource_get_version(r) >= 2 ? WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ALL_RESIZE : WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ZOOM_OUT)) {
         wl_resource_post_error(r, WP_CURSOR_SHAPE_DEVICE_V1_ERROR_INVALID_SHAPE, "invalid shape %u", shape);
         return;
     }
@@ -2542,7 +2599,6 @@ static void top_unmaximize(struct wl_client *c, struct wl_resource *r) {
     if (s && s->mapped) emit(s, "unmaximize", "{}");
 }
 /* Fullscreen: presented by the compositor on top of everything (and straight to the card if possible). */
-static int fs_refused;                  /* wl_fullscreen_allow */
 static void leave_fullscreen(Surf *s);
 
 /* A fullscreen surface is drawn over every layer, the sharing indicator included, so a share and a fullscreen surface can't
@@ -2551,6 +2607,12 @@ void wl_fullscreen_allow(int on) {
     if (fs_refused == !on) return;
     fs_refused = !on;
     if (fs_refused && dpy && fs_surf) leave_fullscreen(fs_surf);
+    for (int i = 0; dpy && i < MAX_SURF; i++) {     /* the apps hide or show their fullscreen button */
+        Surf *s = surfs[i];
+        if (!s || !s->top || s->role != R_TOPLEVEL) continue;
+        send_caps(s);
+        if (s->xdg && s->sent_configure) send_toplevel_configure(s);
+    }
 }
 
 static void enter_fullscreen(Surf *s) {
@@ -2662,13 +2724,17 @@ static void pop_gone(struct wl_resource *r) {
 /* ---- xdg_surface / xdg_wm_base ---- */
 
 static void xs_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
-/* What the window manager offers this toplevel (xdg-shell 5): maximize and minimize, none while it is locked. */
+/* What the window manager offers this toplevel (xdg-shell 5): the window menu (the theme's, at the app's own bar,
+ * top_menu), maximize unless it is locked, fullscreen unless a screen share refuses it (wl_fullscreen_allow), and
+ * minimize even locked. A new list takes effect with the next configure. */
 static void send_caps(Surf *s) {
     if (!s || !s->top || wl_resource_get_version(s->top) < 5) return;
     struct wl_array caps;
     wl_array_init(&caps);
     uint32_t *p;
+    if ((p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_WINDOW_MENU;
     if (!s->fixed && (p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE;
+    if (!fs_refused && (p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN;
     if ((p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE;   /* offered even locked */
     xdg_toplevel_send_wm_capabilities(s->top, &caps);
     wl_array_release(&caps);
@@ -4684,7 +4750,7 @@ int wl_key(int code, int value, const KeyInfo *k) {
 
 /* ---- zwp_linux_dmabuf_v1 (v4): apps' GPU buffers ---- */
 
-typedef struct { int fd[4]; uint32_t off[4], stride[4]; uint64_t mod; int set[4], used; } Params;
+typedef struct { int fd[4]; uint32_t off[4], stride[4]; uint64_t mod; int set[4], used, nset; } Params;
 
 static void dmabuf_buffer_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static const struct wl_buffer_interface dmabuf_buffer_impl = { .destroy = dmabuf_buffer_destroy };
@@ -4710,10 +4776,18 @@ static void params_add(struct wl_client *c, struct wl_resource *r, int32_t fd, u
     if (p->used) { close(fd); wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED, "already used"); return; }
     if (idx >= 4) { close(fd); wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_IDX, "invalid plane"); return; }
     if (p->set[idx]) { close(fd); wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_SET, "repeated plane"); return; }
+    uint64_t mod = (uint64_t)mod_hi << 32 | mod_lo;
+    /* version 5: every plane with the same modifier (a mix was taken as the last plane's before) */
+    if (p->nset && mod != p->mod && wl_resource_get_version(r) >= 5) {
+        close(fd);
+        wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT, "planes with different modifiers");
+        return;
+    }
+    p->nset++;
     p->fd[idx] = fd;
     p->off[idx] = off;
     p->stride[idx] = stride;
-    p->mod = (uint64_t)mod_hi << 32 | mod_lo;
+    p->mod = mod;
     p->set[idx] = 1;
 }
 
@@ -4960,7 +5034,7 @@ static void feedback_link_gone(struct wl_resource *r) { wl_list_remove(wl_resour
 static void pres_feedback(struct wl_client *c, struct wl_resource *r, struct wl_resource *surface, uint32_t id) {
     (void)r;
     Surf *s = wl_resource_get_user_data(surface);
-    struct wl_resource *fb = wl_resource_create(c, &wp_presentation_feedback_interface, 1, id);
+    struct wl_resource *fb = wl_resource_create(c, &wp_presentation_feedback_interface, wl_resource_get_version(r), id);
     if (!fb) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(fb, NULL, NULL, feedback_link_gone);
     wl_list_insert(s->p_feedback.prev, wl_resource_get_link(fb));
@@ -5310,6 +5384,15 @@ void wl_set_fixed(int id, int fixed) {
     if (s->xdg && s->sent_configure) send_toplevel_configure(s);
 }
 
+/* Snapped by the theme (a half, a quarter, a third): the edges against its work area, told as tiled (and constrained). */
+void wl_set_tiled(int id, int edges) {
+    Surf *s = find(id);
+    edges &= 15;
+    if (!s || !s->top || s->tiled == edges) return;
+    s->tiled = edges;
+    if (s->xdg && s->sent_configure) send_toplevel_configure(s);
+}
+
 void wl_set_state(int id, int maximized, int fullscreen) {
     Surf *s = find(id);
     (void)fullscreen;                           /* fullscreen is handled by the compositor */
@@ -5436,7 +5519,7 @@ int wl_start(void) {
     wl_list_init(&prim_devices);
     wl_list_init(&inhibitors);
     wl_global_create(dpy, &zwp_primary_selection_device_manager_v1_interface, 1, NULL, bind_pdm);   /* middle-click paste */
-    wl_global_create(dpy, &xdg_wm_base_interface, 6, NULL, bind_wm_base);
+    wl_global_create(dpy, &xdg_wm_base_interface, 7, NULL, bind_wm_base);   /* 7: constrained_* states */
     wl_global_create(dpy, &zxdg_decoration_manager_v1_interface, 1, NULL, bind_decm);
     wl_list_init(&exports);
     wl_list_init(&imports);
@@ -5447,12 +5530,12 @@ int wl_start(void) {
     wl_list_init(&feedbacks);
     if (gpu_active()) ngpu_fmt = gpu_formats(gpu_fmt_cache, 256);
     gpu_set_hooks(wl_gpu_lost, wl_gpu_changed);
-    wl_global_create(dpy, &zwp_linux_dmabuf_v1_interface, 4, NULL, bind_dmabuf);
-    wl_global_create(dpy, &wp_presentation_interface, 1, NULL, bind_presentation);
+    wl_global_create(dpy, &zwp_linux_dmabuf_v1_interface, 5, NULL, bind_dmabuf);   /* 5: one modifier for every plane */
+    wl_global_create(dpy, &wp_presentation_interface, 2, NULL, bind_presentation);
     wl_global_create(dpy, &wp_viewporter_interface, 1, NULL, bind_viewporter);
     wl_global_create(dpy, &zwp_relative_pointer_manager_v1_interface, 1, NULL, bind_relm);
     wl_global_create(dpy, &zwp_pointer_constraints_v1_interface, 1, NULL, bind_consm);
-    wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 1, NULL, bind_csm);   /* cursors by name */
+    wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 2, NULL, bind_csm);   /* cursors by name (2: dnd_ask, all_resize) */
     wl_global_create(dpy, &zwp_idle_inhibit_manager_v1_interface, 1, NULL, bind_iim);  /* video keeps the screen on */
     wl_global_create(dpy, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, 1, NULL, bind_ksim);   /* VMs take ❖ and ⌥Tab, once allowed */
     wl_global_create(dpy, &xdg_activation_v1_interface, 1, NULL, bind_activation);   /* a window comes forward with a token */

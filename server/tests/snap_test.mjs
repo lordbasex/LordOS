@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { SNAP_ZONES, snapRect, zoneAt, snapNext, SNAP_EDGE, dwellZone, SNAP_DWELL_MS, snapAllowed } = await import(path.join(here, '../../sdk/snap.js'));
+const { SNAP_ZONES, snapRect, zoneAt, snapNext, SNAP_EDGE, dwellZone, SNAP_DWELL_MS, snapAllowed, tiledEdges } = await import(path.join(here, '../../sdk/snap.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -92,6 +92,14 @@ eq('allowed: the theme snaps, setting on', snapAllowed(true, { windowSnap: true 
 eq('allowed: turned off by the person', snapAllowed(true, { windowSnap: false }), false);
 eq('allowed: a theme without snapping ignores the setting', snapAllowed(false, { windowSnap: true }), false);
 eq('allowed: no settings at all', snapAllowed(true, null), true);
+
+eq('tiled edges: left half', tiledEdges('left'), 1 | 4 | 8);
+eq('tiled edges: right half', tiledEdges('right'), 2 | 4 | 8);
+eq('tiled edges: top-right quarter', tiledEdges('top-right'), 2 | 4);
+eq('tiled edges: center third', tiledEdges('center-third'), 4 | 8);
+eq('tiled edges: maximized is lord-server\'s', tiledEdges('max'), 0);
+eq('tiled edges: not snapped', tiledEdges(null), 0);
+eq('tiled edges: an unknown zone', tiledEdges('nowhere'), 0);
 
 console.log(`snap-test: ${n - bad}/${n} ok`);
 process.exit(bad ? 1 : 0);

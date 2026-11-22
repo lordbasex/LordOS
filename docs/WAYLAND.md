@@ -35,18 +35,18 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
 | `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions, files copied in Files as `text/uri-list` and `x-special/gnome-copied-files` (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon, and with X11 apps through XDND (0.8.8.8; the Wayland side checked on VM 127, XDND still to check on the VM, see "Drag and drop") |
 | `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps"); `set_selection` needs a recent click or key serial of the app's own, and LordOS's text fields and Terminal share it (0.8.8.8) |
-| `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
+| `xdg_wm_base` | 7 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen); `wm_capabilities` window menu, maximize (not while locked), fullscreen (not during a screen share) and minimize; `configure_bounds` with the work area of the window's display; `tiled_*` and (7) `constrained_*` states for a maximized or snapped window (0.8.9.5) |
 | `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
 | `xdg_wm_dialog_v1` | 1 | a toplevel says it is a dialog and whether it is modal: a modal one holds its parent's input (0.8.8.8, see "Dialogs") |
 | `zxdg_decoration_manager_v1` | 1 | the app picks who draws the frame: server side (Qt, foot, Kitty, Alacritty: the theme's frame) or client side (Chromium with its own bar), also while it's open (0.8.4) |
-| `wp_cursor_shape_manager_v1` | 1 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`) |
+| `wp_cursor_shape_manager_v1` | 2 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`); 2 adds `dnd_ask` (the arrow) and `all_resize` (the move arrows) |
 | `org_kde_kwin_server_decoration_manager` | 1 | GTK 3's way to ask for the frame (Firefox, Mousepad; see "Who draws the frame") |
 | `zwp_idle_inhibit_manager_v1` | 1 | a video or presentation keeps the screen on while its surface is mapped (0.8.5, see the end of this page) |
 | `zwp_keyboard_shortcuts_inhibit_manager_v1` | 1 | a VM, remote desktop or game takes ❖, ⌥Tab and LordOS's other shortcuts while it has the keyboard, once the person allowed it; ❖Esc gives them back (0.8.8.8, checked on VM 127, `kbinhibit.c`, see "Keyboard shortcuts inhibit") |
 | `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
 | `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (0.8.8.8, checked on VM 127, `wl_textinput.c`, see "Input methods") |
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
-| `zwp_linux_dmabuf_v1` 4, `wp_presentation` 1, `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
+| `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
 `linux#<surface>`): the theme sees them like any other, with their title, focus, maximize,
@@ -1326,6 +1326,17 @@ frame. `tests/wlperf_headless.sh` checks each part against a headless lord-serve
   and a menu's box; a window last drawn inside a transform (the Overview, the minimize effect) or not placed yet still
   marks every display. `engine-test`'s damage suites (`test_damage_fuzz`, `test_damage_pipeline`) pass unchanged, and
   `build/outpick-test` checks the keys of a box (one display, two, mirrored, none).
+- **xdg-shell polish.** `xdg_wm_base` 7: `wm_capabilities` now also offers the window menu (the theme's, at the app's
+  own bar) and fullscreen (withdrawn while a screen share refuses it, and offered again after); `configure_bounds` gives
+  the work area of the window's display (a new window: the display under the pointer), which the theme sends with
+  `lord.wayland.workAreas` (`sdk/wayland.js`); a maximized window is told every edge tiled and constrained, a window
+  snapped to a half, quarter or third the edges on its work area's border (`tiledEdges`, `sdk/snap.js`; the eighth
+  argument of `lord.wayland.state`). `zwp_linux_dmabuf_v1` 5 refuses planes with different modifiers
+  (`invalid_format`), `wp_presentation` 2 (feedback objects of the client's version), `wp_cursor_shape_manager_v1` 2
+  (`dnd_ask`, `all_resize`; a version 1 client asking for them gets `invalid_shape`). Checked with `WAYLAND_DEBUG` on
+  foot 1.21, FeatherPad (Qt 6.8) and zenity (GTK 4.18) against a headless lord-server: each binds what it knows (GTK 4
+  binds dmabuf 5), gets the four capabilities and `configure_bounds(1280, 690)` on a 1280 × 800 desktop, no protocol
+  error; `wlperf-client protocols` checks the versions, the capabilities and the bounds.
 
 ## Pending
 

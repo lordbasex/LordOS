@@ -68,3 +68,12 @@ export function dwellZone(zone, dwell, now, ms = SNAP_DWELL_MS) {
 // Whether dragging a window to an edge snaps it: the theme turns it on (configureWindows({ snap: true })) and the
 // person may turn it off in Settings → Desktop & Dock → Windows (settings.windowSnap, default on; GitHub #182).
 export const snapAllowed = (themeOn, s) => !!themeOn && !(s && s.windowSnap === false);
+
+// The edges of a snapped zone that lie on its work area's border, as a Linux window is told them (xdg-shell's tiled
+// and constrained states; lord.wayland.state): 1 left, 2 right, 4 top, 8 bottom. 0 for no zone or 'max' (a maximized
+// window is told every edge by lord-server itself).
+export function tiledEdges(zone) {
+  if (!zone || zone === 'max' || !SNAP_ZONES.includes(zone)) return 0;
+  const a = { x: 0, y: 0, w: 1200, h: 900 }, r = snapRect(zone, a);
+  return (r.x === a.x ? 1 : 0) | (r.x + r.w === a.x + a.w ? 2 : 0) | (r.y === a.y ? 4 : 0) | (r.y + r.h === a.y + a.h ? 8 : 0);
+}

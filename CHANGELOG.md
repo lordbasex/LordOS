@@ -12,6 +12,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **xdg-shell 7 and newer protocol versions for Linux apps, in development** (Wayland audit item 4, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Windows are offered the window menu and
+  fullscreen (not during a screen share) besides maximize and minimize, told the work area of their display
+  (`configure_bounds`, from the theme through `lord.wayland.workAreas`) so they never open larger than it, and told which
+  edges are tiled and constrained when maximized or snapped to a half, quarter or third. `zwp_linux_dmabuf_v1` 5 (one
+  modifier for every plane), `wp_presentation` 2 and `wp_cursor_shape_manager_v1` 2 (`dnd_ask`, `all_resize`). Checked
+  with `WAYLAND_DEBUG` on foot, FeatherPad (Qt 6.8) and zenity (GTK 4.18): no protocol error.
+
 - **Machines from the terminal: the `machines` command, in development** (approved by the maintainer 2026-11-21;
   `docs/VIRTUALIZATION.md` 6.15 "From the terminal"). `machines list [--json]` shows each machine of `~/Machines` with its
   system, state, vCPUs, memory, disk used and graphics; `status NAME [--json]`, `start NAME [--no-window]`, `open NAME`,

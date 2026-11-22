@@ -7,9 +7,10 @@
 // draws only the content. The app may switch while open ('deco'). Moving, resizing and the window
 // menu from the app's own bar arrive as requests from the compositor.
 import { createElement as h } from 'react';
-import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor } from '@lordos/runtime';
+import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor, screen, onScreenChange } from '@lordos/runtime';
 import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf, isWindowLocked, windowLocks } from './windows.js';
 import { followParents, overParent } from './dialogmodel.js';
+import { tiledEdges } from './snap.js';
 import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, coveredIds, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
@@ -234,6 +235,15 @@ windows.subscribe(() => {
 // below lands on a compositor that agrees.
 let lastFocus = -1;
 const lastState = new Map();
+// Each display's work area (menu bar and Dock out): a new Linux window is told it as the most it can fill
+// (xdg_toplevel.configure_bounds). Sent when it changes.
+let sentAreas = '';
+function sendWorkAreas() {
+  if (typeof lord.wayland?.workAreas !== 'function') return;
+  const list = (screen.displays || []).map((d) => { const a = workAreaOf(d); return { x: Math.round(a.x), y: Math.round(a.y), w: Math.round(a.w), h: Math.round(a.h) }; });
+  const key = JSON.stringify(list);
+  if (key !== sentAreas) { sentAreas = key; lord.wayland.workAreas(list); }
+}
 function sync() {
   if (typeof lord.wayland === 'undefined') return;
   const list = windows.get(), active = activeDesktop.get();
@@ -247,9 +257,12 @@ function sync() {
     const cov = covered.has(w.id);
     // locked (the theme's padlock, isWindowLocked): the app is told it can't maximize (minimize stays), and its own buttons go
     const fixed = isWindowLocked(w.id);
-    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0) | (fixed ? 16 : 0);
-    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov, fixed); }
+    // snapped to a half, quarter or third: the edges against the work area (the app may square its corners there)
+    const edges = st.maximized ? 0 : tiledEdges(w.snapped);
+    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0) | (fixed ? 16 : 0) | (edges << 5);
+    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov, fixed, edges); }
   }
+  sendWorkAreas();
   // search, the launcher, a sheet or a system prompt is open: the keys are LordOS's, not the app's
   const f = keyboardSurface(list, active, shellHasKeyboard(), surfaceOf);
   if (f !== lastFocus) { lastFocus = f; lord.wayland.focus(f, !!f && isTerminalEmulator(focusedOn(list, active))); }
@@ -259,6 +272,9 @@ function sync() {
 }
 windows.subscribe(sync);
 windowLocks.subscribe(sync);
+// (after the theme set its work area, configureWindows; again when the displays change)
+setTimeout(sendWorkAreas, 0);
+onScreenChange(() => setTimeout(sendWorkAreas, 0));
 activeDesktop.subscribe(sync);
 overviewShowing.subscribe(sync);
 if (typeof onShellKeyboard === 'function') onShellKeyboard(() => sync());
