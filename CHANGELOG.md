@@ -12,6 +12,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Machines: a Keys panel in the machine window, in development** (the maintainer's request, like the side keys of other
+  remote consoles but richer; `apps/machines/keys.jsx`, `docs/VIRTUALIZATION.md` 5.8). A keyboard button on the toolbar and
+  on the full-screen floating bar opens it:
+  - **Hold down** Ctrl, Alt, Shift and Win (Super in a Linux guest): a click keeps the key down in the guest until the
+    next key typed there or the next combination sent, then everything held goes up in reverse; a second click lets it go.
+    Another modifier keeps them (held Ctrl + Shift + T). Nothing is left stuck: blur, leaving the window, the machine
+    stopping or the window closing releases all of it. The toolbar button stays lit and its tooltip names what is held.
+  - **Combinations**, one click each, pressed in order and released in reverse. With a Win key: Ctrl+Alt+Del, Win, Win+P,
+    Win+D, Win+E, Win+R, Win+L, Win+Tab, Alt+Tab, Alt+F4, Ctrl+Shift+Esc, Win+Shift+← and → (the window to the other
+    display), Win+↑ and ↓, PrintScreen and Win+Shift+S. Linux: Ctrl+Alt+Del, Super, Alt+Tab, Alt+F4, Ctrl+Alt+T,
+    PrintScreen and the text consoles Ctrl+Alt+F1…F7. They go straight to the guest (`lord.vm.key`), never through
+    LordOS's own shortcuts, so ❖P reaches the guest even without the keyboard-shortcuts permission.
+  - **Single keys**: Esc, Tab, Insert, Delete, Home, End, PgUp, PgDn and F1–F12.
+  - **Show on-screen keyboard**: LordOS's own keyboard types into the machine as it is (its taps take the path of a
+    physical key to the window in front), held keys included.
+  - The menu bar's **Actions → Send Keys** has the same combinations and single keys; Power keeps Ctrl+Alt+Delete.
+  - Key names and descriptions in all 35 languages (Strg/Entf in German, Supr in Spanish, Suppr in French…). The tables
+    of evdev codes and the hold logic are pure functions in `apps/machines/model.js`, with 24 new checks in
+    `server/tests/vm_model_test.mjs` (codes checked against `linux/input-event-codes.h`).
+
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).
