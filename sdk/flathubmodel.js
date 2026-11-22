@@ -171,3 +171,20 @@ export const prefsOf = (s) => ({ on: !!(s && s.on), showAll: !!(s && s.showAll),
 // recordings can only go to the person's folders; OBS's Flatpak asks for Videos, where they go.
 const NOTES = { 'com.obsproject.Studio': 'obsVideos' };
 export const appNote = (id) => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(NOTES, id) ? NOTES[id] : null);
+
+// An app's license from Flathub's catalog (AppStream project_license: an SPDX expression, or
+// "LicenseRef-proprietary=<address>"), as the Store's Facts row shows it: { kind, text, url }.
+// kind: 'proprietary' (text empty: the row says so in the person's language), 'spdx' (text: the expression as given)
+// or null for nothing. url: where the license can be read in the browser, only an https address with no spaces or
+// control characters (at most 512 bytes): the address a proprietary license names, or SPDX's page for a single
+// license id (spdx.org/licenses/<id>.html); null otherwise (an expression with AND/OR has no one page).
+const SPDX_ID = /^[A-Za-z0-9][A-Za-z0-9.+-]{0,63}$/;
+const okUrl = (u) => typeof u === 'string' && u.length <= 512 && /^https:\/\/[^\s/?#]+[^\s]*$/.test(u) && !/[\u0000-\u001f\u007f]/.test(u);
+export function licenseView(s) {
+  const raw = typeof s === 'string' ? s.trim() : '';
+  if (!raw) return { kind: null, text: '', url: null };
+  const m = /^LicenseRef-proprietary(?:=(.*))?$/i.exec(raw);
+  if (m) return { kind: 'proprietary', text: '', url: okUrl((m[1] || '').trim()) ? m[1].trim() : null };
+  const id = raw.replace(/\+$/, '');
+  return { kind: 'spdx', text: raw, url: SPDX_ID.test(raw) && !/^LicenseRef-/i.test(raw) ? `https://spdx.org/licenses/${id}.html` : null };
+}

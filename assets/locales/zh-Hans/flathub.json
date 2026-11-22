@@ -22,6 +22,8 @@
   "job.uninstall": "正在移除 {name}",
   "job.update": "正在更新 {name}",
   "job.updateAll": "正在更新 Flathub 应用",
+  "license.open": "在浏览器中打开许可证",
+  "license.proprietary": "专有",
   "msg.failed": "Flatpak 未能完成：{reason}",
   "msg.fwBlocked": "防火墙阻止了 Flathub，因此无法下载任何内容。要安装或更新 Flathub 应用，请在监视器 → 网络中允许“Flathub”。",
   "msg.fwDenied": "防火墙阻止了 Flathub 需要的一个连接（{host}）。请在监视器 → 网络中检查 Flathub 的规则。",

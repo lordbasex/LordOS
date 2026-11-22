@@ -22,6 +22,8 @@
   "job.uninstall": "{name} ہٹائی جا رہی ہے",
   "job.update": "{name} اپ ڈیٹ ہو رہی ہے",
   "job.updateAll": "Flathub ایپس اپ ڈیٹ ہو رہی ہیں",
+  "license.open": "براؤزر میں لائسنس کھولیں",
+  "license.proprietary": "ملکیتی",
   "msg.failed": "Flatpak مکمل نہیں کر سکا: {reason}",
   "msg.fwBlocked": "فائر وال Flathub کو بلاک کرتا ہے، اس لیے کچھ بھی ڈاؤن لوڈ نہیں ہو سکا۔ Flathub ایپس انسٹال یا اپ ڈیٹ کرنے کے لیے مانیٹر → نیٹ ورک میں “Flathub” کی اجازت دیں۔",
   "msg.fwDenied": "فائر وال نے ایک کنکشن بلاک کیا جس کی Flathub کو ضرورت تھی ({host})۔ مانیٹر → نیٹ ورک میں Flathub کے اصول چیک کریں۔",

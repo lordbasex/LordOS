@@ -22,6 +22,8 @@
   "job.uninstall": "Видалення {name}",
   "job.update": "Оновлення {name}",
   "job.updateAll": "Оновлення програм Flathub",
+  "license.open": "Відкрити ліцензію в браузері",
+  "license.proprietary": "Пропрієтарна",
   "msg.failed": "Flatpak не зміг завершити: {reason}",
   "msg.fwBlocked": "Брандмауер блокує Flathub, тому нічого не вдалося завантажити. Щоб установлювати й оновлювати програми Flathub, дозвольте «Flathub» у розділі Монітор → Мережа.",
   "msg.fwDenied": "Брандмауер заблокував з’єднання, потрібне Flathub ({host}). Перевірте правила Flathub у розділі Монітор → Мережа.",

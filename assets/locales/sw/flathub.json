@@ -22,6 +22,8 @@
   "job.uninstall": "Inaondoa {name}",
   "job.update": "Inasasisha {name}",
   "job.updateAll": "Inasasisha programu za Flathub",
+  "license.open": "Fungua leseni kwenye kivinjari",
+  "license.proprietary": "Ya umiliki",
   "msg.failed": "Flatpak haikuweza kumaliza: {reason}",
   "msg.fwBlocked": "Ngome inazuia Flathub, kwa hivyo hakuna kilichoweza kupakuliwa. Ili kusakinisha au kusasisha programu za Flathub, ruhusu “Flathub” katika Kifuatiliaji → Mtandao.",
   "msg.fwDenied": "Ngome ilizuia muunganisho ambao Flathub ilihitaji ({host}). Angalia sheria za Flathub katika Kifuatiliaji → Mtandao.",

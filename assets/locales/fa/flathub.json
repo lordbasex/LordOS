@@ -22,6 +22,8 @@
   "job.uninstall": "در حال حذف {name}",
   "job.update": "در حال به‌روزرسانی {name}",
   "job.updateAll": "در حال به‌روزرسانی برنامه‌های Flathub",
+  "license.open": "باز کردن مجوز در مرورگر",
+  "license.proprietary": "انحصاری",
   "msg.failed": "Flatpak نتوانست کار را تمام کند: {reason}",
   "msg.fwBlocked": "دیوار آتش Flathub را مسدود می‌کند، برای همین چیزی دانلود نشد. برای نصب یا به‌روزرسانی برنامه‌های Flathub، «Flathub» را در پایشگر → شبکه مجاز کنید.",
   "msg.fwDenied": "دیوار آتش اتصالی را که Flathub لازم داشت مسدود کرد ({host}). قوانین Flathub را در پایشگر → شبکه بررسی کنید.",

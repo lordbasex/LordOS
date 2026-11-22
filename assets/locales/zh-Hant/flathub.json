@@ -22,6 +22,8 @@
   "job.uninstall": "正在移除 {name}",
   "job.update": "正在更新 {name}",
   "job.updateAll": "正在更新 Flathub App",
+  "license.open": "在瀏覽器中開啟授權條款",
+  "license.proprietary": "專有",
   "msg.failed": "Flatpak 無法完成：{reason}",
   "msg.fwBlocked": "防火牆封鎖了 Flathub，因此無法下載任何內容。若要安裝或更新 Flathub App，請在監視器 → 網路中允許「Flathub」。",
   "msg.fwDenied": "防火牆封鎖了 Flathub 需要的一個連線（{host}）。請在監視器 → 網路中檢查 Flathub 的規則。",

@@ -664,6 +664,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   dark, light and Arabic; not yet on a real session with real monitors, a Linux app's own bar or the GPU path.
 
 ### Fixed
+- **Store: a Flathub app's license reads as a license, with a link** (`sdk/flathubmodel.js` `licenseView`,
+  `apps/store/ui.js` `Facts`, `apps/store/flathubpages.js`; reported by the maintainer): the License fact showed
+  Flathub's raw value, so a proprietary app read "LicenseRef-proprietary=https://gitlab.com/…", cut off. It now says
+  "Proprietary" and, when the app names where its license is, is a link that opens it in the default browser; a single
+  SPDX license (GPL-3.0-or-later, MIT…) links to its page on spdx.org, and an expression (MIT AND Apache-2.0) shows as
+  given. Only an https address with no spaces or control characters, at most 512 bytes, becomes a link; the Store
+  never downloads the license itself. Tests: `flathub_model_test.mjs`. New text in all 35 languages.
 
 - **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app

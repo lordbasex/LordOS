@@ -22,6 +22,8 @@
   "job.uninstall": "Poistetaan: {name}",
   "job.update": "Päivitetään: {name}",
   "job.updateAll": "Päivitetään Flathub-sovelluksia",
+  "license.open": "Avaa lisenssi selaimessa",
+  "license.proprietary": "Suljettu",
   "msg.failed": "Flatpak ei voinut viedä loppuun: {reason}",
   "msg.fwBlocked": "Palomuuri estää Flathubin, joten mitään ei voitu ladata. Jos haluat asentaa tai päivittää Flathub-sovelluksia, salli ”Flathub” kohdassa Monitori → Verkko.",
   "msg.fwDenied": "Palomuuri esti yhteyden, jota Flathub tarvitsi ({host}). Tarkista Flathubin säännöt kohdassa Monitori → Verkko.",

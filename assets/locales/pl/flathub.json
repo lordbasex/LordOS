@@ -22,6 +22,8 @@
   "job.uninstall": "Usuwanie: {name}",
   "job.update": "Aktualizowanie: {name}",
   "job.updateAll": "Aktualizowanie aplikacji z Flathub",
+  "license.open": "Otwórz licencję w przeglądarce",
+  "license.proprietary": "Własnościowa",
   "msg.failed": "Flatpak nie mógł dokończyć: {reason}",
   "msg.fwBlocked": "Zapora blokuje Flathub, więc nie udało się nic pobrać. Aby instalować lub aktualizować aplikacje z Flathub, zezwól na „Flathub” w Monitor → Sieć.",
   "msg.fwDenied": "Zapora zablokowała połączenie potrzebne Flathub ({host}). Sprawdź reguły Flathub w Monitor → Sieć.",

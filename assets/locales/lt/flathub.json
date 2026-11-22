@@ -22,6 +22,8 @@
   "job.uninstall": "Šalinama: {name}",
   "job.update": "Atnaujinama: {name}",
   "job.updateAll": "Atnaujinamos Flathub programos",
+  "license.open": "Atverti licenciją naršyklėje",
+  "license.proprietary": "Nuosavybinė",
   "msg.failed": "Flatpak nepavyko užbaigti: {reason}",
   "msg.fwBlocked": "Užkarda blokuoja Flathub, todėl nieko nepavyko atsisiųsti. Norėdami įdiegti ar atnaujinti Flathub programas, leiskite „Flathub“ skiltyje Stebėjimas → Tinklas.",
   "msg.fwDenied": "Užkarda užblokavo ryšį, kurio reikėjo Flathub ({host}). Patikrinkite Flathub taisykles skiltyje Stebėjimas → Tinklas.",

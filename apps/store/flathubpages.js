@@ -273,6 +273,7 @@ export function FlathubDetail({ id }) {
   if (!a) return h(Line, { th }, s.loaded ? t('flathub.gone') : t('flathub.busy.catalog'));
   const busy = !!s.job;
   const mine = s.job && s.job.id === a.id;
+  const lic = M.licenseView(a.license);
   const buttons = inst
     ? [h(Button, { key: 'rm', label: t('flathub.remove'), disabled: busy, onClick: () => !busy && F.uninstall({ ...inst, name: a.name }) }),
       h(Button, { key: 'up', label: t('flathub.update'), disabled: busy, onClick: () => !busy && F.update({ ...inst, name: a.name }) }),
@@ -293,7 +294,8 @@ export function FlathubDetail({ id }) {
     mine || (!s.job && s.msg && s.msg.id === a.id) ? h(JobProgress, { forId: a.id }) : null,
     h(Facts, { items: [
       [t('flathub.fact.developer'), a.developer],
-      [t('flathub.fact.license'), a.license],
+      [t('flathub.fact.license'), lic.kind === 'proprietary' ? t('flathub.license.proprietary') : lic.text,
+        lic.url ? { url: lic.url, title: `${t('flathub.license.open')}: ${lic.url}` } : null],
       [t('flathub.fact.version'), inst && inst.version],
       [t('flathub.fact.branch'), a.branch],
     ] }),

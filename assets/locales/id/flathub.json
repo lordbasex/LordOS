@@ -22,6 +22,8 @@
   "job.uninstall": "Menghapus {name}",
   "job.update": "Memperbarui {name}",
   "job.updateAll": "Memperbarui aplikasi Flathub",
+  "license.open": "Buka lisensi di peramban",
+  "license.proprietary": "Proprietary",
   "msg.failed": "Flatpak tidak dapat menyelesaikan: {reason}",
   "msg.fwBlocked": "Firewall memblokir Flathub, jadi tidak ada yang dapat diunduh. Untuk memasang atau memperbarui aplikasi Flathub, izinkan “Flathub” di Monitor → Jaringan.",
   "msg.fwDenied": "Firewall memblokir koneksi yang dibutuhkan Flathub ({host}). Periksa aturan Flathub di Monitor → Jaringan.",
