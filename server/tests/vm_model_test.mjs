@@ -521,6 +521,33 @@ eq('guest apps menu', M.guestAppItems([{ name: 'Zeta', token: 'z' }, { name: 'al
   eq('apps status diff: added and gone', M.appsStatusDiff(['/m/deb', '/m/old'], gs), { add: ['/m/win'], remove: ['/m/old'] });
   eq('apps status diff: nothing to do', M.appsStatusDiff(['/m/win', '/m/deb'], gs), { add: [], remove: [] });
   eq('apps status diff: apps mode ended everywhere', M.appsStatusDiff(['/m/deb'], {}), { add: [], remove: ['/m/deb'] });
+  // launch feedback: one launch while it waits for a window of that app (5 s at most)
+  eq('window of app: program name holds a word', [M.windowOfApp('Notepad', { app: 'notepad.exe' }), M.windowOfApp('Microsoft Edge', { app: 'msedge.exe' }),
+    M.windowOfApp('Word', { app: 'WINWORD.EXE' }), M.windowOfApp('Calculadora', { app: 'ApplicationFrameHost.exe', title: 'Calculadora' })], [true, true, true, true]);
+  eq('window of app: not another app', [M.windowOfApp('Notepad', { app: 'mspaint.exe', title: 'Untitled - Paint' }), M.windowOfApp('', { app: 'x.exe' }), M.windowOfApp('Go', { app: 'go.exe' })], [false, false, false]);
+  const lst0 = [{ id: 1, app: 'explorer.exe', title: 'Files' }];
+  const np = { name: 'Notepad', token: 'n' };
+  const L1 = M.launchStart({}, np, lst0, 1000);
+  eq('launch start: what was listed', L1.n, { at: 1000, name: 'Notepad', seen: [1] });
+  eq('launch pending: waits', M.launchPending(L1.n, lst0, 1000 + 4999), true);
+  eq('launch pending: 5 s passed', M.launchPending(L1.n, lst0, 1000 + M.LAUNCH_WAIT_MS), false);
+  const lst1 = [...lst0, { id: 7, app: 'notepad.exe', title: 'Untitled - Notepad' }];
+  eq('launch answered by a new window of the app', [M.launchAnswered(L1.n, lst1), M.launchPending(L1.n, lst1, 1500)], [7, false]);
+  eq('launch: a window that was already there does not answer', M.launchAnswered(M.launchStart({}, np, lst1, 0).n, lst1), 0);
+  eq('launch: an owned window does not answer', M.launchAnswered(L1.n, [...lst0, { id: 8, app: 'notepad.exe', owner: 7 }]), 0);
+  eq('launch: none', [M.launchPending(undefined, lst0, 0), M.launchAnswered(null, lst1)], [false, 0]);
+  eq('launch prune keeps the waiting ones', Object.keys(M.launchPrune({ ...L1, p: { at: 0, name: 'Paint', seen: [] } }, lst0, 5500)), ['n']);
+  // close feedback: Closing…, then a note when it stays or the guest refused
+  const C1 = M.closeStart({}, 7, 1000);
+  eq('close start', C1, { 7: { gid: 7, at: 1000 } });
+  eq('close: closing', M.closeView(C1[7], lst1, null, 2000), { state: 'closing' });
+  eq('close: still there after 3 s', M.closeView(C1[7], lst1, null, 1000 + M.CLOSE_WAIT_MS), { state: 'refused', reason: '' });
+  eq('close: gone', M.closeView(C1[7], lst0, null, 9000), null);
+  eq('close: refused as administrator', M.closeView(C1[7], lst1, { reason: 'elevated', at: 1200 }, 1300), { state: 'refused', reason: 'elevated' });
+  eq('close: another reason is generic', M.closeView(C1[7], lst1, { reason: 'busy', at: 1200 }, 1300), { state: 'refused', reason: '' });
+  eq('close: a refusal from before the click does not count', M.closeView(C1[7], lst1, { reason: 'elevated', at: 900 }, 1300), { state: 'closing' });
+  eq('close: none', M.closeView(null, lst1, null, 0), null);
+  eq('close prune drops closed windows', M.closePrune({ ...C1, 9: { gid: 9, at: 0 } }, lst1), C1);
   eq('machine os: kept, then guessed', [M.machineOsId({ os: 'fedora' }, 'Debian'), M.machineOsId({ osName: 'Ubuntu 24.04' }, 'Work'), M.machineOsId({}, 'Debian 13'), M.machineOsId(null, 'zzz')], ['fedora', 'ubuntu', 'debian', 'other']);
 }
 // the boot order (Configure → Boot)
