@@ -28,6 +28,9 @@ void xwm_surface_gone(XWin *w);                /* its wl_surface was destroyed *
 int  xwm_is_dialog(const XWin *w);             /* transient, or of type dialog */
 int  xwm_is_fixed(const XWin *w);              /* its minimum and maximum size are the same */
 int  xwm_skip_taskbar(const XWin *w);          /* _NET_WM_STATE_SKIP_TASKBAR: no Dock entry of its own */
+int  xwm_skip_pager(const XWin *w);            /* _NET_WM_STATE_SKIP_PAGER: not in the Overview */
+int  xwm_layer(const XWin *w);                 /* 1 always on top (_NET_WM_STATE_ABOVE), -1 kept below (_BELOW), 0 */
+void xwm_set_layer(XWin *w, int layer);       /* the person set it in LordOS (the window menu's Always on Top) */
 void xwm_surface_serial(int sid, uint64_t serial);   /* xwayland-shell-v1: surface sid committed this serial (xwshell.c) */
 void xwm_place(XWin *w, int x, int y);         /* where its content is on screen (logical, from wl_paint) */
 void xwm_resize(XWin *w, int width, int height);   /* the theme's frame gave it this size */
@@ -76,6 +79,8 @@ void wlx_popup_moved(int sid, int x, int y);
 void wlx_set_parent(int sid, int parent_sid, int modal);   /* WM_TRANSIENT_FOR (0: none), _NET_WM_STATE_MODAL */
 void wlx_attention(int sid, int granted);      /* 0: wants attention (urgency); 1: a request LordOS grants (activate) */
 void wlx_skip_taskbar(int sid, int skip);
+void wlx_skip_pager(int sid, int skip);
+void wlx_layer(int sid, int layer);            /* the app asked for _NET_WM_STATE_ABOVE / _BELOW (or dropped it) */
 void wlx_set_icon(int sid, const uint8_t *argb_le, int w, int h);  /* _NET_WM_ICON image (straight ARGB), NULL: none */
 int  wlx_work_area(int *x, int *y, int *w, int *h);         /* the first display's work area (logical); 0: none */
 enum { XREQ_MOVE = 1, XREQ_RESIZE, XREQ_MAXIMIZE, XREQ_UNMAXIMIZE, XREQ_MINIMIZE, XREQ_FULLSCREEN, XREQ_UNFULLSCREEN };

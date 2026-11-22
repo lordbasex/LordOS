@@ -442,7 +442,7 @@ The same menus in both themes, built by the SDK (`sdk/windowmenu.js`, `sdk/appco
 shows them in its menu bar (Window, the app's name, the crown menu), Lord Classic in each window's own
 Window and Help menus (its in-window menu strip, since it has no menu bar).
 
-- **Window menu** (`windowMenuItems`): Minimize, Zoom, Fill, Center; **Move & Resize** with the halves
+- **Window menu** (`windowMenuItems`): Minimize, Zoom, Fill, Center, Always on Top (see below); **Move & Resize** with the halves
   (left, right, top, bottom), the quarters and thirds (the zones of `wm.snap`, see "Snapping"), the
   arrangements of two windows (left and right, right and left, top and bottom, bottom and top) or four
   (quarters) with the windows behind it (`wm.arrange`), and Return to Previous Size (`wm.snap(id,
@@ -458,6 +458,48 @@ Window and Help menus (its in-window menu strip, since it has no menu bar).
   lord-server through `lord.wayland.kill(surface)` (`js_sys.c`), only that client of the same user and
   never lord-server itself; an X11 window is only asked to close (every X11 app shares Xwayland); a
   built-in app that runs in the session closes without its close guard.
+
+## Always on top (in development; the latest release is 0.8.9.4)
+
+A window can be kept over every normal window, in every theme (Lord Flow, Lord Classic, Lord Workspaces, Lord Celeste),
+because the rule is in the SDK (`sdk/desktopmodel.js`, `stackOrder`):
+
+- **Stacking and focus are apart.** The window list (`windows` in `sdk/windows.js`) is the order the windows were
+  brought forward: the last one has the keyboard (`focusedOn`, `wm.hasKeyboard`). What is drawn over what is that order
+  split into layers, `w.layer`: `'below'` (kept below), normal, `'above'` (always on top); inside a layer, the most
+  recent is on top. `useWindows().mounted`, the list every theme draws, is already in that order, so the theme's tree,
+  lord-server's painting and its hit testing follow it with no change in the themes.
+- So the keyboard can be on a normal window under an always-on-top one, a click on a normal window brings it forward
+  within the normal layer only, and a click on the always-on-top window gives it the keyboard.
+- A dialog (`args.parent`) is in the highest layer of its own and its owners' (at most 8 up): the dialog of an
+  always-on-top window stays over it.
+- **Over the windows**, in order (`docs/LAYERS.md`): picture-in-picture windows and a Linux app's own notification
+  popups (`floating`, never the front window), then a fullscreen window (also `floating`, drawn after
+  picture-in-picture), the shell's layers (Dock, menu bar, menus, sheets, prompts) and Screenshots' area selection
+  (`capture`); Screenshots' toolbar is a bare picture-in-picture window. A fullscreen Linux app is presented above all
+  of it, and the menus of Linux apps (`xdg_popup`, X override-redirect windows) are painted above everything. An
+  always-on-top window is over every normal window, never over a fullscreen one or the shell. Their behaviour didn't
+  change.
+- **The person** turns it on and off with **Always on Top** (`shell.window.alwaysOnTop`, `alwaysOnTopItem`,
+  `wm.toggleAbove`): in the Window menu (`windowMenuItems`: Lord Flow's menu bar, Lord Classic's and Celeste's
+  in-window menus, Lord Workspaces' window strip) and in every theme's title-bar menu (the right click on the bar, or on
+  an app's own bar, `w.windowMenu`), checked while it is on. Turning it on also brings the window forward.
+- **Apps**: `wm.setLayer(id, 'above' | 'below' | null)`, `wm.layer(id)`, `wm.isAbove(id)`.
+- **X11 apps** (`server/src/wl/xwm.c`): `_NET_WM_STATE_ABOVE` and `_NET_WM_STATE_BELOW` (one excludes the other), asked
+  for before the map or later with add, remove or toggle, reach the theme as the window's layer (the `layer` field of
+  the map, a `layer` event later) and never move the keyboard. The other way, the menu's choice is written in the
+  window's `_NET_WM_STATE` (`lord.wayland.state`'s 9th argument, `wl_set_layer`). X's own stacking and
+  `_NET_CLIENT_LIST_STACKING` follow the layers (`restack_layers`: minimized at the bottom, then below, normal and
+  always on top). `_NET_WM_STATE_SKIP_PAGER` leaves the window out of the Overview and its desktop miniatures
+  (`inPager`). All three are in `_NET_SUPPORTED`.
+- **Wayland apps** have no standard protocol to ask for it; the person's choice is kept for a theme switch
+  (lord-server remembers the layer and the map carries it).
+- Not saved between sessions.
+
+Checked by `tests/desktop_model_test.mjs` (stacking against focus, dialogs, covered windows, the pager),
+`tests/always_on_top_scene.mjs` over each of the four themes (the real tree's drawing order, the title-bar menu's item,
+checked, turned off, a dialog, the Overview), `x11-conformance-client` (the property at map, staying on top while
+another window has the keyboard, toggles, `_NET_WM_STATE_BELOW`) and `docs/wayland-proofs/x11-always-on-top.png`.
 
 ## Pending
 

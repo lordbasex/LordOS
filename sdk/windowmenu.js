@@ -1,6 +1,6 @@
 // windowmenu.js — the Window menu for the window in front, the same in every theme (0.8.5):
 //
-//   Minimize · Zoom · Fill · Center
+//   Minimize · Zoom · Fill · Center · Always on Top
 //   Move & Resize ›  halves, quarters, thirds, arrangements of two or four windows, previous size
 //   Move to <display>  (one item per other display)
 //   Move to Desktop ›  the other desktops and a new one
@@ -24,7 +24,7 @@ export function registerWindowMenuItems(appId, fn) { itemProviders.set(appId, fn
 
 const own = (w) => !(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'));   // not the theme's panels
 
-// the visible app windows of this desktop, the front one last (windows.get() is in stacking order)
+// the visible app windows of this desktop, the front one last (windows.get() is in the order they came forward)
 const stack = () => windows.get().filter((w) => own(w) && !w.minimized && onActiveDesktop(w));
 
 function displayName(d, i) {
@@ -53,6 +53,14 @@ export function moveResizeItems(id) {
   ];
 }
 
+// Always on Top, checked while it is (wm.toggleAbove; desktopmodel.js stackOrder): the same item in the Window menu and
+// in every theme's title-bar menu, so each theme offers it in both places.
+export function alwaysOnTopItem(id) {
+  const w = id ? wm.get(id) : null;
+  return { label: t('shell.window.alwaysOnTop'), checked: !!w && w.layer === 'above', disabled: !w || !!w.pip || !!w.fullscreen,
+    onClick: () => wm.toggleAbove(id) };
+}
+
 export function windowMenuItems(id, { close = true } = {}) {
   const w = id ? wm.get(id) : null;
   let mine = [];
@@ -63,6 +71,7 @@ export function windowMenuItems(id, { close = true } = {}) {
     { label: t('shell.window.zoom'), disabled: !w, onClick: () => wm.toggleMaximize(id) },
     { label: t('shell.window.fill'), disabled: !w, onClick: () => wm.snap(id, 'max') },
     { label: t('shell.window.center'), disabled: !w, onClick: () => wm.center(id) },
+    alwaysOnTopItem(id),
     '-',
     { label: t('shell.window.moveResize'), disabled: !w, submenu: w ? moveResizeItems(id) : [] },
   ];

@@ -12,6 +12,55 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Always on top, in every theme, in development (the latest release is 0.8.9.4).** A window can be kept over every
+  normal window, and X11 apps' `_NET_WM_STATE_ABOVE`, `_NET_WM_STATE_BELOW` and `_NET_WM_STATE_SKIP_PAGER` are now
+  honoured and listed in `_NET_SUPPORTED`: the last X11 conformance point below 100 % (`ewmh.wm_state` 96.2 % → 100 %,
+  X11 mean 99.9 % → 100 %). See `docs/WINDOWS.md`, "Always on top".
+  - **Stacking and focus apart, in the SDK** (`sdk/desktopmodel.js`, so Lord Flow, Lord Classic, Lord Workspaces and
+    Lord Celeste all get it with no theme logic): the window list stays the order windows were brought forward (the
+    last one has the keyboard, `focusedOn`, `wm.hasKeyboard`, unchanged); what is drawn over what is that order split
+    into layers (`w.layer`: `'below'`, normal, `'above'`; `stackOrder`, `layerOf`). `useWindows().mounted`, the list
+    every theme draws, is in that order, so lord-server's painting and hit testing follow it. The keyboard can be on a
+    normal window under an always-on-top one; a click on a normal window raises it within the normal layer only; a
+    dialog (`args.parent`) is in the highest layer of its own and its owners' (at most 8 up, a loop of parents ends);
+    the covered-window pacing (`coveredIds`) judges in drawing order. A desktop with no layer keeps the same list
+    (no reorder, no redraw).
+  - **The order above the windows is unchanged and now written down** (`docs/WINDOWS.md`, `docs/LAYERS.md`):
+    picture-in-picture and a Linux app's own notification popups, then a fullscreen window (`floating`), the shell's
+    layers, Screenshots' area selection (`capture`) and its bare picture-in-picture toolbar; a fullscreen Linux app and
+    Linux apps' menus above all of it. An always-on-top window is never over a fullscreen one or the shell.
+  - **The person's toggle:** **Always on Top**, checked while it is on (`alwaysOnTopItem`, `wm.toggleAbove`; turning
+    it on also brings the window forward), in the Window menu (`windowMenuItems`: Lord Flow's menu bar, Lord Classic's
+    and Celeste's in-window menus, Lord Workspaces' window strip) and in each theme's title-bar menu (Lord Classic's and
+    Lord Workspaces' right click on the bar, Celeste's title menu, and every theme's menu for an app that draws its own
+    bar, `w.windowMenu`). `shell.window.alwaysOnTop` in all 35 languages. New SDK calls: `wm.setLayer(id, 'above' |
+    'below' | null)`, `wm.layer(id)`, `wm.isAbove(id)`, `wm.toggleAbove(id)`.
+  - **X11** (`server/src/wl/xwm.c`, `wl.c`): `_NET_WM_STATE_ABOVE` and `_NET_WM_STATE_BELOW` (one excludes the other)
+    asked for before the map or later with add, remove or toggle reach the theme as the window's layer (`layer` in the
+    map, a `layer` event later) and never move the keyboard; the menu's choice goes back into the window's
+    `_NET_WM_STATE` (`lord.wayland.state`'s new 9th argument, `wl_set_layer`, `xwm_set_layer`). X's own stacking and
+    `_NET_CLIENT_LIST_STACKING` follow the layers (`restack_layers`: minimized at the bottom, then kept below, normal,
+    always on top; a transient takes its owner's layer). `_NET_WM_STATE_SKIP_PAGER` (`pager` event, `args.skipPager`)
+    leaves the window out of the Overview and its desktop miniatures (`inPager`). The `_NET_WM_STATE` an app sets before
+    its window maps is now read until the window manager first writes the property, not only until the MapRequest:
+    an app creates, sets and maps in one go, so the request was often handled first and an initial state (above,
+    modal, skip taskbar) was lost.
+  - **Wayland:** no standard protocol asks for it, so nothing was added; the person's choice for a Wayland window is
+    kept by lord-server for a live theme switch (the map carries it).
+  - **Tests:** `tests/desktop_model_test.mjs` (stacking against focus, raising within a layer, two always-on-top
+    windows, kept below, dialogs, loops, covered windows, fullscreen and picture-in-picture, the pager; 167 checks);
+    the new `tests/always_on_top_scene.mjs` over each of the four themes in `make test` (the real tree's drawing order,
+    the theme's own window menu offering the item, checked, turned off, the Window menu, a dialog over an always-on-top
+    window, a skip-pager window not drawn in the Overview; the scene runner's stub now keeps each node's children in
+    order); `x11-conformance-client`: `_NET_WM_STATE_ABOVE` at map, the window staying at the top of
+    `_NET_CLIENT_LIST_STACKING` while a normal window mapped after it has the keyboard, toggled off and on,
+    `_NET_WM_STATE_BELOW` dropping ABOVE and stacking under, SKIP_PAGER and BELOW add and remove, and the three atoms
+    in `_NET_SUPPORTED`; `tools/wl-conformance.mjs` checks that the layer, its changes and skip pager reach the theme.
+    Proof: `docs/wayland-proofs/x11-always-on-top.png` (xterm 398 asking for ABOVE, another xterm opened after it with
+    the keyboard, xprop's state and stacking; `x11-conformance-client netstate` sends the EWMH request, as `wmctrl -b
+    add,above` does, since xprop can't and wmctrl isn't installed).
+  - Not saved between sessions; not yet tried in a real session or on the VM.
+
 - **LordOS Studio: background blur and background pictures for the camera of LordOS's apps, in development (phases 0
   and 1 of `docs/CAMERA-STUDIO-PLAN.md`; the plan and its exceptions E-S1 to E-S7 approved by the maintainer on
   2026-11-22).** A new camera, "LordOS Studio", appears in `lord.media.cameras()` next to the real ones, so the Camera
@@ -548,9 +597,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **More EWMH:** `_NET_CLIENT_LIST` in mapping order, `_NET_CLIENT_LIST_STACKING`, `_NET_REQUEST_FRAME_EXTENTS`
     answered, `_NET_WORKAREA` (the theme's work area, without the menu bar and Dock), `_NET_CLOSE_WINDOW` (closes as the
     theme's close button), `_NET_WM_PID` read for diagnostics only, never trusted.
-  - **Not supported:** `_NET_WM_STATE_ABOVE` and `SKIP_PAGER` are kept in the property for the app but not listed in
-    `_NET_SUPPORTED`: LordOS has no always-on-top layer (the keyboard always goes to the window in front) and no pager.
-    This is the one X11 point below 100 %.
+  - **Not supported at first:** `_NET_WM_STATE_ABOVE` and `SKIP_PAGER` were kept in the property for the app but not
+    listed in `_NET_SUPPORTED`, as LordOS had no always-on-top layer and no pager; both came later in this cycle
+    ("Always on top", above), which brought X11 to 100 %.
   - **The tool:** its `DEMANDS_ATTENTION` check set the state on the window in front, which KWin and Mutter refuse; it now
     uses a window that isn't in front, and checks that the focused window refuses it. New dynamic checks: frame extents
     answered, stacking order, above/modal/skip-taskbar add and remove, maximum size, urgency set and cleared, utility

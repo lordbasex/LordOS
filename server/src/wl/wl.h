@@ -85,6 +85,7 @@ void wl_set_fixed(int id, int fixed);     /* locked by the theme: no maximize or
 void wl_set_minimized(int id, int minimized);   /* X11 windows: iconic and at the bottom of X's stack */
 void wl_set_parked(int id, int parked);         /* on a hidden desktop: no keyboard and no fullscreen until back */
 void wl_set_covered(int id, int covered);       /* wholly under an opaque window: paced once a second, suspended */
+void wl_set_layer(int id, int layer);           /* 1 always on top, -1 kept below, 0 normal (X11: _NET_WM_STATE) */
 int  wl_count(void);
 int  wl_idle_inhibited(void);             /* idle-inhibit: a shown surface asks the screen to stay on */
 void wl_output_resized(void);               /* headless: one display of ui.width × ui.height */

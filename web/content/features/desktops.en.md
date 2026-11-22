@@ -14,6 +14,7 @@ The three run on the same display server, the same interface engine and the same
 - **The menu bar** holds the app's menus, the status items and the clock; the **Control Center** gathers network, sound, brightness, Do Not Disturb and the rest.
 - **The app launcher** shows every app, and Search finds apps, settings and files.
 - **Snap windows** by dragging them to the edges: a half, a quarter or the whole screen (in Lord Flow since 0.8.9).
+- **Always on Top** in the window menu keeps a window over the others while you type in another one (in development, in every LordOS desktop; X11 apps can ask for it too).
 - **Desktops** with an Overview, since 0.8.7, and an app switcher on ❖Tab.
 
 **Who it's for:** anyone who wants to start working without learning anything new.

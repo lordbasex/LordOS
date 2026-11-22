@@ -1849,7 +1849,7 @@ trusted programs show as not offered). The number is the version of the protocol
 ## Conformance (`tools/wl-conformance.mjs`, in development)
 
 A script checks the compositor **point by point** against the protocol XML files and gives every advertised
-global, and every X11 area, a score from 0 to 100 %. The numbers below are from 2026-11-22, commit `06a59239`
+global, and every X11 area, a score from 0 to 100 %. The numbers below are from 2026-11-22 (X11 re-recorded after "Always on top", branch `feat/always-on-top`)
 (`docs/wayland-conformance.json` has every check, its result and a `file:line` hint).
 
 ```sh
@@ -1943,11 +1943,15 @@ own connection. lord-server answers every one, the window is never disconnected 
 and a new client maps a window afterwards. Also run on 2026-11-22 with six more seeds × 1,500 connections, and with three
 seeds × 800 against an AddressSanitizer/UBSan build of lord-server (no report).
 
-**Xwayland / X11 (2026-11-22, Xwayland 24.1.6, run headless): 28 items, mean 99.9 %** (74 % before). Every item is at
-100 % except `_NET_WM_STATE` (96.2 %): `_NET_WM_STATE_ABOVE` is kept in the property, so an app's toggle sticks, but it
-isn't listed in `_NET_SUPPORTED`, because LordOS has no always-on-top layer: the keyboard always goes to the window in
-front (`focusedOn`, `sdk/desktopmodel.js`), and keeping a window above another one that has the keyboard needs stacking
-and focus apart in the SDK, in every theme. `SKIP_PAGER` is kept the same way (there is no pager). What was added:
+**Xwayland / X11 (2026-11-22, Xwayland 24.1.6, run headless): 28 items, mean 100 %** (74 % before the conformance
+work, 99.9 % after it). Every item is at 100 %. The last one was `_NET_WM_STATE` (96.2 %): `_NET_WM_STATE_ABOVE` was
+kept in the property but not offered, because LordOS had no always-on-top layer (the keyboard always went to the window
+in front). Always on top (`docs/WINDOWS.md`, "Always on top") separated stacking from focus in the SDK, for every theme,
+so `_NET_WM_STATE_ABOVE`, `_NET_WM_STATE_BELOW` and `_NET_WM_STATE_SKIP_PAGER` (out of the Overview) are now honoured
+and in `_NET_SUPPORTED`; `x11-conformance-client` checks the property at map, a window staying at the top of
+`_NET_CLIENT_LIST_STACKING` while a normal window mapped after it has the keyboard, toggles and `BELOW`, and the tool
+checks that the layer and skip pager reach the theme. An initial `_NET_WM_STATE` is now read until the window manager
+first writes the property (an app that creates, sets and maps in one go used to lose it). What the conformance work added:
 xwayland-shell-v1 (the serial association, offered to Xwayland only), the `WM_HINTS` urgency hint and
 `DEMANDS_ATTENTION` (the Dock's attention mark), `WM_NORMAL_HINTS` minimum and maximum enforced, `WM_TRANSIENT_FOR` and
 `MODAL` as the window's owner and modality, `_NET_WM_ICON` as the window's icon, `_NET_ACTIVE_WINDOW` from a pager,
@@ -1960,8 +1964,8 @@ that isn't in front.
 foot, zenity (GTK 4), FeatherPad (Qt 6), vkcube, es2gears and Chromium, and a purpose-built client for subsurface
 order and viewports, on a headless lord-server and screenshots each; `tools/wl-conformance/x11-proofs.sh` does the
 same for the X11 items with xterm, xprop, xwininfo and zenity on X11. Not installed here, so not tried: Firefox, mpv,
-GTK demos, xdotool and wmctrl (the `_NET_ACTIVE_WINDOW`, `_NET_CLOSE_WINDOW` and state requests are checked only by
-`x11-conformance-client`). Not checkable without hardware: the tablet wheel and pad feedback (no tablet), touch
+GTK demos, xdotool and wmctrl (the `_NET_ACTIVE_WINDOW`, `_NET_CLOSE_WINDOW` and state requests are sent only by
+`x11-conformance-client`, whose `netstate` mode sends the ABOVE request in `x11-always-on-top.png`). Not checkable without hardware: the tablet wheel and pad feedback (no tablet), touch
 orientation (no touchscreen), and pointer-constraint regions with a real pointer (headless has no pointer over the
 windows; the region logic is covered by the fuzz client and the protocol checks).
 

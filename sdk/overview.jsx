@@ -19,14 +19,15 @@ import { Layer } from './layers.js';
 import { settings } from './settings.js';
 import { windows, wm, getApp, workAreaOf, windowTitle, activeDesktop, desktopList, desktopNames, desktopName, renameDesktop, moveDesktop, onActiveDesktop, overviewShowing,
   setActiveDesktop, createDesktop, closeDesktop } from './windows.js';
-import { MAX_DESKTOPS, onDesktop, gridNeighbor, gridLayout, stripLayout, stripSlot, moveDesktopTo, hitRect, overviewPlaceholder, OVERVIEW_LABEL } from './desktopmodel.js';
+import { MAX_DESKTOPS, onDesktop, gridNeighbor, gridLayout, stripLayout, stripSlot, moveDesktopTo, hitRect, overviewPlaceholder, OVERVIEW_LABEL, inPager } from './desktopmodel.js';
 import { launcherIdOf } from './dock.js';
 import { windowIcon } from './apps.js';
 import { findWallpaper, wallpaperThumb, wallpaperIdFor } from './wallpapers.js';
 import { clearTextFocus, TextInput } from './components.jsx';
 
 const DRAG_START = 6;
-const own = (w) => !(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'));   // not the theme's panels
+// not the theme's panels, nor a window that asked to be left out of the pager (X11 _NET_WM_STATE_SKIP_PAGER)
+const own = (w) => !(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#')) && inPager(w);
 
 // null, or { app, list, places: Map id → { x, y, scale, w, h }, strip, area }
 export const overview = createStore(null);

@@ -209,6 +209,7 @@ struct Surf {
     uint32_t conf_serial, acked_serial;   /* xdg_surface: the last configure sent, the last one acked */
     int parked, fs_resume;          /* on a hidden desktop (wl_set_parked); fullscreen waits for its return */
     int covered;                    /* wholly under an opaque window of its desktop (wl_set_covered) */
+    int layer;                      /* 1 always on top, -1 kept below, 0 normal (wl_set_layer; an X window's is xwm's) */
     FrameGate fgate;                /* its frame callbacks while it can't be seen (framegate.h) */
     int sent_suspended;             /* the last configure said "suspended" */
     /* HiDPI (docs/DISPLAYS.md): wl_surface.set_buffer_scale, the displays it is on (wl_surface
@@ -4312,9 +4313,10 @@ static void emit_map(Surf *s, int w, int h) {
     if (s->xw) {                    /* X11: WM_CLASS class, and its instance for the .desktop match */
         char alt[260];
         json_str(alt, sizeof alt, s->app_alt);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"skipTaskbar\":%s}",
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"skipTaskbar\":%s,\"skipPager\":%s,\"layer\":%d}",
              t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false",
-             s->owner ? s->owner->id : 0, s->modal ? "true" : "false", xwm_skip_taskbar(s->xw) ? "true" : "false");
+             s->owner ? s->owner->id : 0, s->modal ? "true" : "false", xwm_skip_taskbar(s->xw) ? "true" : "false",
+             xwm_skip_pager(s->xw) ? "true" : "false", xwm_layer(s->xw));
     } else {
         int fixed = s->min_w > 0 && s->min_w == s->max_w && s->min_h > 0 && s->min_h == s->max_h;
         /* a Flatpak app's window: the app lord-server knows from the client's root-owned scope (or its security context),
@@ -4322,9 +4324,9 @@ static void emit_map(Surf *s, int w, int h) {
         const char *who = client_identity(s->client);
         char fp[KBI_ID_MAX + 8] = "";
         if (!strncmp(who, "flatpak:", 8)) json_str(fp, sizeof fp, who + 8);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"flatpak\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s}",
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"flatpak\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"layer\":%d}",
              t, a, fp, w, h, s->csd ? "true" : "false", s->owner || s->dlg ? "true" : "false", fixed ? "true" : "false",
-             s->owner ? s->owner->id : 0, s->modal ? "true" : "false");
+             s->owner ? s->owner->id : 0, s->modal ? "true" : "false", s->layer);
     }
     wlshell_mapped(s->id);              /* its tag, a drag it follows (wlshell.h) */
 }
@@ -7312,6 +7314,17 @@ void wl_set_parked(int id, int parked) {
     if (dpy) wl_display_flush_clients(dpy);
 }
 
+/* The window's layer, as the theme stacks it (sdk/desktopmodel.js stackOrder): 1 always on top, -1 kept below, 0.
+ * Kept for a theme switch (the map carries it); an X11 window's goes to xwm (its _NET_WM_STATE and X's stacking).
+ * Wayland has no protocol to tell an app, so a Wayland window isn't told. */
+void wl_set_layer(int id, int layer) {
+    Surf *s = find(id);
+    layer = layer > 0 ? 1 : layer < 0 ? -1 : 0;
+    if (!s || (!s->top && !s->xw)) return;
+    if (s->xw) { xwm_set_layer(s->xw, layer); return; }
+    s->layer = layer;
+}
+
 /* Wholly covered by an opaque window above it on the showing desktop (sdk/desktopmodel.js coveredIds): it stays
  * where it is, with its keyboard and pointer rules unchanged, but nothing of it is on screen, so its frame callbacks
  * go out once a second and a Wayland window hears "suspended" (framegate.h). An X11 window is only paced: X has no
@@ -7724,6 +7737,19 @@ void wlx_skip_taskbar(int sid, int skip) {
     Surf *s = find(sid);
     if (!s || !s->xw || s->role != R_TOPLEVEL || !s->mapped) return;
     emit(s, "taskbar", "{\"skip\":%s}", skip ? "true" : "false");
+}
+/* _NET_WM_STATE_SKIP_PAGER changed while it is shown: left out of the Overview (the map carries it the first time). */
+void wlx_skip_pager(int sid, int skip) {
+    Surf *s = find(sid);
+    if (!s || !s->xw || s->role != R_TOPLEVEL || !s->mapped) return;
+    emit(s, "pager", "{\"skip\":%s}", skip ? "true" : "false");
+}
+/* _NET_WM_STATE_ABOVE / _BELOW changed while it is shown: the window's layer in the theme (sdk/desktopmodel.js
+ * stackOrder). The map carries it the first time. */
+void wlx_layer(int sid, int layer) {
+    Surf *s = find(sid);
+    if (!s || !s->xw || s->role != R_TOPLEVEL || !s->mapped) return;
+    emit(s, "layer", "{\"layer\":%d}", layer > 0 ? 1 : layer < 0 ? -1 : 0);
 }
 /* _NET_WM_ICON: the image xwm.c picked (x11_net_wm_icon_pick), copied here within wlicon.h's limits and budget, as
  * the window's own icon (what xdg_toplevel_icon_v1 gives a Wayland window); NULL clears it. */

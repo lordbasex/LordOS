@@ -392,7 +392,7 @@ export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, 
 export { userVideoProblem, motionCodecs, MAX_SECONDS } from './motionmodel.js';
 export { lordosWallpapers, userWallpaperName, wallpaperSrc, wallpaperThumb, findWallpaper, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES } from './wallpapers.js';
 export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, hideApp, hideOthers, toggleShowDesktop, appSettingsItem, webHelpItems, webAppearanceItem, webUserAgentItem } from './appcontrol.js';
-export { windowMenuItems, moveResizeItems, registerWindowMenuItems } from './windowmenu.js';
+export { windowMenuItems, moveResizeItems, registerWindowMenuItems, alwaysOnTopItem } from './windowmenu.js';
 export { setDesktopCount } from './desktops.js';
 // Apps in a small window (a Workspaces tile): the window's width, a breakpoint and a sidebar that hides (sdk/narrow.jsx)
 export { useWindowWidth, useWindowHeight, useNarrow, useSidebar, SidebarToggle, SidebarOverlay, NARROW, MIN_W, MIN_H } from './narrow.jsx';
