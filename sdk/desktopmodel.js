@@ -53,6 +53,16 @@ export function keyboardSurface(list, active, shellBusy, surfaceOf) {
   return top ? surfaceOf(top.id) : 0;
 }
 
+// The same rule for a LordOS window (wm.hasKeyboard): true only for the front window of the showing desktop, and
+// never while a shell surface takes the keyboard (search, the launcher, a sheet, a system prompt). Key listeners
+// (runtime addListener) are the whole session's, so a window that forwards keys elsewhere (Machines' guest) asks this
+// at each key, not a focus flag kept from its last render: a fullscreen window and the window under it were both
+// "focused" before this rule, and a password typed in another app or a system prompt reached a virtual machine.
+export function keyboardWindow(list, active, shellBusy) {
+  const top = shellBusy ? null : focusedOn(list, active);
+  return top ? top.id : null;
+}
+
 // A request from a Linux app that would bring its window forward (moving, resizing, the window menu).
 // These come from the app, so a window on a hidden desktop doesn't get to change the desktop.
 export const acceptsAppRequest = (w, active) => !!w && onDesktop(w, active);

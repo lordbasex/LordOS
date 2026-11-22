@@ -783,5 +783,46 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('modifiers', [29, 97, 42, 54, 56, 100, 125, 126, 25, 1].map(M.isModifier), [true, true, true, true, true, true, true, true, false, false]);
 }
 
+// ---- the keyboard to the guest (security): never a key typed while another window has the keyboard ----
+{
+  // a session of two windows: the machine ('vm') and LordOS's Terminal ('term'); `front` is wm.hasKeyboard's answer
+  let front = 'vm';
+  const calls = [];                // lord.vm.key(sid, code, down) and lord.vm.release(sid), in order
+  const gk = M.guestKeys({ send: (c, v) => calls.push(['key', c, v]), release: () => calls.push(['release']), owns: () => front === 'vm' });
+  eq('keys: a key while the machine has the keyboard goes in', [gk.down(30), gk.up(30)], [true, true]);
+  eq('keys: down then up', calls, [['key', 30, 1], ['key', 30, 0]]);
+  calls.length = 0;
+  gk.down(42);                                     // Shift held in the guest
+  front = 'term';                                  // the focus moved; the window has not rendered again yet
+  const typed = [25, 30, 31, 31, 20, 28];          // "password" typed into the Terminal
+  eq('keys: nothing typed in the Terminal goes to the guest', typed.map((c) => gk.down(c)), typed.map(() => false));
+  eq('keys: their releases neither', typed.map((c) => gk.up(c)), typed.map(() => false));
+  eq('keys: what was held is let go of once, no key sent', calls, [['key', 42, 1], ['release']]);
+  eq('keys: the held Shift is forgotten', gk.held(), []);
+  eq('keys: its release later is not sent', gk.up(42), false);
+  calls.length = 0;
+  front = 'vm';
+  eq('keys: back in the machine, keys go in again', gk.down(30), true);
+  front = 'search';                                // a shell surface took the keyboard (wm.hasKeyboard false)
+  eq('keys: a key typed in the search does not go in', gk.down(31), false);
+  eq('keys: the key held at that moment is released, not sent up', gk.up(30), false);
+  eq('keys: one release for the whole change', calls, [['key', 30, 1], ['release']]);
+  calls.length = 0;
+  front = 'vm';
+  eq('keys: a release for a press that never went in is not sent', gk.up(44), false);
+  eq('keys: code 0 (text an input method committed) never goes', gk.down(0), false);
+  eq('keys: nothing sent', calls, []);
+}
+// a window the guest opens takes the front only while the person is in this machine (no focus stealing)
+{
+  const dir = '/home/u/Machines/Win.lordvm';
+  eq('front: nothing in front', M.guestMayTakeFront(null, dir), true);
+  eq('front: the machine window', M.guestMayTakeFront({ app: 'machines', args: { machine: dir } }, dir), true);
+  eq('front: one of its guest windows', M.guestMayTakeFront({ app: 'machines', args: { guestWin: { dir, gid: 4 } } }, dir), true);
+  eq('front: the Terminal keeps the front', M.guestMayTakeFront({ app: 'terminal', args: null }, dir), false);
+  eq('front: another machine keeps it', M.guestMayTakeFront({ app: 'machines', args: { machine: '/other.lordvm' } }, dir), false);
+  eq('front: the library keeps it', M.guestMayTakeFront({ app: 'machines', args: null }, dir), false);
+}
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

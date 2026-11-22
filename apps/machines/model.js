@@ -261,6 +261,47 @@ export function comboSend(codes, latched = []) {
   return { latched: [], send: [...own.map((c) => [c, 1]), ...[...own].reverse().map((c) => [c, 0]), ...latchRelease(latched).send] };
 }
 
+// ---- the keyboard to the guest ----
+// Every key of the session reaches every key listener (runtime addListener), so a window's own focus flag is not
+// enough to send keys to a guest: it is from the window's last render, and it was once true for a full-screen machine
+// and a Terminal at the same time. guestKeys asks owns() at each key: wm.hasKeyboard(winId), the window in front with
+// no search, launcher, sheet or system prompt open. A key goes down in the guest only while owns() is true, and its
+// release only when its press went there; the first key while owns() is false lets go of everything held in the guest
+// (release(): VD_RELEASE_ALL, latched keys included), once, so nothing stays down and nothing typed elsewhere goes in.
+//   guestKeys({ send(code, down), release(), owns() }) → { down(code) → bool, up(code) → bool, held() → codes }
+export function guestKeys({ send, release, owns }) {
+  const held = new Set();
+  let lost = false;
+  const lose = () => { held.clear(); if (!lost) { lost = true; release(); } };
+  return {
+    down(code) {
+      if (!(code > 0)) return false;
+      if (!owns()) { lose(); return false; }
+      lost = false;
+      held.add(code);
+      send(code, 1);
+      return true;
+    },
+    up(code) {
+      if (!held.has(code)) return false;
+      held.delete(code);
+      if (!owns()) { lose(); return false; }
+      send(code, 0);
+      return true;
+    },
+    held: () => [...held],
+  };
+}
+// Whether a window the guest opens or brings back in apps mode may take the front: only while the person is already
+// in this machine (its window or one of its guest windows is in front, or nothing is). Otherwise it opens behind the
+// window in front, so a guest's new window never takes the keys of a Terminal being typed in.
+export function guestMayTakeFront(front, dir) {
+  if (!front) return true;
+  if (front.app !== 'machines' || !dir) return false;
+  const a = front.args || {};
+  return a.guestWin?.dir === dir || a.machine === dir;
+}
+
 // the window's title: "<name> — <state>"
 export const windowTitle = (name, stateText) => (stateText ? `${name} — ${stateText}` : name);
 

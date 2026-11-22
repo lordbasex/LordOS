@@ -1555,6 +1555,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Security
 
+- **Machines: keys typed in another window never reach a machine, in development** (`docs/VIRTUALIZATION.md` 5.8;
+  `sdk/components.jsx` `AppHost`/`FloatingWindows`, `sdk/windows.js` `wm.hasKeyboard`/`setFullscreen`,
+  `sdk/desktopmodel.js` `keyboardWindow`, `sdk/kbinhibit.js`, `apps/machines/vmwindow.jsx`, `appsmode.jsx`, `model.js`).
+  Reported on a real session: typing in LordOS's Terminal also typed into the guest of a running machine (its beeps were heard). Every
+  key of the session reaches every key listener, and a machine sent keys to its guest whenever its own `focused` flag was
+  true, and that flag could be true for two windows at once: `FloatingWindows` gave every full-screen window of the
+  desktop the keys, while the theme gave them to its top framed window too. With a machine full screen on one display and
+  the Terminal on another, a password typed in the Terminal went into the guest; a system prompt (a password, the
+  keyring), the search or the launcher open over the machine window sent their keys there as well.
+  - **At each key.** The machine window (picture and serial console), every apps mode window and the Keys panel's held
+    keys ask `wm.hasKeyboard(window)` for each key, not a flag from the last render: the front window of the showing
+    desktop, with no search, launcher, sheet or system prompt holding the keyboard (the same rule as a Linux app's
+    Wayland keyboard). The first key typed elsewhere lets go of everything held in the guest, the held Win or Ctrl
+    included, and a release goes to the guest only for a press that went there (`model.js` `guestKeys`).
+  - **One focused window.** `AppHost` is focused only when it is also `wm.focused()`, in every theme and in isolated apps;
+    a press on a full-screen window brings it to the front (so it has its keys again), and going full screen brings the
+    window forward. The desktop's shortcuts held for a machine follow `wm.hasKeyboard` too.
+  - **No focus stealing in apps mode.** A window the guest opens or brings back takes the front only while you are in
+    that machine (its window or one of its windows in front); otherwise it opens behind the window you are typing in.
+  - lord-server needed no change: keys reach a guest only through `lord.vm.key`, capture mode takes only the mouse, and
+    lord-vmdisplay lets go of held keys when lord-server goes away (a session that re-attaches finds nothing held).
+  - Tested by `server/tests/vm_model_test.mjs` (focus moving to the Terminal or a search between keys: no `lord.vm.key`,
+    one release), `desktop_model_test.mjs` (`keyboardWindow`) and the new `vm_keys_scene.mjs` (run by `run_suites.sh`:
+    a framed and a full-screen machine with the Terminal in front, and a system prompt over the machine, through the real
+    `AppHost`, `FloatingWindows` and `__lordKey`; it fails on the code before this change). `focus_scene.mjs` and
+    `list_scene.mjs` now open their window, since an `AppHost` is focused only as the front window.
 - **Machines: the clipboard goes into and out of a machine only while you use it, and into it only when something
   there pastes** (`docs/VIRTUALIZATION.md` 6.8; `server/src/vm/vmagent.[ch]`, `lordvm.c`, `ui/js_vm.c`,
   `apps/machines/vmwindow.jsx`, `appsmode.jsx`, `model.js`, `tools/guest-win`, `tools/guest`). A guest is untrusted

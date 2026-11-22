@@ -10,7 +10,7 @@ import * as rt from '@lordos/runtime';
 import { AppHost, Button, Slider } from '../../sdk/components.jsx';
 import { Tabs, Dropdown, RadioGroup, Popover } from '../../sdk/controls.jsx';
 import { List, Table } from '../../sdk/lists.jsx';
-import { registerBuiltinApp } from '../../sdk/windows.js';
+import { registerBuiltinApp, wm } from '../../sdk/windows.js';
 
 const { styles, parents, texts, removed } = globalThis.__lordTest;
 const h = React.createElement;
@@ -44,6 +44,7 @@ function Demo() {
     h(Button, { label: 'End', onClick: () => {} }));
 }
 registerBuiltinApp({ id: 'demo', Component: Demo });
+wm.open('demo');                 // AppHost's window has the keys only as the desktop's front window
 rt.render(h(AppHost, { id: 'demo', focused: true }));
 await flush();
 

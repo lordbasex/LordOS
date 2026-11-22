@@ -1834,6 +1834,29 @@ While the panel is open the keyboard keeps typing into the machine (it is not a 
 Win+P; a click outside closes it. The menu bar's **Actions → Send Keys** has the same combinations and single keys; Power and
 Actions keep their own Ctrl+Alt+Delete.
 
+**Keys reach a machine only while it has the keyboard** (security, in development after 0.8.9.4). A key listener
+(`runtime/events.js` `addListener`) hears every key of the session, whatever window it was typed in, so a window's own
+`focused` flag decides nothing on its own. Every path that sends keys to a guest (the machine window's keyboard and its
+serial console pane in `vmwindow.jsx`, each apps mode window in `appsmode.jsx` `GuestWindow`, the Keys panel's held keys)
+asks `wm.hasKeyboard(window)` **at each key**: true only for the front window of the showing desktop while no search,
+launcher, sheet or system prompt has the keyboard (`sdk/desktopmodel.js` `keyboardWindow`, the same rule as the Wayland
+keyboard's `keyboardSurface`). The first key typed while it is false lets go of everything held in the guest
+(`lord.vm.release`, the held keys included), and a release is sent only for a press that went to the guest
+(`apps/machines/model.js` `guestKeys`). What was wrong before: `FloatingWindows` gave every full-screen window of the
+desktop the keys and the theme gave them to the top framed window too, so with a machine full screen on one display and
+the Terminal on another both heard each key, and a password typed in the Terminal went into the guest; a system prompt
+over the machine window sent its keys there as well. Now `AppHost` is focused only when it is also `wm.focused()`, a press
+on a full-screen window brings it to the front, and going full screen brings the window forward. In apps mode a window the
+guest opens or brings back takes the front only while the person is in this machine (its window or one of its guest
+windows in front, `guestMayTakeFront`); otherwise it opens behind the window in front, so a guest cannot steal the focus
+from a Terminal being typed in. The desktop's shortcuts held for the machine (`sdk/kbinhibit.js`) follow the same
+`wm.hasKeyboard`. lord-server sends a key to a guest only from `lord.vm.key` (`ui/js_vm.c` `f_key` → `VD_KEY`); capture
+mode takes the mouse only, never the keyboard, and lord-vmdisplay lets go of every held key when lord-server goes away, so a
+session that re-attaches to a running machine finds nothing held. Tested by `server/tests/vm_model_test.mjs` (`guestKeys`:
+focus moving to the Terminal or a search between a press and the next key), `desktop_model_test.mjs` (`keyboardWindow`)
+and `vm_keys_scene.mjs` (`node tests/focus_scene_test.mjs vm_keys_scene.mjs`: a framed and a full-screen machine with the
+Terminal in front, and a system prompt over the machine, through the real AppHost, FloatingWindows and `__lordKey`).
+
 ## 6. Features
 
 ### 6.1 Lifecycle

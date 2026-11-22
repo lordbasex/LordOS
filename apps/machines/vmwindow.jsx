@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf } from './model.js';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta } from './meta.js';
@@ -588,7 +588,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (!shell || !shellKeys || !focused || !st?.console) return undefined;
     const id = st.console;
     return addListener('keydown', (e) => {
-      if (menus.open > 0) return;
+      // the session's every key reaches this listener: only the ones typed while this window has the keyboard, now
+      if (menus.open > 0 || !wm.hasKeyboard(winId)) return;
       const key = e.key && e.key.length > 1 ? e.key : '';
       const base = e.ctrl || e.alt ? e.base || '' : '';
       if (!key && !e.char && !base) return;
@@ -600,18 +601,21 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } dropLatched(); return undefined; }
     // a key pressed while one of the window's menus is open is the menu's, down and up (Esc closes it)
     const kept = new Set();
+    // each key asks whether this window has the keyboard at that moment (wm.hasKeyboard: in front, no search, sheet or
+    // system prompt open), not the focus flag of the last render: a key typed in another window never reaches the
+    // guest, and the first one lets go of everything held there, the Keys panel's held keys included (model.js guestKeys)
+    const gk = guestKeys({ send: (c, v) => lord.vm.key(sid, c, v), owns: () => wm.hasKeyboard(winId), release: () => { lord.vm.release(sid); dropLatched(); } });
     const ka = addListener('keydown', (e) => {
       if (!(e.code > 0)) return;
       // ❖0 opens the library (index.jsx), never reaches the machine
       if (menus.open > 0 || kept.has(e.code) || (e.meta && !e.ctrl && !e.alt && (e.base || e.key) === '0')) { kept.add(e.code); return; }
+      if (!gk.down(e.code)) return;
       e.preventDefault?.();                      // Tab goes to the machine, not to the window's buttons (sdk/focus.js)
-      lord.vm.key(sid, e.code, 1);
     });
     const kb = addListener('keyup', (e) => {
       if (!(e.code > 0)) return;
       if (kept.delete(e.code)) return;
-      lord.vm.key(sid, e.code, 0);
-      if (latchRef.current.length) keysTo(sid, latchKeyUp(latchRef.current, e.code));
+      if (gk.up(e.code) && latchRef.current.length) keysTo(sid, latchKeyUp(latchRef.current, e.code));
     });
     const kc = addListener('pointerup', (e) => {
       if (!buttons.current.has(e.button)) return;
@@ -975,7 +979,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const keys = {
     windows: !!cfg.windows || /^windows/i.test(st?.agent?.system || '') || familyOf({ ...cfgRef.current, meta: readMeta(dir), name }) === 'windows',
     latched, ok: !!sid && a.keys, hold: !!sid && a.keys && live && focused,
-    toggle: (c) => { if (sid && live && focused) keysTo(sid, latchToggle(latchRef.current, c)); },
+    toggle: (c) => { if (sid && live && wm.hasKeyboard(winId)) keysTo(sid, latchToggle(latchRef.current, c)); },
     send: sendCombo,
   };
   const ctl = {
