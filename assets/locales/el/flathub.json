@@ -1,4 +1,7 @@
 {
+  "about.less": "Εμφάνιση λιγότερων",
+  "about.more": "Εμφάνιση περισσότερων",
+  "about.title": "Σχετικά με αυτή την εφαρμογή",
   "busy.appstream": "Λήψη του καταλόγου του Flathub…",
   "busy.catalog": "Ανάγνωση του καταλόγου…",
   "busy.remote": "Προσθήκη του Flathub…",

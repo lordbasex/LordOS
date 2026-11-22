@@ -1,4 +1,7 @@
 {
+  "about.less": "Visa mindre",
+  "about.more": "Visa mer",
+  "about.title": "Om den här appen",
   "busy.appstream": "Hämtar Flathubs katalog…",
   "busy.catalog": "Läser katalogen…",
   "busy.remote": "Lägger till Flathub…",

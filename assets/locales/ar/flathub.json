@@ -1,4 +1,7 @@
 {
+  "about.less": "عرض أقل",
+  "about.more": "عرض المزيد",
+  "about.title": "حول هذا التطبيق",
   "busy.appstream": "جارٍ جلب كتالوج Flathub…",
   "busy.catalog": "جارٍ قراءة الكتالوج…",
   "busy.remote": "جارٍ إضافة Flathub…",

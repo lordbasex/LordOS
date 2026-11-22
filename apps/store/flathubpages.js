@@ -257,6 +257,24 @@ function Permissions({ meta }) {
       r.change ? h(Text, { style: { fontSize: typeScale.caption, color: LEVEL[r.level] || th.textDim, lineHeight: 1.4, textAlign: 'start' } }, t(`flathub.change.${r.change}`)) : null))));
 }
 
+// What the app says about itself (AppStream's description, in the catalog's language): shut to about six lines, with
+// "Show more" when there is more. Nothing when it has none.
+function About({ id, catalog }) {
+  const th = useTheme();
+  const [open, setOpen] = useState(false);
+  const text = useMemo(() => F.description(id), [id, catalog]);     // read again after each catalog load (language)
+  useEffect(() => setOpen(false), [id]);
+  const v = M.descriptionView(text, { open });
+  if (!v.paras.length) return null;
+  return h(View, null,
+    h(Header, { th }, t('flathub.about.title')),
+    h(View, { style: { gap: spacing.s, paddingHorizontal: spacing.xs } },
+      ...v.paras.map((p, i) => h(Text, { key: `${i}`, style: { fontSize: typeScale.body, color: th.text, lineHeight: 1.45, textAlign: 'start',
+        ...(p.clamp ? { numberOfLines: p.clamp, textOverflow: 'ellipsis' } : {}) } }, p.text))),
+    v.long ? h(Button, { plain: true, small: true, label: open ? t('flathub.about.less') : t('flathub.about.more'), onClick: () => setOpen(!open),
+      style: { alignSelf: 'flex-start', marginTop: spacing.xs } }) : null);
+}
+
 export function FlathubDetail({ id }) {
   const th = useTheme();
   const s = useStore(F.state);
@@ -296,6 +314,7 @@ export function FlathubDetail({ id }) {
             a.verified ? t('flathub.verified', { developer: a.developer || a.id }) : t('flathub.unverified')))),
       h(View, { style: { flexDirection: 'row', gap: spacing.s, alignItems: 'center' } }, ...buttons)),
     mine || (!s.job && s.msg && s.msg.id === a.id) ? h(JobProgress, { forId: a.id }) : null,
+    a.unknown ? null : h(About, { id: a.id, catalog: s.catalog }),
     h(Facts, { items: [
       [t('flathub.fact.developer'), a.developer],
       [t('flathub.fact.license'), lic.kind === 'proprietary' ? t('flathub.license.proprietary') : lic.text,

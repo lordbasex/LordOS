@@ -206,5 +206,23 @@ for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, 
   eq('license: nothing', [L(''), L(null)], [{ kind: null, text: '', url: null }, { kind: null, text: '', url: null }]);
 }
 
+// an app's description: paragraphs, shut to about six lines, open whole
+{
+  const V = M.descriptionView;
+  eq('no description', V(''), { paras: [], long: false });
+  eq('no description (null)', V(null), { paras: [], long: false });
+  eq('short: whole, nothing to open', V('One.\n\nTwo.'), { paras: [{ text: 'One.', clamp: 0 }, { text: 'Two.', clamp: 0 }], long: false });
+  eq('blank paragraphs dropped', V('\n\nOne.\n\n\n\n  \n\nTwo.\n'), { paras: [{ text: 'One.', clamp: 0 }, { text: 'Two.', clamp: 0 }], long: false });
+  const list = 'Features:\n\n• a\n• b\n• c\n• d\n• e\n\nThe end.';
+  eq('a list counts a line per item; shut cuts the paragraph that overflows', V(list),
+    { paras: [{ text: 'Features:', clamp: 0 }, { text: '• a\n• b\n• c\n• d\n• e', clamp: 0 }], long: true });
+  eq('open: every paragraph', V(list, { open: true }).paras.length, 3);
+  const longP = 'x'.repeat(90 * 8);
+  eq('one long paragraph clamped to six lines', V(longP), { paras: [{ text: longP, clamp: 6 }], long: true });
+  eq('cut to the lines left', V(`a\n\n${longP}`).paras.map((p) => p.clamp), [0, 5]);
+  eq('characters, not UTF-16 units', V('😀'.repeat(90 * 6)).long, false);
+  eq('custom line budget', V('a\n\nb\n\nc', { lines: 2 }), { paras: [{ text: 'a', clamp: 0 }, { text: 'b', clamp: 0 }], long: true });
+}
+
 console.log(bad ? `flathub-model: ${bad} of ${n} failed` : `flathub-model: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

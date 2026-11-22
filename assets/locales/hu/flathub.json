@@ -1,4 +1,7 @@
 {
+  "about.less": "Kevesebb megjelenítése",
+  "about.more": "Több megjelenítése",
+  "about.title": "Az alkalmazásról",
   "busy.appstream": "A Flathub katalógusának letöltése…",
   "busy.catalog": "A katalógus beolvasása…",
   "busy.remote": "A Flathub hozzáadása…",

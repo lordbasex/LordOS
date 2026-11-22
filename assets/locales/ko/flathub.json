@@ -1,4 +1,7 @@
 {
+  "about.less": "간단히 보기",
+  "about.more": "더 보기",
+  "about.title": "이 앱 정보",
   "busy.appstream": "Flathub 카탈로그를 가져오는 중…",
   "busy.catalog": "카탈로그를 읽는 중…",
   "busy.remote": "Flathub를 추가하는 중…",

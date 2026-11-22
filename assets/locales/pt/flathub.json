@@ -1,4 +1,7 @@
 {
+  "about.less": "Mostrar menos",
+  "about.more": "Mostrar mais",
+  "about.title": "Sobre este app",
   "busy.appstream": "Obtendo o catálogo do Flathub…",
   "busy.catalog": "Lendo o catálogo…",
   "busy.remote": "Adicionando o Flathub…",

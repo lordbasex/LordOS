@@ -652,6 +652,22 @@ Flatpak keeps next to the `.gz`. Its index line: id, branch, name, summary, icon
 categories, license, developer, verified (`flathub::verification::verified`). The Store shows the verified ones by
 default (maintainer's decision); the filter is the shell's, the index carries every app.
 
+**Descriptions (in development, after 0.8.9.4):** an app's page shows what it says about itself, AppStream's
+`<description>`, like Flathub's site and other app centres do. The same helper, with nothing new (no syscall, no
+network, still only the C library), takes the component's own `<description>` (never a release's) in the person's
+language with the scoring of the name (`es-AR`: `es_AR`, then `es`, then the untranslated one; translations per
+paragraph, `<p xml:lang>`, are followed too) and flattens its markup to plain text: `<p>` paragraphs apart by an empty
+line, `<ul>`/`<ol>` items on their own line after `• ` or their number, `<em>`/`<code>` and anything else dropped,
+entities decoded, spaces collapsed, control characters and bytes that aren't UTF-8 removed, at most 4 KB cut at a word
+with `…`. It is written as a second line right after its app's, `#d<TAB>id<TAB>text`, with the text's line breaks and
+backslashes escaped (`\n`, `\\`). lord-server checks it again (`fpakas_desc_line`: the id, only those two escapes, no
+tab or control character, valid UTF-8, the size, no more than one empty line in a row) and keeps it only right after
+its own app's line, once, and 24 MB of descriptions at most. The descriptions are kept out of `lord.flatpak.catalog()`,
+which the Store reads at every load: the page asks for one app's with `lord.flatpak.description(id)`. Measured on
+Flathub's catalog of 2026-11-22 (52 MB of XML, 3381 apps): the index grew from 0.6 MB to 2.5 MB, every app has a
+description, four were cut at 4 KB, and the helper still reads the whole file in about 0.1 s, far under its 512 MB cap
+(it keeps one 4 KB buffer per app being read, nothing more).
+
 ### Updates (Design)
 
 - Store → Updates lists Flatpak updates beside Debian ones (`flatpak --user remote-ls --updates`
