@@ -170,6 +170,6 @@
   "vm.gvtReady": "Parte da placa de vídeo pronta ({name})",
   "vm.gvtGone": "Parte da placa de vídeo removida",
   "gpu.freqSet": "Frequência mínima da placa de vídeo definida",
-  "gpu.memlockSet": "Memória que uma máquina pode bloquear salva",
+  "gpu.memlockSet": "Memória que as máquinas podem bloquear salva",
   "vm.memlockSet": "Memória da máquina bloqueada"
 }

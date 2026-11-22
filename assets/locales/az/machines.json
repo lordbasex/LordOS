@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Qrafik kartın bütün payları digər maşınlar tərəfindən istifadə olunur.",
   "win.gvtFailed": "Qrafik kart maşına verilə bilmədi: {why}",
   "close.noGpuSuspend": "Qrafik kartla o, yuxu rejiminə keçə bilməz.",
-  "cfg.memlockNote": "Qrafik kartla bu maşının yaddaşı işlədiyi müddətdə onun üçün ayrılır ({n} / {cap}).",
-  "cfg.memlockOver": "Qrafik kartla bu maşının yaddaşı işlədiyi müddətdə onun üçün ayrılır və {n} bir maşının kilidləyə biləcəyindən ({cap}) çoxdur: siz onun yaddaşını azaldana və ya bu limiti artırana qədər o başlamayacaq.",
+  "cfg.memlockNote": "Qrafik kartla bu maşının yaddaşı işlədiyi müddətdə onun üçün ayrılır (bütün belə maşınların birlikdə kilidləyə biləcəyi {cap} yaddaşdan {n}).",
+  "cfg.memlockOver": "Qrafik kartla bu maşının yaddaşı işlədiyi müddətdə onun üçün ayrılır və {n} bütün belə maşınların birlikdə kilidləyə biləcəyindən ({cap}) çoxdur: siz onun yaddaşını azaldana və ya bu limiti artırana qədər o başlamayacaq.",
   "cfg.memlockChange": "Parametrlər → Qrafik kartlar bölməsində dəyişin",
-  "win.gvtMemlock": "Bu maşının {mem} yaddaşı var, lakin qrafik kartı olan maşın yalnız {cap} kilidləyə bilər (Parametrlər → Qrafik kartlar)."
+  "win.gvtMemlock": "Bu maşının {mem} yaddaşı var, lakin qrafik kartı olan maşınlar birlikdə yalnız {cap} kilidləyə bilər (Parametrlər → Qrafik kartlar)."
 }

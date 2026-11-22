@@ -170,6 +170,6 @@
   "vm.gvtReady": "Handa na ang bahagi ng graphics card ({name})",
   "vm.gvtGone": "Inalis ang bahagi ng graphics card",
   "gpu.freqSet": "Naitakda ang pinakamababang frequency ng graphics card",
-  "gpu.memlockSet": "Na-save ang memory na puwedeng i-lock ng isang makina",
+  "gpu.memlockSet": "Na-save ang memory na puwedeng i-lock ng mga makina",
   "vm.memlockSet": "Na-lock ang memory ng makina"
 }

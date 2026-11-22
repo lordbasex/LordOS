@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Ekran kartının her payı başka makineler tarafından kullanılıyor.",
   "win.gvtFailed": "Ekran kartı makineye verilemedi: {why}",
   "close.noGpuSuspend": "Ekran kartıyla askıya alınamaz.",
-  "cfg.memlockNote": "Ekran kartıyla bu makinenin belleği, çalıştığı sürece ona ayrılır ({cap} içinden {n}).",
-  "cfg.memlockOver": "Ekran kartıyla bu makinenin belleği, çalıştığı sürece ona ayrılır ve {n}, bir makinenin kilitleyebileceğinden ({cap}) fazladır: belleğini azaltana veya bu sınırı yükseltene kadar başlamaz.",
+  "cfg.memlockNote": "Ekran kartıyla bu makinenin belleği, çalıştığı sürece ona ayrılır (böyle tüm makinelerin birlikte kilitleyebileceği {cap} içinden {n}).",
+  "cfg.memlockOver": "Ekran kartıyla bu makinenin belleği, çalıştığı sürece ona ayrılır ve {n}, böyle tüm makinelerin birlikte kilitleyebileceğinden ({cap}) fazladır: belleğini azaltana veya bu sınırı yükseltene kadar başlamaz.",
   "cfg.memlockChange": "Ayarlar → Ekran kartları bölümünden değiştirin",
-  "win.gvtMemlock": "Bu makinenin {mem} belleği var, ancak ekran kartı olan bir makine yalnızca {cap} kilitleyebilir (Ayarlar → Ekran kartları)."
+  "win.gvtMemlock": "Bu makinenin {mem} belleği var, ancak ekran kartı olan makineler birlikte yalnızca {cap} kilitleyebilir (Ayarlar → Ekran kartları)."
 }

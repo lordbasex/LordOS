@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Todas las partes de la tarjeta gráfica están en uso por otras máquinas.",
   "win.gvtFailed": "No se pudo dar la tarjeta gráfica a la máquina: {why}",
   "close.noGpuSuspend": "Con una tarjeta gráfica no se puede suspender.",
-  "cfg.memlockNote": "Con tarjeta gráfica, la memoria de esta máquina queda reservada para ella mientras funciona ({n} de {cap}).",
-  "cfg.memlockOver": "Con tarjeta gráfica, la memoria de esta máquina queda reservada para ella mientras funciona, y {n} es más de lo que una máquina puede bloquear ({cap}): no va a arrancar hasta que bajes su memoria o subas ese límite.",
+  "cfg.memlockNote": "Con tarjeta gráfica, la memoria de esta máquina queda reservada para ella mientras funciona ({n} de los {cap} que pueden bloquear entre todas esas máquinas).",
+  "cfg.memlockOver": "Con tarjeta gráfica, la memoria de esta máquina queda reservada para ella mientras funciona, y {n} es más de lo que pueden bloquear entre todas esas máquinas ({cap}): no va a arrancar hasta que bajes su memoria o subas ese límite.",
   "cfg.memlockChange": "Cambialo en Ajustes → Tarjetas gráficas",
-  "win.gvtMemlock": "Esta máquina tiene {mem} de memoria, pero una máquina con tarjeta gráfica solo puede bloquear {cap} (Ajustes → Tarjetas gráficas)."
+  "win.gvtMemlock": "Esta máquina tiene {mem} de memoria, pero las máquinas con tarjeta gráfica solo pueden bloquear {cap} entre todas (Ajustes → Tarjetas gráficas)."
 }

@@ -907,7 +907,7 @@
   "vm.gvtBusy": "Šios mašinos vaizdo plokštės dalis priklauso kitam naudotojui",
   "vm.gvtInUse": "Šią vaizdo plokštės dalį vis dar naudoja veikianti mašina",
   "vm.gvtFailed": "Nepavyko sukurti vaizdo plokštės dalies",
-  "vm.memlockCap": "Ši mašina užrakintų {need} MB – daugiau nei {cap} MB, kuriuos gali užrakinti mašina su vaizdo plokšte (Nustatymai → Vaizdo plokštės)",
+  "vm.memlockCap": "Ši mašina užrakintų {need} MB, bet dabar mašinoms su vaizdo plokšte laisva tik {cap} MB (Nustatymai → Vaizdo plokštės)",
   "vm.memlockRefused": "Šios mašinos atminties nepavyko užrakinti",
   "gpu.memlockRange": "Šis kiekis viršija ribas, kiek šis kompiuteris leidžia mašinoms užrakinti"
 }

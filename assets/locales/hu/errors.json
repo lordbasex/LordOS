@@ -906,7 +906,7 @@
   "vm.gvtBusy": "Ennek a gépnek a videokártya-része valaki másé",
   "vm.gvtInUse": "A videokártya ezen részét még egy futó gép használja",
   "vm.gvtFailed": "A videokártya-részt nem sikerült létrehozni",
-  "vm.memlockCap": "Ez a gép {need} MB-ot zárolna, többet, mint a {cap} MB, amit egy videokártyás gép zárolhat (Beállítások → Videokártyák)",
+  "vm.memlockCap": "Ez a gép {need} MB-ot zárolna, de a videokártyás gépek számára most csak {cap} MB szabad (Beállítások → Videokártyák)",
   "vm.memlockRefused": "Nem sikerült zárolni a gép memóriáját",
   "gpu.memlockRange": "Ez az érték kívül esik azon, amennyit ez a számítógép engedélyez a gépeknek zárolni"
 }

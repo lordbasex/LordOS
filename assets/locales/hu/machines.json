@@ -1045,8 +1045,8 @@
   "win.gvtNone": "A videokártya minden részét más gépek használják.",
   "win.gvtFailed": "A videokártyát nem sikerült a géphez rendelni: {why}",
   "close.noGpuSuspend": "Videokártyával nem függeszthető fel.",
-  "cfg.memlockNote": "Videokártyával a gép memóriája futás közben neki van fenntartva ({n} / {cap}).",
-  "cfg.memlockOver": "Videokártyával a gép memóriája futás közben neki van fenntartva, és {n} több annál, amit egy gép zárolhat ({cap}): addig nem indul el, amíg nem csökkented a memóriáját vagy nem emeled ezt a korlátot.",
+  "cfg.memlockNote": "Videokártyával a gép memóriája futás közben neki van fenntartva ({n} abból a {cap} memóriából, amit az összes ilyen gép együtt zárolhat).",
+  "cfg.memlockOver": "Videokártyával a gép memóriája futás közben neki van fenntartva, és {n} több annál, amit az összes ilyen gép együtt zárolhat ({cap}): addig nem indul el, amíg nem csökkented a memóriáját vagy nem emeled ezt a korlátot.",
   "cfg.memlockChange": "Módosítás itt: Beállítások → Videokártyák",
-  "win.gvtMemlock": "Ennek a gépnek {mem} memóriája van, de egy videokártyás gép csak {cap} memóriát zárolhat (Beállítások → Videokártyák)."
+  "win.gvtMemlock": "Ennek a gépnek {mem} memóriája van, de a videokártyás gépek együtt csak {cap} memóriát zárolhatnak (Beállítások → Videokártyák)."
 }

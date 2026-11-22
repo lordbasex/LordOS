@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Alla andelar av grafikkortet används av andra maskiner.",
   "win.gvtFailed": "Grafikkortet kunde inte ges till maskinen: {why}",
   "close.noGpuSuspend": "Med ett grafikkort kan den inte försättas i viloläge.",
-  "cfg.memlockNote": "Med ett grafikkort reserveras maskinens minne åt den medan den körs ({n} av {cap}).",
-  "cfg.memlockOver": "Med ett grafikkort reserveras maskinens minne åt den medan den körs, och {n} är mer än en maskin får låsa ({cap}): den startar inte förrän du minskar dess minne eller höjer gränsen.",
+  "cfg.memlockNote": "Med ett grafikkort reserveras maskinens minne åt den medan den körs ({n} av de {cap} som alla sådana maskiner får låsa tillsammans).",
+  "cfg.memlockOver": "Med ett grafikkort reserveras maskinens minne åt den medan den körs, och {n} är mer än alla sådana maskiner får låsa tillsammans ({cap}): den startar inte förrän du minskar dess minne eller höjer gränsen.",
   "cfg.memlockChange": "Ändra i Inställningar → Grafikkort",
-  "win.gvtMemlock": "Den här maskinen har {mem} minne, men en maskin med grafikkort får bara låsa {cap} (Inställningar → Grafikkort)."
+  "win.gvtMemlock": "Den här maskinen har {mem} minne, men maskiner med grafikkort får bara låsa {cap} tillsammans (Inställningar → Grafikkort)."
 }

@@ -179,6 +179,6 @@
   "vm.gvtReady": "Część karty graficznej gotowa ({name})",
   "vm.gvtGone": "Usunięto część karty graficznej",
   "gpu.freqSet": "Ustawiono minimalną częstotliwość karty graficznej",
-  "gpu.memlockSet": "Zapisano pamięć, którą maszyna może zablokować",
+  "gpu.memlockSet": "Zapisano pamięć, którą maszyny mogą zablokować",
   "vm.memlockSet": "Pamięć maszyny zablokowana"
 }

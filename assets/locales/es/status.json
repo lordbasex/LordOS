@@ -170,6 +170,6 @@
   "vm.gvtReady": "Parte de la tarjeta gráfica lista ({name})",
   "vm.gvtGone": "Parte de la tarjeta gráfica quitada",
   "gpu.freqSet": "Frecuencia mínima de la tarjeta gráfica fijada",
-  "gpu.memlockSet": "Memoria que una máquina puede bloquear guardada",
+  "gpu.memlockSet": "Memoria que las máquinas pueden bloquear guardada",
   "vm.memlockSet": "Memoria de la máquina bloqueada"
 }

@@ -32,11 +32,15 @@ void admin_say(const char *kind, const char *fmt, ...) {
 
 int admin_run(const char *const argv[]) { (void)argv; return -1; }
 
+extern const char *vmgpu_admin_lordvm;
+
 int main(int argc, char **argv) {
     if (argc < 2) { fprintf(stderr, "usage: vm-gvt-cli vm-gvt-create|vm-gvt-remove|gpu-min-freq ARG | sweep\n"); return 2; }
     struct passwd *pw = getpwnam(getenv("SUDO_USER") ? getenv("SUDO_USER") : "root");
     if (!pw) return 2;
     AdminReq r = { .id = 1, .user = pw->pw_name, .home = pw->pw_dir, .uid = pw->pw_uid, .gid = pw->pw_gid, .admin = 1 };
+    /* a development lord-vm (this tool is never installed): VMGPU_CLI_LORDVM names the one vm-memlock accepts */
+    if (getenv("VMGPU_CLI_LORDVM") && getenv("VMGPU_CLI_LORDVM")[0] == '/') vmgpu_admin_lordvm = getenv("VMGPU_CLI_LORDVM");
     if (!strcmp(argv[1], "sweep")) { vm_gvt_sweep(r.uid); return 0; }
     if (argc != 3) return 2;
     if (!strcmp(argv[1], "vm-gvt-create")) vm_act_gvt_create(&r, argv[2], strlen(argv[2]));

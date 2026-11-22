@@ -170,6 +170,6 @@
   "vm.gvtReady": "Grafikkortsandel klar ({name})",
   "vm.gvtGone": "Grafikkortsandel borttagen",
   "gpu.freqSet": "Grafikkortets lägsta frekvens inställd",
-  "gpu.memlockSet": "Minne som en maskin får låsa sparat",
+  "gpu.memlockSet": "Minne som maskiner får låsa sparat",
   "vm.memlockSet": "Maskinens minne låst"
 }

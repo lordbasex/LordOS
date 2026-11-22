@@ -906,7 +906,7 @@
   "vm.gvtBusy": "Pag-aari ng iba ang bahagi ng graphics card ng makinang iyon",
   "vm.gvtInUse": "Ginagamit pa ng isang tumatakbong makina ang bahaging iyon ng graphics card",
   "vm.gvtFailed": "Hindi magawa ang bahagi ng graphics card",
-  "vm.memlockCap": "Magla-lock ang makinang ito ng {need} MB, higit sa {cap} MB na puwedeng i-lock ng makinang may graphics card (Mga Setting → Mga graphics card)",
+  "vm.memlockCap": "Magla-lock ang makinang ito ng {need} MB, pero {cap} MB na lang ang bakante ngayon para sa mga makinang may graphics card (Mga Setting → Mga graphics card)",
   "vm.memlockRefused": "Hindi ma-lock ang memory ng makinang ito",
   "gpu.memlockRange": "Lampas ang halagang iyon sa pinapayagan ng computer na ito na i-lock ng mga makina"
 }

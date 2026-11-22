@@ -170,6 +170,6 @@
   "vm.gvtReady": "Anteil der Grafikkarte bereit ({name})",
   "vm.gvtGone": "Anteil der Grafikkarte entfernt",
   "gpu.freqSet": "Mindestfrequenz der Grafikkarte festgelegt",
-  "gpu.memlockSet": "Sperrbarer Speicher pro Maschine gespeichert",
+  "gpu.memlockSet": "Sperrbarer Speicher für Maschinen gespeichert",
   "vm.memlockSet": "Arbeitsspeicher der Maschine gesperrt"
 }

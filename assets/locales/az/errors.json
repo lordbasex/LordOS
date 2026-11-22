@@ -906,7 +906,7 @@
   "vm.gvtBusy": "Həmin maşının qrafik kart payı başqasına məxsusdur",
   "vm.gvtInUse": "Qrafik kartın həmin payı hələ işləyən maşın tərəfindən istifadə olunur",
   "vm.gvtFailed": "Qrafik kartın payı yaradıla bilmədi",
-  "vm.memlockCap": "Bu maşın {need} MB kilidləyərdi, bu isə qrafik kartı olan maşının kilidləyə biləcəyi {cap} MB-dan çoxdur (Parametrlər → Qrafik kartlar)",
+  "vm.memlockCap": "Bu maşın {need} MB kilidləyərdi, lakin hazırda qrafik kartı olan maşınlar üçün yalnız {cap} MB boşdur (Parametrlər → Qrafik kartlar)",
   "vm.memlockRefused": "Bu maşının yaddaşı kilidlənə bilmədi",
   "gpu.memlockRange": "Bu miqdar bu kompüterin maşınlara kilidləməyə icazə verdiyi həddən kənardadır"
 }

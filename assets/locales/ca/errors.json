@@ -906,7 +906,7 @@
   "vm.gvtBusy": "La part de la targeta gràfica d’aquesta màquina pertany a una altra persona",
   "vm.gvtInUse": "Aquesta part de la targeta gràfica encara la fa servir una màquina en marxa",
   "vm.gvtFailed": "No s’ha pogut crear la part de la targeta gràfica",
-  "vm.memlockCap": "Aquesta màquina bloquejaria {need} MB, més que els {cap} MB que pot bloquejar una màquina amb targeta gràfica (Configuració → Targetes gràfiques)",
+  "vm.memlockCap": "Aquesta màquina bloquejaria {need} MB, però ara només queden {cap} MB lliures per a les màquines amb targeta gràfica (Configuració → Targetes gràfiques)",
   "vm.memlockRefused": "No s’ha pogut bloquejar la memòria d’aquesta màquina",
   "gpu.memlockRange": "Aquesta quantitat és fora del que aquest ordinador permet bloquejar a les màquines"
 }

@@ -905,7 +905,7 @@
   "vm.gvtBusy": "Phần chia card đồ họa của máy đó thuộc về người khác",
   "vm.gvtInUse": "Phần chia card đồ họa đó vẫn đang được một máy đang chạy sử dụng",
   "vm.gvtFailed": "Không thể tạo phần chia card đồ họa",
-  "vm.memlockCap": "Máy này sẽ khóa {need} MB, nhiều hơn {cap} MB mà một máy có card đồ họa được khóa (Cài đặt → Card đồ họa)",
+  "vm.memlockCap": "Máy này sẽ khóa {need} MB, nhưng hiện chỉ còn {cap} MB trống cho các máy có card đồ họa (Cài đặt → Card đồ họa)",
   "vm.memlockRefused": "Không thể khóa bộ nhớ của máy này",
   "gpu.memlockRange": "Lượng đó nằm ngoài mức máy tính này cho phép các máy khóa"
 }

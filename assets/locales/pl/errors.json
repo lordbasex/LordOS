@@ -907,7 +907,7 @@
   "vm.gvtBusy": "Część karty graficznej tej maszyny należy do kogoś innego",
   "vm.gvtInUse": "Ta część karty graficznej jest nadal używana przez działającą maszynę",
   "vm.gvtFailed": "Nie udało się utworzyć części karty graficznej",
-  "vm.memlockCap": "Ta maszyna zablokowałaby {need} MB, więcej niż {cap} MB, które może zablokować maszyna z kartą graficzną (Ustawienia → Karty graficzne)",
+  "vm.memlockCap": "Ta maszyna zablokowałaby {need} MB, ale dla maszyn z kartą graficzną jest teraz wolne tylko {cap} MB (Ustawienia → Karty graficzne)",
   "vm.memlockRefused": "Nie udało się zablokować pamięci tej maszyny",
   "gpu.memlockRange": "Ta ilość wykracza poza to, co ten komputer pozwala maszynom zablokować"
 }

@@ -170,6 +170,6 @@
   "vm.gvtReady": "Deel van de videokaart klaar ({name})",
   "vm.gvtGone": "Deel van de videokaart verwijderd",
   "gpu.freqSet": "Minimale frequentie van de videokaart ingesteld",
-  "gpu.memlockSet": "Geheugen dat een machine mag vastzetten opgeslagen",
+  "gpu.memlockSet": "Geheugen dat machines mogen vastzetten opgeslagen",
   "vm.memlockSet": "Geheugen van de machine vastgezet"
 }
