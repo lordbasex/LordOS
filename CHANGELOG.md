@@ -1086,6 +1086,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **The Timer desktop widget fits its card at every size and in every language, in development**
+  (`sdk/deskwidgets.jsx` TimerBody, new `sdk/timerwidgetmodel.js`; `server/tests/timer_widget_test.mjs`,
+  `server/tests/workspaces_scene.mjs`). At the small size (one 170 px cell) and on the timer half of the medium one,
+  the three presets ("1 min", "5 min", "25 min") sat on a wrapping row of 30 px pills, so "25 min" fell to a second
+  row that the card's bottom edge cut off; the stopwatch's "Start"/"Reset" pills could overflow their half the same
+  way in German ("Starten"/"Zurücksetzen"). The layout now comes from a pure model: each row of pills is a single row
+  whose style (font 13 → 12 → 11 → 10.5 px, smaller padding and height) is the largest that keeps every label whole,
+  measured with `lord.measureText`; when even the smallest doesn't fit, the "1 min" preset is dropped first, then
+  "25 min" ("5 min" stays), and a label still too long is cut with an ellipsis. The ring's size and the time's font
+  follow the room left under it, the stopwatch's figure shrinks to its column, and the medium size splits into two
+  columns of equal width with the rule between them. An idle timer's ring now shows the duration a tap starts (the
+  last one used, else 5:00) instead of "—", and tapping the ring starts, pauses or resumes it; tapping the
+  stopwatch's figure starts or pauses it. The ring also fills again as the time runs (its fraction divided the
+  remaining milliseconds by the duration × 1000, so it barely moved). The new test lays the widget out at both of
+  its sizes (the timer has no large size), in each state, with times up to 10:00:00, in all 35 UI languages with a
+  measure wider than the UI font, and checks that every part stays inside the card's content box, each row of pills
+  inside its column, the columns apart and equal, and all three presets whole in English and Spanish; the workspaces
+  scene checks the idle widget shows 5:00, the presets and the stopwatch.
 - **Machines: lord-vm's log no longer goes silent for the rest of a run, in development** (seen live on 2026-11-22).
   After a machine's window closed, QEMU went on calling the closed D-Bus display listener and wrote `Failed to call
   update: The connection is closed` twice every 30 ms; 32,000 such lines reached `lord-vm.log`'s 4 MB cap in 15 minutes,

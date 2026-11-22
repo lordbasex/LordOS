@@ -53,6 +53,7 @@ import { vpnState, rates as vpnRates, targetOf, eventOf } from './vpnmodel.js';
 import { configDirs, accountOf, leftText, alertOf, summarize } from './claudewidgetmodel.js';
 import { admin } from './admin.js';
 import { clockTimer, timerStart, timerPause, timerResume, timerReset, timerLeft, stopwatch, swStart, swStop, swReset, swElapsed } from './alarms.js';
+import { timerLayout, idleSeconds, PRESETS, PRESET_DROP } from './timerwidgetmodel.js';
 import { recent as fsRecent, basename } from './fs.js';
 import { openFileWithApps } from './sysopen.js';
 import { lordosUpdate, restartNeeded } from './updates.js';
@@ -1602,39 +1603,59 @@ function useRunningTick(running) {
   const [, set] = useState(0);
   useEffect(() => { if (!running) return undefined; const id = setInterval(() => set((x) => x + 1), 1000); return () => clearInterval(id); }, [running]);
 }
+// The layout comes from sdk/timerwidgetmodel.js: the ring, the fonts and every pill's width are picked to fit the card
+// in every language (no row ever wraps; a label too long for the room is cut with an ellipsis).
+const textWidth = (s, size, weight) => (typeof lord !== 'undefined' && lord.measureText ? lord.measureText(String(s), size, weight) : String(s).length * size * 0.62);
+function FitPills({ L, row, items }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: row.style.gap, justifyContent: 'center' }}>
+      {row.keep.map((i, k) => {
+        const it = items[i];
+        return (
+          <View key={it.key} onClick={it.onClick} style={{ width: row.widths[k], height: row.style.h, borderRadius: row.style.h / 2, paddingHorizontal: row.style.pad, justifyContent: 'center', backgroundColor: it.primary ? L.accent : L.track }}>
+            <Text style={{ fontSize: row.style.font, fontWeight: 600, color: it.primary ? '#ffffff' : L.text, textAlign: 'center', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{it.label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
 function TimerBody({ w, L }) {
   const tm = useStore(clockTimer), sw = useStore(stopwatch);
   useRunningTick(tm.state === 'running' || sw.running);
-  const left = timerLeft(tm), frac = tm.duration ? 1 - left / (tm.duration * 1000) : 0;
+  const two = w.size !== 's';
+  const left = tm.state === 'idle' ? idleSeconds(tm) * 1000 : timerLeft(tm), frac = tm.state !== 'idle' && tm.duration ? 1 - left / tm.duration : 0;
+  const tItems = tm.state === 'idle'
+    ? PRESETS.map((n) => ({ key: `p${n}`, label: t('clock.timer.preset', { n }), onClick: () => timerStart(n * 60) }))
+    : [{ key: 'pause', primary: true, label: t(tm.state === 'running' ? 'clock.timer.pause' : 'clock.timer.resume'), onClick: tm.state === 'running' ? timerPause : timerResume },
+      { key: 'cancel', label: t('clock.cancel'), onClick: timerReset }];
+  const sItems = [{ key: 'run', primary: true, label: t(sw.running ? 'clock.timer.pause' : 'clock.timer.start'), onClick: sw.running ? swStop : swStart },
+    { key: 'reset', label: t('shell.widgets.timer.reset'), onClick: swReset }];
+  const swText = mmss(swElapsed(sw)), swTitle = t('shell.widgets.timer.stopwatch');
+  const lay = timerLayout({ size: w.size, w: w.w || (two ? 356 : 170), h: w.h || 170, measure: textWidth,
+    timer: { text: mmss(left), labels: tItems.map((i) => i.label), drop: tm.state === 'idle' ? PRESET_DROP : [] },
+    stopwatch: { title: swTitle, text: swText, labels: sItems.map((i) => i.label) } });
+  // tap the ring: start the last duration (idle), pause, resume
+  const ringTap = tm.state === 'idle' ? () => timerStart(idleSeconds(tm)) : tm.state === 'running' ? timerPause : timerResume;
   const timer = (
-    <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
-      <TickRing L={L} size={w.size === 's' ? 92 : 100} value={tm.state === 'idle' ? 0 : frac} color={tm.state === 'paused' ? L.warn : L.accent}>
-        <Text style={{ fontSize: 20, fontWeight: 600, color: L.text }}>{tm.state === 'idle' ? '—' : mmss(left)}</Text>
-      </TickRing>
-      {tm.state === 'idle' ? (
-        <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
-          {[1, 5, 25].map((n) => <Pill key={n} L={L} label={t('clock.timer.preset', { n })} onClick={() => timerStart(n * 60)} />)}
-        </View>
-      ) : (
-        <View style={{ flexDirection: 'row', gap: 4 }}>
-          <Pill L={L} primary label={t(tm.state === 'running' ? 'clock.timer.pause' : 'clock.timer.resume')} onClick={tm.state === 'running' ? timerPause : timerResume} />
-          <Pill L={L} label={t('clock.cancel')} onClick={timerReset} />
-        </View>
-      )}
+    <View style={{ width: lay.cols[0].w, alignItems: 'center', justifyContent: 'center', gap: lay.timer.gap }}>
+      <View onClick={ringTap}>
+        <TickRing L={L} size={lay.timer.ring} value={frac} color={tm.state === 'paused' ? L.warn : L.accent}>
+          <Text style={{ fontSize: lay.timer.ringFont, fontWeight: 600, color: tm.state === 'idle' ? L.dim : L.text, whiteSpace: 'nowrap' }}>{mmss(left)}</Text>
+        </TickRing>
+      </View>
+      <FitPills L={L} row={lay.timer.row} items={tItems} />
     </View>
   );
-  if (w.size === 's') return timer;
+  if (!two) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>{timer}</View>;
   return (
-    <View style={{ flex: 1, flexDirection: 'row', gap: 12 }}>
+    <View style={{ flex: 1, flexDirection: 'row', gap: lay.colGap }}>
       {timer}
       <View style={{ width: 1, alignSelf: 'stretch', backgroundColor: L.sep }} />
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-        <Sub L={L} center>{t('shell.widgets.timer.stopwatch')}</Sub>
-        <Text style={{ fontSize: 26, fontWeight: 600, color: L.text }}>{mmss(swElapsed(sw))}</Text>
-        <View style={{ flexDirection: 'row', gap: 4 }}>
-          <Pill L={L} primary label={t(sw.running ? 'clock.timer.pause' : 'clock.timer.start')} onClick={sw.running ? swStop : swStart} />
-          <Pill L={L} label={t('shell.widgets.timer.reset')} onClick={swReset} />
-        </View>
+      <View style={{ width: lay.cols[1].w, alignItems: 'center', justifyContent: 'center', gap: lay.stopwatch.gap }}>
+        <Sub L={L} center>{swTitle}</Sub>
+        <Text onClick={sw.running ? swStop : swStart} style={{ fontSize: lay.stopwatch.figure, fontWeight: 600, color: L.text, whiteSpace: 'nowrap' }}>{swText}</Text>
+        <FitPills L={L} row={lay.stopwatch.row} items={sItems} />
       </View>
     </View>
   );

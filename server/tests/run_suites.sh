@@ -396,6 +396,7 @@ EOF
     if have node; then run "display-apps-model-test (sdk/displayappsmodel.js)" node tests/display_apps_model_test.mjs; else skip "display-apps-model-test" node; fi
     if have node; then run "slideshow-model-test (sdk/slideshowmodel.js)" node tests/slideshow_model_test.mjs; else skip "slideshow-model-test" node; fi
     if have node; then run "widget-grid-test (sdk/widgetgrid.js)" node tests/widget_grid_test.mjs; else skip "widget-grid-test" node; fi
+    if have node; then run "timer-widget-test (sdk/timerwidgetmodel.js, every language)" node tests/timer_widget_test.mjs; else skip "timer-widget-test" node; fi
     if have node; then run "poll-same-test (sdk/samevalue.js)" node tests/poll_same_test.mjs; else skip "poll-same-test" node; fi
     if have node; then run "widget-feed-test (sdk/widgetfeedmodel.js)" node tests/widget_feed_test.mjs; else skip "widget-feed-test" node; fi
     if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi
