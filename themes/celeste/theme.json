@@ -1,0 +1,18 @@
+{
+  "name": "Lord Celeste",
+  "description": "A screen frame with a side bar and drawers that slide out of its edges. Inspired by Caelestia (caelestia-dots/shell).",
+  "community": true,
+  "author": "pending confirmation",
+  "license": "MIT",
+  "sketch": { "rail": true, "frame": true },
+  "desktopArrows": true,
+  "options": [
+    { "key": "scheme", "label": "shell.celeste.opt.scheme", "hint": "shell.celeste.opt.schemeHint", "default": "lavender",
+      "choices": [["lavender", "shell.celeste.scheme.lavender"], ["rose", "shell.celeste.scheme.rose"], ["sky", "shell.celeste.scheme.sky"], ["mint", "shell.celeste.scheme.mint"], ["sand", "shell.celeste.scheme.sand"]] },
+    { "key": "surface", "label": "shell.celeste.opt.surface", "hint": "shell.celeste.opt.surfaceHint", "default": "solid",
+      "choices": [["clear", "shell.celeste.surface.clear"], ["glass", "shell.celeste.surface.glass"], ["solid", "shell.celeste.surface.solid"], ["opaque", "shell.celeste.surface.opaque"]] },
+    { "key": "hover", "label": "shell.celeste.opt.hover", "hint": "shell.celeste.opt.hoverHint", "toggle": true, "default": true },
+    { "key": "wpEffect", "label": "shell.celeste.opt.wpEffect", "default": "fade",
+      "choices": [["none", "shell.celeste.fx.none"], ["fade", "shell.celeste.fx.fade"], ["curtain", "shell.celeste.fx.curtain"], ["blinds", "shell.celeste.fx.blinds"], ["shutter", "shell.celeste.fx.shutter"], ["zoom", "shell.celeste.fx.zoom"]] }
+  ]
+}

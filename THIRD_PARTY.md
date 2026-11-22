@@ -81,6 +81,12 @@ a real recording; LordOS shows that notice where voices are created. Voices whos
 redistribution and commercial use are left out (jean, from EARS: non-commercial only; cosette, javert and marius: their
 recordings' origin isn't documented).
 
+## Community themes
+
+| Theme | Credit | License |
+|---|---|---|
+| Lord Celeste (`themes/celeste`) | Layout inspired by Caelestia (caelestia-dots/shell, GPL-3.0); no code or assets from it. Author pending confirmation | MIT |
+
 ## npm packages (bundled into the theme JavaScript at build time)
 
 | Package | License |
