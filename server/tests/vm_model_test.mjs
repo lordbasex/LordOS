@@ -659,5 +659,22 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('no suspend: a graphics card, or 3D running', [M.noSuspend(null, 'intel-shared'), M.noSuspend({ sandbox: 512 }, ''), M.noSuspend({ sandbox: 1 }, '')], [true, true, false]);
 }
 
+// ---- a card's ··· menu on the screen, never cut by the window ----
+{
+  const items = ['a', 'b', '-', 'c'].map((x) => (x === '-' ? x : { label: x }));
+  eq('menu height', M.popMenuHeight(items), 14 + 30 * 3 + 11);
+  eq('menu height: no items, nulls skipped', [M.popMenuHeight(null), M.popMenuHeight([null, { label: 'a' }])], [14, 44]);
+  eq('menu below when it fits', M.menuSpot({ x: 100, y: 200, above: 160 }, 220, 300, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 100, top: 200 });
+  eq('menu too tall both ways: as low as fits', M.menuSpot({ x: 1150, y: 420, above: 380 }, 220, 450, { x: 0, y: 0, w: 1920, h: 860 }), { left: 1150, top: 402 });
+  eq('menu above the button', M.menuSpot({ x: 10, y: 800, above: 760 }, 220, 450, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 10, top: 310 });
+  eq('menu with room neither way: as low as fits', M.menuSpot({ x: 10, y: 300, above: 260 }, 220, 900, { x: 0, y: 0, w: 1920, h: 1000 }), { left: 10, top: 92 });
+  eq('menu kept off the right edge', M.menuSpot({ x: 1800, y: 10 }, 220, 100, { x: 0, y: 0, w: 1920, h: 1080 }).left, 1920 - 220 - 8);
+  eq('menu kept off the left and top edges', M.menuSpot({ x: -20, y: -5 }, 220, 100, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 8, top: 8 });
+  const two = [{ x: 0, y: 0, w: 1920, h: 1080, main: true }, { x: 1920, y: 0, w: 1280, h: 720 }];
+  eq('the display under a point', [M.displayUnder(two, 2000, 100).x, M.displayUnder(two, 2000, 900).x, M.displayUnder([], 1, 1)], [1920, 0, null]);
+  eq('menu on the second, shorter display opens up there', M.menuSpot({ x: 3100, y: 600, above: 560 }, 220, 300, two[1]), { left: 1920 + 1280 - 220 - 8, top: 260 });
+  eq('a pointer menu opens up from the pointer', M.menuSpot({ x: 500, y: 1000 }, 220, 300, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 500, top: 700 });
+}
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

@@ -1090,3 +1090,22 @@ export const lordVmWhy = (out) => {
   const s = String(out || '').trim();
   return (s.split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || s).slice(0, 400);
 };
+
+// A PopMenu's height (apps/machines/ui.jsx: 6 px padding and a 1 px edge on each side, 30 px a row, 11 a separator,
+// about 24 an information row), for placing it before it's drawn
+export const popMenuHeight = (items) => 14 + (items || []).filter(Boolean).reduce((s, it) => s + (it === '-' ? 11 : it.note ? 24 : 30), 0);
+
+// Where a menu w × h opened at at ({ x, y }: its top-left on the desktop; above: the y its bottom goes to when it opens
+// upwards, the button's top or the pointer) goes on the display b ({ x, y, w, h }, the one under at): below when it
+// fits, else above, else as low as the display lets it; never past an edge (m from each). The window doesn't cut it:
+// it's drawn over everything.
+export function menuSpot(at, w, h, b, m = 8) {
+  const bx = b?.x || 0, by = b?.y || 0, bw = b?.w || 0, bh = b?.h || 0;
+  const left = Math.max(bx + m, Math.min(Math.round(at?.x || 0), bx + bw - w - m));
+  const y = Math.round(at?.y || 0);
+  if (y + h <= by + bh - m) return { left, top: Math.max(by + m, y) };
+  const up = Math.round(at?.above ?? y) - h;
+  return { left, top: up >= by + m ? up : Math.max(by + m, by + bh - h - m) };
+}
+// the display under a point (screen.displays), or the main one
+export const displayUnder = (ds, x, y) => (ds || []).find((d) => x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h) || (ds || []).find((d) => d.main) || (ds || [])[0] || null;
