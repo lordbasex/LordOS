@@ -486,6 +486,8 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->vgpu && (m->arch != VM_ARCH_AMD64 || m->firmware != VM_FW_UEFI)) return fail(err, n, VM_E_RANGE, "an Intel vGPU is for amd64 machines with UEFI");
     if (m->vgpu && m->graphics == VM_GFX_3D) return fail(err, n, VM_E_RANGE, "an Intel vGPU replaces 3D graphics: choose one");
     if (m->schema < 10 && m->pointer_guest) return fail(err, n, VM_E_FIELD, "pointer needs schema 10");
+    if (m->capture_fullscreen & ~1) return fail(err, n, VM_E_RANGE, "capture_fullscreen is true or false");
+    if (m->schema < 12 && m->capture_fullscreen) return fail(err, n, VM_E_FIELD, "capture_fullscreen needs schema 12");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
     for (int i = 0; m->transfer && i < m->n_shares; i++)
         if (!strcmp(m->share_tag[i], VM_XFER_TAG)) return fail(err, n, VM_E_RANGE, "shares: the tag " VM_XFER_TAG " is the transfer folder's");
@@ -527,7 +529,7 @@ static const char *const KEYS[] = {
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
-    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", NULL,
+    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -791,6 +793,10 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
             for (int i = 1; VM_VGPU_NAMES[i]; i++) if (!strcmp(g, VM_VGPU_NAMES[i])) m->vgpu = i;
             if (!m->vgpu) { r = fail(err, n, VM_E_RANGE, "gpu is intel-whole or intel-shared"); goto out; }
         }
+        /* schema 12: missing means the mouse isn't captured on its own in full screen */
+        const JVal *cf = json_get(o, "capture_fullscreen");
+        if (cf && cf->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "capture_fullscreen must be true or false"); goto out; }
+        m->capture_fullscreen = cf ? json_bool(o, "capture_fullscreen", 0) : 0;
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -884,6 +890,7 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 9 && m->clipboard_ask) jb_raw(&b, ",\n  \"clipboard_ask\": true");
     if (m->schema >= 10 && m->pointer_guest) jb_raw(&b, ",\n  \"pointer\": \"guest\"");
     if (m->schema >= 11 && m->vgpu) { jb_raw(&b, ",\n  \"gpu\": "); jb_str(&b, VM_VGPU_NAMES[m->vgpu]); }
+    if (m->schema >= 12 && m->capture_fullscreen) jb_raw(&b, ",\n  \"capture_fullscreen\": true");
     if (m->schema >= 8 && m->sound_out[0]) { jb_raw(&b, ",\n  \"sound_out\": "); jb_str(&b, m->sound_out); }
     if (m->schema >= 8 && m->sound_in[0]) { jb_raw(&b, ",\n  \"sound_in\": "); jb_str(&b, m->sound_in); }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
@@ -1083,4 +1090,25 @@ int vm_image_kind(const uint8_t *head, size_t n, const char *name, char *err, si
     }
     fail(err, errlen, -1, ends_with(name ? name : "", ".qcow2") ? "not a qcow2 image" : "only qcow2 images (or raw .img) can be imported");
     return -1;
+}
+
+int vm_mouse_pick(const JVal *list, int relative, int *current, int *added) {
+    int best = -1, best_rank = 0, best_cur = 0, n = 0;
+    *current = 0;
+    *added = 0;
+    if (!list || list->type != J_ARR) return -1;
+    for (const JVal *e = list->kid; e && n < 32; e = e->next, n++) {
+        if (e->type != J_OBJ) continue;
+        const JVal *ab = json_get(e, "absolute"), *cu = json_get(e, "current"), *ix = json_get(e, "index");
+        const char *name = json_str(e, "name");
+        if (!ab || ab->type != J_BOOL || !ix || ix->type != J_NUM || ix->num < 0 || ix->num > 1000 || ix->num != (int)ix->num) continue;
+        int is_abs = json_bool(e, "absolute", 0), is_cur = cu && cu->type == J_BOOL && json_bool(e, "current", 0);
+        int ps2 = name && strstr(name, "PS/2") != NULL, tablet = name && strstr(name, "Tablet") != NULL;
+        if (is_cur && !is_abs && !ps2) *added = 1;
+        if (is_abs == !!relative) continue;
+        int rank = relative ? (ps2 ? 1 : 2) : (tablet ? 2 : 1);
+        if (rank > best_rank) { best_rank = rank; best = (int)ix->num; best_cur = is_cur; }
+    }
+    *current = best_cur;
+    return best;
 }

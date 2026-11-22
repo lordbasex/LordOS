@@ -178,6 +178,9 @@ let superAlone = false;
 let altAlone = false;         // the same for ⌥ (the menu bar)
 // a click while ❖ is held is ❖ + click (the Terminal's links and file names, a window's move): its release isn't a tap
 addListener('pointerdown', () => { superAlone = false; altAlone = false; });
+// ❖Esc ended a pointer lock (Machines' "Capture mouse", lord.input.lockPointer): lord-server took the Esc, so ❖'s
+// release isn't a tap either
+addListener('pointerlock', (e) => { if (e.type === 'lockend' && e.why === 1) { superAlone = false; altAlone = false; } });
 
 function filter(e) {
   if (!e.code) return false;                       // text an input method committed

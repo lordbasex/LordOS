@@ -804,7 +804,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 
 typedef struct { int fd, control; } Client;
 enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
-       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST };
+       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 /* a file dropped on the machine's window, for the guest (VM_FILE) */
@@ -850,6 +850,11 @@ static struct {
     long long gvt_poll_at;
     int gvt_done, lag_gvt;
     long long xfer_poll_at;
+    /* "Capture mouse" (VM_CAPTURE, docs/VIRTUALIZATION.md 6.25): the mouse wanted (1 relative, 0 the tablet), whether this
+     * start has a relative mouse lord-vm added (arm64: one that takes over when its driver starts), the next check of
+     * which mouse is active, a query-mice in flight, and what was said about it last (for the log) */
+    int cap_want, cap_rel_added, mice_q, mice_said;   /* cap_rel_added: every machine with a window since 0.8.9 */
+    long long mice_at;
     pid_t tpm;                              /* the TPM (Windows 11): swtpm, and QEMU's end of its control socket */
     int tpm_q;
     off_t serial_bytes;
@@ -1921,6 +1926,10 @@ static void build_qemu_args(void) {
         if (m->devices != VM_DEV_WINDOWS) { arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5"); }
         if (arm) { arg("-device"); arg("usb-kbd,bus=xhci.0"); }
         arg("-device"); arg("usb-tablet,bus=xhci.0");
+        /* "Capture mouse" (6.25): a relative mouse beside the tablet, used only while captured (mouse_set). Not the PS/2
+         * mouse of amd64's chipset: a Linux guest drives it as VMware's VMMouse, which drops plain relative packets */
+        arg("-device"); arg("usb-mouse,bus=xhci.0");
+        S.cap_rel_added = 1;
         /* the same sound path as below: the HDA card after this needs its audiodev (a Windows machine in a window
          * failed to start without it, "audiodev 'snd0' not found") */
         arg("-audiodev"); arg("dbus,id=snd0,out.frequency=48000,out.channels=2,out.format=s16,in.frequency=48000,in.channels=2,in.format=s16");
@@ -1928,6 +1937,10 @@ static void build_qemu_args(void) {
     } else if (m->display == VM_DISPLAY_WINDOW) {
         if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); arg("-device"); arg("virtio-keyboard-pci,addr=0x5"); }
         arg("-device"); arg(arm ? "virtio-tablet-pci,addr=0x6" : "virtio-tablet-pci,addr=0x5");
+        /* the relative mouse for "Capture mouse" (6.25), on a free slot (0x10-0x13 are the data disks, 0x18 on the extra
+         * cards) */
+        arg("-device"); arg("virtio-mouse-pci,addr=0x14");
+        S.cap_rel_added = 1;
         /* the guest's sound goes out through the same peer-to-peer D-Bus as the picture (lord-vmdisplay listens): 48 kHz,
          * 16-bit stereo, what lord-server's recordings and speakers take without converting */
         arg("-audiodev"); arg("dbus,id=snd0,out.frequency=48000,out.channels=2,out.format=s16,in.frequency=48000,in.channels=2,in.format=s16");
@@ -4960,6 +4973,16 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         fx_next();
         return;
     }
+    case VM_CAPTURE:
+        if (S.m.display != VM_DISPLAY_WINDOW) { reply(ci, m->seq, VME_NO_DISPLAY, "this machine has no display"); return; }
+        if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        S.cap_want = m->a;
+        S.mice_said = 0;
+        vlog("capture: the mouse %s", m->a ? "is captured: the guest gets a relative mouse" : "is free: the guest gets the tablet again");
+        if (qmp_do("query-mice", NULL, P_MICE, ci, m->seq, -1, -1)) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
+        S.mice_q = 1;
+        S.mice_at = now_ms() + 1000;
+        return;
     case VM_KEEP:
         S.keep_running = m->a ? 1 : 0;
         vlog("keep running without lord-server: %s", S.keep_running ? "yes" : "no");
@@ -5071,6 +5094,49 @@ static void on_qmp_event(const JVal *root) {
     else vlog("qemu: event %.60s", ev);
 }
 
+/* ---- "Capture mouse" (VM_CAPTURE, docs/VIRTUALIZATION.md 6.25) ----
+ * QEMU sends the pointer to its active mouse: the one whose guest driver started last. Captured, the relative mouse
+ * lord-vm adds beside the tablet is made the active one (HMP mouse_set: QMP has no command for it); otherwise the tablet
+ * is, whenever that mouse took over by itself (its driver started after the tablet's, at each boot). Checked every
+ * second while the machine runs */
+static int mice_watched(void) {
+    return S.qmp_up && S.state == VS_RUNNING && S.m.display == VM_DISPLAY_WINDOW && (S.cap_want || S.cap_rel_added);
+}
+static void mice_answer(const JVal *list, int client, uint32_t seq, const char *desc) {
+    int current = 0, other = 0;
+    int idx = list ? vm_mouse_pick(list, S.cap_want, &current, &other) : -1;
+    if (!list) { if (client >= 0) reply(client, seq, VME_QMP, desc); vlog("capture: query-mice: %.150s", desc); return; }
+    /* not captured, the tablet is set back only when lord-vm's own mouse took over: whatever QEMU chose before the
+     * tablet's driver started (the PS/2 mouse during a BIOS) stays as it always was */
+    if (!S.cap_want && client < 0 && !other) idx = -1, current = 1;
+    if (idx < 0 && !current) {
+        if (S.mice_said != 1) vlog("capture: the guest has no %s mouse: %s", S.cap_want ? "relative" : "absolute",
+                                   S.cap_want ? "lord-vmdisplay moves the tablet by the motion instead" : "the pointer stays as it is");
+        S.mice_said = 1;
+        if (client >= 0) reply(client, seq, VME_QMP, S.cap_want ? "no relative mouse" : "no tablet");
+        return;
+    }
+    if (current) { if (client >= 0) reply(client, seq, VME_OK, ""); return; }
+    char a[64];
+    snprintf(a, sizeof a, "{\"command-line\":\"mouse_set %d\"}", idx);
+    if (S.mice_said != 2 + S.cap_want) {
+        /* what QEMU listed, once per change, for the log (its names are QEMU's own: printable, cut short) */
+        char seen[400] = "";
+        size_t k = 0;
+        int n = 0;
+        for (const JVal *e = list->kid; e && n < 8 && k < sizeof seen - 1; e = e->next, n++) {
+            const char *nm = json_str(e, "name");
+            k += (size_t)snprintf(seen + k, sizeof seen - k, "%s%d %.40s%s%s", n ? ", " : "", (int)json_num(e, "index", -1), nm ? nm : "?",
+                                  json_bool(e, "absolute", 0) ? " (absolute)" : "", json_bool(e, "current", 0) ? " (active)" : "");
+            if (k >= sizeof seen) k = sizeof seen - 1;
+        }
+        for (char *c = seen; *c; c++) if ((unsigned char)*c < 0x20 || *c == 0x7f) *c = '?';
+        vlog("capture: mouse %d made the active one (%s); QEMU has: %s", idx, S.cap_want ? "relative" : "the tablet", seen);
+    }
+    S.mice_said = 2 + S.cap_want;
+    if (qmp_do("human-monitor-command", a, P_MOUSE_SET, client, seq, -1, -1) && client >= 0) reply(client, seq, VME_BUSY, "busy");
+}
+
 static void on_qmp_reply(const JVal *root, int ok) {
     if (!S.pq_n) { vlog("qmp: a reply nobody asked for"); return; }
     Pending p = S.pq[S.pq_head];
@@ -5110,6 +5176,13 @@ static void on_qmp_reply(const JVal *root, int ok) {
         break;
     case P_JOBQ: if (S.snap_kind) snap_concluded(root, ok); break;
     case P_NET: break;                                  /* the old backend may already be gone */
+    case P_MICE: S.mice_q = 0; mice_answer(ok ? json_get(root, "return") : NULL, p.client, p.seq, desc); break;
+    case P_MOUSE_SET:
+        /* human-monitor-command answers HMP's own words as "return" (empty when mouse_set took it) */
+        if (ok) { const char *said = json_str(root, "return"); if (said && *said) { ok = 0; desc = said; } }
+        if (!ok) vlog("capture: mouse_set: %.150s", desc);
+        if (p.client >= 0) reply(p.client, p.seq, ok ? VME_OK : VME_QMP, desc);
+        break;
     case P_NET_ADD: if (!ok && !S.net_err[0]) snprintf(S.net_err, sizeof S.net_err, "%s", desc); break;
     case P_NET_LAST: net_attached(ok, desc); break;
     case P_SNAPSIZE: if (S.snap_kind == VSN_TAKE) snap_taken(root); break;
@@ -5377,6 +5450,7 @@ static void loop(void) {
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
         if (S.win_key_at && (next < 0 || S.win_key_at < next)) next = S.win_key_at;
+        if (mice_watched() && S.mice_at && (next < 0 || S.mice_at < next)) next = S.mice_at;
         int to = next < 0 ? -1 : next <= now ? 0 : (int)(next - now);
         if (poll(p, (nfds_t)n, to) < 0 && errno != EINTR) { vlog("poll: %s", strerror(errno)); break; }
         now = now_ms();
@@ -5387,6 +5461,11 @@ static void loop(void) {
             S.win_key_at = --S.win_keys > 0 && S.state == VS_RUNNING ? now + 700 : 0;
         }
         if (S.net_retry_at && now >= S.net_retry_at) net_restart();
+        if (mice_watched() && now >= S.mice_at) {
+            /* the mouse wanted is still the active one (a guest's driver that starts later takes over) */
+            S.mice_at = now + 1000;
+            if (!S.mice_q && !qmp_do("query-mice", NULL, P_MICE, -1, 0, -1, -1)) S.mice_q = 1;
+        }
         if (S.id_poll_at && now >= S.id_poll_at) { char a[48]; S.id_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.id_pid); qga_do("guest-exec-status", a, AQ_IDSTATUS); }
         if (S.xfer_poll_at && now >= S.xfer_poll_at) { char a[48]; S.xfer_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.xfer_pid); if (qga_do("guest-exec-status", a, AQ_XSTATUS)) S.xfer_poll_at = now + 300; }
         if (S.ptr_poll_at && now >= S.ptr_poll_at) { char a[48]; S.ptr_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.ptr_pid); if (qga_do("guest-exec-status", a, AQ_PSTATUS)) S.ptr_poll_at = now + 300; }
@@ -6038,7 +6117,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -6089,6 +6168,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
             if (gpu < 0) { fprintf(stderr, "lord-vm: --gpu none|intel-whole|intel-shared\n"); return 2; }
             continue;
         }
+        if (!strcmp(a, "--capture-fullscreen")) { capfs = parse_enum(v, "off", "on"); if (capfs < 0) { fprintf(stderr, "lord-vm: --capture-fullscreen on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
@@ -6162,6 +6242,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (m.agent || m.clipboard) m.schema = VM_SCHEMA;
     if (cask >= 0) { m.clipboard_ask = cask; if (cask) m.schema = VM_SCHEMA; }
     if (ptr >= 0) { m.pointer_guest = ptr; if (ptr) m.schema = VM_SCHEMA; }
+    if (capfs >= 0) { m.capture_fullscreen = capfs; if (capfs) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
     if (gpu >= 0) { m.vgpu = gpu; if (gpu) { m.schema = VM_SCHEMA; if (gfx < 0) m.graphics = VM_GFX_2D; } }
@@ -7736,6 +7817,7 @@ static int usage(void) {
             "                         [--sound on|off] [--volume 0..100] [--microphone on|off] [--sound-out NODE|default] [--sound-in NODE|default]   (with the machine off; Machines changes them live)\n"
             "                         [--clipboard-ask on|off]   (ask before each paste into and copy out of the machine)\n"
             "                         [--pointer lordos|guest]   (who draws a Windows guest's pointer: LordOS, or its display driver)\n"
+            "                         [--capture-fullscreen on|off]   (the window captures the mouse when it goes full screen)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"

@@ -320,3 +320,12 @@ int media_cover_node(float x0, float y0, float x1, float y1) {
     }
     return 0;
 }
+
+int media_src_to_screen(int id, float u, float v, float *x, float *y) {
+    MediaSrc *s = media_src_get(id);
+    const Node *n = s && s->node ? node_get(s->node) : NULL;
+    if (!n || !s->map_ok || s->map_w != s->w || s->map_h != s->h || n->w < 1 || n->h < 1) return -1;
+    *x = n->ax + n->w * (s->map_fx + u * s->map_kx);
+    *y = n->ay + n->h * (s->map_fy + v * s->map_ky);
+    return 0;
+}

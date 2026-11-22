@@ -12,6 +12,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Machines: Capture mouse, in development** (`docs/VIRTUALIZATION.md` 6.25; approved by the maintainer 2026-11-21). A
+  machine window's toolbar has a *Capture mouse* button (and *Actions → Capture mouse*): Automatic, as before (an absolute
+  tablet, the pointer moves freely in and out), or Captured, for games and 3D programs: the host's pointer is hidden and held
+  inside the picture and the guest gets relative motion that never stops at a screen's edge. ❖Esc or Ctrl+Alt releases it
+  (taken by lord-server before any app), as do the button, focus loss, apps mode and the machine stopping; *Mouse captured —
+  ❖Esc to release* shows for four seconds. Configure → Display → *Capture automatically in full screen* (off by default;
+  machine.json schema 12 `capture_fullscreen`, `lord-vm --set --capture-fullscreen on|off`): captured on entering full
+  screen, released on leaving it, and a click in the picture captures again after ❖Esc. Not offered in apps mode (the button
+  says why). In all 35 languages.
+  - **A pointer lock in lord-server** (`server/src/pointerlock.c`): the pointer stays inside the owner's node, the mouse's
+    motion goes to the owner instead, buttons and wheel still go where the pointer is; it ends on ❖Esc or Ctrl+Alt, when the
+    node is gone for half a second, or when the session loses its input. Generic: native apps and games get it as
+    `lord.input.lockPointer(node)` / `unlockPointer()` with the motion as `'pointerlock'` listener events once a frame (not for
+    isolated apps). `tests/pointerlock_test.c`.
+  - **The machine's side**: the motion goes straight from lord-server's input path to lord-vmdisplay (`VD_REL`, no JavaScript),
+    which sends QEMU's `Mouse.RelMotion`. lord-vm (`VM_CAPTURE`) makes a relative mouse QEMU's active one with `query-mice` and
+    `mouse_set` (and the tablet again on release). Every machine with a window now has a `usb-mouse` (compat and USB-tablet
+    devices) or a `virtio-mouse-pci` (slot 0x14) beside its tablet; lord-vm checks every second that the tablet stays the active
+    one when not captured (the new mouse's driver takes over at each boot otherwise). amd64's PS/2 mouse isn't used: Linux drives
+    it as VMware's VMMouse, which drops relative packets. A guest that hands its pointer over has its own shape shown where it
+    puts it. Seen on a Debian 13 guest with virtio and with compat devices: relative motion arrives exactly (−3000 px in one move,
+    no edge), the tablet works again after release. Not yet tried in the lord-server window, with a guest of another family or on arm64.
+  - Tests: `tests/vm_capture_test.mjs` (the window's decisions), `vm_test` (schema 12, the choice among QEMU's mice);
+    `lordvm-dev` `capture 0|1` and `rel DX DY`.
+
 - **Machines: LordOS draws the pointer of a machine with the VirtIO GPU display-only driver, in development** (`docs/VIRTUALIZATION.md` 7.1.2,
   `docs/MACHINES-GPU.md` Part 1 step 2). The LordOS guest tools (`lordos-guest-win`) are now w5 and say `pointer`; lord-vm then sets
   viogpudo's `HWCursor` value through qemu-guest-agent with one fixed SYSTEM script (`PTR_PS`: only `VioGpuDod`

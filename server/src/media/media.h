@@ -47,6 +47,9 @@ int  media_present_pending(void);
  * hotspot; NULL: none (the host's arrow). media_src_cursor_visible: the source hid or showed it. */
 void media_src_cursor(int id, const uint8_t *bgra, int w, int h, int hx, int hy);
 void media_src_cursor_visible(int id, int on);
+/* where picture pixel (u, v) is on the screen (logical coordinates), as its node showed it at the last paint; 0 ok, -1 not
+ * shown, or rotated or mirrored (Machines' "Capture mouse" shows the guest's pointer there) */
+int  media_src_to_screen(int id, float u, float v, float *x, float *y);
 void media_src_cursor_guest_draws(int id, int on);
 /* Over a media node of source id (main.c, cursor_now): 0 the host's pointer (none sent, or the source turned its own
  * off), 1 *px… (premultiplied, at the size the picture is shown, at most 64 × 64), 2 hidden (a fully transparent

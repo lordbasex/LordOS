@@ -42,6 +42,7 @@
 #include "ui.h"
 #include "../term/term.h"
 #include "../fsops.h"
+#include "../pointerlock.h"
 
 #include <crypt.h>
 #include <dirent.h>
@@ -431,6 +432,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             JS_SetPropertyStr(c, o, "agent", JS_NewBool(c, m.agent));
             JS_SetPropertyStr(c, o, "clipboardAsk", JS_NewBool(c, m.clipboard_ask));
             set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
+            JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
             set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
             set_str(c, o, "mac", m.mac);
             /* sound (6.9): host-side choices */
@@ -908,7 +910,7 @@ static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 }
 
 /* set(dir, { name, vcpus, memoryMb, diskGb, network, bridge, ports: [{ proto, host, guest, open }], iso,
- *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu, pointer: "lordos"|"guest" }) → job id: lord-vm --set on a
+ *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu, pointer: "lordos"|"guest", captureFullscreen }) → job id: lord-vm --set on a
  * machine that is off (Configure). shares replaces the list ([] empties it); lord-vm decides which folders may be shared */
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -1027,6 +1029,10 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "clipboardAsk");
     if (JS_IsBool(v)) { args[n++] = "--clipboard-ask"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "captureFullscreen");
+    if (JS_IsBool(v)) { args[n++] = "--capture-fullscreen"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "pointer");
@@ -1357,6 +1363,9 @@ typedef struct {
     struct { uint32_t id; int w, h; uint8_t *rgba; } icons[LAG_WIN_MAX];
     LagAppList *gapps;
     int wins_seq, icons_seq, gapps_seq, gapps_gen, apps_mode;
+    /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
+     * did (PTRLOCK_END_*), for the window */
+    int captured, cap_ends, cap_why;
 } Sess;
 static Sess sess[MAX_SESS];
 
@@ -1942,6 +1951,7 @@ static int db_read(Sess *s, MediaSrc *ms, int *ry0, int *ry1) {
 }
 
 static void drop_display(Sess *s, int close_helper) {
+    ptrlock_end_owner(s);               /* no picture, no capture (it tells lord-vm and the helper first) */
     if (s->vd >= 0) { if (close_helper) vdsend(s, VD_CLOSE, 0, 0); close(s->vd); s->vd = -1; }
     if (s->vd_pid > 0) {
         if (waitpid(s->vd_pid, NULL, WNOHANG) == 0) { kill(s->vd_pid, SIGKILL); waitpid(s->vd_pid, NULL, 0); }
@@ -2301,8 +2311,14 @@ static void from_vd(Sess *s) {
             if (fd >= 0 && !s->ptr_guest && !vm_cursor_check(fd, m.a, m.b)) guest_cursor(s, fd, m.a, m.b, m.c, m.d);
             break;
         case VD_POINTER:
-            /* where the guest puts it doesn't matter (the host's pointer drives an absolute tablet); whether it shows does */
+            /* where the guest puts it doesn't matter (the host's pointer drives an absolute tablet); whether it shows does.
+             * Captured, the pointer stays where the guest has it, so its own (or the host's arrow) shows there */
             if (s->media) media_src_cursor_visible(s->media, m.c != 0);
+            if (s->captured && s->media) {
+                float x, y;
+                if (m.c && m.a >= 0 && m.b >= 0 && m.a < s->w && m.b < s->h && !media_src_to_screen(s->media, m.a + 0.5f, m.b + 0.5f, &x, &y)) ptrlock_show(1, x, y);
+                else ptrlock_show(0, 0, 0);
+            }
             break;
         case VD_STATE: s->vd_state = m.a; break;
         default: break;
@@ -2457,6 +2473,9 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         }
     }
     JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "captured", JS_NewBool(c, s->captured));
+    set_int(c, o, "captureEnds", s->cap_ends);
+    set_int(c, o, "captureWhy", s->cap_why);
     set_str(c, o, "state", STATES[s->state]);
     set_str(c, o, "reason", REASONS[s->reason]);
     set_int(c, o, "code", s->code);
@@ -2753,6 +2772,42 @@ static JSValue f_wheel(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (dy || dx) vdsend(s, VD_WHEEL, dy, dx);
     }
     return JS_UNDEFINED;
+}
+/* "Capture mouse" (docs/VIRTUALIZATION.md 6.25): the mouse's motion straight to lord-vmdisplay, no JavaScript in between */
+static void cap_motion(void *ud, int dx, int dy) {
+    Sess *s = ud;
+    while (dx || dy) {
+        int a = dx > VD_REL_MAX ? VD_REL_MAX : dx < -VD_REL_MAX ? -VD_REL_MAX : dx, b = dy > VD_REL_MAX ? VD_REL_MAX : dy < -VD_REL_MAX ? -VD_REL_MAX : dy;
+        vdsend(s, VD_REL, a, b);
+        dx -= a; dy -= b;
+    }
+}
+/* ended by the window, ❖Esc or Ctrl+Alt, the picture's node going away or the input leaving: the tablet again */
+static void cap_ended(void *ud, int why) {
+    Sess *s = ud;
+    s->captured = 0;
+    s->cap_ends++;
+    s->cap_why = why;
+    vdsend(s, VD_CAPTURE, 0, 0);
+    ask(s, VM_CAPTURE, 0);
+}
+/* capture(sid, on, node) → true when captured (on) or released: node is the picture's box (the pointer stays inside it).
+ * Only a running machine with its picture; apps mode never asks (vmwindow.jsx) */
+static JSValue f_capture(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s) return JS_FALSE;
+    if (!JS_ToBool(c, argv[1])) { ptrlock_end_owner(s); return JS_TRUE; }
+    int node = argc >= 3 ? ival(c, argv[2]) : 0;
+    if (s->captured) return JS_NewBool(c, !ptrlock_retarget(s, node));     /* the window was rebuilt (full screen) */
+    if (s->vd < 0 || !s->media || s->vm < 0 || (s->state != VS_RUNNING && s->state != VS_PAUSED) || node <= 0) return JS_FALSE;
+    PtrLockSink k = { cap_motion, cap_ended, s };
+    /* lord-vmdisplay first: from now on it takes only relative motion */
+    vdsend(s, VD_CAPTURE, 1, 0);
+    if (ptrlock_begin(node, &k)) { vdsend(s, VD_CAPTURE, 0, 0); return JS_FALSE; }
+    s->captured = 1;
+    ask(s, VM_CAPTURE, 1);
+    return JS_TRUE;
 }
 static JSValue f_release(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; Sess *s = get(c, argv[0]); if (s) vdsend(s, VD_RELEASE_ALL, 0, 0); return JS_UNDEFINED; }
 static JSValue f_resize(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -4072,7 +4127,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
-    JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
+    JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
     JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
