@@ -68,7 +68,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   ❖Esc to release* shows for four seconds. Configure → Display → *Capture automatically in full screen* (off by default;
   machine.json schema 12 `capture_fullscreen`, `lord-vm --set --capture-fullscreen on|off`): captured on entering full
   screen, released on leaving it, and a click in the picture captures again after ❖Esc. Not offered in apps mode (the button
-  says why). In all 35 languages.
+  says why). In all 35 languages. A machine made with a profile honours its keyboard and mouse choices: *Mouse: capture*
+  captures whenever the window comes to the front (and on a click after ❖Esc), *Shortcuts: never* never takes LordOS's
+  shortcuts, and *Capture in full screen* is written to machine.json (`capture_fullscreen`, its only home) when the machine
+  is made.
   - **A pointer lock in lord-server** (`server/src/pointerlock.c`): the pointer stays inside the owner's node, the mouse's
     motion goes to the owner instead, buttons and wheel still go where the pointer is; it ends on ❖Esc or Ctrl+Alt, when the
     node is gone for half a second, or when the session loses its input. Generic: native apps and games get it as

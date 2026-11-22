@@ -2352,6 +2352,11 @@ pointer is hidden and held inside the picture, and the guest gets relative motio
   by default; `lord-vm --set --capture-fullscreen on|off`) captures on entering full screen and releases on leaving it; after ❖Esc
   there, a click in the picture captures again. A capture asked for with the button stays across full screen (the lock moves to the
   rebuilt window's picture). The floating bar doesn't open while captured.
+- **Profiles** (Settings → Profiles, the New Machine assistant): a profile's *Mouse* `capture` (app.json `input.mouse`) captures
+  whenever the window comes to the front with its picture up, and a click in the picture captures again after ❖Esc; its
+  *Shortcuts* `never` (`input.shortcuts`) means the window never takes LordOS's shortcuts (not even asked). A profile's *Capture in
+  full screen* is written to machine.json `capture_fullscreen` with `lord.vm.set` when the machine is made (`setPatch`): that field,
+  the one Configure changes, is its only home; app.json keeps only the mouse and shortcuts choices.
 - **Apps mode**: not offered (the button says why): the guest's windows are LordOS windows that share this computer's pointer.
 - **The pointer lock** (`server/src/pointerlock.c`, generic, not Machines'): while held the pointer stays at the centre of the
   owner's node and nothing the owner says moves it; the evdev motion (after Settings → Mouse's speed, before clamping to the screen)

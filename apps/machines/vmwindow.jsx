@@ -603,7 +603,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   }, [live, focused, sid]);
   // ❖, ⌥Tab and the desktop's other shortcuts go to the machine too, once the person allowed it (asked the first
   // time); ❖Esc gives them back and takes them again (sdk/kbinhibit.js)
-  useEffect(() => (live && focused ? inhibitShortcuts(winId, 'machines') : undefined), [live, focused, winId]);
+  // never, when the machine's profile says so (app.json input.shortcuts 'never'): LordOS keeps them, not even asked
+  useEffect(() => (live && focused && readMeta(dir).input?.shortcuts !== 'never' ? inhibitShortcuts(winId, 'machines') : undefined), [live, focused, winId]);
 
   const at = (e) => (box.current && st?.w ? toPicture(e.x, e.y, lord.getLayout(box.current.id), st.w, st.h) : null);
   const move = (e) => { const q = live && at(e); if (q) lord.vm.motion(sid, q[0], q[1]); };
@@ -612,7 +613,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const held = useRef(0);
   const down = (e, fresh) => {
     if (!live) return;
-    if (!capRef.current.on && full) capDo({ type: 'click', full, autoFs: !!cfgRef.current?.captureFullscreen });
+    if (!capRef.current.on) capDo({ type: 'click', full, autoFs: !!cfgRef.current?.captureFullscreen, mouse: readMeta(dir).input?.mouse });
     move(e);
     buttons.current.add(e.button);
     const b = e.button, id = sid;
@@ -702,8 +703,15 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     const t2 = setTimeout(() => { if (capRef.current.on && sid && box.current && !lord.vm.capture(sid, true, box.current.id)) capDo({ type: 'failed' }); }, 120);
     return () => clearTimeout(t2);
   }, []);
-  useEffect(() => { if (!focused) capDo({ type: 'blur' }); }, [focused]);
-  useEffect(() => { if (!capOffer.offered) capDo({ type: 'unavailable' }); }, [capOffer.offered]);
+  // the profile's mouse 'capture' (app.json input.mouse): captured whenever the window comes to the front with its picture
+  // up (after that first layout, as for full screen)
+  useEffect(() => {
+    if (!focused) { capDo({ type: 'blur' }); return undefined; }
+    if (!capOffer.offered) { capDo({ type: 'unavailable' }); return undefined; }
+    if (readMeta(dir).input?.mouse !== 'capture' || capRef.current.on) return undefined;
+    const t2 = setTimeout(() => capDo({ type: 'focus', mouse: readMeta(dir).input?.mouse }), 150);
+    return () => clearTimeout(t2);
+  }, [focused, capOffer.offered]);
   useEffect(() => {
     if (full === capFull) return undefined;
     setCapFull(full);
