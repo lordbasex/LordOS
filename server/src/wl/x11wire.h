@@ -161,7 +161,8 @@ int x11_same_process(uint32_t a, uint32_t b, const uint32_t *base, const uint32_
 /* Whether an X drag of files may reach LordOS (Files copies them): the selection owner's client has a pid
  * the server knows, and no client of the display is sandboxed (sandboxed(pid) != 0; it is called for every pid):
  * on one X display any client can stand in for another's selection, so one sandboxed client is enough to
- * refuse. 0 if owner is 0, n < 0 (too many clients) or no pid is known for the owner. */
+ * refuse. The X server's own client (resource base 0: Xwayland, in its own user namespace) is not one of them.
+ * 0 if owner is 0, n < 0 (too many clients) or no pid is known for the owner. */
 int x11_xdnd_trusted(uint32_t owner, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask,
                      int (*sandboxed)(int pid));
 

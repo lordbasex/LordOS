@@ -879,6 +879,10 @@ build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 # (tests/dnd_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/dnd-client, then press twice in its window)
 build/dnd-client: tests/dnd_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/dnd_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# Two wl_seat bindings in one client, as Firefox has: each wl_pointer and wl_keyboard gets every event once, a pointer made
+# while over the window gets its enter (tests/seat2_client.c; run inside a session, then click twice and type a letter)
+build/seat2-client: tests/seat2_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/seat2_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Files on the clipboard: an app's text/uri-list and gnome-copied-files, checked and offered back
 # (tests/clipfiles_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/clipfiles-client)
 build/clipfiles-client: tests/clipfiles_client.c $(CLIENT_GEN)

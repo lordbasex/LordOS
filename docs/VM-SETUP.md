@@ -1925,6 +1925,16 @@ Tests only, nothing from Debian:
   an askpass file of the test password, removed after the run). The run's grants file was backed up and put back.
 - Undo: `dpkg -r go-link-desk-lordos`, the backed-up `lord-server` back in place, the catalog folder and both folders removed.
 
+**2026-11-22, Firefox with two `wl_seat` bindings and XDND** (`docs/WAYLAND.md`, "Two wl_seat bindings (Firefox)" and
+"Drag and drop"). Nothing installed: `firefox-esr` 153.6 was already on the VM (from Debian, tests only). A development
+`lord-server` of `fix/wl-seat-xdnd` (built on VM 116) was run from `/tmp` as a second headless session of `alex` with its
+own `XDG_RUNTIME_DIR` (`/tmp/wsrt`), as a transient unit (`systemd-run --unit=ws-e2e … --user alex`, so Xwayland and the
+window manager start as in a real session), driven over its `remote.sock` with `tools/vm/e2e/ui.py` (copied to `/tmp`).
+Firefox on Wayland (`MOZ_ENABLE_WAYLAND=1`, `WAYLAND_DEBUG=1`) and on X11 (`MOZ_ENABLE_WAYLAND=0 GDK_BACKEND=x11`) ran with
+throwaway profiles in `/tmp`. The installed session was not changed (it crashed once during the first checks, which
+ran in it, see `WAYLAND.md`); afterwards the test files, binaries and profiles were removed and the VM rebooted into its
+installed session.
+
 ## Step — the 0.8.8.8 arm64 release packages on the Raspberry Pi 5 (172.17.0.24, 2026-11-12)
 
 `tools/iso/mkdeb.sh` refuses a package without `lord-screencast` (0.8.8.8), and `lordos-web` needs `lord-web`. Approved by

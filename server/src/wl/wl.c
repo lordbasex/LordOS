@@ -466,11 +466,13 @@ static int damage_box(Surf *s, Box *b) {
     return 1;
 }
 
-static void damage_node(Surf *s) {
+/* whole: all of the window, never its own last damage, and on the GPU path painted again (its draw list changes: a
+ * subsurface came, moved or went) */
+static void damage_node_ex(Surf *s, int whole) {
     Surf *top = s;
     while (top->parent && top->role != R_TOPLEVEL) top = top->parent;
     Box part;
-    int have_part = top == s && damage_box(s, &part);
+    int have_part = !whole && top == s && damage_box(s, &part);
     if (content_on) {               /* a menu or a fullscreen app may be anywhere: all of it */
         Node *tn = top->node ? node_get(top->node) : NULL;
         if (have_part) content_note(part);
@@ -478,10 +480,40 @@ static void damage_node(Surf *s) {
         else content_note(tn->prev_box);
     }
     /* GPU path: if only the content changed, presenting again is enough */
-    if (gpu_active() && (top->role == R_POPUP || top == fs_surf || hole_sig(s) == s->hole_sig)) { new_on(surf_keys(top)); return; }
+    if (!whole && gpu_active() && (top->role == R_POPUP || top == fs_surf || hole_sig(s) == s->hole_sig)) { new_on(surf_keys(top)); return; }
     Node *n = top->node ? node_get(top->node) : NULL;
     if (have_part) { if (part.x1 > part.x0) damage_add(part); }     /* CPU path: only what the app damaged */
     else if (n && n->prev_box.x1 > n->prev_box.x0) damage_add(n->prev_box);
+    ui.dirty = 1;
+}
+static void damage_node(Surf *s) { damage_node_ex(s, 0); }
+
+static void popup_box_damage(Surf *s);
+/* A subsurface changed on its own: a commit of a desync one (GTK 3 maps Firefox's <select> lists and its tooltips as
+ * desync subsurfaces of the window), or it came, moved, was unmapped or destroyed (whole). The window's own last damage
+ * (damage_box) says nothing of it: such a list stayed on screen after it closed and the next one never showed. Its own
+ * box when it has the shape it was painted with; else (whole, new, moved, resized, unmapped) all of the window. */
+static void damage_sub(Surf *s, int whole) {
+    Surf *root = s;
+    while (root->role == R_SUB && root->parent) root = root->parent;
+    if (root == s) return;                      /* a subsurface of nothing is not on screen */
+    if (root->role == R_POPUP) { popup_box_damage(root); return; }
+    Node *n = root->node ? node_get(root->node) : NULL;
+    float x, y;
+    if (whole || root->role != R_TOPLEVEL || root == fs_surf || root->tf_drawn || !n || n->has_tf || !s->content ||
+        s->lw <= 0 || s->lh <= 0 || hole_sig(s) != s->hole_sig || !origin(s, &x, &y)) {
+        damage_node_ex(root, 1);
+        return;
+    }
+    Box b = { floorf(x) - 2, floorf(y) - 2, ceilf(x + (float)s->lw) + 2, ceilf(y + (float)s->lh) + 2 };
+    if (b.x0 < n->prev_box.x0) b.x0 = n->prev_box.x0;
+    if (b.y0 < n->prev_box.y0) b.y0 = n->prev_box.y0;
+    if (b.x1 > n->prev_box.x1) b.x1 = n->prev_box.x1;
+    if (b.y1 > n->prev_box.y1) b.y1 = n->prev_box.y1;
+    if (b.x1 <= b.x0 || b.y1 <= b.y0) return;   /* outside the window: not shown */
+    if (content_on) content_note(b);
+    if (gpu_active()) { new_on(surf_keys(root)); return; }
+    damage_add(b);
     ui.dirty = 1;
 }
 
@@ -1029,6 +1061,10 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
         s->p_geom = 0;
     }
     if (s->role == R_SUB) { s->sx = s->p_sx; s->sy = s->p_sy; }
+    for (int i = 0; i < s->nkids; i++) {        /* wl_subsurface.set_position takes effect with the parent's commit */
+        Surf *k = s->kids[i];
+        if (k->role == R_SUB && (k->sx != k->p_sx || k->sy != k->p_sy)) { k->sx = k->p_sx; k->sy = k->p_sy; damage_sub(k, 1); }
+    }
     surface_commit_role(s);
 }
 
@@ -1272,8 +1308,8 @@ static void surface_gone(struct wl_resource *r) {
     if (s->ksi) kbi_surface_gone(s->ksi);
     if (s->parent) {
         Surf *p = s->parent;
+        if (s->role == R_SUB) damage_sub(s, 1); else damage_node(p);
         for (int i = 0; i < p->nkids; i++) if (p->kids[i] == s) { p->kids[i] = p->kids[--p->nkids]; break; }
-        damage_node(p);
     }
     for (int i = 0; i < s->nkids; i++) s->kids[i]->parent = NULL;
     for (int i = 0; i < MAX_SURF; i++) {
@@ -1390,8 +1426,8 @@ static void sub_gone(struct wl_resource *r) {
     if (!s) return;
     if (s->parent) {
         Surf *p = s->parent;
+        damage_sub(s, 1);                   /* unmapped at once: the window under it, before it is unlinked */
         for (int i = 0; i < p->nkids; i++) if (p->kids[i] == s) { p->kids[i] = p->kids[--p->nkids]; break; }
-        damage_node(p);
     }
     s->parent = NULL;
     s->sub = NULL;
@@ -1953,6 +1989,15 @@ static void seat_get_pointer(struct wl_client *c, struct wl_resource *r, uint32_
     if (!p) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(p, &pointer_impl, NULL, link_gone);
     wl_list_insert(&pointers, wl_resource_get_link(p));
+    /* the pointer is already over one of this client's surfaces (a second wl_seat, a toolkit's own pointer made
+     * late): this wl_pointer is told so too, as a new wl_keyboard is, or its buttons would come with no enter */
+    float ox, oy;
+    if (pointer_focus && pointer_focus->client == c && origin(pointer_focus, &ox, &oy)) {
+        float lx = last_x - ox, ly = last_y - oy;
+        if (xw_scaled(c)) { lx = (float)xws_to_xf(lx, xw_pct); ly = (float)xws_to_xf(ly, xw_pct); }
+        wl_pointer_send_enter(p, wl_display_next_serial(dpy), pointer_focus->res, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
+        if (wl_resource_get_version(p) >= 5) wl_pointer_send_frame(p);
+    }
 }
 
 static void seat_get_keyboard(struct wl_client *c, struct wl_resource *r, uint32_t id) {
@@ -3274,9 +3319,7 @@ static void surface_commit_role(Surf *s) {
         else if (!s->content && s->mapped) { s->mapped = 0; unmap_popup(s); }
         popup_box_damage(s);
     } else if (s->role == R_SUB) {
-        Surf *top = s;
-        while (top->parent) top = top->parent;
-        if (top->role == R_POPUP) popup_box_damage(top); else damage_node(top);
+        damage_sub(s, 0);
     }
 }
 
@@ -4301,6 +4344,7 @@ static int in_drop_ready(int fd, uint32_t mask, void *data) {
     in_drop.paths = in_drop.len && !full ? uril_parse(in_drop.buf, in_drop.len, 0, &cut, &plen, &count) : NULL;
     in_drop.npaths = in_drop.paths && count <= URIL_MAX_PATHS ? count : 0;
     int ok = in_drop.gate.claimed && in_drop.npaths > 0;
+    if (getenv("LORD_WL_DEBUG")) fprintf(stderr, "wayland: dropped files read: %zu bytes, %d paths%s\n", in_drop.len, in_drop.npaths, full ? " (too long)" : "");
     if (in_drop.src && ok && wl_resource_get_version(in_drop.src->res) >= 3) wl_data_source_send_dnd_finished(in_drop.src->res);
     else if (in_drop.src && !ok) wl_data_source_send_cancelled(in_drop.src->res);
     in_drop.src = NULL;
@@ -4326,6 +4370,8 @@ static void dnd_take_files(void) {
 }
 int wl_drop_claim(void) {
     Source *src = in_drop.src;
+    if (getenv("LORD_WL_DEBUG")) fprintf(stderr, "wayland: drop claimed by Files: %s%s\n", src ? "a Wayland app's" : in_drop.x ? "an X app's" : "none",
+                                         in_drop.gate.pending && in_drop.gate.claimable ? "" : " (not claimable)");
     if ((!src && !in_drop.x) || (src && dnd_contained(wl_resource_get_client(src->res))) || !dndg_claim(&in_drop.gate)) return 0;
     int p[2];
     if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) { in_drop_cancel(); return 0; }
@@ -4425,6 +4471,10 @@ static void xdrag_pointer(float x, float y, Node *hit) {
 /* Its last button is up: over a Wayland window it drops when the X app says (XdndDrop, wlx_xdrag_drop); files
  * over LordOS itself are claimable while the UI handles this release, and read from the X app once claimed. */
 static void xdrag_release(void) {
+    if (getenv("LORD_WL_DEBUG"))
+        fprintf(stderr, "wayland: X drag released: %s%s%s%s\n", drag.on && drag.xsrc ? "running" : "not running",
+                drag.focus ? ", over a Linux window" : "", drag.over_lord ? ", over LordOS with files" : "",
+                drag.contained ? ", files kept from LordOS" : "");
     xwm_xdrag_out(0);
     if (!drag.on || !drag.xsrc || drag.focus || !drag.over_lord) return;
     in_drop_cancel();
@@ -6199,6 +6249,7 @@ int wlx_xdrag_begin(const char *const *mimes, int n) {
     nxsrc = 0;
     for (int i = 0; i < n && nxsrc < MAX_MIMES; i++)
         if (strlen(mimes[i]) < sizeof xsrc_mimes[0]) snprintf(xsrc_mimes[nxsrc++], sizeof xsrc_mimes[0], "%s", mimes[i]);
+    if (getenv("LORD_WL_DEBUG")) for (int i = 0; i < nxsrc; i++) fprintf(stderr, "wayland: X drag type %s\n", xsrc_mimes[i]);
     return 1;
 }
 void wlx_xdrag_action(uint32_t actions) {

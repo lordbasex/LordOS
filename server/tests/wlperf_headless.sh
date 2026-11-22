@@ -9,6 +9,8 @@
 #   idle       ext-idle-notify: the first notification asks ("idle" permission; the theme here answers WLPERF_IDLE,
 #              allow by default), an allowed one is told idled
 #   icon       xdg-toplevel-icon: the kept buffer, re-encoded to straight RGBA, reaches the theme; a bad one is an error
+#   subsurface desync subsurfaces (GTK 3's menus in Firefox) shown, redrawn, destroyed, made elsewhere and moved: every
+#              frame painted then equals a full repaint (a closed menu used to stay on screen, a new one not to show)
 #   damage     a client damaging a 10×10 square: every frame painted with only that damage equals a full repaint
 #              (LORD_PAINT_VERIFY=1, the default here; WLPERF_VERIFY=0 turns it off)
 # Run from server/ (tests/run_suites.sh does). Exit 77 when something it needs is missing (the theme bundle: npm run
@@ -106,6 +108,16 @@ if want icon; then
     echo "icon: $i"
     # the 64 px buffer (closest to 128 of 64 and 48; 300 is past the limit), as RGBA: XRGB8888 0x80ff0000 is opaque red
     echo "$i" | grep -q '"size":64,"width":64,"bytes":16384,"rgba":\[255,0,0,255\]' || fail "icon: $i"
+fi
+pv() { grep -ah 'paint-verify' "$D/home/.cache/lordos/compositor.log" "$D/server.log" 2>/dev/null; }
+if want subsurface; then
+    v0=$(pv | wc -l)
+    client subsurface || fail "subsurface: the client"
+    sleep 0.3
+    v=$(($(pv | wc -l) - v0))
+    bad=$(pv | tail -n "$v" | grep -vc ': 0 pixels differ')
+    echo "subsurface: $v frames checked against a full repaint, $bad differ"
+    [ "$v" -ge 8 ] && [ "$bad" -eq 0 ] || fail "subsurface: $bad of $v frames differ from a full repaint"
 fi
 if want damage; then
     client damage 30 || fail "damage: the client"

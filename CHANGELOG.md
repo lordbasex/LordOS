@@ -665,6 +665,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Firefox's drop-down lists and tooltips show and go away again, in development** (the open item of October 19,
+  "Firefox ignored mouse clicks", checked on VM 127 on 2026-11-22; `docs/WAYLAND.md`, "Two wl_seat bindings (Firefox)").
+  Firefox binds `wl_seat` twice (GTK 3's and its own) and gets two pointers and two keyboards: that was checked with
+  `WAYLAND_DEBUG` and is right, each resource gets every event once with its own `frame` and serial, and the page's
+  clicks, links, fields, tabs, menus and drag and drop all reacted. What looked dead were the `<select>` lists: GTK 3
+  maps them (and tooltips) as desync subsurfaces of the window, and lord-server's partial repaint painted only the
+  window's own last damage for a subsurface's commit and nothing when one was destroyed, unmapped or moved, so a closed
+  list stayed on screen and the next one never showed. A subsurface's commit now damages its own box, and one that
+  comes, moves, is unmapped or destroyed damages its whole window (drawn again on the GPU path); `set_position` now takes
+  effect with the parent's commit. Also, a `wl_pointer` made while the pointer is already over that client's surface
+  gets its `enter` at once (it got none until the pointer left and came back, so its clicks had no focus). Tests:
+  `build/seat2-client` (`tests/seat2_client.c`, inside a session: two `wl_seat` bindings, the event stream of each
+  pointer and keyboard, a third pointer made over the window) and `wlperf-client subsurface` in
+  `tests/wlperf_headless.sh` (desync subsurfaces shown, redrawn, destroyed, made elsewhere and moved; every frame equals
+  a full repaint; the old build's stale menus were shown with the same client on VM 127, captured step by step).
+- **Drag and drop with X11 apps works, in development** (XDND, built in 0.8.8.8, checked on VM 127 for the first time on
+  2026-11-22 with Firefox on X11 and on Wayland and with Files; `docs/WAYLAND.md`, "Drag and drop"). Wayland → X11 and
+  Files → X11 already worked. X11 → anything never did: the X app's answer to the conversion of `XdndSelection` was
+  ignored as forged because it came with `SendEvent`, which is how every selection owner answers (ICCCM), so no X drag
+  delivered its data; the right check is that it answers our conversion exactly, then who owns the selection, which is
+  asked again before each read. And X drags of files never reached Files: Xwayland itself, the X server's own entry in
+  X-Resource's list (resource base 0), runs in a user namespace of its own and counted as a sandboxed client; it is not
+  a client and is left out. Last, a drop Files claimed at the release (before the app's `XdndDrop`) told the X app it was
+  refused although the files were copied; it is now told the result. `build/xwm-test` covers the first two.
 - **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
   copied its whole buffer, uploaded the whole texture and, on the CPU path, repainted the whole window, whatever it

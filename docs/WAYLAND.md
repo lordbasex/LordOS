@@ -33,7 +33,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_fractional_scale_v1` | 1 | the exact scale of the display(s) a surface is on (GTK 4, Qt 6, Chromium render sharp at 125–175 %) |
 | `wl_seat` | 9 | pointer (enter, leave, motion, buttons, wheel with `axis_source` and `axis_value120`; fine touchpad scrolling with `axis_source finger`, `axis_stop` and `axis_relative_direction` for natural scrolling), keyboard with LordOS's XKB keymap (`keyboard.c`), modifiers and repeat, and `wl_touch` if there's a touchscreen |
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
-| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions, files copied in Files as `text/uri-list` and `x-special/gnome-copied-files` (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon, and with X11 apps through XDND (0.8.8.8; the Wayland side checked on VM 127, XDND still to check on the VM, see "Drag and drop") |
+| `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions, files copied in Files as `text/uri-list` and `x-special/gnome-copied-files` (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon, and with X11 apps through XDND (0.8.8.8; the Wayland side checked on VM 127, XDND checked on VM 127 on 2026-11-22, see "Drag and drop") |
 | `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps"); `set_selection` needs a recent click or key serial of the app's own, and LordOS's text fields and Terminal share it (0.8.8.8) |
 | `xdg_wm_base` | 7 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen); `wm_capabilities` window menu, maximize (not while locked), fullscreen (not during a screen share) and minimize; `configure_bounds` with the work area of the window's display; `tiled_*` and (7) `constrained_*` states for a maximized or snapped window (0.8.9.5) |
 | `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
@@ -278,8 +278,9 @@ Memory: with foot, FeatherPad and GTK Demo open, lord-server goes from ~51 to 53
 ## Drag and drop (0.8.8.8)
 
 The Wayland side was checked on VM 127: a file dragged from Files opened in Chromium, and a GTK 4
-drop target got copy, or move with Shift held. The bridge to X11 apps (XDND, below) is built but not yet
-checked on the VM.
+drop target got copy, or move with Shift held. The bridge to X11 apps (XDND, below) was checked on VM 127 on
+2026-11-22 (Firefox ESR 153 with `MOZ_ENABLE_WAYLAND=0` as the X11 app, a second Firefox on Wayland, LordOS Files),
+which found and fixed two bugs that had kept it from ever working, see "With X11 apps".
 
 The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file lists in `urilist.c`:
 
@@ -332,8 +333,17 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
   local files and hands them to the page): such a drag's offer to it, and such an app's clipboard selection offered
   to it, leave out `text/uri-list` and the other file-list types (`dndg_file_mime`; `DOffer.nofiles`,
   `OfferRef.nofiles`, also refused at `receive`), so they arrive there as text only (`WEBAPPS.md`).
-- **With X11 apps (XDND, version 5; built, to check on the VM).** The window manager (`xwm.c`) bridges
-  both ways:
+- **With X11 apps (XDND, version 5; checked on VM 127 on 2026-11-22).** The window manager (`xwm.c`) bridges
+  both ways. Checked with real apps in a headless session driven over its `remote.sock` (`tools/vm/e2e/ui.py`): a
+  link dragged from X11 Firefox into a page of Wayland Firefox (the page's `drop` got `text/uri-list`, `text/html`,
+  `text/x-moz-url` and `text/plain` with the URL) and back the other way; a file dragged from Files onto an X11
+  Firefox page (the page got the file); and a file dragged from X11 Firefox's GTK 3 file chooser onto a Files folder
+  (copied there, the X app told `XdndFinished` accepted). Two bugs had kept the X app → LordOS side from working at
+  all: the X app's answer to the conversion (`SelectionNotify`, which an owner always sends with `SendEvent`, as ICCCM
+  says) was ignored as forged, so no X drag ever delivered its data; and Xwayland itself (X-Resource's client 0, the
+  server, which lord-server starts in a user namespace of its own) counted as a sandboxed client, so no X drag of
+  files ever reached Files. A third: Files claims the drop at the release, before the X app sends `XdndDrop`, and
+  the app was told "refused" although the files were copied.
   - *Files or a Wayland app → an X window.* While the drag is over an X window that is `XdndAware`, the
     window manager is the XDND source: it owns `XdndSelection` with its own window, sends `XdndEnter` with
     the drag's types (interned first; more than three go in `XdndTypeList`, and `UTF8_STRING` is added
@@ -357,8 +367,9 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
     to its fd without blocking. Its `accept` and action go back as `XdndStatus`, its `finish` as
     `XdndFinished`. The app's messages count only from the client that owns `XdndSelection` (XFixes
     says), and an owner that changes mid-drag ends it. The data is read only after a `SelectionNotify`
-    the X server made (one sent with `SendEvent`, the event code's 0x80 bit, is ignored, since any X
-    client can send it) whose requestor, selection, target and property are exactly the conversion's,
+    whose requestor, selection, target and property are exactly the conversion's (the owner sends it with
+    `SendEvent`, as ICCCM says: one with the event code's 0x80 bit is taken, since that is how every real answer
+    comes; who owns the selection is what is checked next),
     and right before each read (each `INCR` chunk too) the window manager asks again who owns
     `XdndSelection` (`GetSelectionOwner`) and every client's pid (X-Resource): it must be the very window
     that owned it at `XdndEnter`, with the same client pid and the same answer on files, or the drag ends
@@ -369,7 +380,8 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
     process: the window manager asks X-Resource (`XResQueryClientIds`) for every X client's pid (never
     the client's own `_NET_WM_PID`), and the files may reach LordOS only if the owner's client has a pid
     and no client of the display is sandboxed (`dndg_pid_sandboxed`: its root, mount, pid and user
-    namespaces are lord-server's, without `.flatpak-info`), because one X client can always stand in for
+    namespaces are lord-server's, without `.flatpak-info`; the X server's own entry, Xwayland, resource base 0, is
+    not a client and is left out), because one X client can always stand in for
     another's selection. Until that answer comes, and whenever it says no, LordOS tells the app nothing
     over it and a release there is refused. Released over a Files folder, it is claimed at that release
     (`DropGate`) and read as above (`uril_parse`, at most 1 MB and 256 paths). A Flatpak app with the X11
@@ -383,8 +395,8 @@ The compositor in `wl.c` (`dev_drag` and the `dnd_*` functions), with the file l
 - **Tests:** `build/urilist-test` (in `make -C server test`: encoding, decoding, what a drag may not carry,
   shared with the clipboard's file lists), `build/xwm-test` (also in it: the XDND messages, enter with more
   than three types and `XdndTypeList`, positions, statuses, finished, type names, the X-Resource reply,
-  who may hand files to LordOS, synthetic or mismatched `SelectionNotify` events and owners that changed
-  before the read),
+  who may hand files to LordOS (Xwayland's own entry left out), `SelectionNotify` events sent by the owner
+  (`SendEvent`) taken and mismatched ones refused, and owners that changed before the read),
   `build/dndgate-test` (also in it: a sandboxed root, a drop claimed only at its release), `build/seatbtn-test`
   (also in it: the release that ends a drag with a lost release, a doubled press or another button down, and the
   serials a `start_drag` may name), and
@@ -958,7 +970,7 @@ Both ways, for **CLIPBOARD** and **PRIMARY** (select to copy, middle click to pa
 - **Offers are bound to their selection.** A `wl_data_offer` (and a primary offer) carries the
   generation it was made for and only gives data for that selection, and only to its client while
   it has the keyboard: an app can't keep an old offer to read later copies (`build/clip-offers`).
-- **Drag and drop** between X11 and Wayland apps (and Files) through XDND: built, to check on the VM (see
+- **Drag and drop** between X11 and Wayland apps (and Files) through XDND: checked on VM 127 on 2026-11-22 (see
   "Drag and drop", "With X11 apps"). Inside X (X app to X app) it's X's own protocol; not tested.
 
 ### VMware Tools (`open-vm-tools-desktop`)
@@ -1414,23 +1426,62 @@ the icon belongs to that window, and the Dock entry of an app id nobody installe
   `wlperf-client icon` (the 64 px buffer of 64, 300 and 48 reaches the theme as 64 × 64 RGBA, a 64 × 32 buffer is
   `invalid_buffer`).
 
+## Two wl_seat bindings (Firefox) and menus drawn as subsurfaces (0.8.9.5, in development, checked 2026-11-22)
+
+The open item from October 19 ("Firefox ESR 153 ignored mouse clicks on VM 119 … two `wl_seat` bindings from the same
+client get the events twice") was checked again on VM 127 on 2026-11-22, with Firefox ESR 153.6 on Wayland
+(`MOZ_ENABLE_WAYLAND=1`) in a headless session driven over its `remote.sock` (`tools/vm/e2e/ui.py`), with
+`WAYLAND_DEBUG=1` and screenshots of each step:
+
+- **The two bindings are correct.** Firefox binds `wl_seat` twice on one connection (GTK 3's at version 5 and its own
+  `WaylandDisplay`'s at version 8) and gets a `wl_pointer` and a `wl_keyboard` from each. Each resource gets every
+  event once, as the protocol says: for a click, `wl_pointer#49.enter`, `#20.enter`, then for each its own `motion`,
+  `button` press and release, each closed by its own `frame`; every event has a serial of its own, all of them
+  remembered as the press's (`press_serials`, `seatbtn.h`), so a `start_drag`, `xdg_popup.grab` or activation that
+  names either one is taken. Nothing arrives twice on one resource. The page's button, links, text fields, tabs, the
+  hamburger menu, the context menu and drag and drop all reacted.
+- **What was wrong: the menus.** GTK 3 maps Firefox's `<select>` lists (and its tooltips) not as `xdg_popup`s but as
+  *desync subsurfaces* of the window, and destroys them when they close. lord-server's partial repaint took a
+  subsurface's commit as a change of its window, whose own last damage (a pixel or nothing) was all that was painted
+  again, and a subsurface that was destroyed, unmapped or moved marked nothing: a list that closed stayed on the screen
+  (its option chosen, the page still showing the old one) and the next one never showed, so a `<select>` looked dead.
+  Now a subsurface's own commit damages its own box on screen (`damage_sub`), and one that comes, moves (its
+  `set_position`, applied with the parent's commit), is unmapped or destroyed damages all of its window (on the GPU
+  path its window is drawn again, since its draw list changed). Checked on VM 127: the list opens, an option is
+  chosen, the list goes and the page shows the new value, and again for each of eight opens.
+- **A pointer made over the window gets its `enter`.** A `wl_pointer` created while the pointer is already over one of
+  that client's surfaces (a second `wl_seat`, a toolkit's own pointer made late) was told nothing until the pointer
+  left and came back, so its buttons came with no `enter` and a toolkit drops those. It now gets `enter` (and `frame`)
+  at once, as a new `wl_keyboard` already got its `enter`.
+- **Tests:** `build/seat2-client` (`tests/seat2_client.c`, inside a session, as `dnd-client`: a client with two
+  `wl_seat` bindings, two pointers and two keyboards, then a third pointer made while over its window; it checks
+  each resource's event stream: one `enter`, each press and release once with its own `frame`, the same time stamps,
+  and the third pointer's `enter`). On VM 127 the build before this change failed the third pointer's two checks and
+  this one passes all twelve. `wlperf-client subsurface` in `tests/wlperf_headless.sh` (in `make -C server test`): a
+  window with desync subsurfaces shown, redrawn on their own, destroyed with no commit of the window, made elsewhere,
+  moved, and destroyed under a subsurface of their own (Firefox's order), with `LORD_PAINT_VERIFY` comparing every
+  frame painted with a full repaint. That headless check passes on the old build too (the test session repaints more
+  than the damage there), so it guards the new paths rather than catching the old bug; the old bug was shown by the
+  same client at 1.5 s a step (`wlperf-client subsurface 1500`) in a session on VM 127, captured at each step: the old
+  build kept the destroyed square on screen and didn't show the new one, this one shows each step right.
+- Not reproduced: the October report's clicks that did nothing on the page itself (VM 119, QEMU's USB tablet through
+  QMP). Through the remote desktop's pointer every click on the page reached it on the current build. While these
+  checks ran, the 0.8.9.4 build installed on VM 127 (`0.8.9.4+ws95`) crashed once in its render threads (`libc`,
+  reading freed memory) as a `<select>` list closed; not seen again on the current build across a dozen opens.
+
 ## Pending
 
 - **Explicit sync (`linux-drm-syncobj-v1`)**: designed, not built, waiting for the maintainer's review: see
   [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md).
 
-- **Firefox ESR 153 ignored mouse clicks on VM 119** (October 19, QEMU's USB tablet through QMP):
-  the pointer reaches it (`enter`, `motion`, `button` on its content subsurface, checked with
-  `WAYLAND_DEBUG`) and the keyboard works, but buttons, menus and pages don't react; the same with
-  the build installed before (October 18) and with the LordOS frame, so it isn't the frame. To
-  investigate (two `wl_seat` bindings from the same client get the events twice).
 - SVG app icons: built in 0.8.8.8 (lord-media draws them, `MEDIA.md`, "SVG icons"); the tray's checked on VM 127.
 - (Opening files with a Linux app, `%f`/`%u`, `.desktop` actions and terminal apps: done, see "The launcher" above;
   actions since 0.8.1, terminal apps in 0.8.8.8.)
 - Already done (see `GPU.md`): `linux-dmabuf` v4, GPU composition (Mesa, optional), direct
   fullscreen scanout, `wp_presentation`, `wp_viewporter`, `relative-pointer`,
   `pointer-constraints`, real fullscreen (❖Esc exits) and app cursors (image or hidden).
-- XDND with X11 apps: built in 0.8.8.8, to check on the VM, see "Drag and drop". (Wayland drag and drop: done in
+- (XDND with X11 apps: built in 0.8.8.8, checked on VM 127 on 2026-11-22, see "Drag and drop". Firefox and two
+  `wl_seat` bindings: resolved on 2026-11-22, see "Two wl_seat bindings (Firefox)". Wayland drag and drop: done in
   0.8.8.8, see "Drag and drop". `text-input`, LordOS input methods inside Wayland apps: done in 0.8.8.8, see "Input methods". Activation,
   `xdg-activation`: done, see "Activation" above. Fractional scale and several outputs: done, see `DISPLAYS.md`; primary
   selection and Xwayland: done in 0.8.3, above.)
