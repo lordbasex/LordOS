@@ -3137,7 +3137,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[158 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios, +8 máquinas, +8 Spawn helpers */
+        struct pollfd pfd[190 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +8 machines, +40 Spawn helpers */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -3185,7 +3185,7 @@ int main(int argc, char **argv) {
         n += nabr;
         int medbase = n, nmed = media_pollfds(pfd + n, 40);      /* ayudantes lord-media y sus streams de PipeWire */
         n += nmed;
-        int hwbase = n, nhw = hw_pollfds(pfd + n, 16);           /* uevents, the system bus and the session bus clients (src/hw) */
+        int hwbase = n, nhw = hw_pollfds(pfd + n, 48);   /* 16 fixed + up to 32 Spawn helpers */           /* uevents, the system bus and the session bus clients (src/hw) */
         n += nhw;
         int vmbase = n, nvm = js_vm_pollfds(pfd + n, 8);         /* Machines: each picture's lord-vmdisplay (ui/js_vm.c) */
         n += nvm;

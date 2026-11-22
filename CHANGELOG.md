@@ -451,6 +451,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **A microphone, camera or screen restriction keeps working with many Flatpak apps open** (`server/src/hw/hw.c`,
+  `server/src/main.c`; found by Claude Security, MEDIUM). Each running Flatpak app's Spawn helper took a slot in a
+  16-slot poll set ahead of pwguard's PipeWire socket, so with about 11 apps open pwguard stopped hearing new capture
+  streams and a restricted app could record (the polkit agent was starved too). pwguard and the polkit agent are now
+  polled before the helpers, and the set holds 48 (16 fixed + 32 helpers); a helper that doesn't fit is drained on the
+  tick.
 - **Flatpak apps built on Chromium or Electron no longer die at start** (Whatsie from Flathub: it showed its tray icon
   and quit, with `trap int3` in libQt6WebEngineCore at every launch). Chromium (QtWebEngine, CEF, the browser) and zypak
   (Electron) ask Flatpak's Spawn for a sub-sandbox that joins the app's own user and PID namespaces (EXPOSE_PIDS /
