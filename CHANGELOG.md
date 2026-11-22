@@ -1733,6 +1733,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **What is captured now: one green pill by the clock, in development** (`sdk/capturestatus.jsx`, `sdk/capturemodel.js`,
+  `sdk/privacy.js`, `sdk/share.js`, `sdk/media.js`, `sdk/hardware.jsx`, `server/src/sec/pwguard.c`,
+  `server/src/ui/portal.c`, `docs/PRIVACY.md` "What is captured now", `docs/SCREEN-SHARING.md`, `docs/WAYLAND.md`). The
+  red floating pill of each screen share ("● OBS Studio can see what you chose to share [Stop]") and the green and
+  orange camera and microphone dots are replaced by one status item by the clock, in every theme (Lord Flow, Lord
+  Classic — also its taskbar on the side, Lord Workspaces, Lord Celeste): a green pill whose glyph says what is captured
+  right now, system-wide — a display (the screen, a window, a screenshot just taken), a microphone, a video camera, a
+  display with a microphone badge, a camera with a microphone badge, or a display with a camera badge (screen and
+  camera, with or without the microphone). Clicked, it lists one row per app — its icon, its name, what it captures
+  (screen, a window, screens and windows, camera, microphone; "may use your mouse and keyboard" for a share with input)
+  — with **Stop sharing** (the share's own stop: `lord.share.stop`, `lord.portal.castStop`) and **Turn off for this app**
+  (the app's camera or microphone permission for a native or `.lpk` app — an isolated app loses the device at once, a
+  native app's `lord.media` sources close; the firewall's `no-camera`, `no-mic` or `no-screen` restriction for a Linux
+  or Flatpak app, which the PipeWire guard applies within a second). A native app's camera shows a live preview from its
+  own `lord.media` source; the footer opens Settings → Privacy ("Camera and microphone settings…"). It is a security
+  indicator: there is no setting to hide it, a share's frames still wait for it (`lord.share.shown`,
+  `lord.portal.castShown`), and while a window is full screen a small copy of the pill stays in the top right corner of
+  each display. Screen readers read it as "Screen and microphone in use" and so on.
+  New source: lord-server's PipeWire guard now also follows the links from a microphone, a camera or a shared screen
+  into each capture stream and reports who owns them (hw event `capture-use`), so a Linux or Flatpak app recording the
+  microphone or using the camera through PipeWire shows too, named only after the same checks as its restrictions (a
+  PulseAudio client's `application.process.id` is always verified for this); anything it can't name shows as "An
+  unknown program". The ScreenCast portal now says whether a session shares screens, windows or both. Settings →
+  Privacy's "in use" list includes Linux apps too. Not covered: a program that opens `/dev/video*` or an ALSA capture
+  device itself, without PipeWire. Tested by `server/tests/capture_model_test.mjs` (the glyph for each combination, one
+  row per app across sources, what each button does) and new cases in `build/pwguard-test`. The old pill's texts are
+  removed from every language; the new ones are in all 35.
+
 - **Chromium and Electron apps from Flathub install and work; the Store no longer marks them "not yet supported"**
   (`apps/store/flathubpages.js`, `sdk/flathubmodel.js`, `docs/FLATPAK.md`). Their helpers' sub-sandboxes are now served
   (see Fixed). Checked with Whatsie (QtWebEngine), the Chromium browser and FreeTube (Electron/zypak). The Store's

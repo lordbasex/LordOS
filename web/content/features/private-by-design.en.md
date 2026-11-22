@@ -51,7 +51,7 @@ The project keeps a deliberately malicious test app (`tests/lpk-evil`). It decla
 
 - **The prompt.** The first time an app asks for something, the system shows: *"App" wants to use the microphone — Allow / Don't Allow*. The answer is saved for that app.
 - **Settings → Privacy** lists each permission with the apps that asked for it and an Allow / Ask / Deny control.
-- **Indicators.** A green dot in the menu bar while the camera is in use, an orange one for the microphone. Tapping it shows which app.
+- **Indicators.** A green dot in the menu bar while the camera is in use, an orange one for the microphone. Tapping it shows which app. In development (latest release 0.8.9.4): one green pill by the clock replaces the dots and the screen-sharing pill. Its icon says what is captured right now (the screen, the camera, the microphone, or two of them), it can't be hidden, and clicking it lists each app with Stop sharing and Turn off for this app.
 
 Permissions an app can declare: files, clipboard, notifications, network, camera, microphone, screen, listen, USB, Bluetooth and apps. An app can't get a permission it didn't declare.
 
@@ -104,7 +104,7 @@ A window can be marked protected. Passwords is. Its pixels come out black in Lor
 ## Honest limits
 
 - **Linux apps are not sandboxed by default.** Network rules, attribution and the restrictions you set apply to them; the restrictions don't cover the clipboard, Bluetooth through BlueZ on the system bus, the system bus in general, or programs started outside the app launcher.
-- **Camera and microphone use by Linux apps is not shown** in the indicators yet. The Monitor's device list is planned.
+- **Camera and microphone use by Linux apps is not shown** in the indicators of 0.8.9.4. In development, the green pill shows what they capture through PipeWire; a program that opens the camera or the sound card itself, without PipeWire, still isn't shown.
 - **The broker doesn't cover everything yet.** Permissions like Bluetooth or launching other apps can be declared, but there is no broker call for them, so an isolated app simply can't do those things.
 - **A missing kernel feature weakens the app sandbox quietly.** If Landlock or a cgroup controller is missing, apps still start, with a warning in the log. Helpers, by contrast, refuse to run without seccomp.
 

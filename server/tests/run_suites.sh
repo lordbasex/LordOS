@@ -528,6 +528,9 @@ EOF
     # (0.8.8.8) a Linux app's ScreenCast chooser: what is offered, one or several, what lord-server gets (sdk/screencastmodel.js)
     if have node; then run "screencast-model-test (sdk/screencastmodel.js)" node tests/screencast_model_test.mjs
     else skip "screencast-model-test" "node"; fi
+    # (in development) the capture indicator by the clock: its glyph, one row per app, what Stop and Turn off do (sdk/capturemodel.js)
+    if have node; then run "capture-model-test (sdk/capturemodel.js)" node tests/capture_model_test.mjs
+    else skip "capture-model-test" "node"; fi
     # (0.8.8.8) Linux apps' tray icons: which show, a dbusmenu layout as the SDK's menu, where it opens (sdk/traymodel.js)
     if have node; then run "tray-model-test (sdk/traymodel.js)" node tests/tray_model_test.mjs
     else skip "tray-model-test" "node"; fi

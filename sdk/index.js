@@ -49,13 +49,17 @@ import { registerStatusItem } from './statusitems.js';
 import { ClipboardPanel, ClipboardToast, clipboard as clipboardApi } from './clipboard.js';
 import { SpotlightPanel } from './spotlight.js';
 import { RemoteBadge } from './remote.js';
-import { ShareBadge, SharePrompt, sweepShareGrants } from './share.js';
+import { SharePrompt, sweepShareGrants } from './share.js';
+import { CaptureCorner } from './capturestatus.jsx';
 import { linuxIds } from './apps.js';
 export { share, shareHolder, shareRev } from './share.js';
 export { remote, remoteViewers, sshLogin, remoteCidr, remoteMinutesLeft, remoteAccess, remoteVideo, remoteIceServer, remoteFingerprint } from './remote.js';
 export { inhibitShortcuts } from './kbinhibit.js';
 export { shortcutsWho } from './kbinhibitmodel.js';
-export { perms, permsRev, requestPermission, markDeviceUse, useIndicators, PrivacyIndicators, PermissionPrompt, registerPrivacySection, privacySections, PERMISSIONS, onPermissionRevoked, micStart, micStop, micLevel, shortcutsWhoText } from './privacy.js';
+export { perms, permsRev, requestPermission, markDeviceUse, useIndicators, PermissionPrompt, registerPrivacySection, privacySections, PERMISSIONS, onPermissionRevoked, micStart, micStop, micLevel, shortcutsWhoText } from './privacy.js';
+// the capture indicator by the clock (screen, camera, microphone): themes draw it as <PrivacyIndicators />
+export { PrivacyIndicators, CaptureGlyph, useCaptureRows } from './capturestatus.jsx';
+export { captureRows, captureGlyph, captureSummary, rowStops } from './capturemodel.js';
 import { PermissionPrompt } from './privacy.js';
 import { Powerbox } from './powerbox.jsx';
 export { openFile, saveFile, Powerbox } from './powerbox.jsx';
@@ -375,7 +379,7 @@ function LocaleRoot({ children }) {
     at('overlay', SpotlightPanel, LiveSpeechPanel),
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt, FirstStart),
-    at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),
+    at('notification', NotificationBanner, ClipboardToast, RemoteBadge, CaptureCorner, DisplayIdentify, VoicePlayer),
     at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
     at('input', OskPanel, ImeOverlay));
 }

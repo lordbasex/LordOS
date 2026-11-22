@@ -1362,9 +1362,9 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   with no question. It fails closed, as the PipeWire guard does (`csm_gate`): a sender LordOS can't identify also gets
   response 2 while any app with "no screen capture" runs (it may be that app, out of its scope), and the chooser with
   the warning otherwise.
-- **While it shares.** The screen-sharing API's indicator (`ShareBadge`, `sdk/share.js`) shows one more pill per
-  session, "{app} can see what you chose to share", with its Stop. lord-server sends no frame until that pill is on
-  screen (`lord.portal.castShown`). Stop, a lock or a user switch (`remote/mirror.c`), the shell being replaced, the
+- **While it shares.** The capture indicator by the clock (`sdk/capturestatus.jsx`, docs/PRIVACY.md "What is captured
+  now") shows the app with what it shares (a screen, a window, both: lord-server says which) and its Stop sharing.
+  lord-server sends no frame until the indicator is on screen (`lord.portal.castShown`). Stop, a lock or a user switch (`remote/mirror.c`), the shell being replaced, the
   window being closed (its node destroyed: `node_gone_hook`; a share holds each node id with its never-reused serial,
   `Node.serial` and `node_ref`, so a later window that gets the same id is never captured), the helper failing or the
   app leaving the bus end the session, and the app hears
