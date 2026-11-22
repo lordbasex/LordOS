@@ -15,7 +15,7 @@
  *     the person is asked). The host answers only while the person uses the machine; anything else renders nothing.
  *     An offer is marked so that clipboard history and cloud clipboard skip it. Leaving (WM_RENDERALLFORMATS) empties
  *     the clipboard instead of fetching what nobody pasted;
- *   - the display's size (AGK_DISPLAY): the size the machine's window wants, set on the primary display. The VirtIO
+ *   - the display's size (AGK_DISPLAY): the size the machine's window wants, set on the shown display. The VirtIO
  *     GPU driver (viogpudo) keeps one "custom" mode that follows the host's size (QEMU's ui_info, which lord-vmdisplay
  *     sends) but nothing in Windows applies it: this side switches to it, a listed mode directly, else through the
  *     display configuration (SetDisplayConfig with SDC_ALLOW_CHANGES, as virtio-win's viogpuap does), which makes
@@ -69,11 +69,14 @@
  * qemu-guest-agent once these tools run (docs/VIRTUALIZATION.md 7.1.2); this program itself doesn't touch it */
 /* w6 (2026-11-21): "gvt": lord-vm may install Intel's driver for a GVT-g vGPU, block its updates and turn hibernation
  * off through qemu-guest-agent once these tools run (server/src/vm/vmgvtwin.h); this program itself doesn't touch them */
-#define VERSION "w6"
+/* w7 (2026-11-22): the display the machine's picture shows, when Windows has more than one (a GVT-g vGPU's second
+ * output): the size, apps mode's coordinates and moves follow it, windows on another display come onto it, and the
+ * displays go to the host's log (AGK_DISPLAYS) */
+#define VERSION "w7"
 #define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt"
 
 enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
-enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS };
+enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS, T_MONS };
 
 static HWND win;
 static wchar_t port_path[260] = L"\\\\.\\Global\\org.lordos.agent";
@@ -223,6 +226,8 @@ static DWORD WINAPI reader_main(LPVOID arg) {
 }
 
 static void apps_stop(void);
+static int mons_sent;               /* the displays went to the host (AGK_DISPLAYS) since the port opened */
+static int apps_on, apps_dirty;     /* apps mode (below) */
 static void port_close(const char *why) {
     if (port == INVALID_HANDLE_VALUE) return;
     lg("port closed: %s", why);
@@ -233,6 +238,7 @@ static void port_close(const char *why) {
     InterlockedIncrement(&reader_gen);
     host_hello = host_clipx = 0;
     apps_stop();
+    mons_sent = 0;
     SetEvent(ans_ev);                   /* a paste waiting for the host stops waiting */
 }
 
@@ -643,6 +649,173 @@ static int primary_device(wchar_t name[32]) {
     }
 }
 
+/* ---- the guest's displays, and the one the machine's picture shows ----
+ * Windows may have more than one display attached to its desktop while the machine's window shows one picture: an
+ * Intel GVT-g vGPU (qemu's vfio display=on) can come up with a second output, a virtual display (an IddCx driver) can
+ * sit next to the real one, and the primary isn't always the one the host shows. Everything this side does with the
+ * picture's coordinates (the size the host asks for, apps mode's list and moves, a drop's point) is done on that one
+ * display, the "shown" one, chosen by this rule:
+ *   1. only one display on the desktop: that one;
+ *   2. the one rule 3 chose before, while it stays on the desktop (the host's picture doesn't jump between outputs, and
+ *      the size the host asks for next is set on it);
+ *   3. once the host asked for a size (AGK_DISPLAY, the size of the window that shows the picture): a display whose
+ *      current mode is that size (as disp_apply counts it: equal, or under it by less than 8 pixels); several: the one
+ *      on a PCI adapter (a device qemu gives the guest, not a software display), then the primary, then the first;
+ *   4. otherwise the primary when it is on a PCI adapter, else the first display on a PCI adapter, else the primary.
+ * The list and the choice go to this log and the host's (AGK_DISPLAYS) whenever either changes. */
+typedef struct { wchar_t dev[32]; RECT r, work; int primary, hw; } Mon;
+static Mon mons[AG_DISPLAYS_MAX];
+static int mons_n, mons_shown = -1, mons_stale = 1;
+static wchar_t shown_locked[32];    /* chosen by rule 3, "" not yet */
+static char mons_said[AG_DISPLAYS_MAX * 128];
+
+/* the adapter that drives a display: 1 a PCI device; its description into desc */
+static int adapter_of(const wchar_t *dev, wchar_t *desc, size_t cap) {
+    DISPLAY_DEVICEW d;
+    if (cap) desc[0] = 0;
+    for (DWORD i = 0; i < 64; i++) {
+        memset(&d, 0, sizeof d);
+        d.cb = sizeof d;
+        if (!EnumDisplayDevicesW(NULL, i, &d, 0)) break;
+        if (wcscmp(d.DeviceName, dev)) continue;
+        if (cap) { wcsncpy(desc, d.DeviceString, cap - 1); desc[cap - 1] = 0; }
+        return !_wcsnicmp(d.DeviceID, L"PCI\\", 4);
+    }
+    return 0;
+}
+
+static BOOL CALLBACK mon_one(HMONITOR hm, HDC dc, LPRECT rc, LPARAM lp) {
+    (void)dc; (void)rc;
+    int *n = (int *)lp;
+    if (*n >= AG_DISPLAYS_MAX) return FALSE;
+    MONITORINFOEXW mi;
+    memset(&mi, 0, sizeof mi);
+    mi.cbSize = sizeof mi;
+    if (!GetMonitorInfoW(hm, (MONITORINFO *)&mi)) return TRUE;
+    Mon *m = &mons[*n];
+    memset(m, 0, sizeof *m);
+    wcsncpy(m->dev, mi.szDevice, 31);
+    m->r = mi.rcMonitor;
+    m->work = mi.rcWork;
+    m->primary = (mi.dwFlags & MONITORINFOF_PRIMARY) != 0;
+    m->hw = adapter_of(m->dev, NULL, 0);
+    (*n)++;
+    return TRUE;
+}
+
+static int mon_size_is(const Mon *m, uint32_t w, uint32_t h) {
+    LONG mw = m->r.right - m->r.left, mh = m->r.bottom - m->r.top;
+    return w && mw > 0 && mh > 0 && (uint32_t)mw <= w && (uint32_t)mh <= h && w - (uint32_t)mw < 8 && h - (uint32_t)mh < 8;
+}
+
+static int mon_pick(void) {
+    if (mons_n <= 1) return mons_n - 1;
+    for (int i = 0; shown_locked[0] && i < mons_n; i++) if (!wcscmp(mons[i].dev, shown_locked)) return i;
+    shown_locked[0] = 0;
+    int best = -1, score = -1;
+    for (int i = 0; i < mons_n; i++) {
+        if (!mon_size_is(&mons[i], disp_w, disp_h)) continue;
+        int s = mons[i].hw * 2 + mons[i].primary;
+        if (s > score) { best = i; score = s; }
+    }
+    if (best >= 0) { memcpy(shown_locked, mons[best].dev, sizeof shown_locked); return best; }
+    for (int i = 0; i < mons_n; i++) if (mons[i].primary && mons[i].hw) return i;
+    for (int i = 0; i < mons_n; i++) if (mons[i].hw) return i;
+    for (int i = 0; i < mons_n; i++) if (mons[i].primary) return i;
+    return 0;
+}
+
+/* this log: every display adapter and its monitors, attached to the desktop or not (once per change) */
+static void mon_log_adapters(void) {
+    DISPLAY_DEVICEW a, m;
+    for (DWORD i = 0; i < 64; i++) {
+        memset(&a, 0, sizeof a);
+        a.cb = sizeof a;
+        if (!EnumDisplayDevicesW(NULL, i, &a, 0)) break;
+        if (!(a.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP) && !(a.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE)) {
+            /* an output with nothing on the desktop: said only when a monitor is connected to it */
+            memset(&m, 0, sizeof m);
+            m.cb = sizeof m;
+            if (!EnumDisplayDevicesW(a.DeviceName, 0, &m, 0)) continue;
+        }
+        char *dn = to_utf8(a.DeviceName, -1, NULL), *ds = to_utf8(a.DeviceString, -1, NULL), *id = to_utf8(a.DeviceID, -1, NULL);
+        lg("displays:   %s: %s [%s] flags 0x%lx", dn ? dn : "?", ds ? ds : "?", id ? id : "?", (unsigned long)a.StateFlags);
+        free(dn); free(ds); free(id);
+        for (DWORD j = 0; j < 8; j++) {
+            memset(&m, 0, sizeof m);
+            m.cb = sizeof m;
+            if (!EnumDisplayDevicesW(a.DeviceName, j, &m, 0)) break;
+            char *mn = to_utf8(m.DeviceString, -1, NULL);
+            lg("displays:     monitor %lu: %s flags 0x%lx", (unsigned long)j, mn ? mn : "?", (unsigned long)m.StateFlags);
+            free(mn);
+        }
+    }
+}
+
+/* the displays on the desktop, looked at again when something may have changed; the list goes to the host when it (or
+ * the choice) changed, or hasn't gone since the port opened */
+static void mon_scan(void) {
+    mons_stale = 0;
+    int n = 0;
+    EnumDisplayMonitors(NULL, NULL, mon_one, (LPARAM)&n);
+    mons_n = n;
+    mons_shown = mon_pick();
+    AgDisplay d[AG_DISPLAYS_MAX];
+    int dn = 0, ds = -1;
+    for (int i = 0; i < mons_n; i++) {
+        AgDisplay *o = &d[dn];
+        memset(o, 0, sizeof *o);
+        size_t k = 0;
+        for (; k < AG_DISPLAY_NAME_MAX && mons[i].dev[k]; k++) o->name[k] = mons[i].dev[k] >= 0x20 && mons[i].dev[k] <= 0x7e ? (char)mons[i].dev[k] : '?';
+        if (!k) o->name[k++] = '?';
+        o->x = mons[i].r.left; o->y = mons[i].r.top;
+        LONG w = mons[i].r.right - mons[i].r.left, h = mons[i].r.bottom - mons[i].r.top;
+        if (w < 1 || h < 1 || w > (LONG)AG_DISPLAY_MAX || h > (LONG)AG_DISPLAY_MAX || o->x < -LAG_DIM_MAX || o->x > LAG_DIM_MAX ||
+            o->y < -LAG_DIM_MAX || o->y > LAG_DIM_MAX) continue;
+        o->w = (uint32_t)w; o->h = (uint32_t)h;
+        o->flags = (uint8_t)((mons[i].primary ? AGDS_PRIMARY : 0) | (mons[i].hw ? AGDS_HW : 0));
+        if (i == mons_shown) ds = dn;
+        dn++;
+    }
+    char t[sizeof mons_said];
+    if (dn) ag_displays_text(d, dn, ds, t, sizeof t);
+    else snprintf(t, sizeof t, "none");
+    if (strcmp(t, mons_said)) {
+        memcpy(mons_said, t, sizeof t);
+        lg("displays: %s%s", t, mons_n > 1 && shown_locked[0] ? " (the shown one has the size the host asked for)" : "");
+        mon_log_adapters();
+        mons_sent = 0;
+        if (apps_on) apps_dirty = 1;      /* the list again, relative to the shown display as it is now */
+    }
+    if (!mons_sent && dn && port != INVALID_HANDLE_VALUE && host_hello) {
+        uint8_t b[AG_DISPLAYS_BYTES];
+        size_t bn = ag_displays_write(d, dn, ds, b, sizeof b);
+        if (bn && !send_frame(AGK_DISPLAYS, b, (uint32_t)bn)) mons_sent = 1;
+    }
+}
+
+static void mon_get(void) { if (mons_stale) mon_scan(); }
+
+/* the shown display's device name (disp_*), or the primary's when Windows lists none */
+static int shown_device(wchar_t name[32]) {
+    mon_get();
+    if (mons_shown >= 0) { memcpy(name, mons[mons_shown].dev, sizeof mons[mons_shown].dev); return 0; }
+    return primary_device(name);
+}
+
+/* the shown display's rectangle and work area in screen coordinates (apps mode), the primary's when none is known */
+static void shown_rect(RECT *r, RECT *work) {
+    mon_get();
+    if (mons_shown >= 0) { *r = mons[mons_shown].r; if (work) *work = mons[mons_shown].work; return; }
+    MONITORINFO mi;
+    memset(&mi, 0, sizeof mi);
+    mi.cbSize = sizeof mi;
+    POINT o = { 0, 0 };
+    if (GetMonitorInfoW(MonitorFromPoint(o, MONITOR_DEFAULTTOPRIMARY), &mi)) { *r = mi.rcMonitor; if (work) *work = mi.rcWork; return; }
+    SetRect(r, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+    if (work) *work = *r;
+}
+
 /* the driver's custom mode, asked for directly (viogpudo from 2026: VIOGPU_SET_CUSTOM_RESOLUTION). Declared here: the
  * D3DKMT structures as the WDK has them; the functions are gdi32's */
 typedef UINT D3DKMT_HANDLE;
@@ -718,7 +891,7 @@ static int disp_setconfig(const wchar_t *dev, uint32_t w, uint32_t h) {
 /* one try: the exact size when the driver lists it; at the last try, the largest listed mode that fits */
 static int disp_apply(int last) {
     wchar_t dev[32];
-    if (primary_device(dev)) return -1;
+    if (shown_device(dev)) return -1;
     DEVMODEW cur;
     memset(&cur, 0, sizeof cur);
     cur.dmSize = sizeof cur;
@@ -776,25 +949,27 @@ static void disp_report(void) {
     DEVMODEW cur;
     memset(&cur, 0, sizeof cur);
     cur.dmSize = sizeof cur;
-    if (primary_device(dev) || !EnumDisplaySettingsExW(dev, ENUM_CURRENT_SETTINGS, &cur, 0)) return;
+    if (shown_device(dev) || !EnumDisplaySettingsExW(dev, ENUM_CURRENT_SETTINGS, &cur, 0)) return;
     uint8_t o[8];
     if (cur.dmPelsWidth < AG_DISPLAY_MIN_W || cur.dmPelsHeight < AG_DISPLAY_MIN_H || cur.dmPelsWidth > AG_DISPLAY_MAX || cur.dmPelsHeight > AG_DISPLAY_MAX) return;
     ag_display_write(o, cur.dmPelsWidth, cur.dmPelsHeight);
+    char *dn = to_utf8(dev, -1, NULL);
+    lg("display: %s is %lux%lu", dn ? dn : "?", cur.dmPelsWidth, cur.dmPelsHeight);
+    free(dn);
     send_frame(AGK_DISPLAY, o, 8);
 }
 
 /* the host's size arrives with (or just before) the driver's own change: the mode is looked for every 250 ms for 4 s */
 static void disp_tick(void) {
     disp_tries++;
-    if (disp_tries == 4) { wchar_t dev[32]; if (!primary_device(dev)) viogpu_ask(dev, disp_w, disp_h); }
+    mons_stale = 1;                 /* the mode may have changed since the last try */
+    if (disp_tries == 4) { wchar_t dev[32]; if (!shown_device(dev)) viogpu_ask(dev, disp_w, disp_h); }
     int r = disp_apply(disp_tries >= 16);
     if (r != 0) { KillTimer(win, T_DISP); disp_report(); }
 }
 
 /* ---- apps mode ---- */
-static int apps_on;
 static HWINEVENTHOOK hooks[2];
-static int apps_dirty;
 static uint32_t win_serial;
 static uint32_t listed[LAG_WIN_MAX];
 static int listed_n;
@@ -959,17 +1134,130 @@ static int window_app(HWND h, DWORD pid, char *app, size_t cap, wchar_t aumid[AU
     return 0;
 }
 
-/* the window's rectangle as seen (without the invisible resize borders), or the restored one for a minimized window */
+/* where workspace coordinates (a placement's rectangles) start in screen coordinates: the primary's work area */
+static POINT ws_origin(void) {
+    POINT o = { 0, 0 };
+    MONITORINFO mi;
+    memset(&mi, 0, sizeof mi);
+    mi.cbSize = sizeof mi;
+    if (GetMonitorInfoW(MonitorFromPoint(o, MONITOR_DEFAULTTOPRIMARY), &mi)) { o.x = mi.rcWork.left; o.y = mi.rcWork.top; }
+    return o;
+}
+
+/* the window's rectangle as seen (without the invisible resize borders), or the restored one for a minimized window;
+ * screen coordinates either way */
 static int win_rect(HWND h, RECT *r) {
     if (IsIconic(h)) {
         WINDOWPLACEMENT wp;
         wp.length = sizeof wp;
         if (!GetWindowPlacement(h, &wp)) return -1;
         *r = wp.rcNormalPosition;
+        if (!(GetWindowLongW(h, GWL_EXSTYLE) & WS_EX_TOOLWINDOW)) { POINT o = ws_origin(); OffsetRect(r, o.x, o.y); }
         return 0;
     }
     if (FAILED(DwmGetWindowAttribute(h, DWMWA_EXTENDED_FRAME_BOUNDS, r, sizeof *r)) && !GetWindowRect(h, r)) return -1;
     return 0;
+}
+
+/* r (screen coordinates) kept inside area: no larger, then moved in */
+static void clamp_into(RECT *r, const RECT *area) {
+    LONG w = r->right - r->left, h = r->bottom - r->top;
+    if (w > area->right - area->left) w = area->right - area->left;
+    if (h > area->bottom - area->top) h = area->bottom - area->top;
+    LONG x = r->left, y = r->top;
+    if (x + w > area->right) x = area->right - w;
+    if (y + h > area->bottom) y = area->bottom - h;
+    if (x < area->left) x = area->left;
+    if (y < area->top) y = area->top;
+    SetRect(r, x, y, x + w, y + h);
+}
+
+/* a window's visible frame put at f (screen coordinates): the invisible borders are added back */
+static void place_frame(HWND h, const RECT *f) {
+    RECT v, w;
+    int dl = 0, dt = 0, dr = 0, db = 0;
+    if (SUCCEEDED(DwmGetWindowAttribute(h, DWMWA_EXTENDED_FRAME_BOUNDS, &v, sizeof v)) && GetWindowRect(h, &w)) {
+        dl = v.left - w.left; dt = v.top - w.top; dr = w.right - v.right; db = w.bottom - v.bottom;
+    }
+    if (IsZoomed(h)) ShowWindow(h, SW_RESTORE);
+    SetWindowPos(h, NULL, f->left - dl, f->top - dt, f->right - f->left + dl + dr, f->bottom - f->top + dt + db,
+                 SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+}
+
+/* A window on a display the machine's picture doesn't show is moved onto the shown one (apps mode, as it starts and for
+ * a window that appears later; apps mode off, so nothing stays out of sight): the same place relative to the display's
+ * corner, its size kept, then kept inside the shown display's work area. A minimized window stays minimized, only where
+ * it comes back moves; a maximized one is maximized on the shown display. A window at least partly on the shown
+ * display stays, and so does one on no display at all (a program that parks a window off the screen means it). */
+typedef struct { RECT m, work; const char *why; int once; } Rescue;
+static HWND rescued[LAG_WIN_MAX * 2];
+static int rescued_n;
+static BOOL CALLBACK rescue_one(HWND h, LPARAM lp) {
+    const Rescue *c = (const Rescue *)lp;
+    if (!listable(h)) return TRUE;
+    RECT r, k;
+    if (win_rect(h, &r) || IsRectEmpty(&r) || IntersectRect(&k, &r, &c->m)) return TRUE;
+    HMONITOR src = MonitorFromRect(&r, MONITOR_DEFAULTTONULL);
+    MONITORINFO mi;
+    memset(&mi, 0, sizeof mi);
+    mi.cbSize = sizeof mi;
+    if (!src || !GetMonitorInfoW(src, &mi) || EqualRect(&mi.rcMonitor, &c->m)) return TRUE;
+    if (c->once) {
+        for (int i = 0; i < rescued_n; i++) if (rescued[i] == h) return TRUE;
+        if (rescued_n >= (int)(sizeof rescued / sizeof *rescued)) return TRUE;
+        rescued[rescued_n++] = h;
+    }
+    int iconic = IsIconic(h), zoomed = IsZoomed(h);
+    RECT t;
+    if (iconic || zoomed) {
+        WINDOWPLACEMENT wp;
+        memset(&wp, 0, sizeof wp);
+        wp.length = sizeof wp;
+        if (!GetWindowPlacement(h, &wp)) return TRUE;
+        POINT o = { 0, 0 };
+        if (!(GetWindowLongW(h, GWL_EXSTYLE) & WS_EX_TOOLWINDOW)) o = ws_origin();
+        t = wp.rcNormalPosition;
+        OffsetRect(&t, o.x, o.y);
+        OffsetRect(&t, c->m.left - mi.rcMonitor.left, c->m.top - mi.rcMonitor.top);
+        clamp_into(&t, &c->work);
+        wp.rcNormalPosition = t;
+        OffsetRect(&wp.rcNormalPosition, -o.x, -o.y);
+        wp.flags = (wp.flags & WPF_RESTORETOMAXIMIZED) | WPF_ASYNCWINDOWPLACEMENT;
+        wp.showCmd = iconic ? SW_SHOWMINNOACTIVE : SW_SHOWMAXIMIZED;
+        SetWindowPlacement(h, &wp);
+    } else {
+        t = r;
+        OffsetRect(&t, c->m.left - mi.rcMonitor.left, c->m.top - mi.rcMonitor.top);
+        clamp_into(&t, &c->work);
+        place_frame(h, &t);
+    }
+    wchar_t cls[64];
+    char *cn = GetClassNameW(h, cls, 64) ? to_utf8(cls, -1, NULL) : NULL;
+    lg("%s: window %lx (%s%s) moved from %ld,%ld (another display) to %ld,%ld on the shown one", c->why, (unsigned long)(uintptr_t)h,
+       cn ? cn : "?", iconic ? ", minimized: where it comes back" : zoomed ? ", maximized" : "", r.left, r.top, t.left, t.top);
+    free(cn);
+    return TRUE;
+}
+
+/* once: each window tried at most once per apps mode session (rescued[]) */
+static void rescue_all(const char *why, int once) {
+    mon_get();
+    if (mons_n < 2 || mons_shown < 0) return;
+    Rescue c;
+    memset(&c, 0, sizeof c);
+    shown_rect(&c.m, &c.work);
+    c.why = why;
+    c.once = once;
+    EnumWindows(rescue_one, (LPARAM)&c);
+}
+
+/* apps mode's coordinates are the shown display's: said in the log once per change of that display */
+static RECT apps_said;
+static void apps_note(const RECT *m) {
+    if (EqualRect(m, &apps_said)) return;
+    apps_said = *m;
+    lg("apps: windows listed and moved relative to the shown display at %ld,%ld (%ldx%ld): the host's 0,0 is the guest's %ld,%ld",
+       m->left, m->top, m->right - m->left, m->bottom - m->top, m->left, m->top);
 }
 
 typedef struct { Buf *b; int n; HWND fg; RECT desk; uint32_t ids[LAG_WIN_MAX]; } ListCtx;
@@ -980,6 +1268,7 @@ static BOOL CALLBACK list_one(HWND h, LPARAM lp) {
     RECT r, k;
     if (win_rect(h, &r)) return TRUE;
     if (!IntersectRect(&k, &r, &c->desk)) { if (!IsIconic(h)) return TRUE; k = c->desk; k.right = k.left + 1; k.bottom = k.top + 1; }
+    OffsetRect(&k, -c->desk.left, -c->desk.top);          /* relative to the shown display's corner */
     uint32_t id = (uint32_t)(uintptr_t)h;
     if (!id) return TRUE;
     HWND owner = GetWindow(h, GW_OWNER);
@@ -1101,8 +1390,9 @@ static void send_windows(int force) {
     memset(&c, 0, sizeof c);
     c.b = &b;
     c.fg = GetForegroundWindow();
-    c.desk.left = GetSystemMetrics(SM_XVIRTUALSCREEN); c.desk.top = GetSystemMetrics(SM_YVIRTUALSCREEN);
-    c.desk.right = c.desk.left + GetSystemMetrics(SM_CXVIRTUALSCREEN); c.desk.bottom = c.desk.top + GetSystemMetrics(SM_CYVIRTUALSCREEN);
+    rescue_all("apps", 1);
+    shown_rect(&c.desk, NULL);
+    apps_note(&c.desk);
     pending_left = 0;
     EnumWindows(list_one, (LPARAM)&c);
     if (pending_left) apps_dirty = 1;           /* a Store app's frame waits for its app: looked at again */
@@ -1200,6 +1490,8 @@ static void apps_start(void) {
         hooks[1] = SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_UNCLOAKED, NULL, on_win_event, 0, 0, WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
         SetTimer(win, T_APPS, 33, NULL);
         iconed_n = 0;
+        rescued_n = 0;
+        mons_stale = 1;
         lg("apps mode on");
     }
     send_applist();
@@ -1212,6 +1504,10 @@ static void apps_stop(void) {
     for (int i = 0; i < 2; i++) if (hooks[i]) { UnhookWinEvent(hooks[i]); hooks[i] = NULL; }
     KillTimer(win, T_APPS);
     taskbar(0);
+    /* nothing stays on a display the picture doesn't show */
+    mons_stale = 1;
+    rescue_all("apps mode off", 0);
+    memset(&apps_said, 0, sizeof apps_said);
     free(last_list.p);
     memset(&last_list, 0, sizeof last_list);
     listed_n = 0;
@@ -1249,30 +1545,19 @@ static void win_act(const LagAct *a) {
     case LAGA_MINIMIZE: ShowWindowAsync(h, SW_MINIMIZE); break;
     case LAGA_RESTORE: ShowWindowAsync(h, SW_RESTORE); break;
     case LAGA_MOVE: {
-        /* the list says where the visible frame is: the invisible borders are added back */
-        RECT f, w;
-        int dl = 0, dt = 0, dr = 0, db = 0;
-        if (SUCCEEDED(DwmGetWindowAttribute(h, DWMWA_EXTENDED_FRAME_BOUNDS, &f, sizeof f)) && GetWindowRect(h, &w)) {
-            dl = f.left - w.left; dt = f.top - w.top; dr = w.right - f.right; db = w.bottom - f.bottom;
-        }
-        /* never outside the screen: a window put off it is hidden or dropped from the list (the host clamps too; this
-         * side keeps it so with an older host, apps mode on several host displays) */
-        int x = a->x, y = a->y, ww = a->w, wh = a->h;
-        RECT want = { x, y, x + ww, y + wh };
-        MONITORINFO mi;
-        mi.cbSize = sizeof mi;
-        if (GetMonitorInfoW(MonitorFromRect(&want, MONITOR_DEFAULTTOPRIMARY), &mi)) {
-            RECT m = mi.rcMonitor;
-            if (ww > m.right - m.left) ww = m.right - m.left;
-            if (wh > m.bottom - m.top) wh = m.bottom - m.top;
-            if (x < m.left) x = m.left;
-            if (y < m.top) y = m.top;
-            if (x + ww > m.right) x = m.right - ww;
-            if (y + wh > m.bottom) y = m.bottom - wh;
-            if (x != a->x || y != a->y) lg("apps: a move to %d,%d kept on the screen at %d,%d", a->x, a->y, x, y);
-        }
-        if (IsZoomed(h)) ShowWindow(h, SW_RESTORE);
-        SetWindowPos(h, NULL, x - dl, y - dt, ww + dl + dr, wh + dt + db, SWP_NOZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+        /* the host's coordinates are the shown display's (its 0,0 is that display's corner); never outside it: a window
+         * put off it is out of the picture or dropped from the list (the host clamps too; this side keeps it so with an
+         * older host, apps mode on several host displays) */
+        RECT m, t, want;
+        shown_rect(&m, NULL);
+        apps_note(&m);
+        SetRect(&want, m.left + a->x, m.top + a->y, m.left + a->x + a->w, m.top + a->y + a->h);
+        t = want;
+        clamp_into(&t, &m);
+        if (!EqualRect(&t, &want))
+            lg("apps: a move to %d,%d (%dx%d) kept on the shown display at %ld,%ld (%ldx%ld)", a->x, a->y, a->w, a->h, t.left - m.left,
+               t.top - m.top, t.right - t.left, t.bottom - t.top);
+        place_frame(h, &t);
         break;
     }
     }
@@ -1531,7 +1816,9 @@ static void batch_deliver(Batch *b) {
     DWORD err = 0;
     if (n && known && IsWindow(root)) {
         wchar_t folder[MAX_PATH];
-        POINT pt = { b->x, b->y };
+        RECT m;
+        shown_rect(&m, NULL);
+        POINT pt = { m.left + b->x, m.top + b->y };       /* the host's point is on the shown display */
         HWND under = WindowFromPoint(pt);
         if (!under || GetAncestor(under, GA_ROOT) != root) under = root;
         if (explorer_folder(root, folder)) {
@@ -1626,6 +1913,10 @@ static void on_frame(const Frame *f) {
             host_clipx = strstr(t, " clipx") != NULL;
             if (strstr(t, " ask")) send_frame(AGK_HELLO, (const uint8_t *)HELLO, sizeof HELLO - 1);
             lg("host: %s", ag_utf8_ok(f->data, f->len) ? t : "(hello)");
+            /* the displays, for the host's log (an older lord-vm skips the kind) */
+            mons_sent = 0;
+            mons_stale = 1;
+            mon_get();
         }
         break;
     case AGK_CLIP:
@@ -1652,6 +1943,7 @@ static void on_frame(const Frame *f) {
         if (ag_display_parse(f->data, f->len, &w, &h)) break;
         disp_w = w; disp_h = h;
         disp_tries = 0;
+        mons_stale = 1;
         lg("display: the host wants %ux%u", w, h);
         SetTimer(win, T_DISP, 250, NULL);
         disp_tick();
@@ -1707,14 +1999,24 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
             if (port != INVALID_HANDLE_VALUE && !console_session()) port_close("another session is at the console");
             port_try_open();
             batch_tick();
+            mons_stale = 1;         /* looked at again every 2 s too: a change logged and sent only when there is one */
+            mon_get();
         } else if (wp == T_CLIP) { KillTimer(h, T_CLIP); clip_send(); }
         else if (wp == T_DISP) disp_tick();
+        else if (wp == T_MONS) { KillTimer(h, T_MONS); mons_stale = 1; mon_get(); if (apps_on) apps_dirty = 1; }
         else if (wp == T_APPS && apps_on && apps_dirty) { apps_dirty = 0; send_windows(0); }
         return 0;
     case WM_WTSSESSION_CHANGE:
         if (wp == WTS_CONSOLE_DISCONNECT || wp == WTS_REMOTE_CONNECT || wp == WTS_SESSION_LOCK) { if (!console_session()) port_close("the session left the console"); }
         else port_try_open();
         return 0;
+    case WM_DISPLAYCHANGE:
+        /* a display came, went or changed its mode: looked at once things settle */
+        SetTimer(h, T_MONS, 500, NULL);
+        break;
+    case WM_SETTINGCHANGE:
+        if (wp == SPI_SETWORKAREA) SetTimer(h, T_MONS, 500, NULL);
+        break;
     case WM_QUERYENDSESSION: return TRUE;
     case WM_ENDSESSION: if (wp) { port_close("the person logs off"); } return 0;
     case WM_DESTROY: port_close("exit"); PostQuitMessage(0); return 0;

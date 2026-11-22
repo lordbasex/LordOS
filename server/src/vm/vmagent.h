@@ -49,7 +49,7 @@
  *                            (0 with AGOS_OK); exactly 37 bytes. lord-vm logs it and answers the VM_FILE with it.
  *   AGK_PLACE  host → guest  files dropped on an apps mode window (capability "place"; 7.2.1): the drop's token, size and
  *                            SHA-256 as AGK_OPEN, then u32 the guest window's id (one of its last LAG_WINDOWS), i32 x,
- *                            i32 y (the drop point in the guest's screen, 0..LAG_DIM_MAX), u32 batch (≥ 1), u8 index,
+ *                            i32 y (the drop point on the shown display, 0..LAG_DIM_MAX), u32 batch (≥ 1), u8 index,
  *                            u8 count (index < count ≤ AG_PLACE_MAX); exactly AG_PLACE_BYTES. The guest checks each file as
  *                            for AGK_OPEN and, once a batch is all there, hands those files to that window: an Explorer
  *                            folder window gets them moved into its folder, a window that takes dropped files
@@ -58,8 +58,18 @@
  *                            exactly AG_PLACED_BYTES.
  *   AGK_DISPLAY host → guest  u32 width, u32 height (little endian; 320..8192 × 200..8192): the size the machine's
  *                            window wants (capability "display" in the guest's hello; lord-vm sends it only then, and
- *                            again after each hello). The guest sets that size, or the closest it can, on its primary
- *                            display. guest → host: the same layout, the size it set (lord-vm logs it).
+ *                            again after each hello). The guest sets that size, or the closest it can, on the
+ *                            display the machine's picture shows (on Windows the one lordos-guest-win takes for
+ *                            the shown display, below; elsewhere the primary). guest → host: the same layout, the
+ *                            size it set (lord-vm logs it).
+ *   AGK_DISPLAYS guest → host  the guest's displays, for lord-vm's log only (nothing else uses them): u8 count
+ *                            (1..AG_DISPLAYS_MAX), u8 shown (the index of the display the helper believes the
+ *                            machine's picture shows, < count, or AG_DISPLAYS_NONE), then per display: i32 x, i32 y
+ *                            (within ±LAG_DIM_MAX), u32 w, u32 h (1..AG_DISPLAY_MAX), u8 flags (AGDS_*: nothing else
+ *                            set; at most one display primary), u8 name length (1..AG_DISPLAY_NAME_MAX) + the name
+ *                            (printable ASCII, e.g. \\.\DISPLAY1); nothing after the last. Sent at hello and when
+ *                            the guest's display configuration changes. Apps mode's rectangles (LAG_WINDOWS,
+ *                            LAG_WINACT, AGK_PLACE) are relative to the shown display's top left corner.
  *
  * Apps mode (docs/VIRTUALIZATION.md 7.2), capability "windows" in the guest's hello (lord-vm then sets LAG_CAP_WINDOWS
  * in VM_AGENT_STATE b). Everything little endian; every length is checked by the lag_*_parse functions below, which
@@ -70,7 +80,7 @@
  *                            asks for a fresh LAG_APPLIST and LAG_WINDOWS.
  *   LAG_WINDOWS  guest → host  u32 serial (grows by one per list), u16 count (≤ LAG_WIN_MAX), then per window, top of
  *                            the z-order first: u32 id, i32 x, i32 y, i32 w, i32 h (the guest's picture's pixels, clipped
- *                            to its desktop; w, h 1..LAG_DIM_MAX, x, y within ±LAG_DIM_MAX), u32 flags (LAGW_*; nothing
+ *                            to the shown display; w, h 1..LAG_DIM_MAX, x, y within ±LAG_DIM_MAX), u32 flags (LAGW_*; nothing
  *                            else set), [u32 owner id, only with LAGW_OWNED], u32 pid, u16 title length
  *                            (≤ LAG_TITLE_MAX) + title, u16 app length (≤ LAG_APP_MAX) + the program's file name
  *                            (no '/', '\' or ':'); both UTF-8. Only visible, not cloaked, not tool windows with a
@@ -155,6 +165,22 @@ int ag_placed_write(uint8_t out[AG_PLACED_BYTES], const char *token, uint8_t sta
 #define AG_DISPLAY_MAX   8192u
 int ag_display_parse(const uint8_t *p, size_t n, uint32_t *w, uint32_t *h);
 void ag_display_write(uint8_t out[8], uint32_t w, uint32_t h);
+
+/* AGK_DISPLAYS (the guest's displays, for the log). AGDS_*: the primary display; on a hardware (PCI) adapter */
+enum { AGK_DISPLAYS = 18 };
+#define AG_DISPLAYS_MAX     8
+#define AG_DISPLAY_NAME_MAX 32
+#define AG_DISPLAYS_NONE    0xffu
+#define AG_DISPLAYS_BYTES   (2 + AG_DISPLAYS_MAX * (18 + AG_DISPLAY_NAME_MAX))
+enum { AGDS_PRIMARY = 1, AGDS_HW = 2, AGDS_ALL = 3 };
+typedef struct { int32_t x, y; uint32_t w, h; uint8_t flags; char name[AG_DISPLAY_NAME_MAX + 1]; } AgDisplay;
+/* the number of displays (1..AG_DISPLAYS_MAX) copied into out (names NUL-terminated), *shown the shown one's index or
+ * -1; -1 malformed (exact length, every field within the limits above) */
+int ag_displays_parse(const uint8_t *p, size_t n, AgDisplay out[AG_DISPLAYS_MAX], int *shown);
+/* bytes written (≤ AG_DISPLAYS_BYTES), 0 when the list isn't one ag_displays_parse would take or doesn't fit */
+size_t ag_displays_write(const AgDisplay *d, int n, int shown, uint8_t *out, size_t cap);
+/* one line for a log: "\\.\DISPLAY1 1022x724 at 0,0 primary; \\.\DISPLAY2 1920x1080 at 1022,0 (shown)" */
+void ag_displays_text(const AgDisplay *d, int n, int shown, char *out, size_t cap);
 
 /* apps mode: limits, the VM_AGENT_STATE b bit (vmproto.h's VAC_* go up to VAC_DISPLAY, 128), flags, actions */
 #define LAG_CAP_WINDOWS 256u

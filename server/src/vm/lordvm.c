@@ -989,6 +989,7 @@ static struct {
     /* the guest's display (AGK_DISPLAY): the size the window wants last, sent to a helper with "display" */
     int lag_display, lag_windows;
     uint32_t disp_w, disp_h;
+    char lag_disps[AG_DISPLAYS_MAX * 128];   /* the guest's displays (AGK_DISPLAYS) as last logged, "" none yet */
     /* "Open with" a machine (7.3): the helper said "open"; the drop's token and its hash on the agent's way (the
      * transfer folder's way has fx_dig); the drops waiting for the guest tools' answer */
     int lag_open, lag_place;
@@ -4621,6 +4622,16 @@ static void drain_lag(void) {
             uint32_t w, h;
             if (ag_display_parse(f.data, f.len, &w, &h)) vlog("agent: the guest's display size: malformed");
             else vlog("agent: the guest's display is %ux%u%s", w, h, w == S.disp_w && h == S.disp_h ? "" : " (not the size asked for)");
+        } else if (f.kind == AGK_DISPLAYS && S.lag_hello) {
+            /* the guest's displays (lordos-guest-win w7 and later), for this log only: logged when they change */
+            AgDisplay d[AG_DISPLAYS_MAX];
+            char t[sizeof S.lag_disps];
+            int shown, n = ag_displays_parse(f.data, f.len, d, &shown);
+            if (n < 0) vlog("agent: the guest's displays: malformed");
+            else {
+                ag_displays_text(d, n, shown, t, sizeof t);
+                if (strcmp(t, S.lag_disps)) { memcpy(S.lag_disps, t, sizeof t); vlog("agent: guest displays: %s", t); }
+            }
         } else if ((f.kind == LAG_WINDOWS || f.kind == LAG_WINICON || f.kind == LAG_APPLIST) && S.lag_hello && S.lag_windows) {
             lag_windata(&f);
         } else if ((f.kind == AGK_OPENED && S.lag_hello && S.lag_open) || (f.kind == AGK_PLACED && S.lag_hello && S.lag_place)) {
@@ -5075,7 +5086,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;

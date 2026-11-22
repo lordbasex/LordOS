@@ -716,6 +716,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display it opened on (a second, shorter monitor too). Tests: `vm_model_test.mjs` (placement below, above, too tall
   both ways, the screen's edges, a second display).
 
+- **Machines: a Windows guest with more than one display shows the right one, in apps mode too, in development**
+  (Windows tools **w7**; Machines offers the update). On a Windows 11 guest with an Intel GVT-g vGPU, Windows had a
+  1022 × 724 primary display next to the 1920 × 1080 output the machine's window shows. `lordos-guest-win` measured and
+  moved everything on the primary and the virtual desktop: lord-vm kept logging "the guest's display is 1022x724 (not
+  the size asked for)", each apps mode window showed the wrong part of the picture (Explorer about 200 pixels lower, the
+  browser only wallpaper), and after leaving apps mode the guest's windows were on the display nobody sees (only
+  Win+Shift+← brought one back).
+  - The tools now pick the **shown display**: the only one; else the one they chose before while it stays; else the one
+    whose mode is the size the host asked for (a PCI adapter first, then the primary); else the primary on a PCI
+    adapter, the first on a PCI adapter, the primary. The size the host asks for is set on it.
+  - Apps mode's rectangles (`LAG_WINDOWS`, a move, a drop's point) are relative to the shown display's corner and kept
+    inside it, instead of the primary's and `MonitorFromRect(…, MONITOR_DEFAULTTOPRIMARY)`.
+  - A window on another display is moved onto the shown one when apps mode starts (or when it appears) and again when
+    apps mode ends: the same place relative to the display's corner, its size kept, clamped to the work area; a
+    minimized window stays minimized (only where it comes back moves), a maximized one is maximized there; a window on
+    no display at all is left alone. A minimized window's place is read in screen coordinates now (it was workspace
+    coordinates).
+  - The guest's displays go to lord-vm's log at hello and on every change (`AGK_DISPLAYS`, 18, guest → host, log only;
+    a strict parser: exact length, 1..8 displays, sane rectangles, at most one primary, printable ASCII names of at most
+    32 bytes; cases in `vm-test`): `agent: guest displays: \\.\DISPLAY1 1022x724 at 0,0 primary; \\.\DISPLAY2
+    1920x1080 at 1022,0 (shown)`. The tools' own log (`%LOCALAPPDATA%\LordOS\lordos-guest-win.log`) lists every adapter
+    and monitor, the choice, and each apps mode translation and move.
+  - Still to check on the maintainer's guest. Not changed: Windows' taskbar and desktop icons stay on its primary display.
+
 - **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
   copied its whole buffer, uploaded the whole texture and, on the CPU path, repainted the whole window, whatever it
