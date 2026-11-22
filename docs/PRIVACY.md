@@ -520,9 +520,25 @@ Where it knows from (`sdk/capturemodel.js`, `sdk/capturestatus.jsx`, `server/tes
 The PipeWire guard follows every link from a capture node (a microphone, a camera, lord-screencast's screen) into a
 capture stream, and names the stream's owner as it does for the restrictions: the PID's cgroup and the launcher's scope,
 a Flatpak app by its sandbox, and a PulseAudio client's own word (`application.process.id`) always checked against the
-connections it really holds. Anything it can't name is "an unknown program", shown and never hidden, with nothing to
-turn off from the panel. lord-server's own streams are left out: they are the recordings and calls it makes for an app,
-already shown under that app.
+connections it really holds. lord-server's own streams are left out: they are the recordings and calls it makes for an
+app, already shown under that app.
+
+When there is no verified app, the indicator (and only the indicator: never the restrictions, the portals' gates or the
+restore token) still names it from what the kernel says (`sec/appid.h`, "only to show it"; since 2026-11-22):
+
+- **A process that left its app's scope.** Chrome and Chromium move their browser process into a unit of the user's own
+  service manager, and the audio service it starts afterwards is created there too. A process is created in its
+  parent's cgroup and only root puts one into the session's scopes, so a process under `user@` with a child in an app's
+  scope, or whose parent is in one, is that app's: "Google Chrome", its share and its microphone on one row. A unit's
+  name under `user@` is never trusted; a process whose parent is lord-server is never called LordOS.
+- **A pulse client in a sandbox of its own** (WebKit's in LordOS's web apps): the one app whose scope holds a process
+  with the pid it claims, in another PID namespace, holding enough connections to pipewire-pulse; two candidates name
+  neither.
+- **The sound system's own processes** (pipewire, pipewire-pulse's modules, filter-chain, WirePlumber, by their exact
+  unit and root-owned executable): "The sound system (PipeWire)".
+- **The Terminal, a running machine:** "Terminal", "Machines — <the machine's name>".
+- **Anything else:** "An unknown program (<executable>)", from `/proc/<pid>/exe`, or "an unknown program" when not
+  even that is known; shown and never hidden, with nothing to turn off from the panel.
 
 Not covered: a program that opens `/dev/video*` or an ALSA capture device itself, without PipeWire (many browsers still
 read the camera through V4L2 directly), isn't seen by the indicator; "no camera" still blocks it through the device rules

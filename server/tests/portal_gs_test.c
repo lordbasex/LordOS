@@ -28,6 +28,9 @@ static const char *fake_app = "desktop:com.example.Talk";
 int appid_of_pid(unsigned pid, char *out, size_t n) { (void)pid; if (!fake_app) return 1; snprintf(out, n, "%s", fake_app); return 0; }
 /* the ScreenCast side of the same portal (no helper here: only its sessions, which share the session paths) */
 int appid_running(int (*match)(const char *app, void *u), void *u) { (void)match; (void)u; return 0; }
+/* only to name an unknown caller in the indicator (sec/appid.h): nothing here */
+int appid_of_lineage(unsigned pid, char *out, size_t n) { (void)pid; if (n) out[0] = 0; return -1; }
+int appid_exe_name(unsigned pid, char *out, size_t n) { (void)pid; if (n) out[0] = 0; return -1; }
 int restrict_blocks(const char *fwid, uint32_t flag) { (void)fwid; (void)flag; return 0; }
 int cast_available(void) { return 0; }
 int cast_begin(int id, const CastSource *src, int n, int cursor_embedded) { (void)id; (void)src; (void)n; (void)cursor_embedded; return -1; }

@@ -85,6 +85,62 @@ eq('summary', captureSummary(rows({ devices: [{ app: 'camera', kind: 'camera' }]
   eq('order: the screen, the camera, the microphone', r.map((x) => x.name), ['OBS Studio', 'Camera', 'Voice Memos']);
 }
 eq('junk is ignored', rows({ casts: [null, { id: 'x' }], devices: [{ app: 'a', kind: 'printer' }, null], linux: [{ app: 3 }, null], shots: [{}] }), []);
+
+// ---- what used to be "an unknown program" (2026-11-22): what lord-server tells from the kernel, only to show it ----
+// the indicator's own rule for Turn off (sdk/capturestatus.jsx restrictable): an app's firewall restriction, never a
+// machine's scope, a LordOS component or LordOS itself
+const shown = { ...names, 'desktop:google-chrome': 'Google Chrome', 'desktop:lordos-web-whatsapp': 'WhatsApp', 'lordos:terminal': 'Terminal',
+  'desktop:lordos-vm-1b2b4eb6-77dd-42a8-933c-3cf7eac71aa2': 'Machines — Windows 11 Pro (prueba)', machines: 'Machines' };
+const real = { name: (id) => shown[id] || id, enforceable: (id) => /^(desktop|flatpak|lpk):/.test(id) && !/^desktop:lordos-vm-/.test(id) };
+const live = (src) => captureRows(src, real);
+{
+  // the maintainer's popover: Chrome sharing the screen (Meet) and recording the microphone; its browser process and
+  // audio service had left Chrome's scope, so both were "an unknown program". Now: one row, both buttons
+  const r = live({
+    casts: [{ id: 4, who: '', seen: 'desktop:google-chrome', exe: '', name: 'Google Chrome', screens: 1, windows: 0 }],
+    linux: [{ app: 'desktop:google-chrome', name: 'Google Chrome', mic: 1, camera: 0, screen: 0 }],
+  });
+  eq('Chrome: one row for its share and its microphone', r.length, 1);
+  eq('Chrome: named', [r[0].app, r[0].name, r[0].screen, r[0].mic], ['desktop:google-chrome', 'Google Chrome', 'screen', true]);
+  eq('Chrome: Stop sharing ends its session', rowStops(r[0]).screen, [{ kind: 'cast', id: 4 }]);
+  eq('Chrome: Turn off is its no-mic', rowStops(r[0]).off, { own: 'desktop:google-chrome', perms: [], app: 'desktop:google-chrome', flags: ['no-mic'] });
+}
+{
+  // a share whose asker lord-server can't name at all: still its own row with its Stop, named by castAppName
+  const r = live({ casts: [{ id: 5, who: '', seen: '', exe: 'obs', name: 'An unknown program (obs)', screens: 1, windows: 0 }] });
+  eq('unnamed share: its own row, its Stop', [r[0].key, r[0].app, r[0].name, rowStops(r[0]).screen], ['cast#5', '', 'An unknown program (obs)', [{ kind: 'cast', id: 5 }]]);
+}
+{
+  // a LordOS web app's WebKit, a pulse client in its own sandbox: named by its app
+  const r = live({ linux: [{ app: 'desktop:lordos-web-whatsapp', name: 'WhatsApp', mic: 1, camera: 1, screen: 0 }] });
+  eq('web app: named, turned off by its restrictions', [r[0].name, rowStops(r[0]).off.flags], ['WhatsApp', ['no-camera', 'no-mic']]);
+}
+{
+  // the sound system's own processes, and programs known only by their executable: a row each, nothing to turn off
+  const r = live({ linux: [{ app: '', sys: 'sound', name: 'The sound system (PipeWire)', mic: 1 }, { app: '', exe: 'arecord', name: 'An unknown program (arecord)', mic: 1 },
+    { app: '', exe: 'ffmpeg', name: 'An unknown program (ffmpeg)', camera: 1 }, { app: '', mic: 1 }] });
+  eq('sound and executables: a row each', r.map((x) => x.key).sort(), ['exe:arecord', 'exe:ffmpeg', 'sys:sound', 'unknown']);
+  const snd = r.find((x) => x.key === 'sys:sound');
+  eq('the sound system: named, marked, nothing to turn off', [snd.name, snd.sys, rowStops(snd).off], ['The sound system (PipeWire)', 'sound', null]);
+  eq('an executable: its name', r.find((x) => x.key === 'exe:arecord').name, 'An unknown program (arecord)');
+  eq('nothing at all: still an unknown program', r.find((x) => x.key === 'unknown').name, '');
+  eq('an app\'s entry ignores sys and exe', live({ linux: [{ app: 'desktop:google-chrome', sys: 'sound', exe: 'chrome', mic: 1 }] }).map((x) => [x.key, x.sys]), [['desktop:google-chrome', '']]);
+}
+{
+  // started from the Terminal (a LordOS component): named, but the firewall's restrictions aren't the Terminal's to turn off
+  const r = live({ linux: [{ app: 'lordos:terminal', mic: 1 }] });
+  eq('Terminal: named, no Turn off', [r[0].name, rowStops(r[0]).off], ['Terminal', null]);
+  const m = live({ linux: [{ app: 'desktop:lordos-vm-1b2b4eb6-77dd-42a8-933c-3cf7eac71aa2', mic: 1 }] });
+  eq('a machine\'s QEMU: Machines and the machine, no firewall Turn off', [m[0].name, rowStops(m[0]).off], ['Machines — Windows 11 Pro (prueba)', null]);
+}
+{
+  // Machines' own microphone (lord-server's stream): Machines and the machine, Turn off its permission; two machines,
+  // one row with both, and one stopping leaves the other
+  const r = live({ devices: [{ app: 'machines', kind: 'microphone', detail: 'Windows 11 Pro (prueba)' }, { app: 'machines', kind: 'microphone', detail: 'Ubuntu 24.04' }] });
+  eq('Machines: one row, both machines', [r.length, r[0].name, r[0].details], [1, 'Machines', ['Windows 11 Pro (prueba)', 'Ubuntu 24.04']]);
+  eq('Machines: Turn off its microphone permission', rowStops(r[0]).off, { own: 'machines', perms: ['microphone'], app: 'machines', flags: [] });
+  eq('no detail: none', live({ devices: [{ app: 'recorder', kind: 'microphone' }] })[0].details, []);
+}
 eq('no row: no stops', rowStops(null), { screen: [], off: null });
 
 console.log(`capture-model-test: ${ok}/${ok + bad}`);

@@ -1509,6 +1509,47 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **The capture indicator names what it called "an unknown program", in development (the latest release is
+  0.8.9.4).** Found on the maintainer's ws126 (Lord Flow): the panel by the clock said "An unknown program — Screen"
+  (with Stop sharing) and "An unknown program — Microphone" while Google Chrome shared the screen in a call.
+  - **The cause:** Chrome and Chromium move their browser process into a unit of the user's own service manager
+    (`user@<uid>.service/app.slice/app-com.google.Chrome-<pid>.scope`, Chromium's own systemd scope), and every
+    process it starts afterwards (the audio service that records the microphone) is created there too. The
+    ScreenCast portal's caller (the browser process, from the bus's credentials) and the PipeWire guard's capture
+    stream owner (the audio service, the pulse client's checked pid) were then in no app's scope. The renderers and
+    the zygote, made before the move, stay in Chrome's scope. Other paths that ended in "unknown": a LordOS web app's
+    WebKit process, a pulse client inside WebKit's own bubblewrap sandbox (it reports pid 2 and a made-up Flatpak id
+    `org.webkit.app-<hash>`, so the pid can't be verified); PipeWire's own processes (pipewire-pulse's modules, the
+    session's pipewire, `filter-chain.service`, WirePlumber); a program started from the Terminal; any process with
+    no app at all.
+  - **Named from what the kernel says, only to show it** (`sec/appid.c` `appid_of_lineage`, `appid_session_owner`):
+    a process is created in its parent's cgroup and only root puts one into the session's root-owned scopes, so a
+    process in the user's manager with a child in an app's scope, or whose parent is in one, was in that scope: it is
+    that app's. The walk goes up through the user's manager only (never its `init.scope`, never another user's
+    process, at most 16 steps) and names an app only when every such child agrees. A unit name under `user@` is never
+    trusted, and a process whose parent is lord-server is never called LordOS. A sandboxed pulse client is named by
+    the one app whose scope holds a process with its inner pid that holds enough connections to pipewire-pulse
+    (`pwguard_sandbox_pick`, the check the Flatpak path already makes); two candidates name neither. The sound
+    system's own processes are named by their exact unit and root-owned executable. What still can't be named shows
+    its executable (`/proc/<pid>/exe`, never the comm a process sets): "An unknown program (arecord)".
+  - **What each case shows now:** Chrome's share and microphone are one row, "Google Chrome", with Stop sharing and
+    Turn off (its no-mic, which the guard already enforces on processes that left a restricted app's scope); a web
+    app's microphone or camera, the web app's name and Turn off; "The sound system (PipeWire)"; a program started
+    from the Terminal, "Terminal"; a running machine's scope and Machines' own microphone, "Machines — <the
+    machine's name>" (`markDeviceUse` takes a detail; each machine its own entry); a screenshot taken by such a
+    program, its name too. Turn off is offered only for an app's own firewall restriction, never for a machine's
+    scope, a LordOS component or LordOS itself.
+  - **What is unchanged:** the restrictions, the ScreenCast and Screenshot gates, the restore token and the chooser
+    still use only the verified scope (`appid_of_pid`); the new names reach only the indicator (`capture-use` gains
+    `sys` and `exe`; `portal-casts` and `portal-shot-taken` gain `seen` and `exe`).
+  - **Tests:** `build/pwguard-test` (a fixture process table: Chrome's browser process and audio service, the user
+    manager and its children, a user unit named like an app's scope, children in two apps, a parent in an app's
+    scope, lord-server as a parent, the Terminal, a machine, another user's and another session's processes, a loop;
+    the session owner of a cgroup; the executable's name; the sandbox pick; the indicator's JSON with `sys` and
+    `exe`), `tests/capture_model_test.mjs` (the maintainer's case as one row with both buttons, a web app, the sound
+    system, executables, the Terminal, a machine, Machines' microphone with two machines),
+    `tests/screencast_model_test.mjs` (`castAskerName` for machines and LordOS's parts, `castWhoName`). New text in
+    all 35 languages (`shell.cast.unknownExe`, `shell.capture.who.sound`, `shell.capture.appDetail`).
 - **Machines: clicks with the mouse free, resolutions, and apps mode's windows on a guest with two displays, in
   development** (LordOS guest tools **w10**; found on the maintainer's guest with an Intel GVT-g vGPU, ws126 and tools
   w9, whose desktop has the vGPU's output and a second display that isn't on a PCI adapter).

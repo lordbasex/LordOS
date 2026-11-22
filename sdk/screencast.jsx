@@ -10,7 +10,7 @@
 // capture indicator by the clock (sdk/capturestatus.jsx) shows it with its Stop, and lord-server sends no frame until it is on
 // screen (lord.portal.castShown).
 //
-//   useStore(castRuns)   → [{ id, who, name, screens, windows }]: the sessions sharing now (for the indicator)
+//   useStore(castRuns)   → [{ id, who, seen, exe, name, screens, windows }]: the sessions sharing now (for the indicator)
 //   castStop(id)         the indicator's Stop
 //
 // The Screenshot portal (org.freedesktop.portal.Screenshot, approved 2026-11-22) uses the same chooser: a screen, a
@@ -26,7 +26,7 @@ import { useTheme } from './theme.js';
 import { t } from './i18n.js';
 import { ScrollView } from './components.jsx';
 import { windows, wm } from './windows.js';
-import { castChoices, castToggle, castSources, castWindowOf, shotSource, shotDisplayAt, shotDragRect, shotArea, shotPills, SHOT_PILL_MS } from './screencastmodel.js';
+import { castChoices, castToggle, castSources, castWindowOf, castWhoName, shotSource, shotDisplayAt, shotDragRect, shotArea, shotPills, SHOT_PILL_MS } from './screencastmodel.js';
 
 const api = () => typeof lord !== 'undefined' && lord.portal && typeof lord.portal.cast === 'function';
 const castAsk = createStore(null);      // { id, monitor, window, multiple, who, shot? }
@@ -40,7 +40,10 @@ export const shotTaken = createStore([]);
 let names = { app: () => '', window: () => '', shotPath: () => null };
 export function castNames(n) { names = { ...names, ...n }; }
 const verified = (p) => (typeof p?.who === 'string' && p.who ? names.app(p) : '');
-export const castAppName = (p) => verified(p) || t('shell.cast.unknownApp');
+// The chooser names only `who` (verified); the indicator (castAppName) also what lord-server told from the kernel without a
+// verified scope (`seen`: Chrome's browser process leaves its scope) or, failing that, the program's executable (`exe`)
+export const unknownAppName = (exe) => (exe ? t('shell.cast.unknownExe', { exe }) : t('shell.cast.unknownApp'));
+export const castAppName = (p) => castWhoName(p, { app: (who) => names.app({ who }), unknown: unknownAppName });
 
 // hw events from portal.c (sdk/hardware.jsx passes them on)
 export function castEvent(kind, data) {

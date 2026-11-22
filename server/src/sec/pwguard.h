@@ -36,7 +36,10 @@ void pwguard_tick(void);        /* every pass of the main loop; does work once a
 /* The capture indicator (sdk/capturestatus.jsx): emit("capture-use", json) whenever what Linux apps capture through
  * PipeWire changes. A capture stream counts once a microphone, a camera or a shared screen is linked into it; its owner
  * is worked out as for the restrictions, a pulse client's own word always checked; "" an unknown program. lord-server's
- * own streams are left out (the shell shows them under the app they are for). */
+ * own streams are left out (the shell shows them under the app they are for). With no verified app, it is still named
+ * when the kernel can tell, only for the indicator (appid.h, appid_of_lineage; sandbox_owner): a process that left its
+ * app's scope (Chrome's browser and audio service move into the user's manager), a pulse client in a sandbox of its own
+ * (WebKit's in LordOS's web apps), the sound system's own processes ("sys":"sound"); else its executable ("exe"). */
 void pwguard_on_use(void (*emit)(const char *kind, const char *json));
 
 /* ---- for tests (tests/pwguard_test.c) ---- */
@@ -57,9 +60,15 @@ uint32_t pwguard_node_flag(const char *media_class, const char *media_role, cons
  * "lordos_voice_capture"). Its link from the microphone isn't an app's use (the app reading the filter's source is);
  * pwguard.c only skips it when the node is the session's pipewire daemon's own, never an app's. */
 int pwguard_voice_capture(const char *media_class, const char *node_name);
-/* The capture indicator's JSON from (app, flags) pairs, one entry per app: 0, or -1 when it doesn't fit or an id isn't
- * plain. */
-typedef struct { char app[128]; uint32_t flags; } PwUse;
+/* The capture indicator's JSON from (app, flags) pairs, one entry per app; with no app, one per "sys" (the sound
+ * system's own processes: "sound") or "exe" (the executable of a program LordOS can't name): 0, or -1 when it doesn't
+ * fit or a field isn't plain. */
+typedef struct { char app[128]; uint32_t flags; char exe[32]; char sys[16]; } PwUse;
 int pwguard_use_format(const PwUse *u, int n, char *out, size_t cap);
+/* A sandboxed pulse client's app, only to name it (pwguard.c sandbox_owner): among the processes with the inner pid it
+ * claims, the one app whose processes hold at least `claims` connections to pipewire-pulse. 0, or -1 when none or two
+ * apps could be it. */
+typedef struct { char app[128]; int conns; } PwCand;
+int pwguard_sandbox_pick(const PwCand *c, int n, int claims, char *out, size_t cap);
 
 #endif
