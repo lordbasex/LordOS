@@ -5,7 +5,7 @@ import {
   normalizeStudio, STUDIO_DEFAULTS, realCameras, hasStudioCamera, deviceFor, chosenCamera, serverConfig, portraitOn, backgroundOn,
   withPortrait, withBackground, withPicture, withMode, previewSize, usersOf, previewSource, perfLine,
   loopbackState, studioUseOf, studioWhat, MATCH_MAX, STUDIO_FILTERS, effectsOn, filterOf, isVideoPath, isPicturePath, activeBackground,
-  BG_CATEGORIES, bgItems, bgThumb, bgVariant, bgSrc, bgReady, bgItemOf, bgCredit, VOICE_SOURCE, VOICE_CAPTURE, voiceAvailable, hardwareMics,
+  BG_CATEGORIES, bgItems, bgThumb, bgVariant, bgPick, bgSrc, bgReady, bgItemOf, bgCredit, VOICE_SOURCE, VOICE_CAPTURE, voiceAvailable, hardwareMics,
   micModeOf, micPlan, withoutVoiceInternals,
 } from '../../sdk/studiomodel.js';
 import { captureRows, rowStops, captureGlyph } from '../../sdk/capturemodel.js';
@@ -201,22 +201,48 @@ t('phase 3: the background catalog', () => {
   const sha = 'b'.repeat(64);
   const cat = { items: [
     { id: 'office-a', kind: 'picture', category: 'office', builtin: true, name: 'A', author: 'X', license: 'CC0', source: 'https://polyhaven.com/a/x',
-      variants: [{ name: '1080', h: 1080, sha256: 'c'.repeat(64) }] },
+      variants: [{ name: '2160', h: 2160, sha256: 'e'.repeat(64) }, { name: '1080', h: 1080, sha256: 'c'.repeat(64) }] },
     { id: 'sky-b', kind: 'video', category: 'nature', name: 'B', author: 'Y', license: 'CC BY 4.0', credit: 'Video: Y, CC BY 4.0', source: 'https://commons.wikimedia.org/x',
-      variants: [{ name: '720.h264', h: 720, sha256: sha }, { name: '1080.h264', h: 1080, sha256: 'd'.repeat(64) }] },
+      variants: [{ name: '2160.h264', h: 2160, sha256: 'f'.repeat(64) }, { name: '1080.h264', h: 1080, sha256: sha }] },
+    { id: 'old-c', kind: 'video', category: 'nature', name: 'C', author: 'Z', license: 'CC0', source: 'https://commons.wikimedia.org/y',
+      variants: [{ name: '720.h264', h: 720, sha256: 'a'.repeat(64) }] },
   ] };
-  assert.deepEqual(bgItems(cat, 'video').map((x) => x.id), ['sky-b']);
+  assert.deepEqual(bgItems(cat, 'video').map((x) => x.id), ['sky-b', 'old-c']);
   assert.deepEqual(bgItems(null, 'video'), []);
   assert.equal(bgThumb(cat.items[0]), 'asset:studio/backgrounds/office-a.thumb.jpg');
-  assert.equal(bgVariant(cat.items[1]).name, '720.h264');
+  // a picture at 3840×2160 on the GPU path, 1920×1080 on the CPU path; a loop always 1920×1080 (a 4K decode on every
+  // camera picture doesn't fit the frame); an old single-variant entry still has its one
+  assert.equal(bgVariant(cat.items[1]).name, '1080.h264');
   assert.equal(bgVariant(cat.items[1], { big: true }).name, '1080.h264');
   assert.equal(bgVariant(cat.items[0]).name, '1080');
+  assert.equal(bgVariant(cat.items[0], { big: true }).name, '2160');
+  assert.equal(bgVariant(cat.items[2]).name, '720.h264');
+  assert.equal(bgVariant(cat.items[2], { big: true }).name, '720.h264');
+  assert.equal(bgVariant({ variants: [] }), null);
   assert.equal(bgSrc(cat.items[0]), 'asset:studio/backgrounds/office-a.jpg');                  // built in
-  assert.equal(bgSrc(cat.items[1], '720.h264'), `/var/lib/lordos/studio/${sha}.mp4`);
+  assert.equal(bgSrc(cat.items[0], '1080'), 'asset:studio/backgrounds/office-a.jpg');
+  assert.equal(bgSrc(cat.items[0], '2160'), `/var/lib/lordos/studio/${'e'.repeat(64)}.jpg`);   // its 4K, downloaded
+  assert.equal(bgSrc(cat.items[1], '1080.h264'), `/var/lib/lordos/studio/${sha}.mp4`);
   assert.equal(bgSrc(cat.items[1], 'nope'), null);
   assert.equal(bgReady(cat.items[0], {}), true);
   assert.equal(bgReady(cat.items[1], {}), false);
-  assert.equal(bgReady(cat.items[1], { 'sky-b': '720.h264' }), true);
+  assert.equal(bgReady(cat.items[1], { 'sky-b': '1080.h264' }), true);
+  // what choosing does: a built-in picture as it is on the CPU path, its 4K fetched on the GPU path (the built-in if that fails)
+  assert.deepEqual(bgPick(cat.items[0], {}), { src: 'asset:studio/backgrounds/office-a.jpg', fetch: null, fallback: null });
+  const p4 = bgPick(cat.items[0], {}, { big: true });
+  assert.equal(p4.fetch.name, '2160');
+  assert.equal(p4.fallback, 'asset:studio/backgrounds/office-a.jpg');
+  assert.equal(bgPick(cat.items[0], { 'office-a': '2160' }).src, `/var/lib/lordos/studio/${'e'.repeat(64)}.jpg`);  // a bigger picture serves
+  // a loop: the exact variant (a bigger one would cost its decode on every picture); one no longer in the catalog is fetched again
+  assert.equal(bgPick(cat.items[1], {}).fetch.name, '1080.h264');
+  assert.equal(bgPick(cat.items[1], { 'sky-b': '1080.h264' }).src, `/var/lib/lordos/studio/${sha}.mp4`);
+  assert.equal(bgPick(cat.items[1], { 'sky-b': '1080.h264' }, { big: true }).src, `/var/lib/lordos/studio/${sha}.mp4`);
+  const up = bgPick(cat.items[1], { 'sky-b': '2160.h264' }, { big: true });
+  assert.equal(up.fetch.name, '1080.h264');
+  assert.equal(up.fallback, `/var/lib/lordos/studio/${'f'.repeat(64)}.mp4`);
+  assert.equal(bgPick(cat.items[1], { 'sky-b': '2160.h264' }).fetch.name, '1080.h264');
+  assert.equal(bgPick(cat.items[1], { 'sky-b': '720.h264' }).fetch.name, '1080.h264');
+  assert.equal(bgPick(null, {}).src, null);
   assert.equal(bgItemOf(cat, `/var/lib/lordos/studio/${sha}.mp4`).id, 'sky-b');
   assert.equal(bgItemOf(cat, 'asset:studio/backgrounds/office-a.jpg').id, 'office-a');
   assert.equal(bgItemOf(cat, '/home/a/me.jpg'), null);

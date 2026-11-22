@@ -70,6 +70,11 @@ int stcam_init(int model_fd, int face_fd, int render) {
 /* MM_STUDIO: every value is one byte of v[0..3] (proto.h), each checked again by stfx_config */
 static StCfg cfg_now = { .mode = ST_MODE_BLUR, .blur = 50 };
 static int bg_is_video;
+/* A still background: the decoded picture kept as BGRA (at most ST_MAX_W×ST_MAX_H), cover-fitted by swscale (an area
+ * average, or bicubic up) to the camera's size whenever that changes: a 3840×2160 catalog picture stays sharp behind
+ * a 4K camera and is a clean average behind a 720p one (the composite then takes it as it is, with no resampling). */
+static AVFrame *still;
+static int still_w, still_h;                /* the size it was last fitted to */
 
 static void apply_config(void) {
     StCfg c = cfg_now;
@@ -228,9 +233,31 @@ static void video_step(int w, int h) {
     vid_frames++;
 }
 
-/* the picture or the video: decoded here (FFmpeg, inside the sandbox), a picture at most 1920×1080, never a path */
+/* the still cover-fitted to w×h (even, the camera's size) and handed to the composite; 0 on success */
+static int still_fit(int w, int h) {
+    if (!still || !fx || w < 2 || h < 2) return -1;
+    int sw = still->width, sh = still->height;
+    double k = fmax((double)w / sw, (double)h / sh);
+    int fw = (int)(sw * k + 0.5), fh = (int)(sh * k + 0.5);
+    if (fw < w) fw = w;
+    if (fh < h) fh = h;
+    AVFrame *b = fw == sw && fh == sh ? NULL : lm_to_bgra(still, fw, fh, 0);
+    const AVFrame *src = b ? b : still;
+    if (src->width != fw || src->height != fh) { av_frame_free(&b); return -1; }
+    int cx = (fw - w) / 2, cy = (fh - h) / 2;
+    int r = stfx_background(fx, src->data[0] + (size_t)cy * src->linesize[0] + (size_t)cx * 4, w, h, src->linesize[0]);
+    av_frame_free(&b);
+    still_w = w;
+    still_h = h;
+    return r;
+}
+
+/* the picture or the video: decoded here (FFmpeg, inside the sandbox), a picture kept at most ST_MAX_W×ST_MAX_H and
+ * fitted to the camera's size (still_fit), never a path */
 void stcam_background(int fd) {
     video_close();
+    av_frame_free(&still);
+    still_w = still_h = 0;
     bg_is_video = 0;
     if (!fx) { if (fd >= 0) close(fd); return; }
     if (fd < 0) { stfx_background(fx, NULL, 0, 0, 0); apply_config(); return; }
@@ -248,11 +275,23 @@ void stcam_background(int fd) {
     int ok = 0;
     if (f && f->width > 1 && f->height > 1) {
         double k = 1.0;
-        if (f->width > 1920) k = 1920.0 / f->width;
-        if (f->height * k > 1080) k = 1080.0 / f->height;
+        if (f->width > ST_MAX_W) k = (double)ST_MAX_W / f->width;
+        if (f->height * k > ST_MAX_H) k = (double)ST_MAX_H / f->height;
         int w = (int)(f->width * k) & ~1, h = (int)(f->height * k) & ~1;
-        AVFrame *b = w >= 2 && h >= 2 ? lm_to_bgra(f, w, h, 0) : NULL;
-        if (b) { ok = !stfx_background(fx, b->data[0], b->width, b->height, b->linesize[0]); av_frame_free(&b); }
+        still = w >= 2 && h >= 2 ? lm_to_bgra(f, w, h, 0) : NULL;
+        if (still) {
+            /* the camera's size when frames already come (refitted in stcam_frame if it changes), else at most 1920×1080 */
+            int cw = in_bgra ? in_bgra->width : 0, ch = in_bgra ? in_bgra->height : 0;
+            if (cw < 64 || ch < 64) {
+                double c = 1.0;
+                if (w > 1920) c = 1920.0 / w;
+                if (h * c > 1080) c = 1080.0 / h;
+                cw = (int)(w * c) & ~1;
+                ch = (int)(h * c) & ~1;
+            }
+            ok = !still_fit(cw, ch);
+            if (!ok) av_frame_free(&still);
+        }
     }
     av_frame_free(&f);
     lm_close_input(&fmt);
@@ -289,6 +328,10 @@ AVFrame *stcam_frame(AVFrame *f) {
     }
     if (av_frame_make_writable(in_bgra) < 0 || av_frame_make_writable(out_bgra) < 0) return f;
     sws_scale(sws, (const uint8_t *const *)f->data, f->linesize, 0, f->height, in_bgra->data, in_bgra->linesize);
+    if (still && (still_w != w || still_h != h) && still_fit(w, h)) {
+        av_frame_free(&still);                  /* out of memory: no picture rather than a stale one */
+        stfx_background(fx, NULL, 0, 0, 0);
+    }
     if (bg_is_video && (cfg_now.mode == ST_MODE_PICTURE || cfg_now.mode == ST_MODE_VIDEO)) {
         double t0 = lm_now_ms();
         video_step(w, h);
@@ -525,6 +568,7 @@ done:
 
 void stcam_free(void) {
     video_close();
+    av_frame_free(&still);
     stfx_free(fx);
     fx = NULL;
     av_frame_free(&in_bgra);

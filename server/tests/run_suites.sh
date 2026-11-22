@@ -420,6 +420,8 @@ EOF
     # phase 2's package, built and inspected (never installed; the device itself is checked on a VM)
     if have dpkg-deb; then run "studio-package-test (lordos-studio-camera)" sh tests/studio_package_test.sh; else skip "studio-package-test" dpkg-deb; fi
     if have node; then run "studio-model-test (sdk/studiomodel.js)" node tests/studio_model_test.mjs; else skip "studio-model-test" node; fi
+    # the background catalog at 4K: every entry, license, size, hash and resolution (the staged files with LORDOS_STUDIO_STAGE)
+    if have node; then run "studio-catalog-test (assets/studio/backgrounds.json, tools/studio/bg-sources.json)" node tests/studio_catalog_test.mjs; else skip "studio-catalog-test" node; fi
     if have node; then run "widget-feed-test (sdk/widgetfeedmodel.js)" node tests/widget_feed_test.mjs; else skip "widget-feed-test" node; fi
     if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi
     if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi

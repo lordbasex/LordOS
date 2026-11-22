@@ -382,6 +382,24 @@ releases, and a background with a brand reads as endorsement.
   them download on demand. They play **without hardware decode too**: a 1080p30 software decode in `lord-studio` is
   affordable on the PC (**Estimate** 1 core at about 15 %). The Pi uses 720p HEVC with its hardware decoder, or
   stills only.
+- **Loops at 4K (the maintainer, 2026-11-22: "at least 4K"; the pictures are a set of their own).** Every loop comes
+  in two variants, 3840×2160 (`2160.h264`) and 1920×1080 (`1080.h264`), both made from an original at least 3840×2160;
+  nothing is upscaled, and a loop whose original is smaller was replaced or dropped. **The popover always fetches the
+  1920×1080 one** (`bgVariant`/`bgPick` in `sdk/studiomodel.js`): lord-studio decodes a loop in software on every
+  camera picture, and measured on the development PC (i9-10900; libavcodec with two threads plus the bilinear swscale
+  to 1280×720 BGRA, as `video_step` does) a 3840×2160 H.264 loop costs about 19 ms a picture (decoding alone 21–24 ms of
+  wall time on a busy clip, 43 ms of CPU) against 8 ms at 1920×1080. Added to the composite (11–24 ms with the GPU,
+  13–36 ms on the CPU) that leaves no 30 fps budget, and H.264 has no scaled decode, so the 4K files stay in the catalog
+  for a later hardware-decode path. **What it came to:** 37 loops, 16 of our renders (now rendered at 3840×2160 with a
+  bicubic field and dithered, with a light luma grain at encode so slow gradients don't band) and 21 Wikimedia Commons
+  clips whose originals are 3840×2160 or more. Of the previous 33 Commons loops, 22 had only 1920×1080 (or 1920×1440)
+  originals and three (`loop-sunset-afterglow`, `loop-granite-dusk`, `loop-sardine-school`) could not be closed without
+  a visible dissolve (light that keeps changing, a moving school); they were dropped, and 13 new 4K clips replace them.
+  Each loop starts where its two ends look alike (`tools/studio/pick-loop-start.py`) and is closed with a 1.5 s
+  crossfade. The staged loops are 1028 MB (the biggest file 43.7 MB, under E-S4's 100 MB), in the `LordOS-wallpapers`
+  repository's `studio/videos/` with their own README and `MANIFEST.txt`; their thumbnails are 640×360. lord-studio
+  also keeps a still background at up to 3840×2160 and cover-fits it to the camera's size with an area average, again
+  whenever that size changes.
 - **Downloads.** Extend the existing closed admin action family (`server/src/hw/wallpaper_admin.c`) with
   `studio-bg-get "<id> <variant>"`, which writes `/var/lib/lordos/studio/<sha256>.<ext>`. The rules are the same: JS
   names an entry, never a URL; the base is the project's GitHub owner on `raw.githubusercontent.com`; it goes through
@@ -731,13 +749,15 @@ The effort is for one developer with the existing patterns. These are **estimate
 - **The background catalog** (section 6, E-S4): `assets/studio/backgrounds.json` (the shape of `motion.json`, plus
   `kind`, `category`, `builtin` and `credit`), thumbnails in `assets/studio/backgrounds/`, one built-in picture per
   category, the full files staged for the `LordOS-wallpapers` repository's `studio/` folder (not in this repository).
-  121 backgrounds (72 pictures, 49 loops), each license checked on the file's own page or API: 56 rendered from Poly Haven
-  panoramas and 7 ambientCG textures (CC0), 9 NASA ISS photographs (public domain), 33 Wikimedia Commons clips (CC0,
-  public domain, CC BY and CC BY-SA, each with its credit line) and 19 of our own renders (MIT,
-  `tools/studio/gen-studio-loops.py`); no Unsplash, Pexels or Pixabay, nothing with people, logos or readable text
-  (looked at frame by frame). The curation record is `tools/studio/bg-sources.json`, rebuilt by
-  `tools/studio/build-backgrounds.py`. About 2.6 MB ship (121 thumbnails, 7 built-in pictures); the full files are about
-  255 MB (loops at 720p, and 1080p for 48 of them). The closed actions `studio-bg-get` and `studio-bg-remove` (`server/src/hw/studio_bg_admin.c`) follow
+  109 backgrounds (72 pictures, 37 loops; every loop at 3840×2160 and 1920×1080 from an original at least 3840×2160,
+  6.2 "Loops at 4K"), each license checked on the file's own page or API: 53 pictures rendered from Poly Haven panoramas
+  and 7 ambientCG textures (CC0), 9 NASA ISS photographs (public domain), 21 Wikimedia Commons clips (CC0, CC BY and
+  CC BY-SA, each with its credit line) and 19 of our own renders (MIT, `tools/studio/gen-studio-loops.py`); no
+  Unsplash, Pexels or Pixabay, nothing with people, logos or readable text (looked at frame by frame). The curation
+  record is `tools/studio/bg-sources.json`; `tools/studio/build-backgrounds.py` rebuilds the loops and keeps the
+  pictures as the catalog has them; `server/tests/studio_catalog_test.mjs` checks every entry, license, size and each
+  loop's resolution, and with `LORDOS_STUDIO_STAGE` every staged loop's size, hash and real resolution. The pictures'
+  full files are 23 MB and the loops' 1028 MB. The closed actions `studio-bg-get` and `studio-bg-remove` (`server/src/hw/studio_bg_admin.c`) follow
   `wallpaper-get` (`build/studio-bg-admin-test`). The popover's Background page shows the catalog by category
   (pictures and videos), LordOS's wallpapers (without the Cyberpunk City pictures, which show people), "Add your own…"
   (a picture or a short video) and Credits; a ↓ marks what downloads when chosen.

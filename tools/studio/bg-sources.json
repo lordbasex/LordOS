@@ -2188,72 +2188,6 @@
    }
   },
   {
-   "id": "loop-wetland-clouds",
-   "kind": "video",
-   "category": "nature",
-   "name": "Wetland big sky",
-   "author": "Bureau of Land Management Oregon and Washington",
-   "license": "CC BY 2.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Warner_Wetlands_big_sky_time-lapse_video.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Warner Wetlands big sky time-lapse video.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/4/4d/Warner_Wetlands_big_sky_time-lapse_video.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "4661973d7f39ba6cb8ddd3b331cc10753042b70a",
-    "localKey": "0d112e3de9d7",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Warner_Wetlands_big_sky_time-lapse_video.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Warner_Wetlands_big_sky_time-lapse_video.webm"
-    ],
-    "verifiedLicense": "CC BY 2.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/2.0",
-    "credit": "Warner Wetlands big sky time-lapse video - Flickr",
-    "artist": "Bureau of Land Management Oregon and Washington"
-   },
-   "process": {
-    "op": "loop",
-    "start": 2.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   },
-   "credit": "Video: Bureau of Land Management Oregon and Washington, CC BY 2.0, via Wikimedia Commons"
-  },
-  {
-   "id": "loop-iceland-waves",
-   "kind": "video",
-   "category": "nature",
-   "name": "Black sand waves",
-   "author": "Alexander Grebenkov",
-   "license": "CC BY 3.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Ocean_waves_at_L%C3%A6kjavik_beach,_Iceland.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Ocean waves at Lækjavik beach, Iceland.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/9/9b/Ocean_waves_at_L%C3%A6kjavik_beach%2C_Iceland.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "dc0bda423e95e4a94fca7673a3ec9e3aa3c039ad",
-    "localKey": "0e58a0b0d872",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Ocean_waves_at_L%C3%A6kjavik_beach,_Iceland.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Ocean_waves_at_Lækjavik_beach,_Iceland.webm"
-    ],
-    "verifiedLicense": "CC BY 3.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/3.0",
-    "credit": "Own work",
-    "artist": "Alexander Grebenkov"
-   },
-   "process": {
-    "op": "loop",
-    "start": 0.3,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   },
-   "credit": "Video: Alexander Grebenkov, CC BY 3.0, via Wikimedia Commons"
-  },
-  {
    "id": "loop-sea-nettle",
    "kind": "video",
    "category": "nature",
@@ -2275,81 +2209,20 @@
     "verifiedLicense": "CC BY-SA 4.0",
     "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
     "credit": "Own work",
-    "artist": "Fastily"
+    "artist": "Fastily",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 1.0,
+    "start": 5.75,
     "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
    },
    "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons"
-  },
-  {
-   "id": "loop-snowy-woods",
-   "kind": "video",
-   "category": "nature",
-   "name": "Snowy woods",
-   "author": "Peter Cooper Jr.",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Snow_falling_in_Charlton_MA_2025-12-14.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Snow falling in Charlton MA 2025-12-14.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/5/56/Snow_falling_in_Charlton_MA_2025-12-14.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "57b3fd4e444a6c287613e5499e6b22d5f4beea3c",
-    "localKey": "2915e642b674",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Snow_falling_in_Charlton_MA_2025-12-14.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Snow_falling_in_Charlton_MA_2025-12-14.webm"
-    ],
-    "verifiedLicense": "CC0",
-    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "credit": "Own work",
-    "artist": "Peter Cooper Jr."
-   },
-   "process": {
-    "op": "loop",
-    "start": 2.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-sunset-afterglow",
-   "kind": "video",
-   "category": "nature",
-   "name": "Sunset afterglow",
-   "author": "John Fowler (away)",
-   "license": "CC BY 2.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Second_Glow_(video).webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Second Glow (video).webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/1/14/Second_Glow_%28video%29.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "1c0ee73a4d12f01fcf05639852311b000e9f92d6",
-    "localKey": "31be6499b6e6",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Second_Glow_(video).webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Second_Glow_(video).webm"
-    ],
-    "verifiedLicense": "CC BY 2.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/2.0",
-    "credit": "Second Glow - Flickr",
-    "artist": "John Fowler (away)"
-   },
-   "process": {
-    "op": "loop",
-    "start": 0.5,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   },
-   "credit": "Video: John Fowler (away), CC BY 2.0, via Wikimedia Commons"
   },
   {
    "id": "loop-cumulus",
@@ -2373,306 +2246,20 @@
     "verifiedLicense": "CC BY 2.0",
     "licenseUrlFromApi": "https://creativecommons.org/licenses/by/2.0",
     "credit": "Cloud timelapse - Flickr",
-    "artist": "John Fowler (away)"
+    "artist": "John Fowler (away)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 10.0,
+    "start": 0.0,
     "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
    },
    "credit": "Video: John Fowler (away), CC BY 2.0, via Wikimedia Commons"
-  },
-  {
-   "id": "loop-lake-sunrise",
-   "kind": "video",
-   "category": "nature",
-   "name": "Lake sunrise",
-   "author": "Extemporalist",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:30s_Time_lapse_of_Sunrise_at_the_shore_line_of_Raymer_Bay_on_Okanagan_Lake,_24fps.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:30s Time lapse of Sunrise at the shore line of Raymer Bay on Okanagan Lake, 24fps.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/8/8b/30s_Time_lapse_of_Sunrise_at_the_shore_line_of_Raymer_Bay_on_Okanagan_Lake%2C_24fps.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "9ed68e14bf4ee0cf5d6bb3fec4172b8fc129e532",
-    "localKey": "704b5f9c586f",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:30s_Time_lapse_of_Sunrise_at_the_shore_line_of_Raymer_Bay_on_Okanagan_Lake,_24fps.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:30s_Time_lapse_of_Sunrise_at_the_shore_line_of_Raymer_Bay_on_Okanagan_Lake,_24fps.webm"
-    ],
-    "verifiedLicense": "CC0",
-    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "credit": "Own work",
-    "artist": "Extemporalist"
-   },
-   "process": {
-    "op": "loop",
-    "start": 18.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-mossy-river",
-   "kind": "video",
-   "category": "nature",
-   "name": "Mossy river",
-   "author": "BLM Oregon & Washington",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://commons.wikimedia.org/wiki/File:Little_Applegate_River_(50982975823).webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Little Applegate River (50982975823).webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c9/Little_Applegate_River_%2850982975823%29.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "a650673889ab058ee210458510912e50b3efa122",
-    "localKey": "78549b9a04e0",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Little_Applegate_River_(50982975823).webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Little_Applegate_River_(50982975823).webm"
-    ],
-    "verifiedLicense": "Public domain",
-    "licenseUrlFromApi": "",
-    "credit": "Little Applegate River",
-    "artist": "BLM Oregon & Washington"
-   },
-   "process": {
-    "op": "loop",
-    "start": 12.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-valley-pasture",
-   "kind": "video",
-   "category": "nature",
-   "name": "Valley pasture",
-   "author": "Rose Abrams",
-   "license": "CC BY 4.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Pasture_in_Tay_Valley_-_timelapse.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Pasture in Tay Valley - timelapse.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/0/00/Pasture_in_Tay_Valley_-_timelapse.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "f1151146c44f73abbd93fe3570ec22686ca7b809",
-    "localKey": "84ab76924b75",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Pasture_in_Tay_Valley_-_timelapse.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Pasture_in_Tay_Valley_-_timelapse.webm"
-    ],
-    "verifiedLicense": "CC BY 4.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/4.0",
-    "credit": "Own work",
-    "artist": "Rose Abrams"
-   },
-   "process": {
-    "op": "loop",
-    "start": 3.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   },
-   "credit": "Video: Rose Abrams, CC BY 4.0, via Wikimedia Commons"
-  },
-  {
-   "id": "loop-shore-waves",
-   "kind": "video",
-   "category": "nature",
-   "name": "Shore waves",
-   "author": "דוד שי",
-   "license": "CC BY-SA 4.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Water_waves_in_Herzliya_beach.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Water waves in Herzliya beach.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/0/09/Water_waves_in_Herzliya_beach.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "42d3f1ee7fa78165014708126ee700635ddd48d0",
-    "localKey": "87fb847e2fca",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Water_waves_in_Herzliya_beach.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Water_waves_in_Herzliya_beach.webm"
-    ],
-    "verifiedLicense": "CC BY-SA 4.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
-    "credit": "Own work",
-    "artist": "דוד שי"
-   },
-   "process": {
-    "op": "loop",
-    "start": 2.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   },
-   "credit": "Video: דוד שי, CC BY-SA 4.0, via Wikimedia Commons"
-  },
-  {
-   "id": "loop-freezing-fog",
-   "kind": "video",
-   "category": "nature",
-   "name": "Freezing fog",
-   "author": "Extemporalist",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Okanagan_Wila_wafting_on_branches_in_freezing_fog.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Okanagan Wila wafting on branches in freezing fog.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/4/41/Okanagan_Wila_wafting_on_branches_in_freezing_fog.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "e4409f4a615157c15c086505a04acd02e601f237",
-    "localKey": "8814b75091b8",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Okanagan_Wila_wafting_on_branches_in_freezing_fog.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Okanagan_Wila_wafting_on_branches_in_freezing_fog.webm"
-    ],
-    "verifiedLicense": "CC0",
-    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "credit": "Own work",
-    "artist": "Extemporalist"
-   },
-   "process": {
-    "op": "loop",
-    "start": 2.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-mountain-clouds",
-   "kind": "video",
-   "category": "nature",
-   "name": "Mountain clouds",
-   "author": "BLM Oregon & Washington",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://commons.wikimedia.org/wiki/File:Time_Lapse_Clouds_above_Steens_Mountain_(36203941112).webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Time Lapse Clouds above Steens Mountain (36203941112).webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/b/b2/Time_Lapse_Clouds_above_Steens_Mountain_%2836203941112%29.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "d3eea9de806097594cc7c86197bd7679d55e1f21",
-    "localKey": "904e77deb9c0",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Time_Lapse_Clouds_above_Steens_Mountain_(36203941112).webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Time_Lapse_Clouds_above_Steens_Mountain_(36203941112).webm"
-    ],
-    "verifiedLicense": "Public domain",
-    "licenseUrlFromApi": "",
-    "credit": "Time Lapse Clouds above Steens Mountain",
-    "artist": "BLM Oregon & Washington"
-   },
-   "process": {
-    "op": "loop",
-    "start": 3.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-foggy-forest",
-   "kind": "video",
-   "category": "nature",
-   "name": "Foggy forest",
-   "author": "Extemporalist",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Aerial_View_of_freezing_fog_in_the_Okanagan_Highlands.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Aerial View of freezing fog in the Okanagan Highlands.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c9/Aerial_View_of_freezing_fog_in_the_Okanagan_Highlands.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "e586b84620d1f3838e1af2ff7df867ae545b87c3",
-    "localKey": "9216f963598f",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Aerial_View_of_freezing_fog_in_the_Okanagan_Highlands.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Aerial_View_of_freezing_fog_in_the_Okanagan_Highlands.webm"
-    ],
-    "verifiedLicense": "CC0",
-    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "credit": "Own work",
-    "artist": "Extemporalist"
-   },
-   "process": {
-    "op": "loop",
-    "start": 3.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-snowy-evergreens",
-   "kind": "video",
-   "category": "nature",
-   "name": "Snowy evergreens",
-   "author": "Extemporalist",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Snow_falls_on_evergreens_protected_by_a_rocky_outcrop.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Snow falls on evergreens protected by a rocky outcrop.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Snow_falls_on_evergreens_protected_by_a_rocky_outcrop.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "f8ee5a41f4e9be08be51526022d948007ffacd9c",
-    "localKey": "9508cf5a2553",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Snow_falls_on_evergreens_protected_by_a_rocky_outcrop.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Snow_falls_on_evergreens_protected_by_a_rocky_outcrop.webm"
-    ],
-    "verifiedLicense": "CC0",
-    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "credit": "Own work",
-    "artist": "Extemporalist"
-   },
-   "process": {
-    "op": "loop",
-    "start": 3.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-wetland-creek",
-   "kind": "video",
-   "category": "nature",
-   "name": "Wetland creek",
-   "author": "Extemporalist",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Creek_babbling_through_Benvoulin_wetlands.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Creek babbling through Benvoulin wetlands.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c3/Creek_babbling_through_Benvoulin_wetlands.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "ce2128207da88e966ba9aebd01d76a66a2072add",
-    "localKey": "b206c2c8221c",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Creek_babbling_through_Benvoulin_wetlands.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Creek_babbling_through_Benvoulin_wetlands.webm"
-    ],
-    "verifiedLicense": "CC0",
-    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "credit": "Own work",
-    "artist": "Extemporalist"
-   },
-   "process": {
-    "op": "loop",
-    "start": 3.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
   },
   {
    "id": "loop-comb-jelly",
@@ -2696,13 +2283,17 @@
     "verifiedLicense": "CC BY-SA 4.0",
     "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
     "credit": "Own work",
-    "artist": "Fastily"
+    "artist": "Fastily",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 1.0,
+    "start": 1.25,
     "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
    },
    "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons"
@@ -2729,80 +2320,19 @@
     "verifiedLicense": "CC0",
     "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     "credit": "Own work",
-    "artist": "Extemporalist"
+    "artist": "Extemporalist",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 3.0,
+    "start": 0.0,
     "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
    }
-  },
-  {
-   "id": "loop-big-aquarium",
-   "kind": "video",
-   "category": "nature",
-   "name": "Big aquarium",
-   "author": "Sebastian Wallroth",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Ozeaneum_Stralsund_2019-04_002.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Ozeaneum Stralsund 2019-04 002.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/2/26/Ozeaneum_Stralsund_2019-04_002.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "a3cc39fcfe338626234587e848628ad0f5f477a2",
-    "localKey": "bee6ccedd354",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Ozeaneum_Stralsund_2019-04_002.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Ozeaneum_Stralsund_2019-04_002.webm"
-    ],
-    "verifiedLicense": "CC0",
-    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "credit": "Own work",
-    "artist": "Sebastian Wallroth"
-   },
-   "process": {
-    "op": "loop",
-    "start": 10.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-granite-dusk",
-   "kind": "video",
-   "category": "nature",
-   "name": "Granite dusk",
-   "author": "G. Edward Johnson",
-   "license": "CC BY 4.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Sunset_on_Halfdome_timelapse_Yosemite_CA_2023-07-15_20-11-06_1.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Sunset on Halfdome timelapse Yosemite CA 2023-07-15 20-11-06 1.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/4/4c/Sunset_on_Halfdome_timelapse_Yosemite_CA_2023-07-15_20-11-06_1.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "c0aa9bef7beb54c410a7faf6712424310b6b8c07",
-    "localKey": "c3ff4ffba326",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Sunset_on_Halfdome_timelapse_Yosemite_CA_2023-07-15_20-11-06_1.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Sunset_on_Halfdome_timelapse_Yosemite_CA_2023-07-15_20-11-06_1.webm"
-    ],
-    "verifiedLicense": "CC BY 4.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/4.0",
-    "credit": "Own work",
-    "artist": "G. Edward Johnson"
-   },
-   "process": {
-    "op": "loop",
-    "start": 0.5,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   },
-   "credit": "Video: G. Edward Johnson, CC BY 4.0, via Wikimedia Commons"
   },
   {
    "id": "loop-cliff-waterfall",
@@ -2826,78 +2356,17 @@
     "verifiedLicense": "CC0",
     "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     "credit": "Own work",
-    "artist": "Psypherium"
+    "artist": "Psypherium",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 15.0,
+    "start": 5.0,
     "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-sardine-school",
-   "kind": "video",
-   "category": "nature",
-   "name": "Sardine school",
-   "author": "Fastily",
-   "license": "CC BY-SA 4.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Fish_at_Monterey_Bay_Aquarium_1_2024-01-11.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Fish at Monterey Bay Aquarium 1 2024-01-11.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Fish_at_Monterey_Bay_Aquarium_1_2024-01-11.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "30eaeebe98826737fbcbf590af38949d171337ae",
-    "localKey": "d0be954f773c",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Fish_at_Monterey_Bay_Aquarium_1_2024-01-11.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Fish_at_Monterey_Bay_Aquarium_1_2024-01-11.webm"
-    ],
-    "verifiedLicense": "CC BY-SA 4.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
-    "credit": "Own work",
-    "artist": "Fastily"
-   },
-   "process": {
-    "op": "loop",
-    "start": 2.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   },
-   "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons"
-  },
-  {
-   "id": "loop-snowy-creek",
-   "kind": "video",
-   "category": "nature",
-   "name": "Snowy creek",
-   "author": "Extemporalist",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:KLO_Creek_gurgles_during_an_early_winter_snowfall.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:KLO Creek gurgles during an early winter snowfall.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c7/KLO_Creek_gurgles_during_an_early_winter_snowfall.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "47ee7c8f1f08e56bfee0ad83dde920262cc66fcf",
-    "localKey": "d2d10182f9e5",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:KLO_Creek_gurgles_during_an_early_winter_snowfall.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:KLO_Creek_gurgles_during_an_early_winter_snowfall.webm"
-    ],
-    "verifiedLicense": "CC0",
-    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "credit": "Own work",
-    "artist": "Extemporalist"
-   },
-   "process": {
-    "op": "loop",
-    "start": 3.0,
-    "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
    }
   },
@@ -2923,13 +2392,17 @@
     "verifiedLicense": "CC0",
     "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     "credit": "Own work",
-    "artist": "Роман Рябенко"
+    "artist": "Роман Рябенко",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 0.5,
+    "start": 0.0,
     "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
    }
   },
@@ -2955,54 +2428,20 @@
     "verifiedLicense": "CC BY 4.0",
     "licenseUrlFromApi": "https://creativecommons.org/licenses/by/4.0",
     "credit": "Due to file size or type limitations, this file is a reduced resolution or reduced quality version of the original file. The original version is available at the Internet Archive.",
-    "artist": "Thomas Bresson"
+    "artist": "Thomas Bresson",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 5.0,
+    "start": 26.5,
     "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
    },
    "credit": "Video: Thomas Bresson, CC BY 4.0, via Wikimedia Commons"
-  },
-  {
-   "id": "loop-river-city-dusk",
-   "kind": "video",
-   "category": "city",
-   "name": "River city dusk",
-   "author": "Ecelan",
-   "license": "CC BY-SA 4.0",
-   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Zaragoza_-_Vistas_del_Pilar_-_Anochecer.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Zaragoza - Vistas del Pilar - Anochecer.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c7/Zaragoza_-_Vistas_del_Pilar_-_Anochecer.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "4b5438f8226b42e6e8e975585ace86eb3010589f",
-    "localKey": "d56ab561956d",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Zaragoza_-_Vistas_del_Pilar_-_Anochecer.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Zaragoza_-_Vistas_del_Pilar_-_Anochecer.webm"
-    ],
-    "verifiedLicense": "CC BY-SA 4.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
-    "credit": "Own work",
-    "artist": "Ecelan"
-   },
-   "process": {
-    "op": "loop",
-    "start": 3.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": [
-     0,
-     300,
-     1920,
-     1080
-    ]
-   },
-   "credit": "Video: Ecelan, CC BY-SA 4.0, via Wikimedia Commons"
   },
   {
    "id": "loop-fireplace",
@@ -3026,248 +2465,474 @@
     "verifiedLicense": "CC BY-SA 4.0",
     "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
     "credit": "Own work",
-    "artist": "FASTILY"
+    "artist": "FASTILY",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 2.0,
+    "start": 1.25,
     "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
    },
    "credit": "Video: FASTILY, CC BY-SA 4.0, via Wikimedia Commons"
   },
   {
-   "id": "loop-fire-pit",
+   "id": "loop-mountain-forest",
    "kind": "video",
-   "category": "home",
-   "name": "Fire pit",
-   "author": "FASTILY",
+   "category": "nature",
+   "name": "Mountain over the forest",
+   "author": "Ryan Lane",
+   "license": "CC BY 3.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Time-lapse_of_Mount_Rainier,_Washington,_USA.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Time-lapse of Mount Rainier, Washington, USA.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/a/a2/Time-lapse_of_Mount_Rainier%2C_Washington%2C_USA.webm",
+    "sha1": "ec4e7a41b99c3c69c0577697a89771c6736aaf2d",
+    "localKey": "bbaf7f174fbf",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Time-lapse_of_Mount_Rainier,_Washington,_USA.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Time-lapse_of_Mount_Rainier,_Washington,_USA.webm"
+    ],
+    "verifiedLicense": "CC BY 3.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by/3.0",
+    "artist": "Ryan Lane",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
+   },
+   "process": {
+    "op": "loop",
+    "start": 17.75,
+    "seconds": 7,
+    "crossfade": 1.5,
+    "crop": null
+   },
+   "credit": "Video: Ryan Lane, CC BY 3.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-alpine-view",
+   "kind": "video",
+   "category": "nature",
+   "name": "Alpine view",
+   "author": "Octagon",
+   "license": "CC BY 3.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:S%C3%A4uling-timelapse.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Säuling-timelapse.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/c/c1/S%C3%A4uling-timelapse.webm",
+    "sha1": "ed5104d742691d2bfe9db433fa94d19be3729132",
+    "localKey": "9b85af5426cf",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:S%C3%A4uling-timelapse.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Säuling-timelapse.webm"
+    ],
+    "verifiedLicense": "CC BY 3.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by/3.0",
+    "artist": "Octagon",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
+   },
+   "process": {
+    "op": "loop",
+    "start": 27.0,
+    "seconds": 7,
+    "crossfade": 1.5,
+    "crop": null
+   },
+   "credit": "Video: Octagon, CC BY 3.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-dark-beach",
+   "kind": "video",
+   "category": "nature",
+   "name": "Dark sand beach",
+   "author": "Sea Cow",
    "license": "CC BY-SA 4.0",
    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Fire_pit_1_2017-11-21.webm",
+   "source": "https://commons.wikimedia.org/wiki/File:Rialto_Beach_Waves_2022.webm",
    "origin": {
     "type": "commons",
-    "title": "File:Fire pit 1 2017-11-21.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/4/45/Fire_pit_1_2017-11-21.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "20716073678b735d04962abc1cb2111e91559cd8",
-    "localKey": "bd166b2746b6",
+    "title": "File:Rialto Beach Waves 2022.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/f/f3/Rialto_Beach_Waves_2022.webm",
+    "sha1": "d95bf027426ccb89f3f28af20ec7595944a0d3c1",
+    "localKey": "1ccad07fad8f",
     "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Fire_pit_1_2017-11-21.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Fire_pit_1_2017-11-21.webm"
+     "https://commons.wikimedia.org/wiki/File:Rialto_Beach_Waves_2022.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Rialto_Beach_Waves_2022.webm"
     ],
-    "verifiedLicense": "CC BY-SA 4.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by-sa/4.0",
-    "credit": "Own work",
-    "artist": "FASTILY"
+    "verifiedLicense": "CC BY-SA 4.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by-sa/4.0",
+    "artist": "Sea Cow",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 2.0,
+    "start": 12.0,
     "seconds": 7,
-    "crossfade": 1.0,
-    "crop": [
-     256,
-     216,
-     1536,
-     864
-    ]
-   },
-   "credit": "Video: FASTILY, CC BY-SA 4.0, via Wikimedia Commons"
-  },
-  {
-   "id": "loop-candle",
-   "kind": "video",
-   "category": "home",
-   "name": "Candle",
-   "author": "Bautsch",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Corona.Candle.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Corona.Candle.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/7/72/Corona.Candle.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "d025abc28729fe93422e6b3ced7eb205e045c177",
-    "localKey": "9debda8230e2",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Corona.Candle.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Corona.Candle.webm"
-    ],
-    "verifiedLicense": "CC0",
-    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "credit": "Own work",
-    "artist": "Bautsch"
-   },
-   "process": {
-    "op": "loop",
-    "start": 4.0,
-    "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
-   }
-  },
-  {
-   "id": "loop-snow-fence",
-   "kind": "video",
-   "category": "home",
-   "name": "Snow by the fence",
-   "author": "Extemporalist",
-   "license": "CC0",
-   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:FluffySnowfallByFence.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:FluffySnowfallByFence.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/b/ba/FluffySnowfallByFence.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "93004d369f29959d76384097292797ab02555573",
-    "localKey": "5118c4314fef",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:FluffySnowfallByFence.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:FluffySnowfallByFence.webm"
-    ],
-    "verifiedLicense": "CC0",
-    "licenseUrlFromApi": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-    "credit": "Own work",
-    "artist": "Extemporalist"
    },
-   "process": {
-    "op": "loop",
-    "start": 5.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
+   "credit": "Video: Sea Cow, CC BY-SA 4.0, via Wikimedia Commons"
   },
   {
-   "id": "loop-aurora-iceland",
+   "id": "loop-forest-creek",
    "kind": "video",
-   "category": "space",
-   "name": "Aurora over Iceland",
-   "author": "G. Edward Johnson",
+   "category": "nature",
+   "name": "Forest creek",
+   "author": "Missvain",
    "license": "CC BY 4.0",
    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Aurora-Iceland_Northern_Lights_timelapse_2026-02-06.hd.webm",
+   "source": "https://commons.wikimedia.org/wiki/File:Fife_Creek_-_January_2023_-_Sarah_Stierch.webm",
    "origin": {
     "type": "commons",
-    "title": "File:Aurora-Iceland Northern Lights timelapse 2026-02-06.hd.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/f/ff/Aurora-Iceland_Northern_Lights_timelapse_2026-02-06.hd.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "2e3b1edf28b841d9b55f3f2aad0f8d6bec43ec66",
-    "localKey": "44b8db31d711",
+    "title": "File:Fife Creek - January 2023 - Sarah Stierch.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/5/5a/Fife_Creek_-_January_2023_-_Sarah_Stierch.webm",
+    "sha1": "95010f8b1b160cb3e3bf0b1494d243962a46a190",
+    "localKey": "f177fbabc74b",
     "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Aurora-Iceland_Northern_Lights_timelapse_2026-02-06.hd.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Aurora-Iceland_Northern_Lights_timelapse_2026-02-06.hd.webm"
+     "https://commons.wikimedia.org/wiki/File:Fife_Creek_-_January_2023_-_Sarah_Stierch.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Fife_Creek_-_January_2023_-_Sarah_Stierch.webm"
     ],
-    "verifiedLicense": "CC BY 4.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/4.0",
-    "credit": "Own work",
-    "artist": "G. Edward Johnson"
+    "verifiedLicense": "CC BY 4.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by/4.0",
+    "artist": "Missvain",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 0.2,
+    "start": 0.0,
     "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
    },
-   "credit": "Video: G. Edward Johnson, CC BY 4.0, via Wikimedia Commons"
+   "credit": "Video: Missvain, CC BY 4.0, via Wikimedia Commons"
   },
   {
-   "id": "loop-desert-stars",
+   "id": "loop-creek-cascade",
    "kind": "video",
-   "category": "space",
-   "name": "Desert stars",
-   "author": "Joshua Tree National Park",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://commons.wikimedia.org/wiki/File:Stars_and_Clouds_Over_Headstone_Rock_(30230087163).webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Stars and Clouds Over Headstone Rock (30230087163).webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/1/12/Stars_and_Clouds_Over_Headstone_Rock_%2830230087163%29.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "1c86969efd04b31d62d493b3a7fddae9540c8c6b",
-    "localKey": "df0232b16b0d",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Stars_and_Clouds_Over_Headstone_Rock_(30230087163).webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Stars_and_Clouds_Over_Headstone_Rock_(30230087163).webm"
-    ],
-    "verifiedLicense": "Public domain",
-    "licenseUrlFromApi": "",
-    "credit": "Stars and Clouds Over Headstone Rock",
-    "artist": "Joshua Tree National Park"
-   },
-   "process": {
-    "op": "loop",
-    "start": 6.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-earth-solar-array",
-   "kind": "video",
-   "category": "space",
-   "name": "Earth from orbit",
-   "author": "NASA",
-   "license": "Public domain",
-   "licenseUrl": "",
-   "source": "https://commons.wikimedia.org/wiki/File:Earth-solar-array-timelapse.webm",
-   "origin": {
-    "type": "commons",
-    "title": "File:Earth-solar-array-timelapse.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/3/31/Earth-solar-array-timelapse.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "058b68851c465067777919f5bb041a45c9079416",
-    "localKey": "eb0b7a53e974",
-    "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Earth-solar-array-timelapse.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Earth-solar-array-timelapse.webm"
-    ],
-    "verifiedLicense": "Public domain",
-    "licenseUrlFromApi": "",
-    "credit": "earth-solar-array-timelapse",
-    "artist": "NASA"
-   },
-   "process": {
-    "op": "loop",
-    "start": 1.0,
-    "seconds": 7,
-    "crossfade": 1.0,
-    "crop": null
-   }
-  },
-  {
-   "id": "loop-rain-drops",
-   "kind": "video",
-   "category": "abstract",
-   "name": "Rain drops",
-   "author": "Nesnad",
+   "category": "nature",
+   "name": "Creek cascade",
+   "author": "Missvain",
    "license": "CC BY 4.0",
    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-   "source": "https://commons.wikimedia.org/wiki/File:Rain_drops_-_Japan_-2016_July_20.webm",
+   "source": "https://commons.wikimedia.org/wiki/File:Sonoma_Creek_-_December_2022_-_Sarah_Stierch.webm",
    "origin": {
     "type": "commons",
-    "title": "File:Rain drops - Japan -2016 July 20.webm",
-    "download": "https://upload.wikimedia.org/wikipedia/commons/b/bd/Rain_drops_-_Japan_-2016_July_20.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
-    "sha1": "93cecd76ba5cdd8d6cf689b49973382112386083",
-    "localKey": "fcecf6431144",
+    "title": "File:Sonoma Creek - December 2022 - Sarah Stierch.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/7/72/Sonoma_Creek_-_December_2022_-_Sarah_Stierch.webm",
+    "sha1": "4c77061cc08e4283891ba0eadfb19193ae53a62b",
+    "localKey": "da963d6b02e0",
     "verifiedAt": [
-     "https://commons.wikimedia.org/wiki/File:Rain_drops_-_Japan_-2016_July_20.webm",
-     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|mime&titles=File:Rain_drops_-_Japan_-2016_July_20.webm"
+     "https://commons.wikimedia.org/wiki/File:Sonoma_Creek_-_December_2022_-_Sarah_Stierch.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Sonoma_Creek_-_December_2022_-_Sarah_Stierch.webm"
     ],
-    "verifiedLicense": "CC BY 4.0",
-    "licenseUrlFromApi": "https://creativecommons.org/licenses/by/4.0",
-    "credit": "Own work",
-    "artist": "Nesnad"
+    "verifiedLicense": "CC BY 4.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by/4.0",
+    "artist": "Missvain",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "loop",
-    "start": 5.0,
+    "start": 1.25,
     "seconds": 7,
-    "crossfade": 1.0,
+    "crossfade": 1.5,
     "crop": null
    },
-   "credit": "Video: Nesnad, CC BY 4.0, via Wikimedia Commons"
+   "credit": "Video: Missvain, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-snowy-park",
+   "kind": "video",
+   "category": "nature",
+   "name": "Snow in the park",
+   "author": "Lukas Beck",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Landschaftsschutzgebiet_Volkspark_Rehberge_lub_2026-01-03_snowing.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Landschaftsschutzgebiet Volkspark Rehberge lub 2026-01-03 snowing.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/5/55/Landschaftsschutzgebiet_Volkspark_Rehberge_lub_2026-01-03_snowing.webm",
+    "sha1": "e0439e8cf9420a149b7bb888bfcb202b965da1c7",
+    "localKey": "790cf8469e44",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Landschaftsschutzgebiet_Volkspark_Rehberge_lub_2026-01-03_snowing.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Landschaftsschutzgebiet_Volkspark_Rehberge_lub_2026-01-03_snowing.webm"
+    ],
+    "verifiedLicense": "CC BY 4.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by/4.0",
+    "artist": "Lukas Beck",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
+   },
+   "process": {
+    "op": "loop",
+    "start": 1.25,
+    "seconds": 7,
+    "crossfade": 1.5,
+    "crop": null
+   },
+   "credit": "Video: Lukas Beck, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-snowfall-field",
+   "kind": "video",
+   "category": "nature",
+   "name": "Snowfall over a field",
+   "author": "Lukas Beck",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Berlin_Karow_lub_2025-01-10_Snowfall.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Berlin Karow lub 2025-01-10 Snowfall.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/e/ef/Berlin_Karow_lub_2025-01-10_Snowfall.webm",
+    "sha1": "46d2c9528a87e90856c7572d746c04087f2fd162",
+    "localKey": "cdf538c330e6",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Berlin_Karow_lub_2025-01-10_Snowfall.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Berlin_Karow_lub_2025-01-10_Snowfall.webm"
+    ],
+    "verifiedLicense": "CC BY 4.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by/4.0",
+    "artist": "Lukas Beck",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
+   },
+   "process": {
+    "op": "loop",
+    "start": 0.0,
+    "seconds": 7,
+    "crossfade": 1.5,
+    "crop": null
+   },
+   "credit": "Video: Lukas Beck, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-reed-lake",
+   "kind": "video",
+   "category": "nature",
+   "name": "Lake through the reeds",
+   "author": "ForeverFlying",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Ambiance_at_Marlu_Lake_in_Thompson_Park,_Monmouth_County,_New_Jersey.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Ambiance at Marlu Lake in Thompson Park, Monmouth County, New Jersey.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/9/96/Ambiance_at_Marlu_Lake_in_Thompson_Park%2C_Monmouth_County%2C_New_Jersey.webm",
+    "sha1": "42a5a3407ecb1ec5cb08e99a6ae3560b6096aa57",
+    "localKey": "c506a62999c1",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Ambiance_at_Marlu_Lake_in_Thompson_Park,_Monmouth_County,_New_Jersey.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Ambiance_at_Marlu_Lake_in_Thompson_Park,_Monmouth_County,_New_Jersey.webm"
+    ],
+    "verifiedLicense": "CC BY 4.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by/4.0",
+    "artist": "ForeverFlying",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
+   },
+   "process": {
+    "op": "loop",
+    "start": 3.0,
+    "seconds": 7,
+    "crossfade": 1.5,
+    "crop": null
+   },
+   "credit": "Video: ForeverFlying, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-open-sea",
+   "kind": "video",
+   "category": "nature",
+   "name": "Open sea tank",
+   "author": "Fastily",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Open_Sea_exhibit_at_Monterey_Bay_Aquarium_2_2024-01-11.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Open Sea exhibit at Monterey Bay Aquarium 2 2024-01-11.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/d/d1/Open_Sea_exhibit_at_Monterey_Bay_Aquarium_2_2024-01-11.webm",
+    "sha1": "21a2c93c70c70942d19fb635af6e03280296eacb",
+    "localKey": "db54bac5eba7",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Open_Sea_exhibit_at_Monterey_Bay_Aquarium_2_2024-01-11.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Open_Sea_exhibit_at_Monterey_Bay_Aquarium_2_2024-01-11.webm"
+    ],
+    "verifiedLicense": "CC BY-SA 4.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by-sa/4.0",
+    "artist": "Fastily",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
+   },
+   "process": {
+    "op": "loop",
+    "start": 3.5,
+    "seconds": 7,
+    "crossfade": 1.5,
+    "crop": null
+   },
+   "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-sea-jellies",
+   "kind": "video",
+   "category": "nature",
+   "name": "Sea jellies",
+   "author": "Fastily",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Jellyfish_at_Monterey_Bay_Aquarium_8_2024-01-11.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Jellyfish at Monterey Bay Aquarium 8 2024-01-11.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/e/e3/Jellyfish_at_Monterey_Bay_Aquarium_8_2024-01-11.webm",
+    "sha1": "06ab56244cd81a9e68eb2ade41996909de3170fa",
+    "localKey": "98d1c1c7dc94",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Jellyfish_at_Monterey_Bay_Aquarium_8_2024-01-11.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Jellyfish_at_Monterey_Bay_Aquarium_8_2024-01-11.webm"
+    ],
+    "verifiedLicense": "CC BY-SA 4.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by-sa/4.0",
+    "artist": "Fastily",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
+   },
+   "process": {
+    "op": "loop",
+    "start": 2.5,
+    "seconds": 7,
+    "crossfade": 1.5,
+    "crop": null
+   },
+   "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-gulls-river",
+   "kind": "video",
+   "category": "nature",
+   "name": "Gulls over the river",
+   "author": "CoderAnimeshPathak",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Gulls_Over_River.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:Gulls Over River.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Gulls_Over_River.webm",
+    "sha1": "78584c4ebbca0bfe5387c0576f27bd8a64eed5df",
+    "localKey": "93e98bcd1842",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Gulls_Over_River.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Gulls_Over_River.webm"
+    ],
+    "verifiedLicense": "CC0 (LicenseShortName in the file's extmetadata), http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "artist": "CoderAnimeshPathak",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
+   },
+   "process": {
+    "op": "loop",
+    "start": 12.5,
+    "seconds": 7,
+    "crossfade": 1.5,
+    "crop": null
+   }
+  },
+  {
+   "id": "loop-rooftops-dusk",
+   "kind": "video",
+   "category": "city",
+   "name": "Rooftops at dusk",
+   "author": "Thomas Bresson",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:2020-04-01_timelapse-sunset-Belfort.webm",
+   "origin": {
+    "type": "commons",
+    "title": "File:2020-04-01 timelapse-sunset-Belfort.webm",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/e/e9/2020-04-01_timelapse-sunset-Belfort.webm",
+    "sha1": "bc23155beb93f5d8c8cfb8b231171bd8d34ca1ce",
+    "localKey": "fdbdab774012",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:2020-04-01_timelapse-sunset-Belfort.webm",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:2020-04-01_timelapse-sunset-Belfort.webm"
+    ],
+    "verifiedLicense": "CC BY 4.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by/4.0",
+    "artist": "Thomas Bresson",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
+   },
+   "process": {
+    "op": "loop",
+    "start": 0.5,
+    "seconds": 7,
+    "crossfade": 1.5,
+    "crop": null
+   },
+   "credit": "Video: Thomas Bresson, CC BY 4.0, via Wikimedia Commons"
+  },
+  {
+   "id": "loop-observatory-stars",
+   "kind": "video",
+   "category": "space",
+   "name": "Stars over the observatory",
+   "author": "ESO/B. Tafreshi",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Stars_Rise_over_La_Silla.ogv",
+   "origin": {
+    "type": "commons",
+    "title": "File:Stars Rise over La Silla.ogv",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Stars_Rise_over_La_Silla.ogv",
+    "sha1": "7e1a00cf45806582d722d8e44ee4f6bdbbfc4e2b",
+    "localKey": "7d74c595556c",
+    "verifiedAt": [
+     "https://commons.wikimedia.org/wiki/File:Stars_Rise_over_La_Silla.ogv",
+     "https://commons.wikimedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url|extmetadata|size|sha1&titles=File:Stars_Rise_over_La_Silla.ogv"
+    ],
+    "verifiedLicense": "CC BY 4.0 (LicenseShortName in the file's extmetadata), https://creativecommons.org/licenses/by/4.0",
+    "artist": "ESO/B. Tafreshi",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
+   },
+   "process": {
+    "op": "loop",
+    "start": 0.0,
+    "seconds": 7,
+    "crossfade": 1.5,
+    "crop": null
+   },
+   "credit": "Video: ESO/B. Tafreshi, CC BY 4.0, via Wikimedia Commons"
   },
   {
    "id": "loop-flow-ocean",
@@ -3282,12 +2947,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "flow-ocean",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3303,12 +2972,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "flow-peach",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3324,12 +2997,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "flow-violet",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3345,12 +3022,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "flow-mint",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3366,12 +3047,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "flow-graphite",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3387,12 +3072,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "bokeh-amber",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3408,12 +3097,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "bokeh-blue",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3429,12 +3122,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "bokeh-city-night",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3450,12 +3147,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "aurora-green",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3471,12 +3172,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "aurora-violet",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3492,12 +3197,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "starfield-nebula",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3513,12 +3222,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "waves-dusk",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3534,12 +3247,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "waves-mint",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3555,12 +3272,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "particles-dust",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3576,12 +3297,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "backdrop-grey",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   },
   {
@@ -3597,12 +3322,16 @@
     "type": "procedural",
     "generator": "tools/studio/gen-studio-loops.py",
     "item": "backdrop-teal",
-    "verifiedLicense": "MIT (our own render)"
+    "verifiedLicense": "MIT (our own render)",
+    "original": {
+     "w": 3840,
+     "h": 2160
+    }
    },
    "process": {
     "op": "encode",
     "seconds": 8,
-    "note": "periodic by construction, no crossfade"
+    "note": "periodic by construction, no crossfade; rendered at 3840x2160, light film grain at encode"
    }
   }
  ]

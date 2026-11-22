@@ -69,13 +69,14 @@ works; see `docs/WALLPAPERS.md`. The built-in clip is the project's own.
 
 ## LordOS Studio's backgrounds
 
-The catalog `assets/studio/backgrounds.json` lists 121 backgrounds (72 pictures, 49 short loops) with each one's title,
+The catalog `assets/studio/backgrounds.json` lists 109 backgrounds (72 pictures, 37 short loops; every loop at 3840×2160 and 1920×1080 from an original at least
+3840×2160) with each one's title,
 author, license, license URL, source page and, for CC BY and CC BY-SA works, its credit line; the camera popover shows
 them under Background → Credits. Their thumbnails and seven pictures (one per category) ship in
 `assets/studio/backgrounds/`; the full files are downloaded on demand from the `LordOS-wallpapers` repository's
 `studio/` folder, whose README credits every file. Sources: Poly Haven HDRIs rendered to flat views and ambientCG
-textures (CC0), NASA ISS photographs (public domain; no insignia), Wikimedia Commons clips (CC0, public domain,
-CC BY 2.0/3.0/4.0 and CC BY-SA 4.0; the share-alike applies to those files only) and the project's own renders (MIT,
+textures (CC0), NASA ISS photographs (public domain; no insignia), Wikimedia Commons clips (CC0, CC BY 2.0/3.0/4.0
+and CC BY-SA 4.0; the share-alike applies to those files only) and the project's own renders (MIT,
 `tools/studio/gen-studio-loops.py`). The record of each file's license check is `tools/studio/bg-sources.json`. Nothing
 from Unsplash, Pexels or Pixabay (`docs/CAMERA-STUDIO-PLAN.md` 6.1).
 

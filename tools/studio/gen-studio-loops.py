@@ -7,8 +7,11 @@ loop phase), so the last frame flows into the first without a crossfade. Output 
 item has its own fixed seed.
 
 usage: python3 -I tools/studio/gen-studio-loops.py <outdir> [id ...]
-  loops  -> <outdir>/<id>.mkv  (FFV1 lossless, 1920x1080, 30 fps, 8 s; tools/studio/build-backgrounds.py encodes it)
-  stills -> <outdir>/<id>.png  (1920x1080)
+  loops  -> <outdir>/<id>.mkv  (FFV1 lossless, 3840x2160, 30 fps, 8 s; tools/studio/build-backgrounds.py encodes it)
+  stills -> <outdir>/<id>.png  (3840x2160)
+The size is 3840x2160 (STUDIO_RENDER_W/STUDIO_RENDER_H change it); every length in pixels scales with the width, so a
+smaller render is the same picture. Smooth fields are computed on a quarter-size grid and upscaled bicubically, and
+every frame is dithered (triangular noise of one level) on the way to 8 bits, so gradients don't band.
 """
 import math
 import os
@@ -17,8 +20,10 @@ import sys
 
 import numpy as np
 
-W, H = 1920, 1080
-LW, LH = 480, 270          # low-resolution grid for smooth fields
+W = int(os.environ.get("STUDIO_RENDER_W", "3840"))
+H = int(os.environ.get("STUDIO_RENDER_H", "2160"))
+S = W / 1920.0             # every length in pixels was chosen at 1920x1080
+LW, LH = W // 4, H // 4    # grid for smooth fields
 FPS, SECONDS = 30, 8
 NFRAMES = FPS * SECONDS
 TAU = 2 * math.pi
@@ -39,9 +44,9 @@ def lin_to_srgb(c):
 
 
 def upscale(field):
-    """Smooth low-res (LH, LW, C) float field -> (H, W, C), bilinear."""
+    """Smooth low-res (LH, LW, C) float field -> (H, W, C), bicubic (no visible facets in slow gradients)."""
     from PIL import Image
-    return np.stack([np.asarray(Image.fromarray(np.ascontiguousarray(field[..., c], np.float32), "F").resize((W, H), Image.BILINEAR))
+    return np.stack([np.asarray(Image.fromarray(np.ascontiguousarray(field[..., c], np.float32), "F").resize((W, H), Image.BICUBIC))
                      for c in range(field.shape[2])], -1)
 
 
@@ -109,6 +114,7 @@ def blobs_scene(palette, bg_top, bg_bottom, n=6, size=(0.35, 0.65), amp=0.18, se
 
 def bokeh_scene(palette, bg_top, bg_bottom, n=36, rmin=18, rmax=95, amp=60, glow=0.4, seed=2):
     rng = np.random.default_rng(seed)
+    rmin, rmax, amp = rmin * S, rmax * S, amp * S
     cols = [srgb_to_lin(hexrgb(c)) for c in palette]
     top, bot = srgb_to_lin(hexrgb(bg_top)), srgb_to_lin(hexrgb(bg_bottom))
     bg = upscale(top[None, None, :] * (1 - LY[..., None]) + bot[None, None, :] * LY[..., None]) * VIG
@@ -118,14 +124,14 @@ def bokeh_scene(palette, bg_top, bg_bottom, n=36, rmin=18, rmax=95, amp=60, glow
         R = int(math.ceil(r + 3))
         yy, xx = np.mgrid[-R:R + 1, -R:R + 1].astype(np.float32)
         d = np.sqrt(xx ** 2 + yy ** 2)
-        disc = np.clip((r - d) / 2.5 + 0.5, 0, 1)                    # anti-aliased disc
-        rim = np.exp(-((d - r * 0.92) / (r * 0.08 + 1)) ** 2) * 0.35  # soft brighter rim
+        disc = np.clip((r - d) / (2.5 * S) + 0.5, 0, 1)              # anti-aliased disc
+        rim = np.exp(-((d - r * 0.92) / (r * 0.08 + S)) ** 2) * 0.35  # soft brighter rim
         sprite = (disc * (0.65 + 0.35 * (d / r) ** 2) + rim * disc)[..., None]
         lights.append(dict(sprite=sprite.astype(np.float32), R=R, cx=rng.uniform(0, W), cy=rng.uniform(0.15, 1.0) * H,
                            ax=rng.uniform(0.4, 1.0) * amp, ay=rng.uniform(0.3, 0.8) * amp,
                            kx=int(rng.integers(1, 3)), ky=int(rng.integers(1, 3)),
                            px=rng.uniform(0, TAU), py=rng.uniform(0, TAU), pb=rng.uniform(0, TAU),
-                           col=cols[int(rng.integers(0, len(cols)))] * rng.uniform(0.25, 0.75) * glow * (40 / r) ** 0.5))
+                           col=cols[int(rng.integers(0, len(cols)))] * rng.uniform(0.25, 0.75) * glow * (40 * S / r) ** 0.5))
 
     def frame(t):
         th = TAU * t
@@ -148,13 +154,32 @@ def bokeh_scene(palette, bg_top, bg_bottom, n=36, rmin=18, rmax=95, amp=60, glow
 
 def stars(n, seed, bright=1.0):
     rng = np.random.default_rng(seed)
-    return dict(x=rng.integers(0, W, n), y=rng.integers(0, H, n), b=(rng.random(n) ** 3 * 0.5 + 0.03) * bright,
-                ph=rng.uniform(0, TAU, n), k=rng.integers(1, 4, n))
+    return dict(x=(rng.random(n) * W).astype(np.int64), y=(rng.random(n) * H).astype(np.int64),
+                b=(rng.random(n) ** 3 * 0.5 + 0.03) * bright, ph=rng.uniform(0, TAU, n), k=rng.integers(1, 4, n))
+
+
+# A star is a small cross at 1920 px wide; at a larger size the same cross covers the same share of the picture
+_STAR = None
+
+
+def star_kernel():
+    global _STAR
+    if _STAR is None:
+        r = max(1, int(round(S)))
+        taps = []
+        for dy in range(-r, 2 * r):
+            for dx in range(-r, 2 * r):
+                cy, cx = dy // r, dx // r            # which cell of the 3x3 cross at 1920 px
+                w = 1.0 if (cy, cx) == (0, 0) else 0.3 if abs(cy) + abs(cx) == 1 else 0.0
+                if w:
+                    taps.append((dy, dx, w))
+        _STAR = taps
+    return _STAR
 
 
 def draw_stars(img, st, th):
     b = st["b"] * (0.7 + 0.3 * np.sin(st["k"] * th + st["ph"]))
-    for dy, dx, w in ((0, 0, 1.0), (0, 1, 0.3), (0, -1, 0.3), (1, 0, 0.3), (-1, 0, 0.3)):
+    for dy, dx, w in star_kernel():
         yy = np.clip(st["y"] + dy, 0, H - 1)
         xx = np.clip(st["x"] + dx, 0, W - 1)
         np.add.at(img, (yy, xx), (b * w)[:, None] * np.array([0.9, 0.95, 1.0], np.float32))
@@ -220,12 +245,13 @@ def particles_scene(bg_top, bg_bottom, tint, n=420, seed=5):
     bg = upscale(top[None, None, :] * (1 - LY[..., None]) + bot[None, None, :] * LY[..., None]) * VIG
     col = srgb_to_lin(hexrgb(tint))
     sprites = {}
-    for r in (1.2, 1.8, 2.6, 3.6, 5.0):
+    for r0 in (1.2, 1.8, 2.6, 3.6, 5.0):
+        r = r0 * S
         R = int(math.ceil(r * 2.5))
         yy, xx = np.mgrid[-R:R + 1, -R:R + 1].astype(np.float32)
-        sprites[r] = (np.exp(-(xx ** 2 + yy ** 2) / (r * r)))[..., None].astype(np.float32)
+        sprites[r0] = (np.exp(-(xx ** 2 + yy ** 2) / (r * r)))[..., None].astype(np.float32)
     P = [dict(r=float(rng.choice(list(sprites))), cx=rng.uniform(0, W), cy=rng.uniform(0, H),
-              ax=rng.uniform(20, 90), ay=rng.uniform(20, 90), kx=int(rng.integers(1, 3)), ky=int(rng.integers(1, 3)),
+              ax=rng.uniform(20, 90) * S, ay=rng.uniform(20, 90) * S, kx=int(rng.integers(1, 3)), ky=int(rng.integers(1, 3)),
               px=rng.uniform(0, TAU), py=rng.uniform(0, TAU), b=rng.uniform(0.08, 0.5), pb=rng.uniform(0, TAU)) for _ in range(n)]
 
     def frame(t):

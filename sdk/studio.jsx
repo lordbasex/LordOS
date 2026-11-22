@@ -366,7 +366,7 @@ function Tile({ th, src, label, on, ready, percent, onClick }) {
   );
 }
 
-function BackgroundPage({ th, cfg, go }) {
+function BackgroundPage({ th, cfg, status, go }) {
   const [picking, setPicking] = useState(false);
   const [note, setNote] = useState('');
   const downloads = useStore(bgDownloads);
@@ -377,7 +377,7 @@ function BackgroundPage({ th, cfg, go }) {
   const current = activeBackground(cfg);
   const choose = (it) => {
     setNote('');
-    fetchBackground(it).then((src) => { if (src) update((c) => withPicture(c, src)); }, (e) => setNote(t(`errors.${e?.code || 'studio.downloadFailed'}`)));
+    fetchBackground(it, { big: !!status?.gpu }).then((src) => { if (src) update((c) => withPicture(c, src)); }, (e) => setNote(t(`errors.${e?.code || 'studio.downloadFailed'}`)));
   };
   const walls = lordosWallpapers.filter((w) => w.category !== 'gradients' && !/cyberpunk/.test(w.category || ''));
   const pictured = cfg.mode === 'picture' || cfg.mode === 'video';

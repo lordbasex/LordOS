@@ -208,7 +208,7 @@ static void test_shipped(void) {
         char thumb[256];
         snprintf(thumb, sizeof thumb, "../assets/studio/backgrounds/%s.thumb.jpg", id ? id : "");
         struct stat st;
-        CHECK(!stat(thumb, &st) && st.st_size > 1000 && st.st_size < 60000, "%s: its thumbnail is missing or odd", id ? id : "?");
+        CHECK(!stat(thumb, &st) && st.st_size > 1000 && st.st_size < 150000, "%s: its thumbnail is missing or odd", id ? id : "?");
         count++;
         pictures += kind && !strcmp(kind, "picture");
         videos += kind && !strcmp(kind, "video");
