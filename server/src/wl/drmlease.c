@@ -192,7 +192,8 @@ void drmlease_test_drm(int (*scan)(void *, DrmlConn *, int), int (*lease)(void *
 }
 #endif
 
-/* ---- the conformance tool's fake card (lord-server --headless --test-hooks, testhooks.h "lease") ----
+#ifdef LORD_TEST_HOOKS
+/* ---- the conformance tool's fake card (build/lord-server-test only, -DLORD_TEST_HOOKS; testhooks.h "lease") ----
  * A desktop display and, while "plugged", a non-desktop one (a VR headset). drm_fd and every lease_fd are memfds and
  * the lessee ids are counted here: no ioctl reaches a card. Everything else is the real code: drmlcore.c's rules, the
  * "vr" permission (perms.c, the person's answer from the theme's prompt) and the protocol. */
@@ -228,6 +229,7 @@ int drmlease_fake_card(int plugged) {
     drmlease_card(fake_card);           /* the first time the card arrives, later a rescan (hotplug) */
     return 0;
 }
+#endif
 
 /* ---- wp_drm_lease_connector_v1 ---- */
 

@@ -337,7 +337,7 @@ export function confMarkdown(d, C) {
     `wayland-protocols ${E.waylandProtocols}, libwayland ${E.libwayland}, Xwayland ${E.xwayland}; ${E.mode}. Published with the screenshots on`,
     '[lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/#conformance). **Depth**: *complete* = protocol-specific',
     'tests of every request, event and error, all passed and nothing skipped (pointer, graphics tablet, VR headset and',
-    'Xwayland\'s connection come from lord-server\'s `--test-hooks`, headless only); *partial* = protocol-specific tests, with',
+    'Xwayland\'s connection come from the test build `lord-server-test --test-hooks`, never the installed one); *partial* = protocol-specific tests, with',
     'a point skipped headless; *general* = the static code check and the generic bind at every version (X11: the static',
     'check and the unit tests), no flow of its own yet; *code only* = the static code check alone (X11: nothing to run headless).',
     '',

@@ -366,8 +366,9 @@ const THEME_HOOK = `
 
 async function startServer() {
   const theme = path.join(ROOT, 'themes', 'default', 'theme.bundle.js');
-  const bin = path.join(BUILD, 'lord-server');
-  if (!fs.existsSync(bin) || !fs.existsSync(theme)) throw new Error(`needs ${path.relative(ROOT, bin)} and ${path.relative(ROOT, theme)} (make -C server; npm run build)`);
+  // the test build (same sources, -DLORD_TEST_HOOKS): the installed lord-server has no --test-hooks
+  const bin = path.join(BUILD, 'lord-server-test');
+  if (!fs.existsSync(bin) || !fs.existsSync(theme)) throw new Error(`needs ${path.relative(ROOT, bin)} and ${path.relative(ROOT, theme)} (make -C server build/lord-server-test; npm run build)`);
   const D = fs.mkdtempSync(path.join(os.tmpdir(), 'lwconf.'));
   fs.chmodSync(D, 0o700);
   fs.mkdirSync(path.join(D, 'home', '.config', 'lordos'), { recursive: true });
@@ -377,7 +378,7 @@ async function startServer() {
   for (const k of ['WAYLAND_DISPLAY', 'WAYLAND_SOCKET', 'DISPLAY', 'XAUTHORITY', 'LORD_SESSIOND', 'LORDOS_SESSIOND', 'DBUS_SESSION_BUS_ADDRESS']) delete env[k];
   const out = fs.openSync(path.join(D, 'server.log'), 'w');
   // --user: the session's services, among them the X socket (Xwayland starts on the first X11 connection)
-  // --test-hooks: the pointer, a graphics tablet, a VR headset and an Xwayland-like connection on demand (src/testhooks.h)
+  // --test-hooks (build/lord-server-test only): the pointer, a graphics tablet, a VR headset and an Xwayland-like connection (src/testhooks.h)
   const P = spawn(bin, ['--headless', '1280x800', '--theme', path.join(D, 'theme.js'), '--timeout', '900', '--user', os.userInfo().username, '--test-hooks'],
     { cwd: SERVER, env, stdio: ['ignore', out, out], detached: true });
   let sock = '';

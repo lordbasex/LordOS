@@ -42,7 +42,7 @@ Nothing was installed for them; programs not installed here are listed at the en
   requests, the utility window type, `_NET_REQUEST_FRAME_EXTENTS` (xdotool and wmctrl aren't installed). They are
   checked by `build/x11-conformance-client` only.
 - **Needs hardware:** a real graphics tablet and a VR headset (the conformance run simulates both through
-  `lord-server --test-hooks`, `server/src/testhooks.h`: a tablet's tools, wheel, pad and `set_feedback`, and drm-lease's
+  `build/lord-server-test --test-hooks`, `server/src/testhooks.h`, a test build never installed: a tablet's tools, wheel, pad and `set_feedback`, and drm-lease's
   whole flow, are checked there on fake devices), and a touchscreen (`wl_touch.orientation`; its logic is covered by
   `build/tp-test`). Chromium, zenity (GTK 4) and FeatherPad (Qt 6) bind several of the newer globals (among them xdg-toplevel-drag,
   content-type, the tablet manager and the system bell), but nothing in these runs uses them visibly (no tab dragged,

@@ -77,7 +77,7 @@ MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/m
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/studio_bg_admin.c src/hw/studio_bg_find.c src/hw/wallpaper_image.c src/main.c src/testhooks.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/syncobj.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/timing.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/wl/drmlease.c src/wl/drmlcore.c src/osk.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/studio_bg_admin.c src/hw/studio_bg_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/syncobj.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/timing.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/wl/drmlease.c src/wl/drmlcore.c src/osk.c \
        src/ui/wave.c src/sound/spectrum.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c \
@@ -758,8 +758,9 @@ build/wl-globals: tests/wl_globals.c
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ $< -lwayland-client
 # Wayland and Xwayland conformance, point by point, scored 0–100 % per protocol (tools/wl-conformance.mjs, docs/WAYLAND.md,
 # "Conformance"): a headless lord-server, build/wl-conformance-client and build/x11-conformance-client (built by the tool).
-# Needs the theme bundle (npm run build). WLCONF_ARGS=--record writes docs/wayland-conformance.json.
-wl-conformance: build/lord-server build/wl-globals
+# Needs the theme bundle (npm run build). WLCONF_ARGS=--record writes docs/wayland-conformance.json. It runs
+# build/lord-server-test (the test hooks, below), never the installed lord-server.
+wl-conformance: build/lord-server-test build/wl-globals
 	node ../tools/wl-conformance.mjs $(WLCONF_ARGS)
 .PHONY: wl-conformance
 build/fw-rules-test: tests/fw_rules_test.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c $(wildcard src/fw/*.h) src/sec/json.h
@@ -1240,6 +1241,22 @@ build/gen/%.o: build/gen/%.c
 
 build/lord-server: $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	@printf '%s\n' $^ > build/lord-server.objs
+
+# The conformance tool's server (tools/wl-conformance.mjs, tools/wl-proof.mjs; docs/WAYLAND.md "Conformance"): the same
+# objects as lord-server, but main.c, wl/wl.c and wl/drmlease.c built again with -DLORD_TEST_HOOKS, plus testhooks.c
+# (src/testhooks.h: --test-hooks, a socket for a synthetic pointer, a fake tablet, a fake VR headset and an Xwayland-like
+# connection). A test tool only: never installed (tools/iso/mkdeb.sh packs build/lord-server, and refuses one that
+# holds the hooks). The installed lord-server has no --test-hooks flag, no socket and none of that code.
+TESTHOOK_SWAP := build/obj/main.o build/obj/wl/wl.o build/obj/wl/drmlease.o
+TESTHOOK_OBJ := build/obj-testhooks/main.o build/obj-testhooks/wl/wl.o build/obj-testhooks/wl/drmlease.o build/obj-testhooks/testhooks.o
+build/obj-testhooks/%.o: src/%.c $(HDR)
+	@mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) -DLORD_TEST_HOOKS $(CFLAGS) $(WARN) -std=c11 -c -o $@ $<
+build/obj-testhooks/main.o: build/gen/lord_version.h
+build/lord-server-test: build/lord-server $(TESTHOOK_OBJ)
+	$(CC) $(LDFLAGS) -o $@ $(TESTHOOK_OBJ) $(filter-out $(TESTHOOK_SWAP),$(shell cat build/lord-server.objs)) $(LDLIBS)
+all: build/lord-server-test
 
 SESSIOND_OBJ := build/obj/remote/sessiond.o build/obj/remote/sess.o build/obj/remote/monitor.o build/obj/remote/blackfb.o build/obj/remote/conn.o \
                 build/obj/remote/enc.o build/obj/remote/pages.o build/obj/sec/cgroup.o build/obj/remote/netsup.o build/obj/remote/cgsup.o \

@@ -1,7 +1,7 @@
 {
  "schema": 1,
  "date": "2026-11-22",
- "commit": "0d24bb85a2a50f1ffbe608d026c21d6c95e8ed06",
+ "commit": "6e5f30452c78b35ec56ad02a7dd380767928030e",
  "dirty": true,
  "tool": "tools/wl-conformance.mjs",
  "method": "docs/WAYLAND.md#conformance",
@@ -4311,7 +4311,7 @@
      "what": "wp_commit_timing_manager_v1.get_timer,wp_commit_timer_v1.set_timestamp",
      "weight": 3,
      "result": "pass",
-     "msg": "commits with a target 100, 250 and 400 ms ahead applied at or after it: 3 of 3 (from -0.6 to +0.0 ms of their targets)",
+     "msg": "commits with a target 100, 250 and 400 ms ahead applied at or after it: 3 of 3 (from -0.6 to +0.7 ms of their targets)",
      "where": null
     },
     {
@@ -4320,7 +4320,7 @@
      "what": "wp_commit_timer_v1.set_timestamp",
      "weight": 3,
      "result": "pass",
-     "msg": "the next commit, with no timestamp, is not held: 14 ms",
+     "msg": "the next commit, with no timestamp, is not held: 15 ms",
      "where": null
     },
     {
@@ -4640,7 +4640,7 @@
    "xml": "/usr/share/wayland-protocols/staging/drm-lease/drm-lease-v1.xml",
    "version": 1,
    "advertised": false,
-   "where": "server/src/wl/drmlease.c:394",
+   "where": "server/src/wl/drmlease.c:396",
    "note": "created in the source but not advertised to a normal client here (conditional, trusted-only or needs hardware)",
    "interfaces": [
     "wp_drm_lease_device_v1",
@@ -4668,7 +4668,7 @@
      "hint": "wp_drm_lease_device_v1.create_lease_request",
      "result": "pass",
      "msg": "handled (dev_impl)",
-     "where": "server/src/wl/drmlease.c:348"
+     "where": "server/src/wl/drmlease.c:350"
     },
     {
      "kind": "static",
@@ -4678,7 +4678,7 @@
      "hint": "wp_drm_lease_device_v1.release",
      "result": "pass",
      "msg": "handled (dev_impl)",
-     "where": "server/src/wl/drmlease.c:355"
+     "where": "server/src/wl/drmlease.c:357"
     },
     {
      "kind": "static",
@@ -4688,7 +4688,7 @@
      "hint": "wp_drm_lease_device_v1.drm_fd",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/drmlease.c:250"
+     "where": "server/src/wl/drmlease.c:252"
     },
     {
      "kind": "static",
@@ -4698,7 +4698,7 @@
      "hint": "wp_drm_lease_device_v1.connector",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/drmlease.c:276"
+     "where": "server/src/wl/drmlease.c:278"
     },
     {
      "kind": "static",
@@ -4708,7 +4708,7 @@
      "hint": "wp_drm_lease_device_v1.done",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/drmlease.c:283"
+     "where": "server/src/wl/drmlease.c:285"
     },
     {
      "kind": "static",
@@ -4718,7 +4718,7 @@
      "hint": "wp_drm_lease_device_v1.released",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/drmlease.c:357"
+     "where": "server/src/wl/drmlease.c:359"
     },
     {
      "kind": "static",
@@ -4728,7 +4728,7 @@
      "hint": "wp_drm_lease_connector_v1.destroy",
      "result": "pass",
      "msg": "handled (conn_impl)",
-     "where": "server/src/wl/drmlease.c:240"
+     "where": "server/src/wl/drmlease.c:242"
     },
     {
      "kind": "static",
@@ -4738,7 +4738,7 @@
      "hint": "wp_drm_lease_connector_v1.name",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/drmlease.c:277"
+     "where": "server/src/wl/drmlease.c:279"
     },
     {
      "kind": "static",
@@ -4748,7 +4748,7 @@
      "hint": "wp_drm_lease_connector_v1.description",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/drmlease.c:278"
+     "where": "server/src/wl/drmlease.c:280"
     },
     {
      "kind": "static",
@@ -4758,7 +4758,7 @@
      "hint": "wp_drm_lease_connector_v1.connector_id",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/drmlease.c:279"
+     "where": "server/src/wl/drmlease.c:281"
     },
     {
      "kind": "static",
@@ -4768,7 +4768,7 @@
      "hint": "wp_drm_lease_connector_v1.done",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/drmlease.c:280"
+     "where": "server/src/wl/drmlease.c:282"
     },
     {
      "kind": "static",
@@ -4778,7 +4778,7 @@
      "hint": "wp_drm_lease_connector_v1.withdrawn",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/drmlease.c:258"
+     "where": "server/src/wl/drmlease.c:260"
     },
     {
      "kind": "static",
@@ -4788,7 +4788,7 @@
      "hint": "wp_drm_lease_request_v1.request_connector",
      "result": "pass",
      "msg": "handled (req_impl)",
-     "where": "server/src/wl/drmlease.c:304"
+     "where": "server/src/wl/drmlease.c:306"
     },
     {
      "kind": "static",
@@ -4798,7 +4798,7 @@
      "hint": "wp_drm_lease_request_v1.submit",
      "result": "pass",
      "msg": "handled (req_impl)",
-     "where": "server/src/wl/drmlease.c:320"
+     "where": "server/src/wl/drmlease.c:322"
     },
     {
      "kind": "static",
@@ -4808,7 +4808,7 @@
      "hint": "wp_drm_lease_request_v1.error.wrong_device",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/drmlease.c:309"
+     "where": "server/src/wl/drmlease.c:311"
     },
     {
      "kind": "static",
@@ -4818,7 +4818,7 @@
      "hint": "wp_drm_lease_request_v1.error.duplicate_connector",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/drmlease.c:314"
+     "where": "server/src/wl/drmlease.c:316"
     },
     {
      "kind": "static",
@@ -4828,7 +4828,7 @@
      "hint": "wp_drm_lease_request_v1.error.empty_lease",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/drmlease.c:323"
+     "where": "server/src/wl/drmlease.c:325"
     },
     {
      "kind": "static",
@@ -4838,7 +4838,7 @@
      "hint": "wp_drm_lease_v1.destroy",
      "result": "pass",
      "msg": "handled (lease_impl)",
-     "where": "server/src/wl/drmlease.c:298"
+     "where": "server/src/wl/drmlease.c:300"
     },
     {
      "kind": "static",
@@ -5105,7 +5105,7 @@
      "what": "wp_fifo_v1.wait_barrier",
      "weight": 3,
      "result": "pass",
-     "msg": "wait_barrier with no barrier up applies at once: yes (0 ms)",
+     "msg": "wait_barrier with no barrier up applies at once: yes (4 ms)",
      "where": null
     },
     {
@@ -12461,7 +12461,7 @@
       "what": "xwl_init",
       "weight": 3,
       "result": "pass",
-      "msg": "an X11 client connects (Xwayland started on demand) in 43 ms",
+      "msg": "an X11 client connects (Xwayland started on demand) in 46 ms",
       "hint": "xwl_init"
      },
      {
@@ -14287,5 +14287,5 @@
    "bound": []
   }
  ],
- "seconds": 58
+ "seconds": 56
 }

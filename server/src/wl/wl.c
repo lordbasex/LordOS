@@ -7666,7 +7666,8 @@ void wl__pointer_leave(void) { if (dpy) pointer_enter(NULL, 0, 0); }
 struct wl_client *wlx_client(void) { return xwl_client; }
 void wlx_set_client(struct wl_client *c) { xwl_client = c; }
 
-/* lord-server --headless --test-hooks only (testhooks.h, "xwl"): a connection lord-server makes itself, as it makes
+#ifdef LORD_TEST_HOOKS
+/* build/lord-server-test only (-DLORD_TEST_HOOKS; testhooks.h, "xwl"), never in the installed lord-server: a connection lord-server makes itself, as it makes
  * Xwayland's (xwayland.c), taken as Xwayland's while no Xwayland runs, so the conformance tool can speak
  * xwayland-shell-v1 under the same rule. It stops being Xwayland's when it goes away or a real Xwayland starts. */
 static void test_xwl_gone(struct wl_listener *l, void *data) {
@@ -7683,6 +7684,7 @@ int wl_test_xwl(void) {
     wl_client_add_destroy_listener(c, &test_xwl_l);
     return sv[1];
 }
+#endif
 
 int wlx_begin_scale(int self) {
     int pct[OUT_MAX], n = 0;

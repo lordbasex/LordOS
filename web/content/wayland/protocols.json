@@ -30,7 +30,7 @@
  },
  "conformance": {
   "date": "2026-11-22",
-  "commit": "0d24bb85",
+  "commit": "6e5f3045",
   "dirty": true,
   "tool": "tools/wl-conformance.mjs",
   "schema": 1,

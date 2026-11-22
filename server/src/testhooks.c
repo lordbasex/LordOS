@@ -1,6 +1,10 @@
 /* testhooks.c — the conformance tool's socket on a headless lord-server (see testhooks.h). */
 #include "testhooks.h"
 
+#ifndef LORD_TEST_HOOKS
+#error "testhooks.c is only for build/lord-server-test (-DLORD_TEST_HOOKS)"
+#endif
+
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>

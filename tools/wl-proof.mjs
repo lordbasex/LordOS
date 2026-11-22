@@ -56,8 +56,8 @@ const HOOK = `
 
 async function startServer() {
   const theme = path.join(ROOT, 'themes', 'default', 'theme.bundle.js');
-  const bin = path.join(BUILD, 'lord-server');
-  if (!fs.existsSync(bin) || !fs.existsSync(theme)) throw new Error('needs server/build/lord-server and the theme bundle (make -C server; npm run build)');
+  const bin = path.join(BUILD, 'lord-server-test');     // the conformance tool's build (same sources, -DLORD_TEST_HOOKS)
+  if (!fs.existsSync(bin) || !fs.existsSync(theme)) throw new Error('needs server/build/lord-server-test and the theme bundle (make -C server; npm run build)');
   const D = fs.mkdtempSync(path.join(os.tmpdir(), 'lwproof.'));
   fs.chmodSync(D, 0o700);
   const home = path.join(D, 'home');

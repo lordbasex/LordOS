@@ -1,8 +1,9 @@
 /* testhooks.h — what the Wayland conformance tool needs from a headless lord-server that a real session never has
  * (tools/wl-conformance.mjs, docs/WAYLAND.md "Conformance").
  *
- * Only with `--headless WxH --test-hooks` (main.c refuses the flag otherwise, and on the login screen): the process
- * that starts lord-server asks for it, as it chooses the theme and the home; lord-sessiond never passes it. It makes
+ * Compiled only into build/lord-server-test (the same sources with -DLORD_TEST_HOOKS, `make -C server
+ * build/lord-server-test`): the installed lord-server has no `--test-hooks` flag, no socket and none of this code.
+ * Even there, only with `--headless WxH --test-hooks` (refused otherwise, and on the login screen). It makes
  * one socket, $XDG_RUNTIME_DIR/lordos-test-hooks.sock (0600, SOCK_SEQPACKET, the same user only: SO_PEERCRED), and
  * takes one short text command per message:
  *

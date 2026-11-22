@@ -17,8 +17,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   means tests written for that protocol, all passed, nothing skipped. Before: 29 of 48 (15 checked only by the generic
   bind, `wl_seat` and KDE's server decoration partial, drm-lease and xwayland-shell checked in the code only). Every
   score stays 100 %, X11 too (28 items, 23 complete, unchanged).
-  - **Test hooks for a headless lord-server** (`server/src/testhooks.{c,h}`, `lord-server --headless WxH --test-hooks`;
-    refused on a monitor and on the login screen, never passed by lord-sessiond): a socket
+  - **Test hooks, in a test build only** (`server/src/testhooks.{c,h}`): compiled only into `build/lord-server-test`
+    (the same sources, `main.c`, `wl/wl.c` and `wl/drmlease.c` with `-DLORD_TEST_HOOKS`; `make -C server
+    build/lord-server-test`, part of `all`). The installed `lord-server` has no `--test-hooks` flag, no socket and none
+    of this code (checked with `strings` and `nm`), and `tools/iso/mkdeb.sh` refuses a `lord-server` that holds it.
+    In the test build, `--headless WxH --test-hooks` (refused on a monitor and on the login screen) opens a socket
     `$XDG_RUNTIME_DIR/lordos-test-hooks.sock` (0600, SOCK_SEQPACKET, the same user only by SO_PEERCRED, at most 4
     connections, one short text command per message, answered "ok" or "err") that gives a test session what it has no
     device for. `ptr X Y`, `btn B 1|0` and `wheel N` use the remote desktop's injection (`remote_pointer`,
