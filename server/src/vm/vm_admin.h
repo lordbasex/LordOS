@@ -52,10 +52,12 @@
  *              once no vGPU is left                                                                            anyone
  *   vm-memlock      "<pid>"                         the locked-memory limit of the caller's QEMU of a machine with a vGPU
  *              (maintainer's decision 2026-11-21): a live /usr/bin/qemu-system-* of the caller whose parent is the
- *              caller's lord-vm, whose -uuid and vfio-pci-nohotplug sysfsdev name a vGPU the caller made; soft and hard
- *              RLIMIT_MEMLOCK of that one process = its -m + 512 MB, refused above the cap (vm.memlockCap need= cap=).
- *              Nothing else in the session changes. Answers vm.memlockSet                                      anyone
- *   gpu-memlock-cap "<MB|default>"                  "Memory machines may lock": writes /etc/lordos/gpu-memlock.conf
+ *              installed /usr/lib/lordos/bin/lord-vm, whose -uuid and vfio-pci-nohotplug sysfsdev name a vGPU the caller
+ *              made and which holds that vGPU's /dev/vfio/<group> open; one grant per vGPU (pid and start time noted,
+ *              another refused while it lives); soft and hard RLIMIT_MEMLOCK of that one process = its -m + 512 MB,
+ *              refused when every live grant together would pass the cap (vm.memlockCap need= cap=<free>). Nothing else
+ *              in the session changes. Answers vm.memlockSet                                                   anyone
+ *   gpu-memlock-cap "<MB|default>"                  "Memory machines may lock" (all together): writes /etc/lordos/gpu-memlock.conf
  *              (cap_mb=<MB>, 2048 to total - 2048) or removes it (default: total - max(4 GB, 25 %), down to a GB)
  *              Answers gpu.memlockSet                                                                          admin
  * At the helper's start and end (vm_net_sweep, vm_gvt_sweep) the caller's macvtaps that no process holds are removed; a restart takes

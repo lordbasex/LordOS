@@ -170,6 +170,6 @@
   "vm.gvtReady": "Part de la targeta gràfica a punt ({name})",
   "vm.gvtGone": "Part de la targeta gràfica eliminada",
   "gpu.freqSet": "Freqüència mínima de la targeta gràfica establerta",
-  "gpu.memlockSet": "S’ha desat la memòria que pot bloquejar una màquina",
+  "gpu.memlockSet": "S’ha desat la memòria que poden bloquejar les màquines",
   "vm.memlockSet": "S’ha bloquejat la memòria de la màquina"
 }

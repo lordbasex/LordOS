@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Elk deel van de videokaart is in gebruik door andere machines.",
   "win.gvtFailed": "De videokaart kon niet aan de machine worden gegeven: {why}",
   "close.noGpuSuspend": "Met een videokaart kan ze niet in de slaapstand.",
-  "cfg.memlockNote": "Met een videokaart wordt het geheugen van deze machine voor haar gereserveerd zolang ze draait ({n} van {cap}).",
-  "cfg.memlockOver": "Met een videokaart wordt het geheugen van deze machine voor haar gereserveerd zolang ze draait, en {n} is meer dan één machine mag vastzetten ({cap}): ze start pas als je haar geheugen verlaagt of die limiet verhoogt.",
+  "cfg.memlockNote": "Met een videokaart wordt het geheugen van deze machine voor haar gereserveerd zolang ze draait ({n} van de {cap} die alle zulke machines samen mogen vastzetten).",
+  "cfg.memlockOver": "Met een videokaart wordt het geheugen van deze machine voor haar gereserveerd zolang ze draait, en {n} is meer dan alle zulke machines samen mogen vastzetten ({cap}): ze start pas als je haar geheugen verlaagt of die limiet verhoogt.",
   "cfg.memlockChange": "Wijzigen in Instellingen → Videokaarten",
-  "win.gvtMemlock": "Deze machine heeft {mem} geheugen, maar een machine met een videokaart mag maar {cap} vastzetten (Instellingen → Videokaarten)."
+  "win.gvtMemlock": "Deze machine heeft {mem} geheugen, maar machines met een videokaart mogen samen maar {cap} vastzetten (Instellingen → Videokaarten)."
 }

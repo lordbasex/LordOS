@@ -906,7 +906,7 @@
   "vm.gvtBusy": "La parte di scheda grafica di quella macchina appartiene a qualcun altro",
   "vm.gvtInUse": "Quella parte della scheda grafica è ancora usata da una macchina in esecuzione",
   "vm.gvtFailed": "Impossibile creare la parte della scheda grafica",
-  "vm.memlockCap": "Questa macchina bloccherebbe {need} MB, più dei {cap} MB che una macchina con scheda grafica può bloccare (Impostazioni → Schede grafiche)",
+  "vm.memlockCap": "Questa macchina bloccherebbe {need} MB, ma ora per le macchine con scheda grafica sono liberi solo {cap} MB (Impostazioni → Schede grafiche)",
   "vm.memlockRefused": "Impossibile bloccare la memoria di questa macchina",
   "gpu.memlockRange": "Questa quantità è fuori da ciò che questo computer consente alle macchine di bloccare"
 }

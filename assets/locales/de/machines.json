@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Alle Anteile der Grafikkarte werden von anderen Maschinen verwendet.",
   "win.gvtFailed": "Die Grafikkarte konnte der Maschine nicht gegeben werden: {why}",
   "close.noGpuSuspend": "Mit einer Grafikkarte kann sie nicht in den Ruhezustand versetzt werden.",
-  "cfg.memlockNote": "Mit Grafikkarte ist der Arbeitsspeicher dieser Maschine während des Betriebs für sie reserviert ({n} von {cap}).",
-  "cfg.memlockOver": "Mit Grafikkarte ist der Arbeitsspeicher dieser Maschine während des Betriebs für sie reserviert, und {n} ist mehr, als eine Maschine sperren darf ({cap}): Sie startet erst, wenn du ihren Arbeitsspeicher verringerst oder dieses Limit erhöhst.",
+  "cfg.memlockNote": "Mit Grafikkarte ist der Arbeitsspeicher dieser Maschine während des Betriebs für sie reserviert ({n} von den {cap}, die alle solchen Maschinen zusammen sperren dürfen).",
+  "cfg.memlockOver": "Mit Grafikkarte ist der Arbeitsspeicher dieser Maschine während des Betriebs für sie reserviert, und {n} ist mehr, als alle solchen Maschinen zusammen sperren dürfen ({cap}): Sie startet erst, wenn du ihren Arbeitsspeicher verringerst oder dieses Limit erhöhst.",
   "cfg.memlockChange": "Ändern unter Einstellungen → Grafikkarten",
-  "win.gvtMemlock": "Diese Maschine hat {mem} Arbeitsspeicher, aber eine Maschine mit Grafikkarte darf nur {cap} sperren (Einstellungen → Grafikkarten)."
+  "win.gvtMemlock": "Diese Maschine hat {mem} Arbeitsspeicher, aber Maschinen mit Grafikkarte dürfen zusammen nur {cap} sperren (Einstellungen → Grafikkarten)."
 }

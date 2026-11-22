@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Toutes les parts de la carte graphique sont utilisées par d’autres machines.",
   "win.gvtFailed": "La carte graphique n’a pas pu être attribuée à la machine : {why}",
   "close.noGpuSuspend": "Avec une carte graphique, elle ne peut pas être mise en veille.",
-  "cfg.memlockNote": "Avec une carte graphique, la mémoire de cette machine lui est réservée pendant qu’elle tourne ({n} sur {cap}).",
-  "cfg.memlockOver": "Avec une carte graphique, la mémoire de cette machine lui est réservée pendant qu’elle tourne, et {n} dépasse ce qu’une machine peut verrouiller ({cap}) : elle ne démarrera pas tant que vous n’aurez pas réduit sa mémoire ou relevé cette limite.",
+  "cfg.memlockNote": "Avec une carte graphique, la mémoire de cette machine lui est réservée pendant qu’elle tourne ({n} sur les {cap} que toutes ces machines peuvent verrouiller ensemble).",
+  "cfg.memlockOver": "Avec une carte graphique, la mémoire de cette machine lui est réservée pendant qu’elle tourne, et {n} dépasse ce que toutes ces machines peuvent verrouiller ensemble ({cap}) : elle ne démarrera pas tant que vous n’aurez pas réduit sa mémoire ou relevé cette limite.",
   "cfg.memlockChange": "Modifier dans Réglages → Cartes graphiques",
-  "win.gvtMemlock": "Cette machine a {mem} de mémoire, mais une machine avec carte graphique ne peut verrouiller que {cap} (Réglages → Cartes graphiques)."
+  "win.gvtMemlock": "Cette machine a {mem} de mémoire, mais les machines avec carte graphique ne peuvent verrouiller que {cap} ensemble (Réglages → Cartes graphiques)."
 }

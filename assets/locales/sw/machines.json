@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Kila sehemu ya kadi ya michoro inatumiwa na mashine nyingine.",
   "win.gvtFailed": "Kadi ya michoro haikuweza kupewa mashine: {why}",
   "close.noGpuSuspend": "Ikiwa na kadi ya michoro haiwezi kusimamishwa kwa muda.",
-  "cfg.memlockNote": "Ikiwa na kadi ya michoro, kumbukumbu ya mashine hii imehifadhiwa kwa ajili yake inapoendesha ({n} kati ya {cap}).",
-  "cfg.memlockOver": "Ikiwa na kadi ya michoro, kumbukumbu ya mashine hii imehifadhiwa kwa ajili yake inapoendesha, na {n} ni zaidi ya kile mashine moja inaweza kufunga ({cap}): haitaanza hadi upunguze kumbukumbu yake au uongeze kikomo hicho.",
+  "cfg.memlockNote": "Ikiwa na kadi ya michoro, kumbukumbu ya mashine hii imehifadhiwa kwa ajili yake inapoendesha ({n} kati ya {cap} ambazo mashine zote kama hizo zinaweza kufunga kwa pamoja).",
+  "cfg.memlockOver": "Ikiwa na kadi ya michoro, kumbukumbu ya mashine hii imehifadhiwa kwa ajili yake inapoendesha, na {n} ni zaidi ya kile mashine zote kama hizo zinaweza kufunga kwa pamoja ({cap}): haitaanza hadi upunguze kumbukumbu yake au uongeze kikomo hicho.",
   "cfg.memlockChange": "Badilisha katika Mipangilio → Kadi za michoro",
-  "win.gvtMemlock": "Mashine hii ina kumbukumbu ya {mem}, lakini mashine yenye kadi ya michoro inaweza kufunga {cap} tu (Mipangilio → Kadi za michoro)."
+  "win.gvtMemlock": "Mashine hii ina kumbukumbu ya {mem}, lakini mashine zenye kadi ya michoro zinaweza kufunga {cap} tu kwa pamoja (Mipangilio → Kadi za michoro)."
 }

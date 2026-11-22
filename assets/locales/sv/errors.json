@@ -906,7 +906,7 @@
   "vm.gvtBusy": "Den maskinens andel av grafikkortet tillhör någon annan",
   "vm.gvtInUse": "Den andelen av grafikkortet används fortfarande av en maskin som körs",
   "vm.gvtFailed": "Andelen av grafikkortet kunde inte skapas",
-  "vm.memlockCap": "Den här maskinen skulle låsa {need} MB, mer än de {cap} MB som en maskin med grafikkort får låsa (Inställningar → Grafikkort)",
+  "vm.memlockCap": "Den här maskinen skulle låsa {need} MB, men bara {cap} MB är lediga för maskiner med grafikkort just nu (Inställningar → Grafikkort)",
   "vm.memlockRefused": "Maskinens minne kunde inte låsas",
   "gpu.memlockRange": "Den mängden ligger utanför vad den här datorn låter maskiner låsa"
 }

@@ -32,6 +32,8 @@ static int real_prlimit(pid_t pid, const struct rlimit *rl) { return prlimit(pid
 
 const char *vmgpu_admin_root = "";
 int (*vmgpu_admin_prlimit)(pid_t pid, const struct rlimit *rl) = real_prlimit;
+/* the one lord-vm whose QEMUs vm-memlock serves: the installed one (a test sets its fake root's own) */
+const char *vmgpu_admin_lordvm = "/usr/lib/lordos/bin/lord-vm";
 const char *vmgpu_admin_fd_dir = NULL;
 int (*vmgpu_admin_initramfs)(void) = run_initramfs;
 
@@ -161,7 +163,7 @@ static long note_uid(const char *id) {
     if (read_line(p, b, sizeof b) || !b[0]) return -1;
     char *e;
     long u = strtol(b, &e, 10);
-    return *e || u < 0 ? -1 : u;
+    return (*e && *e != ' ') || e == b || u < 0 ? -1 : u;
 }
 
 static int note_write(const char *id, uid_t uid) {
@@ -219,6 +221,25 @@ static int group_in_use(int grp) {
     }
     closedir(d);
     return used;
+}
+
+/* whether process pid holds /dev/vfio/<group> open */
+static int pid_holds_group(int pid, int grp) {
+    char want[48], fdp[700];
+    snprintf(want, sizeof want, "/dev/vfio/%d", grp);
+    snprintf(fdp, sizeof fdp, "%s/proc/%d/fd", R, pid);
+    DIR *f = opendir(fdp);
+    if (!f) return 0;
+    int held = 0;
+    for (struct dirent *x; !held && (x = readdir(f));) {
+        if (x->d_name[0] == '.') continue;
+        char lp[1400], t[64];
+        snprintf(lp, sizeof lp, "%s/%s", fdp, x->d_name);
+        ssize_t l = readlink(lp, t, sizeof t - 1);
+        if (l > 0) { t[l] = 0; if (!strcmp(t, want)) held = 1; }
+    }
+    closedir(f);
+    return held;
 }
 
 /* /dev/vfio/<group> to the caller, 0600: checked by what it is (that group's character device), never followed */
@@ -439,11 +460,71 @@ static int proc_exe(int pid, char *out, size_t n) {
     return 0;
 }
 
-/* lord-vm sets its QEMU's limit only through this: the pid must be a live QEMU (the system's binary) of the caller,
- * whose parent is the caller's lord-vm, running a vGPU the caller made (its -uuid and its vfio-pci-nohotplug's
- * sysfsdev name the same machine, root's note says the caller's, the mdev is there). Its memory is its own "-m"; the
- * limit (soft and hard) is that + 512 MB, refused above the cap. A pidfd taken first keeps the checks on that process:
- * one that ended (and whose pid could be another's) is refused */
+/* a process's start time (/proc/<pid>/stat, field 22, after the command's closing parenthesis); 0 unknown. With the pid
+ * it names one process: a pid used again has another start time */
+static unsigned long long proc_start(int pid) {
+    char path[700], b[1024];
+    snprintf(path, sizeof path, "%s/proc/%d/stat", R, pid);
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    ssize_t n = fd >= 0 ? read(fd, b, sizeof b - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (n <= 0) return 0;
+    b[n] = 0;
+    char *q = strrchr(b, ')');
+    if (!q) return 0;
+    q++;
+    for (int field = 3; field <= 22 && q; field++) {       /* after ')': field 3 (state) */
+        while (*q == ' ') q++;
+        if (field == 22) return strtoull(q, NULL, 10);
+        q = strchr(q, ' ');
+    }
+    return 0;
+}
+
+/* the grant noted on a vGPU: "<uid> <pid> <start> <MB>" in root's note; -1 when there is none */
+static int note_grant(const char *id, long *pid, unsigned long long *start, long *mb) {
+    char p[1024], b[96];
+    rpath(p, sizeof p, VMGPU_RUN "/%s%s", id, "");
+    unsigned long u;
+    if (read_line(p, b, sizeof b) || sscanf(b, "%lu %ld %llu %ld", &u, pid, start, mb) != 4) return -1;
+    return 0;
+}
+
+static int note_grant_write(const char *id, uid_t uid, int pid, unsigned long long start, long mb) {
+    char p[1024], b[96];
+    rpath(p, sizeof p, VMGPU_RUN "/%s%s", id, "");
+    snprintf(b, sizeof b, "%u %d %llu %ld\n", (unsigned)uid, pid, start, mb);
+    return write_file(p, b);
+}
+
+/* the granted process still runs (the same pid with the same start time) */
+static int grant_live(long pid, unsigned long long start) { return pid > 1 && pid < 1000000000 && start && proc_start((int)pid) == start; }
+
+/* MB granted to the live QEMUs of every vGPU but `except` */
+static long grants_sum(const char *except) {
+    char d[1024];
+    rpath(d, sizeof d, VMGPU_RUN "%s%s", "", "");
+    DIR *dir = opendir(d);
+    if (!dir) return 0;
+    long sum = 0;
+    for (struct dirent *e; (e = readdir(dir));) {
+        char id[37];
+        long pid, mb;
+        unsigned long long st;
+        if (strlen(e->d_name) != 36 || vmgpu_remove_arg(e->d_name, 36, id) || !strcmp(id, except)) continue;
+        if (!note_grant(id, &pid, &st, &mb) && grant_live(pid, st) && mb > 0) sum += mb;
+    }
+    closedir(dir);
+    return sum;
+}
+
+/* lord-vm's QEMU gets its locked-memory limit only through this. The pid must be a live process of the caller whose exe
+ * is the system's QEMU and whose parent is the installed lord-vm (vmgpu_admin_lordvm, never a program of that name
+ * elsewhere), whose -uuid and vfio-pci-nohotplug sysfsdev name a vGPU root's note gives the caller, and which holds that
+ * vGPU's /dev/vfio/<group> open. One grant per vGPU: the granted pid and its start time go into root's note, and another
+ * process is refused while that one lives. The cap is for all the live grants together (every user's): refused when they
+ * and this one would pass it. A pidfd taken first keeps the checks on that process. The limit (soft and hard) is the
+ * process's own -m + 512 MB */
 void vm_act_memlock(const AdminReq *r, const char *arg, size_t len) {
     int pid, ppid = 0;
     if (vmgpu_pid_arg(arg, len, &pid)) { admin_err("admin.invalidArgument", NULL); return; }
@@ -453,7 +534,8 @@ void vm_act_memlock(const AdminReq *r, const char *arg, size_t len) {
     int ok = !proc_owned(pid, r->uid, &ppid) && ppid > 1 && !proc_exe(pid, exe, sizeof exe) &&
              (!strcmp(exe, "/usr/bin/qemu-system-x86_64") || !strcmp(exe, "/usr/bin/qemu-system-aarch64")) &&
              !proc_owned(ppid, r->uid, NULL) && !proc_exe(ppid, pexe, sizeof pexe);
-    if (ok) { const char *b = strrchr(pexe, '/'); ok = b && !strcmp(b + 1, "lord-vm"); }
+    /* the parent: the installed lord-vm itself, not any program of that name */
+    ok = ok && !strcmp(pexe, vmgpu_admin_lordvm);
     /* the command line: -uuid <id>, -m <MB>, and the vGPU of that same id */
     char cl[16384], id[37] = "";
     long mem = 0;
@@ -484,13 +566,28 @@ void vm_act_memlock(const AdminReq *r, const char *arg, size_t len) {
             for (int i = 0; id[0] && i < na; i++) if (!strncmp(a[i], "vfio-pci-nohotplug,", 19) && strstr(a[i], want)) vgpu = 1;
         }
     }
-    ok = ok && id[0] && mem > 0 && vgpu && note_uid(id) == (long)r->uid && mdev_group(id) >= 0;
-    if (!ok) { close(pfd); admin_err("vm.memlockRefused", NULL); return; }
+    int grp = id[0] ? mdev_group(id) : -1;
+    ok = ok && id[0] && mem > 0 && vgpu && note_uid(id) == (long)r->uid && grp >= 0;
+    /* a command line naming the vGPU proves nothing by itself: the process must hold that vGPU's group open */
+    ok = ok && pid_holds_group(pid, grp);
+    unsigned long long start = ok ? proc_start(pid) : 0;
+    if (!ok || !start) { close(pfd); admin_err("vm.memlockRefused", NULL); return; }
+    /* one grant per vGPU: another while the one granted lives is refused (the same process again changes nothing) */
+    long gpid, gmb;
+    unsigned long long gstart;
+    if (!note_grant(id, &gpid, &gstart, &gmb) && grant_live(gpid, gstart)) {
+        close(pfd);
+        if (gpid == pid && gstart == start) { char ns[24]; snprintf(ns, sizeof ns, "%ld", gmb); admin_ok("vm.memlockSet", "need", ns, NULL); }
+        else admin_err("vm.memlockRefused", NULL);
+        return;
+    }
     long total = vmgpu_total_mb(R), cap = vmgpu_memlock_cap_mb(R, total, NULL), need = mem + VMGPU_MEMLOCK_EXTRA_MB;
-    if (need > cap) {
+    /* the cap is for every machine's QEMU together, every user's: the live grants of the other vGPUs count */
+    long others = grants_sum(id);
+    if (others + need > cap) {
         char ns[24], cs[24];
         snprintf(ns, sizeof ns, "%ld", need);
-        snprintf(cs, sizeof cs, "%ld", cap);
+        snprintf(cs, sizeof cs, "%ld", cap - others > 0 ? cap - others : 0);
         close(pfd);
         admin_err("vm.memlockCap", "need", ns, "cap", cs, NULL);
         return;
@@ -501,6 +598,7 @@ void vm_act_memlock(const AdminReq *r, const char *arg, size_t len) {
     int e = vmgpu_admin_prlimit((pid_t)pid, &rl);
     close(pfd);
     if (e) { admin_err("vm.memlockRefused", NULL); return; }
+    if (note_grant_write(id, r->uid, pid, start, need)) { admin_err("vm.memlockRefused", NULL); return; }
     char ns[24];
     snprintf(ns, sizeof ns, "%ld", need);
     admin_ok("vm.memlockSet", "need", ns, NULL);

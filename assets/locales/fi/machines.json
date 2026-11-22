@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Muut koneet käyttävät näytönohjaimen jokaista osuutta.",
   "win.gvtFailed": "Näytönohjainta ei voitu antaa koneelle: {why}",
   "close.noGpuSuspend": "Näytönohjaimen kanssa sitä ei voi asettaa lepotilaan.",
-  "cfg.memlockNote": "Näytönohjaimen kanssa tämän koneen muisti on varattu sille käynnin ajaksi ({n}/{cap}).",
-  "cfg.memlockOver": "Näytönohjaimen kanssa tämän koneen muisti on varattu sille käynnin ajaksi, ja {n} on enemmän kuin yksi kone saa lukita ({cap}): se ei käynnisty, ennen kuin pienennät sen muistia tai nostat tätä rajaa.",
+  "cfg.memlockNote": "Näytönohjaimen kanssa tämän koneen muisti on varattu sille käynnin ajaksi ({n} siitä {cap}, jonka kaikki tällaiset koneet saavat lukita yhteensä).",
+  "cfg.memlockOver": "Näytönohjaimen kanssa tämän koneen muisti on varattu sille käynnin ajaksi, ja {n} on enemmän kuin kaikki tällaiset koneet saavat lukita yhteensä ({cap}): se ei käynnisty, ennen kuin pienennät sen muistia tai nostat tätä rajaa.",
   "cfg.memlockChange": "Muuta kohdassa Asetukset → Näytönohjaimet",
-  "win.gvtMemlock": "Tällä koneella on {mem} muistia, mutta näytönohjaimella varustettu kone saa lukita vain {cap} (Asetukset → Näytönohjaimet)."
+  "win.gvtMemlock": "Tällä koneella on {mem} muistia, mutta näytönohjaimella varustetut koneet saavat lukita yhteensä vain {cap} (Asetukset → Näytönohjaimet)."
 }

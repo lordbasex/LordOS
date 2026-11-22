@@ -905,7 +905,7 @@
   "vm.gvtBusy": "Bagian kartu grafis milik mesin itu adalah milik orang lain",
   "vm.gvtInUse": "Bagian kartu grafis itu masih dipakai oleh mesin yang sedang berjalan",
   "vm.gvtFailed": "Bagian kartu grafis tidak dapat dibuat",
-  "vm.memlockCap": "Mesin ini akan mengunci {need} MB, lebih dari {cap} MB yang boleh dikunci mesin dengan kartu grafis (Pengaturan → Kartu grafis)",
+  "vm.memlockCap": "Mesin ini akan mengunci {need} MB, tetapi saat ini hanya {cap} MB yang tersedia untuk mesin dengan kartu grafis (Pengaturan → Kartu grafis)",
   "vm.memlockRefused": "Memori mesin ini tidak dapat dikunci",
   "gpu.memlockRange": "Jumlah itu di luar batas yang diizinkan komputer ini untuk dikunci oleh mesin"
 }

@@ -170,6 +170,6 @@
   "vm.gvtReady": "Sehemu ya kadi ya michoro iko tayari ({name})",
   "vm.gvtGone": "Sehemu ya kadi ya michoro imeondolewa",
   "gpu.freqSet": "Masafa ya chini ya kadi ya michoro yamewekwa",
-  "gpu.memlockSet": "Kumbukumbu ambayo mashine inaweza kufunga imehifadhiwa",
+  "gpu.memlockSet": "Kumbukumbu ambayo mashine zinaweza kufunga imehifadhiwa",
   "vm.memlockSet": "Kumbukumbu ya mashine imefungwa"
 }

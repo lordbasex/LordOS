@@ -395,70 +395,119 @@ static void test_memlock(void) {
     ACT(vm_act_gpu_memlock_cap, "default");
     CHECK(ok("gpu.memlockSet") && !exists("etc/lordos/gpu-memlock.conf"), "default removes");
     ACT(vm_act_gpu_memlock_cap, "8192");
-
-    /* vm-memlock: a real child stands for QEMU (its pidfd), its /proc under the fake root */
-    pid_t q = fork();
-    if (!q) { pause(); _exit(0); }
-    char st[256], rel[128];
-    snprintf(st, sizeof st, "Name:\tqemu\nPPid:\t5151\nUid:\t%u\t%u\t%u\t%u\n", (unsigned)req.uid, (unsigned)req.uid, (unsigned)req.uid, (unsigned)req.uid);
-    snprintf(rel, sizeof rel, "proc/%d/status", (int)q); put(rel, st);
-    snprintf(rel, sizeof rel, "proc/%d/exe", (int)q); lnk(rel, "/usr/bin/qemu-system-x86_64");
+    /* vm-memlock: real children stand for QEMUs (their pidfds), their /proc under the fake root */
+    char st[256], rel[160];
     snprintf(st, sizeof st, "Name:\tlord-vm\nPPid:\t1\nUid:\t%u\t%u\t%u\t%u\n", (unsigned)req.uid, (unsigned)req.uid, (unsigned)req.uid, (unsigned)req.uid);
     put("proc/5151/status", st);
     lnk("proc/5151/exe", "/usr/lib/lordos/bin/lord-vm");
-    /* QEMU's command line: NUL-separated */
-    static const char cl[] = "/usr/bin/qemu-system-x86_64\0-uuid\0" ID1 "\0-m\0" "4096\0-device\0vfio-pci-nohotplug,id=video0,sysfsdev=/sys/bus/mdev/devices/" ID1 ",display=on\0";
-    char clp[1100];
-    snprintf(clp, sizeof clp, "%s/proc/%d/cmdline", root, (int)q);
-    FILE *f = fopen(clp, "w");
-    if (f) { fwrite(cl, 1, sizeof cl - 1, f); fclose(f); }
-    /* the vGPU: root's note and the mdev */
     mk("sys/kernel/iommu_groups/16");
+    mk("sys/kernel/iommu_groups/17");
     mk("sys/bus/mdev/devices/" ID1);
     lnk("sys/bus/mdev/devices/" ID1 "/iommu_group", "../../../../kernel/iommu_groups/16");
+    mk("sys/bus/mdev/devices/" ID2);
+    lnk("sys/bus/mdev/devices/" ID2 "/iommu_group", "../../../../kernel/iommu_groups/17");
     snprintf(st, sizeof st, "%u\n", (unsigned)req.uid);
     put("run/lordos/vm-gvt/" ID1, st);
-    char a[16];
+    put("run/lordos/vm-gvt/" ID2, st);
+    pid_t q = fork();
+    if (!q) { pause(); _exit(0); }
+    pid_t q2 = fork();
+    if (!q2) { pause(); _exit(0); }
+    /* a fake QEMU: status, exe, stat (start time), cmdline (machine id, memory) and the fds it holds */
+    #define FAKE_QEMU(P, ID, MEM, GRP, START) do { \
+        char s_[256], r_[160]; \
+        snprintf(s_, sizeof s_, "Name:\tqemu\nPPid:\t5151\nUid:\t%u\t%u\t%u\t%u\n", (unsigned)req.uid, (unsigned)req.uid, (unsigned)req.uid, (unsigned)req.uid); \
+        snprintf(r_, sizeof r_, "proc/%d/status", (int)(P)); put(r_, s_); \
+        snprintf(r_, sizeof r_, "proc/%d/exe", (int)(P)); lnk(r_, "/usr/bin/qemu-system-x86_64"); \
+        snprintf(s_, sizeof s_, "%d (qemu-system-x86) S 5151 1 1 0 -1 0 0 0 0 0 0 0 0 0 20 0 9 0 %llu 0 0\n", (int)(P), (unsigned long long)(START)); \
+        snprintf(r_, sizeof r_, "proc/%d/stat", (int)(P)); put(r_, s_); \
+        char c_[400]; \
+        int l_ = snprintf(c_, sizeof c_, "/usr/bin/qemu-system-x86_64%c-uuid%c%s%c-m%c%d%c-device%cvfio-pci-nohotplug,id=video0,sysfsdev=/sys/bus/mdev/devices/%s,display=on%c", \
+                          0, 0, ID, 0, 0, MEM, 0, 0, ID, 0); \
+        char cp_[1100]; snprintf(cp_, sizeof cp_, "%s/proc/%d/cmdline", root, (int)(P)); \
+        FILE *f_ = fopen(cp_, "w"); if (f_) { fwrite(c_, 1, (size_t)l_, f_); fclose(f_); } \
+        snprintf(r_, sizeof r_, "proc/%d/fd/.keep", (int)(P)); put(r_, ""); \
+        snprintf(r_, sizeof r_, "proc/%d/fd/9", (int)(P)); \
+        if (GRP >= 0) { char g_[32]; snprintf(g_, sizeof g_, "/dev/vfio/%d", GRP); lnk(r_, g_); } else { char u_[1100]; snprintf(u_, sizeof u_, "%s/%s", root, r_); unlink(u_); } \
+    } while (0)
+    FAKE_QEMU(q, ID1, 4096, 16, 1000);
+    char a[16], a2[16];
     snprintf(a, sizeof a, "%d", (int)q);
+    snprintf(a2, sizeof a2, "%d", (int)q2);
     pl_pid = 0;
     ACT(vm_act_memlock, a);
     CHECK(ok("vm.memlockSet") && pl_pid == q && pl_cur == (rlim_t)4608 << 20 && pl_max == pl_cur, "set 4096 + 512 MB: %s", last);
-    /* above the cap */
-    ACT(vm_act_gpu_memlock_cap, "4096");
+    char t2[128];
+    snprintf(t2, sizeof t2, "%u %d 1000 4608", (unsigned)req.uid, (int)q);
+    get("run/lordos/vm-gvt/" ID1, t, sizeof t);
+    CHECK(!strncmp(t, t2, strlen(t2)), "the grant noted: %s", t);
+    /* the same process again: nothing new */
     pl_pid = 0;
     ACT(vm_act_memlock, a);
-    CHECK(err("vm.memlockCap") && strstr(last, "need=4608") && strstr(last, "cap=4096") && !pl_pid, "cap: %s", last);
-    ACT(vm_act_gpu_memlock_cap, "8192");
-    /* someone else's QEMU, another binary, another parent, no vGPU, another's vGPU: refused, nothing set */
+    CHECK(ok("vm.memlockSet") && !pl_pid, "again: %s", last);
+    /* a second QEMU for the same vGPU while the first lives: refused */
+    FAKE_QEMU(q2, ID1, 2048, 16, 2000);
+    ACT(vm_act_memlock, a2);
+    CHECK(err("vm.memlockRefused") && !pl_pid, "second grant on one vGPU: %s", last);
+    /* the sum over every vGPU: 4608 granted, cap 8192, another 4096 + 512 doesn't fit */
+    FAKE_QEMU(q2, ID2, 4096, 17, 2000);
+    ACT(vm_act_memlock, a2);
+    CHECK(err("vm.memlockCap") && strstr(last, "need=4608") && strstr(last, "cap=3584") && !pl_pid, "sum over the cap: %s", last);
+    FAKE_QEMU(q2, ID2, 2048, 17, 2000);
+    ACT(vm_act_memlock, a2);
+    CHECK(ok("vm.memlockSet") && pl_pid == q2 && pl_cur == (rlim_t)2560 << 20, "fits beside the first: %s", last);
+    /* the first QEMU ended (its pid now another process's start time): its share is free, and its vGPU can be granted
+     * to a new QEMU */
+    FAKE_QEMU(q, ID1, 4096, 16, 3000);
+    pl_pid = 0;
+    ACT(vm_act_memlock, a);
+    CHECK(ok("vm.memlockSet") && pl_pid == q, "a dead grant frees its share: %s", last);
+    /* the cap alone */
+    ACT(vm_act_gpu_memlock_cap, "4096");
+    FAKE_QEMU(q, ID1, 4096, 16, 4000);
+    pl_pid = 0;
+    ACT(vm_act_memlock, a);
+    CHECK(err("vm.memlockCap") && strstr(last, "need=4608") && !pl_pid, "cap: %s", last);
+    ACT(vm_act_gpu_memlock_cap, "16384");
+    /* refused, nothing set: another user's, another binary, a lord-vm elsewhere than the installed one, no vfio fd,
+     * another's vGPU, another machine's vGPU, a bad argument, an ended process */
+    FAKE_QEMU(q, ID1, 4096, 16, 5000);
+    pl_pid = 0;
     last[0] = 0; vm_act_memlock(&other, a, strlen(a));
     CHECK(err("vm.memlockRefused") && !pl_pid, "another user's: %s", last);
     snprintf(rel, sizeof rel, "proc/%d/exe", (int)q); lnk(rel, "/home/x/qemu-system-x86_64");
     ACT(vm_act_memlock, a);
     CHECK(err("vm.memlockRefused") && !pl_pid, "not the system's QEMU: %s", last);
     lnk(rel, "/usr/bin/qemu-system-x86_64");
+    lnk("proc/5151/exe", "/home/x/lord-vm");
+    ACT(vm_act_memlock, a);
+    CHECK(err("vm.memlockRefused") && !pl_pid, "a lord-vm that isn't the installed one: %s", last);
     lnk("proc/5151/exe", "/usr/bin/bash");
     ACT(vm_act_memlock, a);
     CHECK(err("vm.memlockRefused") && !pl_pid, "parent not lord-vm: %s", last);
     lnk("proc/5151/exe", "/usr/lib/lordos/bin/lord-vm");
+    FAKE_QEMU(q, ID1, 4096, -1, 5000);
+    ACT(vm_act_memlock, a);
+    CHECK(err("vm.memlockRefused") && !pl_pid, "doesn't hold the vGPU's group: %s", last);
+    FAKE_QEMU(q, ID1, 4096, 17, 5000);
+    ACT(vm_act_memlock, a);
+    CHECK(err("vm.memlockRefused") && !pl_pid, "holds another group: %s", last);
+    FAKE_QEMU(q, ID1, 4096, 16, 5000);
     put("run/lordos/vm-gvt/" ID1, "99999\n");
     ACT(vm_act_memlock, a);
     CHECK(err("vm.memlockRefused") && !pl_pid, "another's vGPU: %s", last);
     snprintf(st, sizeof st, "%u\n", (unsigned)req.uid);
     put("run/lordos/vm-gvt/" ID1, st);
-    static const char cl2[] = "/usr/bin/qemu-system-x86_64\0-uuid\0" ID1 "\0-m\0" "4096\0-device\0vfio-pci-nohotplug,sysfsdev=/sys/bus/mdev/devices/" ID2 ",display=on\0";
-    f = fopen(clp, "w");
-    if (f) { fwrite(cl2, 1, sizeof cl2 - 1, f); fclose(f); }
-    ACT(vm_act_memlock, a);
-    CHECK(err("vm.memlockRefused") && !pl_pid, "the vGPU of another machine: %s", last);
-    f = fopen(clp, "w");
-    if (f) { fwrite(cl, 1, sizeof cl - 1, f); fclose(f); }
     ACT(vm_act_memlock, "4242 x");
     CHECK(err("admin.invalidArgument"), "bad arg: %s", last);
-    /* a QEMU that ended */
-    kill(q, SIGKILL);
-    waitpid(q, NULL, 0);
+    ACT(vm_act_memlock, a);
+    CHECK(ok("vm.memlockSet") && pl_pid == q, "all checks pass again: %s", last);
+    kill(q, SIGKILL); kill(q2, SIGKILL);
+    waitpid(q, NULL, 0); waitpid(q2, NULL, 0);
+    pl_pid = 0;
     ACT(vm_act_memlock, a);
     CHECK(err("vm.memlockRefused") && !pl_pid, "ended: %s", last);
+    #undef FAKE_QEMU
 }
 
 int main(void) {

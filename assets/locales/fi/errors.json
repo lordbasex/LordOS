@@ -906,7 +906,7 @@
   "vm.gvtBusy": "Tuon koneen osuus näytönohjaimesta kuuluu jollekulle toiselle",
   "vm.gvtInUse": "Käynnissä oleva kone käyttää yhä tuota näytönohjaimen osuutta",
   "vm.gvtFailed": "Näytönohjaimen osuutta ei voitu luoda",
-  "vm.memlockCap": "Tämä kone lukitsisi {need} Mt, enemmän kuin ne {cap} Mt, jotka näytönohjaimella varustettu kone saa lukita (Asetukset → Näytönohjaimet)",
+  "vm.memlockCap": "Tämä kone lukitsisi {need} Mt, mutta näytönohjaimella varustetuille koneille on nyt vapaana vain {cap} Mt (Asetukset → Näytönohjaimet)",
   "vm.memlockRefused": "Tämän koneen muistia ei voitu lukita",
   "gpu.memlockRange": "Määrä on sen ulkopuolella, mitä tämä tietokone sallii koneiden lukita"
 }

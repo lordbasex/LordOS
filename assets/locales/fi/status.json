@@ -170,6 +170,6 @@
   "vm.gvtReady": "Näytönohjaimen osuus valmis ({name})",
   "vm.gvtGone": "Näytönohjaimen osuus poistettu",
   "gpu.freqSet": "Näytönohjaimen vähimmäistaajuus asetettu",
-  "gpu.memlockSet": "Koneen lukittavissa oleva muisti tallennettu",
+  "gpu.memlockSet": "Koneiden lukittavissa oleva muisti tallennettu",
   "vm.memlockSet": "Koneen muisti lukittu"
 }

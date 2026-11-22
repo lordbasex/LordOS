@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Setiap bahagian kad grafik sedang digunakan oleh mesin lain.",
   "win.gvtFailed": "Kad grafik tidak dapat diberikan kepada mesin: {why}",
   "close.noGpuSuspend": "Dengan kad grafik, ia tidak boleh digantung.",
-  "cfg.memlockNote": "Dengan kad grafik, memori mesin ini dikhaskan untuknya semasa ia berjalan ({n} daripada {cap}).",
-  "cfg.memlockOver": "Dengan kad grafik, memori mesin ini dikhaskan untuknya semasa ia berjalan, dan {n} melebihi jumlah yang boleh dikunci oleh satu mesin ({cap}): ia tidak akan bermula sehingga anda mengurangkan memorinya atau menaikkan had itu.",
+  "cfg.memlockNote": "Dengan kad grafik, memori mesin ini dikhaskan untuknya semasa ia berjalan ({n} daripada {cap} yang boleh dikunci oleh semua mesin sedemikian bersama-sama).",
+  "cfg.memlockOver": "Dengan kad grafik, memori mesin ini dikhaskan untuknya semasa ia berjalan, dan {n} melebihi jumlah yang boleh dikunci oleh semua mesin sedemikian bersama-sama ({cap}): ia tidak akan bermula sehingga anda mengurangkan memorinya atau menaikkan had itu.",
   "cfg.memlockChange": "Tukar dalam Tetapan → Kad grafik",
-  "win.gvtMemlock": "Mesin ini mempunyai {mem} memori, tetapi mesin dengan kad grafik hanya boleh mengunci {cap} (Tetapan → Kad grafik)."
+  "win.gvtMemlock": "Mesin ini mempunyai {mem} memori, tetapi mesin dengan kad grafik hanya boleh mengunci {cap} bersama-sama (Tetapan → Kad grafik)."
 }

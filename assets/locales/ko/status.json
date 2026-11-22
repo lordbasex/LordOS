@@ -161,6 +161,6 @@
   "vm.gvtReady": "그래픽 카드 할당 준비됨({name})",
   "vm.gvtGone": "그래픽 카드 할당을 제거했습니다",
   "gpu.freqSet": "그래픽 카드 최소 주파수를 설정했습니다",
-  "gpu.memlockSet": "머신이 잠글 수 있는 메모리를 저장했습니다",
+  "gpu.memlockSet": "머신들이 잠글 수 있는 메모리를 저장했습니다",
   "vm.memlockSet": "머신의 메모리를 잠갔습니다"
 }

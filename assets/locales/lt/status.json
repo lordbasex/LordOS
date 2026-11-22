@@ -179,6 +179,6 @@
   "vm.gvtReady": "Vaizdo plokštės dalis paruošta ({name})",
   "vm.gvtGone": "Vaizdo plokštės dalis pašalinta",
   "gpu.freqSet": "Nustatytas mažiausias vaizdo plokštės dažnis",
-  "gpu.memlockSet": "Atmintis, kurią mašina gali užrakinti, išsaugota",
+  "gpu.memlockSet": "Atmintis, kurią mašinos gali užrakinti, išsaugota",
   "vm.memlockSet": "Mašinos atmintis užrakinta"
 }

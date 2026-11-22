@@ -906,7 +906,7 @@
   "vm.gvtBusy": "That machine's share of the graphics card belongs to someone else",
   "vm.gvtInUse": "That share of the graphics card is still in use by a running machine",
   "vm.gvtFailed": "The share of the graphics card couldn't be made",
-  "vm.memlockCap": "This machine would lock {need} MB, more than the {cap} MB a machine with a graphics card may lock (Settings → Graphics cards)",
+  "vm.memlockCap": "This machine would lock {need} MB, but only {cap} MB are free for machines with a graphics card now (Settings → Graphics cards)",
   "vm.memlockRefused": "This machine's memory couldn't be locked",
   "gpu.memlockRange": "That amount is outside what this computer allows machines to lock"
 }

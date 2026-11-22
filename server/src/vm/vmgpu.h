@@ -26,7 +26,7 @@ extern const char VMGPU_MODPROBE_TEXT[], VMGPU_MODLOAD_TEXT[];
 #define VMGPU_RUN "/run/lordos/vm-gvt"
 
 /* "Memory machines may lock" (maintainer's decision 2026-11-21): a machine with a vGPU has its memory locked while it runs
- * (VFIO pins its pages), its memory + 512 MB set on its own QEMU by vm-memlock, never above this cap. gpu-memlock-cap
+ * (VFIO pins its pages), its memory + 512 MB set on its own QEMU by vm-memlock, all of them together never above this cap. gpu-memlock-cap
  * writes it ("cap_mb=<N>\n") or removes it (the default: total - max(4 GB, 25 %), down to a whole GB). Range 2048 MB to
  * total - 2048 MB */
 #define VMGPU_MEMLOCK_CONF "/etc/lordos/gpu-memlock.conf"

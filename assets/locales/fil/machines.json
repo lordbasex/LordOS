@@ -1045,8 +1045,8 @@
   "win.gvtNone": "Ginagamit ng ibang mga makina ang bawat bahagi ng graphics card.",
   "win.gvtFailed": "Hindi maibigay sa makina ang graphics card: {why}",
   "close.noGpuSuspend": "Kapag may graphics card, hindi ito maisususpinde.",
-  "cfg.memlockNote": "Kapag may graphics card, nakareserba para sa makinang ito ang memory nito habang tumatakbo ({n} sa {cap}).",
-  "cfg.memlockOver": "Kapag may graphics card, nakareserba para sa makinang ito ang memory nito habang tumatakbo, at mas malaki ang {n} kaysa sa puwedeng i-lock ng isang makina ({cap}): hindi ito magsisimula hangga't hindi mo binabawasan ang memory nito o tinataasan ang limitasyong iyon.",
+  "cfg.memlockNote": "Kapag may graphics card, nakareserba para sa makinang ito ang memory nito habang tumatakbo ({n} sa {cap} na puwedeng i-lock ng lahat ng ganoong makina nang magkakasama).",
+  "cfg.memlockOver": "Kapag may graphics card, nakareserba para sa makinang ito ang memory nito habang tumatakbo, at mas malaki ang {n} kaysa sa puwedeng i-lock ng lahat ng ganoong makina nang magkakasama ({cap}): hindi ito magsisimula hangga't hindi mo binabawasan ang memory nito o tinataasan ang limitasyong iyon.",
   "cfg.memlockChange": "Baguhin sa Mga Setting → Mga graphics card",
-  "win.gvtMemlock": "May {mem} na memory ang makinang ito, pero ang makinang may graphics card ay puwedeng mag-lock lang ng {cap} (Mga Setting → Mga graphics card)."
+  "win.gvtMemlock": "May {mem} na memory ang makinang ito, pero ang mga makinang may graphics card ay puwedeng mag-lock lang ng {cap} nang magkakasama (Mga Setting → Mga graphics card)."
 }

@@ -170,6 +170,6 @@
   "vm.gvtReady": "Ekran kartı payı hazır ({name})",
   "vm.gvtGone": "Ekran kartı payı kaldırıldı",
   "gpu.freqSet": "Ekran kartının en düşük frekansı ayarlandı",
-  "gpu.memlockSet": "Bir makinenin kilitleyebileceği bellek kaydedildi",
+  "gpu.memlockSet": "Makinelerin kilitleyebileceği bellek kaydedildi",
   "vm.memlockSet": "Makinenin belleği kilitlendi"
 }

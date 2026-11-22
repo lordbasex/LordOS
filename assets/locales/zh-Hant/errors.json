@@ -905,7 +905,7 @@
   "vm.gvtBusy": "該機器的顯示卡配額屬於其他人",
   "vm.gvtInUse": "該顯示卡配額仍被一台執行中的機器使用",
   "vm.gvtFailed": "無法建立顯示卡配額",
-  "vm.memlockCap": "這台虛擬機器將鎖定 {need} MB，超過有顯示卡的虛擬機器可鎖定的 {cap} MB（設定 → 顯示卡）",
+  "vm.memlockCap": "這台虛擬機器將鎖定 {need} MB，但有顯示卡的虛擬機器現在只剩 {cap} MB 可用（設定 → 顯示卡）",
   "vm.memlockRefused": "無法鎖定這台虛擬機器的記憶體",
   "gpu.memlockRange": "該數量超出這部電腦允許虛擬機器鎖定的範圍"
 }
