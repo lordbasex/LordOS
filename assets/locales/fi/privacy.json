@@ -59,5 +59,11 @@
   "ask.idle": "”{app}” haluaa tietää, milloin olet poissa tietokoneelta",
   "ask.idleNote": "Sille kerrotaan, kun lopetat näppäimistön ja hiiren käytön hetkeksi ja kun palaat; ei mitään muuta. Voit muuttaa tämän myöhemmin kohdassa Asetukset → Tietosuoja.",
   "perm.idle": "Poissaolo tietokoneelta",
-  "permHint.idle": "Sovellukset, joille kerrotaan, kun lopetat tietokoneen käytön hetkeksi ja kun palaat, kuten keskustelusovellukset, jotka näyttävät sinut poissaolevana. Muuta ne eivät saa tietää; näytön päällä pitävä video tai esitys lasketaan läsnäoloksi."
+  "permHint.idle": "Sovellukset, joille kerrotaan, kun lopetat tietokoneen käytön hetkeksi ja kun palaat, kuten keskustelusovellukset, jotka näyttävät sinut poissaolevana. Muuta ne eivät saa tietää; näytön päällä pitävä video tai esitys lasketaan läsnäoloksi.",
+  "allowOnce": "Salli kerran",
+  "allowAlways": "Salli aina",
+  "ask.vr": "”{app}” haluaa käyttää VR-laseja {headset}",
+  "ask.vrNote": "Niiden näyttö annetaan vain sovellukselle; LordOS ei koskaan näytä työpöytääsi siellä. Se otetaan takaisin, kun sovellus suljetaan, lasit irrotetaan tai näyttö lukitaan. Voit muuttaa tämän myöhemmin kohdassa Asetukset → Tietosuoja.",
+  "perm.vr": "VR-lasit",
+  "permHint.vr": "Sovellukset, jotka saavat ohjata VR-lasien näyttöä suoraan. Lainaan annetaan vain laseja, ei koskaan näyttöjäsi, ja ne otetaan takaisin, kun näyttö lukitaan, vaihdat käyttäjää tai valitset Estä."
 }

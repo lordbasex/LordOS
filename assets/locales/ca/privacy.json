@@ -59,5 +59,11 @@
   "ask.idle": "«{app}» vol saber quan no ets a l’ordinador",
   "ask.idleNote": "Se li avisa quan deixes d’usar el teclat i el ratolí una estona, i quan tornes; res més. Pots canviar-ho després a Configuració → Privadesa.",
   "perm.idle": "Absència de l’ordinador",
-  "permHint.idle": "Apps a les quals s’avisa quan deixes d’usar l’ordinador una estona i quan tornes, com les de xat que et mostren absent. No en saben res més; un vídeo o una presentació que manté la pantalla encesa compta com que hi ets."
+  "permHint.idle": "Apps a les quals s’avisa quan deixes d’usar l’ordinador una estona i quan tornes, com les de xat que et mostren absent. No en saben res més; un vídeo o una presentació que manté la pantalla encesa compta com que hi ets.",
+  "allowOnce": "Permet una vegada",
+  "allowAlways": "Permet sempre",
+  "ask.vr": "«{app}» vol fer servir les ulleres de realitat virtual {headset}",
+  "ask.vrNote": "La seva pantalla passa a ser només de l’app; LordOS mai no hi mostra el teu escriptori. Se li treu quan l’app es tanca, desconnectes les ulleres o es bloqueja la pantalla. Pots canviar-ho després a Configuració → Privadesa.",
+  "perm.vr": "Ulleres de realitat virtual",
+  "permHint.vr": "Apps que poden controlar directament la pantalla d’unes ulleres de realitat virtual. Només es presten ulleres, mai els teus monitors, i se’ls treuen quan es bloqueja la pantalla, canvies d’usuari o tries Denega."
 }

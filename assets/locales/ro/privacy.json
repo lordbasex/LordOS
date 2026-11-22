@@ -59,5 +59,11 @@
   "ask.idle": "„{app}” vrea să știe când nu ești la calculator",
   "ask.idleNote": "Este anunțată când nu mai folosești tastatura și mouse-ul o vreme și când revii; nimic altceva. Poți schimba asta mai târziu în Setări → Confidențialitate.",
   "perm.idle": "Absența de la calculator",
-  "permHint.idle": "Aplicații anunțate când nu mai folosești calculatorul o vreme și când revii, precum aplicațiile de chat care te arată absent. Nu află nimic altceva; un videoclip sau o prezentare care ține ecranul aprins contează ca prezență."
+  "permHint.idle": "Aplicații anunțate când nu mai folosești calculatorul o vreme și când revii, precum aplicațiile de chat care te arată absent. Nu află nimic altceva; un videoclip sau o prezentare care ține ecranul aprins contează ca prezență.",
+  "allowOnce": "Permite o dată",
+  "allowAlways": "Permite întotdeauna",
+  "ask.vr": "„{app}” vrea să folosească ochelarii VR {headset}",
+  "ask.vrNote": "Ecranul lor revine doar aplicației; LordOS nu îți arată niciodată desktopul acolo. Este luat înapoi când aplicația se închide, ochelarii sunt deconectați sau ecranul se blochează. Poți schimba asta mai târziu în Setări → Confidențialitate.",
+  "perm.vr": "Ochelari VR",
+  "permHint.vr": "Aplicații care pot controla direct ecranul ochelarilor VR. Sunt împrumutați doar ochelari, niciodată monitoarele tale, și sunt luați înapoi când ecranul se blochează, schimbi utilizatorul sau alegi Refuză."
 }

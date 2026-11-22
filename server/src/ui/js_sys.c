@@ -42,6 +42,7 @@
 #include "../wl/xwm.h"
 #include "../wl/urilist.h"
 #include "../wl/wlshell.h"
+#include "../wl/drmlease.h"
 #include "../keyboard.h"
 #include "../fsops.h"
 #include "../fsasync.h"
@@ -1706,6 +1707,18 @@ static JSValue f_wl_icon(JSContext *c, JSValueConst this_val, int argc, JSValueC
     return o;
 }
 
+/* lord.wayland.leaseAnswer(app, "once" | "always" | "deny") → bool: the person's answer to the "vr" prompt (drm-lease)
+ * lord-server is waiting on for app; anything else is ignored and nothing is saved (drmlease_answer) */
+static JSValue f_wl_lease_answer(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) return JS_FALSE;
+    const char *app = JS_ToCString(c, argv[0]), *how = JS_ToCString(c, argv[1]);
+    int ok = app && how && drmlease_answer(app, how);
+    if (app) JS_FreeCString(c, app);
+    if (how) JS_FreeCString(c, how);
+    return JS_NewBool(c, ok);
+}
+
 /* lord.wayland.idleAnswer(app, allow) → bool: the person's answer to the "idle" prompt (ext-idle-notify) lord-server is
  * waiting on for app; anything else is ignored (wl_idle_answer) */
 static JSValue f_wl_idle_answer(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -1940,6 +1953,7 @@ static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("state", 8, f_wl_state),
     JS_CFUNC_DEF("workAreas", 1, f_wl_work_areas),
     JS_CFUNC_DEF("idleAnswer", 2, f_wl_idle_answer),
+    JS_CFUNC_DEF("leaseAnswer", 2, f_wl_lease_answer),
     JS_CFUNC_DEF("icon", 1, f_wl_icon),
     JS_CFUNC_DEF("info", 0, f_wl_info),
     JS_CFUNC_DEF("x11SelfScale", 1, f_wl_x11_self_scale),

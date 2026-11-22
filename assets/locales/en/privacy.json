@@ -59,5 +59,11 @@
   "ask.idle": "“{app}” wants to know when you’re away from the computer",
   "ask.idleNote": "It’s told when you stop using the keyboard and mouse for a while, and when you’re back; nothing else. You can change this later in Settings → Privacy.",
   "perm.idle": "Away from the computer",
-  "permHint.idle": "Apps that are told when you stop using the computer for a while and when you come back, such as chat apps that show you as away. They learn nothing else; a video or presentation that keeps the screen on counts as you being there."
+  "permHint.idle": "Apps that are told when you stop using the computer for a while and when you come back, such as chat apps that show you as away. They learn nothing else; a video or presentation that keeps the screen on counts as you being there.",
+  "allowOnce": "Allow once",
+  "allowAlways": "Always allow",
+  "ask.vr": "“{app}” wants to use the VR headset {headset}",
+  "ask.vrNote": "Its display goes to the app alone; LordOS never shows your desktop there. It’s taken back when the app closes, the headset is unplugged or the screen locks. You can change this later in Settings → Privacy.",
+  "perm.vr": "VR headsets",
+  "permHint.vr": "Apps that may drive a VR headset’s display directly. Only headsets are ever lent, never your monitors, and they’re taken back when the screen locks, you switch users or you choose Deny."
 }

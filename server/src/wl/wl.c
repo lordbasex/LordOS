@@ -89,6 +89,7 @@
 #include "wlcolor.h"
 #include "buftf.h"
 #include "idlenotify.h"
+#include "drmlease.h"
 #include "ext-idle-notify-v1-protocol.h"
 #include "xdg-toplevel-icon-v1-protocol.h"
 #include "linux-drm-syncobj-v1-protocol.h"
@@ -6444,6 +6445,26 @@ int wl_count(void) {
     return n;
 }
 
+/* ---- drm-lease-v1 (drmlease.c): what it needs to know of a client ---- */
+static int drml_trusted(struct wl_client *c) {
+    return c && c != xwl_client && !greeter && client_pid(c) != getpid() && !app_of_client(c) && !client_sandboxed(c);
+}
+static const char *drml_identity(struct wl_client *c) {
+    const char *who = client_identity(c);
+    return kbi_key_valid(who) ? who : "";
+}
+static void drml_ask(const char *app, const char *headset) {
+    /* the shell asks (sdk/wayland.js); the name is an installed app's whose entry runs that program, never the client's */
+    char name[128] = "", id[400], a[160], h[160], json[600];
+    wl_shortcuts_name(app, "", name, sizeof name);
+    json_str(id, sizeof id, app);
+    json_str(a, sizeof a, name);
+    json_str(h, sizeof h, headset);
+    int n = snprintf(json, sizeof json, "{\"app\":\"%s\",\"name\":\"%s\",\"headset\":\"%s\"}", id, a, h);
+    if (n > 0 && n < (int)sizeof json) emit_id(0, "drmlease", json);   /* never a cut one (an event holds 600) */
+    else fprintf(stderr, "wayland: drm-lease: the prompt for %s does not fit an event\n", app);
+}
+
 /* ---- startup and loop ---- */
 
 int wl_start(void) {
@@ -6520,6 +6541,7 @@ int wl_start(void) {
     bgeffect_globals(dpy);              /* and blur behind a window where it can be drawn */
     secctx_init(dpy, may_secctx);       /* a sandbox's own socket per app (secctx.c) */
     wlfixes_init(dpy);                  /* wl_fixes: a client destroys a registry it no longer needs (wlfixes.c) */
+    drmlease_init(dpy, &(DrmlHooks){ drml_trusted, drml_identity, drml_ask });   /* a VR headset, if allowed (after secctx) */
     /* inherited by apps opened from the LordOS terminal */
     setenv("WAYLAND_DISPLAY", socket_name, 1);
     setenv("XDG_SESSION_TYPE", "wayland", 1);

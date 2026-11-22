@@ -15,7 +15,7 @@
  *               non-square buffer that must be invalid_buffer
  *   protocols   the globals and versions of items 4 and 7 (xdg_wm_base 7, linux-dmabuf 5, wp_presentation 2,
  *               cursor-shape 2, single-pixel-buffer, alpha-modifier): the capabilities, the bounds, a single-pixel
- *               buffer at 50 % opacity
+ *               buffer at 50 % opacity; no drm-lease device (no VR headset, no card: docs/WAYLAND.md "DRM leases")
  *
  *   WAYLAND_DISPLAY=wayland-0 build/wlperf-client MODE [ARG]   (exit 0, or 1 on a protocol error or a failed check) */
 #include <stdio.h>
@@ -44,7 +44,7 @@ static struct wp_alpha_modifier_v1 *alpha;
 static struct ext_idle_notifier_v1 *idler;
 static struct xdg_toplevel_icon_manager_v1 *iconm;
 static struct wl_seat *seat;
-static uint32_t ver_wm, ver_dmabuf, ver_pres, ver_cursor, ver_spb, ver_alpha;
+static uint32_t ver_wm, ver_dmabuf, ver_pres, ver_cursor, ver_spb, ver_alpha, ver_lease;
 static int fails;
 
 static void check(const char *what, long got, long want) {
@@ -75,6 +75,7 @@ static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char
         spb = wl_registry_bind(r, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
     } else if (!strcmp(iface, xdg_toplevel_icon_manager_v1_interface.name)) iconm = wl_registry_bind(r, name, &xdg_toplevel_icon_manager_v1_interface, 1);
     else if (!strcmp(iface, ext_idle_notifier_v1_interface.name)) idler = wl_registry_bind(r, name, &ext_idle_notifier_v1_interface, 1);
+    else if (!strcmp(iface, "wp_drm_lease_device_v1")) ver_lease = ver;
     else if (!strcmp(iface, wl_seat_interface.name)) seat = wl_registry_bind(r, name, &wl_seat_interface, 1);
     else if (!strcmp(iface, wp_alpha_modifier_v1_interface.name)) {
         ver_alpha = ver;
@@ -282,6 +283,7 @@ static int run_protocols(void) {
     check("wp_cursor_shape_manager_v1 version 2", ver_cursor, 2);
     check("wp_single_pixel_buffer_manager_v1", ver_spb, 1);
     check("wp_alpha_modifier_v1", ver_alpha, 1);
+    check("no wp_drm_lease_device_v1 without a VR headset on lord-server's card", ver_lease, 0);
     Buf b = buffer(300, 200, 0xff808080u);
     window("protocols", &b, 0);
     check("wm_capabilities: maximize", win.caps_max, 1);

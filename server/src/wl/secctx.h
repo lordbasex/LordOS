@@ -33,6 +33,9 @@ struct wl_client;
  * says who sees the manager besides being outside a context: lord-server offers it only to clients known
  * to be unsandboxed. 0 or -1. */
 int secctx_init(struct wl_display *dpy, int (*may_create)(struct wl_client *c));
+/* One more say in which globals a client sees (the display has one filter, this one): gate(c, iface) returns 0 to hide
+ * iface from c. wl/drmlease.c hides the DRM lease device from every client that may never lease. */
+void secctx_set_gate(int (*gate)(struct wl_client *c, const char *iface));
 /* The metadata of a client that connected through a security context; NULL for any other client */
 const SecMeta *secctx_of(struct wl_client *c);
 

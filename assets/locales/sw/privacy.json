@@ -59,5 +59,11 @@
   "ask.idle": "“{app}” inataka kujua lini huko kwenye kompyuta",
   "ask.idleNote": "Huarifiwa unapoacha kutumia kibodi na kipanya kwa muda, na unaporudi; hakuna kingine. Unaweza kubadilisha hili baadaye katika Mipangilio → Faragha.",
   "perm.idle": "Kutokuwepo kwenye kompyuta",
-  "permHint.idle": "Programu zinazoarifiwa unapoacha kutumia kompyuta kwa muda na unaporudi, kama programu za gumzo zinazokuonyesha haupo. Hazijui kitu kingine; video au wasilisho linaloweka skrini ikiwa imewaka huhesabiwa kama upo."
+  "permHint.idle": "Programu zinazoarifiwa unapoacha kutumia kompyuta kwa muda na unaporudi, kama programu za gumzo zinazokuonyesha haupo. Hazijui kitu kingine; video au wasilisho linaloweka skrini ikiwa imewaka huhesabiwa kama upo.",
+  "allowOnce": "Ruhusu mara moja",
+  "allowAlways": "Ruhusu kila mara",
+  "ask.vr": "“{app}” inataka kutumia kifaa cha VR cha kichwani {headset}",
+  "ask.vrNote": "Skrini yake inapewa programu hiyo pekee; LordOS haionyeshi kamwe eneo-kazi lako hapo. Inarudishwa programu inapofungwa, kifaa kinapochomolewa au skrini inapofungwa. Unaweza kubadilisha hili baadaye katika Mipangilio → Faragha.",
+  "perm.vr": "Vifaa vya VR vya kichwani",
+  "permHint.vr": "Programu zinazoweza kuendesha skrini ya kifaa cha VR cha kichwani moja kwa moja. Vifaa vya kichwani pekee ndivyo vinavyoazimwa, kamwe si skrini zako, na vinarudishwa skrini inapofungwa, unapobadilisha mtumiaji au ukichagua Kataa."
 }

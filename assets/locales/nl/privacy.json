@@ -59,5 +59,11 @@
   "ask.idle": "“{app}” wil weten wanneer je niet achter de computer zit",
   "ask.idleNote": "Het hoort het wanneer je het toetsenbord en de muis een tijdje niet gebruikt en wanneer je terug bent; verder niets. Je kunt dit later wijzigen in Instellingen → Privacy.",
   "perm.idle": "Afwezig van de computer",
-  "permHint.idle": "Apps die horen wanneer je de computer een tijdje niet gebruikt en wanneer je terugkomt, zoals chatapps die je als afwezig tonen. Verder horen ze niets; een video of presentatie die het scherm aan houdt, telt als aanwezig."
+  "permHint.idle": "Apps die horen wanneer je de computer een tijdje niet gebruikt en wanneer je terugkomt, zoals chatapps die je als afwezig tonen. Verder horen ze niets; een video of presentatie die het scherm aan houdt, telt als aanwezig.",
+  "allowOnce": "Eén keer toestaan",
+  "allowAlways": "Altijd toestaan",
+  "ask.vr": "“{app}” wil de VR-bril {headset} gebruiken",
+  "ask.vrNote": "Het scherm ervan gaat alleen naar de app; LordOS toont daar nooit je bureaublad. Het wordt teruggenomen wanneer de app sluit, de bril wordt losgekoppeld of het scherm vergrendelt. Je kunt dit later wijzigen in Instellingen → Privacy.",
+  "perm.vr": "VR-brillen",
+  "permHint.vr": "Apps die het scherm van een VR-bril rechtstreeks mogen aansturen. Alleen brillen worden uitgeleend, nooit je monitors, en ze worden teruggenomen wanneer het scherm vergrendelt, je van gebruiker wisselt of je Weigeren kiest."
 }
