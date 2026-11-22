@@ -898,5 +898,14 @@
   "celeste.side.night": "Éclairage nocturne",
   "celeste.side.notifications": "Notifications",
   "celeste.side.remove": "Retirer",
-  "celeste.side.volume": "Volume"
+  "celeste.side.volume": "Volume",
+  "shot.title": "« {app} » veut faire une capture d’écran",
+  "shot.titleUnknown": "Un programme inconnu veut faire une capture d’écran",
+  "shot.body": "Choisissez un écran ou une fenêtre, ou sélectionnez une zone. L’app ne reçoit que cette image.",
+  "shot.area": "Sélectionner une zone…",
+  "shot.take": "Faire la capture",
+  "shot.areaHint": "Faites glisser sur la zone à donner à {app}. Échap annule.",
+  "shot.colorHint": "Cliquez sur la couleur à donner à {app}. Échap annule.",
+  "share.shotTaken": "{app} a fait une capture d’écran",
+  "share.colorPicked": "{app} a prélevé une couleur sur votre écran"
 }

@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include "../fpak.h"
 #include "../fpspawn.h"
+#include "../fplend.h"
 #include "../apps.h"
 
 static const DisplayHost *host;
@@ -90,6 +91,7 @@ void hw_start(const DisplayHost *h, int with_bus) {
     if (with_bus && mpris_start(hw_emit)) fprintf(stderr, "hw: no session bus for the Linux players (Now Playing)\n");
     fpspawn_bus = with_bus;
     apps_set_spawn_hook(fpspawn_add_view);         /* each Flatpak app's Spawn helper (fpspawner.h) */
+    apps_set_lend_hook(fplend_add_view);           /* each Flatpak view's lending socket (fplend.h) */
     fpspawn_try();
     if (with_bus && pwguard_start()) fprintf(stderr, "hw: PipeWire not reachable yet (the microphone and camera restrictions of Linux apps apply once it is)\n");
     if (with_bus && sysbus_start() == 0) {

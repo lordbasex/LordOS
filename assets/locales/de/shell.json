@@ -898,5 +898,14 @@
   "celeste.side.night": "Nachtlicht",
   "celeste.side.notifications": "Mitteilungen",
   "celeste.side.remove": "Entfernen",
-  "celeste.side.volume": "Lautstärke"
+  "celeste.side.volume": "Lautstärke",
+  "shot.title": "„{app}“ möchte ein Bildschirmfoto machen",
+  "shot.titleUnknown": "Ein unbekanntes Programm möchte ein Bildschirmfoto machen",
+  "shot.body": "Wähle einen Bildschirm oder ein Fenster oder markiere einen Bereich. Die App bekommt nur dieses Bild.",
+  "shot.area": "Bereich auswählen …",
+  "shot.take": "Bildschirmfoto machen",
+  "shot.areaHint": "Ziehe über den Bereich, den {app} bekommen soll. Esc bricht ab.",
+  "shot.colorHint": "Klicke auf die Farbe, die {app} bekommen soll. Esc bricht ab.",
+  "share.shotTaken": "{app} hat ein Bildschirmfoto gemacht",
+  "share.colorPicked": "{app} hat eine Farbe von deinem Bildschirm genommen"
 }

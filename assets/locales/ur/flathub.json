@@ -107,5 +107,6 @@
   "updates.button": "Flathub ایپس اپ ڈیٹ کریں",
   "updates.text": "Flathub سے انسٹال شدہ: {count}۔ Flatpak ہر ایک کو چیک کرتا ہے اور جو بدلا ہے وہ انسٹال کرتا ہے؛ کھلی ہوئی ایپ دوبارہ کھولنے پر اپ ڈیٹ مکمل کرتی ہے۔",
   "updates.title": "Flathub ایپس",
-  "verified": "تصدیق شدہ: {developer} کی شائع کردہ"
+  "verified": "تصدیق شدہ: {developer} کی شائع کردہ",
+  "note.obsVideos": "LordOS میں OBS Studio ریکارڈنگز آپ کے ویڈیوز فولڈر میں محفوظ کرتی ہے: آپ کے ہوم کے باقی فولڈر Flathub ایپس کے لیے صرف پڑھنے کے لیے ہیں۔"
 }

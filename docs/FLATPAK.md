@@ -962,8 +962,9 @@ lord-server serves the name itself (`server/src/fpspawn.c`, the argument rules i
 - **What**: `flatpak run` of the same app id, with the app's command and arguments after the id (never read as
   flatpak options), its environment as `--env=` (names checked), `--sandbox` and the sandbox flags as flatpak-portal
   maps them, `--die-with-parent`, and then LordOS's never-granted options and current restrictions, so they win.
-  `usr-fd`, `app-fd` and `sandbox-expose`/`sandbox-expose-ro` are refused (the last two since the security review
-  below: the path is in a folder the app writes, and Flatpak follows a link there). `sandbox-expose-fd(-ro)` is read
+  `usr-fd`, `app-fd` (but for Steam since 2026-11-22, see "Steam" below) and `sandbox-expose`/`sandbox-expose-ro` are
+  refused (the last two since the security review below: the path is in a folder the app writes, and Flatpak follows a
+  link there). `sandbox-expose-fd(-ro)` is read
   and left out (since 2026-11-22, as flatpak-portal does with an fd it can't resolve): Flatpak would be handed the
   fd's path, which the app can swap for a link between the check and the bind. The Chromium browser asks it for its
   `WidevineCdm` folder only, and runs without it (no DRM video).
@@ -1005,6 +1006,110 @@ FreeTube (Electron, zypak) each start their zygote in a sandbox nested in the ap
 Chromium the right relative pid, renderers run with seccomp-bpf, a window draws, and nothing traps. Before: Whatsie
 died at every start (`trap int3` in libQt6WebEngineCore).
 
+### Shared runtime folders (decided 2026-11-22)
+
+Open question 4, decided by the maintainer: a second launch of a running Flatpak app shares its runtime folders. Flatpak
+gives all instances of an app the same `$XDG_RUNTIME_DIR/.flatpak/<id>` (its per-app `/tmp`, `tmp/` in it) and
+`$XDG_RUNTIME_DIR/app/<id>` (bound as the app's `/run/user/<uid>`); in LordOS both were in each view's own tmpfs, so a
+second launch (Open with, the Launcher, a Dock "New Window") couldn't reach the first instance's single-instance socket.
+
+The launcher (`flatpak_share` in `apps.c`) makes `$XDG_RUNTIME_DIR/lordos/fpshare/<id>.<restrictions>/flatpak` and
+`.../app` (the user's, 0700, each step a real folder) and the view binds them at `.flatpak/<id>` and `app/<id>` of its
+runtime folder (`share_src`/`share_dst` of `sandbox_files_isolate`, opened again there with no link on the way). Only
+views of the same app id, the same user and the same restrictions (the hex mask of `FW_R_*` in the name) share them: a
+restriction added while an instance runs never puts a new instance in the same folders as the unrestricted one. Flatpak's
+own instance folders (`.flatpak/<number>`) stay in each view.
+
+### Lending a chosen file (decided 2026-11-22)
+
+LordOS's equivalent of the document portal, without FUSE (`server/src/fplend.c`; the view's side is `lend_one` in
+`sec/sandbox.c`). When a Flatpak app with the session bus gets a file from LordOS's file dialog
+(`org.freedesktop.portal.FileChooser`), or a picture from the Screenshot portal, it gets
+`/run/flatpak/app/<id>/doc/<grant>/<name>` instead of the real path (Flatpak 1.16 binds `$XDG_RUNTIME_DIR/app/<id>` there
+in every instance), and exactly that is mounted in its running view:
+
+| Dialog | What the app sees at `doc/<grant>/` |
+|---|---|
+| Open a file | that file, writable when the launcher's grant rules allow it (`apps_grant_ok`), else read-only |
+| Choose a folder | that folder and what is in it (refused for the home, a folder holding its keys or startup files, a protected one) |
+| Save | the chosen folder read-only, with only the chosen name writable (lord-server makes it empty first) |
+
+- **How it reaches the running app.** The view's PID 1 (the only process with the view's user namespace's capabilities)
+  mounts a small tmpfs at `$XDG_RUNTIME_DIR/.lordos-lend`, makes it shared and binds it read-only at
+  `app/<id>/doc` before `flatpak run`. bubblewrap binds `app/<id>` (with what is mounted under it) at
+  `/run/flatpak/app/<id>`, as a slave, so a grant PID 1 mounts later in its tmpfs appears in the running app. The app can't
+  write where grants go (a read-only bind); another view of the same app has its own tmpfs.
+- **Who asks.** The D-Bus caller's pid (the app's xdg-dbus-proxy) must be in a root-owned `app-lordos-fp-<id>.scope`;
+  its view is the one whose PID 1 is that process's topmost ancestor in the scope, and lord-server talks to that PID 1
+  only over the socket pair the launcher gave it (`FPLEND_FD`, closed in the app; PID 1 says hello with its pidfd).
+- **What is lent.** lord-server opens the path with no link on the way and sends its device and inode; PID 1 opens the
+  path again in its own mount namespace (`openat2`, no links), lends it only if it is that very file, copies its mount
+  (`open_tree`), sets it nosuid, nodev and read-only unless writable, and moves it onto `<grant>/<name>` (a random
+  128-bit name). Protected paths (`fsops_protected_resolved`) are never lent. A mount the kernel keeps read-only is lent
+  read-only. At most 256 grants per view.
+- **Revoked** with the view: when the app's last process leaves, its mount namespace and every grant go.
+- A caller that isn't a Flatpak app LordOS started gets the real path, as before. A lend that fails is logged and the
+  app gets the real path (which its own Flatpak permissions decide).
+- Limit: an app that saves only by writing a temporary file next to the target and renaming it over it can't save
+  there (the folder is read-only and the target a mount point): "write limited to that name" is the decision. Not yet
+  measured with a real app.
+
+Tested by `build/sandbox-lend-test` (a fake app, also inside bubblewrap with the grant made after it started) and
+`build/portal-cast-test`; end to end with `build/fpportal-probe` inside a real Flatpak sandbox (below).
+
+### Steam (decided 2026-11-22)
+
+Steam's Flatpak runs its client and games in the Steam Runtime through pressure-vessel, which asks the Spawn portal for a
+sub-sandbox with its own `/usr` and `/app` (`usr-fd`, `app-fd`, with SHARE_PIDS). Approved for the verified id
+`com.valvesoftware.Steam` only (`read_spawn` in `fpspawn.c`), every other app's still refused:
+
+- each fd must be a folder opened for reading (or `O_PATH`), inside Steam's data folder (`~/.var/app/com.valvesoftware.Steam`,
+  where Steam keeps the runtime it deploys), Steam's own installed app, or the installed runtimes of the user's or the
+  system's installation (`fpak_steam_fd_ok`): from the folder up through `..`, on the very same mount all the way (the
+  statx mount id; a bind of another folder, or a link the app followed when it opened it, ends elsewhere), to one of
+  those folders, opened by lord-server with no link on the way;
+- lord-server places them like the app's own fds and adds `--usr-fd=N`/`--app-fd=M` (`fpak_spawn_argv`; never with an
+  empty `/app` too) to `flatpak run` of Steam itself, which the Spawn helper starts in Steam's view and Landlock domain,
+  with LordOS's never-granted options and restrictions after what Steam asked: the child never has more than Steam.
+
+### Screenshots and the screen-share token (decided 2026-11-22)
+
+- **ScreenCast restore token.** A session that asked to persist (`persist_mode` 1 or 2) of an app LordOS verified gets
+  `restore_token` and `persist_mode` 1 in Start's answer: kept only in lord-server's memory, for the sources the person
+  picked, valid 10 s from when it was given and once (`csm_token_issue`/`csm_token_take`). The same app's next session
+  with it, within that time, starts on those sources without the chooser (Chromium asks twice for one share; OBS restarts
+  its capture right after the choice); the indicator shows the share as always and its frames still wait for it; a
+  restored session gets no token, so a token never leads to another. Never for an unknown program; never written.
+- **Screenshot portal** (`org.freedesktop.portal.Screenshot` version 2: Screenshot and PickColor). The same chooser and
+  gate as ScreenCast ("no screen capture" refuses; an unknown program is said so), always interactive whatever the app
+  asks: a screen, a window, or "Select Area…" to drag over the live screen; PickColor shows only the overlay, a click
+  picks the point. The picture is taken after the commit that removed the chooser and the overlay (an effect), painted as
+  a share is (protected windows black, `cast_still`), encoded by lord-media into a new PNG in the person's Screenshots
+  folder (named as the Screenshots app names its files, never over a file) and lent to a Flatpak app as above; others get
+  its real path. The indicator shows "‹App› took a screenshot" (or picked a color) for 4 s. One request at a time.
+
+### Checked end to end (2026-11-22, the maintainer's PC)
+
+The branch's lord-server, headless (1600×900), in the session's server leaf with a private bus and runtime folder and a
+test home whose `~/.local/share/flatpak` was the user's installation (bound in; `flatpak list --user --all` taken
+before, Steam, ksnip and what they brought installed for the run and removed after, the list identical at the end), and
+`build/fpportal-probe` run inside a real Flatpak sandbox (nsenter into the app's namespaces, the app's own filtered bus):
+
+- **Lending** (Whatsie, which has the Documents folder but not the rest of the home): an Open of `~/Private/chosen.txt`
+  answered `/run/flatpak/app/com.ktechpit.whatsie/doc/<grant>/chosen.txt`, readable; `~/Private/sibling.txt` was
+  reachable neither at its real path nor next to the lent file. A Save of `~/Private/probe-saved.txt` was written through
+  the lent name, and nothing else could be made next to it. (ksnip declares `host`, so it sees everything anyway.)
+- **Shared runtime folders**: a second launch of Whatsie printed "another instance owns … running as secondary,
+  forwarded commands to running instance" and left; before, it ran as a second copy.
+- **Screenshot**: the chooser showed the screen and every window with pictures; "Select Area…" and a drag of 500 × 350
+  gave a 500 × 350 PNG of exactly that part, with neither the chooser nor the overlay in it, lent to the app and readable
+  there; PickColor answered a color. "Whatsie took a screenshot" in the log.
+- **Steam**: with the update downloaded (483 MB) the client reached "Sign in to Steam"; `pv-adverb` ran with `/usr` and
+  `/app` from `~/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamrt64/pv-runtime/…/var/tmp-*/`, `NoNewPrivs: 1`
+  and seccomp. pressure-vessel's Spawn carries 82 environment variables: the per-Spawn limit went from 64 to 128 (the
+  whole command line still fits the Spawn helper's, checked at build time). Whatsie's Spawn with a `usr-fd` was refused
+  (`NotSupported`, "option not served: usr-fd").
+
 ## Open questions
 
 1. **Long ids.** The scope name allows 62 bytes for the id part; Flatpak ids may be 255. Refuse
@@ -1025,7 +1130,8 @@ died at every start (`trap int3` in libQt6WebEngineCore).
    app; in LordOS both sit in the view's own tmpfs, so a second launch (Open with, the Launcher, a Dock "New Window")
    can't reach the first instance's socket and runs as a second copy on the same profile: Chromium showed "Profile
    error occurred" and its databases were locked, four VS Code copies corrupted `argv.json`. Session restore now
-   launches a Flatpak app once (`launchesOnce`); the rest needs this decision.
+   launches a Flatpak app once (`launchesOnce`); the rest needs this decision. **Decided by the maintainer 2026-11-22:
+   shared between the views of the same app id, user and restrictions ("Shared runtime folders" above).**
 5. **Which binary parses appstream** (E7): a mode of `lord-doc` (which already decodes untrusted
    files), or a small new helper?
 6. **Key roll-over.** Accept Flathub's key updates delivered in its signed summary (`xa.gpg-keys`,

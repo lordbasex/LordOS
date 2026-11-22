@@ -905,5 +905,14 @@
   "celeste.side.night": "Lumină de noapte",
   "celeste.side.notifications": "Notificări",
   "celeste.side.remove": "Elimină",
-  "celeste.side.volume": "Volum"
+  "celeste.side.volume": "Volum",
+  "shot.title": "„{app}” vrea să facă o captură de ecran",
+  "shot.titleUnknown": "Un program necunoscut vrea să facă o captură de ecran",
+  "shot.body": "Alegeți un ecran sau o fereastră ori selectați o zonă. Aplicația primește doar acea imagine.",
+  "shot.area": "Selectați o zonă…",
+  "shot.take": "Fă captura",
+  "shot.areaHint": "Trageți peste zona de dat lui {app}. Esc anulează.",
+  "shot.colorHint": "Faceți clic pe culoarea de dat lui {app}. Esc anulează.",
+  "share.shotTaken": "{app} a făcut o captură de ecran",
+  "share.colorPicked": "{app} a luat o culoare de pe ecranul dvs."
 }

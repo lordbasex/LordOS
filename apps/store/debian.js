@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import { Suggested } from './suggested.js';
 import { Card, CardGrid, Facts, Pill, Shelf } from './ui.js';
-import { sysPkgKey, snapshotDate } from './syspkg.js';
+import { sysPkgKey, snapshotDate, companionsOf } from './syspkg.js';
 import { AdminRescue, isNotAdmin } from './rescue.js';
 import { search } from './search.js';
 
@@ -126,11 +126,13 @@ function PlanView({ plan }) {
 // extras: packages installed with it (a catalog app's "with": Steam's steam-libs-i386:i386); withRemove: those
 // removed with it, when installed. When the app is installed and some extras are not (a catalog entry that gained
 // "with" packages after it was installed: Steam's 32-bit Vulkan drivers), Update installs the missing ones.
-function Details({ name, onBack, onRemoved, extras = [], withRemove = [] }) {
+// A few Debian packages bring others with them (syspkg.js companionsOf: OBS Studio's plugins and Qt's Wayland plugin).
+function Details({ name, onBack, onRemoved, extras: given = [], withRemove = [] }) {
   const th = useTheme();
   const { gen, job } = useStore(state);
   const [plan, setPlan] = useState(null);
   const info = ready() ? lord.pkg.info(name, { lang: lang2() }) : null;
+  const extras = [...given, ...companionsOf(name, (p) => !given.includes(p) && !!(ready() && lord.pkg.info(p, {})))];
   useEffect(() => setPlan(null), [name, gen]);
   const launcher = useLauncherApps();
   if (!info) return h(Text, { style: { color: th.textDim } }, t('store.debian.notFound', { name }));

@@ -47,7 +47,7 @@ int fpak_argv(const FpakRun *r, char **argv, char *buf, size_t cap);
  * instance of the same app; LordOS's never-granted options and restrictions come after what it asks for (Flatpak's
  * last option wins) and the arguments after the app id (never read as flatpak options). */
 #define FPAK_SPAWN_ARGS_MAX 128     /* argv entries of the command */
-#define FPAK_SPAWN_ENV_MAX 64
+#define FPAK_SPAWN_ENV_MAX 128     /* Steam's pressure-vessel passes 82 (2026-11-22) */
 #define FPAK_SPAWN_EXPOSE_MAX 8
 #define FPAK_SPAWN_STR_MAX 4096
 #define FPAK_SPAWN_ARGV_MAX (FPAK_ARGV_MAX + FPAK_SPAWN_ARGS_MAX + 2 * FPAK_SPAWN_ENV_MAX + 2 * FPAK_SPAWN_EXPOSE_MAX + 24)
@@ -79,7 +79,21 @@ typedef struct {
     const char *const *expose, *const *expose_ro;   /* names under ~/.var/app/<id>/sandbox, NULL-terminated (may be NULL) */
     int parent_pid;                                 /* the caller's instance in the view's PID namespace (EXPOSE/SHARE_PIDS) */
     int instance_fd;                                /* --instance-id-fd (NOTIFY_START), or -1 */
+    /* Steam alone (FPAK_STEAM_ID, fpak_steam_fd_ok): the numbers its usr-fd / app-fd get in `flatpak run` (--usr-fd,
+     * --app-fd), 3-1023; 0 none */
+    int usr_fd, app_fd;
 } FpakSpawn;
+
+/* The one app whose Spawn may bring its own /usr and /app (usr-fd, app-fd: pressure-vessel, the Steam Runtime's
+ * container), approved by the maintainer 2026-11-22 for this verified id only (docs/FLATPAK.md, "Steam"). */
+#define FPAK_STEAM_ID "com.valvesoftware.Steam"
+/* A usr-fd / app-fd Steam sent may be used: a folder, opened for reading (or O_PATH), inside Steam's own data folder
+ * (home/.var/app/com.valvesoftware.Steam, where Steam keeps the Steam Runtime it runs games in) or Steam's own installed
+ * app or the installed runtimes of the user's or the system's Flatpak installation. Checked physically, not by path: from
+ * the folder up through "..", on the very same mount all the way (a mount crossed on the way, a bind of another folder,
+ * a link followed when the app opened it to somewhere outside: refused), until the folder that is one of those (device
+ * and inode of the folder lord-server opened itself, no link on its way). 1 yes, 0 no. */
+int fpak_steam_fd_ok(int fd, const char *home);
 
 /* What an app asked for is acceptable: known flags only, an absolute cwd with no ".." component, 1 to
  * FPAK_SPAWN_ARGS_MAX arguments with a non-empty command, environment names [A-Za-z_][A-Za-z0-9_]* (none of

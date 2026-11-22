@@ -107,5 +107,6 @@
   "updates.button": "更新 Flathub 应用",
   "updates.text": "从 Flathub 安装：{count}。Flatpak 会逐一检查并安装有变化的内容；已打开的应用会在你再次打开时完成更新。",
   "updates.title": "Flathub 应用",
-  "verified": "已验证：由 {developer} 发布"
+  "verified": "已验证：由 {developer} 发布",
+  "note.obsVideos": "在 LordOS 中，OBS Studio 会把录制内容存到你的“视频”文件夹：你主文件夹中的其他文件夹对 Flathub 应用是只读的。"
 }

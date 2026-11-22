@@ -16,7 +16,7 @@ import { admin } from './admin.js';
 import { appName } from './i18n.js';
 import { getApp } from './windows.js';
 import { shareAppId, shareAskList, staleGrants } from './sharemodel.js';
-import { castRuns, castShown, castStop } from './screencast.jsx';
+import { castRuns, castShown, castStop, shotTaken } from './screencast.jsx';
 
 const api = () => typeof lord !== 'undefined' && lord.share;
 export const shareHolder = createStore(null);
@@ -76,6 +76,7 @@ export const share = {
 export function ShareBadge() {
   const c = useStore(shareHolder);
   const casts = useStore(castRuns);
+  const shots = useStore(shotTaken);     // a screenshot or a color an app just took (no Stop: it is done)
   const token = c ? c.token : 0;
   useEffect(() => {
     if (!token || !api()) return undefined;
@@ -87,6 +88,7 @@ export function ShareBadge() {
   const pills = [
     ...(c ? [{ key: 'share', text: t(c.input ? 'shell.share.sharingInput' : 'shell.share.sharing', { app: c.name }), stop: () => share.stop() }] : []),
     ...casts.map((r) => ({ key: `cast${r.id}`, text: t('shell.share.castSharing', { app: r.name }), stop: () => castStop(r.id) })),
+    ...shots.map((r) => ({ key: r.key, text: t(r.color ? 'shell.share.colorPicked' : 'shell.share.shotTaken', { app: r.name }), stop: null })),
   ];
   if (!pills.length) return null;
   const list = screen.displays?.length ? screen.displays : [{ x: 0, y: 0, w: screen.width }];
@@ -99,8 +101,8 @@ export function ShareBadge() {
   },
   h(View, { style: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' } }),
   h(Text, { style: { flex: 1, fontSize: 12, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden' } }, p.text),
-  h(View, { onClick: p.stop, style: { paddingHorizontal: 10, height: 22, borderRadius: 11, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' } },
-    h(Text, { style: { fontSize: 12, fontWeight: 700, color: '#fff' } }, t('shell.share.stop')))))));
+  p.stop ? h(View, { onClick: p.stop, style: { paddingHorizontal: 10, height: 22, borderRadius: 11, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' } },
+    h(Text, { style: { fontSize: 12, fontWeight: 700, color: '#fff' } }, t('shell.share.stop'))) : null))));
 }
 
 async function answer(a, allow) {

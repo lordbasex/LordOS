@@ -165,3 +165,9 @@ export const appstreamStale = (at, now) => !(at > 0) || now - at > APPSTREAM_EVE
 
 // The Flathub settings (settings.flathub): { on, showAll, appstreamAt }.
 export const prefsOf = (s) => ({ on: !!(s && s.on), showAll: !!(s && s.showAll), appstreamAt: (s && Number(s.appstreamAt)) || 0 });
+
+// A note on an app's page about how it works in LordOS (the Flathub compatibility run, 2026-11-22): a key under
+// "flathub.note.", or null. OBS Studio: the home folder is read-only in a Flatpak app's view (docs/FLATPAK.md, E2), so
+// recordings can only go to the person's folders; OBS's Flatpak asks for Videos, where they go.
+const NOTES = { 'com.obsproject.Studio': 'obsVideos' };
+export const appNote = (id) => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(NOTES, id) ? NOTES[id] : null);

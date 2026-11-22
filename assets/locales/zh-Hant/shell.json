@@ -891,5 +891,14 @@
   "celeste.side.night": "夜間模式",
   "celeste.side.notifications": "通知",
   "celeste.side.remove": "移除",
-  "celeste.side.volume": "音量"
+  "celeste.side.volume": "音量",
+  "shot.title": "「{app}」想要擷取螢幕畫面",
+  "shot.titleUnknown": "一個不明程式想要擷取螢幕畫面",
+  "shot.body": "選擇一個螢幕或視窗，或選取一個區域。App 只會取得那張圖片。",
+  "shot.area": "選取區域…",
+  "shot.take": "擷取螢幕畫面",
+  "shot.areaHint": "拖過要給 {app} 的區域。按 Esc 取消。",
+  "shot.colorHint": "按一下要給 {app} 的顏色。按 Esc 取消。",
+  "share.shotTaken": "{app} 擷取了螢幕畫面",
+  "share.colorPicked": "{app} 從你的螢幕上取了一個顏色"
 }

@@ -9,7 +9,8 @@
  * restrictions after whatever the app asked for (fpak_spawn_argv). The app's command and arguments come after the app
  * id, so flatpak never reads them as its own options. Nothing reaches the host: no command outside Flatpak's sandbox,
  * no other app id, no path outside the app's own ~/.var/app/<id>/sandbox, and no custom /app or /usr (usr-fd, app-fd
- * and the expose-fd options are refused).
+ * and the expose-fd options are refused) except for Steam (com.valvesoftware.Steam, approved 2026-11-22): its usr-fd and
+ * app-fd, folders of its own checked by fpak_steam_fd_ok, for the Steam Runtime's container.
  *
  * The process tree: lord-server asks the app's own Spawn helper (fpspawner.h), which the launcher forked inside the
  * app's view right after the app's Landlock scoping: the helper forks `flatpak run` (whose pid the caller gets), so the
@@ -64,6 +65,8 @@ extern char **environ;
 #define MAX_KIDS 128
 #define MAX_PER_APP FPSW_MAX_KIDS
 #define MAX_VIEWS 32
+/* the helper takes the whole command line a Spawn can make (fpsw_unpack's argv) */
+_Static_assert(FPAK_SPAWN_ARGV_MAX <= FPSW_ARGV_MAX - 1, "a Spawn's command line fits the helper's");
 
 static DConn conn;
 static int up;
@@ -238,6 +241,8 @@ typedef struct {
     int has_cwd;
     char refused[48];                   /* the option not served, for the log */
     int exposed_ignored;                /* sandbox-expose-fd(-ro) handles left out */
+    int has_usr, has_app;               /* Steam's usr-fd / app-fd (FPAK_STEAM_ID only): their handles */
+    uint32_t usr_h, app_h;
 } Req;
 
 static const char *keep(Req *q, const uint8_t *p, size_t n) {
@@ -269,8 +274,9 @@ static int read_strv(Req *q, DRd *r, const char **out, int max) {
     return r->err ? -1 : 0;
 }
 
-/* Spawn(ay cwd, aay argv, a{uh} fds, a{ss} envs, u flags, a{sv} options). 0 read, -1 bad, -2 unsupported option. */
-static int read_spawn(const DMsg *m, Req *q) {
+/* Spawn(ay cwd, aay argv, a{uh} fds, a{ss} envs, u flags, a{sv} options) from app id. 0 read, -1 bad, -2 unsupported
+ * option. */
+static int read_spawn(const DMsg *m, Req *q, const char *id) {
     DRd r;
     dr_init(&r, m);
     const char *cwd = keep_bytes(q, &r);
@@ -328,6 +334,20 @@ static int read_spawn(const DMsg *m, Req *q) {
                 if (r.err || h >= (uint32_t)m->n_fds) return -1;
                 q->exposed_ignored++;
             }
+        }
+        else if ((!strcmp(k, "usr-fd") || !strcmp(k, "app-fd")) && !strcmp(sig, "h") && !strcmp(id, FPAK_STEAM_ID)) {
+            /* Steam alone (approved by the maintainer 2026-11-22): pressure-vessel runs the Steam client and its games
+             * in the Steam Runtime, its own /usr and /app, in a sub-sandbox of Steam that has no more than Steam has.
+             * Each fd must be a folder opened for reading inside Steam's own data folder or Flatpak installation, on
+             * the same mount all the way and with no link out (fpak_steam_fd_ok); anything else is refused. */
+            uint32_t h = dr_u32(&r);
+            int usr = k[0] == 'u';
+            if (r.err || m->n_fds <= 0 || h >= (uint32_t)m->n_fds || (usr ? q->has_usr : q->has_app)) return -1;
+            if (!fpak_steam_fd_ok(m->fds[h], getenv("HOME"))) {
+                snprintf(q->refused, sizeof q->refused, "%s (not a folder of Steam's)", usr ? "usr-fd" : "app-fd");
+                return -2;
+            }
+            if (usr) { q->has_usr = 1; q->usr_h = h; } else { q->has_app = 1; q->app_h = h; }
         }
         else {                          /* sandbox-expose(-ro), usr-fd, app-fd, sandbox-expose-fd(-ro) and anything else: not served */
             snprintf(q->refused, sizeof q->refused, "%.40s", k);
@@ -551,9 +571,19 @@ static void do_spawn(DMsg *m, uint32_t caller) {
     if (root <= 0) { reply_error(m, "org.freedesktop.DBus.Error.Failed", "the app's view is gone"); return; }
     Req *q = calloc(1, sizeof *q);
     if (!q || !(q->store = malloc(q->cap = 256 * 1024))) { free(q); reply_error(m, "org.freedesktop.DBus.Error.NoMemory", "no memory"); return; }
-    int rr = read_spawn(m, q);
+    int rr = read_spawn(m, q, id);
     FpakSpawn sp = { .flags = q->flags, .sandbox_flags = q->sandbox_flags, .cwd = q->has_cwd ? q->cwd : NULL, .args = q->args,
                      .env = q->env, .unset_env = q->unset, .expose = q->expose, .expose_ro = q->expose_ro, .instance_fd = -1 };
+    /* Steam's usr-fd / app-fd: placed like the app's own fds, at numbers none of them has, for --usr-fd / --app-fd */
+    for (int part = 0; !rr && part < 2; part++) {
+        if (!(part ? q->has_app : q->has_usr)) continue;
+        if (q->nfd >= DBUS_MAX_FDS) { rr = -1; break; }
+        int n = 3;
+        for (int again = 1; again;) { again = 0; for (int i = 0; i < q->nfd; i++) if ((int)q->target[i] == n) { n++; again = 1; } }
+        q->target[q->nfd] = (uint32_t)n;
+        q->handle[q->nfd++] = part ? q->app_h : q->usr_h;
+        if (part) sp.app_fd = n; else sp.usr_fd = n;
+    }
     if (!rr && (q->flags & (FPAK_SPAWN_EXPOSE_PIDS | FPAK_SPAWN_SHARE_PIDS))) sp.parent_pid = instance_child_pid(root, iid);
     if (!rr && (q->flags & FPAK_SPAWN_NOTIFY_START)) {
         int n = 3;
@@ -583,7 +613,8 @@ static void do_spawn(DMsg *m, uint32_t caller) {
     if (argc < 0 || ((q->flags & (FPAK_SPAWN_EXPOSE_PIDS | FPAK_SPAWN_SHARE_PIDS)) && sp.parent_pid <= 0)) {
         reply_error(m, rr == -2 ? "org.freedesktop.DBus.Error.NotSupported" : "org.freedesktop.DBus.Error.InvalidArgs",
                     rr == -2 ? "option not supported" : "request refused");
-        fprintf(stderr, "fpspawn: %s: a Spawn was refused (%s%s)\n", id, rr == -2 ? "option not served: " : found ? "not installed" : "invalid request",
+        fprintf(stderr, "fpspawn: %s: a Spawn was refused (%s%s)\n", id, rr == -2 ? "option not served: " : found ? "not installed"
+                : rr ? "invalid request: its arguments" : argc < 0 ? "invalid request: the command line" : "invalid request: no instance to share pids with",
                 rr == -2 ? q->refused : "");
         free(abuf); free(q->store); free(q);
         return;

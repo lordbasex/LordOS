@@ -61,3 +61,53 @@ export function castSources(picked, choices, frameOf) {
   }
   return out.slice(0, CAST_MAX);
 }
+
+// ---- the Screenshot portal (org.freedesktop.portal.Screenshot, approved 2026-11-22): the same chooser, plus an area ----
+//
+//   shotSource(picked, choices, frameOf)  the one source lord.portal.shot gets for a picked screen or window (or null)
+//   shotDisplayAt(displays, x, y)         the display a global logical point is on (null in a gap between displays)
+//   shotDragRect(start, x, y, display)    the area from the press to the pointer, kept inside the press's display
+//   shotArea(rect, display)               what lord.portal.shot gets for an area: { display, area: { x, y, width, height } }
+//                                         (logical px, whole pixels, at least 1 × 1), or null for a click without a drag
+//   shotStamp(date)                       "YYYY-MM-DD HH.MM.SS", as the Screenshots app names its files
+//   shotFreeName(dir, base, exists)       dir/base.png, or "base (2).png"… the first name exists(path) says is free
+//   shotPills(list, now)                  the "took a screenshot" pills still shown (SHOT_PILL_MS each)
+export const SHOT_PILL_MS = 4000;
+
+export function shotSource(picked, choices, frameOf) {
+  return castSources((picked || []).slice(0, 1), choices, frameOf)[0] || null;
+}
+
+export function shotDisplayAt(displays, x, y) {
+  return (displays || []).find((d) => d && x >= d.x && y >= d.y && x < d.x + d.w && y < d.y + d.h) || null;
+}
+
+export function shotDragRect(start, x, y, d) {
+  const cx = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const ex = d ? cx(x, d.x, d.x + d.w) : x, ey = d ? cx(y, d.y, d.y + d.h) : y;
+  return { x: Math.min(start.x, ex), y: Math.min(start.y, ey), w: Math.abs(ex - start.x), h: Math.abs(ey - start.y) };
+}
+
+export function shotArea(rect, display) {
+  if (!rect || !display || !(rect.w >= 1) || !(rect.h >= 1)) return null;
+  const x0 = Math.floor(rect.x), y0 = Math.floor(rect.y);
+  const x1 = Math.ceil(rect.x + rect.w), y1 = Math.ceil(rect.y + rect.h);
+  return { display: display.id, area: { x: x0, y: y0, width: Math.max(1, x1 - x0), height: Math.max(1, y1 - y0) } };
+}
+
+export function shotStamp(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}.${p(d.getMinutes())}.${p(d.getSeconds())}`;
+}
+
+export function shotFreeName(dir, base, exists) {
+  for (let n = 1; n < 1000; n++) {
+    const p = `${dir}/${base}${n > 1 ? ` (${n})` : ''}.png`;
+    if (!exists(p)) return p;
+  }
+  return null;
+}
+
+export function shotPills(list, now) {
+  return (Array.isArray(list) ? list : []).filter((p) => p && now - p.at < SHOT_PILL_MS);
+}

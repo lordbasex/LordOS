@@ -898,5 +898,14 @@
   "celeste.side.night": "Nachtlampje",
   "celeste.side.notifications": "Meldingen",
   "celeste.side.remove": "Verwijder",
-  "celeste.side.volume": "Volume"
+  "celeste.side.volume": "Volume",
+  "shot.title": "'{app}' wil een schermafbeelding maken",
+  "shot.titleUnknown": "Een onbekend programma wil een schermafbeelding maken",
+  "shot.body": "Kies een scherm of venster, of selecteer een gebied. De app krijgt alleen die afbeelding.",
+  "shot.area": "Gebied selecteren…",
+  "shot.take": "Schermafbeelding maken",
+  "shot.areaHint": "Sleep over het gebied dat {app} krijgt. Esc annuleert.",
+  "shot.colorHint": "Klik op de kleur die {app} krijgt. Esc annuleert.",
+  "share.shotTaken": "{app} heeft een schermafbeelding gemaakt",
+  "share.colorPicked": "{app} heeft een kleur van je scherm genomen"
 }

@@ -107,5 +107,6 @@
   "updates.button": "Actualizează aplicațiile Flathub",
   "updates.text": "Instalate din Flathub: {count}. Flatpak verifică fiecare aplicație și instalează ce s-a schimbat; o aplicație deschisă termină actualizarea când o deschideți din nou.",
   "updates.title": "Aplicații Flathub",
-  "verified": "Verificată: publicată de {developer}"
+  "verified": "Verificată: publicată de {developer}",
+  "note.obsVideos": "În LordOS, OBS Studio salvează înregistrările în dosarul Videoclipuri: celelalte dosare din dosarul personal sunt doar în citire pentru aplicațiile Flathub."
 }

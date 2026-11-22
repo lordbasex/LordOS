@@ -891,5 +891,14 @@
   "celeste.side.night": "แสงกลางคืน",
   "celeste.side.notifications": "การแจ้งเตือน",
   "celeste.side.remove": "เอาออก",
-  "celeste.side.volume": "ระดับเสียง"
+  "celeste.side.volume": "ระดับเสียง",
+  "shot.title": "“{app}” ต้องการถ่ายภาพหน้าจอ",
+  "shot.titleUnknown": "โปรแกรมที่ไม่รู้จักต้องการถ่ายภาพหน้าจอ",
+  "shot.body": "เลือกหน้าจอหรือหน้าต่าง หรือเลือกพื้นที่ แอปจะได้รับเพียงภาพนั้น",
+  "shot.area": "เลือกพื้นที่…",
+  "shot.take": "ถ่ายภาพหน้าจอ",
+  "shot.areaHint": "ลากผ่านพื้นที่ที่จะให้ {app} กด Esc เพื่อยกเลิก",
+  "shot.colorHint": "คลิกสีที่จะให้ {app} กด Esc เพื่อยกเลิก",
+  "share.shotTaken": "{app} ถ่ายภาพหน้าจอแล้ว",
+  "share.colorPicked": "{app} หยิบสีจากหน้าจอของคุณแล้ว"
 }

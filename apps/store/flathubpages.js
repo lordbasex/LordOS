@@ -300,6 +300,7 @@ export function FlathubDetail({ id }) {
     h(View, null,
       h(Header, { th }, t('flathub.perm.title')),
       h(Permissions, { meta })),
+    M.appNote(a.id) ? h(Line, { th, color: th.text }, t(`flathub.note.${M.appNote(a.id)}`)) : null,
     h(Line, { th }, t('flathub.howItRuns')),
     h(Text, { style: { fontSize: typeScale.caption, color: th.textDim, direction: 'ltr', textAlign: 'start' } }, a.id));
 }

@@ -107,5 +107,6 @@
   "updates.button": "Flathub tətbiqlərini yenilə",
   "updates.text": "Flathub-dan quraşdırılıb: {count}. Flatpak hər birini yoxlayır və dəyişəni quraşdırır; açıq tətbiq yenidən açdığınızda yenilənməni başa çatdırır.",
   "updates.title": "Flathub tətbiqləri",
-  "verified": "Təsdiqlənib: {developer} tərəfindən dərc olunub"
+  "verified": "Təsdiqlənib: {developer} tərəfindən dərc olunub",
+  "note.obsVideos": "LordOS-da OBS Studio yazıları Videolar qovluğunuzda saxlayır: ev qovluğunuzun digər qovluqları Flathub tətbiqləri üçün yalnız oxunandır."
 }

@@ -107,5 +107,6 @@
   "updates.button": "Actualizar las apps de Flathub",
   "updates.text": "Instaladas desde Flathub: {count}. Flatpak revisa cada una e instala lo que cambió; una app abierta termina de actualizarse cuando la volvés a abrir.",
   "updates.title": "Apps de Flathub",
-  "verified": "Verificada: publicada por {developer}"
+  "verified": "Verificada: publicada por {developer}",
+  "note.obsVideos": "En LordOS, OBS Studio guarda las grabaciones en tu carpeta Videos: las demás carpetas de tu carpeta personal son de solo lectura para las apps de Flathub."
 }

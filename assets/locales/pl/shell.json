@@ -905,5 +905,14 @@
   "celeste.side.night": "Światło nocne",
   "celeste.side.notifications": "Powiadomienia",
   "celeste.side.remove": "Usuń",
-  "celeste.side.volume": "Głośność"
+  "celeste.side.volume": "Głośność",
+  "shot.title": "„{app}” chce zrobić zrzut ekranu",
+  "shot.titleUnknown": "Nieznany program chce zrobić zrzut ekranu",
+  "shot.body": "Wybierz ekran lub okno albo zaznacz obszar. Aplikacja dostanie tylko ten obraz.",
+  "shot.area": "Zaznacz obszar…",
+  "shot.take": "Zrób zrzut ekranu",
+  "shot.areaHint": "Przeciągnij po obszarze, który ma dostać {app}. Esc anuluje.",
+  "shot.colorHint": "Kliknij kolor, który ma dostać {app}. Esc anuluje.",
+  "share.shotTaken": "{app} zrobiła zrzut ekranu",
+  "share.colorPicked": "{app} pobrała kolor z Twojego ekranu"
 }

@@ -107,5 +107,6 @@
   "updates.button": "Actualitza les aplicacions de Flathub",
   "updates.text": "Instal·lades des de Flathub: {count}. Flatpak revisa cadascuna i instal·la el que ha canviat; una aplicació oberta acaba d’actualitzar-se quan la tornes a obrir.",
   "updates.title": "Aplicacions de Flathub",
-  "verified": "Verificada: publicada per {developer}"
+  "verified": "Verificada: publicada per {developer}",
+  "note.obsVideos": "A LordOS, l’OBS Studio desa els enregistraments a la carpeta Vídeos: les altres carpetes de la teva carpeta personal són només de lectura per a les apps de Flathub."
 }

@@ -12,6 +12,60 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Flatpak apps: the maintainer's decisions of 2026-11-22, in development** (`docs/FLATPAK.md`, "Shared runtime
+  folders", "Lending a chosen file", "Steam" and "Screenshots"; AGENTS.md, Flatpak entries; found by the Flathub
+  compatibility run of 2026-11-22).
+  - **A second launch reaches the first** (open question 4, decided): every view of the same app id, same user and same
+    restrictions shares `$XDG_RUNTIME_DIR/.flatpak/<id>` (Flatpak's per-app `/tmp`) and `$XDG_RUNTIME_DIR/app/<id>`
+    (the app's runtime folder), folders the launcher makes under `$XDG_RUNTIME_DIR/lordos/fpshare/<id>.<restrictions>/`
+    and binds into that app's views only (`flatpak_share` in `apps.c`, `share_src`/`share_dst` in `sec/sandbox.c`).
+    Chromium's and VS Code's single-instance logic finds the running instance again instead of starting a second copy on
+    the same profile ("Profile error occurred", locked databases, a corrupt `argv.json`). Another app, or the same app
+    with other restrictions, never sees them.
+  - **The chosen file is lent, never the rest of the home**: when a Flatpak app gets a file from LordOS's file dialog
+    (FileChooser portal), exactly that file, that folder, or for a save the chosen folder read-only with only the chosen
+    name writable, is bind-mounted into the app's running view by the view's own PID 1 and the app gets
+    `/run/flatpak/app/<id>/doc/<grant>/<name>`, as Flatpak's document portal would give a path of its own, without FUSE
+    (`server/src/fplend.c`, `lend_one` in `sec/sandbox.c`). PID 1 keeps a tmpfs only it writes, shown read-only to the app
+    inside `app/<id>` (which Flatpak 1.16 binds at `/run/flatpak/app/<id>`) and
+    propagated as a slave into Flatpak's sandbox, so a grant made while the app runs reaches it. PID 1 opens the path itself
+    in the view, never through a link, and lends it only if it is the device and inode lord-server checked; protected
+    paths and the launcher's sensitive folders are never lent, a save only where the launcher's grant rules allow writing.
+    The grants go with the view when the app's last process leaves. Other callers get the real path, as before.
+  - **Steam starts** (`com.valvesoftware.Steam` only): its Spawn's `usr-fd` and `app-fd` (pressure-vessel's Steam Runtime
+    container) are served when each is a folder opened for reading inside Steam's data folder or Steam's own installation
+    or the installed runtimes, checked physically (`..` by `..` on the same mount, to a folder lord-server opened with no
+    link on its way; `fpak_steam_fd_ok`), and passed as `--usr-fd`/`--app-fd` to `flatpak run` of Steam itself in Steam's
+    view and Landlock domain, with LordOS's never-granted options and restrictions after it. Every other app's
+    `usr-fd`/`app-fd` is still refused.
+  - **Screen sharing asks once**: a ScreenCast session of an app LordOS verified that asked to persist gets a restore
+    token for the sources the person picked, kept only in memory, valid 10 s and once (`csm_token_issue`/`csm_token_take`
+    in `cast/castsm.c`): Chromium's second request and OBS's restart right after the choice start without the chooser;
+    the indicator shows the share as always, and a restored session gets no new token.
+  - **Screenshot portal** (`org.freedesktop.portal.Screenshot`, Screenshot and PickColor; for Flameshot, ksnip and the
+    like): the same chooser, gate and indicator as ScreenCast, always interactive: a screen, a window, or "Select Area…"
+    to drag over the screen; for a color, a click. The picture is taken once the chooser and the overlay are gone,
+    painted as a share is (protected windows black, `cast_still`), written by lord-media as a new PNG in the person's
+    Screenshots folder (`ui/portalshot.c`) and lent to a Flatpak app as above; the indicator says "‹App› took a
+    screenshot" for a few seconds. New texts in all 35 languages.
+  - **OBS Studio**: the Store installs Debian's `obs-plugins` and `qt6-wayland` with `obs-studio` (its capture, encoders
+    and Wayland display; an OBS installed before gets them from its page's Update: `companionsOf` in
+    `apps/store/syspkg.js`), and OBS's Flathub page says recordings go to the Videos folder (the rest of the home is
+    read-only for Flathub apps).
+  - **Tests**: `build/sandbox-lend-test` (two views of one app share the folders, another app doesn't; a fake app reads
+    and writes the lent file, the file next to it isn't there, the lent folder can't be written, a save writes only its
+    name, a folder, a stale inode, a link and a bad name refused; the same inside bubblewrap with the grant made after the
+    sandbox started), `build/portal-cast-test` (the restore token: given, used once, never another app's or an unknown
+    program's; Screenshot, Cancel, refusals, PickColor; the FileChooser lending a Flatpak caller's file),
+    `castsm-test` (tokens), `fpak-test` (Steam's folders and `--usr-fd`/`--app-fd`), `screencast_model_test.mjs` (the
+    area, the file name, the pills), `screencast_scene.mjs` (the chooser in screenshot mode, the overlay, PickColor),
+    `store_syspkg_test.mjs`, `flathub_model_test.mjs`; `build/fpportal-probe`, a fake app's side of the portals run
+    inside a real Flatpak sandbox. Checked end to end on the maintainer's PC (headless session, the user's installation
+    snapshotted and restored): Whatsie got the chosen file and not the one next to it, saved through the lent name, a
+    second launch forwarded to the first; an area screenshot came back 500 × 350 without the chooser; Steam reached "Sign
+    in to Steam" with pv-adverb's `/usr` from its own runtime; Whatsie's `usr-fd` was refused.
+  - The Spawn portal takes up to 128 environment variables (was 64): pressure-vessel passes 82.
+
 - **Machines from the terminal: the `machines` command, in development** (approved by the maintainer 2026-11-21;
   `docs/VIRTUALIZATION.md` 6.15 "From the terminal"). `machines list [--json]` shows each machine of `~/Machines` with its
   system, state, vCPUs, memory, disk used and graphics; `status NAME [--json]`, `start NAME [--no-window]`, `open NAME`,

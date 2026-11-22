@@ -898,5 +898,14 @@
   "celeste.side.night": "Éjszakai fény",
   "celeste.side.notifications": "Értesítések",
   "celeste.side.remove": "Eltávolítás",
-  "celeste.side.volume": "Hangerő"
+  "celeste.side.volume": "Hangerő",
+  "shot.title": "„{app}” képernyőképet szeretne készíteni",
+  "shot.titleUnknown": "Egy ismeretlen program képernyőképet szeretne készíteni",
+  "shot.body": "Válasszon egy képernyőt vagy ablakot, vagy jelöljön ki egy területet. Az alkalmazás csak azt a képet kapja meg.",
+  "shot.area": "Terület kijelölése…",
+  "shot.take": "Képernyőkép készítése",
+  "shot.areaHint": "Húzza végig a területen, amelyet {app} megkap. Az Esc megszakítja.",
+  "shot.colorHint": "Kattintson a színre, amelyet {app} megkap. Az Esc megszakítja.",
+  "share.shotTaken": "{app} képernyőképet készített",
+  "share.colorPicked": "{app} színt vett a képernyőjéről"
 }

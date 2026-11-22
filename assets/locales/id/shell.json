@@ -891,5 +891,14 @@
   "celeste.side.night": "Lampu Malam",
   "celeste.side.notifications": "Pemberitahuan",
   "celeste.side.remove": "Hapus",
-  "celeste.side.volume": "Volume"
+  "celeste.side.volume": "Volume",
+  "shot.title": "“{app}” ingin mengambil tangkapan layar",
+  "shot.titleUnknown": "Program tak dikenal ingin mengambil tangkapan layar",
+  "shot.body": "Pilih layar atau jendela, atau pilih area. Aplikasi hanya mendapat gambar itu.",
+  "shot.area": "Pilih Area…",
+  "shot.take": "Ambil Tangkapan Layar",
+  "shot.areaHint": "Seret di atas area yang akan diberikan ke {app}. Esc membatalkan.",
+  "shot.colorHint": "Klik warna yang akan diberikan ke {app}. Esc membatalkan.",
+  "share.shotTaken": "{app} mengambil tangkapan layar",
+  "share.colorPicked": "{app} mengambil warna dari layar Anda"
 }

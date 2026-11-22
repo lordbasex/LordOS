@@ -898,5 +898,14 @@
   "celeste.side.night": "نائٹ لائٹ",
   "celeste.side.notifications": "اطلاعات",
   "celeste.side.remove": "ہٹائیں",
-  "celeste.side.volume": "آواز"
+  "celeste.side.volume": "آواز",
+  "shot.title": "“{app}” اسکرین شاٹ لینا چاہتی ہے",
+  "shot.titleUnknown": "ایک نامعلوم پروگرام اسکرین شاٹ لینا چاہتا ہے",
+  "shot.body": "کوئی اسکرین یا ونڈو چنیں، یا کوئی حصہ منتخب کریں۔ ایپ کو صرف وہی تصویر ملتی ہے۔",
+  "shot.area": "حصہ منتخب کریں…",
+  "shot.take": "اسکرین شاٹ لیں",
+  "shot.areaHint": "{app} کو دینے والے حصے پر گھسیٹیں۔ Esc منسوخ کرتا ہے۔",
+  "shot.colorHint": "{app} کو دینے والے رنگ پر کلک کریں۔ Esc منسوخ کرتا ہے۔",
+  "share.shotTaken": "{app} نے اسکرین شاٹ لیا",
+  "share.colorPicked": "{app} نے آپ کی اسکرین سے ایک رنگ لیا"
 }

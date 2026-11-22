@@ -107,5 +107,6 @@
   "updates.button": "Kemas kini apl Flathub",
   "updates.text": "Dipasang daripada Flathub: {count}. Flatpak menyemak setiap satu dan memasang apa yang berubah; apl yang sedang terbuka selesai dikemas kini apabila anda membukanya semula.",
   "updates.title": "Apl Flathub",
-  "verified": "Disahkan: diterbitkan oleh {developer}"
+  "verified": "Disahkan: diterbitkan oleh {developer}",
+  "note.obsVideos": "Dalam LordOS, OBS Studio menyimpan rakaman dalam folder Video anda: folder lain dalam folder rumah anda adalah baca sahaja bagi apl Flathub."
 }

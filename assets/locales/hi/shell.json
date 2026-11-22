@@ -898,5 +898,14 @@
   "celeste.side.night": "नाइट लाइट",
   "celeste.side.notifications": "सूचनाएँ",
   "celeste.side.remove": "हटाएँ",
-  "celeste.side.volume": "वॉल्यूम"
+  "celeste.side.volume": "वॉल्यूम",
+  "shot.title": "“{app}” स्क्रीनशॉट लेना चाहता है",
+  "shot.titleUnknown": "एक अज्ञात प्रोग्राम स्क्रीनशॉट लेना चाहता है",
+  "shot.body": "कोई स्क्रीन या विंडो चुनें, या कोई क्षेत्र चुनें। ऐप को केवल वही चित्र मिलता है।",
+  "shot.area": "क्षेत्र चुनें…",
+  "shot.take": "स्क्रीनशॉट लें",
+  "shot.areaHint": "{app} को देने वाले क्षेत्र पर खींचें। Esc रद्द करता है।",
+  "shot.colorHint": "{app} को देने वाले रंग पर क्लिक करें। Esc रद्द करता है।",
+  "share.shotTaken": "{app} ने स्क्रीनशॉट लिया",
+  "share.colorPicked": "{app} ने आपकी स्क्रीन से एक रंग लिया"
 }

@@ -898,5 +898,14 @@
   "celeste.side.night": "Gece Işığı",
   "celeste.side.notifications": "Bildirimler",
   "celeste.side.remove": "Kaldır",
-  "celeste.side.volume": "Ses düzeyi"
+  "celeste.side.volume": "Ses düzeyi",
+  "shot.title": "“{app}” ekran görüntüsü almak istiyor",
+  "shot.titleUnknown": "Bilinmeyen bir program ekran görüntüsü almak istiyor",
+  "shot.body": "Bir ekran ya da pencere seçin veya bir alan seçin. Uygulama yalnızca o görüntüyü alır.",
+  "shot.area": "Alan Seç…",
+  "shot.take": "Ekran Görüntüsü Al",
+  "shot.areaHint": "{app} uygulamasına verilecek alanın üzerinde sürükleyin. Esc vazgeçer.",
+  "shot.colorHint": "{app} uygulamasına verilecek renge tıklayın. Esc vazgeçer.",
+  "share.shotTaken": "{app} ekran görüntüsü aldı",
+  "share.colorPicked": "{app} ekranınızdan bir renk aldı"
 }

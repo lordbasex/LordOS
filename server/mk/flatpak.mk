@@ -52,3 +52,17 @@ build/sandbox-view-lifetime-test: tests/sandbox_view_lifetime_test.c src/sec/san
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/sandbox_view_lifetime_test.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
 	./$@; r=$$?; [ $$r = 0 ] || [ $$r = 77 ] || { rm -f $@; exit 1; }
+
+# a Flatpak app's shared runtime folders and the chosen file lent into its running view, with a fake app (and inside
+# bubblewrap when it is installed) (tests/sandbox_lend_test.c; 77: no user namespaces here)
+test: build/sandbox-lend-test
+build/sandbox-lend-test: tests/sandbox_lend_test.c src/sec/sandbox.c src/sec/cgroup.c src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/sandbox_lend_test.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
+	./$@; r=$$?; [ $$r = 0 ] || [ $$r = 77 ] || { rm -f $@; exit 1; }
+
+# tests/fpportal_probe.c: a fake Flatpak app's side of the portals, run inside a real sandbox for the end-to-end checks
+# (docs/FLATPAK.md, "Lending a chosen file"); static, so it runs on any runtime. A test tool: never installed.
+build/fpportal-probe: tests/fpportal_probe.c src/vault/dbus.c src/vault/dbus.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -static -o $@ tests/fpportal_probe.c src/vault/dbus.c

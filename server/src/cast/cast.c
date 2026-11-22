@@ -660,3 +660,46 @@ int cast_thumb(const CastSource *src, int max) {
     free(px);
     return 0;
 }
+
+/* ---- a still picture (the Screenshot portal, ui/portalshot.c) ---- */
+
+uint32_t *cast_still(const CastSource *src, const int *area, int *ow, int *oh) {
+    if (!src || src->nalso < 0 || src->nalso > CAST_ALSO_MAX) return NULL;
+    Stream s;
+    memset(&s, 0, sizeof s);
+    s.src = *src;
+    uint32_t w, h;
+    if (geometry(&s, &w, &h) || w < 2 || h < 2 || w > CAST_MAX_DIM || h > CAST_MAX_DIM) return NULL;
+    uint32_t *px = malloc((size_t)w * h * 4);
+    if (!px) return NULL;
+    canvas_init(&s.cv, px, (int)w, (int)h, (int)w);
+    s.px = px;
+    s.w = w;
+    s.h = h;
+    if (!paint_source(&s, (Rect){ 0, 0, (int)w, (int)h })) { free(px); return NULL; }
+    int x0 = 0, y0 = 0, x1 = (int)w, y1 = (int)h;
+    if (area) {                                 /* logical px of the global space → this source's pixels */
+        if (area[2] <= 0 || area[3] <= 0) { free(px); return NULL; }
+        x0 = (int)floor((area[0] - s.ox) * s.k + s.dx + 1e-6);
+        y0 = (int)floor((area[1] - s.oy) * s.k + s.dy + 1e-6);
+        x1 = (int)ceil((area[0] + area[2] - s.ox) * s.k + s.dx - 1e-6);
+        y1 = (int)ceil((area[1] + area[3] - s.oy) * s.k + s.dy - 1e-6);
+        if (x0 < 0) x0 = 0;
+        if (y0 < 0) y0 = 0;
+        if (x1 > (int)w) x1 = (int)w;
+        if (y1 > (int)h) y1 = (int)h;
+        if (x1 <= x0 || y1 <= y0) { free(px); return NULL; }
+    }
+    int cw = x1 - x0, ch = y1 - y0;
+    uint32_t *out = px;
+    if (cw != (int)w || ch != (int)h) {
+        out = malloc((size_t)cw * ch * 4);
+        if (out) for (int j = 0; j < ch; j++) memcpy(out + (size_t)j * cw, px + (size_t)(y0 + j) * w + x0, (size_t)cw * 4);
+        free(px);
+        if (!out) return NULL;
+    }
+    for (size_t i = 0; i < (size_t)cw * ch; i++) out[i] |= 0xff000000u;
+    *ow = cw;
+    *oh = ch;
+    return out;
+}

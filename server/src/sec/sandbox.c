@@ -21,8 +21,11 @@
 #include <string.h>
 #include <sched.h>
 #include <signal.h>
+#include <poll.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
+#include <sys/random.h>
+#include <sys/signalfd.h>
 #include <sys/wait.h>
 #include <sys/syscall.h>
 #include <sys/stat.h>
@@ -424,6 +427,142 @@ static int view_others(pid_t except) {
     return sandbox_view_others_in(buf, except);
 }
 
+/* ---- lending a chosen file into the view (sandbox.h, SbLendMsg; fplend.c is lord-server's side) ---- */
+
+#ifndef AT_RECURSIVE
+#define AT_RECURSIVE 0x8000
+#endif
+#ifndef MOVE_MOUNT_T_EMPTY_PATH
+#define MOVE_MOUNT_T_EMPTY_PATH 0x00000040
+#endif
+
+int sandbox_lend_name_ok(const char *name) {
+    if (!name || !name[0] || strlen(name) > SB_LEND_NAME_MAX || !strcmp(name, ".") || !strcmp(name, "..")) return 0;
+    return !strchr(name, '/');
+}
+
+/* path (absolute) or a name below dirfd, opened O_PATH without following any link; beneath: never above dirfd */
+static int open_nolink(int dirfd, const char *path, int dir, int beneath) {
+#if defined(HAVE_OPENAT2) && defined(SYS_openat2)
+    struct open_how how;
+    memset(&how, 0, sizeof how);
+    how.flags = O_PATH | O_CLOEXEC | (dir ? O_DIRECTORY : 0);
+    how.resolve = RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS | (beneath ? RESOLVE_BENEATH : 0);
+    return (int)syscall(SYS_openat2, dirfd, path, &how, sizeof how);
+#else
+    (void)dirfd; (void)path; (void)dir; (void)beneath;
+    errno = ENOSYS;
+    return -1;
+#endif
+}
+
+static int same_file(int fd, uint64_t dev, uint64_t ino, int dir) {
+    struct stat st;
+    return !fstat(fd, &st) && (uint64_t)st.st_dev == dev && (uint64_t)st.st_ino == ino &&
+           (dir ? S_ISDIR(st.st_mode) : S_ISREG(st.st_mode));
+}
+
+/* a detached copy of what fd names, with its flags: nosuid and nodev always, read-only unless rw */
+static int lend_tree(int fd, int dir, int rw) {
+    int t = (int)syscall(SYS_open_tree, fd, "", OPEN_TREE_CLONE | O_CLOEXEC | AT_EMPTY_PATH | (dir ? AT_RECURSIVE : 0));
+    if (t < 0) return -1;
+    struct mount_attr a;
+    memset(&a, 0, sizeof a);
+    a.attr_set = MOUNT_ATTR_NOSUID | MOUNT_ATTR_NODEV | (rw ? 0 : MOUNT_ATTR_RDONLY);
+    a.attr_clr = rw ? MOUNT_ATTR_RDONLY : 0;
+    if (syscall(SYS_mount_setattr, t, "", AT_EMPTY_PATH | AT_RECURSIVE, &a, sizeof a)) { int e = errno; close(t); errno = e; return -1; }
+    return t;
+}
+
+/* One grant, done by PID 1 in its own mount namespace: the path opened again here, never through a link, only if it is
+ * the file lord-server checked; a copy of its mount at docfd/<grant>/<name>. 0 (grant set) or an errno. */
+static int lend_one(int docfd, const SbLendMsg *q, char *grant) {
+    if (q->kind < SB_LEND_FILE || q->kind > SB_LEND_SAVE || q->path[0] != '/' || !sandbox_lend_name_ok(q->name)) return EINVAL;
+    int dir = q->kind != SB_LEND_FILE;
+    int src = open_nolink(AT_FDCWD, q->path, dir, 0);
+    if (src < 0) return errno ? errno : ENOENT;
+    if (!same_file(src, q->dev, q->ino, dir)) { close(src); return ESTALE; }
+    int tree = lend_tree(src, dir, q->kind == SB_LEND_SAVE ? 0 : !!q->rw);
+    int e = errno;
+    close(src);
+    if (tree < 0) return e ? e : EPERM;
+    unsigned char rnd[16];
+    if (getrandom(rnd, sizeof rnd, 0) != (ssize_t)sizeof rnd) { close(tree); return EIO; }
+    for (int i = 0; i < 16; i++) snprintf(grant + 2 * i, 3, "%02x", rnd[i]);
+    if (mkdirat(docfd, grant, 0700)) { e = errno; close(tree); return e; }
+    int g = openat(docfd, grant, O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (g < 0) { e = errno; close(tree); return e; }
+    int r = 0;
+    if (q->kind == SB_LEND_FILE) {
+        int f = openat(g, q->name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+        if (f < 0) r = errno; else close(f);
+        if (!r && syscall(SYS_move_mount, tree, "", g, q->name, MOVE_MOUNT_F_EMPTY_PATH)) r = errno;
+    } else if (q->kind == SB_LEND_DIR) {
+        if (mkdirat(g, q->name, 0700)) r = errno;
+        if (!r && syscall(SYS_move_mount, tree, "", g, q->name, MOVE_MOUNT_F_EMPTY_PATH)) r = errno;
+    } else {
+        /* the folder read-only on <grant>, then the target file writable over its own name in it */
+        if (syscall(SYS_move_mount, tree, "", g, "", MOVE_MOUNT_F_EMPTY_PATH | MOVE_MOUNT_T_EMPTY_PATH)) r = errno;
+        int top = r ? -1 : openat(docfd, grant, O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        if (!r && (top < 0 || !same_file(top, q->dev, q->ino, 1))) r = ESTALE;
+        int f = r ? -1 : open_nolink(top, q->name, 0, 1);
+        if (!r && (f < 0 || !same_file(f, q->tdev, q->tino, 0))) r = ESTALE;
+        int ft = r ? -1 : lend_tree(f, 0, 1);
+        if (!r && ft < 0) r = errno ? errno : EPERM;
+        if (!r && syscall(SYS_move_mount, ft, "", top, q->name, MOVE_MOUNT_F_EMPTY_PATH)) r = errno;
+        if (ft >= 0) close(ft);
+        if (f >= 0) close(f);
+        /* on a failure the folder is not left there read-only without its file: unmounted (top is its root) */
+        if (r && top >= 0) { char p[64]; snprintf(p, sizeof p, "/proc/self/fd/%d", top); umount2(p, MNT_DETACH); }
+        if (top >= 0) close(top);
+    }
+    close(g);
+    close(tree);
+    return r;
+}
+
+/* What lord-server asked, answered; -1 when the socket is gone */
+static int lend_serve(int sock, int docfd, int *count) {
+    SbLendMsg *q = malloc(sizeof *q);
+    if (!q) return 0;
+    ssize_t n = recv(sock, q, sizeof *q, MSG_DONTWAIT);
+    if (n == 0 || (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)) { free(q); return -1; }
+    if (n != (ssize_t)sizeof *q || q->magic != SB_LEND_MAGIC || q->type != SB_LEND_LEND) { free(q); return 0; }
+    q->path[sizeof q->path - 1] = 0;
+    q->name[sizeof q->name - 1] = 0;
+    char grant[33] = "";
+    int st = *count >= SB_LEND_MAX ? ENOSPC : docfd < 0 ? ENOTSUP : lend_one(docfd, q, grant);
+    if (!st) (*count)++;
+    uint32_t seq = q->seq;
+    memset(q, 0, sizeof *q);
+    q->magic = SB_LEND_MAGIC;
+    q->type = SB_LEND_DONE;
+    q->seq = seq;
+    q->status = st;
+    if (!st) memcpy(q->grant, grant, sizeof q->grant);
+    if (send(sock, q, sizeof *q, MSG_NOSIGNAL | MSG_DONTWAIT) < 0) {}
+    free(q);
+    return 0;
+}
+
+static void lend_hello(int sock) {
+    SbLendMsg *m = calloc(1, sizeof *m);
+    int pfd = (int)syscall(SYS_pidfd_open, getpid(), 0);
+    if (!m || pfd < 0) { free(m); if (pfd >= 0) close(pfd); return; }
+    m->magic = SB_LEND_MAGIC;
+    m->type = SB_LEND_HELLO;
+    union { struct cmsghdr c; char b[CMSG_SPACE(sizeof(int))]; } u;
+    memset(&u, 0, sizeof u);
+    struct iovec iov = { m, sizeof *m };
+    struct msghdr mh = { .msg_iov = &iov, .msg_iovlen = 1, .msg_control = u.b, .msg_controllen = sizeof u.b };
+    struct cmsghdr *c = CMSG_FIRSTHDR(&mh);
+    c->cmsg_level = SOL_SOCKET; c->cmsg_type = SCM_RIGHTS; c->cmsg_len = CMSG_LEN(sizeof(int));
+    memcpy(CMSG_DATA(c), &pfd, sizeof pfd);
+    if (sendmsg(sock, &mh, MSG_NOSIGNAL | MSG_DONTWAIT) < 0) {}
+    close(pfd);
+    free(m);
+}
+
 int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     if (!cfg->home || cfg->home[0] != '/' || !strcmp(cfg->home, "/")) return -1;
     char map[64];
@@ -453,7 +592,7 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     close(sync[0]);
 
     /* PID 1: clones of everything that stays visible, taken before the tmpfs hide the originals */
-    struct { int fd, dir; const char *path; int ro; } keep[2 * SANDBOX_FILES_MAX + 12];
+    struct { int fd, dir; const char *path; int ro; } keep[2 * SANDBOX_FILES_MAX + 16];
     int nk = 0;
     for (int pass = 0; pass < 2; pass++) {
         const char *const *list = pass ? cfg->ro : cfg->rw;
@@ -475,6 +614,22 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
             if (t < 0) continue;
             keep[nk].fd = t; keep[nk].dir = S_ISDIR(st.st_mode); keep[nk].path = list[i]; keep[nk].ro = pass; nk++;
         }
+    }
+    /* a Flatpak app's shared runtime folders (share_src: the launcher's, under runtime_dir/lordos/fpshare; no link) */
+    static char sharepath[2][PATH_MAX], sharebase[PATH_MAX];
+    if (cfg->runtime_dir) snprintf(sharebase, sizeof sharebase, "%s/lordos/fpshare", cfg->runtime_dir);
+    for (int i = 0; cfg->runtime_dir && i < 2; i++) {
+        const char *src = cfg->share_src[i], *dst = cfg->share_dst[i];
+        if (!src || !dst || !is_under(src, sharebase) || !strcmp(src, sharebase) || strstr(src, "/..") || dst[0] == '/' ||
+            strstr(dst, "..") || snprintf(sharepath[i], PATH_MAX, "%s/%s", cfg->runtime_dir, dst) >= PATH_MAX) continue;
+        int fd = open_nolink(AT_FDCWD, src, 1, 0);
+        struct stat st;
+        if (fd < 0) continue;
+        int t = !fstat(fd, &st) && st.st_uid == getuid() && !(st.st_mode & 077)
+                    ? (int)syscall(SYS_open_tree, fd, "", OPEN_TREE_CLONE | O_CLOEXEC | AT_EMPTY_PATH) : -1;
+        close(fd);
+        if (t < 0) continue;
+        keep[nk].fd = t; keep[nk].dir = 1; keep[nk].path = sharepath[i]; keep[nk].ro = 0; nk++;
     }
     char sockpath[8][PATH_MAX];
     int nsock = 0;
@@ -527,6 +682,28 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
         if (keep[i].ro && mount(NULL, keep[i].path, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV, NULL)) { bad = 1; break; }
     }
     for (int i = 0; i < nk; i++) close(keep[i].fd);
+    /* lending (fplend.h): a tmpfs only PID 1 writes, shared, and its read-only bind at lend_dir, which bubblewrap gets
+     * as a slave inside the app's /run/user/<uid>; anything that fails here leaves the app without lending, never
+     * without its view */
+    int lend = cfg->lend_sock > 0 ? cfg->lend_sock : -1, docfd = -1;
+    if (!bad && lend >= 0) {
+        char stage[PATH_MAX], dst[PATH_MAX];
+        const char *ld = cfg->lend_dir;
+        int ok = cfg->runtime_dir && ld && ld[0] && ld[0] != '/' && !strstr(ld, "..") &&
+                 snprintf(stage, sizeof stage, "%s/.lordos-lend", cfg->runtime_dir) < (int)sizeof stage &&
+                 snprintf(dst, sizeof dst, "%s/%s", cfg->runtime_dir, ld) < (int)sizeof dst;
+        if (ok) { mkdir(stage, 0700); mk_parents(dst); mkdir(dst, 0700); }
+        ok = ok && !mount("tmpfs", stage, "tmpfs", MS_NOSUID | MS_NODEV | MS_NOEXEC, "mode=0755,size=1m,nr_inodes=4096") &&
+             !mount(NULL, stage, NULL, MS_SHARED, NULL) && !mount(stage, dst, NULL, MS_BIND, NULL) &&
+             !mount(NULL, dst, NULL, MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL) &&
+             (docfd = open(stage, O_PATH | O_DIRECTORY | O_CLOEXEC)) >= 0;
+        if (!ok) {
+            static const char m[] = "sandbox: no lending in this view (its folder could not be made)\n";
+            if (write(2, m, sizeof m - 1) < 0) {}
+            if (docfd >= 0) close(docfd);
+            docfd = -1;
+        }
+    }
     /* the working directory again, inside the view: the one inherited still points into the real
      * folders under the tmpfs (relative connect() to the session bus, sockets in the home) */
     if (!bad && (!cfg->cwd || chdir(cfg->cwd)) && chdir(cfg->home)) bad = 1;
@@ -543,6 +720,8 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     if (app == 0) {                                 /* the app: Landlock, then execve */
         prctl(PR_SET_PDEATHSIG, SIGKILL);
         close(ctl[0]);
+        if (lend >= 0) close(lend);                 /* lord-server's socket is PID 1's alone */
+        if (docfd >= 0) close(docfd);
         view_ctl = ctl[1];
         return 0;
     }
@@ -556,12 +735,30 @@ int sandbox_files_isolate(const SandboxFilesCfg *cfg) {
     sigset_t all;
     sigfillset(&all);
     sigprocmask(SIG_BLOCK, &all, NULL);
+    /* signals through a signalfd, so PID 1 also hears lord-server's lending requests while it waits */
+    int sfd = signalfd(-1, &all, SFD_CLOEXEC | SFD_NONBLOCK);
+    if (lend >= 0) lend_hello(lend);
     pid_t helper = 0;
-    int app_done = 0, status = 0, stopping = 0;
+    int app_done = 0, status = 0, stopping = 0, lent = 0;
     for (;;) {
-        struct timespec tick = { 1, 0 };
-        siginfo_t si;
-        int sig = sigtimedwait(&all, &si, &tick);
+        int sig = 0;
+        if (sfd >= 0) {
+            struct pollfd pf[2] = { { sfd, POLLIN, 0 }, { lend, POLLIN, 0 } };
+            poll(pf, lend >= 0 ? 2 : 1, 1000);
+            struct signalfd_siginfo si;
+            for (ssize_t r; (r = read(sfd, &si, sizeof si)) == (ssize_t)sizeof si;) {
+                int s1 = (int)si.ssi_signo;
+                if (s1 == SIGTERM || s1 == SIGINT || s1 == SIGHUP) sig = s1;
+            }
+            if (lend >= 0 && (pf[1].revents & (POLLIN | POLLHUP | POLLERR)) && lend_serve(lend, docfd, &lent) < 0) {
+                close(lend);
+                lend = -1;
+            }
+        } else {
+            struct timespec tick = { 1, 0 };
+            siginfo_t si;
+            sig = sigtimedwait(&all, &si, &tick);
+        }
         if (sig == SIGTERM || sig == SIGINT || sig == SIGHUP) {
             if (!app_done) stopping = 1;
             kill(app_done ? -1 : app, sig);

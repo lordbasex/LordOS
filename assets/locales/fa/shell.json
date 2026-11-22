@@ -898,5 +898,14 @@
   "celeste.side.night": "نور شب",
   "celeste.side.notifications": "اعلان‌ها",
   "celeste.side.remove": "حذف",
-  "celeste.side.volume": "صدا"
+  "celeste.side.volume": "صدا",
+  "shot.title": "«{app}» می‌خواهد از صفحه عکس بگیرد",
+  "shot.titleUnknown": "یک برنامهٔ ناشناس می‌خواهد از صفحه عکس بگیرد",
+  "shot.body": "یک صفحه یا یک پنجره برگزینید، یا ناحیه‌ای را انتخاب کنید. برنامه فقط همان تصویر را می‌گیرد.",
+  "shot.area": "انتخاب ناحیه…",
+  "shot.take": "گرفتن عکس صفحه",
+  "shot.areaHint": "روی ناحیه‌ای که می‌خواهید به {app} بدهید بکشید. Esc لغو می‌کند.",
+  "shot.colorHint": "روی رنگی که می‌خواهید به {app} بدهید کلیک کنید. Esc لغو می‌کند.",
+  "share.shotTaken": "{app} از صفحه عکس گرفت",
+  "share.colorPicked": "{app} رنگی از صفحهٔ شما برداشت"
 }

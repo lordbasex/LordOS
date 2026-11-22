@@ -786,6 +786,8 @@ static void job_free(Job *j) {
 
 static void thumb_done(const char *key, int ok);
 
+void (*media_portal_saved)(int tag, int ok, const char *path);
+
 static void job_finish(Job *j, int status, int fd) {
     char esc[PATH_MAX * 2 + 8], res[MP_PAYLOAD_MAX * 2 + 8];
     int ok = status == 0;
@@ -805,6 +807,11 @@ static void job_finish(Job *j, int status, int fd) {
         media_json_str(esc, sizeof esc, ok ? j->dst : "");
         media_event(0, "job", "{\"id\":%d,\"ok\":%s,\"path\":%s,\"result\":%s}", j->id, ok ? "true" : "false", esc,
                     ok && payload[0] == '{' ? payload : "null");
+        break;
+    case JP_PORTAL:
+        ok = ok && !media_finish_output(j->tmp, j->dst, 1);
+        if (!ok && j->tmp) media_finish_output(j->tmp, j->dst, 0);
+        if (media_portal_saved) media_portal_saved(j->src, ok, ok ? j->dst : NULL);
         break;
     case JP_CLIP: {
         ok = ok && !media_finish_output(j->tmp, j->dst, 1);

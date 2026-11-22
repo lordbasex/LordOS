@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -187,7 +188,65 @@ int main(void) {
         r.opened = "/home/a/x";                                                               /* never both */
         CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
         r.opened = NULL;
+        /* Steam's usr-fd / app-fd (approved 2026-11-22): placed numbers, never 1/2, never both the same, never with an
+         * empty /app */
+        sp.flags = FPAK_SPAWN_SHARE_PIDS; sp.parent_pid = 3; sp.usr_fd = 11; sp.app_fd = 12;
+        m = fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf);
+        CHECK(m > 0 && has(sargv, "--usr-fd=11") && has(sargv, "--app-fd=12") && idx(sargv, "--usr-fd=11") < idx(sargv, "org.gnome.Calculator"));
+        sp.app_fd = 11;
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.app_fd = 2;
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.app_fd = 12; sp.flags |= FPAK_SPAWN_EMPTY_APP;
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.app_fd = 0; sp.usr_fd = 2000;
+        CHECK(fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf) < 0);
+        sp.usr_fd = 0; sp.flags = 0; sp.parent_pid = 0;
+        m = fpak_spawn_argv(&r, &sp, sargv, sbuf, sizeof sbuf);
+        CHECK(m > 0 && !has(sargv, "--usr-fd=0"));
+        for (int i = 0; sargv[i]; i++) CHECK(strncmp(sargv[i], "--usr-fd", 8) && strncmp(sargv[i], "--app-fd", 8));
         r.restricted = 0;
+    }
+
+    /* which folders Steam's usr-fd / app-fd may be: inside its own data folder, on the same mount, no link out */
+    {
+        char h[512], p[1400];
+        snprintf(h, sizeof h, "%s/steamhome", root);
+        mkdir(h, 0755);
+        static const char *const dirs[] = { "/.var", "/.var/app", "/.var/app/" FPAK_STEAM_ID, "/.var/app/" FPAK_STEAM_ID "/rt",
+                                            "/.var/app/" FPAK_STEAM_ID "/rt/usr", "/.var/app/org.other.App", "/.var/app/org.other.App/usr",
+                                            "/outside", NULL };
+        for (int i = 0; dirs[i]; i++) { snprintf(p, sizeof p, "%s%s", h, dirs[i]); mkdir(p, 0755); }
+        snprintf(p, sizeof p, "%s/.var/app/%s/rt/escape", h, FPAK_STEAM_ID);
+        char t[700];
+        snprintf(t, sizeof t, "%s/outside", h);
+        if (symlink(t, p)) {}
+        snprintf(p, sizeof p, "%s/.var/app/%s/rt/file", h, FPAK_STEAM_ID);
+        FILE *f = fopen(p, "w"); if (f) fclose(f);
+        int fd;
+        snprintf(p, sizeof p, "%s/.var/app/%s/rt/usr", h, FPAK_STEAM_ID);
+        fd = open(p, O_RDONLY | O_DIRECTORY | O_CLOEXEC); CHECK(fd >= 0 && fpak_steam_fd_ok(fd, h)); if (fd >= 0) close(fd);
+        fd = open(p, O_PATH | O_DIRECTORY | O_CLOEXEC); CHECK(fd >= 0 && fpak_steam_fd_ok(fd, h)); if (fd >= 0) close(fd);
+        snprintf(p, sizeof p, "%s/.var/app/%s", h, FPAK_STEAM_ID);
+        fd = open(p, O_RDONLY | O_DIRECTORY | O_CLOEXEC); CHECK(fd >= 0 && fpak_steam_fd_ok(fd, h)); if (fd >= 0) close(fd);
+        snprintf(p, sizeof p, "%s/.var/app/org.other.App/usr", h);               /* another app's folder */
+        fd = open(p, O_RDONLY | O_DIRECTORY | O_CLOEXEC); CHECK(fd >= 0 && !fpak_steam_fd_ok(fd, h)); if (fd >= 0) close(fd);
+        snprintf(p, sizeof p, "%s/.var/app/%s/rt/escape", h, FPAK_STEAM_ID);     /* a link out, followed when opened */
+        fd = open(p, O_RDONLY | O_DIRECTORY | O_CLOEXEC); CHECK(fd >= 0 && !fpak_steam_fd_ok(fd, h)); if (fd >= 0) close(fd);
+        snprintf(p, sizeof p, "%s/.var/app/%s/rt/file", h, FPAK_STEAM_ID);       /* not a folder */
+        fd = open(p, O_RDONLY | O_CLOEXEC); CHECK(fd >= 0 && !fpak_steam_fd_ok(fd, h)); if (fd >= 0) close(fd);
+        fd = open(p, O_RDWR | O_CLOEXEC); CHECK(fd >= 0 && !fpak_steam_fd_ok(fd, h)); if (fd >= 0) close(fd);
+        fd = open("/usr", O_RDONLY | O_DIRECTORY | O_CLOEXEC); CHECK(fd >= 0 && !fpak_steam_fd_ok(fd, h)); if (fd >= 0) close(fd);
+        CHECK(!fpak_steam_fd_ok(-1, h));
+        snprintf(p, sizeof p, "%s/.var/app/%s/rt/usr", h, FPAK_STEAM_ID);
+        fd = open(p, O_RDONLY | O_DIRECTORY | O_CLOEXEC); CHECK(fd >= 0 && !fpak_steam_fd_ok(fd, "relative")); if (fd >= 0) close(fd);
+        snprintf(t, sizeof t, "%s/nolink", root);                                  /* Steam's folder through a link: no root */
+        mkdir(t, 0755);
+        snprintf(p, sizeof p, "%s/home2", t);
+        if (symlink(h, p)) {}
+        snprintf(p, sizeof p, "%s/.var/app/%s/rt/usr", h, FPAK_STEAM_ID);
+        snprintf(t, sizeof t, "%s/nolink/home2", root);
+        fd = open(p, O_RDONLY | O_DIRECTORY | O_CLOEXEC); CHECK(fd >= 0 && !fpak_steam_fd_ok(fd, t)); if (fd >= 0) close(fd);
     }
 
     /* refs and the closed list of management commands (E3) */

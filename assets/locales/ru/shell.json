@@ -905,5 +905,14 @@
   "celeste.side.night": "Ночной свет",
   "celeste.side.notifications": "Уведомления",
   "celeste.side.remove": "Убрать",
-  "celeste.side.volume": "Громкость"
+  "celeste.side.volume": "Громкость",
+  "shot.title": "«{app}» хочет сделать снимок экрана",
+  "shot.titleUnknown": "Неизвестная программа хочет сделать снимок экрана",
+  "shot.body": "Выберите экран или окно либо выделите область. Приложение получит только этот снимок.",
+  "shot.area": "Выделить область…",
+  "shot.take": "Сделать снимок",
+  "shot.areaHint": "Проведите по области, которую получит {app}. Esc — отмена.",
+  "shot.colorHint": "Нажмите на цвет, который получит {app}. Esc — отмена.",
+  "share.shotTaken": "{app} сделало снимок экрана",
+  "share.colorPicked": "{app} взяло цвет с вашего экрана"
 }

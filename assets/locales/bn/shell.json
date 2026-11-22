@@ -898,5 +898,14 @@
   "celeste.side.night": "নাইট লাইট",
   "celeste.side.notifications": "বিজ্ঞপ্তি",
   "celeste.side.remove": "সরান",
-  "celeste.side.volume": "ভলিউম"
+  "celeste.side.volume": "ভলিউম",
+  "shot.title": "“{app}” একটি স্ক্রিনশট নিতে চায়",
+  "shot.titleUnknown": "একটি অজানা প্রোগ্রাম একটি স্ক্রিনশট নিতে চায়",
+  "shot.body": "একটি স্ক্রিন বা উইন্ডো বেছে নিন, অথবা একটি এলাকা নির্বাচন করুন। অ্যাপটি কেবল সেই ছবিটি পায়।",
+  "shot.area": "এলাকা নির্বাচন করুন…",
+  "shot.take": "স্ক্রিনশট নিন",
+  "shot.areaHint": "{app}-কে যে এলাকা দিতে চান তার উপর টেনে আনুন। Esc বাতিল করে।",
+  "shot.colorHint": "{app}-কে যে রং দিতে চান তাতে ক্লিক করুন। Esc বাতিল করে।",
+  "share.shotTaken": "{app} একটি স্ক্রিনশট নিয়েছে",
+  "share.colorPicked": "{app} আপনার স্ক্রিন থেকে একটি রং নিয়েছে"
 }

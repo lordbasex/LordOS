@@ -898,5 +898,14 @@
   "celeste.side.night": "Nattljus",
   "celeste.side.notifications": "Notiser",
   "celeste.side.remove": "Ta bort",
-  "celeste.side.volume": "Volym"
+  "celeste.side.volume": "Volym",
+  "shot.title": "”{app}” vill ta en skärmbild",
+  "shot.titleUnknown": "Ett okänt program vill ta en skärmbild",
+  "shot.body": "Välj en skärm eller ett fönster, eller markera ett område. Appen får bara den bilden.",
+  "shot.area": "Markera område…",
+  "shot.take": "Ta skärmbild",
+  "shot.areaHint": "Dra över området som {app} ska få. Esc avbryter.",
+  "shot.colorHint": "Klicka på färgen som {app} ska få. Esc avbryter.",
+  "share.shotTaken": "{app} tog en skärmbild",
+  "share.colorPicked": "{app} tog en färg från din skärm"
 }

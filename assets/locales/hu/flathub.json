@@ -107,5 +107,6 @@
   "updates.button": "Flathub-alkalmazások frissítése",
   "updates.text": "A Flathubról telepítve: {count}. A Flatpak mindegyiket ellenőrzi, és telepíti, ami változott; egy megnyitott alkalmazás frissítése akkor fejeződik be, amikor újra megnyitja.",
   "updates.title": "Flathub-alkalmazások",
-  "verified": "Ellenőrzött: közzétevő: {developer}"
+  "verified": "Ellenőrzött: közzétevő: {developer}",
+  "note.obsVideos": "A LordOS-ben az OBS Studio a Videók mappába menti a felvételeket: a saját mappája többi mappája csak olvasható a Flathub-alkalmazások számára."
 }

@@ -898,5 +898,14 @@
   "celeste.side.night": "Нощна светлина",
   "celeste.side.notifications": "Известия",
   "celeste.side.remove": "Премахване",
-  "celeste.side.volume": "Сила на звука"
+  "celeste.side.volume": "Сила на звука",
+  "shot.title": "„{app}“ иска да направи екранна снимка",
+  "shot.titleUnknown": "Неизвестна програма иска да направи екранна снимка",
+  "shot.body": "Изберете екран или прозорец или маркирайте област. Приложението получава само тази снимка.",
+  "shot.area": "Избор на област…",
+  "shot.take": "Направи снимка",
+  "shot.areaHint": "Плъзнете върху областта, която да дадете на {app}. Esc отказва.",
+  "shot.colorHint": "Щракнете върху цвета, който да дадете на {app}. Esc отказва.",
+  "share.shotTaken": "{app} направи екранна снимка",
+  "share.colorPicked": "{app} взе цвят от екрана ви"
 }

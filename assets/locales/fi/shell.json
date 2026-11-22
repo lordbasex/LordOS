@@ -898,5 +898,14 @@
   "celeste.side.night": "Yövalo",
   "celeste.side.notifications": "Ilmoitukset",
   "celeste.side.remove": "Poista",
-  "celeste.side.volume": "Äänenvoimakkuus"
+  "celeste.side.volume": "Äänenvoimakkuus",
+  "shot.title": "”{app}” haluaa ottaa kuvakaappauksen",
+  "shot.titleUnknown": "Tuntematon ohjelma haluaa ottaa kuvakaappauksen",
+  "shot.body": "Valitse näyttö tai ikkuna tai rajaa alue. Sovellus saa vain sen kuvan.",
+  "shot.area": "Valitse alue…",
+  "shot.take": "Ota kuvakaappaus",
+  "shot.areaHint": "Vedä sen alueen yli, jonka annat sovellukselle {app}. Esc peruuttaa.",
+  "shot.colorHint": "Napsauta väriä, jonka annat sovellukselle {app}. Esc peruuttaa.",
+  "share.shotTaken": "{app} otti kuvakaappauksen",
+  "share.colorPicked": "{app} otti värin näytöltäsi"
 }
