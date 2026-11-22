@@ -75,19 +75,36 @@ static double now_ms(void) {
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
 
+/* The last exception, kept short (its message and the first lines of its stack) for js_init_error() */
+static char last_error[1024];
+
 static void dump_exception(JSContext *c) {
     JSValue e = JS_GetException(c);
     const char *msg = JS_ToCString(c, e);
     fprintf(stderr, "js: %s\n", msg ? msg : "(exception)");
+    snprintf(last_error, sizeof last_error, "%s", msg ? msg : "(exception)");
     if (msg) JS_FreeCString(c, msg);
     if (JS_IsObject(e)) {
         JSValue st = JS_GetPropertyStr(c, e, "stack");
         const char *s = JS_IsUndefined(st) ? NULL : JS_ToCString(c, st);
-        if (s) { fprintf(stderr, "%s\n", s); JS_FreeCString(c, s); }
+        if (s) {
+            fprintf(stderr, "%s\n", s);
+            size_t used = strlen(last_error), lines = 0;
+            for (const char *p = s; *p && lines < 6 && used + 2 < sizeof last_error; lines++) {
+                size_t l = strcspn(p, "\n");
+                int w = snprintf(last_error + used, sizeof last_error - used, "\n%.*s", (int)l, p);
+                if (w < 0) break;
+                used = strlen(last_error);
+                p += l + (p[l] == '\n');
+            }
+            JS_FreeCString(c, s);
+        }
         JS_FreeValue(c, st);
     }
     JS_FreeValue(c, e);
 }
+
+const char *js_init_error(void) { return last_error; }
 
 static void drain_jobs(void) {
     JSContext *c;
@@ -579,6 +596,7 @@ int js_init(const char *bundle_path) {
 
     size_t len = 0;
     int refused = 0;
+    last_error[0] = 0;
     char *src = load_code(bundle_path, &len, &refused);
     if (!src) return refused ? JS_REFUSED : -1;
 

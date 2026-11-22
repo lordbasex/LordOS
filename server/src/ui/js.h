@@ -8,6 +8,8 @@ int    js_init(const char *bundle_path);
 /* js_init/js_init_app return JS_REFUSED when the code was refused by the verified-code check
  * (sec/codesig.h): the caller falls back to another theme or to js_init_recovery(). */
 #define JS_REFUSED (-2)
+/* The last exception js_init's code threw (its message and the first lines of its stack), or "" */
+const char *js_init_error(void);
 int    js_init_app(const char *host_bundle, const char *app_id);   /* lord-server --app <id> */
 int    js_init_recovery(int greeter);   /* the built-in "component was modified" screen */
 int    js_app_recovery(void);           /* the same in an isolated app's window */
