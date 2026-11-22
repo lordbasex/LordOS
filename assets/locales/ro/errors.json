@@ -894,5 +894,20 @@
   "media.streamAuth": "Fluxul a cerut utilizator și parolă, sau erau greșite",
   "media.streamLost": "Fluxul s-a pierdut",
   "media.streamNoChannels": "Lista nu are canale",
-  "media.noStreamHelper": "Ajutorul pentru fluxuri (lord-stream) nu este disponibil"
+  "media.noStreamHelper": "Ajutorul pentru fluxuri (lord-stream) nu este disponibil",
+  "gpu.notFound": "Acea placă video nu se află în acest computer",
+  "gpu.desktop": "Acea placă video desenează acest desktop: nu i se poate da altă utilizare",
+  "gpu.notGvt": "Acea placă video nu poate fi partajată cu mașinile",
+  "gpu.roleNotYet": "Această utilizare a unei plăci video nu este încă disponibilă în această versiune",
+  "gpu.writeFailed": "Setările plăcii video nu au putut fi scrise",
+  "gpu.initramfsFailed": "Imaginea de pornire (initramfs) nu a putut fi actualizată cu setările plăcii video",
+  "gpu.freqRange": "Acea frecvență este în afara celor acceptate de această placă video",
+  "vm.gvtNoType": "Placa video nu oferă acea porțiune",
+  "vm.gvtNone": "Nicio porțiune de placă video nu este disponibilă acum pentru mașini",
+  "vm.gvtBusy": "Porțiunea plăcii video a acelei mașini aparține altcuiva",
+  "vm.gvtInUse": "Acea porțiune a plăcii video este încă folosită de o mașină pornită",
+  "vm.gvtFailed": "Porțiunea plăcii video nu a putut fi creată",
+  "vm.memlockCap": "Această mașină ar bloca {need} MB, mai mult decât cei {cap} MB pe care îi poate bloca o mașină cu placă video (Setări → Plăci video)",
+  "vm.memlockRefused": "Memoria acestei mașini nu a putut fi blocată",
+  "gpu.memlockRange": "Această cantitate depășește ce permite acest computer mașinilor să blocheze"
 }

@@ -4,7 +4,7 @@
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions } from './model.js';
+  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
@@ -100,6 +100,8 @@ export function Configure({ dir, section: section0, onClose }) {
   const { id: winId } = useAppWindow();
   const [m, setM] = useState(null);
   const [host] = useState(() => (has() ? lord.vm.host() : null));
+  // the computer's graphics cards (lord.vm.gpus): a spare Intel iGPU shared with machines (docs/MACHINES-GPU.md, Mode A)
+  const [gpus, setGpus] = useState(null);
   const [sec, setSec] = useState(SECTIONS.includes(section0) ? section0 : 'general');
   const [draft, setDraft] = useState({});
   const [meta, setMeta] = useState(() => readMeta(dir));
@@ -118,6 +120,8 @@ export function Configure({ dir, section: section0, onClose }) {
     const x = has() ? lord.vm.list().find((y) => y.dir === dir) : null;
     setM(x || null);
     if (x) { const s = lord.vm.stats(dir); setDisk(s?.diskBytes ?? null); }
+    // its shares' free instances change as other machines start and stop
+    if (x && typeof lord.vm?.gpus === 'function') { try { setGpus(lord.vm.gpus()); } catch (e) { setGpus(null); } }
   };
   useEffect(() => { load(); const timer = setInterval(load, 2000); return () => clearInterval(timer); }, []);
   useEffect(() => { if (m && !onClose) wm.setTitle(winId, tr('machines.cfg.title', { name: m.name })); }, [m?.name]);
@@ -141,11 +145,11 @@ export function Configure({ dir, section: section0, onClose }) {
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
-    pointer: m.pointer || 'lordos', ...draft };
+    pointer: m.pointer || 'lordos', gpu: m.gpu || '', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -175,7 +179,7 @@ export function Configure({ dir, section: section0, onClose }) {
     general: [meta.osName || systemOf(m.name).name, m.arch, prof ? tr(`machines.as.profile.${prof}`) : null].filter(Boolean).join(', '),
     startup: tr(`machines.cfg.close.${closeChoice(meta)}`) + (m.suspended ? `, ${tr('machines.doing.suspended')}` : ''),
     cpu: tr('machines.cfg.sum.cpu', { n: m.vcpus, mem: gb(m.memoryMb) }),
-    display: m.display === 'window' ? (m.resolution && m.resolution !== 'follow' ? m.resolution.replace('x', ' × ') : tr('machines.cfg.sum.display')) + (m.graphics === '3d' ? `, ${tr('machines.cfg.graphics3d')}` : '') : tr('machines.cfg.sum.noDisplay'),
+    display: m.display === 'window' ? (m.resolution && m.resolution !== 'follow' ? m.resolution.replace('x', ' × ') : tr('machines.cfg.sum.display')) + (m.graphics === '3d' ? `, ${tr('machines.cfg.graphics3d')}` : '') + (m.gpu ? `, ${tr('machines.cfg.sum.gpu')}` : '') : tr('machines.cfg.sum.noDisplay'),
     network: (() => {
       const ns = netSummary(m);
       return [tr(`machines.cfg.net.${ns.mode}`), ns.card || null, ns.ports ? tr('machines.cfg.sum.ports', { n: ns.ports }) : null].filter(Boolean).join(', ');
@@ -213,7 +217,7 @@ export function Configure({ dir, section: section0, onClose }) {
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><MenuBtn label={prof ? tr(`machines.as.profile.${prof}`) : tr('machines.cfg.profileCustom')}
           items={PROFILES.map((k) => { const s = profileSize(k, host); return { label: tr(`machines.as.profile.${k}`), checked: prof === k,
             hint: tr('machines.as.spec', { cpus: s.vcpus, mem: gb(s.memoryMb), gfx: tr(`machines.as.gfx.${s.gfx}`) }),
-            onClick: () => { set({ vcpus: s.vcpus, memoryMb: s.memoryMb, network: s.network, graphics: gfxFor(s.gfx, host, m.windowsDevices, m.arch) }); writeMeta(dir, { profile: k }); setMeta(readMeta(dir)); } }; })} /></View></Off>
+            onClick: () => { const g = gfxFor(s.gfx, host, m.windowsDevices, m.arch); set({ vcpus: s.vcpus, memoryMb: s.memoryMb, network: s.network, graphics: g, ...(g === '3d' ? { gpu: '' } : {}) }); writeMeta(dir, { profile: k }); setMeta(readMeta(dir)); } }; })} /></View></Off>
       </Row>
       <Row label={tr('machines.cfg.arch')} value={emulated ? `${m.arch}, ${tr('machines.emulatedLower')}` : m.arch} />
       <Row label={tr('machines.cfg.created')} value={(m.created || '').replace('T', ' ').replace('Z', ' UTC')} />
@@ -244,7 +248,13 @@ export function Configure({ dir, section: section0, onClose }) {
     {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}
   </>;
   else if (sec === 'cpu') {
-    const cpus = host?.cpus || m.vcpus, memMax = host?.memMaxMb || m.memoryMb;
+    const memMax0 = host?.memMaxMb || m.memoryMb;
+    // a machine with a graphics card has its memory locked while it runs, within "Memory machines may lock" (Settings →
+    // Graphics cards): the slider stops where memory + 512 MB reaches that cap (a machine already over it keeps its value)
+    const memlock = cur.gpu ? gpus?.memlock || null : null;
+    const lockMax = memlock ? memlockMaxMemory(memlock) : Infinity;
+    const cpus = host?.cpus || m.vcpus, memMax = Math.max(Math.min(memMax0, lockMax), Math.min(m.memoryMb, memMax0), 256);
+    const lockOver = memlock && !memlockFits({ memoryMb: cur.memoryMb }, memlock);
     pane = <>
       <Group>
         <Row label={tr('machines.cfg.cores')} value={tr('machines.cfg.ofN', { a: cur.vcpus, b: cpus })}>
@@ -261,12 +271,42 @@ export function Configure({ dir, section: section0, onClose }) {
         </Row>
       </Group>
       <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
-        {tr('machines.cfg.cpuNote', { limit: gb(memLimit({ ...m, ...cur })), max: gb(memMax) })}{offNote ? ` ${offNote}` : ''}</Text>
+        {tr('machines.cfg.cpuNote', { limit: gb(memLimit({ ...m, ...cur })), max: gb(memMax0) })}{offNote ? ` ${offNote}` : ''}</Text>
+      {memlock ? <View style={{ gap: 8, alignItems: 'flex-start' }}>
+        <Text style={{ fontSize: 12, lineHeight: 1.5, color: lockOver ? '#ff9f0a' : p.dim, textAlign: 'start' }}>
+          {tr(lockOver ? 'machines.cfg.memlockOver' : 'machines.cfg.memlockNote', { n: gb(memlockNeed({ memoryMb: cur.memoryMb })), cap: gb(memlock.capMb) })}</Text>
+        <Btn label={tr('machines.cfg.memlockChange')} onClick={() => wm.open('settings', { args: { section: 'gpus', nonce: Date.now() } })} />
+      </View> : null}
       {cur.vcpus > (host?.vcpusRecommended || 99) ? <Text style={{ fontSize: 12, color: '#ff9f0a', textAlign: 'start' }}>{tr('machines.new.warn.vcpus', { n: host.vcpusRecommended })}</Text> : null}
     </>;
   } else if (sec === 'display') {
     // 3D (6.10): Linux machines on a computer that can give it; a machine that has it can always go back to 2D
     const why3d = no3dReason(host, m.windowsDevices, m.arch);
+    // a graphics card (Mode A, Intel GVT-g): amd64 UEFI machines, when a spare Intel iGPU is shared with machines; a vGPU
+    // and 3D are exclusive, so choosing one sets the other back
+    const igpu = gvtGpu(gpus), spare = igpu ? null : gvtSpare(gpus);
+    const offerGpu = m.arch === 'amd64' && m.firmware === 'uefi' && (igpu || spare || cur.gpu);
+    let gpuRow = null;
+    if (offerGpu) {
+      const card = igpu || spare;
+      const gname = card ? tr('machines.cfg.gpuName', { id: gpuIds(card) }) : tr('machines.cfg.gpuMissing');
+      const typeOf = (c) => (igpu ? gvtType(igpu, c, cur.resolution) : null);
+      const freeText = (t) => (!t ? tr('machines.cfg.gpuFreeNone') : (t.available | 0) > 0 ? tr('machines.cfg.gpuFree', { n: t.available | 0 }) : tr('machines.cfg.gpuFreeNone'));
+      // a share with no free instance can't be chosen, unless it's already this machine's
+      const full = (c) => !igpu || (!(typeOf(c)?.available > 0) && (m.gpu || '') !== c);
+      const pick = (x) => set(x && cur.graphics === '3d' ? { gpu: x, graphics: '2d' } : { gpu: x });
+      const gnote = [tr('machines.cfg.gpuNote'), m.windowsDevices ? tr('machines.win.gpuDriverNote') : null,
+        igpu ? tr('machines.cfg.gpuFreeLine', { whole: freeText(typeOf('intel-whole')), shared: freeText(typeOf('intel-shared')) }) : null,
+        !igpu ? tr(spare ? 'machines.cfg.gpuTurnOn' : 'machines.cfg.gpuGone') : null, offNote].filter(Boolean).join(' ');
+      gpuRow = <Row label={tr('machines.cfg.gpu')} value={gname} last={!m.windowsDevices} note={gnote}>
+        <Off off={running || (!igpu && !cur.gpu)}><Segmented small value={cur.gpu} onChange={pick}
+          options={[['', tr('machines.cfg.gpuNone')], ['intel-whole', tr('machines.cfg.gpuWhole'), full('intel-whole')],
+            ['intel-shared', tr('machines.cfg.gpuShared'), full('intel-shared')]]} /></Off>
+        {spare && !igpu ? <View style={{ alignSelf: 'flex-start' }}>
+          <Btn label={tr('machines.cfg.gpuOpenSettings')} onClick={() => wm.open('settings', { args: { section: 'gpus', nonce: Date.now() } })} />
+        </View> : null}
+      </Row>;
+    }
     const note = [cur.graphics === '3d' ? tr('machines.cfg.graphics3dNote') : tr('machines.cfg.graphics2dNote'), why3d ? tr(`machines.cfg.no3d.${why3d}`) : null, offNote]
       .filter(Boolean).join(' ');
     pane = <>
@@ -278,12 +318,13 @@ export function Configure({ dir, section: section0, onClose }) {
           items={[{ label: tr('machines.cfg.followsWindow'), checked: cur.resolution === 'follow', onClick: () => set({ resolution: 'follow' }) }, '-',
             ...resolutions(screen.width, screen.height, null).map(([w, h]) => ({ label: `${w} × ${h}`, checked: cur.resolution === `${w}x${h}`, onClick: () => set({ resolution: `${w}x${h}` }) }))]} /></Off>
       </Row>
-      <Row label={tr('machines.cfg.graphics')} last={!m.windowsDevices} note={note}>
-        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set({ graphics: x })}
+      <Row label={tr('machines.cfg.graphics')} last={!m.windowsDevices && !gpuRow} note={note}>
+        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set(x === '3d' ? { graphics: x, gpu: '' } : { graphics: x })}
           options={[['2d', tr('machines.cfg.graphics2d')], ['3d', tr('machines.cfg.graphics3d'), !!why3d && cur.graphics !== '3d']]} /></Off>
       </Row>
       {/* who draws a Windows guest's pointer (7.1.2): LordOS, from the shape the guest hands over (no round trip through
           the guest for each move), or its display driver, into the picture; applied by the guest tools at the next start */}
+      {gpuRow}
       {m.windowsDevices ? <Row label={tr('machines.cfg.pointer')} last note={[tr('machines.cfg.pointerNote'), offNote].filter(Boolean).join(' ')}>
         <Off off={running}><Segmented small value={cur.pointer} onChange={(x) => set({ pointer: x })}
           options={[['lordos', tr('machines.cfg.pointerLordos')], ['guest', tr('machines.cfg.pointerGuest')]]} /></Off>

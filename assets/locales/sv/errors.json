@@ -893,5 +893,20 @@
   "media.streamAuth": "Strömmen bad om användare och lösenord, eller så var de fel",
   "media.streamLost": "Strömmen bröts",
   "media.streamNoChannels": "Listan har inga kanaler",
-  "media.noStreamHelper": "Strömhjälpen (lord-stream) är inte tillgänglig"
+  "media.noStreamHelper": "Strömhjälpen (lord-stream) är inte tillgänglig",
+  "gpu.notFound": "Det grafikkortet finns inte i den här datorn",
+  "gpu.desktop": "Det grafikkortet ritar det här skrivbordet: det kan inte få någon annan användning",
+  "gpu.notGvt": "Det grafikkortet kan inte delas med maskiner",
+  "gpu.roleNotYet": "Den användningen av ett grafikkort finns inte i den här versionen än",
+  "gpu.writeFailed": "Grafikkortets inställningar kunde inte skrivas",
+  "gpu.initramfsFailed": "Startavbildningen (initramfs) kunde inte uppdateras med grafikkortets inställningar",
+  "gpu.freqRange": "Den frekvensen ligger utanför vad det här grafikkortet stöder",
+  "vm.gvtNoType": "Grafikkortet erbjuder inte den andelen",
+  "vm.gvtNone": "Ingen andel av ett grafikkort är tillgänglig för maskiner just nu",
+  "vm.gvtBusy": "Den maskinens andel av grafikkortet tillhör någon annan",
+  "vm.gvtInUse": "Den andelen av grafikkortet används fortfarande av en maskin som körs",
+  "vm.gvtFailed": "Andelen av grafikkortet kunde inte skapas",
+  "vm.memlockCap": "Den här maskinen skulle låsa {need} MB, mer än de {cap} MB som en maskin med grafikkort får låsa (Inställningar → Grafikkort)",
+  "vm.memlockRefused": "Maskinens minne kunde inte låsas",
+  "gpu.memlockRange": "Den mängden ligger utanför vad den här datorn låter maskiner låsa"
 }

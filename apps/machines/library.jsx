@@ -9,11 +9,11 @@ import {
   t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines } from './model.js';
+import { stateView, actionsFor, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet } from './kit.jsx';
-import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, StateDot, markColors, overlayRoot, vmRefusal, bridgeUp } from './ui.jsx';
+import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, StateDot, markColors, overlayRoot, vmRefusal, startPrep } from './ui.jsx';
 import { readMeta } from './meta.js';
 import { CloneSheet } from './clone.jsx';
 import { withAsk } from './openwith.js';
@@ -436,11 +436,11 @@ export function Library() {
     const stop = (how) => lord.vm.stop(m.dir, how);
     return [
       a.start ? { label: tr('machines.start'), onClick: () => openMachine(m) } : { label: tr('machines.open'), disabled: !a.open, onClick: () => openMachine(m) },
-      a.start ? { label: tr('machines.cmd.startNoWindow'), onClick: () => bridgeUp(m).then(() => follow(lord.vm.startDetached(m.dir), m.name),
-        (e) => setError(tr('machines.win.bridgeFailed', { why: e.message }))) } : null,
+      a.start ? { label: tr('machines.cmd.startNoWindow'), onClick: () => startPrep(m).then(() => follow(lord.vm.startDetached(m.dir), m.name),
+        (e) => setError(e.message)) } : null,
       { label: tr('machines.cmd.pause'), disabled: !a.pause, onClick: () => stop('pause') },
       { label: tr('machines.cmd.resume'), disabled: !a.resume, onClick: () => stop('resume') },
-      { label: tr('machines.cmd.suspend'), disabled: !a.suspend, onClick: () => stop('suspend') },
+      { label: tr('machines.cmd.suspend'), disabled: !a.suspend || noSuspend(null, m.gpu), onClick: () => stop('suspend') },
       { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => stop('shutdown') },
       { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => stop('reset') },
       { label: tr('machines.cmd.poweroff'), destructive: true, disabled: !a.poweroff, onClick: () => stop('poweroff') },

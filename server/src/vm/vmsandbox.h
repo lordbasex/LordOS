@@ -10,6 +10,10 @@
  *     virglrenderer and Mesa: read, write and (ABI 5+) ioctls on that render node only; list the folder /dev/dri (names
  *     only); read its GPU's PCI device folder in sysfs (vendor, device, revision, uevent). Never card0 or another
  *     device: the primary node stays refused. Every other machine gets none of it.
+ *     A machine with an Intel vGPU (VmQemuJail.vgpu_dev) gets: read, write and ioctls on /dev/vfio/vfio and its own
+ *     /dev/vfio/<group> only; read on that mdev's sysfs folder (the real /sys/devices/... path); the iGPU's render node
+ *     as above. Our GOP option ROM is under /usr. The VFIO ioctls need nothing from seccomp (a denylist: only TIOCSTI
+ *     and TIOCLINUX are refused).
  *   - seccomp, ours: no socket(2) at all (EACCES), no connect, bind, listen or accept (its sockets are the
  *     socketpairs lord-vm passed), no namespaces (unshare, setns, clone with CLONE_NEW*), no mount, ptrace,
  *     process_vm_*, bpf, perf_event_open, keyctl, io_uring, userfaultfd, module or kexec calls, no TIOCSTI.
@@ -28,7 +32,11 @@ typedef struct {
     int kvm;                    /* KVM machine: /dev/kvm may be opened again (arm64's -cpu host makes a scratch vCPU
                                  * by path to read the host's features); QEMU holds a KVM descriptor already */
     const char *render;         /* 3D graphics (6.10, only a Linux machine with graphics "3d"): the GPU's render node,
-                                 * /dev/dri/renderD<N>, never a primary card node; NULL for every other machine */
+                                 * /dev/dri/renderD<N>, never a primary card node; NULL for every other machine.
+                                 * With an Intel vGPU, the iGPU's render node (QEMU's GL display makes its dmabufs) */
+    const char *vgpu_dev;       /* an Intel GVT-g vGPU (docs/MACHINES-GPU.md Mode A): /sys/bus/mdev/devices/<uuid>, or NULL */
+    int vgpu_group;             /* its IOMMU group: /dev/vfio/<group> and the container /dev/vfio/vfio; -1 none */
+    const char *vgpu_rom;       /* its option ROM, read (the package's is under /usr already; a test build's may not be) */
 } VmQemuJail;
 
 /* In the child, before execve. Returns the VMS_* bits that applied; the caller refuses to exec without

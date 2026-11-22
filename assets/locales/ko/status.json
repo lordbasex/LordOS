@@ -156,5 +156,11 @@
   "vm.kvmNextLogin": "다음 로그인부터 허용됨",
   "pkg.foreignArchAdded": "32비트({arch}) 패키지를 활성화했습니다",
   "pkg.foreignArchPresent": "32비트({arch}) 패키지가 이미 활성화되어 있습니다",
-  "pkg.why.multiarchPair": "{name}와(과) 같은 버전"
+  "pkg.why.multiarchPair": "{name}와(과) 같은 버전",
+  "gpu.roleSet": "그래픽 카드 용도를 저장했습니다({card}): 적용하려면 다시 시작하세요",
+  "vm.gvtReady": "그래픽 카드 할당 준비됨({name})",
+  "vm.gvtGone": "그래픽 카드 할당을 제거했습니다",
+  "gpu.freqSet": "그래픽 카드 최소 주파수를 설정했습니다",
+  "gpu.memlockSet": "머신이 잠글 수 있는 메모리를 저장했습니다",
+  "vm.memlockSet": "머신의 메모리를 잠갔습니다"
 }

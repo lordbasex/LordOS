@@ -892,5 +892,20 @@
   "media.streamAuth": "直播串流要求使用者與密碼，或輸入錯誤",
   "media.streamLost": "直播串流已中斷",
   "media.streamNoChannels": "清單中沒有頻道",
-  "media.noStreamHelper": "直播串流輔助程式（lord-stream）無法使用"
+  "media.noStreamHelper": "直播串流輔助程式（lord-stream）無法使用",
+  "gpu.notFound": "這部電腦上沒有該顯示卡",
+  "gpu.desktop": "該顯示卡正在繪製此桌面：無法變更其用途",
+  "gpu.notGvt": "該顯示卡無法與虛擬機器共用",
+  "gpu.roleNotYet": "此版本尚未提供該顯示卡用途",
+  "gpu.writeFailed": "無法寫入顯示卡的設定",
+  "gpu.initramfsFailed": "無法以顯示卡的設定更新開機映像檔（initramfs）",
+  "gpu.freqRange": "該頻率超出這張顯示卡支援的範圍",
+  "vm.gvtNoType": "顯示卡不提供該配額",
+  "vm.gvtNone": "目前沒有可供虛擬機器使用的顯示卡配額",
+  "vm.gvtBusy": "該機器的顯示卡配額屬於其他人",
+  "vm.gvtInUse": "該顯示卡配額仍被一台執行中的機器使用",
+  "vm.gvtFailed": "無法建立顯示卡配額",
+  "vm.memlockCap": "這台虛擬機器將鎖定 {need} MB，超過有顯示卡的虛擬機器可鎖定的 {cap} MB（設定 → 顯示卡）",
+  "vm.memlockRefused": "無法鎖定這台虛擬機器的記憶體",
+  "gpu.memlockRange": "該數量超出這部電腦允許虛擬機器鎖定的範圍"
 }

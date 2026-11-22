@@ -165,5 +165,11 @@
   "vm.kvmNextLogin": "Papayagan mula sa susunod mong pag-login",
   "pkg.foreignArchAdded": "Na-enable ang mga 32-bit ({arch}) na package",
   "pkg.foreignArchPresent": "Naka-enable na ang mga 32-bit ({arch}) na package",
-  "pkg.why.multiarchPair": "Kaparehong bersyon ng {name}"
+  "pkg.why.multiarchPair": "Kaparehong bersyon ng {name}",
+  "gpu.roleSet": "Nai-save ang gamit ng graphics card ({card}): i-restart para mailapat",
+  "vm.gvtReady": "Handa na ang bahagi ng graphics card ({name})",
+  "vm.gvtGone": "Inalis ang bahagi ng graphics card",
+  "gpu.freqSet": "Naitakda ang pinakamababang frequency ng graphics card",
+  "gpu.memlockSet": "Na-save ang memory na puwedeng i-lock ng isang makina",
+  "vm.memlockSet": "Na-lock ang memory ng makina"
 }

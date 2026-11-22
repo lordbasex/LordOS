@@ -893,5 +893,20 @@
   "media.streamAuth": "Yayım istifadəçi və parol istədi və ya səhv idi",
   "media.streamLost": "Yayım kəsildi",
   "media.streamNoChannels": "Siyahıda kanal yoxdur",
-  "media.noStreamHelper": "Yayım köməkçisi (lord-stream) əlçatan deyil"
+  "media.noStreamHelper": "Yayım köməkçisi (lord-stream) əlçatan deyil",
+  "gpu.notFound": "Həmin qrafik kart bu kompüterdə yoxdur",
+  "gpu.desktop": "Həmin qrafik kart bu iş masasını çəkir: ona başqa istifadə verilə bilməz",
+  "gpu.notGvt": "Həmin qrafik kart maşınlarla paylaşıla bilməz",
+  "gpu.roleNotYet": "Qrafik kartın bu istifadəsi bu versiyada hələ mövcud deyil",
+  "gpu.writeFailed": "Qrafik kartın parametrləri yazıla bilmədi",
+  "gpu.initramfsFailed": "Başlanğıc təsviri (initramfs) qrafik kartın parametrləri ilə yenilənə bilmədi",
+  "gpu.freqRange": "Həmin tezlik bu qrafik kartın dəstəklədiyi həddən kənardadır",
+  "vm.gvtNoType": "Qrafik kart həmin payı təklif etmir",
+  "vm.gvtNone": "Hazırda maşınlar üçün qrafik kartın heç bir boş payı yoxdur",
+  "vm.gvtBusy": "Həmin maşının qrafik kart payı başqasına məxsusdur",
+  "vm.gvtInUse": "Qrafik kartın həmin payı hələ işləyən maşın tərəfindən istifadə olunur",
+  "vm.gvtFailed": "Qrafik kartın payı yaradıla bilmədi",
+  "vm.memlockCap": "Bu maşın {need} MB kilidləyərdi, bu isə qrafik kartı olan maşının kilidləyə biləcəyi {cap} MB-dan çoxdur (Parametrlər → Qrafik kartlar)",
+  "vm.memlockRefused": "Bu maşının yaddaşı kilidlənə bilmədi",
+  "gpu.memlockRange": "Bu miqdar bu kompüterin maşınlara kilidləməyə icazə verdiyi həddən kənardadır"
 }

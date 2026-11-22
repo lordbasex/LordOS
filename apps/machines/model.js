@@ -390,7 +390,7 @@ export function clipState(agent, cfg) {
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w5', linux: '5' };
+export const TOOLS_SHIPPED = { windows: 'w6', linux: '5' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
@@ -815,6 +815,55 @@ export const playStarts = (sid, starting, closing) => !sid && !starting && !clos
 
 // vm-net-bridge's argument (vm_admin.h): "<id> <card> <mac>"
 export const bridgeArg = (m) => (m?.id && m?.bridge && m?.mac ? `${m.id} ${m.bridge} ${m.mac}` : '');
+
+// ---- a graphics card for a machine (docs/MACHINES-GPU.md, Mode A: Intel GVT-g) ----
+
+// machine.json's gpu (schema 11): none, the iGPU's largest share, or a share that fits the machine's picture
+export const GPU_CHOICES = ['', 'intel-whole', 'intel-shared'];
+const INTEL = 0x8086;
+// lord.vm.gpus()'s Intel iGPU that isn't the desktop's and runs with GVT-g on (it lists mdev types), or null
+export function gvtGpu(r) {
+  return (r?.gpus || []).find((g) => g && g.vendor === INTEL && !g.desktop && g.gvtOn) || null;
+}
+// one that could be shared but isn't on yet (Settings → Graphics cards turns it on), or null
+export function gvtSpare(r) {
+  return (r?.gpus || []).find((g) => g && g.vendor === INTEL && !g.desktop && g.gvtCapable && !g.gvtOn) || null;
+}
+// "8086:9bc5": the PCI ids, the only honest name there is
+const hex4 = (v) => ((v >>> 0) & 0xffff).toString(16).padStart(4, '0');
+export const gpuIds = (g) => (g ? `${hex4(g.vendor)}:${hex4(g.device)}` : '');
+// the picture a shared type must show: the machine's fixed resolution, or 1920 × 1080 when it follows the window
+function wantSize(resolution) {
+  const m = /^([0-9]{2,5})x([0-9]{2,5})$/.exec(String(resolution || ''));
+  return m ? [Number(m[1]), Number(m[2])] : [1920, 1080];
+}
+// the mdev type a choice uses on that GPU: whole, the largest (by its memory, then its share of time); shared, the
+// smallest that shows the machine's picture, else the largest. free: only types with an instance available (the
+// shared choice then takes the next one up). null when none
+export function gvtType(gpu, choice, resolution, free = false) {
+  if (choice !== 'intel-whole' && choice !== 'intel-shared') return null;
+  const up = (gpu?.types || []).filter((t) => t && t.name)
+    .sort((a, b) => (a.highMb | 0) - (b.highMb | 0) || (a.weight | 0) - (b.weight | 0));
+  if (!up.length) return null;
+  const ok = (t) => !free || (t.available | 0) > 0;
+  const largest = up[up.length - 1];
+  // the whole iGPU is only ever the largest type: a smaller one isn't "whole"
+  if (choice === 'intel-whole') return ok(largest) ? largest : null;
+  const [w, h] = wantSize(resolution);
+  return up.find((t) => ok(t) && (t.maxW | 0) >= w && (t.maxH | 0) >= h) || (ok(largest) ? largest : null);
+}
+// vm-gvt-create's argument (AGENTS.md "Machines' graphics cards"): "<machine id> <mdev type>"
+export const gvtArg = (m, type) => (m?.id && type?.name ? `${m.id} ${type.name}` : '');
+// a machine that can't be suspended or keep snapshots with its memory: 3D (virgl) running, or a graphics card
+export const noSuspend = (st, gpu) => !!gpu || runs3d(st);
+// a machine with a graphics card has its memory locked while it runs (VFIO): its memory plus QEMU's 512 MB, in MB
+export const MEMLOCK_EXTRA_MB = 512;
+export const memlockNeed = (m) => ((m?.memoryMb | 0) > 0 ? (m.memoryMb | 0) + MEMLOCK_EXTRA_MB : 0);
+// whether that fits "Memory machines may lock" (lord.vm.gpus().memlock.capMb); true when the cap isn't known
+export const memlockFits = (m, memlock) => !(memlock && memlock.capMb > 0) || memlockNeed(m) <= memlock.capMb;
+// the largest memory (MB, a multiple of step) a machine with a graphics card may have under that cap; Infinity when unknown
+export const memlockMaxMemory = (memlock, step = 256) => (memlock && memlock.capMb > 0
+  ? Math.floor(Math.max(0, memlock.capMb - MEMLOCK_EXTRA_MB) / step) * step : Infinity);
 // the summary line of Configure's Network section
 export function netSummary(m) {
   const n = NET_MODES.includes(m?.network) ? m.network : 'shared';

@@ -160,6 +160,24 @@ static int render_rules(int rs, const char *node, uint64_t h) {
     return 0;
 }
 
+/* an Intel vGPU (vmsandbox.h): the VFIO container and the vGPU's own group, nothing else of /dev/vfio; the mdev's sysfs
+ * folder read. -1 when the paths aren't what they must be, and nothing is allowed then */
+static int vgpu_rules(int rs, const char *sysdev, int group, uint64_t h) {
+    if (group < 0 || strncmp(sysdev, "/sys/bus/mdev/devices/", 22) || strlen(sysdev) != 22 + 36 || strchr(sysdev + 22, '/')) return -1;
+    uint64_t dev = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE;
+#ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
+    dev |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
+#endif
+    char g[32], real[PATH_MAX];
+    snprintf(g, sizeof g, "/dev/vfio/%d", group);
+    struct stat st;
+    if (stat(g, &st) || !S_ISCHR(st.st_mode)) return -1;
+    if (rule(rs, "/dev/vfio/vfio", dev, h) || rule(rs, g, dev, h)) return -1;
+    if (!realpath(sysdev, real) || strncmp(real, "/sys/devices/", 13)) return -1;
+    if (rule(rs, real, LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR, h)) return -1;
+    return 0;
+}
+
 int vm_jail_qemu(const VmQemuJail *j) {
     int mask = 0;
     struct rlimit no = { 0, 0 };
@@ -197,6 +215,9 @@ int vm_jail_qemu(const VmQemuJail *j) {
             /* 3D: a render node that doesn't check out gets no rule (QEMU's EGL then fails and it exits); it never costs
              * the rest of the sandbox */
             if (j->render && j->render[0]) render_rules(rs, j->render, h);
+            /* a vGPU whose paths don't check out costs the whole sandbox: QEMU doesn't run (the caller refuses) */
+            if (j->vgpu_dev && j->vgpu_dev[0] && vgpu_rules(rs, j->vgpu_dev, j->vgpu_group, h)) ok = 0;
+            if (j->vgpu_dev && j->vgpu_rom && j->vgpu_rom[0] && rule(rs, j->vgpu_rom, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (j->iso && j->iso[0] && rule(rs, j->iso, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (j->drivers && j->drivers[0] && rule(rs, j->drivers, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (j->base && j->base[0] && rule(rs, j->base, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;

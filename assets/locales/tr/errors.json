@@ -893,5 +893,20 @@
   "media.streamAuth": "Yayın kullanıcı ve parola istedi ya da yanlıştı",
   "media.streamLost": "Yayın kesildi",
   "media.streamNoChannels": "Listede kanal yok",
-  "media.noStreamHelper": "Yayın yardımcısı (lord-stream) kullanılamıyor"
+  "media.noStreamHelper": "Yayın yardımcısı (lord-stream) kullanılamıyor",
+  "gpu.notFound": "Bu ekran kartı bu bilgisayarda yok",
+  "gpu.desktop": "Bu ekran kartı bu masaüstünü çiziyor: başka bir kullanıma verilemez",
+  "gpu.notGvt": "Bu ekran kartı makinelerle paylaşılamaz",
+  "gpu.roleNotYet": "Ekran kartının bu kullanımı bu sürümde henüz yok",
+  "gpu.writeFailed": "Ekran kartının ayarları yazılamadı",
+  "gpu.initramfsFailed": "Başlangıç görüntüsü (initramfs) ekran kartının ayarlarıyla güncellenemedi",
+  "gpu.freqRange": "Bu frekans, bu ekran kartının desteklediği aralığın dışında",
+  "vm.gvtNoType": "Ekran kartı bu payı sunmuyor",
+  "vm.gvtNone": "Şu anda makineler için kullanılabilir bir ekran kartı payı yok",
+  "vm.gvtBusy": "Bu makinenin ekran kartı payı başka birine ait",
+  "vm.gvtInUse": "Ekran kartının bu payı hâlâ çalışan bir makine tarafından kullanılıyor",
+  "vm.gvtFailed": "Ekran kartı payı oluşturulamadı",
+  "vm.memlockCap": "Bu makine {need} MB kilitleyecekti; bu, ekran kartı olan bir makinenin kilitleyebileceği {cap} MB'tan fazla (Ayarlar → Ekran kartları)",
+  "vm.memlockRefused": "Bu makinenin belleği kilitlenemedi",
+  "gpu.memlockRange": "Bu miktar, bu bilgisayarın makinelerin kilitlemesine izin verdiği aralığın dışında"
 }

@@ -893,5 +893,20 @@
   "media.streamAuth": "Az adás felhasználót és jelszót kért, vagy hibásak voltak",
   "media.streamLost": "Megszakadt az adás",
   "media.streamNoChannels": "A listán nincsenek csatornák",
-  "media.noStreamHelper": "Az adássegéd (lord-stream) nem érhető el"
+  "media.noStreamHelper": "Az adássegéd (lord-stream) nem érhető el",
+  "gpu.notFound": "Ez a videokártya nincs ebben a számítógépben",
+  "gpu.desktop": "Ez a videokártya rajzolja ezt az asztalt: nem kaphat más használatot",
+  "gpu.notGvt": "Ez a videokártya nem osztható meg a gépekkel",
+  "gpu.roleNotYet": "A videokártya ilyen használata ebben a verzióban még nem érhető el",
+  "gpu.writeFailed": "A videokártya beállításait nem sikerült kiírni",
+  "gpu.initramfsFailed": "Az indítási lemezképet (initramfs) nem sikerült frissíteni a videokártya beállításaival",
+  "gpu.freqRange": "Ez a frekvencia kívül esik azon, amit ez a videokártya támogat",
+  "vm.gvtNoType": "A videokártya nem kínál ilyen részt",
+  "vm.gvtNone": "Jelenleg nincs elérhető videokártya-rész a gépek számára",
+  "vm.gvtBusy": "Ennek a gépnek a videokártya-része valaki másé",
+  "vm.gvtInUse": "A videokártya ezen részét még egy futó gép használja",
+  "vm.gvtFailed": "A videokártya-részt nem sikerült létrehozni",
+  "vm.memlockCap": "Ez a gép {need} MB-ot zárolna, többet, mint a {cap} MB, amit egy videokártyás gép zárolhat (Beállítások → Videokártyák)",
+  "vm.memlockRefused": "Nem sikerült zárolni a gép memóriáját",
+  "gpu.memlockRange": "Ez az érték kívül esik azon, amennyit ez a számítógép engedélyez a gépeknek zárolni"
 }

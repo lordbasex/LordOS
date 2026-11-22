@@ -12,5 +12,11 @@ int  uevent_fd(void);                   /* -1 if closed */
 int  uevent_dispatch(void);
 /* Parses one uevent datagram ("ACTION@devpath\0KEY=VAL\0..."): its UEV_* subsystem, or 0. */
 int  uevent_parse(const char *buf, int len);
+/* The card lord-server drives (N of /dev/dri/cardN): drm uevents of another card (DEVNAME dri/cardM, or a DEVPATH
+ * .../drm/cardM[/...]) are ignored, so an Intel iGPU sending hotplugs as a GVT-g machine starts on it doesn't make
+ * the displays be read again. -1 (the default) accepts every card; drm uevents that name no card always count. */
+void uevent_set_card(int n);
+/* N of the cardN a DRM device fd is (/sys/dev/char/M:m), or -1 */
+int  uevent_card_of_fd(int fd);
 
 #endif

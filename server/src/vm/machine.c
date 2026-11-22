@@ -481,6 +481,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->clipboard_ask & ~1) return fail(err, n, VM_E_RANGE, "clipboard_ask is true or false");
     if (m->schema < 9 && m->clipboard_ask) return fail(err, n, VM_E_FIELD, "clipboard_ask needs schema 9");
     if (m->pointer_guest & ~1) return fail(err, n, VM_E_RANGE, "pointer is lordos or guest");
+    if (m->vgpu < VM_VGPU_NONE || m->vgpu > VM_VGPU_SHARED) return fail(err, n, VM_E_RANGE, "gpu is intel-whole or intel-shared");
+    if (m->schema < 11 && m->vgpu) return fail(err, n, VM_E_FIELD, "gpu needs schema 11");
+    if (m->vgpu && (m->arch != VM_ARCH_AMD64 || m->firmware != VM_FW_UEFI)) return fail(err, n, VM_E_RANGE, "an Intel vGPU is for amd64 machines with UEFI");
+    if (m->vgpu && m->graphics == VM_GFX_3D) return fail(err, n, VM_E_RANGE, "an Intel vGPU replaces 3D graphics: choose one");
     if (m->schema < 10 && m->pointer_guest) return fail(err, n, VM_E_FIELD, "pointer needs schema 10");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
     for (int i = 0; m->transfer && i < m->n_shares; i++)
@@ -523,7 +527,7 @@ static const char *const KEYS[] = {
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
-    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", NULL,
+    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -562,6 +566,7 @@ const char *const VM_NET_NAMES[] = { "shared", "isolated", "bridged", "hostonly"
 static const char *const CLIPS[] = { "off", "to-guest", "from-guest", "both", NULL };
 static const char *const DEVS[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_DEV_NAMES[] = { "virtio", "compat", "windows", NULL };
+const char *const VM_VGPU_NAMES[] = { "", "intel-whole", "intel-shared", NULL };
 const char *const VM_BOOT_NAMES[] = { "disk", "cd", "network", NULL };
 
 int vm_boot_parse(const char *s, int order[VM_BOOT_DEVS]) {
@@ -778,6 +783,14 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         if ((r = get_str(o, "pointer", ptr, sizeof ptr, 0, err, n))) goto out;
         if (ptr[0] && strcmp(ptr, "lordos") && strcmp(ptr, "guest")) { r = fail(err, n, VM_E_RANGE, "pointer is lordos or guest"); goto out; }
         m->pointer_guest = !strcmp(ptr, "guest");
+        /* schema 11: missing means no real GPU */
+        char g[16];
+        if ((r = get_str(o, "gpu", g, sizeof g, 0, err, n))) goto out;
+        m->vgpu = VM_VGPU_NONE;
+        if (g[0]) {
+            for (int i = 1; VM_VGPU_NAMES[i]; i++) if (!strcmp(g, VM_VGPU_NAMES[i])) m->vgpu = i;
+            if (!m->vgpu) { r = fail(err, n, VM_E_RANGE, "gpu is intel-whole or intel-shared"); goto out; }
+        }
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -870,6 +883,7 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 7) jb_printf(&b, ",\n  \"transfer\": %s", m->transfer ? "true" : "false");
     if (m->schema >= 9 && m->clipboard_ask) jb_raw(&b, ",\n  \"clipboard_ask\": true");
     if (m->schema >= 10 && m->pointer_guest) jb_raw(&b, ",\n  \"pointer\": \"guest\"");
+    if (m->schema >= 11 && m->vgpu) { jb_raw(&b, ",\n  \"gpu\": "); jb_str(&b, VM_VGPU_NAMES[m->vgpu]); }
     if (m->schema >= 8 && m->sound_out[0]) { jb_raw(&b, ",\n  \"sound_out\": "); jb_str(&b, m->sound_out); }
     if (m->schema >= 8 && m->sound_in[0]) { jb_raw(&b, ",\n  \"sound_in\": "); jb_str(&b, m->sound_in); }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);

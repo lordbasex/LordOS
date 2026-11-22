@@ -34,7 +34,31 @@
  *              refused (vm.bridgeBusy). Answers vm.bridgeReady name=<macvtap>                                   admin
  *   vm-net-unbridge "<machine id>"                   removes that machine's macvtap: only the caller's own (by the
  *              alias), never while a process holds its device (vm.bridgeInUse)                                anyone
- * At the helper's start and end (vm_net_sweep) the caller's macvtaps that no process holds are removed; a restart takes
+ *   gpu-role        "<pci address> <unused|machines-shared|machines-dedicated|ai>"   a spare GPU's role (Settings → Graphics
+ *              cards; AGENTS.md "Machines' graphics cards"): for an Intel iGPU GVT-g supports, machines-shared writes the
+ *              fixed files /etc/modprobe.d/lordos-gpu.conf (options i915 enable_gvt=1 enable_guc=0) and
+ *              /etc/modules-load.d/lordos-gpu.conf (kvmgt), adopting hand-written i915-gvt.conf / kvmgt.conf that say
+ *              exactly that (removed), and runs update-initramfs -u; unused removes them. The desktop's GPU is refused
+ *              (gpu.desktop); machines-dedicated and ai aren't built yet (gpu.roleNotYet). Takes effect after a
+ *              restart. Answers gpu.roleSet                                                                    admin
+ *   vm-gvt-create   "<machine id> <mdev type>"     an Intel GVT-g vGPU for that machine: the type must be one the iGPU
+ *              (not the desktop's) lists with an instance available; the mdev gets the machine's UUID, root notes the
+ *              caller in /run/lordos/vm-gvt/<id>, and /dev/vfio/<group> is given to the caller 0600. One the same caller
+ *              made is given again; anyone else's is refused (vm.gvtBusy). Answers vm.gvtReady name=<group>    anyone
+ *   vm-gvt-remove   "<machine id>"                  removes that vGPU: only the caller's, never while a process holds
+ *              its /dev/vfio/<group> (vm.gvtInUse)                                                             anyone
+ *   gpu-min-freq    "<pci address> <MHz|default>"   the GVT iGPU's minimum frequency (rps_min_freq_mhz) within its own
+ *              RPn..RP0, only while the caller has a vGPU; default puts back the value read before the first change
+ *              once no vGPU is left                                                                            anyone
+ *   vm-memlock      "<pid>"                         the locked-memory limit of the caller's QEMU of a machine with a vGPU
+ *              (maintainer's decision 2026-11-21): a live /usr/bin/qemu-system-* of the caller whose parent is the
+ *              caller's lord-vm, whose -uuid and vfio-pci-nohotplug sysfsdev name a vGPU the caller made; soft and hard
+ *              RLIMIT_MEMLOCK of that one process = its -m + 512 MB, refused above the cap (vm.memlockCap need= cap=).
+ *              Nothing else in the session changes. Answers vm.memlockSet                                      anyone
+ *   gpu-memlock-cap "<MB|default>"                  "Memory machines may lock": writes /etc/lordos/gpu-memlock.conf
+ *              (cap_mb=<MB>, 2048 to total - 2048) or removes it (default: total - max(4 GB, 25 %), down to a GB)
+ *              Answers gpu.memlockSet                                                                          admin
+ * At the helper's start and end (vm_net_sweep, vm_gvt_sweep) the caller's macvtaps that no process holds are removed; a restart takes
  * them all (they are never written to disk).
  * The downloads run in lordos-net-machines.scope (firewall app lordos:machines), with the Store's downloader
  * (pkg/http.c fetch_batch_in: a child as nobody, TLS by lord-tls).
@@ -54,6 +78,14 @@ void vm_act_net_bridge(const AdminReq *r, const char *arg, size_t len);
 void vm_act_net_unbridge(const AdminReq *r, const char *arg, size_t len);
 /* removes uid's macvtaps (by their alias) that no process holds */
 void vm_net_sweep(uid_t uid);
+void vm_act_gpu_role(const AdminReq *r, const char *arg, size_t len);
+void vm_act_gvt_create(const AdminReq *r, const char *arg, size_t len);
+void vm_act_gvt_remove(const AdminReq *r, const char *arg, size_t len);
+void vm_act_gpu_min_freq(const AdminReq *r, const char *arg, size_t len);
+void vm_act_memlock(const AdminReq *r, const char *arg, size_t len);
+void vm_act_gpu_memlock_cap(const AdminReq *r, const char *arg, size_t len);
+/* removes uid's vGPUs no process holds; the iGPU's minimum frequency back when none is left */
+void vm_gvt_sweep(uid_t uid);
 
 /* the packages vm-enable installs for `arches` (VM_ARCH bits: 1 arm64, 2 amd64) that this computer lacks, by the
  * files each package brings; space-separated into out. Returns how many. Also used by lord.vm.requirements. */
@@ -67,6 +99,12 @@ int vm_missing_packages(int arches, char *out, size_t n);
     { "vm-image-cancel", vm_act_image_cancel, A_ANYONE }, \
     { "vm-image-remove", vm_act_image_remove, 0 }, \
     { "vm-net-bridge", vm_act_net_bridge, 0 }, \
-    { "vm-net-unbridge", vm_act_net_unbridge, A_ANYONE },
+    { "vm-net-unbridge", vm_act_net_unbridge, A_ANYONE }, \
+    { "gpu-role", vm_act_gpu_role, A_FORK }, \
+    { "vm-gvt-create", vm_act_gvt_create, A_ANYONE }, \
+    { "vm-gvt-remove", vm_act_gvt_remove, A_ANYONE }, \
+    { "gpu-min-freq", vm_act_gpu_min_freq, A_ANYONE }, \
+    { "vm-memlock", vm_act_memlock, A_ANYONE }, \
+    { "gpu-memlock-cap", vm_act_gpu_memlock_cap, 0 },
 
 #endif

@@ -165,5 +165,11 @@
   "vm.kvmNextLogin": "Engedélyezve a következő bejelentkezéstől",
   "pkg.foreignArchAdded": "32 bites ({arch}) csomagok engedélyezve",
   "pkg.foreignArchPresent": "A 32 bites ({arch}) csomagok már engedélyezve voltak",
-  "pkg.why.multiarchPair": "Ugyanaz a verzió, mint: {name}"
+  "pkg.why.multiarchPair": "Ugyanaz a verzió, mint: {name}",
+  "gpu.roleSet": "A videokártya használata mentve ({card}): az alkalmazáshoz indítsa újra",
+  "vm.gvtReady": "A videokártya része kész ({name})",
+  "vm.gvtGone": "A videokártya része eltávolítva",
+  "gpu.freqSet": "A videokártya minimális frekvenciája beállítva",
+  "gpu.memlockSet": "Egy gép által zárolható memória mentve",
+  "vm.memlockSet": "A gép memóriája zárolva"
 }

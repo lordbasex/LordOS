@@ -893,5 +893,20 @@
   "media.streamAuth": "La transmisión pidió usuario y contraseña, o eran incorrectos",
   "media.streamLost": "Se perdió la transmisión",
   "media.streamNoChannels": "La lista no tiene canales",
-  "media.noStreamHelper": "El ayudante de transmisiones (lord-stream) no está disponible"
+  "media.noStreamHelper": "El ayudante de transmisiones (lord-stream) no está disponible",
+  "gpu.notFound": "Esa tarjeta gráfica no está en esta computadora",
+  "gpu.desktop": "Esa tarjeta gráfica dibuja este escritorio: no se le puede dar otro uso",
+  "gpu.notGvt": "Esa tarjeta gráfica no se puede compartir con máquinas",
+  "gpu.roleNotYet": "Ese uso de una tarjeta gráfica todavía no está disponible en esta versión",
+  "gpu.writeFailed": "No se pudieron escribir los ajustes de la tarjeta gráfica",
+  "gpu.initramfsFailed": "No se pudo actualizar la imagen de arranque (initramfs) con los ajustes de la tarjeta gráfica",
+  "gpu.freqRange": "Esa frecuencia está fuera de lo que admite esta tarjeta gráfica",
+  "vm.gvtNoType": "La tarjeta gráfica no ofrece esa parte",
+  "vm.gvtNone": "Ahora no hay ninguna parte de una tarjeta gráfica disponible para máquinas",
+  "vm.gvtBusy": "La parte de la tarjeta gráfica de esa máquina pertenece a otra persona",
+  "vm.gvtInUse": "Esa parte de la tarjeta gráfica todavía la usa una máquina en marcha",
+  "vm.gvtFailed": "No se pudo crear la parte de la tarjeta gráfica",
+  "vm.memlockCap": "Esta máquina bloquearía {need} MB, más que los {cap} MB que puede bloquear una máquina con tarjeta gráfica (Ajustes → Tarjetas gráficas)",
+  "vm.memlockRefused": "No se pudo bloquear la memoria de esta máquina",
+  "gpu.memlockRange": "Esa cantidad está fuera de lo que esta computadora permite bloquear a las máquinas"
 }

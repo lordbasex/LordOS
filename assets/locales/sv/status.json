@@ -165,5 +165,11 @@
   "vm.kvmNextLogin": "Tillåtet från din nästa inloggning",
   "pkg.foreignArchAdded": "32-bitarspaket ({arch}) aktiverade",
   "pkg.foreignArchPresent": "32-bitarspaket ({arch}) var redan aktiverade",
-  "pkg.why.multiarchPair": "Samma version som {name}"
+  "pkg.why.multiarchPair": "Samma version som {name}",
+  "gpu.roleSet": "Grafikkortets användning sparad ({card}): starta om för att tillämpa",
+  "vm.gvtReady": "Grafikkortsandel klar ({name})",
+  "vm.gvtGone": "Grafikkortsandel borttagen",
+  "gpu.freqSet": "Grafikkortets lägsta frekvens inställd",
+  "gpu.memlockSet": "Minne som en maskin får låsa sparat",
+  "vm.memlockSet": "Maskinens minne låst"
 }

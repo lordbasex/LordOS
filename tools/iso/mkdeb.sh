@@ -22,6 +22,7 @@
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
 #   /usr/lib/lordos/themes/<theme>/       theme.json, theme.bundle.js and their resources (greeter: the
 #                                         login screen)
+#   /usr/lib/lordos/firmware/lordos-gvt-gop.rom  the GVT-g GOP option ROM Machines gives a vGPU (amd64; firmware/gvt-gop)
 #   /usr/lib/lordos/assets/               fonts, texts (locales), icons, shell integration, cloud/providers.json (the
 #                                         Cloud providers verified on LordOS: without it every one read "not verified", #195)
 #   /usr/lib/lordos/code-manifest.json    SHA-256 of every bundle LordOS runs as its own code, and
@@ -219,6 +220,15 @@ if [ -f server/build/lordos-guest-win.exe ]; then
 elif [ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ]; then
     case " ${ALLOW_MISSING:-} " in *" lordos-guest-win.exe "*) echo "mkdeb: leaving out lordos-guest-win.exe (ALLOW_MISSING)" >&2 ;;
     *) echo "missing server/build/lordos-guest-win.exe (make -C server, with gcc-mingw-w64-x86-64-posix)" >&2; exit 1 ;; esac
+fi
+# lordos-gvt-gop.rom: LordOS's own UEFI GOP option ROM for Intel GVT-g vGPUs (firmware/gvt-gop, MIT), which lord-vm gives
+# QEMU for a machine with a graphics card (docs/MACHINES-GPU.md, Mode A). Building it needs EDK2 (a download and a few
+# minutes), so the package takes the reproducible build committed in firmware/gvt-gop/prebuilt, checked against its
+# SHA256SUMS; tools/firmware/build-gvt-gop.sh makes the same bytes (firmware/gvt-gop/README.md, "Prebuilt")
+if [ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ]; then
+    (cd firmware/gvt-gop/prebuilt && sha256sum -c --quiet SHA256SUMS) || { echo "firmware/gvt-gop/prebuilt: the ROM doesn't match its SHA256SUMS" >&2; exit 1; }
+    install -d "$L/firmware"
+    install -m 644 firmware/gvt-gop/prebuilt/lordos-gvt-gop.rom "$L/firmware/lordos-gvt-gop.rom"
 fi
 # lord-sql (0.8.8.7): the Databases app's MySQL / MariaDB client, sandboxed (docs/DATABASES.md)
 [ -x server/build/lord-sql ] && install -m 755 server/build/lord-sql "$L/bin/lord-sql"

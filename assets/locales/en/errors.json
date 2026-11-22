@@ -893,5 +893,20 @@
   "media.streamAuth": "The stream asked for a user and password, or they were wrong",
   "media.streamLost": "The stream was lost",
   "media.streamNoChannels": "The list has no channels",
-  "media.noStreamHelper": "The stream helper (lord-stream) is not available"
+  "media.noStreamHelper": "The stream helper (lord-stream) is not available",
+  "gpu.notFound": "That graphics card isn't on this computer",
+  "gpu.desktop": "That graphics card draws this desktop: it can't be given another use",
+  "gpu.notGvt": "That graphics card can't be shared with machines",
+  "gpu.roleNotYet": "That use of a graphics card isn't available in this version yet",
+  "gpu.writeFailed": "The graphics card's settings couldn't be written",
+  "gpu.initramfsFailed": "The startup image (initramfs) couldn't be updated with the graphics card's settings",
+  "gpu.freqRange": "That frequency is outside what this graphics card supports",
+  "vm.gvtNoType": "The graphics card doesn't offer that share",
+  "vm.gvtNone": "No graphics card share is available for machines now",
+  "vm.gvtBusy": "That machine's share of the graphics card belongs to someone else",
+  "vm.gvtInUse": "That share of the graphics card is still in use by a running machine",
+  "vm.gvtFailed": "The share of the graphics card couldn't be made",
+  "vm.memlockCap": "This machine would lock {need} MB, more than the {cap} MB a machine with a graphics card may lock (Settings → Graphics cards)",
+  "vm.memlockRefused": "This machine's memory couldn't be locked",
+  "gpu.memlockRange": "That amount is outside what this computer allows machines to lock"
 }

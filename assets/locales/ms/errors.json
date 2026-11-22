@@ -892,5 +892,20 @@
   "media.streamAuth": "Strim meminta pengguna dan kata laluan, atau ia salah",
   "media.streamLost": "Strim terputus",
   "media.streamNoChannels": "Senarai tiada saluran",
-  "media.noStreamHelper": "Pembantu strim (lord-stream) tiada"
+  "media.noStreamHelper": "Pembantu strim (lord-stream) tiada",
+  "gpu.notFound": "Kad grafik itu tiada pada komputer ini",
+  "gpu.desktop": "Kad grafik itu melukis desktop ini: ia tidak boleh diberi kegunaan lain",
+  "gpu.notGvt": "Kad grafik itu tidak boleh dikongsi dengan mesin",
+  "gpu.roleNotYet": "Kegunaan kad grafik itu belum tersedia dalam versi ini",
+  "gpu.writeFailed": "Tetapan kad grafik tidak dapat ditulis",
+  "gpu.initramfsFailed": "Imej permulaan (initramfs) tidak dapat dikemas kini dengan tetapan kad grafik",
+  "gpu.freqRange": "Frekuensi itu di luar julat yang disokong oleh kad grafik ini",
+  "vm.gvtNoType": "Kad grafik tidak menawarkan bahagian itu",
+  "vm.gvtNone": "Tiada bahagian kad grafik tersedia untuk mesin sekarang",
+  "vm.gvtBusy": "Bahagian kad grafik mesin itu milik orang lain",
+  "vm.gvtInUse": "Bahagian kad grafik itu masih digunakan oleh mesin yang sedang berjalan",
+  "vm.gvtFailed": "Bahagian kad grafik tidak dapat dibuat",
+  "vm.memlockCap": "Mesin ini akan mengunci {need} MB, melebihi {cap} MB yang boleh dikunci oleh mesin dengan kad grafik (Tetapan → Kad grafik)",
+  "vm.memlockRefused": "Memori mesin ini tidak dapat dikunci",
+  "gpu.memlockRange": "Jumlah itu di luar had yang dibenarkan komputer ini untuk dikunci oleh mesin"
 }

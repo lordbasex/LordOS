@@ -165,5 +165,11 @@
   "vm.kvmNextLogin": "Pronto a partir do seu próximo login",
   "pkg.foreignArchAdded": "Pacotes de 32 bits ({arch}) habilitados",
   "pkg.foreignArchPresent": "Os pacotes de 32 bits ({arch}) já estavam habilitados",
-  "pkg.why.multiarchPair": "A mesma versão que {name}"
+  "pkg.why.multiarchPair": "A mesma versão que {name}",
+  "gpu.roleSet": "Uso da placa de vídeo salvo ({card}): reinicie para aplicar",
+  "vm.gvtReady": "Parte da placa de vídeo pronta ({name})",
+  "vm.gvtGone": "Parte da placa de vídeo removida",
+  "gpu.freqSet": "Frequência mínima da placa de vídeo definida",
+  "gpu.memlockSet": "Memória que uma máquina pode bloquear salva",
+  "vm.memlockSet": "Memória da máquina bloqueada"
 }

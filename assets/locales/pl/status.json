@@ -174,5 +174,11 @@
   "vm.kvmNextLogin": "Zezwolono od następnego logowania",
   "pkg.foreignArchAdded": "Włączono pakiety 32-bitowe ({arch})",
   "pkg.foreignArchPresent": "Pakiety 32-bitowe ({arch}) były już włączone",
-  "pkg.why.multiarchPair": "Ta sama wersja co {name}"
+  "pkg.why.multiarchPair": "Ta sama wersja co {name}",
+  "gpu.roleSet": "Zapisano przeznaczenie karty graficznej ({card}): uruchom ponownie, aby zastosować",
+  "vm.gvtReady": "Część karty graficznej gotowa ({name})",
+  "vm.gvtGone": "Usunięto część karty graficznej",
+  "gpu.freqSet": "Ustawiono minimalną częstotliwość karty graficznej",
+  "gpu.memlockSet": "Zapisano pamięć, którą maszyna może zablokować",
+  "vm.memlockSet": "Pamięć maszyny zablokowana"
 }

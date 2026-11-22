@@ -165,5 +165,11 @@
   "vm.kvmNextLogin": "Növbəti girişinizdən etibarən icazə verildi",
   "pkg.foreignArchAdded": "32 bitlik ({arch}) paketlər aktivləşdirildi",
   "pkg.foreignArchPresent": "32 bitlik ({arch}) paketlər artıq aktiv idi",
-  "pkg.why.multiarchPair": "{name} ilə eyni versiya"
+  "pkg.why.multiarchPair": "{name} ilə eyni versiya",
+  "gpu.roleSet": "Qrafik kartın istifadəsi saxlanıldı ({card}): tətbiq etmək üçün yenidən başladın",
+  "vm.gvtReady": "Qrafik kart payı hazırdır ({name})",
+  "vm.gvtGone": "Qrafik kart payı silindi",
+  "gpu.freqSet": "Qrafik kartın minimum tezliyi təyin edildi",
+  "gpu.memlockSet": "Maşının kilidləyə biləcəyi yaddaş saxlanıldı",
+  "vm.memlockSet": "Maşının yaddaşı kilidləndi"
 }

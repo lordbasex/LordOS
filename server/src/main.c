@@ -41,6 +41,7 @@
 #include "inputkind.h"
 #include "kms.h"
 #include "drmcard.h"
+#include <sys/resource.h>
 #include "term/term.h"
 #include "ui/js.h"
 #include "ui/js_input.h"
@@ -78,6 +79,7 @@
 #include "hw/sleeplock.h"
 #include "hw/logindlock.h"
 #include "hw/modes.h"
+#include "hw/uevent.h"
 #include "ui/js_hw.h"
 #include "ui/js_vm.h"
 #include "outputs.h"
@@ -1105,6 +1107,7 @@ static void display_attach(const int *fds, int n, int flags) {
     o0->gpu = -1;
     int card = dup(fds[0]);             /* kms_attach closes its fd when it fails */
     int keep = (flags & RP_DISPLAY_KEEP) != 0;
+    uevent_set_card(uevent_card_of_fd(fds[0]));     /* only this card's drm uevents are display hotplugs (a parked one's too) */
     if (kms_attach(&o0->kms, fds[0], keep)) {
         o0->kms.fd = -1;
         if (card >= 0 && n <= PARK_MAX) {
@@ -2743,6 +2746,7 @@ int main(int argc, char **argv) {
         if (!card) { drm_pick_card(picked, sizeof picked); card = picked; }
         kms_set_picker(display_pick);       /* the display saved in Settings (displays.json) */
         if (kms_open(K0(&s), card)) return 1;
+        uevent_set_card(uevent_card_of_fd(K0(&s)->fd));    /* only this card's drm uevents are display hotplugs */
         /* one display until the plan (after dropping root: displays.json is the user's) opens the others */
         s.W = (int)K0(&s)->width;
         s.H = (int)K0(&s)->height;

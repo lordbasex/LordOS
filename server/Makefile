@@ -77,6 +77,8 @@ FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/
 SRC += $(FW_SRC)
 # Apps mode's guest side (ui/js_guestwin.c): this lord-server's windows for lordos-guest, inside a Machines guest
 SRC += src/ui/js_guestwin.c
+# Machines' pictures the desktop's GPU can't import (an Intel GVT-g machine's Y-tiled dmabufs): read on their own render node
+SRC += src/gpu/dmaread.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)
@@ -859,6 +861,15 @@ build/lock-seat: tests/lock_seat.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lock_seat.c
 
+# the second EGL reader (src/gpu/dmaread.c): an Intel Y-tiled and a linear dmabuf made on the Intel render node,
+# read back on it while another context is current; "skipped: needs an Intel render node" without one
+ifeq ($(GPU),1)
+test: build/dmaread-test
+build/dmaread-test: tests/dmaread_test.c src/gpu/dmaread.c src/gpu/dmaread.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/dmaread_test.c src/gpu/dmaread.c $(shell pkg-config --libs gbm egl glesv2)
+	./$@ || { rm -f $@; exit 1; }
+endif
 # what slows the GPU under CPU load (tests/gpu_contention.c, docs/GPU.md): a test tool, never installed
 GC_PKGS := gbm egl glesv2
 build/gpu-contention: tests/gpu_contention.c src/gpu/gcontend.c src/gpu/gcontend.h

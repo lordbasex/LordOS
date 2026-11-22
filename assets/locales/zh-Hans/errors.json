@@ -892,5 +892,20 @@
   "media.streamAuth": "直播流要求用户名和密码，或输入有误",
   "media.streamLost": "直播流已中断",
   "media.streamNoChannels": "列表中没有频道",
-  "media.noStreamHelper": "直播流助手（lord-stream）不可用"
+  "media.noStreamHelper": "直播流助手（lord-stream）不可用",
+  "gpu.notFound": "这台电脑上没有该显卡",
+  "gpu.desktop": "该显卡正在绘制此桌面：不能更改其用途",
+  "gpu.notGvt": "该显卡无法与虚拟机共享",
+  "gpu.roleNotYet": "此版本尚不支持该显卡用途",
+  "gpu.writeFailed": "无法写入显卡的设置",
+  "gpu.initramfsFailed": "无法用显卡的设置更新启动映像（initramfs）",
+  "gpu.freqRange": "该频率超出了这块显卡支持的范围",
+  "vm.gvtNoType": "显卡不提供该份额",
+  "vm.gvtNone": "目前没有可供虚拟机使用的显卡份额",
+  "vm.gvtBusy": "该机器的显卡份额属于其他人",
+  "vm.gvtInUse": "该显卡份额仍被一台正在运行的机器使用",
+  "vm.gvtFailed": "无法创建显卡份额",
+  "vm.memlockCap": "这台虚拟机将锁定 {need} MB，超过带显卡的虚拟机可锁定的 {cap} MB（设置 → 显卡）",
+  "vm.memlockRefused": "无法锁定这台虚拟机的内存",
+  "gpu.memlockRange": "该数量超出了这台电脑允许虚拟机锁定的范围"
 }

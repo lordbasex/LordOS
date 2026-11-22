@@ -20,6 +20,7 @@
  * Exit status: 0 ok (or the machine stopped cleanly), 1 failed or crashed, 2 usage, 3 already running / not
  * running. */
 #include "machine.h"
+#include "vmgpu.h"
 #include "qmp.h"
 #include "vmproto.h"
 #include "vmsandbox.h"
@@ -27,6 +28,7 @@
 #include "vmagent.h"
 #include "vmimport.h"
 #include "vmunattend.h"
+#include "vmgvtwin.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -844,6 +846,9 @@ static struct {
     long ptr_pid;                           /* the pointer's script (PTR_PS): its guest-exec pid, -1 asked; done this run */
     long long ptr_poll_at;
     int ptr_done, lag_pointer;
+    long gvt_pid;                           /* Intel's driver for a GVT-g vGPU (GVTWIN_PS): as ptr_pid */
+    long long gvt_poll_at;
+    int gvt_done, lag_gvt;
     long long xfer_poll_at;
     pid_t tpm;                              /* the TPM (Windows 11): swtpm, and QEMU's end of its control socket */
     int tpm_q;
@@ -868,6 +873,12 @@ static struct {
     /* 3D (virgl, 6.10): machine.json asks for it and this start can give it (decide_graphics); the render node QEMU opens */
     int gl;
     char render[32], render_want[32];
+    /* an Intel GVT-g vGPU this run (decide_vgpu, docs/MACHINES-GPU.md Mode A): its render node (the iGPU's, where QEMU
+     * makes the picture's dmabufs), /dev/vfio/<group>, the picture's size, and whether the guest asked for a restart
+     * (QEMU runs with -action reboot=shutdown: a reset is an exit, and Machines starts it again) */
+    int vgpu, vgpu_group, vgpu_w, vgpu_h, vgpu_reset;
+    long long ml_wait;                  /* waiting for vm-memlock until then (ms), 0 not waiting */
+    char vgpu_render[32], vgpu_dev[96];
     int notify_fd;
     int display_n;
     int cred_fd[MAX_CREDS];
@@ -1635,6 +1646,83 @@ static void decide_graphics(void) {
     vlog("graphics: 3D (virgl) on %s", S.render);
 }
 
+/* ---- an Intel GVT-g vGPU (docs/MACHINES-GPU.md, Mode A) ---- */
+
+#ifdef LORDVM_TEST_PATHS
+#define GVT_ROM test_path("LORDVM_TEST_GVT_ROM", VMGPU_ROM)
+#else
+#define GVT_ROM VMGPU_ROM
+#endif
+
+/* the locked memory QEMU needs with a vGPU: VFIO pins the guest pages the vGPU uses (about 50 MB idle, 200 MB under 3D,
+ * measured 2026-11-21), counted against QEMU's RLIMIT_MEMLOCK. Only root raises it (the hard limit is 8 MB): lord-server
+ * asks the admin helper's vm-memlock for this QEMU, which sets the machine's memory + 512 MB within the cap "Memory
+ * machines may lock"; until then the vCPUs don't run (vgpu_memlock_tick) */
+static rlim_t vgpu_memlock(void) { return ((rlim_t)S.m.memory_mb + VMGPU_MEMLOCK_EXTRA_MB) << 20; }
+static int vgpu_memlock_ok(void) {
+    struct rlimit rl;
+    return S.qemu > 0 && !prlimit(S.qemu, RLIMIT_MEMLOCK, NULL, &rl) && (rl.rlim_cur == RLIM_INFINITY || rl.rlim_cur >= vgpu_memlock());
+}
+
+/* machine.json asks for a vGPU: the mdev Machines asked the admin helper for (vm-gvt-create, named after the machine's
+ * id) must be there with its group given to this user, our GOP option ROM in the package, QEMU's GL display and the
+ * iGPU's render node. Then the vGPU is the machine's only display. -1 (and the start fails, saying why) otherwise */
+static int decide_vgpu(void) {
+    S.vgpu = S.vgpu_reset = 0;
+    S.vgpu_render[0] = S.vgpu_dev[0] = 0;
+    if (!S.m.vgpu) return 0;
+    if (S.m.display != VM_DISPLAY_WINDOW) { vlog("graphics card: the machine has no display: it starts without its vGPU"); return 0; }
+    char dev[96], p[200], t[256];
+    snprintf(dev, sizeof dev, "/sys/bus/mdev/devices/%s", S.m.id);
+    snprintf(p, sizeof p, "%s/iommu_group", dev);
+    ssize_t l = readlink(p, t, sizeof t - 1);
+    const char *g = l > 0 ? (t[l] = 0, strrchr(t, '/')) : NULL;
+    if (!g || !g[1] || strspn(g + 1, "0123456789") != strlen(g + 1) || strlen(g + 1) > 6) {
+        fail_start("the machine's Intel graphics card isn't ready: start it from Machines, which asks for it");
+        return -1;
+    }
+    int grp = atoi(g + 1);
+    /* the iGPU it belongs to: the mdev's parent PCI device, its render node */
+    char real[PATH_MAX];
+    if (!realpath(dev, real) || strncmp(real, "/sys/devices/", 13)) { fail_start("the machine's Intel graphics card isn't a device"); return -1; }
+    char *slash = strrchr(real, '/');
+    if (!slash) { fail_start("the machine's Intel graphics card isn't a device"); return -1; }
+    *slash = 0;
+    const char *parent = strrchr(real, '/');
+    if (!parent || !vmgpu_addr_valid(parent + 1)) { fail_start("the machine's Intel graphics card isn't on a PCI device"); return -1; }
+    int pk = snprintf(p, sizeof p, "%s/drm", real);
+    DIR *d = pk > 0 && (size_t)pk < sizeof p ? opendir(p) : NULL;
+    for (struct dirent *e; d && (e = readdir(d));)
+        if (!strncmp(e->d_name, "renderD", 7) && strlen(e->d_name) < 12) snprintf(S.vgpu_render, sizeof S.vgpu_render, "/dev/dri/%s", e->d_name);
+    if (d) closedir(d);
+    if (!S.vgpu_render[0] || !render_node_ok(S.vgpu_render)) { fail_start("the Intel graphics card's render node can't be opened"); return -1; }
+    /* /dev/vfio/<group>: given to this user by the admin helper */
+    snprintf(p, sizeof p, "/dev/vfio/%d", grp);
+    struct stat st;
+    if (stat(p, &st) || !S_ISCHR(st.st_mode) || st.st_uid != getuid() || access(p, R_OK | W_OK)) {
+        fail_start("the machine's Intel graphics card isn't this user's: start it from Machines, which asks for it");
+        return -1;
+    }
+    if (!file_exists(GVT_ROM)) { fail_start("LordOS's GVT-g option ROM is missing (%s)", GVT_ROM); return -1; }
+    if (!gl_modules()) { fail_start("QEMU's OpenGL modules (qemu-system-modules-opengl) aren't installed: Machines installs them"); return -1; }
+    /* the picture: the machine's resolution, or 1920 x 1080, no larger than its type shows */
+    int w = S.m.res_w ? S.m.res_w : 1920, h = S.m.res_h ? S.m.res_h : 1080;
+    VmGpuType ty = { 0 };
+    snprintf(p, sizeof p, "%s/mdev_type/description", dev);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t r = fd >= 0 ? read(fd, t, sizeof t - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (r > 0 && (t[r] = 0, !vmgpu_type_desc(t, &ty)) && (w > ty.max_w || h > ty.max_h)) {
+        vlog("graphics card: %dx%d is more than its type shows: %dx%d", w, h, ty.max_w, ty.max_h);
+        w = ty.max_w; h = ty.max_h;
+    }
+    S.vgpu = 1; S.vgpu_group = grp; S.vgpu_w = w; S.vgpu_h = h;
+    snprintf(S.vgpu_dev, sizeof S.vgpu_dev, "%s", dev);
+    vlog("graphics card: Intel vGPU %s of %s (group %d), %dx%d, on %s; it locks %llu MB while it runs", S.m.id, parent + 1, grp, w, h, S.vgpu_render,
+         (unsigned long long)(vgpu_memlock() >> 20));
+    return 0;
+}
+
 /* fds inside QEMU: 3 /dev/kvm (or /dev/null), 4 QMP, 5 serial, 6 network (or /dev/null) */
 static void build_qemu_args(void) {
     const VmMachine *m = &S.m;
@@ -1815,10 +1903,17 @@ static void build_qemu_args(void) {
         static char vga[96];
         snprintf(vga, sizeof vga, "%s,id=video0,addr=0x4", S.gl ? "virtio-vga-gl" : "virtio-vga");
         if (m->res_w && m->res_h) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",xres=%d,yres=%d", m->res_w, m->res_h);
-        arg("-device"); arg(vga);
+        /* an Intel vGPU instead (decide_vgpu): its own display, the OpRegion QEMU hands over (the VBT Intel's driver
+         * reads), and our GOP option ROM, which lights the UEFI screen on it; the guest's resets end QEMU (they crash a
+         * GVT-g guest otherwise, 3 of 3) and Machines starts it again */
+        if (S.vgpu) {
+            arg("-device");
+            argf("vfio-pci-nohotplug,id=video0,sysfsdev=%s,display=on,x-igd-opregion=on,xres=%d,yres=%d,romfile=%s,addr=0x4", S.vgpu_dev, S.vgpu_w, S.vgpu_h, GVT_ROM);
+            if (!S.unattended) { arg("-action"); arg("reboot=shutdown"); }
+        } else { arg("-device"); arg(vga); }
     }
     char dbus_disp[96];
-    if (S.gl) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=%s,audiodev=snd0", S.render);
+    if (S.gl || S.vgpu) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=%s,audiodev=snd0", S.vgpu ? S.vgpu_render : S.render);
     else snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,audiodev=snd0");
     if (m->display == VM_DISPLAY_WINDOW && (m->devices == VM_DEV_COMPAT || m->devices == VM_DEV_WINDOWS)) {
         /* a USB tablet (and keyboard on arm64) on xHCI: drivers every system has */
@@ -1891,6 +1986,7 @@ static void fail_start(const char *fmt, ...) {
 static int suspend_usable(char *err, size_t n);
 static const char *snap_devices(void);
 static void send_job(int kind, int status, int pct, const char *text);
+static void start_vcpus(void);
 static int start_machine(void) {
     VmHost h;
     vm_host_probe(&h);
@@ -1962,6 +2058,7 @@ static int start_machine(void) {
         }
     }
     if (!file_exists(QEMU_BIN_OF(S.m.arch))) { fail_start("%s isn't installed", QEMU_BIN_OF(S.m.arch)); return -1; }
+    if (decide_vgpu()) return -1;
     int passt_net = S.m.network == VM_NET_SHARED || S.m.network == VM_NET_HOSTONLY;
     if (passt_net && !file_exists(PASST)) { fail_start("passt isn't installed (%s network)", S.m.network == VM_NET_SHARED ? "Shared" : "Host-only"); return -1; }
     if (passt_net) {
@@ -2044,14 +2141,17 @@ static int start_machine(void) {
         int stf = 3 + nf - 1;
         fcntl(stf, F_SETFD, FD_CLOEXEC);
         VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
-                         S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : NULL };
+                         S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
+                         S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL };
         int mask = vm_jail_qemu(&j);
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
-        if (!(mask & VMS_SECCOMP_OURS) || !(mask & VMS_NO_NEW_PRIVS)) { write_all(stf, msg, sizeof msg[0]); _exit(126); }
+        /* a vGPU only inside Landlock where the kernel has it: its device rules must have applied (vgpu_rules) */
+        if (S.vgpu && vm_landlock_abi() >= 1 && !(mask & VMS_LANDLOCK_FS)) mask &= ~VMS_SECCOMP_OURS;
+        if (!(mask & VMS_SECCOMP_OURS) || !(mask & VMS_NO_NEW_PRIVS)) { msg[0] = mask; write_all(stf, msg, sizeof msg[0]); _exit(126); }
         write_all(stf, msg, sizeof msg[0]);
         /* 3D: Mesa in QEMU can't write a shader cache (its sandbox has no home folder): told not to try */
-        char *env[] = { "LC_ALL=C.UTF-8", S.gl ? "MESA_SHADER_CACHE_DISABLE=true" : NULL, NULL };
+        char *env[] = { "LC_ALL=C.UTF-8", S.gl || S.vgpu ? "MESA_SHADER_CACHE_DISABLE=true" : NULL, NULL };
         execve(qargv[0], qargv, env);
         msg[1] = errno ? errno : ENOEXEC;
         write_all(stf, &msg[1], sizeof msg[1]);
@@ -2083,7 +2183,7 @@ static int start_machine(void) {
     S.sandbox |= VMS_SECCOMP_QEMU | VMS_PDEATHSIG;
     vlog("qemu: pid %d; sandbox: landlock-fs=%d landlock-net=%d landlock-scope=%d seccomp(ours)=%d no-new-privs=%d kvm-by-fd=%d%s",
          (int)pid, !!(S.sandbox & VMS_LANDLOCK_FS), !!(S.sandbox & VMS_LANDLOCK_NET), !!(S.sandbox & VMS_LANDLOCK_SCOPE),
-         !!(S.sandbox & VMS_SECCOMP_OURS), !!(S.sandbox & VMS_NO_NEW_PRIVS), !!(S.sandbox & VMS_KVM_FD), S.gl ? " render-node=1" : "");
+         !!(S.sandbox & VMS_SECCOMP_OURS), !!(S.sandbox & VMS_NO_NEW_PRIVS), !!(S.sandbox & VMS_KVM_FD), S.gl ? " render-node=1" : S.vgpu ? " vgpu=1" : "");
     if (!(S.sandbox & VMS_LANDLOCK_FS)) vlog("note: no Landlock on this kernel: weaker isolation (3.3)");
     if (qmp_open(&S.qmp, qmp[0])) { fail_start("out of memory"); return -1; }
     if (qmp_handshake(&S.qmp, 20000, err, sizeof err)) {
@@ -2097,6 +2197,20 @@ static int start_machine(void) {
     S.oom0 = read_oom_kills();
     qmp_do("query-version", NULL, P_VERSION, -1, 0, -1, -1);
     if (S.resuming) return 0;
+    /* a vGPU: its vCPUs run once QEMU may lock the machine's memory (vm-memlock, asked by lord-server) */
+    if (S.vgpu && !vgpu_memlock_ok()) {
+        S.ml_wait = now_ms() + 30000;
+        vlog("graphics card: waiting until this machine's memory may be locked (%llu MB)", (unsigned long long)(vgpu_memlock() >> 20));
+        /* run.json now names this QEMU: lord-server reads its pid from there for vm-memlock */
+        set_state(VS_STARTING, VR_NONE, 0, "waiting for the machine's memory to be locked");
+        return 0;
+    }
+    start_vcpus();
+    return 0;
+}
+
+/* the vCPUs of a fresh start: a snapshot's memory first, or paused, or running */
+static void start_vcpus(void) {
     if (S.loadvm[0]) {
         /* -loadvm would take the first snapshot-capable disk for the memory (the UEFI variables, which hold none): the
          * job names the system disk, before a vCPU runs; cont follows when it's done (snap_concluded) */
@@ -2106,11 +2220,22 @@ static int start_machine(void) {
         snprintf(S.snap_tag, sizeof S.snap_tag, "%s", S.loadvm);
         qmp_do("snapshot-load", a, P_SNAPJOB, -1, 0, -1, -1);
         send_job(VJ_REVERT, VJS_RUNNING, -1, S.loadvm);
-        return 0;
+        return;
     }                   /* the state goes in first (P_VERSION → begin_resume), then cont */
     if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "started paused");
     else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
-    return 0;
+}
+
+/* the loop's turn while a vGPU machine waits for its locked memory: on with the start, or ended after 30 s saying why */
+static void vgpu_memlock_tick(long long now) {
+    if (!S.ml_wait || S.qemu_done) return;
+    if (vgpu_memlock_ok()) { S.ml_wait = 0; vlog("graphics card: the machine's memory may be locked"); start_vcpus(); return; }
+    if (now < S.ml_wait) return;
+    S.ml_wait = 0;
+    fail_start("this machine's memory (%d MB + %d MB) couldn't be locked for its graphics card: Settings, Graphics cards, sets how much a machine may lock",
+               S.m.memory_mb, VMGPU_MEMLOCK_EXTRA_MB);
+    kill(S.qemu, SIGKILL);
+    S.killed = 1;
 }
 
 /* ---- requests ---- */
@@ -2510,7 +2635,7 @@ static void host_stop(const char *why) {
     if (S.state == VS_STOPPING) return;                         /* already shutting down */
     char err[160];
     int ok_state = S.state == VS_RUNNING || S.state == VS_PAUSED;
-    if (ok_state && S.gl) { vlog("a machine with 3D graphics can't be saved to disk (virgl can't be migrated): shutting it down"); begin_shutdown(30); return; }
+    if (ok_state && (S.gl || S.vgpu)) { vlog("a machine with %s can't be saved to disk: shutting it down", S.vgpu ? "a graphics card" : "3D graphics (virgl can't be migrated)"); begin_shutdown(30); return; }
     if (ok_state && !S.snap_kind && !S.cd_busy) { begin_suspend(-1, 0); return; }
     if (ok_state && (S.snap_kind || S.cd_busy)) return;         /* tried again from the loop once that's done */
     snprintf(err, sizeof err, "the machine can't be saved now (%s): shutting it down", STATE_NAME[S.state]);
@@ -2528,7 +2653,7 @@ static void host_stop_tick(long long now) {
         return;
     }
     if (!S.suspending && S.state != VS_STOPPING && (S.state == VS_RUNNING || S.state == VS_PAUSED) && !S.snap_kind && !S.cd_busy) {
-        if (now < S.host_stop_deadline && !S.gl) begin_suspend(-1, 0);
+        if (now < S.host_stop_deadline && !S.gl && !S.vgpu) begin_suspend(-1, 0);
         else begin_shutdown(30);
     }
 }
@@ -2746,7 +2871,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS,
-       AQ_PEXEC, AQ_PSTATUS };
+       AQ_PEXEC, AQ_PSTATUS, AQ_GEXEC, AQ_GSTATUS };
 
 /* A Clone's first start (6.3): one fixed script, run as root by qemu-guest-agent, with the new hostname as its only
  * argument (checked: one DNS label). The machine-id is made again by systemd from the clone's new SMBIOS UUID (the old
@@ -2903,6 +3028,33 @@ static void ptr_reply(int kind, const JVal *root, const JVal *r, int ok) {
               n, n == 1 ? "" : "s", c ? ", restarted to take it" : ", already so");
 }
 
+/* ---- Intel's driver for a Windows machine's GVT-g vGPU (docs/MACHINES-GPU.md Mode A; vmgvtwin.h) ----
+ * Once per run, when the machine has a vGPU and the LordOS tools say "gvt" in their hello (w6: the person installed
+ * them), the fixed GVTWIN_PS runs as SYSTEM by qemu-guest-agent: hibernation and Fast Startup off, Intel's
+ * GVTWIN_DRV_VERSION on the vGPU unless it's there (downloaded from the Microsoft Update Catalog, its SHA-256 and
+ * signatures checked), then that device's later driver installs denied by policy. Nothing from the guest, the person or
+ * JS goes into it; what it prints is logged only, after gvtwin_parse. The download (247 MB) and the install take
+ * minutes: polled each second. */
+static void gvt_begin(void) {
+    if (S.gvt_done || S.m.vgpu == VM_VGPU_NONE || !S.ag_windows || !S.lag_gvt || !S.qga_up || !(S.ag_caps & VAC_EXEC) || S.gvt_pid || S.gvt_poll_at) return;
+    if (fx_exec_ps(GVTWIN_PS, AQ_GEXEC)) { vlog("intel driver: the guest agent is busy: tried again when the tools say hello"); return; }
+    S.gvt_pid = -1;
+    vlog("intel driver: checking the guest's driver for the vGPU (%s), its updates and hibernation", GVTWIN_DRV_VERSION);
+}
+static void gvt_reply(int kind, const JVal *root, const JVal *r, int ok) {
+    if (!ok) { S.gvt_pid = 0; S.gvt_poll_at = 0; S.gvt_done = 1; vlog("intel driver: qemu-guest-agent: %s", qmp_error_desc(root)); return; }
+    if (kind == AQ_GEXEC) { S.gvt_pid = (long)json_num(r, "pid", 0); S.gvt_poll_at = now_ms() + 1000; return; }
+    if (!json_bool(r, "exited", 0)) { S.gvt_poll_at = now_ms() + 1000; return; }
+    S.gvt_poll_at = 0; S.gvt_pid = 0; S.gvt_done = 1;
+    int code = (int)json_num(r, "exitcode", -1);
+    char said[400], line[400];
+    GvtWinResult g;
+    ag_exec_text(json_str(r, code == 0 ? "out-data" : "err-data"), said, sizeof said);
+    if (code != 0 || gvtwin_parse(said, &g)) { vlog("intel driver: the guest's script failed (%d): %.200s", code, said); return; }
+    gvtwin_describe(&g, line, sizeof line);
+    vlog("%s", line);
+}
+
 /* VM_AGENT_STATE's text: the guest agent's version, its system and the LordOS tools' version from their hello (empty
  * until they said it; only letters, digits, '.', '-' and '_' pass, so the tab stays the separator) */
 static void ag_state_text(char *t, size_t n) {
@@ -2977,6 +3129,7 @@ static void qga_sync(void) {
     S.agq_n = 0;                        /* nothing sent before is waited for any more */
     S.xfer_pid = 0; S.xfer_poll_at = 0;
     S.ptr_pid = 0; S.ptr_poll_at = 0;
+    S.gvt_pid = 0; S.gvt_poll_at = 0;
     snprintf(a, sizeof a, "{\"id\":%ld}", ++S.sync_id);
     qga_do("guest-sync", a, AQ_SYNC);
     S.sync_at = now_ms();
@@ -3004,6 +3157,7 @@ static void ag_lost(const char *why) {
     S.qga_up = 0; S.agq_n = 0; S.jpid = 0; S.inhibit_done = 0;
     S.xfer_pid = 0; S.xfer_poll_at = 0; S.xfer_guest = XG_UNKNOWN;
     S.ptr_pid = 0; S.ptr_poll_at = 0;
+    S.gvt_pid = 0; S.gvt_poll_at = 0;
     /* an install of lordos-guest on its way: its next step's answer won't come */
     if (S.inst_busy) inst_reply(VME_WRONG_STATE, "qemu-guest-agent stopped answering in the guest");
     if (S.id_state == 2) { S.id_state = 1; S.id_poll_at = 0; }      /* tried again when the agent is back */
@@ -3047,6 +3201,7 @@ static void on_qga_reply(const JVal *root, int ok) {
     case AQ_FXEXEC: case AQ_FXSTATUS: case AQ_FXOPEN: case AQ_FXWRITE: case AQ_FXCLOSE: fx_on_reply(kind, root, r, ok); break;
     case AQ_XEXEC: case AQ_XSTATUS: xfer_reply(kind, root, r, ok); break;
     case AQ_PEXEC: case AQ_PSTATUS: ptr_reply(kind, root, r, ok); break;
+    case AQ_GEXEC: case AQ_GSTATUS: gvt_reply(kind, root, r, ok); break;
     case AQ_WIEXEC: case AQ_WISTATUS: case AQ_WIOPEN: case AQ_WIWRITE: case AQ_WICLOSE: wi_on_reply(kind, root, r, ok); break;
     case AQ_DEVRAW: {
         /* --dev-qmp: a qemu-guest-agent command for the tests; a pid, or what a guest-exec printed */
@@ -3129,6 +3284,7 @@ static void on_qga_reply(const JVal *root, int ok) {
         }
         xfer_begin();
         ptr_begin();
+        gvt_begin();
         /* a machine that resumed from a saved state has a clipboard helper that said hello to the lord-vm before: it
          * is asked to say it again (once; its answer gets the plain hello) */
         if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx clipreq ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
@@ -4399,6 +4555,7 @@ static void drain_lag(void) {
                 S.lag_open = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_OPEN) != 0;
                 S.lag_place = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_PLACE) != 0;
                 S.lag_pointer = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_POINTER) != 0;
+                S.lag_gvt = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_GVT) != 0;
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
                 unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
@@ -4421,6 +4578,7 @@ static void drain_lag(void) {
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
                 ag_broadcast();
                 ptr_begin();                    /* the tools say "pointer": the display driver's pointer, once per run */
+                gvt_begin();                    /* the tools say "gvt": Intel's driver for the vGPU, once per run */
             }
         } else if (f.kind == AGK_CLIP && S.lag_hello && clip_allows(0) && f.len && ag_utf8_ok(f.data, f.len)) {
             int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
@@ -4558,13 +4716,14 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
         if (S.suspending || S.cd_busy || S.snap_kind) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
         if (S.gl) { reply(ci, m->seq, VME_WRONG_STATE, "a machine with 3D graphics can't be suspended (virgl can't be migrated): shut it down"); return; }
+        if (S.vgpu) { reply(ci, m->seq, VME_WRONG_STATE, "a machine with a graphics card can't be suspended (a vGPU can't be saved): shut it down"); return; }
         begin_suspend(ci, m->seq);
         return;
     case VM_SNAPSHOT:
         if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
         if (S.snap_kind || S.suspending) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
         /* snapshots of a running machine hold its memory: QEMU can't save virgl's state */
-        if (S.gl && m->a != VSN_DELETE) { reply(ci, m->seq, VME_WRONG_STATE, "a running machine with 3D graphics can't take or revert a snapshot with its memory: shut it down first"); return; }
+        if ((S.gl || S.vgpu) && m->a != VSN_DELETE) { reply(ci, m->seq, VME_WRONG_STATE, "a running machine with 3D graphics can't take or revert a snapshot with its memory: shut it down first"); return; }
         begin_snapshot(ci, m->seq, m->a, m->text);
         return;
     case VM_CONSOLE: {
@@ -4879,6 +5038,9 @@ static void on_qmp_event(const JVal *root) {
         vlog("qemu: SHUTDOWN guest=%d reason=%s", guest, why ? why : "?");
         if (guest) S.guest_shutdown = 1;
         if (S.unattended && why && !strcmp(why, "guest-reset")) { S.install_done = 1; vlog("unattended: the installer restarted the machine: the install is done"); }
+        /* with a vGPU every reset is an exit (-action reboot=shutdown): the guest's own ("guest-reset") and Restart's
+         * ("host-qmp-system-reset"); Machines starts the machine again */
+        else if (S.vgpu && why && strstr(why, "reset")) { S.vgpu_reset = 1; vlog("graphics card: the machine restarted (%s): QEMU ends and Machines starts it again", why); }
         if (S.state != VS_STOPPING) set_state(VS_STOPPING, guest ? VR_GUEST_SHUTDOWN : VR_POWEROFF, 0, why ? why : "");
     } else if (!strcmp(ev, "RESET")) {
         if (S.state == VS_RUNNING || S.state == VS_PAUSED) set_state(S.state, VR_GUEST_RESET, 0, "");
@@ -4890,7 +5052,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -5020,6 +5182,7 @@ static void qemu_exited(int status) {
         else if (S.forced) why = VR_FORCED;
         else if (S.poweroff) why = VR_POWEROFF;
         else if (S.install_done) why = VR_INSTALLED;
+        else if (S.vgpu_reset) why = VR_GUEST_RESET;     /* a vGPU machine's restart: Machines starts it again */
         else if (S.host_shutdown && S.guest_shutdown) why = VR_HOST_SHUTDOWN;
         else if (S.guest_shutdown) why = VR_GUEST_SHUTDOWN;
     } else if (WIFSIGNALED(status)) {
@@ -5206,6 +5369,7 @@ static void loop(void) {
         if (S.id_poll_at && (next < 0 || S.id_poll_at < next)) next = S.id_poll_at;
         if (S.xfer_poll_at && (next < 0 || S.xfer_poll_at < next)) next = S.xfer_poll_at;
         if (S.ptr_poll_at && (next < 0 || S.ptr_poll_at < next)) next = S.ptr_poll_at;
+        if (S.gvt_poll_at && (next < 0 || S.gvt_poll_at < next)) next = S.gvt_poll_at;
         if (S.inst_poll_at && (next < 0 || S.inst_poll_at < next)) next = S.inst_poll_at;
         if (S.fx_poll_at && (next < 0 || S.fx_poll_at < next)) next = S.fx_poll_at;
         if (S.wi_poll_at && (next < 0 || S.wi_poll_at < next)) next = S.wi_poll_at;
@@ -5226,11 +5390,13 @@ static void loop(void) {
         if (S.id_poll_at && now >= S.id_poll_at) { char a[48]; S.id_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.id_pid); qga_do("guest-exec-status", a, AQ_IDSTATUS); }
         if (S.xfer_poll_at && now >= S.xfer_poll_at) { char a[48]; S.xfer_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.xfer_pid); if (qga_do("guest-exec-status", a, AQ_XSTATUS)) S.xfer_poll_at = now + 300; }
         if (S.ptr_poll_at && now >= S.ptr_poll_at) { char a[48]; S.ptr_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.ptr_pid); if (qga_do("guest-exec-status", a, AQ_PSTATUS)) S.ptr_poll_at = now + 300; }
+        if (S.gvt_poll_at && now >= S.gvt_poll_at) { char a[48]; S.gvt_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.gvt_pid); if (qga_do("guest-exec-status", a, AQ_GSTATUS)) S.gvt_poll_at = now + 1000; }
         if (S.inst_poll_at && now >= S.inst_poll_at) { char a[48]; S.inst_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.inst_pid); if (qga_do("guest-exec-status", a, AQ_INSTSTATUS)) S.inst_poll_at = now + 500; }
         fx_tick(now);
         open_tick(now);
         wi_tick(now);
         host_stop_tick(now);
+        vgpu_memlock_tick(now);
         if (S.shut_deadline && now >= S.shut_deadline) {
             S.shut_deadline = 0;
             vlog("the guest didn't shut down in time: turning it off");
@@ -5872,7 +6038,7 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -5918,6 +6084,11 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         }
         /* the transfer folder (6.7.1): a device of the machine, so like the shares, never while a state is saved */
         if (!strcmp(a, "--clipboard-ask")) { cask = parse_enum(v, "off", "on"); if (cask < 0) { fprintf(stderr, "lord-vm: --clipboard-ask on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--gpu")) {
+            gpu = !strcmp(v, "none") ? VM_VGPU_NONE : !strcmp(v, "intel-whole") ? VM_VGPU_WHOLE : !strcmp(v, "intel-shared") ? VM_VGPU_SHARED : -1;
+            if (gpu < 0) { fprintf(stderr, "lord-vm: --gpu none|intel-whole|intel-shared\n"); return 2; }
+            continue;
+        }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
@@ -5968,7 +6139,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
         /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     if (name) snprintf(m.name, sizeof m.name, "%s", name);
     if (vcpus && vcpus != m.vcpus) {
@@ -5992,6 +6163,9 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (cask >= 0) { m.clipboard_ask = cask; if (cask) m.schema = VM_SCHEMA; }
     if (ptr >= 0) { m.pointer_guest = ptr; if (ptr) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
+    /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
+    if (gpu >= 0) { m.vgpu = gpu; if (gpu) { m.schema = VM_SCHEMA; if (gfx < 0) m.graphics = VM_GFX_2D; } }
+    if (gfx == VM_GFX_3D && gpu < 0) m.vgpu = VM_VGPU_NONE;
     if (m.graphics) m.schema = VM_SCHEMA;
     if (res_set) { m.res_w = resw; m.res_h = reshh; if (resw) m.schema = VM_SCHEMA; }
     if (sound >= 0) m.sound = sound;
@@ -6059,9 +6233,9 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
     char bspec[32];
     vm_boot_spec(&m, bspec, sizeof bspec);
-    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\",\"boot_order\":\"%s\",\"boot_menu\":%s,\"transfer\":%s}\n",
+    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\",\"gpu\":\"%s\",\"boot_order\":\"%s\",\"boot_menu\":%s,\"transfer\":%s}\n",
            m.vcpus, m.memory_mb, m.disk_gb, VM_NET_NAMES[m.network], m.n_ports, m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices],
-           VM_NIC_MODELS[m.nic_model], m.graphics == VM_GFX_3D ? "3d" : "2d", bspec, m.boot_menu ? "true" : "false", m.transfer ? "true" : "false");
+           VM_NIC_MODELS[m.nic_model], m.graphics == VM_GFX_3D ? "3d" : "2d", VM_VGPU_NAMES[m.vgpu], bspec, m.boot_menu ? "true" : "false", m.transfer ? "true" : "false");
     rc = 0;
 out:
     close(lock);
