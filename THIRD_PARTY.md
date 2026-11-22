@@ -10,6 +10,7 @@ the components below, each under its own license.
 | QuickJS | JavaScript engine for the UI | MIT (`third_party/quickjs/LICENSE`) |
 | stb_image, stb_image_write, stb_truetype | image decoding/encoding, font rasterization | MIT or public domain (dual) |
 | Monocypher 4 | vault and keyring cryptography | CC0-1.0 or BSD-2-Clause (`third_party/monocypher/LICENCE.md`) |
+| Wayland's `wl_fixes` interface (wayland.xml 1.24) | the core `wl_fixes` global on a libwayland older than 1.24 (`server/mk/wlfixes.mk`) | MIT (in `third_party/wayland/wl-fixes.xml`) |
 | EFF large wordlist, SecLists common passwords | passphrase generator, weak-password check | CC BY 3.0 (EFF), MIT (SecLists, `third_party/wordlists/LICENSE-SecLists`) |
 
 ## Fetched at build time (`third_party/audiocpp`, ignored by git)

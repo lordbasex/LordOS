@@ -662,6 +662,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   in `make test`, and `theme_cost_scene.mjs` now measures it too (426 native calls on the first render and 312 timer
   wake-ups a minute at rest, against Lord Flow's 465 and 330). Seen in headless sessions on the development machine in
   dark, light and Arabic; not yet on a real session with real monitors, a Linux app's own bar or the GPU path.
+- **Linux apps: the core `wl_fixes` global (version 1), in development.** `wl_registry` has no destructor, so until now
+  every registry a client asked for stayed in lord-server, and kept getting `global` and `global_remove` events, until
+  the client disconnected. `wl_fixes.destroy_registry` (wayland.xml 1.24) destroys it: lord-server sends
+  `wl_display.delete_id` and the client can reuse the id. Debian 13's libwayland is 1.23, which doesn't ship the
+  interface, so `server/mk/wlfixes.mk` generates it with wayland-scanner from `third_party/wayland/wl-fixes.xml`
+  (vendored from wayland.xml 1.24 with its MIT license; listed in `THIRD_PARTY.md`); on libwayland 1.24 or newer the
+  system's interface is used. The code is `server/src/wl/wlfixes.c`, one call in `wl.c`. Test:
+  `server/tests/wlfixes_client.c`, the "fixes" part of `tests/wlperf_headless.sh` in `make test`, against a headless
+  lord-server: the global is offered at version 1, the destroyed registry's id comes back for a new registry that gets
+  every global once (with destroy_registry turned into a no-op the check fails), and a non-registry argument is a
+  display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
 
