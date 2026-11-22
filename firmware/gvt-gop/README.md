@@ -6,7 +6,7 @@ the vGPU's own display, and QEMU hands that display to LordOS as dmabufs. Writte
 documentation; MIT, like the rest of LordOS. `NOTICE.md` lists every source consulted.
 
 Status: tested with a Comet Lake GT2 vGPU (8086:9BC5, mdev type `i915-GVTg_V5_4`), QEMU 10.0, Debian's OVMF
-2025.02 and Windows 11 with Intel's driver 27.20.100.8681. Not wired into lord-vm yet.
+2025.02 and Windows 11 with Intel's driver 27.20.100.8681. Machines gives it to QEMU for a machine with an Intel graphics card (lord-vm, in development).
 
 ## What it does
 
@@ -48,6 +48,20 @@ SHA-256 are in `out/SHA256SUMS`; two builds in different work folders give the s
 
 Packages it needs (Debian 13): `build-essential nasm uuid-dev python3 curl git`. The DEBUG image prints to
 QEMU's debug console: `-debugcon file:debug.log -global isa-debugcon.iobase=0x402`.
+
+## Prebuilt
+
+`prebuilt/lordos-gvt-gop.rom` is the RELEASE ROM this script builds from this folder (device ID 0x9BC5), committed with
+its SHA-256 in `prebuilt/SHA256SUMS` (`aca1ff08…0759`). The package (`tools/iso/mkdeb.sh`) checks that hash and installs
+it as `/usr/lib/lordos/firmware/lordos-gvt-gop.rom`, the fixed path lord-vm passes as `romfile=`: building EDK2 in every
+package build would need a download and several minutes for an 8.7 KB file that never changes between builds. Anyone
+can check it: `tools/firmware/build-gvt-gop.sh --out /tmp/g && cmp /tmp/g/lordos-gvt-gop-release.rom
+firmware/gvt-gop/prebuilt/lordos-gvt-gop.rom` (two builds in different work folders gave these same bytes, 2026-11-21).
+After a change to the driver, rebuild and replace both files in the same commit.
+
+The ROM's PCI header names device 0x9BC5 (Comet Lake GT2); OVMF loads a `romfile=` image without comparing the device ID,
+and the driver itself binds by the PVINFO page and the gen9 display, so other gen9 iGPUs take the same file (only 0x9BC5
+is tested).
 
 ## Use with QEMU
 
