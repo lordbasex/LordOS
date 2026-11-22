@@ -4,6 +4,7 @@
 #include "fpak.h"
 #include "fsops.h"
 #include "sec/appid.h"
+#include "sec/pathcanon.h"
 #include "sec/sandbox.h"
 
 #include <errno.h>
@@ -179,6 +180,22 @@ static int open_nolink(int dirfd, const char *path, int flags, int dir) {
 #endif
 }
 
+/* path opened O_PATH (a folder when dir) with no link on the way, only when it is canonical (pathcanon.h) and the kernel
+ * names what it opened by that very string: every policy below compares strings, so "/home/u/./.config" or
+ * "/home/u//.ssh" never reach it (Claude Security F1/F2, 2026-11-22). The fd, or -1. */
+static int open_canonical(const char *path, int dir) {
+    if (!path_canonical(path)) return -1;
+    int fd = open_nolink(AT_FDCWD, path, O_PATH, dir);
+    if (fd < 0) return -1;
+    char link[64], real[PATH_MAX + 1];
+    snprintf(link, sizeof link, "/proc/self/fd/%d", fd);
+    ssize_t n = readlink(link, real, sizeof real);
+    if (n <= 0 || n >= (ssize_t)sizeof real) { close(fd); return -1; }
+    real[n] = 0;
+    if (strcmp(real, path)) { close(fd); return -1; }
+    return fd;
+}
+
 /* asks the view and waits for its answer: 0 (grant set) or an errno */
 static int ask(int v, SbLendMsg *q, char *grant) {
     q->magic = SB_LEND_MAGIC;
@@ -206,6 +223,58 @@ static int ask(int v, SbLendMsg *q, char *grant) {
     }
 }
 
+int fplend_check(const char *id, const char *path, int kind, SbLendMsg *q) {
+    if (!id || !path || !q || kind < FPLEND_FILE || kind > FPLEND_SAVE) return -1;
+    /* every check below compares strings: only a path written the one way realpath writes it */
+    if (!path_canonical(path)) { fprintf(stderr, "fplend: %s: a path not written the plain way isn't lent\n", id); return -1; }
+    const char *slash = strrchr(path, '/');
+    const char *name = slash + 1;                /* the name the app sees */
+    if (!sandbox_lend_name_ok(name) || strlen(path) >= sizeof q->path) return -1;
+    memset(q, 0, sizeof *q);
+    int r = -1, fd = -1, pfd = -1;
+    struct stat st;
+    q->kind = (uint32_t)kind;
+    snprintf(q->name, sizeof q->name, "%s", name);
+    if (kind == FPLEND_SAVE) {
+        char parent[PATH_MAX];
+        size_t pl = (size_t)(slash - path);
+        if (!pl) pl = 1;                        /* "/name": the root folder */
+        if (pl >= sizeof parent) goto out;
+        memcpy(parent, path, pl);
+        parent[pl] = 0;
+        pfd = open_canonical(parent, 1);
+        if (pfd < 0) { fprintf(stderr, "fplend: %s: the save's folder isn't the one named\n", id); goto out; }
+        /* only a name the person may write, never a protected or sensitive one (the launcher's grant rules). Only that
+         * file is lent, never its folder (F5): nothing else in the folder is seen. */
+        if (fsops_protected_resolved(path) || !apps_grant_ok(path)) {
+            fprintf(stderr, "fplend: %s: a save there isn't lent\n", id);
+            goto out;
+        }
+        /* the target, made empty if it isn't there (the app writes it through the lent name) */
+        fd = open_nolink(pfd, name, O_WRONLY | O_CREAT | O_NOFOLLOW, 0);
+        if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_nlink != 1) goto out;
+        q->rw = 1;
+    } else {
+        fd = open_canonical(path, kind == FPLEND_DIR);
+        if (fd < 0 || fstat(fd, &st) || (kind == FPLEND_DIR ? !S_ISDIR(st.st_mode) : !S_ISREG(st.st_mode))) goto out;
+        /* never a protected folder or file (launchers, security decisions), nor a folder that is or holds the home's
+         * keys and startup files: those the launcher's grant rules refuse even read */
+        if (fsops_protected_resolved(path) || (kind == FPLEND_DIR && !apps_grant_ok(path))) {
+            fprintf(stderr, "fplend: %s: that %s isn't lent\n", id, kind == FPLEND_DIR ? "folder" : "file");
+            goto out;
+        }
+        q->rw = (uint32_t)apps_grant_ok(path);
+    }
+    snprintf(q->path, sizeof q->path, "%s", path);
+    q->dev = q->tdev = (uint64_t)st.st_dev;
+    q->ino = q->tino = (uint64_t)st.st_ino;
+    r = 0;
+out:
+    if (fd >= 0) close(fd);
+    if (pfd >= 0) close(pfd);
+    return r;
+}
+
 int fplend_lend(unsigned caller_pid, const char *path, int kind, char *out, size_t n) {
     char app[160];
     if (!caller_pid || appid_of_pid(caller_pid, app, sizeof app) != 0 || strncmp(app, "flatpak:", 8)) return 1;
@@ -218,50 +287,10 @@ int fplend_lend(unsigned caller_pid, const char *path, int kind, char *out, size
     for (int i = 0; root > 0 && i < MAX_VIEWS; i++)
         if (views[i].fd >= 0 && views[i].pid == root && !strcmp(views[i].id, id)) { v = i; break; }
     if (v < 0) { fprintf(stderr, "fplend: %s: no lending in the caller's view\n", id); return -1; }
-    /* the name the app sees, and the folder for a save */
-    const char *slash = strrchr(path, '/');
-    const char *name = slash ? slash + 1 : path;
-    if (!sandbox_lend_name_ok(name)) return -1;
     SbLendMsg *q = calloc(1, sizeof *q);
     if (!q) return -1;
-    int r = -1, fd = -1, pfd = -1;
-    struct stat st, pst;
-    q->kind = (uint32_t)kind;
-    snprintf(q->name, sizeof q->name, "%s", name);
-    if (kind == FPLEND_SAVE) {
-        char parent[PATH_MAX];
-        size_t pl = (size_t)(slash - path);
-        if (!pl) pl = 1;                        /* "/name": the root folder */
-        if (pl >= sizeof parent) goto out;
-        memcpy(parent, path, pl);
-        parent[pl] = 0;
-        /* only a place the person may write, never a protected or sensitive one (the launcher's grant rules) */
-        if (fsops_protected_resolved(path) || !apps_grant_ok(path) || !apps_grant_ok(parent)) {
-            fprintf(stderr, "fplend: %s: a save there isn't lent\n", id);
-            goto out;
-        }
-        pfd = open_nolink(AT_FDCWD, parent, O_PATH, 1);
-        if (pfd < 0 || fstat(pfd, &pst) || !S_ISDIR(pst.st_mode)) goto out;
-        /* the target, made empty if it isn't there (the app writes it through the lent name) */
-        fd = open_nolink(pfd, name, O_WRONLY | O_CREAT | O_NOFOLLOW, 0);
-        if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_nlink != 1) goto out;
-        snprintf(q->path, sizeof q->path, "%s", parent);
-        q->dev = (uint64_t)pst.st_dev; q->ino = (uint64_t)pst.st_ino;
-        q->tdev = (uint64_t)st.st_dev; q->tino = (uint64_t)st.st_ino;
-        q->rw = 1;
-    } else {
-        fd = open_nolink(AT_FDCWD, path, O_PATH, kind == FPLEND_DIR);
-        if (fd < 0 || fstat(fd, &st) || (kind == FPLEND_DIR ? !S_ISDIR(st.st_mode) : !S_ISREG(st.st_mode))) goto out;
-        /* never a protected folder or file (launchers, security decisions), nor a folder that is or holds the home's
-         * keys and startup files: those the launcher's grant rules refuse even read */
-        if (fsops_protected_resolved(path) || (kind == FPLEND_DIR && !apps_grant_ok(path))) {
-            fprintf(stderr, "fplend: %s: that %s isn't lent\n", id, kind == FPLEND_DIR ? "folder" : "file");
-            goto out;
-        }
-        snprintf(q->path, sizeof q->path, "%s", path);
-        q->dev = (uint64_t)st.st_dev; q->ino = (uint64_t)st.st_ino;
-        q->rw = (uint32_t)apps_grant_ok(path);
-    }
+    int r = -1;
+    if (fplend_check(id, path, kind, q)) goto out;
     char grant[33];
     int e = ask(v, q, grant);
     /* a mount the kernel keeps read-only (a disk mounted so) is lent read-only */
@@ -271,11 +300,9 @@ int fplend_lend(unsigned caller_pid, const char *path, int kind, char *out, size
     }
     if (e) { fprintf(stderr, "fplend: %s: could not lend the chosen %s (%s)\n", id, kind == FPLEND_DIR ? "folder" : "file", strerror(e)); goto out; }
     /* Flatpak 1.16 binds $XDG_RUNTIME_DIR/app/<id> at /run/flatpak/app/<id> in every instance (and at the same path) */
-    if (snprintf(out, n, "/run/flatpak/app/%s/doc/%s/%s", id, grant, name) >= (int)n) goto out;
+    if (snprintf(out, n, "/run/flatpak/app/%s/doc/%s/%s", id, grant, q->name) >= (int)n) goto out;
     r = 0;
 out:
-    if (fd >= 0) close(fd);
-    if (pfd >= 0) close(pfd);
     free(q);
     return r;
 }

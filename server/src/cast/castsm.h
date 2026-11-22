@@ -62,6 +62,9 @@ int csm_token_issue(CastSm *m, const char *who, const void *blob, int len, uint6
 /* The sources of token, if it is who's and still valid: their length (copied to blob, at most cap), and the token is
  * gone (once). -1: unknown, expired (then gone too) or another app's (kept: it isn't that app's to spend). */
 int csm_token_take(CastSm *m, const char *who, const char *token, uint64_t now_ms, void *blob, int cap);
+/* Revokes who's tokens (NULL: everyone's): the person stopped that app's share, or a lock, a user switch or the shell
+ * going ended every share (Claude Security F6/F7, 2026-11-22). How many went. */
+int csm_token_drop(CastSm *m, const char *who);
 
 void csm_init(CastSm *m);
 /* OBJ/<what>/<sender without ':' and with '.' as '_'>/<token> — the form the spec gives, so the app can listen before

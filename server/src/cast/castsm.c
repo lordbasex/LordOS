@@ -178,3 +178,14 @@ int csm_token_take(CastSm *m, const char *who, const char *token, uint64_t now_m
     }
     return -1;
 }
+
+int csm_token_drop(CastSm *m, const char *who) {
+    int n = 0;
+    for (int i = 0; i < CSM_TOKENS; i++) {
+        CsToken *c = &m->tok[i];
+        if (!c->token[0] || (who && strcmp(c->who, who))) continue;
+        memset(c, 0, sizeof *c);
+        n++;
+    }
+    return n;
+}

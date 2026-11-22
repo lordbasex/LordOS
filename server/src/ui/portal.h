@@ -51,6 +51,11 @@ void portal_cast_streams(int id, const CastStreamInfo *info, int n);
 void portal_cast_failed(int id);
 void portal_cast_lost(int id);
 void portal_cast_remote(int id, uint32_t req, int fd);
+/* Every share ended (cast_end_all: a lock, a user switch, the shell going): every restore token is revoked. */
+void portal_cast_tokens_drop(void);
+/* The session is locked, switched away from or off the display (1; every restore token revoked, none honoured until it
+ * is back), or the person is at it again (0) (remote/mirror.c). */
+void portal_cast_away(int away);
 /* Screenshot and PickColor (org.freedesktop.portal.Screenshot; approved by the maintainer 2026-11-22), through the same
  * chooser and indicator as ScreenCast. From the shell: the person's pick for request id (src NULL: Cancel), with area
  * (x, y, w, h in logical px, or NULL for the whole source) and the file to write in the home folder (a new one); the

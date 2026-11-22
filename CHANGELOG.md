@@ -23,8 +23,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     the same profile ("Profile error occurred", locked databases, a corrupt `argv.json`). Another app, or the same app
     with other restrictions, never sees them.
   - **The chosen file is lent, never the rest of the home**: when a Flatpak app gets a file from LordOS's file dialog
-    (FileChooser portal), exactly that file, that folder, or for a save the chosen folder read-only with only the chosen
-    name writable, is bind-mounted into the app's running view by the view's own PID 1 and the app gets
+    (FileChooser portal), exactly that file, that folder, or for a save only the chosen file (writable, alone in its
+    grant), is bind-mounted into the app's running view by the view's own PID 1 and the app gets
     `/run/flatpak/app/<id>/doc/<grant>/<name>`, as Flatpak's document portal would give a path of its own, without FUSE
     (`server/src/fplend.c`, `lend_one` in `sec/sandbox.c`). PID 1 keeps a tmpfs only it writes, shown read-only to the app
     inside `app/<id>` (which Flatpak 1.16 binds at `/run/flatpak/app/<id>`) and
@@ -42,6 +42,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     token for the sources the person picked, kept only in memory, valid 10 s and once (`csm_token_issue`/`csm_token_take`
     in `cast/castsm.c`): Chromium's second request and OBS's restart right after the choice start without the chooser;
     the indicator shows the share as always, and a restored session gets no new token.
+  - **Hardened after the Claude Security review of 2026-11-22** (F1, F2, F5, F6, F7):
+    - Paths are canonical before any lending decision: an app could set the dialog's starting folder to
+      `/home/u/./.config` or `/home/u//.ssh`, the chosen path kept that spelling, no entry of the string-compared deny
+      lists matched it, and `~/.config` (autostart, LordOS's permission files) or `~/.ssh` could be lent writable. Now
+      the dialog never starts in such a folder (`startFolder` refuses empty, `.` and `..` elements), the portal drops such
+      a chosen path, `fplend_check` refuses any path that isn't canonical (`sec/pathcanon.h`) or that the kernel names
+      otherwise once opened with no link (`/proc/self/fd`) and decides the policy on that path only, `apps_grant_ok`
+      refuses any non-canonical path, and the view's PID 1 refuses one too.
+    - A save lends only the chosen file, never its folder: before, the folder the app pointed the dialog at was lent
+      read-only, so an app could read every file in `~/.aws`, a browser profile or `~/Documents` after one Save. A save
+      directly in the home folder now works (only the file is lent). An app that saves through a temporary file renamed
+      over the target can't save there (`docs/FLATPAK.md`, the limit).
+    - What is never lent to a Flatpak app as a folder, writable or as a save grows by the common credential stores,
+      browser and mail profiles and other Flatpak apps' data (`~/.aws`, `~/.kube`, `~/.password-store`,
+      `~/.local/share/keyrings`, `~/.docker`, `~/.netrc`, `~/.pki`, `~/.mozilla`, `~/.thunderbird`, Chrome's, Chromium's,
+      Brave's and Edge's folders under `~/.config`, `~/.var/app`; `lend_sensitive` in `apps.c`). A file there the person
+      opens is lent read-only. Isolated apps' own data folders are unchanged (an isolated Firefox keeps `~/.mozilla`).
+    - A screen-share restore token is revoked before it is spent: the indicator's Stop drops that app's tokens, a lock, a
+      text console, a user switch or every share ending drops all of them (`csm_token_drop`, `portal_cast_away`,
+      `portal_cast_tokens_drop`), and none is honoured while the session is locked. Only the app's own Close keeps it.
+    - Tests: `build/fplend-test` (new: `/./`, `//`, `..`, a trailing `/` or `.` and links refused for files, folders and
+      saves even past a string-compared grant rule; a save names its file, never its folder), `build/sandbox-lend-test`
+      (a save's grant holds only the chosen name, the files and folders next to it can't be read; non-canonical paths
+      refused by PID 1), `build/portal-cast-test` (a token dead after Stop, after every share ended and while locked, and
+      working again for a new share after the unlock; non-canonical chosen paths dropped), `castsm-test`
+      (`csm_token_drop`), `filepicker_model_test.mjs` (`startFolder`).
   - **Screenshot portal** (`org.freedesktop.portal.Screenshot`, Screenshot and PickColor; for Flameshot, ksnip and the
     like): the same chooser, gate and indicator as ScreenCast, always interactive: a screen, a window, or "Select Area…"
     to drag over the screen; for a color, a click. The picture is taken once the chooser and the overlay are gone,

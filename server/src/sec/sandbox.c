@@ -8,6 +8,7 @@
  * sockets remain allowed: Wayland and the broker need them (the broker arrives as an already
  * connected fd, no connect). */
 #include "sandbox.h"
+#include "pathcanon.h"
 #include "cgroup.h"
 
 #include <dirent.h>
@@ -432,9 +433,6 @@ static int view_others(pid_t except) {
 #ifndef AT_RECURSIVE
 #define AT_RECURSIVE 0x8000
 #endif
-#ifndef MOVE_MOUNT_T_EMPTY_PATH
-#define MOVE_MOUNT_T_EMPTY_PATH 0x00000040
-#endif
 
 int sandbox_lend_name_ok(const char *name) {
     if (!name || !name[0] || strlen(name) > SB_LEND_NAME_MAX || !strcmp(name, ".") || !strcmp(name, "..")) return 0;
@@ -474,15 +472,19 @@ static int lend_tree(int fd, int dir, int rw) {
     return t;
 }
 
-/* One grant, done by PID 1 in its own mount namespace: the path opened again here, never through a link, only if it is
- * the file lord-server checked; a copy of its mount at docfd/<grant>/<name>. 0 (grant set) or an errno. */
+/* One grant, done by PID 1 in its own mount namespace: the path opened again here, never through a link and only when it
+ * is written the canonical way (the same string lord-server checked its policy on), only if it is the object lord-server
+ * checked (device and inode); a copy of its mount at docfd/<grant>/<name>. A save is its target file alone, writable,
+ * exactly as a file: never its folder. 0 (grant set) or an errno. */
 static int lend_one(int docfd, const SbLendMsg *q, char *grant) {
-    if (q->kind < SB_LEND_FILE || q->kind > SB_LEND_SAVE || q->path[0] != '/' || !sandbox_lend_name_ok(q->name)) return EINVAL;
-    int dir = q->kind != SB_LEND_FILE;
+    if (q->kind < SB_LEND_FILE || q->kind > SB_LEND_SAVE || !path_canonical(q->path) || !sandbox_lend_name_ok(q->name)) return EINVAL;
+    const char *base = strrchr(q->path, '/') + 1;
+    if (strcmp(base, q->name)) return EINVAL;           /* the app sees the chosen name, never another */
+    int dir = q->kind == SB_LEND_DIR;
     int src = open_nolink(AT_FDCWD, q->path, dir, 0);
     if (src < 0) return errno ? errno : ENOENT;
     if (!same_file(src, q->dev, q->ino, dir)) { close(src); return ESTALE; }
-    int tree = lend_tree(src, dir, q->kind == SB_LEND_SAVE ? 0 : !!q->rw);
+    int tree = lend_tree(src, dir, q->kind == SB_LEND_SAVE ? 1 : !!q->rw);
     int e = errno;
     close(src);
     if (tree < 0) return e ? e : EPERM;
@@ -493,29 +495,14 @@ static int lend_one(int docfd, const SbLendMsg *q, char *grant) {
     int g = openat(docfd, grant, O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
     if (g < 0) { e = errno; close(tree); return e; }
     int r = 0;
-    if (q->kind == SB_LEND_FILE) {
+    /* the grant's folder is on PID 1's tmpfs, read-only to the app: it holds the one name and nothing else */
+    if (dir) {
+        if (mkdirat(g, q->name, 0700)) r = errno;
+    } else {
         int f = openat(g, q->name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
         if (f < 0) r = errno; else close(f);
-        if (!r && syscall(SYS_move_mount, tree, "", g, q->name, MOVE_MOUNT_F_EMPTY_PATH)) r = errno;
-    } else if (q->kind == SB_LEND_DIR) {
-        if (mkdirat(g, q->name, 0700)) r = errno;
-        if (!r && syscall(SYS_move_mount, tree, "", g, q->name, MOVE_MOUNT_F_EMPTY_PATH)) r = errno;
-    } else {
-        /* the folder read-only on <grant>, then the target file writable over its own name in it */
-        if (syscall(SYS_move_mount, tree, "", g, "", MOVE_MOUNT_F_EMPTY_PATH | MOVE_MOUNT_T_EMPTY_PATH)) r = errno;
-        int top = r ? -1 : openat(docfd, grant, O_PATH | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-        if (!r && (top < 0 || !same_file(top, q->dev, q->ino, 1))) r = ESTALE;
-        int f = r ? -1 : open_nolink(top, q->name, 0, 1);
-        if (!r && (f < 0 || !same_file(f, q->tdev, q->tino, 0))) r = ESTALE;
-        int ft = r ? -1 : lend_tree(f, 0, 1);
-        if (!r && ft < 0) r = errno ? errno : EPERM;
-        if (!r && syscall(SYS_move_mount, ft, "", top, q->name, MOVE_MOUNT_F_EMPTY_PATH)) r = errno;
-        if (ft >= 0) close(ft);
-        if (f >= 0) close(f);
-        /* on a failure the folder is not left there read-only without its file: unmounted (top is its root) */
-        if (r && top >= 0) { char p[64]; snprintf(p, sizeof p, "/proc/self/fd/%d", top); umount2(p, MNT_DETACH); }
-        if (top >= 0) close(top);
     }
+    if (!r && syscall(SYS_move_mount, tree, "", g, q->name, MOVE_MOUNT_F_EMPTY_PATH)) r = errno;
     close(g);
     close(tree);
     return r;

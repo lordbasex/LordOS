@@ -45,6 +45,7 @@
 #include "fpak.h"
 #include "fpspawner.h"
 #include "fplend.h"
+#include "sec/pathcanon.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -560,6 +561,13 @@ static const char *const sensitive[] = { "/.ssh", "/.gnupg", "/.config/systemd",
                                          "/.local/bin", "/bin", "/.config/autostart", "/.local/share/applications",
                                          "/.config/lordos", "/.local/share/lordos", "/.config/fish", "/.bin",
                                          "/.local/share/flatpak", "/.config/dbus-1", NULL };
+/* What a Flatpak app is never lent writable, as a folder or as a save (fplend.c), besides those: credential stores and
+ * browser and mail profiles (Claude Security F5, 2026-11-22). Not in sensitive[]: an isolated Firefox keeps ~/.mozilla
+ * as its own data folder. */
+static const char *const lend_sensitive[] = { "/.aws", "/.kube", "/.password-store", "/.local/share/keyrings", "/.docker",
+                                              "/.netrc", "/.pki", "/.mozilla", "/.thunderbird", "/.config/google-chrome",
+                                              "/.config/chromium", "/.config/BraveSoftware", "/.config/microsoft-edge",
+                                              "/.var/app", NULL };
 
 static int path_under(const char *path, const char *dir) {
     size_t n = strlen(dir);
@@ -588,7 +596,19 @@ static int grant_ok(const char *path) {
     return 1;
 }
 
-int apps_grant_ok(const char *path) { return path && path[0] == '/' && grant_ok(path); }   /* fplend.h */
+/* fplend.h. grant_ok compares strings, so only a canonical path (no "/./", "//", "..", or '/' at the end): any other
+ * spelling of a sensitive folder would match none of the entries (Claude Security F1/F2, 2026-11-22). */
+int apps_grant_ok(const char *path) {
+    if (!path_canonical(path) || !grant_ok(path)) return 0;
+    const char *h = getenv("HOME");
+    char home[PATH_MAX], full[PATH_MAX + 64];
+    if (!h || !realpath(h, home)) return 0;
+    for (int i = 0; lend_sensitive[i]; i++) {
+        snprintf(full, sizeof full, "%s%s", home, lend_sensitive[i]);
+        if (path_under(path, full) || path_under(full, path)) return 0;
+    }
+    return 1;
+}
 
 static int is_dir(const char *p) { struct stat st; return !lstat(p, &st) && S_ISDIR(st.st_mode); }
 

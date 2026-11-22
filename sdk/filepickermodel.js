@@ -10,12 +10,14 @@ export const localDisks = (volumes, home) => (volumes || []).filter((v) => !NETW
 
 const inside = (path, root) => path === root || path.startsWith(`${root}/`);
 
-// start: empty, relative to the home folder, or absolute. Nothing above the home folder or a disk.
+// start: empty, relative to the home folder, or absolute. Nothing above the home folder or a disk, and only a path written
+// the plain way: an empty, "." or ".." element ("/home/u/./.config", "/home/u//.ssh") would carry that spelling into the
+// path chosen, and the policy that lends it to a Flatpak app compares strings (fplend.c).
 export function startFolder(start, home, disks = []) {
   const s = String(start || '').replace(/\/+$/, '');
   if (!s) return home;
   const path = s.startsWith('/') ? s : `${home}/${s}`;
-  if (path.split('/').includes('..')) return home;
+  if (path.split('/').slice(1).some((e) => e === '' || e === '.' || e === '..')) return home;
   return [home, ...disks.map((d) => d.path)].some((r) => inside(path, r)) ? path : home;
 }
 

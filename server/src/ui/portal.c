@@ -18,6 +18,7 @@
 #include "../fsops.h"
 #include "../fplend.h"
 #include "../sec/appid.h"
+#include "../sec/pathcanon.h"
 #include "../sec/restrict.h"
 #include "../fw/rules.h"
 #include "../vault/dbus.h"
@@ -375,6 +376,15 @@ void portal_file_chosen(int id, const char *const *paths, int n) {
     int i = 0;
     while (i < npicks && picks[i].id != id) i++;
     if (i == npicks) return;
+    /* only paths written the canonical way (no "/./", "//", ".." or '/' at the end): the lending policy compares strings
+     * (Claude Security F1/F2, 2026-11-22); any other is dropped, and with none left the dialog counts as cancelled */
+    const char *ok[256];
+    int m = 0;
+    for (int k = 0; k < n && m < (int)(sizeof ok / sizeof ok[0]); k++)
+        if (path_canonical(paths[k])) ok[m++] = paths[k];
+        else fprintf(stderr, "portal: a chosen path not written the plain way is dropped\n");
+    paths = ok;
+    n = m;
     if (up) {
         DBuf b;
         dw_init(&b);
@@ -1232,6 +1242,7 @@ _Static_assert((int)CSM_TYPE_MONITOR == (int)CAST_SRC_MONITOR && (int)CSM_TYPE_W
 _Static_assert((int)CSM_MAX_SOURCES == CAST_MAX_STREAMS, "one stream per source");
 
 static CastSm csm;
+static int cast_away;                       /* the session is locked, switched away or not on the display */
 /* per session (the same index as csm.s): who asked (the app LordOS verified, "" when it can't tell: never the name a
  * process gives itself in /proc/<pid>/comm, which any process sets), and the bus's answer we wait for */
 static struct { char who[128]; uint32_t serial; CastSource src[CSM_MAX_SOURCES]; int nsrc; } cast_app[CSM_MAX];
@@ -1362,6 +1373,9 @@ static void cast_close(CsSess *s, int closed) {
         dw_free(&b);
         dbus_flush(&conn);
     }
+    /* the person's Stop, or a lock, a user switch or the helper's end: the app's restore tokens are revoked with it, so
+     * no share starts again without the chooser after the person ended one (an app's own Close keeps them: OBS) */
+    if (closed && cast_app[cast_idx(s)].who[0]) csm_token_drop(&csm, cast_app[cast_idx(s)].who);
     memset(&cast_app[cast_idx(s)], 0, sizeof cast_app[0]);
     csm_end(s);
     if (was) casts_changed();
@@ -1471,6 +1485,7 @@ static void cast_ask(CsSess *s, unsigned pid) {
     }
     /* a restore token this same verified app got for its last pick, still valid (csm_token_take: ~10 s, once): the
      * same sources again without the chooser; the indicator shows the share as always */
+    if (cast_away) s->restore[0] = 0;          /* never while the session is locked or away: the chooser, as always */
     if (known && s->restore[0]) {
         CastSource src[CSM_MAX_SOURCES];
         int len = csm_token_take(&csm, who, s->restore, ms_now(), src, (int)sizeof src);
@@ -1656,6 +1671,13 @@ void portal_cast_remote(int id, uint32_t req, int fd) {
         if (rcalls[i].sess == id && rcalls[i].req == req) { rcall_drop(i, fd); break; }
     if (fd >= 0) close(fd);
 }
+
+void portal_cast_away(int away) {
+    cast_away = !!away;
+    if (away) csm_token_drop(&csm, NULL);
+}
+
+void portal_cast_tokens_drop(void) { csm_token_drop(&csm, NULL); }
 
 void portal_cast_stop(int id) {
     CsSess *s = csm_by_id(&csm, id);

@@ -428,6 +428,7 @@ void cast_shown(int id) {
 
 void cast_end_all(void) {
     for (int i = 0; i < MAX_RUNS; i++) if (runs[i].id) run_lost(&runs[i]);
+    portal_cast_tokens_drop();          /* and no share starts again from a restore token without the chooser */
 }
 
 /* ---- what changed ---- */

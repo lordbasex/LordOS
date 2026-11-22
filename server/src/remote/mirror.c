@@ -23,6 +23,7 @@
 #include "../par.h"
 #include "../canvas.h"
 #include "../cast/cast.h"
+#include "../ui/portal.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -181,7 +182,7 @@ static void drop(Client *c) {
     int had = c->who[0] != 0;
     release_keys(c);
     /* lord-sessiond went away from the monitor's session: nobody vouches for who is at the screen */
-    if (c->seat) { share_session(SHARE_S_LEFT); cast_end_all(); }
+    if (c->seat) { share_session(SHARE_S_LEFT); portal_cast_away(1); cast_end_all(); }
     close_fds(c);
     close(c->fd);
     free(c->in);
@@ -313,6 +314,7 @@ static void handle(Client *c, int type, const unsigned char *d, uint32_t n) {
     case RP_DISPLAY:
         if (c->seat && c->nfds > 0 && cb.display) {
             share_session(SHARE_S_SHOWN);           /* lent: the person is at this session, signed in */
+            portal_cast_away(0);                    /* restore tokens may be honoured again */
             cb.display(c->fds, c->nfds, n >= 2 ? d[1] : 0);  /* the fds now belong to the session */
             c->nfds = 0;
         }
@@ -324,7 +326,7 @@ static void handle(Client *c, int type, const unsigned char *d, uint32_t n) {
         }
         break;
     case RP_UNDISPLAY:
-        if (c->seat) { share_session(SHARE_S_LEFT); cast_end_all(); }   /* before anything else is composed */
+        if (c->seat) { share_session(SHARE_S_LEFT); portal_cast_away(1); cast_end_all(); }   /* before anything else is composed */
         if (c->seat && cb.undisplay) cb.undisplay();
         break;
     case RP_VIDEO:
@@ -578,8 +580,8 @@ void mirror_session(const char *json) {
      * what Linux apps are shown (the ScreenCast portal) end here, before anything else, because the session goes on
      * drawing behind the lock (docs/SESSIONS.md) */
     /* a text console (Ctrl+Alt+Fn) locks the session too (lord-sessiond, vt_away) */
-    if (strstr(json, "\"lock\"") || strstr(json, "\"vt\"")) { share_session(SHARE_S_LOCK); cast_end_all(); vc_lock_all("screen"); }
-    else if (strstr(json, "\"switch\"")) { share_session(SHARE_S_SWITCH); cast_end_all(); vc_lock_all("switch"); }
+    if (strstr(json, "\"lock\"") || strstr(json, "\"vt\"")) { share_session(SHARE_S_LOCK); portal_cast_away(1); cast_end_all(); vc_lock_all("screen"); }
+    else if (strstr(json, "\"switch\"")) { share_session(SHARE_S_SWITCH); portal_cast_away(1); cast_end_all(); vc_lock_all("switch"); }
     send_json(RP_SESSION, json, 0);
 }
 void mirror_greeter(const char *json) { send_json(RP_GREETER, json, 1); }

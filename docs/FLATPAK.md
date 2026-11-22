@@ -473,7 +473,7 @@ callers are Linux apps outside Flatpak; none of them identifies a Flatpak app ye
 | `org.freedesktop.portal.GlobalShortcuts` | served (version 1; 0.8.8.8) | `CreateSession`, `BindShortcuts`, `ListShortcuts`; `Activated` and `Deactivated` (press and release, for push-to-talk) and `ShortcutsChanged`, sent only to the connection that opened the session and only while it is bound. Nothing is bound until the person answers LordOS's own sheet; never a ❖ combination or a key LordOS keeps; a bound key goes only to that app. Decisions kept per app scope in `~/.config/lordos/global-shortcuts.json` (`fsops_protected`), changed or forgotten in Settings → Keyboard ([SHORTCUTS.md](SHORTCUTS.md), "Linux apps' global shortcuts") |
 | `org.freedesktop.ScreenSaver` (own bus name) | served (0.8.8.8) | `Inhibit`/`UnInhibit` with a cookie, the same hold, and `GetActive`; released when the caller leaves the bus |
 | Notification | not a portal here | apps use `org.freedesktop.Notifications` (`server/src/hw/notifyd.c`) |
-| `org.freedesktop.portal.ScreenCast` | served (version 4; 0.8.8.8) | `CreateSession`, `SelectSources` (monitor and window, one or several, the pointer hidden or drawn into the picture; the cursor as metadata isn't offered), `Start` and `OpenPipeWireRemote`, and the `Session` object (`Close`, `Closed`). `Start` shows LordOS's own chooser: the displays and the open windows with a picture of each and the name of the app asking; nothing is shared until the person picks, Cancel answers 1, and an app with "no screen capture" is answered 2 without a question. `persist_mode` is accepted and nothing is kept: no `restore_token` is ever given, so the person picks every time. The streams come from the sandboxed `lord-screencast` (`server/src/cast/`); the fd `OpenPipeWireRemote` returns is a PipeWire connection that can see only the session's streams. While it runs, the sharing indicator shows it with a Stop; Stop, a lock, the app's `Close` or the app leaving the bus end it. See `WAYLAND.md`, "Sharing a screen or a window" |
+| `org.freedesktop.portal.ScreenCast` | served (version 4; 0.8.8.8) | `CreateSession`, `SelectSources` (monitor and window, one or several, the pointer hidden or drawn into the picture; the cursor as metadata isn't offered), `Start` and `OpenPipeWireRemote`, and the `Session` object (`Close`, `Closed`). `Start` shows LordOS's own chooser: the displays and the open windows with a picture of each and the name of the app asking; nothing is shared until the person picks, Cancel answers 1, and an app with "no screen capture" is answered 2 without a question. `persist_mode` gives an app LordOS verified a restore token kept only in memory, valid 10 s and once, revoked by Stop or a lock ("Screenshots and the screen-share token", below); nothing is ever written. The streams come from the sandboxed `lord-screencast` (`server/src/cast/`); the fd `OpenPipeWireRemote` returns is a PipeWire connection that can see only the session's streams. While it runs, the sharing indicator shows it with a Stop; Stop, a lock, the app's `Close` or the app leaving the bus end it. See `WAYLAND.md`, "Sharing a screen or a window" |
 | Documents, Flatpak (sub-sandboxes) | not served | see below and E5 |
 | Screenshot, Camera | never offered | they would hand out the screen or the camera (see A) |
 
@@ -1032,7 +1032,7 @@ in every instance), and exactly that is mounted in its running view:
 |---|---|
 | Open a file | that file, writable when the launcher's grant rules allow it (`apps_grant_ok`), else read-only |
 | Choose a folder | that folder and what is in it (refused for the home, a folder holding its keys or startup files, a protected one) |
-| Save | the chosen folder read-only, with only the chosen name writable (lord-server makes it empty first) |
+| Save | only the chosen file, writable (lord-server makes it empty first); nothing else of its folder |
 
 - **How it reaches the running app.** The view's PID 1 (the only process with the view's user namespace's capabilities)
   mounts a small tmpfs at `$XDG_RUNTIME_DIR/.lordos-lend`, makes it shared and binds it read-only at
@@ -1042,17 +1042,34 @@ in every instance), and exactly that is mounted in its running view:
 - **Who asks.** The D-Bus caller's pid (the app's xdg-dbus-proxy) must be in a root-owned `app-lordos-fp-<id>.scope`;
   its view is the one whose PID 1 is that process's topmost ancestor in the scope, and lord-server talks to that PID 1
   only over the socket pair the launcher gave it (`FPLEND_FD`, closed in the app; PID 1 says hello with its pidfd).
-- **What is lent.** lord-server opens the path with no link on the way and sends its device and inode; PID 1 opens the
-  path again in its own mount namespace (`openat2`, no links), lends it only if it is that very file, copies its mount
-  (`open_tree`), sets it nosuid, nodev and read-only unless writable, and moves it onto `<grant>/<name>` (a random
-  128-bit name). Protected paths (`fsops_protected_resolved`) are never lent. A mount the kernel keeps read-only is lent
-  read-only. At most 256 grants per view.
+- **What is lent.** Only a path written the canonical way (no empty, `.` or `..` element, no `/` at the end:
+  `sec/pathcanon.h`): the policy compares strings, and `/home/u/./.config` or `/home/u//.ssh` (an app sets the dialog's
+  starting folder) would match none of its entries (Claude Security F1/F2, 2026-11-22). The dialog never starts in such a
+  folder (`startFolder`), the portal drops such a chosen path, and lord-server opens the path with no link on the way and
+  goes on only when the kernel names what it opened (`/proc/self/fd`) by that very string; the policy
+  (`fsops_protected_resolved`, `apps_grant_ok`, which also refuses any non-canonical path) is decided on it, and it sends
+  its device and inode. PID 1 refuses a non-canonical path too, opens it again in its own mount namespace (`openat2`, no
+  links), lends it only if it is that very file, copies its mount (`open_tree`), sets it nosuid, nodev and read-only
+  unless writable, and moves it onto `<grant>/<name>` (a random 128-bit name, on PID 1's tmpfs, read-only to the app).
+  Protected paths are never lent. A mount the kernel keeps read-only is lent read-only. At most 256 grants per view.
+- **A save** lends the target file alone, exactly as an open does, writable: the grant folder holds that name and
+  nothing else, so the app never sees the rest of the folder it pointed the dialog at (Claude Security F5, 2026-11-22;
+  before, the whole folder was lent read-only). The name must pass `apps_grant_ok` (never a protected or sensitive path,
+  a startup file, or a file with another name); the folder itself isn't checked, since nothing of it is lent.
+- **Sensitive folders**: the launcher's (`sensitive` in `apps.c`: keys, startup, autostart and LordOS's folders) and, for
+  lending only (`lend_sensitive`), credential stores, browser and mail profiles and other Flatpak apps' data: `~/.aws`,
+  `~/.kube`, `~/.password-store`, `~/.local/share/keyrings`, `~/.docker`, `~/.netrc`, `~/.pki`, `~/.mozilla`,
+  `~/.thunderbird`, `~/.config/google-chrome`, `~/.config/chromium`, `~/.config/BraveSoftware`,
+  `~/.config/microsoft-edge`, `~/.var/app`. Never lent as a folder or writable, nor a save into them; a file there the
+  person opens is lent read-only.
 - **Revoked** with the view: when the app's last process leaves, its mount namespace and every grant go.
 - A caller that isn't a Flatpak app LordOS started gets the real path, as before. A lend that fails is logged and the
   app gets the real path (which its own Flatpak permissions decide).
 - Limit: an app that saves only by writing a temporary file next to the target and renaming it over it can't save
-  there (the folder is read-only and the target a mount point): "write limited to that name" is the decision. Not yet
-  measured with a real app.
+  there: the grant folder is read-only and holds no room for a temporary file, and the target is a mount point (a rename
+  over it fails with `EBUSY`). "Write limited to that name" is the decision. An app that writes the file in place (most
+  GTK and Qt apps through the portal's answer, `fpportal-probe`) saves normally. Not yet measured with a real app that
+  renames.
 
 Tested by `build/sandbox-lend-test` (a fake app, also inside bubblewrap with the grant made after it started) and
 `build/portal-cast-test`; end to end with `build/fpportal-probe` inside a real Flatpak sandbox (below).
@@ -1080,6 +1097,10 @@ sub-sandbox with its own `/usr` and `/app` (`usr-fd`, `app-fd`, with SHARE_PIDS)
   with it, within that time, starts on those sources without the chooser (Chromium asks twice for one share; OBS restarts
   its capture right after the choice); the indicator shows the share as always and its frames still wait for it; a
   restored session gets no token, so a token never leads to another. Never for an unknown program; never written.
+  Revoked before it is spent (Claude Security F6/F7, 2026-11-22): the person's Stop in the indicator (or the share
+  ending on its own) drops that app's tokens; a lock, a text console, a user switch, the session leaving the display or
+  every share ending (`cast_end_all`) drops all of them, and none is honoured while the session is locked or away: the
+  chooser, as always. Only the app's own `Close` keeps it (OBS restarting its capture).
 - **Screenshot portal** (`org.freedesktop.portal.Screenshot` version 2: Screenshot and PickColor). The same chooser and
   gate as ScreenCast ("no screen capture" refuses; an unknown program is said so), always interactive whatever the app
   asks: a screen, a window, or "Select Area…" to drag over the live screen; PickColor shows only the overlay, a click

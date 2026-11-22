@@ -21,6 +21,13 @@ eq('outside', startFolder('/etc', home, [usb]), home);
 eq('a neighbor with the same start', startFolder('/home/anabel', home), home);
 eq('climbing', startFolder('../../etc', home), home);
 eq('climbing absolute', startFolder(`${home}/../root`, home), home);
+// a path not written the plain way never reaches the dialog (Claude Security F1/F2): its spelling would be in what is chosen
+eq('a dot element', startFolder(`${home}/./.config`, home), home);
+eq('a dot element, relative', startFolder('./.config', home), home);
+eq('a doubled slash', startFolder(`${home}//.ssh`, home), home);
+eq('a doubled slash, relative', startFolder('Documents//x', home), home);
+eq('a dot at the end', startFolder(`${home}/.config/.`, home), home);
+eq('a plain hidden folder still opens', startFolder(`${home}/.config`, home), `${home}/.config`);
 
 const labels = (p) => pathCrumbs(p, home).map((c) => c.label);
 eq('home crumb', pathCrumbs(home, home), [{ label: 'ana', path: home, home: true }]);
