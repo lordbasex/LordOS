@@ -254,23 +254,32 @@ function NoIndex() {
 }
 
 // Search results: apps as cards, other packages as rows.
-function Results({ q, onOpen, more, hide = [] }) {
+function Results({ q, onOpen, more: hasTop, hide = [] }) {
   const th = useTheme();
-  const res = cached(`q:${q}`, () => lord.pkg.search(q, { limit: 60, lang: lang2() })).filter((r) => !hide.includes(r.name));
+  // up to the engine's 500 (it was 60, the other packages cut at 30), shown a page at a time as the results are
+  // scrolled (endless.js): the apps first, then the other packages; the cards' items are cached (memoized cards)
+  const all = cached(`q:${q}`, () => lord.pkg.search(q, { limit: 500, lang: lang2() }).map((r) => (r.app ? { ...r, package: r.name } : r)));
+  const res = hide.length ? all.filter((r) => !hide.includes(r.name)) : all;
   const apps = res.filter((r) => r.app), others = res.filter((r) => !r.app);
+  const { limit, more } = usePaged(res.length, `q:${q}`);
+  const openRef = useRef(onOpen);
+  openRef.current = onOpen;
+  const open = useCallback((name) => openRef.current(name), []);
+  const otherLimit = Math.max(0, limit - apps.length);
   return h(View, { style: { gap: spacing.l } },
     h(Progress),
-    apps.length ? h(Shelf, { title: t('store.debian.results', { q }) }, h(Grid, { items: apps.map((r) => ({ ...r, package: r.name })), onOpen })) : null,
-    others.length ? h(View, { style: { marginTop: spacing.s } },
+    apps.length ? h(Shelf, { title: t('store.debian.results', { q }) }, h(Grid, { items: apps.slice(0, limit), onOpen: open })) : null,
+    others.length && otherLimit ? h(View, { style: { marginTop: spacing.s } },
       h(Header, { th }, t('store.debian.otherPackages')),
-      h(GroupBox, null, ...others.slice(0, 30).map((r) => h(View, { key: r.name, onClick: () => onOpen(r.name),
+      h(GroupBox, null, ...others.slice(0, otherLimit).map((r) => h(View, { key: r.name, onClick: () => onOpen(r.name),
         style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, minHeight: 44, paddingVertical: 6 } },
         h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
           h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, r.name),
           h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, r.summary)),
         r.installed ? h(Text, { style: { fontSize: typeScale.caption, fontWeight: 500, color: '#30d158' } }, t('store.installedBadge')) : null,
         h(Text, { style: { fontSize: 15, color: th.textDim } }, direction() === 'rtl' ? '‹' : '›'))))) : null,
-    res.length === 0 && !more ? h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }) : null);
+    h(MoreButton, { left: res.length - limit, onMore: more }),
+    res.length === 0 && !hasTop ? h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }) : null);
 }
 
 // Discover: what the page above it brings (`top`: the featured app and the AI shelf; while searching,
@@ -383,10 +392,12 @@ function Updates() {
   const [plan, setPlan] = useState(null);
   const [prefs, setPrefs] = useState(updatePrefs);
   void gen;
-  if (!ready()) return h(NoIndex);
-  const ups = lord.pkg.upgrades();
-  const own = lordosUpdate(lang2());
+  const ups = ready() ? lord.pkg.upgrades() : [];
   const others = ups.filter((u) => u.name !== 'lordos');
+  // a full upgrade can list hundreds of packages: a page of rows at a time as the page is scrolled (endless.js)
+  const { limit, more } = usePaged(others.length, 'updates');
+  if (!ready()) return h(NoIndex);
+  const own = lordosUpdate(lang2());
   const need = !job ? restartNeeded() : null;
   const auto = (on) => { setUpdatePrefs({ autoCheck: on }); setPrefs(updatePrefs()); };
   return h(View, { style: { gap: 12 } },
@@ -411,12 +422,13 @@ function Updates() {
     ups.length === 0 ? h(EmptyState, { mascot: 'celebrate', title: t('store.updates.none'), style: { minHeight: 260 } }) : null,
     others.length ? h(View, { style: { marginTop: spacing.s } },
       h(Header, { th }, t('store.updates.debian', { count: others.length })),
-      h(GroupBox, null, ...others.map((u) => h(View, { key: u.name, style: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 } },
+      h(GroupBox, null, ...others.slice(0, limit).map((u) => h(View, { key: u.name, style: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 } },
         h(PkgIcon, { name: u.name, size: 32 }),
         h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
           h(Text, { style: { fontSize: 13, fontWeight: 600, color: th.text, textAlign: 'start' } }, pkgLabel(u.name)),
           h(Text, { style: { fontSize: 11, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, pkgLine(u))),
-        h(Text, { style: { fontSize: 11, color: th.textDim } }, formatBytes(u.size)))))) : null,
+        h(Text, { style: { fontSize: 11, color: th.textDim } }, formatBytes(u.size))))),
+      h(MoreButton, { left: others.length - limit, onMore: more })) : null,
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, marginTop: spacing.m, paddingHorizontal: spacing.xs } },
       h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
         h(Text, { style: { fontSize: typeScale.body, color: th.text, textAlign: 'start' } }, t('store.updates.auto')),

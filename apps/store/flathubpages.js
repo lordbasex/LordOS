@@ -209,11 +209,17 @@ export function FlathubCategory({ cat, query, onOpen }) {
   const fh = useFlathub();
   const [all, setAll] = useState(false);
   useEffect(() => { if (fh.on && !s.loaded) F.loadCatalog(); }, [fh.on]);
-  if (!fh.on || !s.loaded) return null;
-  const list = M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll, category: cat });
+  const list = useMemo(() => (fh.on && s.loaded ? M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll, category: cat }) : []),
+    [fh.on, s.loaded, s.catalog, query, fh.prefs.showAll, cat]);
+  // "See all": every app, a page at a time as the list is scrolled (endless.js); it used to stop at 240
+  const { limit, more } = usePaged(all ? list.length : 0, `${cat}|${query}|${fh.prefs.showAll}|${all}`);
+  const openRef = useRef(onOpen);
+  openRef.current = onOpen;
+  const open = useCallback((id) => openRef.current(id), []);
   if (!list.length) return null;
   return h(Shelf, { title: t('flathub.shelf'), more: all ? '' : t('store.seeAll', { count: list.length }), onMore: all || list.length <= SHELF ? null : () => setAll(true) },
-    h(CardGrid, null, ...list.slice(0, all ? 240 : SHELF).map((a) => h(FlathubCard, { key: a.id, a, onOpen }))));
+    h(CardGrid, null, ...list.slice(0, all ? limit : SHELF).map((a) => h(FlathubCard, { key: a.id, a, onOpen: open }))),
+    all ? h(MoreButton, { left: list.length - limit, onMore: more }) : null);
 }
 
 // Store → Updates: Flathub's apps are updated together (Flatpak finds what changed), and the runtimes no app uses any
