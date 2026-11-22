@@ -27,6 +27,7 @@
 #include "keygrab.h"
 #include "secctx.h"
 #include "kbinhibit.h"
+#include "wlfixes.h"
 #include "../keylag.h"
 #include "../sec/perms.h"
 #include "../apps.h"
@@ -5994,6 +5995,7 @@ int wl_start(void) {
     wl_input_globals(dpy);              /* zwp_pointer_gestures_v1 (wl_input.c) */
     wl_textinput_globals(dpy, text_field_report);    /* zwp_text_input_v3 (wl_textinput.c) */
     secctx_init(dpy, may_secctx);       /* a sandbox's own socket per app (secctx.c) */
+    wlfixes_init(dpy);                  /* wl_fixes: a client destroys a registry it no longer needs (wlfixes.c) */
     /* inherited by apps opened from the LordOS terminal */
     setenv("WAYLAND_DISPLAY", socket_name, 1);
     setenv("XDG_SESSION_TYPE", "wayland", 1);

@@ -1,0 +1,7 @@
+wl-fixes.xml: the wl_fixes interface of the Wayland core protocol (wayland.xml in wayland 1.24, version 1),
+with wayland.xml's copyright and MIT license, otherwise unchanged. Debian 13's libwayland (1.23) predates it,
+so server/mk/wlfixes.mk generates the server code (and the test client's code) from this file with
+wayland-scanner when the system's libwayland-server is older than 1.24. On 1.24 or newer the system's own
+wl_fixes_interface is used and this file is not read.
+
+Upstream: https://gitlab.freedesktop.org/wayland/wayland/-/blob/main/protocol/wayland.xml

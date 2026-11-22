@@ -9,6 +9,8 @@
 #   idle       ext-idle-notify: the first notification asks ("idle" permission; the theme here answers WLPERF_IDLE,
 #              allow by default), an allowed one is told idled
 #   icon       xdg-toplevel-icon: the kept buffer, re-encoded to straight RGBA, reaches the theme; a bad one is an error
+#   fixes      wl_fixes v1: destroy_registry destroys a registry (its id comes back), not-a-registry is an error
+#              (tests/wlfixes_client.c, build/wlfixes-client)
 #   damage     a client damaging a 10×10 square: every frame painted with only that damage equals a full repaint
 #              (LORD_PAINT_VERIFY=1, the default here; WLPERF_VERIFY=0 turns it off)
 # Run from server/ (tests/run_suites.sh does). Exit 77 when something it needs is missing (the theme bundle: npm run
@@ -106,6 +108,10 @@ if want icon; then
     echo "icon: $i"
     # the 64 px buffer (closest to 128 of 64 and 48; 300 is past the limit), as RGBA: XRGB8888 0x80ff0000 is opaque red
     echo "$i" | grep -q '"size":64,"width":64,"bytes":16384,"rgba":\[255,0,0,255\]' || fail "icon: $i"
+fi
+if want fixes; then
+    out=$(XDG_RUNTIME_DIR="$D" WAYLAND_DISPLAY="$S" ./build/wlfixes-client) || fail "fixes: the client"
+    echo "$out"
 fi
 if want damage; then
     client damage 30 || fail "damage: the client"
