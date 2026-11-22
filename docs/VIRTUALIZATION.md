@@ -1674,7 +1674,15 @@ entry of that kind gives kernel and initrd and lord-vm checks everything again; 
   an empty environment, the fingerprint and the time on fd 0, the memfds on fds 3–5, its answer on fd 1. It applies
   `sandbox_apply_helper` (no network, no files, no exec, 32 MB) before reading anything, verifies with LordOS's own
   OpenPGP code (`pkg/pgp.c` through `vmsig.c`; no new library), where only the primary key with that fingerprint (or its
-  subkeys) counts, and prints exactly `valid <fingerprint>` or `invalid <reason>`. lord-server reads that line strictly
+  subkeys) counts, and prints exactly `valid <fingerprint>` or `invalid <reason>`. The key is untrusted input, so it is
+  read with `pgp_keyring_add_untrusted`, unlike root's APT keyrings: every self-signature, subkey binding (0x18) and
+  revocation must verify with the primary key (SHA-256/512, RSA or Ed25519; SHA-1 ones don't count), and only verified
+  ones give key flags, expiry and revocation; a primary key with no verified self-signature and a subkey with no
+  verified binding are dropped, and a subkey may sign only when its newest binding gives it the sign flag and carries a
+  valid back-signature (0x19) made by the subkey itself. A subkey lives no longer than its primary. So a subkey grafted
+  under a genuine primary key (from a pasted block or an imported profile) can't sign as that fingerprint, and the pin
+  can't be bypassed that way (Claude Security F3/F4, 2026-11-22). Debian's archive keys sign with such bound subkeys;
+  Debian CD, Ubuntu's CD image, Kali and Fedora sign with the primary key. lord-server reads that line strictly
   (`vmsig_reply`: the fingerprint it asked for, a reason from a fixed list) and only then requires the image's SHA-256 to be
   a line of the very checksum file bytes it handed over (`vmsig_sums_has_hash`). Settings → Systems says "Signature:
   verified by ‹fingerprint›" or "Signature: invalid — not used" (or that the checksum file doesn't list the image), and

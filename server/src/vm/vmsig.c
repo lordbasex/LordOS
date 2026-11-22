@@ -43,10 +43,11 @@ int vmsig_verify(const char *key, size_t kl, const char *sums, size_t sl, const 
     if (!sums || !sig || !gl) { reason(why, whyn, "malformed"); return 0; }
     PgpKeyring kr = { 0 };
     int ok = 0;
-    if (pgp_keyring_add_mem(&kr, key, kl)) reason(why, whyn, "noKey");
+    if (pgp_keyring_add_untrusted(&kr, key, kl, now)) reason(why, whyn, "noKey");
     else {
         const char *fp[1] = { fpr };
-        /* only that primary key (and its subkeys) may sign: any other key in the block is dropped */
+        /* only that primary key (and the subkeys it really bound, with their back-signatures) may sign: any other key
+         * in the block, and any subkey grafted under it, is dropped */
         if (pgp_keyring_pin(&kr, fp, 1) != 1) reason(why, whyn, "noKey");
         else {
             char err[200] = "";

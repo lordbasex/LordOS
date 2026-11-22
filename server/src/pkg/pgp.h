@@ -18,6 +18,7 @@ typedef struct {
     uint8_t ed[32];                     /* EdDSA */
     int64_t created, expires;           /* expires 0: never */
     int revoked, can_sign, primary;
+    int bound;                          /* a self-signature (primary) or binding (subkey) was read; verified if untrusted */
 } PgpKey;
 
 typedef struct {
@@ -28,7 +29,12 @@ typedef struct {
 } PgpKeyring;
 
 int  pgp_keyring_add_file(PgpKeyring *kr, const char *path);      /* 0 ok */
-int  pgp_keyring_add_mem(PgpKeyring *kr, const char *data, size_t len);   /* binary or armored */
+int  pgp_keyring_add_mem(PgpKeyring *kr, const char *data, size_t len);   /* binary or armored, trusted (root's keyrings) */
+/* Key material nobody vouched for (pasted, from a file, from an imported profile): every self-signature, subkey binding
+ * (0x18) and signing subkey's back-signature (0x19) is verified (SHA-256/512, RSA or Ed25519) and only verified ones
+ * give flags, expiry and revocation; a primary key with no verified self-signature and a subkey with no verified
+ * binding are dropped; a subkey may sign only with key flag 0x02 and a valid back-signature. 0 ok. */
+int  pgp_keyring_add_untrusted(PgpKeyring *kr, const char *data, size_t len, int64_t now);
 void pgp_keyring_free(PgpKeyring *kr);
 
 /* Verifies a cleartext-signed message (InRelease). Returns the number of valid signatures from
