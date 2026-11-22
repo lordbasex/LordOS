@@ -12,7 +12,7 @@ import { webAppOfWindow } from './webapps.js';
 import { webWindowTitles, profileHex } from './webappsmodel.js';
 import { SNAP_ZONES, snapRect, zoneAt, snapNext, dwellZone, SNAP_DWELL_MS, snapAllowed } from './snap.js';
 import { settings } from './settings.js';
-import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, keyboardWindow, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo } from './desktopmodel.js';
+import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, keyboardWindow, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo, cleanLayer } from './desktopmodel.js';
 
 export { SNAP_ZONES, snapRect };
 
@@ -80,7 +80,9 @@ export const placeLinuxWindow = (dockId) => (linuxPlacement ? linuxPlacement(doc
 let seq = 2;
 const guards = new Map();
 
-// State: list ordered from bottom to top (the last one is in front).
+// State: list in the order the windows were brought forward (the last one is in front and has the keyboard). It is
+// also the drawing order inside each layer: always-on-top windows (w.layer) are drawn over the rest (desktopmodel.js
+// stackOrder; useWindows().mounted is already in that order).
 export const windows = createStore([]);
 
 // Desktops (docs/DESKTOPS.md, the rules are in desktopmodel.js): each window has w.desktop, and only
@@ -555,6 +557,22 @@ export const wm = {
     const next = ws.map((w) => (w.id === id ? { ...w, fullscreen: !!on, capture: !!(on && capture), minimized: false } : w));
     return on && next.some((w) => w.id === id) ? raiseUnlessTop(next, id) : next;
   }),
+  // Always on top (docs/WINDOWS.md, "Always on top"; the rules are desktopmodel.js stackOrder): layer 'above' keeps the
+  // window over every normal one, 'below' under them, null is normal. It changes only what is drawn over what: the
+  // keyboard stays with the window brought forward last, which may be a normal one under it. An X11 window is told
+  // (_NET_WM_STATE_ABOVE / _BELOW, sdk/wayland.js), and its own request arrives here the same way.
+  setLayer: (id, layer) => {
+    const w = windows.get().find((x) => x.id === id), l = cleanLayer(layer);
+    if (w && (w.layer || null) !== l) patch(id, { layer: l });
+  },
+  layer: (id) => cleanLayer(windows.get().find((x) => x.id === id)?.layer),
+  isAbove: (id) => wm.layer(id) === 'above',
+  // the window menu's Always on Top: on, it also comes forward (the person is looking at it)
+  toggleAbove(id) {
+    const on = !wm.isAbove(id);
+    wm.setLayer(id, on ? 'above' : null);
+    if (on) wm.raise(id);
+  },
   // Picture-in-picture: a small frameless window, always on top (frame = { x, y, w, h } or null).
   // It shows on every desktop; back from it, the window stays on the one in view.
   desktop: () => activeDesktop.get(),

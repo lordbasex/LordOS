@@ -85,7 +85,7 @@ static void set8(xcb_window_t w, xcb_atom_t p, xcb_atom_t type, const char *s, i
 static xcb_atom_t A_WM_PROTOCOLS, A_WM_DELETE, A_WM_TAKE_FOCUS, A_WM_STATE, A_WM_CHANGE_STATE, A_UTF8, A_NET_WM_NAME, A_NET_SUPPORTED,
     A_NET_CHECK, A_NET_ACTIVE, A_NET_STATE, A_FULLSCREEN, A_MAXV, A_MAXH, A_HIDDEN, A_ABOVE, A_ATTENTION, A_MODAL, A_FOCUSED, A_TYPE, A_TYPE_NORMAL,
     A_TYPE_DIALOG, A_PID, A_CLIENT_LIST, A_FRAME, A_WORKAREA, A_MOTIF, A_ICON, A_MOVERESIZE, A_CLIPBOARD, A_TARGETS, A_INCR, A_MIME_UTF8,
-    A_PROP, A_RESOURCE_MANAGER, A_REQ_FRAME, A_STACKING, A_SKIP_TASKBAR, A_TYPE_UTILITY, A_CLOSE;
+    A_PROP, A_RESOURCE_MANAGER, A_REQ_FRAME, A_STACKING, A_SKIP_TASKBAR, A_TYPE_UTILITY, A_CLOSE, A_BELOW, A_SKIP_PAGER;
 static void atoms(void) {
     A_WM_PROTOCOLS = atom("WM_PROTOCOLS"); A_WM_DELETE = atom("WM_DELETE_WINDOW"); A_WM_TAKE_FOCUS = atom("WM_TAKE_FOCUS");
     A_WM_STATE = atom("WM_STATE"); A_WM_CHANGE_STATE = atom("WM_CHANGE_STATE"); A_UTF8 = atom("UTF8_STRING");
@@ -100,7 +100,7 @@ static void atoms(void) {
     A_MIME_UTF8 = atom("text/plain;charset=utf-8"); A_PROP = atom("WLCONF_SEL"); A_RESOURCE_MANAGER = XCB_ATOM_RESOURCE_MANAGER;
     A_REQ_FRAME = atom("_NET_REQUEST_FRAME_EXTENTS"); A_STACKING = atom("_NET_CLIENT_LIST_STACKING");
     A_SKIP_TASKBAR = atom("_NET_WM_STATE_SKIP_TASKBAR"); A_TYPE_UTILITY = atom("_NET_WM_WINDOW_TYPE_UTILITY");
-    A_CLOSE = atom("_NET_CLOSE_WINDOW");
+    A_CLOSE = atom("_NET_CLOSE_WINDOW"); A_BELOW = atom("_NET_WM_STATE_BELOW"); A_SKIP_PAGER = atom("_NET_WM_STATE_SKIP_PAGER");
 }
 
 /* ---------------------------------------------------------------- events */
@@ -185,6 +185,17 @@ static int state_has(xcb_window_t w, xcb_atom_t a) { uint32_t v[32]; int n = pro
 typedef struct { xcb_window_t w; xcb_atom_t a; int want; } StateWait;
 static int c_state(void *arg) { StateWait *s = arg; return state_has(s->w, s->a) == s->want; }
 static int wait_state(xcb_window_t w, xcb_atom_t a, int want, int ms) { StateWait s = { w, a, want }; return wait_for(c_state, &s, ms); }
+/* _NET_CLIENT_LIST_STACKING: where w is (0 = bottom), -1 if absent; and waiting until it is the top one */
+static int stack_index(xcb_window_t w, int *count) {
+    uint32_t v[256];
+    int n = prop32(scr->root, A_STACKING, v, 256);
+    if (count) *count = n;
+    for (int i = 0; i < n; i++) if (v[i] == w) return i;
+    return -1;
+}
+static int c_top(void *arg) { int n = 0, i = stack_index(*(xcb_window_t *)arg, &n); return n > 0 && i == n - 1; }
+static int wait_top(xcb_window_t w, int ms) { return wait_for(c_top, &w, ms); }
+static xcb_window_t active_window(void) { uint32_t a = 0; prop32(scr->root, A_NET_ACTIVE, &a, 1); return a; }
 
 /* ---------------------------------------------------------------- the window manager */
 static void wm(void) {
@@ -205,6 +216,7 @@ static void wm(void) {
         { "ewmh.wm_name", "_NET_WM_NAME" }, { "ewmh.wm_state", "_NET_WM_STATE" }, { "ewmh.wm_state", "_NET_WM_STATE_FULLSCREEN" },
         { "ewmh.wm_state", "_NET_WM_STATE_MAXIMIZED_VERT" }, { "ewmh.wm_state", "_NET_WM_STATE_MAXIMIZED_HORZ" }, { "ewmh.wm_state", "_NET_WM_STATE_HIDDEN" },
         { "ewmh.wm_state", "_NET_WM_STATE_ABOVE" }, { "ewmh.wm_state", "_NET_WM_STATE_DEMANDS_ATTENTION" }, { "ewmh.wm_state", "_NET_WM_STATE_MODAL" },
+        { "ewmh.wm_state", "_NET_WM_STATE_BELOW" }, { "ewmh.wm_state", "_NET_WM_STATE_SKIP_PAGER" }, { "ewmh.wm_state", "_NET_WM_STATE_SKIP_TASKBAR" },
         { "ewmh.window_type", "_NET_WM_WINDOW_TYPE" }, { "ewmh.window_type", "_NET_WM_WINDOW_TYPE_NORMAL" }, { "ewmh.window_type", "_NET_WM_WINDOW_TYPE_DIALOG" },
         { "ewmh.window_type", "_NET_WM_WINDOW_TYPE_UTILITY" }, { "ewmh.window_type", "_NET_WM_WINDOW_TYPE_POPUP_MENU" },
         { "ewmh.active_window", "_NET_ACTIVE_WINDOW" }, { "ewmh.client_list", "_NET_CLIENT_LIST" }, { "ewmh.client_list", "_NET_CLIENT_LIST_STACKING" },
@@ -272,8 +284,9 @@ static void wm(void) {
     root_message(w1, A_NET_STATE, 0, A_MAXV, A_MAXH, 1);
     int mx0 = wait_state(w1, A_MAXV, 0, 2000);
     check("ewmh.wm_state", "maximize_remove", mx0, "_NET_WM_STATE_MAXIMIZED_VERT", "remove maximized: %s", mx0 ? "removed" : "still set");
-    struct { const char *id; xcb_atom_t a; } more[] = { { "above", A_ABOVE }, { "modal", A_MODAL }, { "skip_taskbar", A_SKIP_TASKBAR } };
-    for (int i = 0; i < 3; i++) {
+    struct { const char *id; xcb_atom_t a; } more[] = { { "above", A_ABOVE }, { "modal", A_MODAL }, { "skip_taskbar", A_SKIP_TASKBAR },
+                                                        { "skip_pager", A_SKIP_PAGER }, { "below", A_BELOW } };
+    for (int i = 0; i < (int)(sizeof more / sizeof more[0]); i++) {
         root_message(w1, A_NET_STATE, 1, more[i].a, 0, 1);
         int on = wait_state(w1, more[i].a, 1, 1500);
         char id[64];
@@ -375,6 +388,38 @@ static void wm(void) {
     check("ewmh.close_window", "close_request", nc, "_NET_CLOSE_WINDOW", "_NET_CLOSE_WINDOW from a pager sends WM_DELETE_WINDOW: %s", nc ? "yes" : "no in 3 s");
     xcb_destroy_window(X, w7);
     xcb_destroy_window(X, w6);
+
+    /* Always on top: a window that asks for _NET_WM_STATE_ABOVE before it maps stays over a normal window that maps
+     * after it, and that window has the keyboard (stacking and focus apart, sdk/desktopmodel.js stackOrder) */
+    xcb_window_t w_above = make_window("wlconf-x11-above", 1, 0, 0, A_TYPE_NORMAL, 0, 0);
+    set32(w_above, A_NET_STATE, XCB_ATOM_ATOM, &A_ABOVE, 1);
+    xcb_map_window(X, w_above);
+    int ma = wait_for(c_map, ev_of(w_above), 3000);
+    check("ewmh.wm_state", "above_initial", ma && state_has(w_above, A_ABOVE), "_NET_WM_STATE_ABOVE", "asked for before the map, kept: %s", ma && state_has(w_above, A_ABOVE) ? "yes" : "no");
+    xcb_window_t wunder = make_window("wlconf-x11-under", 1, 0, 0, A_TYPE_NORMAL, 0, 0);
+    xcb_map_window(X, wunder);
+    wait_for(c_map, ev_of(wunder), 3000);
+    wait_for(c_focus, ev_of(wunder), 3000);
+    int ontop = wait_top(w_above, 2000);
+    xcb_window_t act_now = active_window();
+    check("ewmh.wm_state", "above_stays_on_top", ontop && act_now == wunder, "_NET_WM_STATE_ABOVE",
+          "a normal window mapped after it has the keyboard (%s) and the always-on-top one stays at the top of _NET_CLIENT_LIST_STACKING (%s)",
+          act_now == wunder ? "yes" : "no", ontop ? "yes" : "no");
+    root_message(w_above, A_NET_STATE, 2, A_ABOVE, 0, 1);              /* toggle: off */
+    int off_now = wait_state(w_above, A_ABOVE, 0, 1500) && wait_top(wunder, 1500);
+    check("ewmh.wm_state", "above_toggle_off", off_now, "_NET_WM_STATE_ABOVE", "toggled off: the window with the keyboard is on top again: %s", off_now ? "yes" : "no");
+    root_message(w_above, A_NET_STATE, 2, A_ABOVE, 0, 1);              /* toggle: on */
+    int on_again = wait_state(w_above, A_ABOVE, 1, 1500) && wait_top(w_above, 1500) && active_window() == wunder;
+    check("ewmh.wm_state", "above_toggle_on", on_again, "_NET_WM_STATE_ABOVE", "toggled on: over it again, the keyboard not taken: %s", on_again ? "yes" : "no");
+    root_message(w_above, A_NET_STATE, 1, A_BELOW, 0, 1);              /* kept below: it excludes above, and goes under */
+    int bl = wait_state(w_above, A_BELOW, 1, 1500) && wait_state(w_above, A_ABOVE, 0, 1500) && wait_top(wunder, 1500);
+    int ia = stack_index(w_above, NULL), ib = stack_index(wunder, NULL);
+    check("ewmh.wm_state", "below_under", bl && ia >= 0 && ia < ib, "_NET_WM_STATE_BELOW",
+          "_NET_WM_STATE_BELOW drops ABOVE and stacks it under the normal window (%d < %d): %s", ia, ib, bl && ia >= 0 && ia < ib ? "yes" : "no");
+    xcb_destroy_window(X, wunder);
+    xcb_destroy_window(X, w_above);
+    xcb_flush(X);
+    wait_for(c_never, NULL, 400);
 
     /* iconify (WM_CHANGE_STATE): WM_STATE Iconic and _NET_WM_STATE_HIDDEN */
     xcb_client_message_event_t m = { .response_type = XCB_CLIENT_MESSAGE, .format = 32, .window = w1, .type = A_WM_CHANGE_STATE };
@@ -540,6 +585,16 @@ int main(int argc, char **argv) {
     if (argc >= 2 && !strcmp(argv[1], "wm")) { wm(); xcb_disconnect(X); return 0; }
     if (argc >= 4 && !strcmp(argv[1], "clip-own")) return clip_own(atol(argv[2]), atoi(argv[3]), argc > 4 && !strcmp(argv[4], "primary"));
     if (argc >= 3 && !strcmp(argv[1], "clip-read")) return clip_read(atol(argv[2]));
-    fprintf(stderr, "usage: x11-conformance-client wm | clip-own <bytes> <incr 0|1> [primary] | clip-read <bytes>\n");
+    /* the EWMH request a pager or `wmctrl -b` sends (xprop only sets properties, and the WM owns _NET_WM_STATE once a
+     * window is mapped): netstate <window> add|remove|toggle <_NET_WM_STATE_...>; tools/wl-conformance/x11-proofs.sh */
+    if (argc >= 5 && !strcmp(argv[1], "netstate")) {
+        uint32_t w = (uint32_t)strtoul(argv[2], NULL, 0);
+        uint32_t how = !strcmp(argv[3], "add") ? 1 : !strcmp(argv[3], "toggle") ? 2 : 0;
+        root_message(w, A_NET_STATE, how, atom(argv[4]), 0, 1);
+        free(xcb_get_input_focus_reply(X, xcb_get_input_focus(X), NULL));   /* a round trip: sent before we hang up */
+        xcb_disconnect(X);
+        return 0;
+    }
+    fprintf(stderr, "usage: x11-conformance-client wm | clip-own <bytes> <incr 0|1> [primary] | clip-read <bytes> | netstate <window> add|remove|toggle <atom>\n");
     return 2;
 }

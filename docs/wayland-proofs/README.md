@@ -32,10 +32,11 @@ Nothing was installed for them; programs not installed here are listed at the en
 | `x11-icccm.transient_for.png` | `WM_TRANSIENT_FOR` | two xterm 398, xprop | The dialog xterm's `WM_TRANSIENT_FOR` is the other xterm, and the theme got its "parent" event |
 | `x11-ewmh.wm_icon.png` | `_NET_WM_ICON` | zenity 4.1.90 with `GDK_BACKEND=x11`, xprop | zenity's 16×16 `_NET_WM_ICON`, the theme's "icon" event (size 16), and zenity's own icon as its Dock entry |
 | `x11-ewmh.frame_extents.png` | `_NET_FRAME_EXTENTS`, `_NET_WM_PID`, `_NET_WM_STATE` | xterm 398, xprop | `_NET_FRAME_EXTENTS = 0,0,0,0`, `_NET_WM_STATE_FOCUSED`, `WM_STATE` Normal, `_NET_WM_PID`, `_NET_WORKAREA` |
+| `x11-always-on-top.png` | `_NET_WM_STATE_ABOVE`, `_NET_CLIENT_LIST_STACKING` | two xterm 398, xprop, xwininfo; `build/x11-conformance-client netstate` sends the request (as `wmctrl -b add,above` would: xprop can only set properties, and wmctrl isn't installed) | The xterm that asked for ABOVE (`0x40000c`) stays drawn over a normal xterm opened after it, which has the keyboard (`_NET_ACTIVE_WINDOW = 0x80000c`); its `_NET_WM_STATE` is ABOVE, it is last in `_NET_CLIENT_LIST_STACKING`, and the theme got its `layer` event (taken 2026-11-22, branch `feat/always-on-top`) |
 
 ## Not shown with a real program
 
-- **No installed program sends these:** `_NET_ACTIVE_WINDOW`, `_NET_CLOSE_WINDOW`, the ABOVE/MODAL/SKIP_TASKBAR state
+- **No installed program sends these:** `_NET_ACTIVE_WINDOW`, `_NET_CLOSE_WINDOW`, the MODAL/SKIP_TASKBAR/SKIP_PAGER/BELOW state
   requests, the utility window type, `_NET_REQUEST_FRAME_EXTENTS` (xdotool and wmctrl aren't installed). They are
   checked by `build/x11-conformance-client` only.
 - **Needs hardware:** a tablet tool's wheel and the pads' `set_feedback` (no graphics tablet), `wl_touch.orientation`

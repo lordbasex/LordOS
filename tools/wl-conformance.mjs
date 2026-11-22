@@ -567,6 +567,14 @@ async function x11Section(S, src, spec) {
   const noFrame = mot && /"csd":\s*true|"deco":\s*"?(client|none)/.test(JSON.stringify(mot.d));
   add('motif.wm_hints', { kind: 'dynamic', id: 'no_decorations', what: '_MOTIF_WM_HINTS', weight: W.x11dyn, result: noFrame ? 'pass' : 'fail', msg: noFrame ? 'decorations 0: the theme draws no frame' : (mot ? `decorations 0 but the theme frames it (${JSON.stringify(mot.d).slice(0, 120)})` : 'the window never mapped') });
   const icon = ev.some((e) => e.type === 'icon' && e.title === 'wlconf-x11-motif');
+  // always on top and skip pager reach the theme's window model (sdk/wayland.js: w.layer, args.skipPager)
+  const ab = mapOf('wlconf-x11-above');
+  add('ewmh.wm_state', { kind: 'dynamic', id: 'above_reaches_theme', what: '_NET_WM_STATE_ABOVE', weight: W.x11dyn, result: ab && ab.d.layer === 1 ? 'pass' : 'fail', msg: ab ? `the window mapped with layer ${ab.d.layer} (1: always on top)` : 'the always-on-top window never mapped' });
+  const layerEv = ev.filter((e) => e.type === 'layer' && e.title === 'wlconf-x11-above').map((e) => e.d && e.d.layer);
+  const toggled = layerEv.includes(0) && layerEv.includes(1) && layerEv.includes(-1);
+  add('ewmh.wm_state', { kind: 'dynamic', id: 'layer_changes_reach_theme', what: '_NET_WM_STATE_ABOVE', weight: W.x11dyn, result: toggled ? 'pass' : 'fail', msg: `the theme was told the layers ${JSON.stringify(layerEv)} (off, on, below expected)` });
+  const pager = ev.some((e) => e.type === 'pager' && String(e.title).startsWith('wlconf-x11') && e.d && e.d.skip === true);
+  add('ewmh.wm_state', { kind: 'dynamic', id: 'skip_pager_reaches_theme', what: '_NET_WM_STATE_SKIP_PAGER', weight: W.x11dyn, result: pager ? 'pass' : 'fail', msg: pager ? 'the theme was told to leave it out of the Overview' : 'no pager event reached the theme' });
   add('ewmh.wm_icon', { kind: 'dynamic', id: 'icon_reaches_theme', what: '_NET_WM_ICON', weight: W.x11dyn, result: icon ? 'pass' : 'fail', msg: icon ? 'the theme got the icon' : 'a _NET_WM_ICON never reached the theme' });
   // selections, both ways
   const wlb = path.join(BUILD, 'wl-conformance-client');

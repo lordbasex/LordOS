@@ -25,7 +25,7 @@ printf '{ "version": 1, "apps": { "screenshots": { "screen": { "state": "allow",
   globalThis.__lordWayland = (id, type, d) => {
     const r = orig(id, type, d);
     try {
-      if (['map', 'title', 'attention', 'activate', 'parent', 'icon', 'taskbar', 'unmap'].includes(type)) {
+      if (['map', 'title', 'attention', 'activate', 'parent', 'icon', 'taskbar', 'pager', 'layer', 'unmap'].includes(type)) {
         let j = ''; try { j = JSON.stringify(d); } catch (e) { j = '?'; }
         console.log('WLPROOF ' + JSON.stringify({ id, type, d: j.slice(0, 400) }));
       }
@@ -101,6 +101,10 @@ scene wm-icon 'I=$(xwininfo -root -tree | grep "\"zenity\" \"zenity\"" | grep -v
 kill $ICON 2>/dev/null
 # 7. per-window properties the WM keeps: _NET_FRAME_EXTENTS, _NET_WM_STATE, WM_STATE, _NET_WM_PID
 scene window-props 'xprop -id $WINDOWID _NET_FRAME_EXTENTS _NET_WM_STATE WM_STATE _NET_WM_PID _NET_WM_WINDOW_TYPE; echo; xprop -root _NET_WORKAREA'
+# 8. always on top: this xterm asks for _NET_WM_STATE_ABOVE (the EWMH request wmctrl -b add,above sends; xprop can't
+#    send one, and wmctrl isn't installed: build/x11-conformance-client netstate), then a normal xterm opens after it
+#    and takes the keyboard; this one stays drawn over it, and xprop shows the state, the active window and the stacking
+scene always-on-top 'C='"$SV"'/build/x11-conformance-client; sleep 1; $C netstate $WINDOWID add _NET_WM_STATE_ABOVE; sleep 1; xterm -fa Monospace -fs 10 -geometry 120x40 -T "a normal xterm opened after it: it has the keyboard" -e sh -c "sleep 40" & sleep 3; echo "this xterm: $WINDOWID, always on top"; xprop -id $WINDOWID _NET_WM_STATE; xprop -root _NET_ACTIVE_WINDOW _NET_CLIENT_LIST_STACKING; xwininfo -root -tree | grep -E "normal xterm|scene always" | cut -c1-100; grep -h "WLPROOF.*\"layer\"" '"$D"'/home/.cache/lordos/shell.log | tail -1 | cut -c1-100'
 sleep 2
 cp "$D"/home/proofs/*.png "$OUT"/ 2>/dev/null
 ls -la "$OUT"

@@ -12,7 +12,8 @@
  *     title, class (WM_CLASS → the app's .desktop), protocols, hints, Motif decorations, window type
  *     and transient parent; WL_SURFACE_ID tells which wl_surface shows each one;
  *   - keeps every X window where LordOS shows it (the X position is the content's position on
- *     screen, so Xwayland routes the pointer right), and stacks the focused one on top;
+ *     screen, so Xwayland routes the pointer right), and stacks the focused one on top of its layer
+ *     (always on top, normal, kept below: _NET_WM_STATE_ABOVE / _BELOW, restack_layers);
  *   - focus (SetInputFocus / WM_TAKE_FOCUS), close (WM_DELETE_WINDOW or KillClient), fullscreen,
  *     maximize and minimize requests (_NET_WM_STATE, WM_CHANGE_STATE), moves and resizes asked by
  *     apps that draw their own frame (_NET_WM_MOVERESIZE);
@@ -82,7 +83,7 @@ enum { XA_PRIMARY = 1, XA_ATOM = 4, XA_CARDINAL = 6, XA_RESOURCE_MANAGER = 23, X
     X(XdndPosition, "XdndPosition") X(XdndStatus, "XdndStatus") X(XdndLeave, "XdndLeave") X(XdndDrop, "XdndDrop") \
     X(XdndFinished, "XdndFinished") X(XdndActionCopy, "XdndActionCopy") X(XdndActionMove, "XdndActionMove") \
     X(XdndActionAsk, "XdndActionAsk") \
-    X(WL_SURFACE_SERIAL, "WL_SURFACE_SERIAL") X(NET_WM_STATE_ABOVE, "_NET_WM_STATE_ABOVE") \
+    X(WL_SURFACE_SERIAL, "WL_SURFACE_SERIAL") X(NET_WM_STATE_ABOVE, "_NET_WM_STATE_ABOVE") X(NET_WM_STATE_BELOW, "_NET_WM_STATE_BELOW") \
     X(NET_WM_STATE_DEMANDS_ATTENTION, "_NET_WM_STATE_DEMANDS_ATTENTION") X(NET_WM_STATE_MODAL, "_NET_WM_STATE_MODAL") \
     X(NET_WM_STATE_SKIP_TASKBAR, "_NET_WM_STATE_SKIP_TASKBAR") X(NET_WM_STATE_SKIP_PAGER, "_NET_WM_STATE_SKIP_PAGER") \
     X(NET_WM_WINDOW_TYPE_UTILITY, "_NET_WM_WINDOW_TYPE_UTILITY") X(NET_WM_WINDOW_TYPE_TOOLBAR, "_NET_WM_WINDOW_TYPE_TOOLBAR") \
@@ -111,7 +112,8 @@ struct XWin {
     XSizeHints hints;
     int want_fs;                        /* asked for fullscreen before it had a surface */
     int fullscreen, maximized, minimized, focused;
-    int above, attention, modal, skip_taskbar, skip_pager;  /* _NET_WM_STATE kept for the app (see on_client_message) */
+    int above, below;                   /* _NET_WM_STATE_ABOVE / _BELOW: its layer (always on top, kept below) */
+    int attention, modal, skip_taskbar, skip_pager;  /* the rest of _NET_WM_STATE it asked for (see on_client_message) */
     int urgent;                         /* WM_HINTS urgency */
     uint32_t pid;                       /* _NET_WM_PID as the app wrote it: diagnostics only, never trusted */
     uint32_t map_seq, stack_seq;        /* order of first mapping; place in the stacking order (bottom first) */
@@ -295,17 +297,37 @@ static int is_popup_type(uint32_t t) {
                  t == AT(NET_WM_WINDOW_TYPE_DND));
 }
 
-/* _NET_CLIENT_LIST in the order the windows were first mapped, _NET_CLIENT_LIST_STACKING bottom to top (EWMH). The
- * focused window is raised (xwm_focus), a minimized one goes to the bottom (xwm_set_state). */
+/* Its layer (sdk/desktopmodel.js layerOf): 1 always on top (_NET_WM_STATE_ABOVE), -1 kept below (_BELOW), 0 normal.
+ * A transient window takes the highest of its own and its owners' (a dialog of an always-on-top window stays with it),
+ * as the theme stacks it; at most 8 owners up, so a loop of WM_TRANSIENT_FOR ends. */
+static int layer_of(const XWin *w) {
+    int best = -2;
+    for (int i = 0; w && i < 8; i++) {
+        int l = w->above ? 1 : w->below ? -1 : 0;
+        if (l > best) best = l;
+        w = w->transient ? find(w->transient) : NULL;
+    }
+    return best < -1 ? 0 : best;
+}
+
+/* _NET_CLIENT_LIST in the order the windows were first mapped, _NET_CLIENT_LIST_STACKING bottom to top (EWMH): the
+ * minimized ones at the bottom, then the layers (kept below, normal, always on top), each in the order they were
+ * raised. The focused window is raised within its layer (xwm_focus), a minimized one goes to the bottom
+ * (xwm_set_state). */
 #define NLIST 256
+static int stacked_after(const XWin *o, const XWin *k) {
+    if (o->stack_low != k->stack_low) return o->stack_low < k->stack_low;
+    int lo = layer_of(o), lk = layer_of(k);
+    if (lo != lk) return lo > lk;
+    return o->stack_seq > k->stack_seq;
+}
 static void sort_by(XWin **v, uint32_t n, int stacking) {
     for (uint32_t i = 1; i < n; i++) {
         XWin *k = v[i];
         uint32_t j = i;
         for (; j > 0; j--) {
             XWin *o = v[j - 1];
-            int after = stacking ? (o->stack_low != k->stack_low ? o->stack_low < k->stack_low : o->stack_seq > k->stack_seq)
-                                 : o->map_seq > k->map_seq;
+            int after = stacking ? stacked_after(o, k) : o->map_seq > k->map_seq;
             if (!after) break;
             v[j] = o;
         }
@@ -314,7 +336,7 @@ static void sort_by(XWin **v, uint32_t n, int stacking) {
 }
 static void update_client_list(void) {
     XWin *v[NLIST];
-    uint32_t ids[NLIST];
+    uint32_t ids[NLIST] = { 0 };                       /* (zeroed: GCC can't see n bounds what is read) */
     uint32_t n = 0;
     for (XWin *w = X.wins; w && n < NLIST; w = w->next) if (w->managed) v[n++] = w;
     sort_by(v, n, 0);
@@ -326,6 +348,34 @@ static void update_client_list(void) {
 }
 static void stack_top(XWin *w) { w->stack_low = 0; w->stack_seq = ++X.stack_ctr; }
 static void stack_bottom(XWin *w) { w->stack_low = 1; w->stack_seq = ++X.stack_ctr; }
+
+/* X's own stacking follows the layers, so Xwayland's idea of what is on top matches what the theme draws: after a
+ * raise, the always-on-top windows go back over the others in their own order; when a window is kept below, it goes
+ * under the normal ones, with the minimized ones still lowest (they never catch the pointer). */
+static void restack_layers(void) {
+    XWin *v[NLIST];
+    uint32_t n = 0;
+    int below = 0;
+    for (XWin *w = X.wins; w && n < NLIST; w = w->next)
+        if (w->managed) { v[n++] = w; if (!w->minimized && layer_of(w) < 0) below = 1; }
+    sort_by(v, n, 1);                                       /* bottom to top, layers included */
+    for (uint32_t i = 0; i < n; i++) {                      /* always on top, raised bottom first: their order stays */
+        if (v[i]->minimized || layer_of(v[i]) <= 0) continue;
+        int32_t a[1] = { X_Above };
+        configure(v[i]->id, XCF_StackMode, a, 1);
+    }
+    if (!below) return;
+    for (uint32_t i = n; i-- > 0;) {                        /* kept below, lowered top first; then the minimized */
+        if (v[i]->minimized || layer_of(v[i]) >= 0) continue;
+        int32_t b[1] = { X_Below };
+        configure(v[i]->id, XCF_StackMode, b, 1);
+    }
+    for (uint32_t i = n; i-- > 0;) {
+        if (!v[i]->minimized) continue;
+        int32_t b[1] = { X_Below };
+        configure(v[i]->id, XCF_StackMode, b, 1);
+    }
+}
 
 /* _NET_WORKAREA (one desktop): the first display's work area as the theme computes it, in X pixels; written when it
  * changes (checked every loop, xwm_tick) */
@@ -356,12 +406,13 @@ static void write_net_state(XWin *w) {
     if (w->minimized) v[n++] = AT(NET_WM_STATE_HIDDEN);
     if (w->focused) v[n++] = AT(NET_WM_STATE_FOCUSED);
     if (w->above) v[n++] = AT(NET_WM_STATE_ABOVE);
+    if (w->below) v[n++] = AT(NET_WM_STATE_BELOW);
     if (w->attention) v[n++] = AT(NET_WM_STATE_DEMANDS_ATTENTION);
     if (w->modal) v[n++] = AT(NET_WM_STATE_MODAL);
     if (w->skip_taskbar) v[n++] = AT(NET_WM_STATE_SKIP_TASKBAR);
     if (w->skip_pager) v[n++] = AT(NET_WM_STATE_SKIP_PAGER);
     unsigned sig = (unsigned)(w->fullscreen | w->maximized << 1 | w->minimized << 2 | w->focused << 3 | w->above << 4 |
-                              w->attention << 5 | w->modal << 6 | w->skip_taskbar << 7 | w->skip_pager << 8) + 1;
+                              w->attention << 5 | w->modal << 6 | w->skip_taskbar << 7 | w->skip_pager << 8 | w->below << 9) + 1;
     if (sig == w->state_sig) return;
     w->state_sig = sig;
     change_prop(w->id, AT(NET_WM_STATE), XA_ATOM, 32, v, n);
@@ -484,14 +535,28 @@ static void prop_reply(const uint8_t *r, size_t n, uint32_t id, uint32_t prop) {
         w->decorated = x11_motif_decorated(nl ? longs : NULL, nl);
     } else if (prop == AT(NET_WM_STATE)) {
         for (size_t i = 0; i < nl; i++) if (longs[i] == AT(NET_WM_STATE_FULLSCREEN) && !w->sid) w->want_fs = 1;
-        if (!w->managed) {                                  /* what it asks for before it is mapped (EWMH); later ones
-                                                             * come as client messages, and the property is then ours */
+        /* What it asks for before it is mapped (EWMH); later ones come as client messages, and the property is then
+         * ours. Until the WM first writes it (state_sig): an app creates, sets and maps its window in one go, so the
+         * MapRequest is often handled before this reply arrives. */
+        if (!w->state_sig) {
+            int was_layer = xwm_layer(w), was_tb = w->skip_taskbar, was_pg = w->skip_pager;
             for (size_t i = 0; i < nl; i++) {
-                if (longs[i] == AT(NET_WM_STATE_ABOVE)) w->above = 1;
+                if (longs[i] == AT(NET_WM_STATE_ABOVE)) { w->above = 1; w->below = 0; }
+                if (longs[i] == AT(NET_WM_STATE_BELOW) && !w->above) w->below = 1;
                 if (longs[i] == AT(NET_WM_STATE_MODAL)) w->modal = 1;
                 if (longs[i] == AT(NET_WM_STATE_SKIP_TASKBAR)) w->skip_taskbar = 1;
                 if (longs[i] == AT(NET_WM_STATE_SKIP_PAGER)) w->skip_pager = 1;
                 if (longs[i] == AT(NET_WM_STATE_DEMANDS_ATTENTION)) w->attention = 1;
+            }
+            if (w->managed && (w->above || w->below || w->attention || w->modal || w->skip_taskbar || w->skip_pager)) {
+                /* already mapped: the stacking follows, and the theme hears it if it already has the window */
+                if (w->sid && xwm_layer(w) != was_layer) wlx_layer(w->sid, xwm_layer(w));
+                if (w->sid && w->skip_taskbar != was_tb) wlx_skip_taskbar(w->sid, w->skip_taskbar);
+                if (w->sid && w->skip_pager != was_pg) wlx_skip_pager(w->sid, w->skip_pager);
+                if (w->modal) tell_parent(w);
+                restack_layers();
+                update_client_list();
+                write_net_state(w);
             }
         }
     } else if (prop == AT(XdndAware)) {
@@ -1531,8 +1596,9 @@ static void on_map_request(const uint8_t *p) {
         set_wm_state(w, 1);                                 /* NormalState */
         if (!w->map_seq) w->map_seq = ++X.map_ctr;
         stack_top(w);
+        restack_layers();                                   /* a new window starts on top of its own layer */
         update_client_list();
-        if (w->above || w->attention || w->modal || w->skip_taskbar || w->skip_pager) { w->state_sig = 0; write_net_state(w); }
+        if (w->above || w->below || w->attention || w->modal || w->skip_taskbar || w->skip_pager) { w->state_sig = 0; write_net_state(w); }
     }
     req(X_MapWindow, 0);
     xo_u32(&X.out, id);
@@ -1660,6 +1726,7 @@ static void on_client_message(const uint8_t *p) {
         wlx_attention(w->sid, granted);
     } else if (type == AT(NET_WM_STATE)) {
         int action = (int)d[0];                             /* 0 remove, 1 add, 2 toggle */
+        if (X.debug) fprintf(stderr, "xwm: 0x%x _NET_WM_STATE request %d (atoms %u %u, managed %d, surface %d)\n", w->id, action, d[1], d[2], w->managed, w->sid);
         for (int i = 1; i <= 2; i++) {
             if (d[i] == AT(NET_WM_STATE_FULLSCREEN)) {
                 int on = action == 1 || (action == 2 && !w->fullscreen);
@@ -1670,19 +1737,31 @@ static void on_client_message(const uint8_t *p) {
                 if (w->sid) wlx_request(w->sid, on ? XREQ_MAXIMIZE : XREQ_UNMAXIMIZE, 0);
             } else if (d[i] == AT(NET_WM_STATE_HIDDEN) && action == 1 && w->sid) {
                 wlx_request(w->sid, XREQ_MINIMIZE, 0);
-            } else if (d[i] && (d[i] == AT(NET_WM_STATE_ABOVE) || d[i] == AT(NET_WM_STATE_DEMANDS_ATTENTION) || d[i] == AT(NET_WM_STATE_MODAL) ||
+            } else if (d[i] && (d[i] == AT(NET_WM_STATE_ABOVE) || d[i] == AT(NET_WM_STATE_BELOW))) {
+                /* always on top / kept below: the window's layer. One excludes the other; the theme stacks it
+                 * (sdk/desktopmodel.js stackOrder) and X's stacking follows (restack_layers). It never moves the
+                 * keyboard: a window going on top is drawn over the one that has it, which keeps it. */
+                int *f = d[i] == AT(NET_WM_STATE_ABOVE) ? &w->above : &w->below;
+                int on = action == 1 || (action == 2 && !*f);
+                if (action > 2 || on == *f) continue;
+                *f = on;
+                if (on) { if (f == &w->above) w->below = 0; else w->above = 0; }
+                if (w->sid) wlx_layer(w->sid, w->above ? 1 : w->below ? -1 : 0);
+                if (w->managed) { restack_layers(); update_client_list(); }
+            } else if (d[i] && (d[i] == AT(NET_WM_STATE_DEMANDS_ATTENTION) || d[i] == AT(NET_WM_STATE_MODAL) ||
                                 d[i] == AT(NET_WM_STATE_SKIP_TASKBAR) || d[i] == AT(NET_WM_STATE_SKIP_PAGER))) {
-                int *f = d[i] == AT(NET_WM_STATE_ABOVE) ? &w->above : d[i] == AT(NET_WM_STATE_DEMANDS_ATTENTION) ? &w->attention
+                int *f = d[i] == AT(NET_WM_STATE_DEMANDS_ATTENTION) ? &w->attention
                        : d[i] == AT(NET_WM_STATE_MODAL) ? &w->modal : d[i] == AT(NET_WM_STATE_SKIP_TASKBAR) ? &w->skip_taskbar : &w->skip_pager;
                 int on = action == 1 || (action == 2 && !*f);
                 if (action > 2 || on == *f) continue;
                 *f = on;
                 /* demands attention: the Dock marks it (cleared when it gets the keyboard); modal: it takes its
-                 * owner's input; skip taskbar: no Dock entry of its own. Above and skip pager are kept for the app
-                 * only: LordOS has no always-on-top layer and no pager (not in _NET_SUPPORTED). */
+                 * owner's input; skip taskbar: no Dock entry of its own; skip pager: left out of the Overview and
+                 * its desktop miniatures (sdk/overview.jsx). */
                 if (f == &w->attention && on) { if (w == X.focus) w->attention = 0; else if (w->sid) wlx_attention(w->sid, 0); }
                 if (f == &w->modal) tell_parent(w);
                 if (f == &w->skip_taskbar && w->sid) wlx_skip_taskbar(w->sid, on);
+                if (f == &w->skip_pager && w->sid) wlx_skip_pager(w->sid, on);
             }
         }
         write_net_state(w);
@@ -1850,7 +1929,8 @@ static void init_done(void) {
                        AT(NET_WM_WINDOW_TYPE_DROPDOWN_MENU), AT(NET_WM_WINDOW_TYPE_TOOLTIP), AT(NET_WM_WINDOW_TYPE_COMBO),
                        AT(NET_WM_WINDOW_TYPE_NOTIFICATION), AT(NET_WM_WINDOW_TYPE_DND), AT(NET_WM_WINDOW_TYPE_UTILITY),
                        AT(NET_WM_WINDOW_TYPE_TOOLBAR), AT(NET_WM_STATE_DEMANDS_ATTENTION), AT(NET_WM_STATE_MODAL),
-                       AT(NET_WM_STATE_SKIP_TASKBAR), AT(NET_CLIENT_LIST_STACKING), AT(NET_WM_PID), AT(NET_WM_ICON),
+                       AT(NET_WM_STATE_SKIP_TASKBAR), AT(NET_WM_STATE_SKIP_PAGER), AT(NET_WM_STATE_ABOVE),
+                       AT(NET_WM_STATE_BELOW), AT(NET_CLIENT_LIST_STACKING), AT(NET_WM_PID), AT(NET_WM_ICON),
                        AT(NET_REQUEST_FRAME_EXTENTS), AT(NET_WORKAREA), AT(NET_CLOSE_WINDOW) };
     change_prop(root, AT(NET_SUPPORTED), XA_ATOM, 32, sup, (uint32_t)(sizeof sup / sizeof sup[0]));
     uint32_t none = 0;
@@ -2064,6 +2144,23 @@ int xwm_is_dialog(const XWin *w) {
            w->wtype == AT(NET_WM_WINDOW_TYPE_TOOLBAR);
 }
 int xwm_skip_taskbar(const XWin *w) { return w->skip_taskbar; }
+int xwm_skip_pager(const XWin *w) { return w->skip_pager; }
+int xwm_layer(const XWin *w) { return w->above ? 1 : w->below ? -1 : 0; }
+
+/* The person set the window's layer in LordOS (the window menu's Always on Top, sdk/windows.js wm.setLayer): the
+ * property says so, and X's stacking follows. Its own request comes the other way (on_client_message, wlx_layer). */
+void xwm_set_layer(XWin *w, int layer) {
+    if (!w) return;
+    int above = layer > 0, below = layer < 0;
+    if (w->above == above && w->below == below) return;
+    w->above = above;
+    w->below = below;
+    if (!X.ready || !w->managed) return;
+    restack_layers();
+    update_client_list();
+    write_net_state(w);
+    flush();
+}
 int xwm_is_fixed(const XWin *w) { return w->hints.min_w > 0 && w->hints.min_w == w->hints.max_w && w->hints.min_h > 0 && w->hints.min_h == w->hints.max_h; }
 
 void xwm_place(XWin *w, int x, int y) {
@@ -2126,6 +2223,7 @@ void xwm_focus(XWin *w) {
         int32_t v[1] = { X_Above };
         configure(w->id, XCF_StackMode, v, 1);
         stack_top(w);
+        restack_layers();                                   /* raised within its layer: always-on-top ones stay over it */
         update_client_list();
         w->focused = 1;
         w->attention = 0;                                   /* it has the person's attention now */

@@ -194,7 +194,7 @@
   },
   {
    "id": "ewmh.wm_state",
-   "title": "EWMH _NET_WM_STATE (fullscreen, maximized, hidden, above, demands attention, modal, focused)",
+   "title": "EWMH _NET_WM_STATE (fullscreen, maximized, hidden, above, below, demands attention, modal, skip taskbar and pager, focused)",
    "static": [
     {
      "id": "fullscreen",
@@ -236,7 +236,25 @@
      "id": "skip_taskbar",
      "file": "server/src/wl/xwm.c",
      "pattern": "\"_NET_WM_STATE_SKIP_TASKBAR\"",
-     "what": "skip taskbar / pager"
+     "what": "skip taskbar"
+    },
+    {
+     "id": "skip_pager",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "wlx_skip_pager\\(",
+     "what": "skip pager: out of the Overview"
+    },
+    {
+     "id": "below",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_STATE_BELOW\"",
+     "what": "below"
+    },
+    {
+     "id": "layers",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "restack_layers\\(\\)",
+     "what": "X's stacking follows the layers (always on top, normal, below)"
     }
    ]
   },

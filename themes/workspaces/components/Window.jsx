@@ -10,7 +10,7 @@
 // wm.beginMove); a maximized window is dragged out of its place by JS. Memoized: a window redraws only when its own
 // entry in the window list changes (index.jsx keeps the tokens object stable).
 import {
-  View, Text, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, useMenusWithSpeech, getApp, appGroup, windowMenuItems,
+  View, Text, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, useMenusWithSpeech, getApp, appGroup, windowMenuItems, alwaysOnTopItem,
   solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, desktopList, desktopName, activeDesktop, useStore, SeamCover, t as tr,
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
@@ -169,6 +169,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
     ...(extra || []),
     { label: tr('shell.classic.minimize'), onClick: () => wm.minimize(win.id) },
     win.maximized ? { label: tr('shell.classic.restore'), onClick: () => wm.toggleMaximize(win.id) } : { label: tr('shell.classic.maximize'), onClick: () => wm.toggleMaximize(win.id) },
+    alwaysOnTopItem(win.id),
     '-',
     { label: tr('shell.classic.close'), hint: 'Alt+F4', onClick: () => wm.close(win.id) },
   ];

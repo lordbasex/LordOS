@@ -559,6 +559,19 @@
           }
         },
         {
+          "id": "always-on-top",
+          "q": {
+            "en": "Can I keep a window always on top?",
+            "es": "¿Puedo dejar una ventana siempre encima?",
+            "pt": "Posso deixar uma janela sempre no topo?"
+          },
+          "a": {
+            "en": "Yes, in development (the latest release is 0.8.9.4), in every LordOS desktop: choose Always on Top in the window menu (the Window menu, or a right click on the title bar). The window stays over the others while you type in another one, and the same item turns it off. X11 apps that ask for it (_NET_WM_STATE_ABOVE) get it too; Wayland has no standard way for an app to ask, so for those it is your choice from the menu. It isn't kept after you log out.",
+            "es": "Sí, en desarrollo (la última versión publicada es la 0.8.9.4), en todos los escritorios de LordOS: elegí Siempre encima en el menú de la ventana (el menú Ventana, o un clic derecho en la barra de título). La ventana queda sobre las demás mientras escribís en otra, y el mismo ítem lo apaga. Las apps X11 que lo piden (_NET_WM_STATE_ABOVE) también lo tienen; Wayland no tiene una forma estándar de que una app lo pida, así que para esas lo elegís vos desde el menú. No se guarda al cerrar la sesión.",
+            "pt": "Sim, em desenvolvimento (a última versão publicada é a 0.8.9.4), em todos os desktops do LordOS: escolha Sempre no topo no menu da janela (o menu Janela, ou um clique direito na barra de título). A janela fica por cima das outras enquanto você digita em outra, e o mesmo item desliga. Os apps X11 que pedem isso (_NET_WM_STATE_ABOVE) também ganham; o Wayland não tem um jeito padrão de um app pedir, então para esses é você quem escolhe no menu. Não fica salvo quando você sai da sessão."
+          }
+        },
+        {
           "id": "themes",
           "q": {
             "en": "Which desktop styles does LordOS have?",

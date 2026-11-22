@@ -2,7 +2,7 @@
 // theme is built) together with the whole theme (themes/workspaces/index.jsx, its startShell caught by a shim so the
 // scene renders the shell itself) over a stub `lord` whose screen has three monitors, run, and its checks read. The
 // same runner measures what a change costs in any theme: node tests/workspaces_test.mjs theme_cost_scene.mjs <theme>
-// (default, classic or workspaces). Needs node and the repository's node_modules (esbuild, react, react-reconciler).
+// (default, classic, workspaces or celeste). Needs node and the repository's node_modules (esbuild, react, react-reconciler).
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
@@ -22,7 +22,7 @@ if (!esbuild) { console.log('needs node_modules (esbuild)'); process.exit(1); }
 const NS = new Set();
 const scene = process.argv[2] || 'workspaces_scene.mjs';
 const theme = process.argv[3] || 'workspaces';
-const themeDirs = ['default', 'classic', 'workspaces'].flatMap((t) => [`themes/${t}`, `themes/${t}/components`, ...(t === 'workspaces' ? ['themes/workspaces/model'] : [])]);
+const themeDirs = ['default', 'classic', 'workspaces', 'celeste'].flatMap((t) => [`themes/${t}`, `themes/${t}/components`, ...(t === 'workspaces' ? ['themes/workspaces/model'] : [])]);
 for (const d of ['sdk', 'runtime', ...themeDirs]) {
   for (const f of readdirSync(path.join(root, d))) {
     if (!/\.(m?js|jsx)$/.test(f)) continue;
@@ -34,6 +34,10 @@ for (const d of ['sdk', 'runtime', ...themeDirs]) {
 // scene fills (the bars' rectangles), far off screen otherwise; settings saved in memory; the network polls counted.
 const MOCK = `globalThis.__lordTest = (() => {
   const styles = new Map(), texts = new Map(), parents = new Map(), removed = new Set(), layouts = new Map(), props = new Map();
+  // each node's children in order (always_on_top_scene.mjs reads the drawing order of the windows from it)
+  const kids = new Map();
+  const unkid = (c) => { const p = parents.get(c), l = p != null && kids.get(p); if (l) { const i = l.indexOf(c); if (i >= 0) l.splice(i, 1); } };
+  const kid = (p, c, before) => { unkid(c); if (!kids.has(p)) kids.set(p, []); const l = kids.get(p), i = before == null ? -1 : l.indexOf(before); if (i < 0) l.push(c); else l.splice(i, 0, c); };
   const counts = { netPolls: 0, ops: 0, wx: 0 };
   let nextId = 1, saved = '{}';
   const base = {
@@ -44,9 +48,9 @@ const MOCK = `globalThis.__lordTest = (() => {
     setStyle: (id, k, v) => { counts.ops++; const s = styles.get(id); if (!s) return; if (v === undefined) delete s[k]; else s[k] = v; },
     setText: (id, s) => { counts.ops++; texts.set(id, s); },
     setProp: (id, k, v) => { counts.ops++; if (!props.has(id)) props.set(id, {}); props.get(id)[k] = v; },
-    appendChild: (p, c) => { counts.ops++; parents.set(c, p); removed.delete(c); },
-    insertBefore: (p, c) => { counts.ops++; parents.set(c, p); removed.delete(c); },
-    removeChild: (p, c) => { counts.ops++; removed.add(c); },
+    appendChild: (p, c) => { counts.ops++; kid(p, c); parents.set(c, p); removed.delete(c); },
+    insertBefore: (p, c, b) => { counts.ops++; kid(p, c, b); parents.set(c, p); removed.delete(c); },
+    removeChild: (p, c) => { counts.ops++; unkid(c); removed.add(c); },
     locale: { languages: () => ['en'], get: () => 'en', catalog: () => null },
     destroy: (id) => { styles.delete(id); texts.delete(id); parents.delete(id); removed.add(id); },
     settings: { load: () => saved, save: (s) => { saved = s; return true; } },
@@ -61,7 +65,7 @@ const MOCK = `globalThis.__lordTest = (() => {
   for (const ns of ${JSON.stringify([...NS])}) if (!(ns in base)) base[ns] = undefined;
   const noop = () => undefined;
   globalThis.lord = new Proxy(base, { get: (o, k) => (k in o ? o[k] : typeof k === 'string' ? noop : undefined) });
-  return { styles, texts, parents, removed, layouts, counts, props, saved: () => saved };
+  return { styles, texts, parents, removed, layouts, counts, props, kids, saved: () => saved };
 })();`;
 
 const dir = mkdtempSync(path.join(tmpdir(), 'lord-workspaces-'));

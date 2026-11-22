@@ -11,7 +11,7 @@ import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, di
 import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf, isWindowLocked, windowLocks } from './windows.js';
 import { followParents, overParent } from './dialogmodel.js';
 import { tiledEdges } from './snap.js';
-import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, coveredIds, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H } from './desktopmodel.js';
+import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, coveredIds, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H, ownLayer, layerName } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName, direction } from './i18n.js';
@@ -169,6 +169,7 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       if (d.dialog) args.dialog = true;
       if (d.fixed) args.fixedLinux = true;
       if (d.skipTaskbar) args.skipTaskbar = true;      // X11 _NET_WM_STATE_SKIP_TASKBAR: no Dock entry of its own
+      if (d.skipPager) args.skipPager = true;          // X11 _NET_WM_STATE_SKIP_PAGER: not in the Overview
       if (d.parent) { args.parent = idOf(d.parent); args.modal = !!d.modal; }
       const kept = restored || saved || d.dialog ? null : rememberedFrame(placeKeyOf(dockIdOfWindow({ id, args }), args.tag), { fixed: !!d.fixed, size: [w, hh] });
       wm.open('linux', {
@@ -179,6 +180,9 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
         desktop: owner ? owner.desktop : saved?.desktop ?? desktopOfSurface(sid),    // restored, or still open across a theme switch
       });
       if (restored) { if (restored.max) wm.toggleMaximize(id); } else saved?.then(id);
+      // always on top or kept below: what an X11 app asked for (_NET_WM_STATE_ABOVE / _BELOW), or the layer the
+      // window had before a theme switch
+      if (d.layer) wm.setLayer(id, layerName(d.layer));
       if (kept?.maximized) wm.toggleMaximize(id);
       // app .lpk aislada: su nombre (del manifest) en vez del id
       { const pkg = d.appId ? getApp(d.appId) : null; wm.setTitle(id, pkg && (pkg.package || pkg.isolated) && (!d.title || d.title === d.appId) ? (pkg.isolated ? appName(pkg) : pkg.name) : (d.title || args.tagDescription || d.appId || null)); }
@@ -192,6 +196,9 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     case 'unmap': if (win) wm.close(id, true); if (windowPixelIcons.get()[id]) windowOwnIcon(-1, id); break;
     case 'icon': windowOwnIcon(sid, id); break;       // xdg_toplevel_icon_manager_v1.set_icon, committed (X11: _NET_WM_ICON)
     case 'taskbar': if (win) wm.setArgs(id, { skipTaskbar: !!d.skip }); break;   // X11 _NET_WM_STATE_SKIP_TASKBAR changed
+    case 'pager': if (win) wm.setArgs(id, { skipPager: !!d.skip }); break;       // X11 _NET_WM_STATE_SKIP_PAGER changed
+    // X11 _NET_WM_STATE_ABOVE / _BELOW changed: its layer (it never takes the keyboard by it, desktopmodel.js stackOrder)
+    case 'layer': if (win) wm.setLayer(id, layerName(d.layer)); break;
     // the window it belongs to changed, or it became modal or not (xdg-foreign, xdg-dialog-v1)
     case 'parent': if (win) wm.setArgs(id, { parent: d.parent ? idOf(d.parent) : null, modal: !!d.parent && !!d.modal, dialog: win.args?.dialog || !!d.parent }); break;
     case 'title': {                      // an isolated app keeps its name when the title is just its id
@@ -367,8 +374,10 @@ function sync() {
     const fixed = isWindowLocked(w.id);
     // snapped to a half, quarter or third: the edges against the work area (the app may square its corners there)
     const edges = st.maximized ? 0 : tiledEdges(w.snapped);
-    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0) | (fixed ? 16 : 0) | (edges << 5);
-    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov, fixed, edges); }
+    // always on top (1) or kept below (-1): an X11 app sees it in _NET_WM_STATE (xwm.c), and it survives a theme switch
+    const layer = ownLayer(w);
+    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0) | (fixed ? 16 : 0) | (edges << 5) | ((layer + 1) << 9);
+    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov, fixed, edges, layer); }
   }
   sendWorkAreas();
   // search, the launcher, a sheet or a system prompt is open: the keys are LordOS's, not the app's

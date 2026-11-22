@@ -307,5 +307,60 @@ eq('notice: not a window with an app id, a title, a parent, a dialog or X11', [
   eq('keyboard: never a minimized window', kw([win('term', 1), win('vm', 1, { minimized: true })], 1, false), 'term');
 }
 
+// Always on top (docs/WINDOWS.md "Always on top"): the list is the order windows came forward (focus), the drawing
+// order splits it into layers. raise = what wm.focus does to the list (the window goes last).
+{
+  const { stackOrder, layerOf, ownLayer, cleanLayer, layerName, inPager, keyboardWindow, coveredIds } = M;
+  const raise = (l, id) => [...l.filter((w) => w.id !== id), l.find((w) => w.id === id)];
+  const front = (l) => focusedOn(l, 1)?.id ?? null;
+  const top = win('top', 1, { layer: 'above' });
+  let l = [win('a', 1), top, win('b', 1)];
+  eq('layers: an always-on-top window is drawn over the normal ones', ids(stackOrder(l)), ['a', 'b', 'top']);
+  eq('layers: the keyboard is on the normal window brought forward last, under it', front(l), 'b');
+  eq('layers: wm.hasKeyboard agrees', keyboardWindow(l, 1, false), 'b');
+  l = raise(l, 'a');
+  eq('layers: clicking a normal window raises it within the normal layer only', ids(stackOrder(l)), ['b', 'a', 'top']);
+  eq('layers: ...and it takes the keyboard', front(l), 'a');
+  l = raise(l, 'top');
+  eq('layers: clicking the always-on-top window gives it the keyboard', [front(l), ids(stackOrder(l))], ['top', ['b', 'a', 'top']]);
+  const two = [win('t1', 1, { layer: 'above' }), win('n', 1), win('t2', 1, { layer: 'above' })];
+  eq('layers: two always-on-top windows keep their own order', ids(stackOrder(two)), ['n', 't1', 't2']);
+  eq('layers: raising the lower one puts it over the other', ids(stackOrder(raise(two, 't1'))), ['n', 't2', 't1']);
+  const below = [win('desk', 1, { layer: 'below' }), win('a', 1), win('b', 1)];
+  eq('layers: a kept-below window stays under the others when brought forward', ids(stackOrder(raise(below, 'desk'))), ['desk', 'a', 'b']);
+  eq('layers: ...and has the keyboard', front(raise(below, 'desk')), 'desk');
+  // a dialog: the highest layer of its own and its owners'
+  const dlg = [win('p', 1, { layer: 'above' }), win('a', 1), win('d', 1, { args: { parent: 'p', modal: true } })];
+  eq('layers: the dialog of an always-on-top window stays over it', ids(stackOrder(dlg)), ['a', 'p', 'd']);
+  eq('layers: the dialog of a normal window stays under an always-on-top one', ids(stackOrder([win('a', 1), top, win('d', 1, { args: { parent: 'a' } })])), ['a', 'd', 'top']);
+  eq('layers: a dialog over a kept-below window is in the normal layer', layerOf(win('d', 1, { args: { parent: 'k' } }), new Map([['k', win('k', 1, { layer: 'below' })]])), 0);
+  const loop = new Map([['x', win('x', 1, { args: { parent: 'y' } })], ['y', win('y', 1, { args: { parent: 'x' } })]]);
+  eq('layers: a loop of parents ends', layerOf(loop.get('x'), loop), 0);
+  eq('layers: an owner only in the full list counts', ids(stackOrder([win('d', 1, { args: { parent: 'p' } }), win('a', 1)], [win('p', 1, { layer: 'above' })])), ['a', 'd']);
+  // nothing changes for a desktop with no layers (the theme's list stays the same array: no reorder, no redraw)
+  const plain = [win('a', 1), win('b', 1)];
+  eq('layers: no layer, the same list', stackOrder(plain) === plain, true);
+  eq('layers: only known names', [cleanLayer('above'), cleanLayer('below'), cleanLayer('top'), cleanLayer('constructor'), cleanLayer(null)], ['above', 'below', null, null, null]);
+  eq('layers: rank', [ownLayer(top), ownLayer(win('x', 1, { layer: 'constructor' })), ownLayer(null), layerName(1), layerName(-1), layerName(0)], [1, 0, 0, 'above', 'below', null]);
+  // what the theme mounts is in drawing order; fullscreen and picture-in-picture are the SDK's (FloatingWindows), above it
+  const mixed = [win('a', 1), top, win('fs', 1, { fullscreen: true }), win('pip', 1, { pip: { x: 0 } }), win('b', 1)];
+  eq('layers: mounted in drawing order, without fullscreen and picture-in-picture', ids(mountedOn(mixed, 1)), ['a', 'b', 'top']);
+  eq('layers: a fullscreen window brought forward has the keyboard over an always-on-top one', front(raise(mixed, 'fs')), 'fs');
+  eq('layers: picture-in-picture never has the keyboard', front([win('a', 1), win('pip', 1, { pip: { x: 0 } })]), 'a');
+  // covered (lord-server paces it): judged in drawing order
+  const S = (id, x, y, w, h, more = {}) => ({ id, x, y, w, h, desktop: 1, args: { surface: 1 }, ...more });
+  const N = (id, x, y, w, h, more = {}) => ({ id, x, y, w, h, desktop: 1, ...more });
+  const cov = (list) => [...coveredIds(list, 1, false, (w) => w, (w) => !w.args?.surface)].sort();
+  eq('layers: a Linux window always on top is not covered by a normal window brought forward after it',
+    cov([S('linux#1', 100, 100, 200, 200, { layer: 'above' }), N('files', 0, 0, 1280, 800)]), []);
+  eq('layers: a normal Linux window brought forward is covered by an always-on-top window over it',
+    cov([N('files', 0, 0, 1280, 800, { layer: 'above' }), S('linux#1', 100, 100, 200, 200)]), ['linux#1']);
+  // the pager (X11 _NET_WM_STATE_SKIP_PAGER): out of the Overview, so not drawn there
+  const sp = L(9, 1, { args: { surface: 9, skipPager: true } });
+  eq('pager: a window that skips it', [inPager(sp), inPager(win('a', 1)), inPager(null)], [false, true, true]);
+  eq('pager: not drawn in the Overview', ids(mountedOn([win('a', 1), sp], 1, true)), ['a']);
+  eq('pager: drawn on the desktop', ids(mountedOn([win('a', 1), sp], 1, false)), ['a', 'linux#9']);
+}
+
 if (bad) { console.error(`desktop-model-test: ${bad} of ${n} failed`); process.exit(1); }
 console.log(`desktop-model-test: ${n} checks passed`);

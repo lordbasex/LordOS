@@ -1,8 +1,8 @@
 {
  "schema": 1,
  "date": "2026-11-22",
- "commit": "06a592393a4064bbff8004d91c22837196498182",
- "dirty": false,
+ "commit": "de240de5587f740b0b4e3f4d79e286d2324bdaaa",
+ "dirty": true,
  "tool": "tools/wl-conformance.mjs",
  "method": "docs/WAYLAND.md#conformance",
  "weights": {
@@ -69,7 +69,7 @@
   "protocols": 48,
   "complete": 29,
   "mean": 100,
-  "x11_mean": 99.9
+  "x11_mean": 100
  },
  "notes": [],
  "protocols": [
@@ -177,7 +177,7 @@
    "xml": "/usr/share/wayland-protocols/staging/ext-idle-notify/ext-idle-notify-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7416",
+   "where": "server/src/wl/wl.c:7429",
    "interfaces": [
     "ext_idle_notifier_v1",
     "ext_idle_notification_v1"
@@ -197,7 +197,7 @@
      "hint": "ext_idle_notifier_v1.destroy",
      "result": "pass",
      "msg": "handled (idnm_impl)",
-     "where": "server/src/wl/wl.c:6381"
+     "where": "server/src/wl/wl.c:6383"
     },
     {
      "kind": "static",
@@ -207,7 +207,7 @@
      "hint": "ext_idle_notifier_v1.get_idle_notification",
      "result": "pass",
      "msg": "handled (idnm_impl)",
-     "where": "server/src/wl/wl.c:6350"
+     "where": "server/src/wl/wl.c:6352"
     },
     {
      "kind": "static",
@@ -217,7 +217,7 @@
      "hint": "ext_idle_notification_v1.destroy",
      "result": "pass",
      "msg": "handled (idn_impl)",
-     "where": "server/src/wl/wl.c:6348"
+     "where": "server/src/wl/wl.c:6350"
     },
     {
      "kind": "static",
@@ -227,7 +227,7 @@
      "hint": "ext_idle_notification_v1.idled",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6415"
+     "where": "server/src/wl/wl.c:6417"
     },
     {
      "kind": "static",
@@ -237,7 +237,7 @@
      "hint": "ext_idle_notification_v1.resumed",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6416"
+     "where": "server/src/wl/wl.c:6418"
     },
     {
      "kind": "generic",
@@ -274,7 +274,7 @@
    "xml": null,
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7440",
+   "where": "server/src/wl/wl.c:7453",
    "interfaces": [],
    "score": 100,
    "points": 12,
@@ -336,7 +336,7 @@
    "xml": "/usr/share/wayland/wayland.xml",
    "version": 6,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7396",
+   "where": "server/src/wl/wl.c:7409",
    "interfaces": [
     "wl_compositor",
     "wl_region",
@@ -358,7 +358,7 @@
      "hint": "wl_compositor.create_surface",
      "result": "pass",
      "msg": "handled (compositor_impl)",
-     "where": "server/src/wl/wl.c:2097"
+     "where": "server/src/wl/wl.c:2098"
     },
     {
      "kind": "static",
@@ -368,7 +368,7 @@
      "hint": "wl_compositor.create_region",
      "result": "pass",
      "msg": "handled (compositor_impl)",
-     "where": "server/src/wl/wl.c:2122"
+     "where": "server/src/wl/wl.c:2123"
     },
     {
      "kind": "static",
@@ -378,7 +378,7 @@
      "hint": "wl_region.destroy",
      "result": "pass",
      "msg": "handled (region_impl)",
-     "where": "server/src/wl/wl.c:2084"
+     "where": "server/src/wl/wl.c:2085"
     },
     {
      "kind": "static",
@@ -388,7 +388,7 @@
      "hint": "wl_region.add",
      "result": "pass",
      "msg": "handled (region_impl)",
-     "where": "server/src/wl/wl.c:2088"
+     "where": "server/src/wl/wl.c:2089"
     },
     {
      "kind": "static",
@@ -398,7 +398,7 @@
      "hint": "wl_region.subtract",
      "result": "pass",
      "msg": "handled (region_impl)",
-     "where": "server/src/wl/wl.c:2089"
+     "where": "server/src/wl/wl.c:2090"
     },
     {
      "kind": "static",
@@ -408,7 +408,7 @@
      "hint": "wl_surface.destroy",
      "result": "pass",
      "msg": "handled (surface_impl)",
-     "where": "server/src/wl/wl.c:1061"
+     "where": "server/src/wl/wl.c:1062"
     },
     {
      "kind": "static",
@@ -418,7 +418,7 @@
      "hint": "wl_surface.attach",
      "result": "pass",
      "msg": "handled (surface_impl)",
-     "where": "server/src/wl/wl.c:1072"
+     "where": "server/src/wl/wl.c:1073"
     },
     {
      "kind": "static",
@@ -428,7 +428,7 @@
      "hint": "wl_surface.damage",
      "result": "pass",
      "msg": "handled (surface_impl)",
-     "where": "server/src/wl/wl.c:1091"
+     "where": "server/src/wl/wl.c:1092"
     },
     {
      "kind": "static",
@@ -438,7 +438,7 @@
      "hint": "wl_surface.frame",
      "result": "pass",
      "msg": "handled (surface_impl)",
-     "where": "server/src/wl/wl.c:1142"
+     "where": "server/src/wl/wl.c:1143"
     },
     {
      "kind": "static",
@@ -448,7 +448,7 @@
      "hint": "wl_surface.set_opaque_region",
      "result": "allowed",
      "msg": "An optimization hint the protocol lets the compositor ignore; lord-server composites every surface with its alpha.",
-     "where": "server/src/wl/wl.c:1818"
+     "where": "server/src/wl/wl.c:1819"
     },
     {
      "kind": "static",
@@ -458,7 +458,7 @@
      "hint": "wl_surface.set_input_region",
      "result": "pass",
      "msg": "handled (surface_impl)",
-     "where": "server/src/wl/wl.c:1154"
+     "where": "server/src/wl/wl.c:1155"
     },
     {
      "kind": "static",
@@ -468,7 +468,7 @@
      "hint": "wl_surface.commit",
      "result": "pass",
      "msg": "handled (surface_impl)",
-     "where": "server/src/wl/wl.c:1684"
+     "where": "server/src/wl/wl.c:1685"
     },
     {
      "kind": "static",
@@ -478,7 +478,7 @@
      "hint": "wl_surface.set_buffer_transform",
      "result": "pass",
      "msg": "handled (surface_impl)",
-     "where": "server/src/wl/wl.c:1796"
+     "where": "server/src/wl/wl.c:1797"
     },
     {
      "kind": "static",
@@ -488,7 +488,7 @@
      "hint": "wl_surface.set_buffer_scale",
      "result": "pass",
      "msg": "handled (surface_impl)",
-     "where": "server/src/wl/wl.c:1805"
+     "where": "server/src/wl/wl.c:1806"
     },
     {
      "kind": "static",
@@ -498,7 +498,7 @@
      "hint": "wl_surface.damage_buffer",
      "result": "pass",
      "msg": "handled (surface_impl)",
-     "where": "server/src/wl/wl.c:1102"
+     "where": "server/src/wl/wl.c:1103"
     },
     {
      "kind": "static",
@@ -508,7 +508,7 @@
      "hint": "wl_surface.offset",
      "result": "pass",
      "msg": "handled (surface_impl)",
-     "where": "server/src/wl/wl.c:1811"
+     "where": "server/src/wl/wl.c:1812"
     },
     {
      "kind": "static",
@@ -518,7 +518,7 @@
      "hint": "wl_surface.enter",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2360"
+     "where": "server/src/wl/wl.c:2361"
     },
     {
      "kind": "static",
@@ -528,7 +528,7 @@
      "hint": "wl_surface.leave",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2557"
+     "where": "server/src/wl/wl.c:2558"
     },
     {
      "kind": "static",
@@ -538,7 +538,7 @@
      "hint": "wl_surface.preferred_buffer_scale",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2569"
+     "where": "server/src/wl/wl.c:2570"
     },
     {
      "kind": "static",
@@ -548,7 +548,7 @@
      "hint": "wl_surface.preferred_buffer_transform",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2571"
+     "where": "server/src/wl/wl.c:2572"
     },
     {
      "kind": "static",
@@ -558,7 +558,7 @@
      "hint": "wl_surface.error.invalid_scale",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1808"
+     "where": "server/src/wl/wl.c:1809"
     },
     {
      "kind": "static",
@@ -568,7 +568,7 @@
      "hint": "wl_surface.error.invalid_transform",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1800"
+     "where": "server/src/wl/wl.c:1801"
     },
     {
      "kind": "static",
@@ -578,7 +578,7 @@
      "hint": "wl_surface.error.invalid_size",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1647"
+     "where": "server/src/wl/wl.c:1648"
     },
     {
      "kind": "static",
@@ -588,7 +588,7 @@
      "hint": "wl_surface.error.invalid_offset",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1077"
+     "where": "server/src/wl/wl.c:1078"
     },
     {
      "kind": "static",
@@ -598,7 +598,7 @@
      "hint": "wl_surface.error.defunct_role_object",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1065"
+     "where": "server/src/wl/wl.c:1066"
     },
     {
      "kind": "static",
@@ -608,7 +608,7 @@
      "hint": "wl_callback.done",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:4925"
+     "where": "server/src/wl/wl.c:4927"
     },
     {
      "kind": "generic",
@@ -771,7 +771,7 @@
    "xml": "/usr/share/wayland/wayland.xml",
    "version": 3,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7401",
+   "where": "server/src/wl/wl.c:7414",
    "interfaces": [
     "wl_data_device_manager",
     "wl_data_device",
@@ -793,7 +793,7 @@
      "hint": "wl_data_device_manager.create_data_source",
      "result": "pass",
      "msg": "handled (ddm_impl)",
-     "where": "server/src/wl/wl.c:3441"
+     "where": "server/src/wl/wl.c:3442"
     },
     {
      "kind": "static",
@@ -803,7 +803,7 @@
      "hint": "wl_data_device_manager.get_data_device",
      "result": "pass",
      "msg": "handled (ddm_impl)",
-     "where": "server/src/wl/wl.c:3448"
+     "where": "server/src/wl/wl.c:3449"
     },
     {
      "kind": "static",
@@ -813,7 +813,7 @@
      "hint": "wl_data_device.start_drag",
      "result": "pass",
      "msg": "handled (device_impl)",
-     "where": "server/src/wl/wl.c:5733"
+     "where": "server/src/wl/wl.c:5735"
     },
     {
      "kind": "static",
@@ -823,7 +823,7 @@
      "hint": "wl_data_device.set_selection",
      "result": "pass",
      "msg": "handled (device_impl)",
-     "where": "server/src/wl/wl.c:3424"
+     "where": "server/src/wl/wl.c:3425"
     },
     {
      "kind": "static",
@@ -833,7 +833,7 @@
      "hint": "wl_data_device.release",
      "result": "pass",
      "msg": "handled (device_impl)",
-     "where": "server/src/wl/wl.c:2635"
+     "where": "server/src/wl/wl.c:2636"
     },
     {
      "kind": "static",
@@ -843,7 +843,7 @@
      "hint": "wl_data_device.data_offer",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3309"
+     "where": "server/src/wl/wl.c:3310"
     },
     {
      "kind": "static",
@@ -853,7 +853,7 @@
      "hint": "wl_data_device.enter",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5516"
+     "where": "server/src/wl/wl.c:5518"
     },
     {
      "kind": "static",
@@ -863,7 +863,7 @@
      "hint": "wl_data_device.leave",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5401"
+     "where": "server/src/wl/wl.c:5403"
     },
     {
      "kind": "static",
@@ -873,7 +873,7 @@
      "hint": "wl_data_device.motion",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5483"
+     "where": "server/src/wl/wl.c:5485"
     },
     {
      "kind": "static",
@@ -883,7 +883,7 @@
      "hint": "wl_data_device.drop",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5669"
+     "where": "server/src/wl/wl.c:5671"
     },
     {
      "kind": "static",
@@ -893,7 +893,7 @@
      "hint": "wl_data_device.selection",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3300"
+     "where": "server/src/wl/wl.c:3301"
     },
     {
      "kind": "static",
@@ -903,7 +903,7 @@
      "hint": "wl_data_device.error.role",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:5737"
+     "where": "server/src/wl/wl.c:5739"
     },
     {
      "kind": "static",
@@ -913,7 +913,7 @@
      "hint": "wl_data_device.error.used_source",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3427"
+     "where": "server/src/wl/wl.c:3428"
     },
     {
      "kind": "static",
@@ -923,7 +923,7 @@
      "hint": "wl_data_offer.accept",
      "result": "allowed",
      "msg": "handled; allowed: offer_impl: accept is drag-and-drop feedback (which mime type would be taken on drop); on a selection offer it has no meaning and the protocol defines no error for it.",
-     "where": "server/src/wl/wl.c:5318"
+     "where": "server/src/wl/wl.c:5320"
     },
     {
      "kind": "static",
@@ -933,7 +933,7 @@
      "hint": "wl_data_offer.receive",
      "result": "pass",
      "msg": "handled (offer_impl, dnd_offer_impl)",
-     "where": "server/src/wl/wl.c:5326"
+     "where": "server/src/wl/wl.c:5328"
     },
     {
      "kind": "static",
@@ -943,7 +943,7 @@
      "hint": "wl_data_offer.destroy",
      "result": "pass",
      "msg": "handled (offer_impl, dnd_offer_impl)",
-     "where": "server/src/wl/wl.c:5366"
+     "where": "server/src/wl/wl.c:5368"
     },
     {
      "kind": "static",
@@ -953,7 +953,7 @@
      "hint": "wl_data_offer.finish",
      "result": "pass",
      "msg": "handled (offer_impl, dnd_offer_impl)",
-     "where": "server/src/wl/wl.c:5336"
+     "where": "server/src/wl/wl.c:5338"
     },
     {
      "kind": "static",
@@ -963,7 +963,7 @@
      "hint": "wl_data_offer.set_actions",
      "result": "pass",
      "msg": "handled (offer_impl, dnd_offer_impl)",
-     "where": "server/src/wl/wl.c:5355"
+     "where": "server/src/wl/wl.c:5357"
     },
     {
      "kind": "static",
@@ -973,7 +973,7 @@
      "hint": "wl_data_offer.offer",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3311"
+     "where": "server/src/wl/wl.c:3312"
     },
     {
      "kind": "static",
@@ -983,7 +983,7 @@
      "hint": "wl_data_offer.source_actions",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5513"
+     "where": "server/src/wl/wl.c:5515"
     },
     {
      "kind": "static",
@@ -993,7 +993,7 @@
      "hint": "wl_data_offer.action",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5314"
+     "where": "server/src/wl/wl.c:5316"
     },
     {
      "kind": "static",
@@ -1003,7 +1003,7 @@
      "hint": "wl_data_offer.error.invalid_finish",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3276"
+     "where": "server/src/wl/wl.c:3277"
     },
     {
      "kind": "static",
@@ -1013,7 +1013,7 @@
      "hint": "wl_data_offer.error.invalid_action_mask",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:5357"
+     "where": "server/src/wl/wl.c:5359"
     },
     {
      "kind": "static",
@@ -1023,7 +1023,7 @@
      "hint": "wl_data_offer.error.invalid_action",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:5358"
+     "where": "server/src/wl/wl.c:5360"
     },
     {
      "kind": "static",
@@ -1033,7 +1033,7 @@
      "hint": "wl_data_offer.error.invalid_offer",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3280"
+     "where": "server/src/wl/wl.c:3281"
     },
     {
      "kind": "static",
@@ -1043,7 +1043,7 @@
      "hint": "wl_data_source.offer",
      "result": "pass",
      "msg": "handled (source_impl)",
-     "where": "server/src/wl/wl.c:2960"
+     "where": "server/src/wl/wl.c:2961"
     },
     {
      "kind": "static",
@@ -1053,7 +1053,7 @@
      "hint": "wl_data_source.destroy",
      "result": "pass",
      "msg": "handled (source_impl)",
-     "where": "server/src/wl/wl.c:2967"
+     "where": "server/src/wl/wl.c:2968"
     },
     {
      "kind": "static",
@@ -1063,7 +1063,7 @@
      "hint": "wl_data_source.set_actions",
      "result": "pass",
      "msg": "handled (source_impl)",
-     "where": "server/src/wl/wl.c:2969"
+     "where": "server/src/wl/wl.c:2970"
     },
     {
      "kind": "static",
@@ -1073,7 +1073,7 @@
      "hint": "wl_data_source.target",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5323"
+     "where": "server/src/wl/wl.c:5325"
     },
     {
      "kind": "static",
@@ -1083,7 +1083,7 @@
      "hint": "wl_data_source.send",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3154"
+     "where": "server/src/wl/wl.c:3155"
     },
     {
      "kind": "static",
@@ -1093,7 +1093,7 @@
      "hint": "wl_data_source.cancelled",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3406"
+     "where": "server/src/wl/wl.c:3407"
     },
     {
      "kind": "static",
@@ -1103,7 +1103,7 @@
      "hint": "wl_data_source.dnd_drop_performed",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5624"
+     "where": "server/src/wl/wl.c:5626"
     },
     {
      "kind": "static",
@@ -1113,7 +1113,7 @@
      "hint": "wl_data_source.dnd_finished",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5350"
+     "where": "server/src/wl/wl.c:5352"
     },
     {
      "kind": "static",
@@ -1123,7 +1123,7 @@
      "hint": "wl_data_source.action",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5315"
+     "where": "server/src/wl/wl.c:5317"
     },
     {
      "kind": "static",
@@ -1133,7 +1133,7 @@
      "hint": "wl_data_source.error.invalid_action_mask",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:2972"
+     "where": "server/src/wl/wl.c:2973"
     },
     {
      "kind": "static",
@@ -1143,7 +1143,7 @@
      "hint": "wl_data_source.error.invalid_source",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3429"
+     "where": "server/src/wl/wl.c:3430"
     },
     {
      "kind": "generic",
@@ -1272,7 +1272,7 @@
    "xml": "/usr/share/wayland/wayland.xml",
    "version": 4,
    "advertised": true,
-   "where": "server/src/wl/wl.c:2525",
+   "where": "server/src/wl/wl.c:2526",
    "interfaces": [
     "wl_output"
    ],
@@ -1291,7 +1291,7 @@
      "hint": "wl_output.release",
      "result": "pass",
      "msg": "handled (output_impl)",
-     "where": "server/src/wl/wl.c:2313"
+     "where": "server/src/wl/wl.c:2314"
     },
     {
      "kind": "static",
@@ -1301,7 +1301,7 @@
      "hint": "wl_output.geometry",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2326"
+     "where": "server/src/wl/wl.c:2327"
     },
     {
      "kind": "static",
@@ -1311,7 +1311,7 @@
      "hint": "wl_output.mode",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2328"
+     "where": "server/src/wl/wl.c:2329"
     },
     {
      "kind": "static",
@@ -1321,7 +1321,7 @@
      "hint": "wl_output.done",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2357"
+     "where": "server/src/wl/wl.c:2358"
     },
     {
      "kind": "static",
@@ -1331,7 +1331,7 @@
      "hint": "wl_output.scale",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2329"
+     "where": "server/src/wl/wl.c:2330"
     },
     {
      "kind": "static",
@@ -1341,7 +1341,7 @@
      "hint": "wl_output.name",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2330"
+     "where": "server/src/wl/wl.c:2331"
     },
     {
      "kind": "static",
@@ -1351,7 +1351,7 @@
      "hint": "wl_output.description",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2330"
+     "where": "server/src/wl/wl.c:2331"
     },
     {
      "kind": "generic",
@@ -1478,7 +1478,7 @@
    "xml": "/usr/share/wayland/wayland.xml",
    "version": 9,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7400",
+   "where": "server/src/wl/wl.c:7413",
    "interfaces": [
     "wl_seat",
     "wl_touch",
@@ -1500,7 +1500,7 @@
      "hint": "wl_seat.get_pointer",
      "result": "pass",
      "msg": "handled (seat_impl)",
-     "where": "server/src/wl/wl.c:2851"
+     "where": "server/src/wl/wl.c:2852"
     },
     {
      "kind": "static",
@@ -1510,7 +1510,7 @@
      "hint": "wl_seat.get_keyboard",
      "result": "pass",
      "msg": "handled (seat_impl)",
-     "where": "server/src/wl/wl.c:2868"
+     "where": "server/src/wl/wl.c:2869"
     },
     {
      "kind": "static",
@@ -1520,7 +1520,7 @@
      "hint": "wl_seat.get_touch",
      "result": "pass",
      "msg": "handled (seat_impl)",
-     "where": "server/src/wl/wl.c:2878"
+     "where": "server/src/wl/wl.c:2879"
     },
     {
      "kind": "static",
@@ -1530,7 +1530,7 @@
      "hint": "wl_seat.release",
      "result": "pass",
      "msg": "handled (seat_impl)",
-     "where": "server/src/wl/wl.c:2635"
+     "where": "server/src/wl/wl.c:2636"
     },
     {
      "kind": "static",
@@ -1550,7 +1550,7 @@
      "hint": "wl_seat.name",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2893"
+     "where": "server/src/wl/wl.c:2894"
     },
     {
      "kind": "static",
@@ -1640,7 +1640,7 @@
      "hint": "wl_keyboard.release",
      "result": "pass",
      "msg": "handled (keyboard_impl)",
-     "where": "server/src/wl/wl.c:2635"
+     "where": "server/src/wl/wl.c:2636"
     },
     {
      "kind": "static",
@@ -1650,7 +1650,7 @@
      "hint": "wl_keyboard.keymap",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2833"
+     "where": "server/src/wl/wl.c:2834"
     },
     {
      "kind": "static",
@@ -1660,7 +1660,7 @@
      "hint": "wl_keyboard.enter",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2843"
+     "where": "server/src/wl/wl.c:2844"
     },
     {
      "kind": "static",
@@ -1670,7 +1670,7 @@
      "hint": "wl_keyboard.leave",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:7150"
+     "where": "server/src/wl/wl.c:7152"
     },
     {
      "kind": "static",
@@ -1680,7 +1680,7 @@
      "hint": "wl_keyboard.key",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5986"
+     "where": "server/src/wl/wl.c:5988"
     },
     {
      "kind": "static",
@@ -1690,7 +1690,7 @@
      "hint": "wl_keyboard.modifiers",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2847"
+     "where": "server/src/wl/wl.c:2848"
     },
     {
      "kind": "static",
@@ -1700,7 +1700,7 @@
      "hint": "wl_pointer.set_cursor",
      "result": "pass",
      "msg": "handled (pointer_impl)",
-     "where": "server/src/wl/wl.c:2621"
+     "where": "server/src/wl/wl.c:2622"
     },
     {
      "kind": "static",
@@ -1710,7 +1710,7 @@
      "hint": "wl_pointer.release",
      "result": "pass",
      "msg": "handled (pointer_impl)",
-     "where": "server/src/wl/wl.c:2635"
+     "where": "server/src/wl/wl.c:2636"
     },
     {
      "kind": "static",
@@ -1720,7 +1720,7 @@
      "hint": "wl_pointer.enter",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2863"
+     "where": "server/src/wl/wl.c:2864"
     },
     {
      "kind": "static",
@@ -1730,7 +1730,7 @@
      "hint": "wl_pointer.leave",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5129"
+     "where": "server/src/wl/wl.c:5131"
     },
     {
      "kind": "static",
@@ -1740,7 +1740,7 @@
      "hint": "wl_pointer.motion",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5860"
+     "where": "server/src/wl/wl.c:5862"
     },
     {
      "kind": "static",
@@ -1750,7 +1750,7 @@
      "hint": "wl_pointer.button",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5866"
+     "where": "server/src/wl/wl.c:5868"
     },
     {
      "kind": "static",
@@ -1770,7 +1770,7 @@
      "hint": "wl_pointer.frame",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2864"
+     "where": "server/src/wl/wl.c:2865"
     },
     {
      "kind": "static",
@@ -1830,7 +1830,7 @@
      "hint": "wl_pointer.error.role",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:2627"
+     "where": "server/src/wl/wl.c:2628"
     },
     {
      "kind": "generic",
@@ -2039,7 +2039,7 @@
    "version": 2,
    "advertised": true,
    "libwayland": true,
-   "where": "server/src/wl/wl.c:7395",
+   "where": "server/src/wl/wl.c:7408",
    "interfaces": [
     "wl_shm",
     "wl_shm_pool",
@@ -2150,7 +2150,7 @@
      "hint": "wl_buffer.destroy",
      "result": "pass",
      "msg": "handled (spb_buffer_impl, dmabuf_buffer_impl)",
-     "where": "server/src/wl/wl.c:6526"
+     "where": "server/src/wl/wl.c:6528"
     },
     {
      "kind": "static",
@@ -2160,7 +2160,7 @@
      "hint": "wl_buffer.release",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:720"
+     "where": "server/src/wl/wl.c:721"
     },
     {
      "kind": "generic",
@@ -2242,7 +2242,7 @@
    "xml": "/usr/share/wayland/wayland.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7397",
+   "where": "server/src/wl/wl.c:7410",
    "interfaces": [
     "wl_subcompositor",
     "wl_subsurface"
@@ -2262,7 +2262,7 @@
      "hint": "wl_subcompositor.destroy",
      "result": "pass",
      "msg": "handled (subcompositor_impl)",
-     "where": "server/src/wl/wl.c:2263"
+     "where": "server/src/wl/wl.c:2264"
     },
     {
      "kind": "static",
@@ -2272,7 +2272,7 @@
      "hint": "wl_subcompositor.get_subsurface",
      "result": "pass",
      "msg": "handled (subcompositor_impl)",
-     "where": "server/src/wl/wl.c:2264"
+     "where": "server/src/wl/wl.c:2265"
     },
     {
      "kind": "static",
@@ -2282,7 +2282,7 @@
      "hint": "wl_subcompositor.error.bad_surface",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:2266"
+     "where": "server/src/wl/wl.c:2267"
     },
     {
      "kind": "static",
@@ -2292,7 +2292,7 @@
      "hint": "wl_subcompositor.error.bad_parent",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:2276"
+     "where": "server/src/wl/wl.c:2277"
     },
     {
      "kind": "static",
@@ -2302,7 +2302,7 @@
      "hint": "wl_subsurface.destroy",
      "result": "pass",
      "msg": "handled (subsurface_impl)",
-     "where": "server/src/wl/wl.c:2142"
+     "where": "server/src/wl/wl.c:2143"
     },
     {
      "kind": "static",
@@ -2312,7 +2312,7 @@
      "hint": "wl_subsurface.set_position",
      "result": "pass",
      "msg": "handled (subsurface_impl)",
-     "where": "server/src/wl/wl.c:2143"
+     "where": "server/src/wl/wl.c:2144"
     },
     {
      "kind": "static",
@@ -2322,7 +2322,7 @@
      "hint": "wl_subsurface.place_above",
      "result": "pass",
      "msg": "handled (subsurface_impl)",
-     "where": "server/src/wl/wl.c:2186"
+     "where": "server/src/wl/wl.c:2187"
     },
     {
      "kind": "static",
@@ -2332,7 +2332,7 @@
      "hint": "wl_subsurface.place_below",
      "result": "pass",
      "msg": "handled (subsurface_impl)",
-     "where": "server/src/wl/wl.c:2187"
+     "where": "server/src/wl/wl.c:2188"
     },
     {
      "kind": "static",
@@ -2342,7 +2342,7 @@
      "hint": "wl_subsurface.set_sync",
      "result": "pass",
      "msg": "handled (subsurface_impl)",
-     "where": "server/src/wl/wl.c:2210"
+     "where": "server/src/wl/wl.c:2211"
     },
     {
      "kind": "static",
@@ -2352,7 +2352,7 @@
      "hint": "wl_subsurface.set_desync",
      "result": "pass",
      "msg": "handled (subsurface_impl)",
-     "where": "server/src/wl/wl.c:2211"
+     "where": "server/src/wl/wl.c:2212"
     },
     {
      "kind": "static",
@@ -2362,7 +2362,7 @@
      "hint": "wl_subsurface.error.bad_surface",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:2166"
+     "where": "server/src/wl/wl.c:2167"
     },
     {
      "kind": "generic",
@@ -2426,7 +2426,7 @@
    "xml": "/usr/share/wayland-protocols/staging/alpha-modifier/alpha-modifier-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7430",
+   "where": "server/src/wl/wl.c:7443",
    "interfaces": [
     "wp_alpha_modifier_v1",
     "wp_alpha_modifier_surface_v1"
@@ -2446,7 +2446,7 @@
      "hint": "wp_alpha_modifier_v1.destroy",
      "result": "pass",
      "msg": "handled (am_impl)",
-     "where": "server/src/wl/wl.c:914"
+     "where": "server/src/wl/wl.c:915"
     },
     {
      "kind": "static",
@@ -2456,7 +2456,7 @@
      "hint": "wp_alpha_modifier_v1.get_surface",
      "result": "pass",
      "msg": "handled (am_impl)",
-     "where": "server/src/wl/wl.c:915"
+     "where": "server/src/wl/wl.c:916"
     },
     {
      "kind": "static",
@@ -2466,7 +2466,7 @@
      "hint": "wp_alpha_modifier_v1.error.already_constructed",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:917"
+     "where": "server/src/wl/wl.c:918"
     },
     {
      "kind": "static",
@@ -2476,7 +2476,7 @@
      "hint": "wp_alpha_modifier_surface_v1.destroy",
      "result": "pass",
      "msg": "handled (ams_impl)",
-     "where": "server/src/wl/wl.c:902"
+     "where": "server/src/wl/wl.c:903"
     },
     {
      "kind": "static",
@@ -2486,7 +2486,7 @@
      "hint": "wp_alpha_modifier_surface_v1.set_multiplier",
      "result": "pass",
      "msg": "handled (ams_impl)",
-     "where": "server/src/wl/wl.c:903"
+     "where": "server/src/wl/wl.c:904"
     },
     {
      "kind": "static",
@@ -2496,7 +2496,7 @@
      "hint": "wp_alpha_modifier_surface_v1.error.no_surface",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:906"
+     "where": "server/src/wl/wl.c:907"
     },
     {
      "kind": "generic",
@@ -3360,7 +3360,7 @@
    "xml": "/usr/share/wayland-protocols/staging/cursor-shape/cursor-shape-v1.xml",
    "version": 2,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7434",
+   "where": "server/src/wl/wl.c:7447",
    "interfaces": [
     "wp_cursor_shape_manager_v1",
     "wp_cursor_shape_device_v1"
@@ -3380,7 +3380,7 @@
      "hint": "wp_cursor_shape_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (csm_impl)",
-     "where": "server/src/wl/wl.c:2635"
+     "where": "server/src/wl/wl.c:2636"
     },
     {
      "kind": "static",
@@ -3390,7 +3390,7 @@
      "hint": "wp_cursor_shape_manager_v1.get_pointer",
      "result": "pass",
      "msg": "handled (csm_impl)",
-     "where": "server/src/wl/wl.c:2661"
+     "where": "server/src/wl/wl.c:2662"
     },
     {
      "kind": "static",
@@ -3400,7 +3400,7 @@
      "hint": "wp_cursor_shape_manager_v1.get_tablet_tool_v2",
      "result": "pass",
      "msg": "handled (csm_impl)",
-     "where": "server/src/wl/wl.c:2665"
+     "where": "server/src/wl/wl.c:2666"
     },
     {
      "kind": "static",
@@ -3410,7 +3410,7 @@
      "hint": "wp_cursor_shape_device_v1.destroy",
      "result": "pass",
      "msg": "handled (csd_impl)",
-     "where": "server/src/wl/wl.c:2635"
+     "where": "server/src/wl/wl.c:2636"
     },
     {
      "kind": "static",
@@ -3420,7 +3420,7 @@
      "hint": "wp_cursor_shape_device_v1.set_shape",
      "result": "pass",
      "msg": "handled (csd_impl)",
-     "where": "server/src/wl/wl.c:2640"
+     "where": "server/src/wl/wl.c:2641"
     },
     {
      "kind": "static",
@@ -3430,7 +3430,7 @@
      "hint": "wp_cursor_shape_device_v1.error.invalid_shape",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:2644"
+     "where": "server/src/wl/wl.c:2645"
     },
     {
      "kind": "generic",
@@ -3825,7 +3825,7 @@
    "xml": "/usr/share/wayland-protocols/staging/fractional-scale/fractional-scale-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7399",
+   "where": "server/src/wl/wl.c:7412",
    "interfaces": [
     "wp_fractional_scale_manager_v1",
     "wp_fractional_scale_v1"
@@ -3845,7 +3845,7 @@
      "hint": "wp_fractional_scale_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (frac_mgr_impl)",
-     "where": "server/src/wl/wl.c:2397"
+     "where": "server/src/wl/wl.c:2398"
     },
     {
      "kind": "static",
@@ -3855,7 +3855,7 @@
      "hint": "wp_fractional_scale_manager_v1.get_fractional_scale",
      "result": "pass",
      "msg": "handled (frac_mgr_impl)",
-     "where": "server/src/wl/wl.c:2398"
+     "where": "server/src/wl/wl.c:2399"
     },
     {
      "kind": "static",
@@ -3865,7 +3865,7 @@
      "hint": "wp_fractional_scale_manager_v1.error.fractional_scale_exists",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:2400"
+     "where": "server/src/wl/wl.c:2401"
     },
     {
      "kind": "static",
@@ -3875,7 +3875,7 @@
      "hint": "wp_fractional_scale_v1.destroy",
      "result": "pass",
      "msg": "handled (frac_impl)",
-     "where": "server/src/wl/wl.c:2387"
+     "where": "server/src/wl/wl.c:2388"
     },
     {
      "kind": "static",
@@ -3885,7 +3885,7 @@
      "hint": "wp_fractional_scale_v1.preferred_scale",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2407"
+     "where": "server/src/wl/wl.c:2408"
     },
     {
      "kind": "generic",
@@ -3940,7 +3940,7 @@
    "xml": "/usr/share/wayland-protocols/staging/linux-drm-syncobj/linux-drm-syncobj-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7426",
+   "where": "server/src/wl/wl.c:7439",
    "interfaces": [
     "wp_linux_drm_syncobj_manager_v1",
     "wp_linux_drm_syncobj_timeline_v1",
@@ -3961,7 +3961,7 @@
      "hint": "wp_linux_drm_syncobj_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (sobjm_impl)",
-     "where": "server/src/wl/wl.c:1576"
+     "where": "server/src/wl/wl.c:1577"
     },
     {
      "kind": "static",
@@ -3971,7 +3971,7 @@
      "hint": "wp_linux_drm_syncobj_manager_v1.get_surface",
      "result": "pass",
      "msg": "handled (sobjm_impl)",
-     "where": "server/src/wl/wl.c:1577"
+     "where": "server/src/wl/wl.c:1578"
     },
     {
      "kind": "static",
@@ -3981,7 +3981,7 @@
      "hint": "wp_linux_drm_syncobj_manager_v1.import_timeline",
      "result": "pass",
      "msg": "handled (sobjm_impl)",
-     "where": "server/src/wl/wl.c:1591"
+     "where": "server/src/wl/wl.c:1592"
     },
     {
      "kind": "static",
@@ -3991,7 +3991,7 @@
      "hint": "wp_linux_drm_syncobj_manager_v1.error.surface_exists",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1580"
+     "where": "server/src/wl/wl.c:1581"
     },
     {
      "kind": "static",
@@ -4001,7 +4001,7 @@
      "hint": "wp_linux_drm_syncobj_manager_v1.error.invalid_timeline",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1596"
+     "where": "server/src/wl/wl.c:1597"
     },
     {
      "kind": "static",
@@ -4011,7 +4011,7 @@
      "hint": "wp_linux_drm_syncobj_timeline_v1.destroy",
      "result": "pass",
      "msg": "handled (sobjt_impl)",
-     "where": "server/src/wl/wl.c:1534"
+     "where": "server/src/wl/wl.c:1535"
     },
     {
      "kind": "static",
@@ -4021,7 +4021,7 @@
      "hint": "wp_linux_drm_syncobj_surface_v1.destroy",
      "result": "pass",
      "msg": "handled (sobjs_impl)",
-     "where": "server/src/wl/wl.c:1543"
+     "where": "server/src/wl/wl.c:1544"
     },
     {
      "kind": "static",
@@ -4031,7 +4031,7 @@
      "hint": "wp_linux_drm_syncobj_surface_v1.set_acquire_point",
      "result": "pass",
      "msg": "handled (sobjs_impl)",
-     "where": "server/src/wl/wl.c:1552"
+     "where": "server/src/wl/wl.c:1553"
     },
     {
      "kind": "static",
@@ -4041,7 +4041,7 @@
      "hint": "wp_linux_drm_syncobj_surface_v1.set_release_point",
      "result": "pass",
      "msg": "handled (sobjs_impl)",
-     "where": "server/src/wl/wl.c:1556"
+     "where": "server/src/wl/wl.c:1557"
     },
     {
      "kind": "static",
@@ -4051,7 +4051,7 @@
      "hint": "wp_linux_drm_syncobj_surface_v1.error.no_surface",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1519"
+     "where": "server/src/wl/wl.c:1520"
     },
     {
      "kind": "static",
@@ -4061,7 +4061,7 @@
      "hint": "wp_linux_drm_syncobj_surface_v1.error.unsupported_buffer",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1514"
+     "where": "server/src/wl/wl.c:1515"
     },
     {
      "kind": "static",
@@ -4071,7 +4071,7 @@
      "hint": "wp_linux_drm_syncobj_surface_v1.error.no_buffer",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1515"
+     "where": "server/src/wl/wl.c:1516"
     },
     {
      "kind": "static",
@@ -4081,7 +4081,7 @@
      "hint": "wp_linux_drm_syncobj_surface_v1.error.no_acquire_point",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1516"
+     "where": "server/src/wl/wl.c:1517"
     },
     {
      "kind": "static",
@@ -4091,7 +4091,7 @@
      "hint": "wp_linux_drm_syncobj_surface_v1.error.no_release_point",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1517"
+     "where": "server/src/wl/wl.c:1518"
     },
     {
      "kind": "static",
@@ -4101,7 +4101,7 @@
      "hint": "wp_linux_drm_syncobj_surface_v1.error.conflicting_points",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1518"
+     "where": "server/src/wl/wl.c:1519"
     },
     {
      "kind": "generic",
@@ -4186,7 +4186,7 @@
    "xml": "/usr/share/wayland-protocols/stable/presentation-time/presentation-time.xml",
    "version": 2,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7427",
+   "where": "server/src/wl/wl.c:7440",
    "interfaces": [
     "wp_presentation",
     "wp_presentation_feedback"
@@ -4206,7 +4206,7 @@
      "hint": "wp_presentation.destroy",
      "result": "pass",
      "msg": "handled (presentation_impl)",
-     "where": "server/src/wl/wl.c:6826"
+     "where": "server/src/wl/wl.c:6828"
     },
     {
      "kind": "static",
@@ -4216,7 +4216,7 @@
      "hint": "wp_presentation.feedback",
      "result": "pass",
      "msg": "handled (presentation_impl)",
-     "where": "server/src/wl/wl.c:6828"
+     "where": "server/src/wl/wl.c:6830"
     },
     {
      "kind": "static",
@@ -4226,7 +4226,7 @@
      "hint": "wp_presentation.clock_id",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6842"
+     "where": "server/src/wl/wl.c:6844"
     },
     {
      "kind": "static",
@@ -4256,7 +4256,7 @@
      "hint": "wp_presentation_feedback.sync_output",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6863"
+     "where": "server/src/wl/wl.c:6865"
     },
     {
      "kind": "static",
@@ -4266,7 +4266,7 @@
      "hint": "wp_presentation_feedback.presented",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6865"
+     "where": "server/src/wl/wl.c:6867"
     },
     {
      "kind": "static",
@@ -4276,7 +4276,7 @@
      "hint": "wp_presentation_feedback.discarded",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:1328"
+     "where": "server/src/wl/wl.c:1329"
     },
     {
      "kind": "generic",
@@ -4552,7 +4552,7 @@
    "xml": "/usr/share/wayland-protocols/staging/single-pixel-buffer/single-pixel-buffer-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7429",
+   "where": "server/src/wl/wl.c:7442",
    "interfaces": [
     "wp_single_pixel_buffer_manager_v1",
     "wl_buffer"
@@ -4572,7 +4572,7 @@
      "hint": "wp_single_pixel_buffer_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (spbm_impl)",
-     "where": "server/src/wl/wl.c:892"
+     "where": "server/src/wl/wl.c:893"
     },
     {
      "kind": "static",
@@ -4582,7 +4582,7 @@
      "hint": "wp_single_pixel_buffer_manager_v1.create_u32_rgba_buffer",
      "result": "pass",
      "msg": "handled (spbm_impl)",
-     "where": "server/src/wl/wl.c:880"
+     "where": "server/src/wl/wl.c:881"
     },
     {
      "kind": "static",
@@ -4592,7 +4592,7 @@
      "hint": "wl_buffer.destroy",
      "result": "pass",
      "msg": "handled (spb_buffer_impl, dmabuf_buffer_impl)",
-     "where": "server/src/wl/wl.c:6526"
+     "where": "server/src/wl/wl.c:6528"
     },
     {
      "kind": "static",
@@ -4602,7 +4602,7 @@
      "hint": "wl_buffer.release",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:720"
+     "where": "server/src/wl/wl.c:721"
     },
     {
      "kind": "generic",
@@ -4736,7 +4736,7 @@
    "xml": "/usr/share/wayland-protocols/stable/viewporter/viewporter.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7428",
+   "where": "server/src/wl/wl.c:7441",
    "interfaces": [
     "wp_viewporter",
     "wp_viewport"
@@ -4756,7 +4756,7 @@
      "hint": "wp_viewporter.destroy",
      "result": "pass",
      "msg": "handled (viewporter_impl)",
-     "where": "server/src/wl/wl.c:6906"
+     "where": "server/src/wl/wl.c:6908"
     },
     {
      "kind": "static",
@@ -4766,7 +4766,7 @@
      "hint": "wp_viewporter.get_viewport",
      "result": "pass",
      "msg": "handled (viewporter_impl)",
-     "where": "server/src/wl/wl.c:6907"
+     "where": "server/src/wl/wl.c:6909"
     },
     {
      "kind": "static",
@@ -4776,7 +4776,7 @@
      "hint": "wp_viewporter.error.viewport_exists",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6909"
+     "where": "server/src/wl/wl.c:6911"
     },
     {
      "kind": "static",
@@ -4786,7 +4786,7 @@
      "hint": "wp_viewport.destroy",
      "result": "pass",
      "msg": "handled (viewport_impl)",
-     "where": "server/src/wl/wl.c:6874"
+     "where": "server/src/wl/wl.c:6876"
     },
     {
      "kind": "static",
@@ -4796,7 +4796,7 @@
      "hint": "wp_viewport.set_source",
      "result": "pass",
      "msg": "handled (viewport_impl)",
-     "where": "server/src/wl/wl.c:6883"
+     "where": "server/src/wl/wl.c:6885"
     },
     {
      "kind": "static",
@@ -4806,7 +4806,7 @@
      "hint": "wp_viewport.set_destination",
      "result": "pass",
      "msg": "handled (viewport_impl)",
-     "where": "server/src/wl/wl.c:6895"
+     "where": "server/src/wl/wl.c:6897"
     },
     {
      "kind": "static",
@@ -4816,7 +4816,7 @@
      "hint": "wp_viewport.error.bad_value",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6888"
+     "where": "server/src/wl/wl.c:6890"
     },
     {
      "kind": "static",
@@ -4826,7 +4826,7 @@
      "hint": "wp_viewport.error.bad_size",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1654"
+     "where": "server/src/wl/wl.c:1655"
     },
     {
      "kind": "static",
@@ -4836,7 +4836,7 @@
      "hint": "wp_viewport.error.out_of_buffer",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1661"
+     "where": "server/src/wl/wl.c:1662"
     },
     {
      "kind": "static",
@@ -4846,7 +4846,7 @@
      "hint": "wp_viewport.error.no_surface",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6886"
+     "where": "server/src/wl/wl.c:6888"
     },
     {
      "kind": "generic",
@@ -4937,7 +4937,7 @@
    "xml": "/usr/share/wayland-protocols/staging/xdg-activation/xdg-activation-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7437",
+   "where": "server/src/wl/wl.c:7450",
    "interfaces": [
     "xdg_activation_v1",
     "xdg_activation_token_v1"
@@ -4957,7 +4957,7 @@
      "hint": "xdg_activation_v1.destroy",
      "result": "pass",
      "msg": "handled (act_impl)",
-     "where": "server/src/wl/wl.c:2762"
+     "where": "server/src/wl/wl.c:2763"
     },
     {
      "kind": "static",
@@ -4967,7 +4967,7 @@
      "hint": "xdg_activation_v1.get_activation_token",
      "result": "pass",
      "msg": "handled (act_impl)",
-     "where": "server/src/wl/wl.c:2747"
+     "where": "server/src/wl/wl.c:2748"
     },
     {
      "kind": "static",
@@ -4977,7 +4977,7 @@
      "hint": "xdg_activation_v1.activate",
      "result": "pass",
      "msg": "handled (act_impl)",
-     "where": "server/src/wl/wl.c:2753"
+     "where": "server/src/wl/wl.c:2754"
     },
     {
      "kind": "static",
@@ -4987,7 +4987,7 @@
      "hint": "xdg_activation_token_v1.set_serial",
      "result": "pass",
      "msg": "handled (tok_impl)",
-     "where": "server/src/wl/wl.c:2711"
+     "where": "server/src/wl/wl.c:2712"
     },
     {
      "kind": "static",
@@ -4997,7 +4997,7 @@
      "hint": "xdg_activation_token_v1.set_app_id",
      "result": "pass",
      "msg": "handled (tok_impl)",
-     "where": "server/src/wl/wl.c:2718"
+     "where": "server/src/wl/wl.c:2719"
     },
     {
      "kind": "static",
@@ -5007,7 +5007,7 @@
      "hint": "xdg_activation_token_v1.set_surface",
      "result": "pass",
      "msg": "handled (tok_impl)",
-     "where": "server/src/wl/wl.c:2724"
+     "where": "server/src/wl/wl.c:2725"
     },
     {
      "kind": "static",
@@ -5017,7 +5017,7 @@
      "hint": "xdg_activation_token_v1.commit",
      "result": "pass",
      "msg": "handled (tok_impl)",
-     "where": "server/src/wl/wl.c:2733"
+     "where": "server/src/wl/wl.c:2734"
     },
     {
      "kind": "static",
@@ -5027,7 +5027,7 @@
      "hint": "xdg_activation_token_v1.destroy",
      "result": "pass",
      "msg": "handled (tok_impl)",
-     "where": "server/src/wl/wl.c:2704"
+     "where": "server/src/wl/wl.c:2705"
     },
     {
      "kind": "static",
@@ -5037,7 +5037,7 @@
      "hint": "xdg_activation_token_v1.done",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2742"
+     "where": "server/src/wl/wl.c:2743"
     },
     {
      "kind": "static",
@@ -5047,7 +5047,7 @@
      "hint": "xdg_activation_token_v1.error.already_used",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:2708"
+     "where": "server/src/wl/wl.c:2709"
     },
     {
      "kind": "generic",
@@ -5506,7 +5506,7 @@
    "xml": "/usr/share/wayland-protocols/staging/xdg-toplevel-icon/xdg-toplevel-icon-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7415",
+   "where": "server/src/wl/wl.c:7428",
    "interfaces": [
     "xdg_toplevel_icon_manager_v1",
     "xdg_toplevel_icon_v1"
@@ -5526,7 +5526,7 @@
      "hint": "xdg_toplevel_icon_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (iconm_impl)",
-     "where": "server/src/wl/wl.c:6290"
+     "where": "server/src/wl/wl.c:6292"
     },
     {
      "kind": "static",
@@ -5536,7 +5536,7 @@
      "hint": "xdg_toplevel_icon_manager_v1.create_icon",
      "result": "pass",
      "msg": "handled (iconm_impl)",
-     "where": "server/src/wl/wl.c:6291"
+     "where": "server/src/wl/wl.c:6293"
     },
     {
      "kind": "static",
@@ -5546,7 +5546,7 @@
      "hint": "xdg_toplevel_icon_manager_v1.set_icon",
      "result": "pass",
      "msg": "handled (iconm_impl)",
-     "where": "server/src/wl/wl.c:6298"
+     "where": "server/src/wl/wl.c:6300"
     },
     {
      "kind": "static",
@@ -5556,7 +5556,7 @@
      "hint": "xdg_toplevel_icon_manager_v1.icon_size",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6314"
+     "where": "server/src/wl/wl.c:6316"
     },
     {
      "kind": "static",
@@ -5566,7 +5566,7 @@
      "hint": "xdg_toplevel_icon_manager_v1.done",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6316"
+     "where": "server/src/wl/wl.c:6318"
     },
     {
      "kind": "static",
@@ -5576,7 +5576,7 @@
      "hint": "xdg_toplevel_icon_v1.destroy",
      "result": "pass",
      "msg": "handled (icon_impl)",
-     "where": "server/src/wl/wl.c:6256"
+     "where": "server/src/wl/wl.c:6258"
     },
     {
      "kind": "static",
@@ -5586,7 +5586,7 @@
      "hint": "xdg_toplevel_icon_v1.set_name",
      "result": "pass",
      "msg": "handled (icon_impl)",
-     "where": "server/src/wl/wl.c:6257"
+     "where": "server/src/wl/wl.c:6259"
     },
     {
      "kind": "static",
@@ -5596,7 +5596,7 @@
      "hint": "xdg_toplevel_icon_v1.add_buffer",
      "result": "pass",
      "msg": "handled (icon_impl)",
-     "where": "server/src/wl/wl.c:6262"
+     "where": "server/src/wl/wl.c:6264"
     },
     {
      "kind": "static",
@@ -5606,7 +5606,7 @@
      "hint": "xdg_toplevel_icon_v1.error.invalid_buffer",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6269"
+     "where": "server/src/wl/wl.c:6271"
     },
     {
      "kind": "static",
@@ -5616,7 +5616,7 @@
      "hint": "xdg_toplevel_icon_v1.error.immutable",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6260"
+     "where": "server/src/wl/wl.c:6262"
     },
     {
      "kind": "static",
@@ -5626,7 +5626,7 @@
      "hint": "xdg_toplevel_icon_v1.error.no_buffer",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6239"
+     "where": "server/src/wl/wl.c:6241"
     },
     {
      "kind": "generic",
@@ -5757,7 +5757,7 @@
    "xml": "/usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml",
    "version": 7,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7405",
+   "where": "server/src/wl/wl.c:7418",
    "interfaces": [
     "xdg_wm_base",
     "xdg_surface",
@@ -5780,7 +5780,7 @@
      "hint": "xdg_wm_base.destroy",
      "result": "pass",
      "msg": "handled (wm_base_impl)",
-     "where": "server/src/wl/wl.c:4103"
+     "where": "server/src/wl/wl.c:4104"
     },
     {
      "kind": "static",
@@ -5790,7 +5790,7 @@
      "hint": "xdg_wm_base.create_positioner",
      "result": "pass",
      "msg": "handled (wm_base_impl)",
-     "where": "server/src/wl/wl.c:4134"
+     "where": "server/src/wl/wl.c:4135"
     },
     {
      "kind": "static",
@@ -5800,7 +5800,7 @@
      "hint": "xdg_wm_base.get_xdg_surface",
      "result": "pass",
      "msg": "handled (wm_base_impl)",
-     "where": "server/src/wl/wl.c:4140"
+     "where": "server/src/wl/wl.c:4141"
     },
     {
      "kind": "static",
@@ -5810,7 +5810,7 @@
      "hint": "xdg_wm_base.pong",
      "result": "pass",
      "msg": "handled (wm_base_impl)",
-     "where": "server/src/wl/wl.c:4156"
+     "where": "server/src/wl/wl.c:4157"
     },
     {
      "kind": "static",
@@ -5820,7 +5820,7 @@
      "hint": "xdg_wm_base.ping",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:4132"
+     "where": "server/src/wl/wl.c:4133"
     },
     {
      "kind": "static",
@@ -5830,7 +5830,7 @@
      "hint": "xdg_wm_base.error.role",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4026"
+     "where": "server/src/wl/wl.c:4027"
     },
     {
      "kind": "static",
@@ -5840,7 +5840,7 @@
      "hint": "xdg_wm_base.error.defunct_surfaces",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4107"
+     "where": "server/src/wl/wl.c:4108"
     },
     {
      "kind": "static",
@@ -5850,7 +5850,7 @@
      "hint": "xdg_wm_base.error.not_the_topmost_popup",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3933"
+     "where": "server/src/wl/wl.c:3934"
     },
     {
      "kind": "static",
@@ -5860,7 +5860,7 @@
      "hint": "xdg_wm_base.error.invalid_popup_parent",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4049"
+     "where": "server/src/wl/wl.c:4050"
     },
     {
      "kind": "static",
@@ -5870,7 +5870,7 @@
      "hint": "xdg_wm_base.error.invalid_surface_state",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4147"
+     "where": "server/src/wl/wl.c:4148"
     },
     {
      "kind": "static",
@@ -5880,7 +5880,7 @@
      "hint": "xdg_wm_base.error.invalid_positioner",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3955"
+     "where": "server/src/wl/wl.c:3956"
     },
     {
      "kind": "static",
@@ -5900,7 +5900,7 @@
      "hint": "xdg_surface.destroy",
      "result": "pass",
      "msg": "handled (xdg_surface_impl)",
-     "where": "server/src/wl/wl.c:3998"
+     "where": "server/src/wl/wl.c:3999"
     },
     {
      "kind": "static",
@@ -5910,7 +5910,7 @@
      "hint": "xdg_surface.get_toplevel",
      "result": "pass",
      "msg": "handled (xdg_surface_impl)",
-     "where": "server/src/wl/wl.c:4022"
+     "where": "server/src/wl/wl.c:4023"
     },
     {
      "kind": "static",
@@ -5920,7 +5920,7 @@
      "hint": "xdg_surface.get_popup",
      "result": "pass",
      "msg": "handled (xdg_surface_impl)",
-     "where": "server/src/wl/wl.c:4036"
+     "where": "server/src/wl/wl.c:4037"
     },
     {
      "kind": "static",
@@ -5930,7 +5930,7 @@
      "hint": "xdg_surface.set_window_geometry",
      "result": "pass",
      "msg": "handled (xdg_surface_impl)",
-     "where": "server/src/wl/wl.c:4061"
+     "where": "server/src/wl/wl.c:4062"
     },
     {
      "kind": "static",
@@ -5940,7 +5940,7 @@
      "hint": "xdg_surface.ack_configure",
      "result": "pass",
      "msg": "handled (xdg_surface_impl)",
-     "where": "server/src/wl/wl.c:4073"
+     "where": "server/src/wl/wl.c:4074"
     },
     {
      "kind": "static",
@@ -5950,7 +5950,7 @@
      "hint": "xdg_surface.configure",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:659"
+     "where": "server/src/wl/wl.c:660"
     },
     {
      "kind": "static",
@@ -5960,7 +5960,7 @@
      "hint": "xdg_surface.error.not_constructed",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4024"
+     "where": "server/src/wl/wl.c:4025"
     },
     {
      "kind": "static",
@@ -5970,7 +5970,7 @@
      "hint": "xdg_surface.error.already_constructed",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4025"
+     "where": "server/src/wl/wl.c:4026"
     },
     {
      "kind": "static",
@@ -5980,7 +5980,7 @@
      "hint": "xdg_surface.error.unconfigured_buffer",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1670"
+     "where": "server/src/wl/wl.c:1671"
     },
     {
      "kind": "static",
@@ -5990,7 +5990,7 @@
      "hint": "xdg_surface.error.invalid_serial",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4080"
+     "where": "server/src/wl/wl.c:4081"
     },
     {
      "kind": "static",
@@ -6000,7 +6000,7 @@
      "hint": "xdg_surface.error.invalid_size",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4063"
+     "where": "server/src/wl/wl.c:4064"
     },
     {
      "kind": "static",
@@ -6010,7 +6010,7 @@
      "hint": "xdg_surface.error.defunct_role_object",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4002"
+     "where": "server/src/wl/wl.c:4003"
     },
     {
      "kind": "static",
@@ -6020,7 +6020,7 @@
      "hint": "xdg_popup.destroy",
      "result": "pass",
      "msg": "handled (popup_impl)",
-     "where": "server/src/wl/wl.c:3928"
+     "where": "server/src/wl/wl.c:3929"
     },
     {
      "kind": "static",
@@ -6030,7 +6030,7 @@
      "hint": "xdg_popup.grab",
      "result": "pass",
      "msg": "handled (popup_impl)",
-     "where": "server/src/wl/wl.c:3938"
+     "where": "server/src/wl/wl.c:3939"
     },
     {
      "kind": "static",
@@ -6040,7 +6040,7 @@
      "hint": "xdg_popup.reposition",
      "result": "pass",
      "msg": "handled (popup_impl)",
-     "where": "server/src/wl/wl.c:3950"
+     "where": "server/src/wl/wl.c:3951"
     },
     {
      "kind": "static",
@@ -6050,7 +6050,7 @@
      "hint": "xdg_popup.configure",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3964"
+     "where": "server/src/wl/wl.c:3965"
     },
     {
      "kind": "static",
@@ -6060,7 +6060,7 @@
      "hint": "xdg_popup.popup_done",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:5146"
+     "where": "server/src/wl/wl.c:5148"
     },
     {
      "kind": "static",
@@ -6070,7 +6070,7 @@
      "hint": "xdg_popup.repositioned",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3963"
+     "where": "server/src/wl/wl.c:3964"
     },
     {
      "kind": "static",
@@ -6080,7 +6080,7 @@
      "hint": "xdg_popup.error.invalid_grab",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3941"
+     "where": "server/src/wl/wl.c:3942"
     },
     {
      "kind": "static",
@@ -6090,7 +6090,7 @@
      "hint": "xdg_toplevel.destroy",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3729"
+     "where": "server/src/wl/wl.c:3730"
     },
     {
      "kind": "static",
@@ -6100,7 +6100,7 @@
      "hint": "xdg_toplevel.set_parent",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3738"
+     "where": "server/src/wl/wl.c:3739"
     },
     {
      "kind": "static",
@@ -6110,7 +6110,7 @@
      "hint": "xdg_toplevel.set_title",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3757"
+     "where": "server/src/wl/wl.c:3758"
     },
     {
      "kind": "static",
@@ -6120,7 +6120,7 @@
      "hint": "xdg_toplevel.set_app_id",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3768"
+     "where": "server/src/wl/wl.c:3769"
     },
     {
      "kind": "static",
@@ -6130,7 +6130,7 @@
      "hint": "xdg_toplevel.show_window_menu",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3774"
+     "where": "server/src/wl/wl.c:3775"
     },
     {
      "kind": "static",
@@ -6140,7 +6140,7 @@
      "hint": "xdg_toplevel.move",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3785"
+     "where": "server/src/wl/wl.c:3786"
     },
     {
      "kind": "static",
@@ -6150,7 +6150,7 @@
      "hint": "xdg_toplevel.resize",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3790"
+     "where": "server/src/wl/wl.c:3791"
     },
     {
      "kind": "static",
@@ -6160,7 +6160,7 @@
      "hint": "xdg_toplevel.set_max_size",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3802"
+     "where": "server/src/wl/wl.c:3803"
     },
     {
      "kind": "static",
@@ -6170,7 +6170,7 @@
      "hint": "xdg_toplevel.set_min_size",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3808"
+     "where": "server/src/wl/wl.c:3809"
     },
     {
      "kind": "static",
@@ -6180,7 +6180,7 @@
      "hint": "xdg_toplevel.set_maximized",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3817"
+     "where": "server/src/wl/wl.c:3818"
     },
     {
      "kind": "static",
@@ -6190,7 +6190,7 @@
      "hint": "xdg_toplevel.unset_maximized",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3822"
+     "where": "server/src/wl/wl.c:3823"
     },
     {
      "kind": "static",
@@ -6200,7 +6200,7 @@
      "hint": "xdg_toplevel.set_fullscreen",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3884"
+     "where": "server/src/wl/wl.c:3885"
     },
     {
      "kind": "static",
@@ -6210,7 +6210,7 @@
      "hint": "xdg_toplevel.unset_fullscreen",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3888"
+     "where": "server/src/wl/wl.c:3889"
     },
     {
      "kind": "static",
@@ -6220,7 +6220,7 @@
      "hint": "xdg_toplevel.set_minimized",
      "result": "pass",
      "msg": "handled (toplevel_impl)",
-     "where": "server/src/wl/wl.c:3892"
+     "where": "server/src/wl/wl.c:3893"
     },
     {
      "kind": "static",
@@ -6230,7 +6230,7 @@
      "hint": "xdg_toplevel.configure",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:694"
+     "where": "server/src/wl/wl.c:695"
     },
     {
      "kind": "static",
@@ -6240,7 +6240,7 @@
      "hint": "xdg_toplevel.close",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:7177"
+     "where": "server/src/wl/wl.c:7179"
     },
     {
      "kind": "static",
@@ -6250,7 +6250,7 @@
      "hint": "xdg_toplevel.configure_bounds",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:692"
+     "where": "server/src/wl/wl.c:693"
     },
     {
      "kind": "static",
@@ -6260,7 +6260,7 @@
      "hint": "xdg_toplevel.wm_capabilities",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:4019"
+     "where": "server/src/wl/wl.c:4020"
     },
     {
      "kind": "static",
@@ -6270,7 +6270,7 @@
      "hint": "xdg_toplevel.error.invalid_resize_edge",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3795"
+     "where": "server/src/wl/wl.c:3796"
     },
     {
      "kind": "static",
@@ -6280,7 +6280,7 @@
      "hint": "xdg_toplevel.error.invalid_parent",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3744"
+     "where": "server/src/wl/wl.c:3745"
     },
     {
      "kind": "static",
@@ -6290,7 +6290,7 @@
      "hint": "xdg_toplevel.error.invalid_size",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1677"
+     "where": "server/src/wl/wl.c:1678"
     },
     {
      "kind": "static",
@@ -6300,7 +6300,7 @@
      "hint": "xdg_positioner.destroy",
      "result": "pass",
      "msg": "handled (positioner_impl)",
-     "where": "server/src/wl/wl.c:3611"
+     "where": "server/src/wl/wl.c:3612"
     },
     {
      "kind": "static",
@@ -6310,7 +6310,7 @@
      "hint": "xdg_positioner.set_size",
      "result": "pass",
      "msg": "handled (positioner_impl)",
-     "where": "server/src/wl/wl.c:3612"
+     "where": "server/src/wl/wl.c:3613"
     },
     {
      "kind": "static",
@@ -6320,7 +6320,7 @@
      "hint": "xdg_positioner.set_anchor_rect",
      "result": "pass",
      "msg": "handled (positioner_impl)",
-     "where": "server/src/wl/wl.c:3617"
+     "where": "server/src/wl/wl.c:3618"
     },
     {
      "kind": "static",
@@ -6330,7 +6330,7 @@
      "hint": "xdg_positioner.set_anchor",
      "result": "pass",
      "msg": "handled (positioner_impl)",
-     "where": "server/src/wl/wl.c:3622"
+     "where": "server/src/wl/wl.c:3623"
     },
     {
      "kind": "static",
@@ -6340,7 +6340,7 @@
      "hint": "xdg_positioner.set_gravity",
      "result": "pass",
      "msg": "handled (positioner_impl)",
-     "where": "server/src/wl/wl.c:3627"
+     "where": "server/src/wl/wl.c:3628"
     },
     {
      "kind": "static",
@@ -6350,7 +6350,7 @@
      "hint": "xdg_positioner.set_constraint_adjustment",
      "result": "pass",
      "msg": "handled (positioner_impl)",
-     "where": "server/src/wl/wl.c:3632"
+     "where": "server/src/wl/wl.c:3633"
     },
     {
      "kind": "static",
@@ -6360,7 +6360,7 @@
      "hint": "xdg_positioner.set_offset",
      "result": "pass",
      "msg": "handled (positioner_impl)",
-     "where": "server/src/wl/wl.c:3636"
+     "where": "server/src/wl/wl.c:3637"
     },
     {
      "kind": "static",
@@ -6370,7 +6370,7 @@
      "hint": "xdg_positioner.set_reactive",
      "result": "pass",
      "msg": "handled (positioner_impl)",
-     "where": "server/src/wl/wl.c:3639"
+     "where": "server/src/wl/wl.c:3640"
     },
     {
      "kind": "static",
@@ -6380,7 +6380,7 @@
      "hint": "xdg_positioner.set_parent_size",
      "result": "pass",
      "msg": "handled (positioner_impl)",
-     "where": "server/src/wl/wl.c:3640"
+     "where": "server/src/wl/wl.c:3641"
     },
     {
      "kind": "static",
@@ -6390,7 +6390,7 @@
      "hint": "xdg_positioner.set_parent_configure",
      "result": "pass",
      "msg": "handled (positioner_impl)",
-     "where": "server/src/wl/wl.c:3645"
+     "where": "server/src/wl/wl.c:3646"
     },
     {
      "kind": "static",
@@ -6400,7 +6400,7 @@
      "hint": "xdg_positioner.error.invalid_input",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3614"
+     "where": "server/src/wl/wl.c:3615"
     },
     {
      "kind": "generic",
@@ -6652,7 +6652,7 @@
      "weight": 3,
      "result": "allowed",
      "msg": "grab with a serial never sent: popup_done not sent in 2 s — allowed: xdg_popup.grab: 'If the compositor denies the grab, the popup will be immediately dismissed' — denying a grab with a stale serial is the compositor's choice, not a requirement; lord-server grants it to the focused client.",
-     "where": "server/src/wl/wl.c:5146"
+     "where": "server/src/wl/wl.c:5148"
     },
     {
      "kind": "flow",
@@ -6806,7 +6806,7 @@
    "xml": "/usr/share/wayland-protocols/staging/xdg-dialog/xdg-dialog-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7411",
+   "where": "server/src/wl/wl.c:7424",
    "interfaces": [
     "xdg_wm_dialog_v1",
     "xdg_dialog_v1"
@@ -6826,7 +6826,7 @@
      "hint": "xdg_wm_dialog_v1.destroy",
      "result": "pass",
      "msg": "handled (wm_dialog_impl)",
-     "where": "server/src/wl/wl.c:2003"
+     "where": "server/src/wl/wl.c:2004"
     },
     {
      "kind": "static",
@@ -6836,7 +6836,7 @@
      "hint": "xdg_wm_dialog_v1.get_xdg_dialog",
      "result": "pass",
      "msg": "handled (wm_dialog_impl)",
-     "where": "server/src/wl/wl.c:2004"
+     "where": "server/src/wl/wl.c:2005"
     },
     {
      "kind": "static",
@@ -6846,7 +6846,7 @@
      "hint": "xdg_wm_dialog_v1.error.already_used",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:2006"
+     "where": "server/src/wl/wl.c:2007"
     },
     {
      "kind": "static",
@@ -6856,7 +6856,7 @@
      "hint": "xdg_dialog_v1.destroy",
      "result": "pass",
      "msg": "handled (dialog_impl)",
-     "where": "server/src/wl/wl.c:1993"
+     "where": "server/src/wl/wl.c:1994"
     },
     {
      "kind": "static",
@@ -6866,7 +6866,7 @@
      "hint": "xdg_dialog_v1.set_modal",
      "result": "pass",
      "msg": "handled (dialog_impl)",
-     "where": "server/src/wl/wl.c:1994"
+     "where": "server/src/wl/wl.c:1995"
     },
     {
      "kind": "static",
@@ -6876,7 +6876,7 @@
      "hint": "xdg_dialog_v1.unset_modal",
      "result": "pass",
      "msg": "handled (dialog_impl)",
-     "where": "server/src/wl/wl.c:1995"
+     "where": "server/src/wl/wl.c:1996"
     },
     {
      "kind": "generic",
@@ -6983,7 +6983,7 @@
      "hint": "xwayland_surface_v1.destroy",
      "result": "pass",
      "msg": "handled (xs_impl)",
-     "where": "server/src/wl/wl.c:3998"
+     "where": "server/src/wl/wl.c:3999"
     },
     {
      "kind": "static",
@@ -7013,7 +7013,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/idle-inhibit/idle-inhibit-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7435",
+   "where": "server/src/wl/wl.c:7448",
    "interfaces": [
     "zwp_idle_inhibit_manager_v1",
     "zwp_idle_inhibitor_v1"
@@ -7033,7 +7033,7 @@
      "hint": "zwp_idle_inhibit_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (iim_impl)",
-     "where": "server/src/wl/wl.c:2692"
+     "where": "server/src/wl/wl.c:2693"
     },
     {
      "kind": "static",
@@ -7043,7 +7043,7 @@
      "hint": "zwp_idle_inhibit_manager_v1.create_inhibitor",
      "result": "pass",
      "msg": "handled (iim_impl)",
-     "where": "server/src/wl/wl.c:2686"
+     "where": "server/src/wl/wl.c:2687"
     },
     {
      "kind": "static",
@@ -7053,7 +7053,7 @@
      "hint": "zwp_idle_inhibitor_v1.destroy",
      "result": "pass",
      "msg": "handled (inh_impl)",
-     "where": "server/src/wl/wl.c:2684"
+     "where": "server/src/wl/wl.c:2685"
     },
     {
      "kind": "generic",
@@ -7090,7 +7090,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7436",
+   "where": "server/src/wl/wl.c:7449",
    "interfaces": [
     "zwp_keyboard_shortcuts_inhibit_manager_v1",
     "zwp_keyboard_shortcuts_inhibitor_v1"
@@ -7110,7 +7110,7 @@
      "hint": "zwp_keyboard_shortcuts_inhibit_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (ksim_impl)",
-     "where": "server/src/wl/wl.c:6191"
+     "where": "server/src/wl/wl.c:6193"
     },
     {
      "kind": "static",
@@ -7120,7 +7120,7 @@
      "hint": "zwp_keyboard_shortcuts_inhibit_manager_v1.inhibit_shortcuts",
      "result": "pass",
      "msg": "handled (ksim_impl)",
-     "where": "server/src/wl/wl.c:6152"
+     "where": "server/src/wl/wl.c:6154"
     },
     {
      "kind": "static",
@@ -7130,7 +7130,7 @@
      "hint": "zwp_keyboard_shortcuts_inhibit_manager_v1.error.already_inhibited",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6155"
+     "where": "server/src/wl/wl.c:6157"
     },
     {
      "kind": "static",
@@ -7140,7 +7140,7 @@
      "hint": "zwp_keyboard_shortcuts_inhibitor_v1.destroy",
      "result": "pass",
      "msg": "handled (ksi_impl)",
-     "where": "server/src/wl/wl.c:6137"
+     "where": "server/src/wl/wl.c:6139"
     },
     {
      "kind": "static",
@@ -7150,7 +7150,7 @@
      "hint": "zwp_keyboard_shortcuts_inhibitor_v1.active",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6097"
+     "where": "server/src/wl/wl.c:6099"
     },
     {
      "kind": "static",
@@ -7160,7 +7160,7 @@
      "hint": "zwp_keyboard_shortcuts_inhibitor_v1.inactive",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6098"
+     "where": "server/src/wl/wl.c:6100"
     },
     {
      "kind": "generic",
@@ -7206,7 +7206,7 @@
    "xml": "/usr/share/wayland-protocols/stable/linux-dmabuf/linux-dmabuf-v1.xml",
    "version": 5,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7419",
+   "where": "server/src/wl/wl.c:7432",
    "interfaces": [
     "zwp_linux_dmabuf_v1",
     "zwp_linux_dmabuf_feedback_v1",
@@ -7228,7 +7228,7 @@
      "hint": "zwp_linux_dmabuf_v1.destroy",
      "result": "pass",
      "msg": "handled (dmabuf_impl)",
-     "where": "server/src/wl/wl.c:6712"
+     "where": "server/src/wl/wl.c:6714"
     },
     {
      "kind": "static",
@@ -7238,7 +7238,7 @@
      "hint": "zwp_linux_dmabuf_v1.create_params",
      "result": "pass",
      "msg": "handled (dmabuf_impl)",
-     "where": "server/src/wl/wl.c:6713"
+     "where": "server/src/wl/wl.c:6715"
     },
     {
      "kind": "static",
@@ -7248,7 +7248,7 @@
      "hint": "zwp_linux_dmabuf_v1.get_default_feedback",
      "result": "pass",
      "msg": "handled (dmabuf_impl)",
-     "where": "server/src/wl/wl.c:6719"
+     "where": "server/src/wl/wl.c:6721"
     },
     {
      "kind": "static",
@@ -7258,7 +7258,7 @@
      "hint": "zwp_linux_dmabuf_v1.get_surface_feedback",
      "result": "pass",
      "msg": "handled (dmabuf_impl)",
-     "where": "server/src/wl/wl.c:6726"
+     "where": "server/src/wl/wl.c:6728"
     },
     {
      "kind": "static",
@@ -7268,7 +7268,7 @@
      "hint": "zwp_linux_dmabuf_v1.format",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6746"
+     "where": "server/src/wl/wl.c:6748"
     },
     {
      "kind": "static",
@@ -7278,7 +7278,7 @@
      "hint": "zwp_linux_dmabuf_v1.modifier",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6747"
+     "where": "server/src/wl/wl.c:6749"
     },
     {
      "kind": "static",
@@ -7288,7 +7288,7 @@
      "hint": "zwp_linux_dmabuf_feedback_v1.destroy",
      "result": "pass",
      "msg": "handled (feedback_impl)",
-     "where": "server/src/wl/wl.c:6651"
+     "where": "server/src/wl/wl.c:6653"
     },
     {
      "kind": "static",
@@ -7298,7 +7298,7 @@
      "hint": "zwp_linux_dmabuf_feedback_v1.done",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6707"
+     "where": "server/src/wl/wl.c:6709"
     },
     {
      "kind": "static",
@@ -7308,7 +7308,7 @@
      "hint": "zwp_linux_dmabuf_feedback_v1.format_table",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6693"
+     "where": "server/src/wl/wl.c:6695"
     },
     {
      "kind": "static",
@@ -7318,7 +7318,7 @@
      "hint": "zwp_linux_dmabuf_feedback_v1.main_device",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6700"
+     "where": "server/src/wl/wl.c:6702"
     },
     {
      "kind": "static",
@@ -7328,7 +7328,7 @@
      "hint": "zwp_linux_dmabuf_feedback_v1.tranche_done",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6706"
+     "where": "server/src/wl/wl.c:6708"
     },
     {
      "kind": "static",
@@ -7338,7 +7338,7 @@
      "hint": "zwp_linux_dmabuf_feedback_v1.tranche_target_device",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6701"
+     "where": "server/src/wl/wl.c:6703"
     },
     {
      "kind": "static",
@@ -7348,7 +7348,7 @@
      "hint": "zwp_linux_dmabuf_feedback_v1.tranche_formats",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6704"
+     "where": "server/src/wl/wl.c:6706"
     },
     {
      "kind": "static",
@@ -7358,7 +7358,7 @@
      "hint": "zwp_linux_dmabuf_feedback_v1.tranche_flags",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6705"
+     "where": "server/src/wl/wl.c:6707"
     },
     {
      "kind": "static",
@@ -7368,7 +7368,7 @@
      "hint": "zwp_linux_buffer_params_v1.destroy",
      "result": "pass",
      "msg": "handled (params_impl)",
-     "where": "server/src/wl/wl.c:6535"
+     "where": "server/src/wl/wl.c:6537"
     },
     {
      "kind": "static",
@@ -7378,7 +7378,7 @@
      "hint": "zwp_linux_buffer_params_v1.add",
      "result": "pass",
      "msg": "handled (params_impl)",
-     "where": "server/src/wl/wl.c:6543"
+     "where": "server/src/wl/wl.c:6545"
     },
     {
      "kind": "static",
@@ -7388,7 +7388,7 @@
      "hint": "zwp_linux_buffer_params_v1.create",
      "result": "pass",
      "msg": "handled (params_impl)",
-     "where": "server/src/wl/wl.c:6629"
+     "where": "server/src/wl/wl.c:6631"
     },
     {
      "kind": "static",
@@ -7398,7 +7398,7 @@
      "hint": "zwp_linux_buffer_params_v1.create_immed",
      "result": "pass",
      "msg": "handled (params_impl)",
-     "where": "server/src/wl/wl.c:6632"
+     "where": "server/src/wl/wl.c:6634"
     },
     {
      "kind": "static",
@@ -7408,7 +7408,7 @@
      "hint": "zwp_linux_buffer_params_v1.created",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6626"
+     "where": "server/src/wl/wl.c:6628"
     },
     {
      "kind": "static",
@@ -7418,7 +7418,7 @@
      "hint": "zwp_linux_buffer_params_v1.failed",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6619"
+     "where": "server/src/wl/wl.c:6621"
     },
     {
      "kind": "static",
@@ -7428,7 +7428,7 @@
      "hint": "zwp_linux_buffer_params_v1.error.already_used",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6547"
+     "where": "server/src/wl/wl.c:6549"
     },
     {
      "kind": "static",
@@ -7438,7 +7438,7 @@
      "hint": "zwp_linux_buffer_params_v1.error.plane_idx",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6548"
+     "where": "server/src/wl/wl.c:6550"
     },
     {
      "kind": "static",
@@ -7448,7 +7448,7 @@
      "hint": "zwp_linux_buffer_params_v1.error.plane_set",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6549"
+     "where": "server/src/wl/wl.c:6551"
     },
     {
      "kind": "static",
@@ -7458,7 +7458,7 @@
      "hint": "zwp_linux_buffer_params_v1.error.incomplete",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6584"
+     "where": "server/src/wl/wl.c:6586"
     },
     {
      "kind": "static",
@@ -7468,7 +7468,7 @@
      "hint": "zwp_linux_buffer_params_v1.error.invalid_format",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6554"
+     "where": "server/src/wl/wl.c:6556"
     },
     {
      "kind": "static",
@@ -7478,7 +7478,7 @@
      "hint": "zwp_linux_buffer_params_v1.error.invalid_dimensions",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6586"
+     "where": "server/src/wl/wl.c:6588"
     },
     {
      "kind": "static",
@@ -7488,7 +7488,7 @@
      "hint": "zwp_linux_buffer_params_v1.error.out_of_bounds",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6593"
+     "where": "server/src/wl/wl.c:6595"
     },
     {
      "kind": "static",
@@ -7498,7 +7498,7 @@
      "hint": "zwp_linux_buffer_params_v1.error.invalid_wl_buffer",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:6618"
+     "where": "server/src/wl/wl.c:6620"
     },
     {
      "kind": "static",
@@ -7508,7 +7508,7 @@
      "hint": "wl_buffer.destroy",
      "result": "pass",
      "msg": "handled (spb_buffer_impl, dmabuf_buffer_impl)",
-     "where": "server/src/wl/wl.c:6526"
+     "where": "server/src/wl/wl.c:6528"
     },
     {
      "kind": "static",
@@ -7518,7 +7518,7 @@
      "hint": "wl_buffer.release",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:720"
+     "where": "server/src/wl/wl.c:721"
     },
     {
      "kind": "generic",
@@ -7690,7 +7690,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7433",
+   "where": "server/src/wl/wl.c:7446",
    "interfaces": [
     "zwp_pointer_constraints_v1",
     "zwp_confined_pointer_v1",
@@ -7711,7 +7711,7 @@
      "hint": "zwp_pointer_constraints_v1.destroy",
      "result": "pass",
      "msg": "handled (consm_impl)",
-     "where": "server/src/wl/wl.c:7066"
+     "where": "server/src/wl/wl.c:7068"
     },
     {
      "kind": "static",
@@ -7721,7 +7721,7 @@
      "hint": "zwp_pointer_constraints_v1.lock_pointer",
      "result": "pass",
      "msg": "handled (consm_impl)",
-     "where": "server/src/wl/wl.c:7056"
+     "where": "server/src/wl/wl.c:7058"
     },
     {
      "kind": "static",
@@ -7731,7 +7731,7 @@
      "hint": "zwp_pointer_constraints_v1.confine_pointer",
      "result": "pass",
      "msg": "handled (consm_impl)",
-     "where": "server/src/wl/wl.c:7061"
+     "where": "server/src/wl/wl.c:7063"
     },
     {
      "kind": "static",
@@ -7741,7 +7741,7 @@
      "hint": "zwp_pointer_constraints_v1.error.already_constrained",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:7039"
+     "where": "server/src/wl/wl.c:7041"
     },
     {
      "kind": "static",
@@ -7751,7 +7751,7 @@
      "hint": "zwp_confined_pointer_v1.destroy",
      "result": "pass",
      "msg": "handled (confined_impl)",
-     "where": "server/src/wl/wl.c:7011"
+     "where": "server/src/wl/wl.c:7013"
     },
     {
      "kind": "static",
@@ -7761,7 +7761,7 @@
      "hint": "zwp_confined_pointer_v1.set_region",
      "result": "pass",
      "msg": "handled (confined_impl)",
-     "where": "server/src/wl/wl.c:7014"
+     "where": "server/src/wl/wl.c:7016"
     },
     {
      "kind": "static",
@@ -7771,7 +7771,7 @@
      "hint": "zwp_confined_pointer_v1.confined",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6963"
+     "where": "server/src/wl/wl.c:6965"
     },
     {
      "kind": "static",
@@ -7781,7 +7781,7 @@
      "hint": "zwp_confined_pointer_v1.unconfined",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6963"
+     "where": "server/src/wl/wl.c:6965"
     },
     {
      "kind": "static",
@@ -7791,7 +7791,7 @@
      "hint": "zwp_locked_pointer_v1.destroy",
      "result": "pass",
      "msg": "handled (locked_impl)",
-     "where": "server/src/wl/wl.c:7011"
+     "where": "server/src/wl/wl.c:7013"
     },
     {
      "kind": "static",
@@ -7801,7 +7801,7 @@
      "hint": "zwp_locked_pointer_v1.set_cursor_position_hint",
      "result": "allowed",
      "msg": "'A compositor may use this information to warp the pointer upon unlock': optional; lord-server leaves the pointer where it was locked.",
-     "where": "server/src/wl/wl.c:7033"
+     "where": "server/src/wl/wl.c:7035"
     },
     {
      "kind": "static",
@@ -7811,7 +7811,7 @@
      "hint": "zwp_locked_pointer_v1.set_region",
      "result": "pass",
      "msg": "handled (locked_impl)",
-     "where": "server/src/wl/wl.c:7014"
+     "where": "server/src/wl/wl.c:7016"
     },
     {
      "kind": "static",
@@ -7821,7 +7821,7 @@
      "hint": "zwp_locked_pointer_v1.locked",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6962"
+     "where": "server/src/wl/wl.c:6964"
     },
     {
      "kind": "static",
@@ -7831,7 +7831,7 @@
      "hint": "zwp_locked_pointer_v1.unlocked",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:6962"
+     "where": "server/src/wl/wl.c:6964"
     },
     {
      "kind": "generic",
@@ -8073,7 +8073,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/primary-selection/primary-selection-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7404",
+   "where": "server/src/wl/wl.c:7417",
    "interfaces": [
     "zwp_primary_selection_device_manager_v1",
     "zwp_primary_selection_device_v1",
@@ -8095,7 +8095,7 @@
      "hint": "zwp_primary_selection_device_manager_v1.create_source",
      "result": "pass",
      "msg": "handled (pdm_impl)",
-     "where": "server/src/wl/wl.c:3575"
+     "where": "server/src/wl/wl.c:3576"
     },
     {
      "kind": "static",
@@ -8105,7 +8105,7 @@
      "hint": "zwp_primary_selection_device_manager_v1.get_device",
      "result": "pass",
      "msg": "handled (pdm_impl)",
-     "where": "server/src/wl/wl.c:3582"
+     "where": "server/src/wl/wl.c:3583"
     },
     {
      "kind": "static",
@@ -8115,7 +8115,7 @@
      "hint": "zwp_primary_selection_device_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (pdm_impl)",
-     "where": "server/src/wl/wl.c:2635"
+     "where": "server/src/wl/wl.c:2636"
     },
     {
      "kind": "static",
@@ -8125,7 +8125,7 @@
      "hint": "zwp_primary_selection_device_v1.set_selection",
      "result": "pass",
      "msg": "handled (pdev_impl)",
-     "where": "server/src/wl/wl.c:3551"
+     "where": "server/src/wl/wl.c:3552"
     },
     {
      "kind": "static",
@@ -8135,7 +8135,7 @@
      "hint": "zwp_primary_selection_device_v1.destroy",
      "result": "pass",
      "msg": "handled (pdev_impl)",
-     "where": "server/src/wl/wl.c:2635"
+     "where": "server/src/wl/wl.c:2636"
     },
     {
      "kind": "static",
@@ -8145,7 +8145,7 @@
      "hint": "zwp_primary_selection_device_v1.data_offer",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3544"
+     "where": "server/src/wl/wl.c:3545"
     },
     {
      "kind": "static",
@@ -8155,7 +8155,7 @@
      "hint": "zwp_primary_selection_device_v1.selection",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3537"
+     "where": "server/src/wl/wl.c:3538"
     },
     {
      "kind": "static",
@@ -8165,7 +8165,7 @@
      "hint": "zwp_primary_selection_offer_v1.receive",
      "result": "pass",
      "msg": "handled (poffer_impl)",
-     "where": "server/src/wl/wl.c:3527"
+     "where": "server/src/wl/wl.c:3528"
     },
     {
      "kind": "static",
@@ -8175,7 +8175,7 @@
      "hint": "zwp_primary_selection_offer_v1.destroy",
      "result": "pass",
      "msg": "handled (poffer_impl)",
-     "where": "server/src/wl/wl.c:2635"
+     "where": "server/src/wl/wl.c:2636"
     },
     {
      "kind": "static",
@@ -8185,7 +8185,7 @@
      "hint": "zwp_primary_selection_offer_v1.offer",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3545"
+     "where": "server/src/wl/wl.c:3546"
     },
     {
      "kind": "static",
@@ -8195,7 +8195,7 @@
      "hint": "zwp_primary_selection_source_v1.offer",
      "result": "pass",
      "msg": "handled (psrc_impl)",
-     "where": "server/src/wl/wl.c:3512"
+     "where": "server/src/wl/wl.c:3513"
     },
     {
      "kind": "static",
@@ -8205,7 +8205,7 @@
      "hint": "zwp_primary_selection_source_v1.destroy",
      "result": "pass",
      "msg": "handled (psrc_impl)",
-     "where": "server/src/wl/wl.c:2635"
+     "where": "server/src/wl/wl.c:2636"
     },
     {
      "kind": "static",
@@ -8215,7 +8215,7 @@
      "hint": "zwp_primary_selection_source_v1.send",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3562"
+     "where": "server/src/wl/wl.c:3563"
     },
     {
      "kind": "static",
@@ -8225,7 +8225,7 @@
      "hint": "zwp_primary_selection_source_v1.cancelled",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:3556"
+     "where": "server/src/wl/wl.c:3557"
     },
     {
      "kind": "generic",
@@ -8262,7 +8262,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/relative-pointer/relative-pointer-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7432",
+   "where": "server/src/wl/wl.c:7445",
    "interfaces": [
     "zwp_relative_pointer_manager_v1",
     "zwp_relative_pointer_v1"
@@ -8282,7 +8282,7 @@
      "hint": "zwp_relative_pointer_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (relm_impl)",
-     "where": "server/src/wl/wl.c:6927"
+     "where": "server/src/wl/wl.c:6929"
     },
     {
      "kind": "static",
@@ -8292,7 +8292,7 @@
      "hint": "zwp_relative_pointer_manager_v1.get_relative_pointer",
      "result": "pass",
      "msg": "handled (relm_impl)",
-     "where": "server/src/wl/wl.c:6928"
+     "where": "server/src/wl/wl.c:6930"
     },
     {
      "kind": "static",
@@ -8302,7 +8302,7 @@
      "hint": "zwp_relative_pointer_v1.destroy",
      "result": "pass",
      "msg": "handled (relp_impl)",
-     "where": "server/src/wl/wl.c:6925"
+     "where": "server/src/wl/wl.c:6927"
     },
     {
      "kind": "generic",
@@ -9308,7 +9308,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7406",
+   "where": "server/src/wl/wl.c:7419",
    "interfaces": [
     "zxdg_decoration_manager_v1",
     "zxdg_toplevel_decoration_v1"
@@ -9328,7 +9328,7 @@
      "hint": "zxdg_decoration_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (decm_impl)",
-     "where": "server/src/wl/wl.c:4219"
+     "where": "server/src/wl/wl.c:4220"
     },
     {
      "kind": "static",
@@ -9338,7 +9338,7 @@
      "hint": "zxdg_decoration_manager_v1.get_toplevel_decoration",
      "result": "pass",
      "msg": "handled (decm_impl)",
-     "where": "server/src/wl/wl.c:4220"
+     "where": "server/src/wl/wl.c:4221"
     },
     {
      "kind": "static",
@@ -9348,7 +9348,7 @@
      "hint": "zxdg_toplevel_decoration_v1.destroy",
      "result": "pass",
      "msg": "handled (deco_impl)",
-     "where": "server/src/wl/wl.c:4196"
+     "where": "server/src/wl/wl.c:4197"
     },
     {
      "kind": "static",
@@ -9358,7 +9358,7 @@
      "hint": "zxdg_toplevel_decoration_v1.set_mode",
      "result": "pass",
      "msg": "handled (deco_impl)",
-     "where": "server/src/wl/wl.c:4197"
+     "where": "server/src/wl/wl.c:4198"
     },
     {
      "kind": "static",
@@ -9368,7 +9368,7 @@
      "hint": "zxdg_toplevel_decoration_v1.unset_mode",
      "result": "pass",
      "msg": "handled (deco_impl)",
-     "where": "server/src/wl/wl.c:4210"
+     "where": "server/src/wl/wl.c:4211"
     },
     {
      "kind": "static",
@@ -9378,7 +9378,7 @@
      "hint": "zxdg_toplevel_decoration_v1.configure",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:4205"
+     "where": "server/src/wl/wl.c:4206"
     },
     {
      "kind": "static",
@@ -9388,7 +9388,7 @@
      "hint": "zxdg_toplevel_decoration_v1.error.unconfigured_buffer",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4225"
+     "where": "server/src/wl/wl.c:4226"
     },
     {
      "kind": "static",
@@ -9398,7 +9398,7 @@
      "hint": "zxdg_toplevel_decoration_v1.error.already_constructed",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4222"
+     "where": "server/src/wl/wl.c:4223"
     },
     {
      "kind": "static",
@@ -9408,7 +9408,7 @@
      "hint": "zxdg_toplevel_decoration_v1.error.orphaned",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:3733"
+     "where": "server/src/wl/wl.c:3734"
     },
     {
      "kind": "static",
@@ -9418,7 +9418,7 @@
      "hint": "zxdg_toplevel_decoration_v1.error.invalid_mode",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:4200"
+     "where": "server/src/wl/wl.c:4201"
     },
     {
      "kind": "generic",
@@ -9500,7 +9500,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/xdg-foreign/xdg-foreign-unstable-v2.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7409",
+   "where": "server/src/wl/wl.c:7422",
    "interfaces": [
     "zxdg_exporter_v2",
     "zxdg_exported_v2"
@@ -9520,7 +9520,7 @@
      "hint": "zxdg_exporter_v2.destroy",
      "result": "pass",
      "msg": "handled (exporter_impl)",
-     "where": "server/src/wl/wl.c:1927"
+     "where": "server/src/wl/wl.c:1928"
     },
     {
      "kind": "static",
@@ -9530,7 +9530,7 @@
      "hint": "zxdg_exporter_v2.export_toplevel",
      "result": "pass",
      "msg": "handled (exporter_impl)",
-     "where": "server/src/wl/wl.c:1928"
+     "where": "server/src/wl/wl.c:1929"
     },
     {
      "kind": "static",
@@ -9540,7 +9540,7 @@
      "hint": "zxdg_exporter_v2.error.invalid_surface",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1931"
+     "where": "server/src/wl/wl.c:1932"
     },
     {
      "kind": "static",
@@ -9550,7 +9550,7 @@
      "hint": "zxdg_exported_v2.destroy",
      "result": "pass",
      "msg": "handled (exported_impl)",
-     "where": "server/src/wl/wl.c:1919"
+     "where": "server/src/wl/wl.c:1920"
     },
     {
      "kind": "static",
@@ -9560,7 +9560,7 @@
      "hint": "zxdg_exported_v2.handle",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:1944"
+     "where": "server/src/wl/wl.c:1945"
     },
     {
      "kind": "generic",
@@ -9615,7 +9615,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/xdg-foreign/xdg-foreign-unstable-v2.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7410",
+   "where": "server/src/wl/wl.c:7423",
    "interfaces": [
     "zxdg_importer_v2",
     "zxdg_imported_v2"
@@ -9635,7 +9635,7 @@
      "hint": "zxdg_importer_v2.destroy",
      "result": "pass",
      "msg": "handled (importer_impl)",
-     "where": "server/src/wl/wl.c:1972"
+     "where": "server/src/wl/wl.c:1973"
     },
     {
      "kind": "static",
@@ -9645,7 +9645,7 @@
      "hint": "zxdg_importer_v2.import_toplevel",
      "result": "pass",
      "msg": "handled (importer_impl)",
-     "where": "server/src/wl/wl.c:1973"
+     "where": "server/src/wl/wl.c:1974"
     },
     {
      "kind": "static",
@@ -9655,7 +9655,7 @@
      "hint": "zxdg_imported_v2.destroy",
      "result": "pass",
      "msg": "handled (imported_impl)",
-     "where": "server/src/wl/wl.c:1954"
+     "where": "server/src/wl/wl.c:1955"
     },
     {
      "kind": "static",
@@ -9665,7 +9665,7 @@
      "hint": "zxdg_imported_v2.set_parent_of",
      "result": "pass",
      "msg": "handled (imported_impl)",
-     "where": "server/src/wl/wl.c:1955"
+     "where": "server/src/wl/wl.c:1956"
     },
     {
      "kind": "static",
@@ -9675,7 +9675,7 @@
      "hint": "zxdg_imported_v2.destroyed",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:1901"
+     "where": "server/src/wl/wl.c:1902"
     },
     {
      "kind": "static",
@@ -9685,7 +9685,7 @@
      "hint": "zxdg_imported_v2.error.invalid_surface",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/wl.c:1960"
+     "where": "server/src/wl/wl.c:1961"
     },
     {
      "kind": "generic",
@@ -9740,7 +9740,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/xdg-output/xdg-output-unstable-v1.xml",
    "version": 3,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7398",
+   "where": "server/src/wl/wl.c:7411",
    "interfaces": [
     "zxdg_output_manager_v1",
     "zxdg_output_v1"
@@ -9760,7 +9760,7 @@
      "hint": "zxdg_output_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (xdg_output_mgr_impl)",
-     "where": "server/src/wl/wl.c:2367"
+     "where": "server/src/wl/wl.c:2368"
     },
     {
      "kind": "static",
@@ -9770,7 +9770,7 @@
      "hint": "zxdg_output_manager_v1.get_xdg_output",
      "result": "pass",
      "msg": "handled (xdg_output_mgr_impl)",
-     "where": "server/src/wl/wl.c:2368"
+     "where": "server/src/wl/wl.c:2369"
     },
     {
      "kind": "static",
@@ -9780,7 +9780,7 @@
      "hint": "zxdg_output_v1.destroy",
      "result": "pass",
      "msg": "handled (xdg_output_impl)",
-     "where": "server/src/wl/wl.c:2364"
+     "where": "server/src/wl/wl.c:2365"
     },
     {
      "kind": "static",
@@ -9790,7 +9790,7 @@
      "hint": "zxdg_output_v1.logical_position",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2335"
+     "where": "server/src/wl/wl.c:2336"
     },
     {
      "kind": "static",
@@ -9800,7 +9800,7 @@
      "hint": "zxdg_output_v1.logical_size",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2336"
+     "where": "server/src/wl/wl.c:2337"
     },
     {
      "kind": "static",
@@ -9810,7 +9810,7 @@
      "hint": "zxdg_output_v1.done",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2345"
+     "where": "server/src/wl/wl.c:2346"
     },
     {
      "kind": "static",
@@ -9820,7 +9820,7 @@
      "hint": "zxdg_output_v1.name",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2344"
+     "where": "server/src/wl/wl.c:2345"
     },
     {
      "kind": "static",
@@ -9830,7 +9830,7 @@
      "hint": "zxdg_output_v1.description",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:2344"
+     "where": "server/src/wl/wl.c:2345"
     },
     {
      "kind": "generic",
@@ -9979,8 +9979,8 @@
       "what": "X window to wl_surface association through WL_SURFACE_ID (the legacy way)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:77",
-      "where": "server/src/wl/xwm.c:77"
+      "msg": "found at server/src/wl/xwm.c:78",
+      "where": "server/src/wl/xwm.c:78"
      },
      {
       "kind": "static",
@@ -10034,8 +10034,8 @@
       "what": "WM_NAME read",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:59",
-      "where": "server/src/wl/xwm.c:59"
+      "msg": "found at server/src/wl/xwm.c:60",
+      "where": "server/src/wl/xwm.c:60"
      },
      {
       "kind": "static",
@@ -10043,8 +10043,8 @@
       "what": "_NET_WM_NAME read (UTF-8 preferred)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:441",
-      "where": "server/src/wl/xwm.c:441"
+      "msg": "found at server/src/wl/xwm.c:492",
+      "where": "server/src/wl/xwm.c:492"
      },
      {
       "kind": "dynamic",
@@ -10079,8 +10079,8 @@
       "what": "WM_CLASS read (the app's .desktop)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:60",
-      "where": "server/src/wl/xwm.c:60"
+      "msg": "found at server/src/wl/xwm.c:61",
+      "where": "server/src/wl/xwm.c:61"
      },
      {
       "kind": "dynamic",
@@ -10107,8 +10107,8 @@
       "what": "WM_DELETE_WINDOW sent to close",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:2142",
-      "where": "server/src/wl/xwm.c:2142"
+      "msg": "found at server/src/wl/xwm.c:2240",
+      "where": "server/src/wl/xwm.c:2240"
      },
      {
       "kind": "static",
@@ -10116,8 +10116,8 @@
       "what": "WM_TAKE_FOCUS sent on focus",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:2123",
-      "where": "server/src/wl/xwm.c:2123"
+      "msg": "found at server/src/wl/xwm.c:2220",
+      "where": "server/src/wl/xwm.c:2220"
      },
      {
       "kind": "static",
@@ -10125,8 +10125,8 @@
       "what": "KillClient when the window doesn't speak WM_DELETE_WINDOW",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:2145",
-      "where": "server/src/wl/xwm.c:2145"
+      "msg": "found at server/src/wl/xwm.c:2243",
+      "where": "server/src/wl/xwm.c:2243"
      },
      {
       "kind": "dynamic",
@@ -10163,8 +10163,8 @@
       "what": "WM_HINTS read",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:59",
-      "where": "server/src/wl/xwm.c:59"
+      "msg": "found at server/src/wl/xwm.c:60",
+      "where": "server/src/wl/xwm.c:60"
      },
      {
       "kind": "static",
@@ -10172,8 +10172,8 @@
       "what": "the urgency hint (1 << 8) marks the window as demanding attention",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:115",
-      "where": "server/src/wl/xwm.c:115"
+      "msg": "found at server/src/wl/xwm.c:117",
+      "where": "server/src/wl/xwm.c:117"
      },
      {
       "kind": "dynamic",
@@ -10210,8 +10210,8 @@
       "what": "WM_NORMAL_HINTS read",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:60",
-      "where": "server/src/wl/xwm.c:60"
+      "msg": "found at server/src/wl/xwm.c:61",
+      "where": "server/src/wl/xwm.c:61"
      },
      {
       "kind": "dynamic",
@@ -10248,8 +10248,8 @@
       "what": "WM_TRANSIENT_FOR read (the dialog's parent)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:60",
-      "where": "server/src/wl/xwm.c:60"
+      "msg": "found at server/src/wl/xwm.c:61",
+      "where": "server/src/wl/xwm.c:61"
      },
      {
       "kind": "dynamic",
@@ -10285,8 +10285,8 @@
       "what": "SetInputFocus on the focused window",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:220",
-      "where": "server/src/wl/xwm.c:220"
+      "msg": "found at server/src/wl/xwm.c:222",
+      "where": "server/src/wl/xwm.c:222"
      },
      {
       "kind": "static",
@@ -10294,8 +10294,8 @@
       "what": "an X app taking the focus from another one is reverted",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:1736",
-      "where": "server/src/wl/xwm.c:1736"
+      "msg": "found at server/src/wl/xwm.c:1815",
+      "where": "server/src/wl/xwm.c:1815"
      },
      {
       "kind": "dynamic",
@@ -10323,8 +10323,8 @@
       "what": "WM_STATE written",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:348",
-      "where": "server/src/wl/xwm.c:348"
+      "msg": "found at server/src/wl/xwm.c:398",
+      "where": "server/src/wl/xwm.c:398"
      },
      {
       "kind": "static",
@@ -10332,8 +10332,8 @@
       "what": "WM_CHANGE_STATE (iconify) handled",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:1692",
-      "where": "server/src/wl/xwm.c:1692"
+      "msg": "found at server/src/wl/xwm.c:1771",
+      "where": "server/src/wl/xwm.c:1771"
      },
      {
       "kind": "dynamic",
@@ -10370,8 +10370,8 @@
       "what": "the check window",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:1830",
-      "where": "server/src/wl/xwm.c:1830"
+      "msg": "found at server/src/wl/xwm.c:1909",
+      "where": "server/src/wl/xwm.c:1909"
      },
      {
       "kind": "dynamic",
@@ -10417,8 +10417,8 @@
       "what": "_NET_SUPPORTED written on the root",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:1855",
-      "where": "server/src/wl/xwm.c:1855"
+      "msg": "found at server/src/wl/xwm.c:1935",
+      "where": "server/src/wl/xwm.c:1935"
      },
      {
       "kind": "dynamic",
@@ -10426,7 +10426,7 @@
       "what": "_NET_SUPPORTED",
       "weight": 3,
       "result": "pass",
-      "msg": "_NET_SUPPORTED on the root: 34 atoms",
+      "msg": "_NET_SUPPORTED on the root: 37 atoms",
       "hint": "_NET_SUPPORTED"
      }
     ]
@@ -10453,12 +10453,12 @@
    },
    {
     "id": "ewmh.wm_state",
-    "title": "EWMH _NET_WM_STATE (fullscreen, maximized, hidden, above, demands attention, modal, focused)",
-    "score": 96.2,
-    "points": 76,
-    "total": 79,
+    "title": "EWMH _NET_WM_STATE (fullscreen, maximized, hidden, above, below, demands attention, modal, skip taskbar and pager, focused)",
+    "score": 100,
+    "points": 127,
+    "total": 127,
     "skipped": 0,
-    "complete": false,
+    "complete": true,
     "checks": [
      {
       "kind": "static",
@@ -10466,8 +10466,8 @@
       "what": "fullscreen",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:67",
-      "where": "server/src/wl/xwm.c:67"
+      "msg": "found at server/src/wl/xwm.c:68",
+      "where": "server/src/wl/xwm.c:68"
      },
      {
       "kind": "static",
@@ -10475,8 +10475,8 @@
       "what": "maximized",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:67",
-      "where": "server/src/wl/xwm.c:67"
+      "msg": "found at server/src/wl/xwm.c:68",
+      "where": "server/src/wl/xwm.c:68"
      },
      {
       "kind": "static",
@@ -10484,8 +10484,8 @@
       "what": "hidden",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:68",
-      "where": "server/src/wl/xwm.c:68"
+      "msg": "found at server/src/wl/xwm.c:69",
+      "where": "server/src/wl/xwm.c:69"
      },
      {
       "kind": "static",
@@ -10493,8 +10493,8 @@
       "what": "above",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:85",
-      "where": "server/src/wl/xwm.c:85"
+      "msg": "found at server/src/wl/xwm.c:86",
+      "where": "server/src/wl/xwm.c:86"
      },
      {
       "kind": "static",
@@ -10502,8 +10502,8 @@
       "what": "demands attention",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:86",
-      "where": "server/src/wl/xwm.c:86"
+      "msg": "found at server/src/wl/xwm.c:87",
+      "where": "server/src/wl/xwm.c:87"
      },
      {
       "kind": "static",
@@ -10511,17 +10511,44 @@
       "what": "modal",
       "weight": 1,
       "result": "pass",
+      "msg": "found at server/src/wl/xwm.c:87",
+      "where": "server/src/wl/xwm.c:87"
+     },
+     {
+      "kind": "static",
+      "id": "src.skip_taskbar",
+      "what": "skip taskbar",
+      "weight": 1,
+      "result": "pass",
+      "msg": "found at server/src/wl/xwm.c:88",
+      "where": "server/src/wl/xwm.c:88"
+     },
+     {
+      "kind": "static",
+      "id": "src.skip_pager",
+      "what": "skip pager: out of the Overview",
+      "weight": 1,
+      "result": "pass",
+      "msg": "found at server/src/wl/xwm.c:555",
+      "where": "server/src/wl/xwm.c:555"
+     },
+     {
+      "kind": "static",
+      "id": "src.below",
+      "what": "below",
+      "weight": 1,
+      "result": "pass",
       "msg": "found at server/src/wl/xwm.c:86",
       "where": "server/src/wl/xwm.c:86"
      },
      {
       "kind": "static",
-      "id": "src.skip_taskbar",
-      "what": "skip taskbar / pager",
+      "id": "src.layers",
+      "what": "X's stacking follows the layers (always on top, normal, below)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:87",
-      "where": "server/src/wl/xwm.c:87"
+      "msg": "found at server/src/wl/xwm.c:557",
+      "where": "server/src/wl/xwm.c:557"
      },
      {
       "kind": "dynamic",
@@ -10573,7 +10600,7 @@
       "id": "supported._NET_WM_STATE_ABOVE",
       "what": "_NET_WM_STATE_ABOVE",
       "weight": 3,
-      "result": "fail",
+      "result": "pass",
       "msg": "_NET_WM_STATE_ABOVE listed in _NET_SUPPORTED",
       "hint": "_NET_WM_STATE_ABOVE"
      },
@@ -10594,6 +10621,33 @@
       "result": "pass",
       "msg": "_NET_WM_STATE_MODAL listed in _NET_SUPPORTED",
       "hint": "_NET_WM_STATE_MODAL"
+     },
+     {
+      "kind": "dynamic",
+      "id": "supported._NET_WM_STATE_BELOW",
+      "what": "_NET_WM_STATE_BELOW",
+      "weight": 3,
+      "result": "pass",
+      "msg": "_NET_WM_STATE_BELOW listed in _NET_SUPPORTED",
+      "hint": "_NET_WM_STATE_BELOW"
+     },
+     {
+      "kind": "dynamic",
+      "id": "supported._NET_WM_STATE_SKIP_PAGER",
+      "what": "_NET_WM_STATE_SKIP_PAGER",
+      "weight": 3,
+      "result": "pass",
+      "msg": "_NET_WM_STATE_SKIP_PAGER listed in _NET_SUPPORTED",
+      "hint": "_NET_WM_STATE_SKIP_PAGER"
+     },
+     {
+      "kind": "dynamic",
+      "id": "supported._NET_WM_STATE_SKIP_TASKBAR",
+      "what": "_NET_WM_STATE_SKIP_TASKBAR",
+      "weight": 3,
+      "result": "pass",
+      "msg": "_NET_WM_STATE_SKIP_TASKBAR listed in _NET_SUPPORTED",
+      "hint": "_NET_WM_STATE_SKIP_TASKBAR"
      },
      {
       "kind": "dynamic",
@@ -10705,6 +10759,42 @@
      },
      {
       "kind": "dynamic",
+      "id": "skip_pager_add",
+      "what": "_NET_WM_STATE_SKIP_PAGER",
+      "weight": 3,
+      "result": "pass",
+      "msg": "add _NET_WM_STATE_SKIP_PAGER: set",
+      "hint": "_NET_WM_STATE_SKIP_PAGER"
+     },
+     {
+      "kind": "dynamic",
+      "id": "skip_pager_remove",
+      "what": "_NET_WM_STATE_SKIP_PAGER",
+      "weight": 3,
+      "result": "pass",
+      "msg": "remove _NET_WM_STATE_SKIP_PAGER: removed",
+      "hint": "_NET_WM_STATE_SKIP_PAGER"
+     },
+     {
+      "kind": "dynamic",
+      "id": "below_add",
+      "what": "_NET_WM_STATE_BELOW",
+      "weight": 3,
+      "result": "pass",
+      "msg": "add _NET_WM_STATE_BELOW: set",
+      "hint": "_NET_WM_STATE_BELOW"
+     },
+     {
+      "kind": "dynamic",
+      "id": "below_remove",
+      "what": "_NET_WM_STATE_BELOW",
+      "weight": 3,
+      "result": "pass",
+      "msg": "remove _NET_WM_STATE_BELOW: removed",
+      "hint": "_NET_WM_STATE_BELOW"
+     },
+     {
+      "kind": "dynamic",
       "id": "demands_attention_focused",
       "what": "_NET_WM_STATE_DEMANDS_ATTENTION",
       "weight": 3,
@@ -10732,12 +10822,81 @@
      },
      {
       "kind": "dynamic",
+      "id": "above_initial",
+      "what": "_NET_WM_STATE_ABOVE",
+      "weight": 3,
+      "result": "pass",
+      "msg": "asked for before the map, kept: yes",
+      "hint": "_NET_WM_STATE_ABOVE"
+     },
+     {
+      "kind": "dynamic",
+      "id": "above_stays_on_top",
+      "what": "_NET_WM_STATE_ABOVE",
+      "weight": 3,
+      "result": "pass",
+      "msg": "a normal window mapped after it has the keyboard (yes) and the always-on-top one stays at the top of _NET_CLIENT_LIST_STACKING (yes)",
+      "hint": "_NET_WM_STATE_ABOVE"
+     },
+     {
+      "kind": "dynamic",
+      "id": "above_toggle_off",
+      "what": "_NET_WM_STATE_ABOVE",
+      "weight": 3,
+      "result": "pass",
+      "msg": "toggled off: the window with the keyboard is on top again: yes",
+      "hint": "_NET_WM_STATE_ABOVE"
+     },
+     {
+      "kind": "dynamic",
+      "id": "above_toggle_on",
+      "what": "_NET_WM_STATE_ABOVE",
+      "weight": 3,
+      "result": "pass",
+      "msg": "toggled on: over it again, the keyboard not taken: yes",
+      "hint": "_NET_WM_STATE_ABOVE"
+     },
+     {
+      "kind": "dynamic",
+      "id": "below_under",
+      "what": "_NET_WM_STATE_BELOW",
+      "weight": 3,
+      "result": "pass",
+      "msg": "_NET_WM_STATE_BELOW drops ABOVE and stacks it under the normal window (0 < 5): yes",
+      "hint": "_NET_WM_STATE_BELOW"
+     },
+     {
+      "kind": "dynamic",
       "id": "hidden",
       "what": "_NET_WM_STATE_HIDDEN",
       "weight": 3,
       "result": "pass",
       "msg": "WM_CHANGE_STATE Iconic gives _NET_WM_STATE_HIDDEN: yes",
       "hint": "_NET_WM_STATE_HIDDEN"
+     },
+     {
+      "kind": "dynamic",
+      "id": "above_reaches_theme",
+      "what": "_NET_WM_STATE_ABOVE",
+      "weight": 3,
+      "result": "pass",
+      "msg": "the window mapped with layer 1 (1: always on top)"
+     },
+     {
+      "kind": "dynamic",
+      "id": "layer_changes_reach_theme",
+      "what": "_NET_WM_STATE_ABOVE",
+      "weight": 3,
+      "result": "pass",
+      "msg": "the theme was told the layers [0,1,-1] (off, on, below expected)"
+     },
+     {
+      "kind": "dynamic",
+      "id": "skip_pager_reaches_theme",
+      "what": "_NET_WM_STATE_SKIP_PAGER",
+      "weight": 3,
+      "result": "pass",
+      "msg": "the theme was told to leave it out of the Overview"
      }
     ]
    },
@@ -10756,8 +10915,8 @@
       "what": "dialog",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:70",
-      "where": "server/src/wl/xwm.c:70"
+      "msg": "found at server/src/wl/xwm.c:71",
+      "where": "server/src/wl/xwm.c:71"
      },
      {
       "kind": "static",
@@ -10765,8 +10924,8 @@
       "what": "menus",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:73",
-      "where": "server/src/wl/xwm.c:73"
+      "msg": "found at server/src/wl/xwm.c:74",
+      "where": "server/src/wl/xwm.c:74"
      },
      {
       "kind": "static",
@@ -10774,8 +10933,8 @@
       "what": "utility / toolbar",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:88",
-      "where": "server/src/wl/xwm.c:88"
+      "msg": "found at server/src/wl/xwm.c:89",
+      "where": "server/src/wl/xwm.c:89"
      },
      {
       "kind": "static",
@@ -10783,8 +10942,8 @@
       "what": "notification",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:74",
-      "where": "server/src/wl/xwm.c:74"
+      "msg": "found at server/src/wl/xwm.c:75",
+      "where": "server/src/wl/xwm.c:75"
      },
      {
       "kind": "dynamic",
@@ -10857,8 +11016,8 @@
       "what": "_NET_ACTIVE_WINDOW kept and requests handled",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:1653",
-      "where": "server/src/wl/xwm.c:1653"
+      "msg": "found at server/src/wl/xwm.c:1719",
+      "where": "server/src/wl/xwm.c:1719"
      },
      {
       "kind": "dynamic",
@@ -10904,8 +11063,8 @@
       "what": "_NET_CLIENT_LIST kept",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:322",
-      "where": "server/src/wl/xwm.c:322"
+      "msg": "found at server/src/wl/xwm.c:344",
+      "where": "server/src/wl/xwm.c:344"
      },
      {
       "kind": "static",
@@ -10913,8 +11072,8 @@
       "what": "_NET_CLIENT_LIST_STACKING kept",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:89",
-      "where": "server/src/wl/xwm.c:89"
+      "msg": "found at server/src/wl/xwm.c:90",
+      "where": "server/src/wl/xwm.c:90"
      },
      {
       "kind": "dynamic",
@@ -10978,8 +11137,8 @@
       "what": "_NET_WM_PID read",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:481",
-      "where": "server/src/wl/xwm.c:481"
+      "msg": "found at server/src/wl/xwm.c:532",
+      "where": "server/src/wl/xwm.c:532"
      },
      {
       "kind": "dynamic",
@@ -11015,8 +11174,8 @@
       "what": "_NET_WM_ICON read (an X app's own icon)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:89",
-      "where": "server/src/wl/xwm.c:89"
+      "msg": "found at server/src/wl/xwm.c:90",
+      "where": "server/src/wl/xwm.c:90"
      },
      {
       "kind": "dynamic",
@@ -11052,8 +11211,8 @@
       "what": "move/resize requests (apps with their own frame)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:1689",
-      "where": "server/src/wl/xwm.c:1689"
+      "msg": "found at server/src/wl/xwm.c:1768",
+      "where": "server/src/wl/xwm.c:1768"
      },
      {
       "kind": "dynamic",
@@ -11081,8 +11240,8 @@
       "what": "_NET_FRAME_EXTENTS written",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:1530",
-      "where": "server/src/wl/xwm.c:1530"
+      "msg": "found at server/src/wl/xwm.c:1595",
+      "where": "server/src/wl/xwm.c:1595"
      },
      {
       "kind": "static",
@@ -11090,8 +11249,8 @@
       "what": "_NET_REQUEST_FRAME_EXTENTS answered before map",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:90",
-      "where": "server/src/wl/xwm.c:90"
+      "msg": "found at server/src/wl/xwm.c:91",
+      "where": "server/src/wl/xwm.c:91"
      },
      {
       "kind": "dynamic",
@@ -11146,8 +11305,8 @@
       "what": "_NET_WORKAREA on the root (the area apps may use)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:90",
-      "where": "server/src/wl/xwm.c:90"
+      "msg": "found at server/src/wl/xwm.c:91",
+      "where": "server/src/wl/xwm.c:91"
      },
      {
       "kind": "dynamic",
@@ -11184,8 +11343,8 @@
       "what": "_NET_CLOSE_WINDOW requests (pagers, taskbars)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:90",
-      "where": "server/src/wl/xwm.c:90"
+      "msg": "found at server/src/wl/xwm.c:91",
+      "where": "server/src/wl/xwm.c:91"
      },
      {
       "kind": "dynamic",
@@ -11222,8 +11381,8 @@
       "what": "_MOTIF_WM_HINTS decorations read",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:483",
-      "where": "server/src/wl/xwm.c:483"
+      "msg": "found at server/src/wl/xwm.c:534",
+      "where": "server/src/wl/xwm.c:534"
      },
      {
       "kind": "dynamic",
@@ -11250,8 +11409,8 @@
       "what": "XdndAware",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:81",
-      "where": "server/src/wl/xwm.c:81"
+      "msg": "found at server/src/wl/xwm.c:82",
+      "where": "server/src/wl/xwm.c:82"
      },
      {
       "kind": "static",
@@ -11259,8 +11418,8 @@
       "what": "XdndEnter",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:81",
-      "where": "server/src/wl/xwm.c:81"
+      "msg": "found at server/src/wl/xwm.c:82",
+      "where": "server/src/wl/xwm.c:82"
      },
      {
       "kind": "static",
@@ -11268,8 +11427,8 @@
       "what": "XdndPosition",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:82",
-      "where": "server/src/wl/xwm.c:82"
+      "msg": "found at server/src/wl/xwm.c:83",
+      "where": "server/src/wl/xwm.c:83"
      },
      {
       "kind": "static",
@@ -11277,8 +11436,8 @@
       "what": "XdndStatus",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:82",
-      "where": "server/src/wl/xwm.c:82"
+      "msg": "found at server/src/wl/xwm.c:83",
+      "where": "server/src/wl/xwm.c:83"
      },
      {
       "kind": "static",
@@ -11286,8 +11445,8 @@
       "what": "XdndLeave",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:82",
-      "where": "server/src/wl/xwm.c:82"
+      "msg": "found at server/src/wl/xwm.c:83",
+      "where": "server/src/wl/xwm.c:83"
      },
      {
       "kind": "static",
@@ -11295,8 +11454,8 @@
       "what": "XdndDrop",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:82",
-      "where": "server/src/wl/xwm.c:82"
+      "msg": "found at server/src/wl/xwm.c:83",
+      "where": "server/src/wl/xwm.c:83"
      },
      {
       "kind": "static",
@@ -11304,8 +11463,8 @@
       "what": "XdndFinished",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:83",
-      "where": "server/src/wl/xwm.c:83"
+      "msg": "found at server/src/wl/xwm.c:84",
+      "where": "server/src/wl/xwm.c:84"
      },
      {
       "kind": "static",
@@ -11313,8 +11472,8 @@
       "what": "XdndSelection",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:81",
-      "where": "server/src/wl/xwm.c:81"
+      "msg": "found at server/src/wl/xwm.c:82",
+      "where": "server/src/wl/xwm.c:82"
      },
      {
       "kind": "static",
@@ -11322,8 +11481,8 @@
       "what": "XdndTypeList",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:81",
-      "where": "server/src/wl/xwm.c:81"
+      "msg": "found at server/src/wl/xwm.c:82",
+      "where": "server/src/wl/xwm.c:82"
      },
      {
       "kind": "static",
@@ -11331,8 +11490,8 @@
       "what": "XdndActionCopy",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:83",
-      "where": "server/src/wl/xwm.c:83"
+      "msg": "found at server/src/wl/xwm.c:84",
+      "where": "server/src/wl/xwm.c:84"
      },
      {
       "kind": "static",
@@ -11340,8 +11499,8 @@
       "what": "XdndActionMove",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:83",
-      "where": "server/src/wl/xwm.c:83"
+      "msg": "found at server/src/wl/xwm.c:84",
+      "where": "server/src/wl/xwm.c:84"
      },
      {
       "kind": "static",
@@ -11349,8 +11508,8 @@
       "what": "XdndActionAsk",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:84",
-      "where": "server/src/wl/xwm.c:84"
+      "msg": "found at server/src/wl/xwm.c:85",
+      "where": "server/src/wl/xwm.c:85"
      },
      {
       "kind": "unit",
@@ -11396,8 +11555,8 @@
       "what": "INCR when sending to an X app",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:730",
-      "where": "server/src/wl/xwm.c:730"
+      "msg": "found at server/src/wl/xwm.c:795",
+      "where": "server/src/wl/xwm.c:795"
      },
      {
       "kind": "static",
@@ -11405,8 +11564,8 @@
       "what": "INCR when reading from an X app",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:661",
-      "where": "server/src/wl/xwm.c:661"
+      "msg": "found at server/src/wl/xwm.c:726",
+      "where": "server/src/wl/xwm.c:726"
      },
      {
       "kind": "static",
@@ -11414,8 +11573,8 @@
       "what": "XFixes selection notify (an X app copied)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:1936",
-      "where": "server/src/wl/xwm.c:1936"
+      "msg": "found at server/src/wl/xwm.c:2016",
+      "where": "server/src/wl/xwm.c:2016"
      },
      {
       "kind": "static",
@@ -11423,8 +11582,8 @@
       "what": "PRIMARY",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:59",
-      "where": "server/src/wl/xwm.c:59"
+      "msg": "found at server/src/wl/xwm.c:60",
+      "where": "server/src/wl/xwm.c:60"
      },
      {
       "kind": "dynamic",
@@ -11492,8 +11651,8 @@
       "what": "X pixels to logical conversion",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:334",
-      "where": "server/src/wl/xwm.c:334"
+      "msg": "found at server/src/wl/xwm.c:384",
+      "where": "server/src/wl/xwm.c:384"
      },
      {
       "kind": "unit",
@@ -11530,8 +11689,8 @@
       "what": "the root's cursor is LordOS's arrow (Render)",
       "weight": 1,
       "result": "pass",
-      "msg": "found at server/src/wl/xwm.c:1813",
-      "where": "server/src/wl/xwm.c:1813"
+      "msg": "found at server/src/wl/xwm.c:1892",
+      "where": "server/src/wl/xwm.c:1892"
      }
     ]
    },
