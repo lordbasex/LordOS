@@ -330,6 +330,15 @@ static void test_subkeys(void) {
     CHECK(!VER(NULL) && !strcmp(why, "keyRevoked"), "revoked subkey: %s", why);
     bl = add_subkey_revocation(blk, whole, &a, &c, &b, a.fpr, T0 - 100);
     CHECK(VER(&a), "a forged revocation is ignored (%s)", why);
+    /* a revocation by A with a hash this code can't check (SHA-1, SHA-384) still revokes: fail closed */
+    for (int alg = 0; alg < 2; alg++) {
+        bl = add_subkey_revocation(blk, whole, &a, &c, &a, NULL, T0 - 100);
+        size_t at = whole;
+        while (at + 4 < bl && !(blk[at] == 4 && blk[at + 1] == 0x28 && blk[at + 2] == 22)) at++;
+        CHECK(at + 4 < bl, "found the revocation's header");
+        blk[at + 3] = alg ? 9 : 2;
+        CHECK(!VER(NULL) && !strcmp(why, "keyRevoked"), "a %s revocation revokes: %s", alg ? "SHA-384" : "SHA-1", why);
+    }
 
     /* grafted: the subkey packet after A's genuine block, no binding at all */
     memcpy(blk, a.blk, a.blklen);
