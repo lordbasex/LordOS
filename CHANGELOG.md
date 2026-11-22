@@ -714,6 +714,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     key, a missing, empty, garbage or OpenPGP signature, another list, malformed entries), `vmunattend-test`
     (`lordos-auto.conf`, the seed disk read back), `vm_catalog_test.mjs` (the card, the live ISO from the real list, the
     tag against `web/content/downloads.json`). Not run yet: a whole install on a machine, which needs the next ISO.
+- **Machines: an Android 13 card in New Machine, amd64 only, in development** (asked by the maintainer 2026-11-22: "one more
+  operating system ISO in Machines' cards"; docs/VIRTUALIZATION.md 4.2). The card downloads **Bliss OS 16.9.7, FOSS edition**
+  (no Google apps), the only installable Android ISO for PCs found: Android-x86 stopped at 9.0 in 2020, LineageOS's QEMU targets
+  are built by nobody as an ISO, and no installable Android ISO exists for arm64, so the card isn't shown on arm64 hosts.
+  - **Trust:** Bliss OS signs no list, so `assets/machines/systems.json` pins the one file, its SourceForge address and its
+    SHA-256 (`735cb962…a68e`, 2 342 518 784 bytes), checked on 2026-11-22 against the project's own `.sha256` file, a download
+    that day, and the MD5 SourceForge recorded at the upload (2024-10-12). The admin helper keeps the download only with that
+    hash (`vm-image-get`, as for the Windows evaluation and virtio-win); no address comes from the app.
+  - **The machine:** a new `"machine"` field gives the card 4 vCPUs, 4 GB, a 32 GB disk and 3D graphics (virgl) whatever the
+    profile, fitted to the computer (`cardSize`), on the usual q35 + UEFI virtio devices. Install is Bliss OS's own installer.
+  - **What it says:** choosing the card shows the file with "SHA-256 pinned in LordOS's signed catalog" and a warning that Bliss
+    OS paused its public images, that this is the last one (2024-10-11) and gets no more security updates, and that it has no
+    Google apps (`machines.dl.pinned`, `machines.dl.notice.archived`, in all 35 languages). Android ISOs chosen from a file
+    (Bliss OS, Android-x86, LineageOS) are now recognized and get Machines' own green "A" mark.
+  - **Code:** `apps/machines/catalog.js` (`pinnedImage`, `cardSize`, `noticeOf`; a pinned ISO is a card and needs no maker's
+    list), `assistant.jsx` and `download.js` (no `vm-image-list` for a pinned card), `model.js` and `ui.jsx` (the mark), `settingswin.jsx` (a card's `family`: a Linux profile never suggests Android). Tests:
+    `vm_catalog_test.mjs` (83), `vmcatalog-test` (242, the helper's view of the pin), `vm_model_test.mjs`.
+  - **Not yet:** booting it under Machines on the dev VM with a screenshot (**to test**); a maintained Android (LineageOS 24 /
+    Android 16, built by LordOS or as a prebuilt-disk card) and arm64 are open question 6 for the maintainer.
 
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;

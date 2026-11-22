@@ -783,6 +783,8 @@
   "dl.sizeAbout": "{arch}, kira-kira {size}",
   "dl.reading": "Membaca senarai imej di laman {name}…",
   "dl.found": "{file}, daripada senarai bertandatangan pembuatnya (tandatangan dan SHA-256 disemak)",
+  "dl.pinned": "{file}, SHA-256nya ditetapkan dalam katalog bertandatangan LordOS (disemak selepas muat turun)",
+  "dl.notice.archived": "{maker} telah menghentikan sementara imej awamnya: ini yang terakhir, dari {date}, dan ia tidak lagi menerima kemas kini keselamatan. Tanpa apl Google.",
   "dl.noList": "Senarai imej tidak dapat dibaca: {why}",
   "dl.noImage": "senarainya tiada imej keluaran ini untuk seni bina ini buat masa ini",
   "dl.retry": "Cuba Lagi",

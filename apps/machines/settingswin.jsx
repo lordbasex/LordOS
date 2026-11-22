@@ -312,7 +312,7 @@ function ProfileEdit({ host, gpus, start, fresh, taken, onClose, onSaved }) {
     if (!a || !top || !scroll.current) return;
     scroll.current.scrollTo(lord.getLayout(a.id)[1] - lord.getLayout(top.id)[1]);
   };
-  const catalog = systemsFor(CATALOG, host.arch).filter((s) => (pr.system.kind === 'windows' ? s.kind === 'windows' : pr.system.kind === 'linux' ? s.kind !== 'windows' : false));
+  const catalog = systemsFor(CATALOG, host.arch).filter((s) => s.family === pr.system.kind);
   const mine = systems.filter((s) => s.kind === pr.system.kind);
   const toggleSys = (id) => set('system', { suggested: pr.system.suggested.includes(id) ? pr.system.suggested.filter((x) => x !== id) : [...pr.system.suggested, id].slice(0, 8) });
   const sysChip = (id, label) => {

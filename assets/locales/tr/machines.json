@@ -783,6 +783,8 @@
   "dl.sizeAbout": "{arch}, yaklaşık {size}",
   "dl.reading": "{name} sitesindeki görüntü listesi okunuyor…",
   "dl.found": "{file}, yapımcısının imzalı listesinden (imza ve SHA-256 denetlendi)",
+  "dl.pinned": "{file}, SHA-256 değeri LordOS'un imzalı kataloğunda sabitlenmiş (indirmeden sonra denetlenir)",
+  "dl.notice.archived": "{maker} herkese açık görüntülerini durdurdu: bu, {date} tarihli sonuncusu ve artık güvenlik güncellemesi almıyor. Google uygulamaları olmadan gelir.",
   "dl.noList": "Görüntü listesi okunamadı: {why}",
   "dl.noImage": "listesinde şu anda bu mimari için bu sürümün görüntüsü yok",
   "dl.retry": "Yeniden Dene",

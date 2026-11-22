@@ -783,6 +783,8 @@
   "dl.sizeAbout": "{arch}，约 {size}",
   "dl.reading": "正在读取 {name} 网站上的映像列表…",
   "dl.found": "{file}，来自其发行方签名的列表（已检查签名和 SHA-256）",
+  "dl.pinned": "{file}，其 SHA-256 固定在 LordOS 的签名目录中（下载完成后校验）",
+  "dl.notice.archived": "{maker} 已暂停发布公开镜像：这是最后一个，日期为 {date}，不再获得安全更新。不含 Google 应用。",
   "dl.noList": "无法读取映像列表：{why}",
   "dl.noImage": "其列表目前没有此版本针对此架构的映像",
   "dl.retry": "重试",

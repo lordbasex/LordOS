@@ -22,8 +22,34 @@ const eq = (name, got, want) => {
 const H = (c) => c.repeat(64);
 
 // ---- the cards ----
-eq('amd64 cards, LordOS first', systemsFor(CAT, 'amd64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali', 'windows']);
+eq('amd64 cards, LordOS first', systemsFor(CAT, 'amd64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali', 'windows', 'android']);
+// no installable Android ISO exists for arm64 (4.2): no card there
 eq('arm64 cards', systemsFor(CAT, 'arm64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali']);
+// ---- Android (4.2): one ISO pinned by the catalog, no maker's list ----
+{
+  const card = systemsFor(CAT, 'amd64').find((s) => s.id === 'android');
+  eq('android: a pinned card, not a listed one', [card.kind, card.pinned, card.listed, card.name, card.release], ['iso', true, false, 'Android', '13']);
+  eq('families: a Linux profile never suggests Android', systemsFor(CAT, 'amd64').map((s) => s.family).slice(1), ['linux', 'linux', 'linux', 'linux', 'windows', 'android']);
+  const img = C.pinnedImage(entryOf(CAT, 'android', 'amd64'));
+  eq('android: the FOSS edition, its hash and size', [/^Bliss-v16\.9\.7-x86_64-OFFICIAL-foss-\d{8}\.iso$/.test(img.name), img.sha, img.size, img.pinned],
+    [true, '735cb962ec6bd92b62eb82a812831a38d79a0dfdf12b7973d2d0f7ab001ba68e', 2342518784, true]);
+  eq('android: never Google\'s apps', CAT.systems.some((s) => Object.values(s.arch || {}).some((a) => (a.pinned || []).some((f) => /gapps/i.test(f.name)))), false);
+  eq('android: pickImage takes the pin, whatever the text', pickImage(entryOf(CAT, 'android', 'amd64'), `${H('a')}  other.iso\n`).sha, img.sha);
+  eq('android: no list to read', entryOf(CAT, 'android', 'amd64').sums, undefined);
+  const host = { cpus: 16, memMaxMb: 30000 };
+  eq('android: its own machine, whatever the profile', C.cardSize(CAT, 'android', { vcpus: 8, memoryMb: 16384, diskGb: 128, gfx: '2d', network: 'shared' }, host),
+    { vcpus: 4, memoryMb: 4096, diskGb: 32, gfx: '3d', network: 'shared' });
+  eq('android: fitted to a small computer', C.cardSize(CAT, 'android', { vcpus: 2, memoryMb: 2048, diskGb: 40, gfx: '2d' }, { cpus: 2, memMaxMb: 3000 }),
+    { vcpus: 2, memoryMb: 2816, diskGb: 32, gfx: '3d' });
+  eq('a card without a machine keeps the profile\'s', C.cardSize(CAT, 'debian', { vcpus: 8 }, host), { vcpus: 8 });
+  eq('android: the archived notice', C.noticeOf(CAT, 'android'), { key: 'archived', maker: 'Bliss OS', date: '2024-10-11' });
+  eq('no notice for Debian', C.noticeOf(CAT, 'debian'), null);
+  eq('a pin must be one https ISO', [C.pinnedImage({ pinned: [{ name: 'a.iso', url: 'http://x/a.iso', sha256: H('a'), bytes: 1 }] }),
+    C.pinnedImage({ pinned: [{ name: 'a.msi', url: 'https://x/a.msi', sha256: H('a'), bytes: 1 }] }),
+    C.pinnedImage({ pinned: [{ name: 'a.iso', url: 'https://x/a.iso', sha256: H('a'), bytes: 1 }, { name: 'b.iso', url: 'https://x/b.iso', sha256: H('b'), bytes: 1 }] }),
+    C.pinnedImage({ pinned: [{ name: 'a.iso', url: 'https://x/a.iso', sha256: H('a'), bytes: 0 }] })], [null, null, null, null]);
+  eq('the drivers\' and tools\' pins are no cards', systemsFor(CAT, 'amd64').some((s) => ['virtio-win', 'winfsp'].includes(s.id) || /^logo-/.test(s.id)), false);
+}
 eq('no cards for another arch', systemsFor(CAT, 'riscv64'), []);
 const card = (id, arch = 'amd64') => systemsFor(CAT, arch).find((s) => s.id === id);
 eq('Debian 13', [card('debian').name, card('debian').release], ['Debian', '13']);

@@ -783,6 +783,8 @@
   "dl.sizeAbout": "{arch}, około {size}",
   "dl.reading": "Odczytywanie listy obrazów na stronie {name}…",
   "dl.found": "{file}, z podpisanej listy twórcy (sprawdzono podpis i SHA-256)",
+  "dl.pinned": "{file}, z SHA-256 przypiętym w podpisanym katalogu LordOS (sprawdzane po pobraniu)",
+  "dl.notice.archived": "{maker} wstrzymał publiczne obrazy: to ostatni, z {date}, i nie otrzymuje już aktualizacji zabezpieczeń. Bez aplikacji Google.",
   "dl.noList": "Nie udało się odczytać listy obrazów: {why}",
   "dl.noImage": "jej lista nie ma teraz obrazu tego wydania dla tej architektury",
   "dl.retry": "Spróbuj ponownie",

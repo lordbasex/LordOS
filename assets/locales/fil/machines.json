@@ -783,6 +783,8 @@
   "dl.sizeAbout": "{arch}, mga {size}",
   "dl.reading": "Binabasa ang listahan ng mga image sa site ng {name}…",
   "dl.found": "{file}, mula sa naka-sign na listahan ng gumawa nito (nasuri ang lagda at SHA-256)",
+  "dl.pinned": "{file}, naka-pin ang SHA-256 nito sa signed catalog ng LordOS (sinusuri pagkatapos ng download)",
+  "dl.notice.archived": "Itinigil muna ng {maker} ang mga pampublikong image nito: ito ang huli, mula {date}, at hindi na ito tumatanggap ng mga security update. Wala itong mga app ng Google.",
   "dl.noList": "Hindi mabasa ang listahan ng mga image: {why}",
   "dl.noImage": "walang image ng release na ito para sa architecture na ito sa listahan nito ngayon",
   "dl.retry": "Subukan Ulit",

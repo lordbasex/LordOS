@@ -783,6 +783,8 @@
   "dl.sizeAbout": "{arch}，約 {size}",
   "dl.reading": "正在讀取 {name} 網站上的映像檔清單…",
   "dl.found": "{file}，來自其製作者簽署的清單（已檢查簽章與 SHA-256）",
+  "dl.pinned": "{file}，其 SHA-256 固定在 LordOS 的簽署目錄中（下載完成後驗證）",
+  "dl.notice.archived": "{maker} 已暫停發布公開映像：這是最後一個，日期為 {date}，不再獲得安全性更新。不含 Google 應用程式。",
   "dl.noList": "無法讀取映像檔清單：{why}",
   "dl.noImage": "其清單目前沒有此版本適用於此架構的映像檔",
   "dl.retry": "再試一次",

@@ -783,6 +783,8 @@
   "dl.sizeAbout": "{arch}, aproximativ {size}",
   "dl.reading": "Se citește lista de imagini de pe site-ul {name}…",
   "dl.found": "{file}, din lista semnată a producătorului (semnătura și SHA-256 verificate)",
+  "dl.pinned": "{file}, cu SHA-256 fixat în catalogul semnat al LordOS (verificat după descărcare)",
+  "dl.notice.archived": "{maker} și-a suspendat imaginile publice: aceasta este ultima, din {date}, și nu mai primește actualizări de securitate. Vine fără aplicațiile Google.",
   "dl.noList": "Lista de imagini nu a putut fi citită: {why}",
   "dl.noImage": "lista sa nu are acum nicio imagine a acestei versiuni pentru această arhitectură",
   "dl.retry": "Încearcă din nou",

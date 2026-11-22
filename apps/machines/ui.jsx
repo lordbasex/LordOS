@@ -57,7 +57,8 @@ const MARKS = {
   lordos: ['#5aa9ff', '#1f5fbf', 'L'], debian: ['#e0668c', '#8c2146', 'D'], ubuntu: ['#f28a55', '#a83a1a', 'U'], fedora: ['#6a8fd8', '#2b4478', 'F'],
   mint: ['#8bd17c', '#3c7a32', 'M'], arch: ['#5fb4e0', '#1d6a91', 'A'], alpine: ['#4fa3c7', '#1a4f6a', 'A'], opensuse: ['#7fcf6a', '#2f6b25', 'S'],
   kali: ['#5b7fd6', '#22305a', 'K'], rocky: ['#4fc6a0', '#1f6a52', 'R'], alma: ['#e2b04a', '#8a5a14', 'A'], centos: ['#b07ad6', '#5a2d7a', 'C'],
-  windows: ['#4aa3f0', '#1a56a8', 'W'], freebsd: ['#e05a5a', '#7a1f1f', 'B'], raspios: ['#d6567a', '#7a1f3a', 'P'], other: ['#8a93a6', '#3b4252', '▣'],
+  windows: ['#4aa3f0', '#1a56a8', 'W'], freebsd: ['#e05a5a', '#7a1f1f', 'B'], raspios: ['#d6567a', '#7a1f3a', 'P'],
+  android: ['#5cc98a', '#1f6b45', 'A'], other: ['#8a93a6', '#3b4252', '▣'],
 };
 // Machines' own marks for systems whose makers don't let their logos be shown (Canonical asks for written permission;
 // Microsoft allows no use of its logos or of designs like them): drawn for LordOS, nothing like either logo
