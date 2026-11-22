@@ -905,5 +905,8 @@
   "vm.gvtNone": "Şu anda makineler için kullanılabilir bir ekran kartı payı yok",
   "vm.gvtBusy": "Bu makinenin ekran kartı payı başka birine ait",
   "vm.gvtInUse": "Ekran kartının bu payı hâlâ çalışan bir makine tarafından kullanılıyor",
-  "vm.gvtFailed": "Ekran kartı payı oluşturulamadı"
+  "vm.gvtFailed": "Ekran kartı payı oluşturulamadı",
+  "vm.memlockCap": "Bu makine {need} MB kilitleyecekti; bu, ekran kartı olan bir makinenin kilitleyebileceği {cap} MB'tan fazla (Ayarlar → Ekran kartları)",
+  "vm.memlockRefused": "Bu makinenin belleği kilitlenemedi",
+  "gpu.memlockRange": "Bu miktar, bu bilgisayarın makinelerin kilitlemesine izin verdiği aralığın dışında"
 }

@@ -160,5 +160,7 @@
   "gpu.roleSet": "Penggunaan kad grafik disimpan ({card}): mulakan semula untuk menggunakannya",
   "vm.gvtReady": "Bahagian kad grafik sedia ({name})",
   "vm.gvtGone": "Bahagian kad grafik dibuang",
-  "gpu.freqSet": "Frekuensi minimum kad grafik ditetapkan"
+  "gpu.freqSet": "Frekuensi minimum kad grafik ditetapkan",
+  "gpu.memlockSet": "Memori yang boleh dikunci oleh mesin disimpan",
+  "vm.memlockSet": "Memori mesin dikunci"
 }

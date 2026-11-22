@@ -16,7 +16,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/sysmacros.h>
 #include <time.h>
 #include <unistd.h>
@@ -26,7 +28,10 @@ static int run_initramfs(void) {
     return admin_run(argv);
 }
 
+static int real_prlimit(pid_t pid, const struct rlimit *rl) { return prlimit(pid, RLIMIT_MEMLOCK, rl, NULL); }
+
 const char *vmgpu_admin_root = "";
+int (*vmgpu_admin_prlimit)(pid_t pid, const struct rlimit *rl) = real_prlimit;
 const char *vmgpu_admin_fd_dir = NULL;
 int (*vmgpu_admin_initramfs)(void) = run_initramfs;
 
@@ -403,4 +408,121 @@ void vm_gvt_sweep(uid_t uid) {
         if (read_line(saved, b, sizeof b)) continue;
         if (!freq_path(&g[i], "min", minp, sizeof minp) && !write_attr(minp, b)) unlink(saved);
     }
+}
+
+/* ---- vm-memlock, gpu-memlock-cap (maintainer's decision 2026-11-21) ---- */
+
+/* "Uid:" (all four the same as uid) and "PPid:" of a process's status; -1 when it isn't uid's */
+static int proc_owned(int pid, uid_t uid, int *ppid) {
+    char rel[64], b[4096], path[700];
+    snprintf(rel, sizeof rel, "/proc/%d/status", pid);
+    snprintf(path, sizeof path, "%s%s", R, rel);
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    ssize_t r = fd >= 0 ? read(fd, b, sizeof b - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (r <= 0) return -1;
+    b[r] = 0;
+    const char *u = strstr(b, "\nUid:"), *pp = strstr(b, "\nPPid:");
+    unsigned a[4];
+    if (!u || !pp || sscanf(u + 5, "%u %u %u %u", &a[0], &a[1], &a[2], &a[3]) != 4) return -1;
+    for (int i = 0; i < 4; i++) if (a[i] != (unsigned)uid) return -1;
+    if (ppid) *ppid = atoi(pp + 6);
+    return 0;
+}
+
+static int proc_exe(int pid, char *out, size_t n) {
+    char path[700];
+    snprintf(path, sizeof path, "%s/proc/%d/exe", R, pid);
+    ssize_t l = readlink(path, out, n - 1);
+    if (l <= 0) return -1;
+    out[l] = 0;
+    return 0;
+}
+
+/* lord-vm sets its QEMU's limit only through this: the pid must be a live QEMU (the system's binary) of the caller,
+ * whose parent is the caller's lord-vm, running a vGPU the caller made (its -uuid and its vfio-pci-nohotplug's
+ * sysfsdev name the same machine, root's note says the caller's, the mdev is there). Its memory is its own "-m"; the
+ * limit (soft and hard) is that + 512 MB, refused above the cap. A pidfd taken first keeps the checks on that process:
+ * one that ended (and whose pid could be another's) is refused */
+void vm_act_memlock(const AdminReq *r, const char *arg, size_t len) {
+    int pid, ppid = 0;
+    if (vmgpu_pid_arg(arg, len, &pid)) { admin_err("admin.invalidArgument", NULL); return; }
+    int pfd = (int)syscall(SYS_pidfd_open, pid, 0);
+    if (pfd < 0) { admin_err("vm.memlockRefused", NULL); return; }
+    char exe[256], pexe[256];
+    int ok = !proc_owned(pid, r->uid, &ppid) && ppid > 1 && !proc_exe(pid, exe, sizeof exe) &&
+             (!strcmp(exe, "/usr/bin/qemu-system-x86_64") || !strcmp(exe, "/usr/bin/qemu-system-aarch64")) &&
+             !proc_owned(ppid, r->uid, NULL) && !proc_exe(ppid, pexe, sizeof pexe);
+    if (ok) { const char *b = strrchr(pexe, '/'); ok = b && !strcmp(b + 1, "lord-vm"); }
+    /* the command line: -uuid <id>, -m <MB>, and the vGPU of that same id */
+    char cl[16384], id[37] = "";
+    long mem = 0;
+    int vgpu = 0;
+    if (ok) {
+        char path[700];
+        snprintf(path, sizeof path, "%s/proc/%d/cmdline", R, pid);
+        int fd = open(path, O_RDONLY | O_CLOEXEC);
+        ssize_t n = fd >= 0 ? read(fd, cl, sizeof cl - 1) : -1;
+        if (fd >= 0) close(fd);
+        ok = n > 0 && n < (ssize_t)sizeof cl - 1;
+        if (ok) {
+            cl[n] = 0;
+            const char *a[1024];
+            int na = 0;
+            for (ssize_t o = 0; o < n && na < 1024; o += (ssize_t)strlen(cl + o) + 1) a[na++] = cl + o;
+            for (int i = 0; i + 1 < na; i++) {
+                if (!strcmp(a[i], "-uuid") && !vmgpu_remove_arg(a[i + 1], strlen(a[i + 1]), id)) {}
+                if (!strcmp(a[i], "-m")) {
+                    const char *v = a[i + 1];
+                    char *e;
+                    long x = strtol(v, &e, 10);
+                    mem = !*e && v[0] >= '1' && v[0] <= '9' && x >= 64 && x <= 16 * 1024 * 1024 ? x : -1;
+                }
+            }
+            char want[96];
+            snprintf(want, sizeof want, "sysfsdev=/sys/bus/mdev/devices/%s,", id);
+            for (int i = 0; id[0] && i < na; i++) if (!strncmp(a[i], "vfio-pci-nohotplug,", 19) && strstr(a[i], want)) vgpu = 1;
+        }
+    }
+    ok = ok && id[0] && mem > 0 && vgpu && note_uid(id) == (long)r->uid && mdev_group(id) >= 0;
+    if (!ok) { close(pfd); admin_err("vm.memlockRefused", NULL); return; }
+    long total = vmgpu_total_mb(R), cap = vmgpu_memlock_cap_mb(R, total, NULL), need = mem + VMGPU_MEMLOCK_EXTRA_MB;
+    if (need > cap) {
+        char ns[24], cs[24];
+        snprintf(ns, sizeof ns, "%ld", need);
+        snprintf(cs, sizeof cs, "%ld", cap);
+        close(pfd);
+        admin_err("vm.memlockCap", "need", ns, "cap", cs, NULL);
+        return;
+    }
+    /* still the process checked */
+    if (syscall(SYS_pidfd_send_signal, pfd, 0, NULL, 0)) { close(pfd); admin_err("vm.memlockRefused", NULL); return; }
+    struct rlimit rl = { (rlim_t)need << 20, (rlim_t)need << 20 };
+    int e = vmgpu_admin_prlimit((pid_t)pid, &rl);
+    close(pfd);
+    if (e) { admin_err("vm.memlockRefused", NULL); return; }
+    char ns[24];
+    snprintf(ns, sizeof ns, "%ld", need);
+    admin_ok("vm.memlockSet", "need", ns, NULL);
+}
+
+void vm_act_gpu_memlock_cap(const AdminReq *r, const char *arg, size_t len) {
+    (void)r;
+    long mb;
+    if (vmgpu_memlock_arg(arg, len, &mb)) { admin_err("admin.invalidArgument", NULL); return; }
+    long total = vmgpu_total_mb(R);
+    char path[1024];
+    snprintf(path, sizeof path, "%s" VMGPU_MEMLOCK_CONF, R);
+    if (!mb) {
+        if (unlink(path) && errno != ENOENT) { admin_err("gpu.writeFailed", "name", VMGPU_MEMLOCK_CONF, NULL); return; }
+        admin_ok("gpu.memlockSet", NULL);
+        return;
+    }
+    if (total <= 0 || mb < VMGPU_MEMLOCK_MIN_MB || mb > total - VMGPU_MEMLOCK_MIN_MB) { admin_err("gpu.memlockRange", NULL); return; }
+    char d[1024], b[48];
+    snprintf(d, sizeof d, "%s/etc/lordos", R);
+    if (mkdir(d, 0755) && errno != EEXIST) { admin_err("gpu.writeFailed", "name", VMGPU_MEMLOCK_CONF, NULL); return; }
+    snprintf(b, sizeof b, "cap_mb=%ld\n", mb);
+    if (write_file(path, b)) { admin_err("gpu.writeFailed", "name", VMGPU_MEMLOCK_CONF, NULL); return; }
+    admin_ok("gpu.memlockSet", NULL);
 }

@@ -1,11 +1,12 @@
 /* vm_gvt_cli.c — runs Machines' vm-gvt-create, vm-gvt-remove and gpu-min-freq (src/vm/vmgpu_admin.c) like the admin
  * helper does, for a manual check on a computer whose iGPU runs GVT-g (not part of `make test`: it needs root and makes a
- * real mdev). gpu-role is left out on purpose: it writes /etc and runs update-initramfs (vmgpu-test runs it under a
- * fake root folder).
+ * real mdev). gpu-role and gpu-memlock-cap are left out on purpose: they write /etc (vmgpu-test runs them under a fake
+ * root folder).
  *
  *   sudo build/vm-gvt-cli vm-gvt-create '<machine id> <mdev type>'
  *   sudo build/vm-gvt-cli vm-gvt-remove '<machine id>'
  *   sudo build/vm-gvt-cli gpu-min-freq '<pci address> <MHz|default>'
+ *   sudo build/vm-gvt-cli vm-memlock '<qemu pid>'
  *   sudo build/vm-gvt-cli sweep
  *
  * The caller is SUDO_USER (as the helper's session user). The desktop's GPU is read from sudo's descriptors, which hold
@@ -41,6 +42,7 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[1], "vm-gvt-create")) vm_act_gvt_create(&r, argv[2], strlen(argv[2]));
     else if (!strcmp(argv[1], "vm-gvt-remove")) vm_act_gvt_remove(&r, argv[2], strlen(argv[2]));
     else if (!strcmp(argv[1], "gpu-min-freq")) vm_act_gpu_min_freq(&r, argv[2], strlen(argv[2]));
+    else if (!strcmp(argv[1], "vm-memlock")) vm_act_memlock(&r, argv[2], strlen(argv[2]));
     else return 2;
     return 0;
 }

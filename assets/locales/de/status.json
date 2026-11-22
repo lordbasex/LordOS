@@ -169,5 +169,7 @@
   "gpu.roleSet": "Verwendung der Grafikkarte gespeichert ({card}): zum Übernehmen neu starten",
   "vm.gvtReady": "Anteil der Grafikkarte bereit ({name})",
   "vm.gvtGone": "Anteil der Grafikkarte entfernt",
-  "gpu.freqSet": "Mindestfrequenz der Grafikkarte festgelegt"
+  "gpu.freqSet": "Mindestfrequenz der Grafikkarte festgelegt",
+  "gpu.memlockSet": "Sperrbarer Speicher pro Maschine gespeichert",
+  "vm.memlockSet": "Arbeitsspeicher der Maschine gesperrt"
 }

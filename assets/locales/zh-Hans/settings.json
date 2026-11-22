@@ -761,5 +761,13 @@
   "gpus.restartHint": "显卡的新用途将在重新启动后生效。",
   "gpus.restartNow": "立即重新启动",
   "gpus.applying": "正在应用…可能需要一分钟。",
-  "gpus.needAdmin": "只有管理员可以更改显卡的用途。"
+  "gpus.needAdmin": "只有管理员可以更改显卡的用途。",
+  "gpus.memlock": "虚拟机可锁定的内存",
+  "gpus.memlockCap": "单台虚拟机最多可锁定",
+  "gpus.memlockHint": "带显卡的虚拟机在运行时会把内存保留在 RAM 中（不能换出）。这是单台这类虚拟机最多可锁定的量；请设置得让这台电脑 {total} 中剩余的部分足够它使用。更改会立即生效。",
+  "gpus.memlockRecommended": "推荐",
+  "gpus.memlockDefault": "推荐：{n}",
+  "gpus.memlockApply": "应用",
+  "gpus.memlockUseDefault": "使用推荐值",
+  "gpus.gb": "{n} GB"
 }

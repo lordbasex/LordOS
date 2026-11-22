@@ -768,5 +768,13 @@
   "gpus.restartHint": "Näytönohjaimen uusi käyttö tulee voimaan uudelleenkäynnistyksen jälkeen.",
   "gpus.restartNow": "Käynnistä uudelleen nyt",
   "gpus.applying": "Otetaan käyttöön… tämä voi kestää minuutin.",
-  "gpus.needAdmin": "Vain järjestelmänvalvoja voi muuttaa näytönohjaimen käyttötarkoitusta."
+  "gpus.needAdmin": "Vain järjestelmänvalvoja voi muuttaa näytönohjaimen käyttötarkoitusta.",
+  "gpus.memlock": "Muisti, jonka kone saa lukita",
+  "gpus.memlockCap": "Enintään yhtä konetta kohden",
+  "gpus.memlockHint": "Näytönohjaimella varustettu kone pitää muistinsa RAM-muistissa käynnissä ollessaan (sitä ei voi siirtää sivutustilaan). Tämä on enimmäismäärä, jonka tällainen kone saa lukita; aseta se niin, että tämän tietokoneen {total} loppuosa riittää sille. Muutos tulee voimaan heti.",
+  "gpus.memlockRecommended": "Suositeltu",
+  "gpus.memlockDefault": "Suositeltu: {n}",
+  "gpus.memlockApply": "Käytä",
+  "gpus.memlockUseDefault": "Käytä suositeltua",
+  "gpus.gb": "{n} Gt"
 }

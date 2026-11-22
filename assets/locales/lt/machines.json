@@ -1044,5 +1044,9 @@
   "win.gvtOff": "Šiuo metu jokia vaizdo plokštė nebendrinama su mašinomis (Nustatymai → Vaizdo plokštės).",
   "win.gvtNone": "Visas vaizdo plokštės dalis naudoja kitos mašinos.",
   "win.gvtFailed": "Nepavyko suteikti vaizdo plokštės mašinai: {why}",
-  "close.noGpuSuspend": "Su vaizdo plokšte jos negalima užmigdyti."
+  "close.noGpuSuspend": "Su vaizdo plokšte jos negalima užmigdyti.",
+  "cfg.memlockNote": "Su vaizdo plokšte šios mašinos atmintis, kol ji veikia, rezervuojama jai ({n} iš {cap}).",
+  "cfg.memlockOver": "Su vaizdo plokšte šios mašinos atmintis, kol ji veikia, rezervuojama jai, o {n} yra daugiau, nei gali užrakinti viena mašina ({cap}): ji nepasileis, kol nesumažinsite jos atminties arba nepadidinsite šios ribos.",
+  "cfg.memlockChange": "Keisti: Nustatymai → Vaizdo plokštės",
+  "win.gvtMemlock": "Ši mašina turi {mem} atminties, bet mašina su vaizdo plokšte gali užrakinti tik {cap} (Nustatymai → Vaizdo plokštės)."
 }

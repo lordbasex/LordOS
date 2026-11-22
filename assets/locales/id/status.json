@@ -160,5 +160,7 @@
   "gpu.roleSet": "Penggunaan kartu grafis disimpan ({card}): mulai ulang untuk menerapkan",
   "vm.gvtReady": "Bagian kartu grafis siap ({name})",
   "vm.gvtGone": "Bagian kartu grafis dihapus",
-  "gpu.freqSet": "Frekuensi minimum kartu grafis diatur"
+  "gpu.freqSet": "Frekuensi minimum kartu grafis diatur",
+  "gpu.memlockSet": "Memori yang boleh dikunci mesin disimpan",
+  "vm.memlockSet": "Memori mesin dikunci"
 }

@@ -169,5 +169,7 @@
   "gpu.roleSet": "Näytönohjaimen käyttö tallennettu ({card}): käynnistä uudelleen ottaaksesi käyttöön",
   "vm.gvtReady": "Näytönohjaimen osuus valmis ({name})",
   "vm.gvtGone": "Näytönohjaimen osuus poistettu",
-  "gpu.freqSet": "Näytönohjaimen vähimmäistaajuus asetettu"
+  "gpu.freqSet": "Näytönohjaimen vähimmäistaajuus asetettu",
+  "gpu.memlockSet": "Koneen lukittavissa oleva muisti tallennettu",
+  "vm.memlockSet": "Koneen muisti lukittu"
 }

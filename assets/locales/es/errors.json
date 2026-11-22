@@ -905,5 +905,8 @@
   "vm.gvtNone": "Ahora no hay ninguna parte de una tarjeta gráfica disponible para máquinas",
   "vm.gvtBusy": "La parte de la tarjeta gráfica de esa máquina pertenece a otra persona",
   "vm.gvtInUse": "Esa parte de la tarjeta gráfica todavía la usa una máquina en marcha",
-  "vm.gvtFailed": "No se pudo crear la parte de la tarjeta gráfica"
+  "vm.gvtFailed": "No se pudo crear la parte de la tarjeta gráfica",
+  "vm.memlockCap": "Esta máquina bloquearía {need} MB, más que los {cap} MB que puede bloquear una máquina con tarjeta gráfica (Ajustes → Tarjetas gráficas)",
+  "vm.memlockRefused": "No se pudo bloquear la memoria de esta máquina",
+  "gpu.memlockRange": "Esa cantidad está fuera de lo que esta computadora permite bloquear a las máquinas"
 }

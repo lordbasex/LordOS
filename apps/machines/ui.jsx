@@ -1,7 +1,7 @@
 // Pieces the Machines windows share: the state dot, the system marks, the three lights, bars, a context menu and the
 // surfaces of the Control Center (docs/VIRTUALIZATION.md, "The app"; the approved mocks, Main and Toolbar).
 import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, t as tr } from '@lordos/sdk';
-import { bridgeArg, soundDevChoices, gvtGpu, gvtType, gvtArg } from './model.js';
+import { bridgeArg, soundDevChoices, gvtGpu, gvtType, gvtArg, memlockFits } from './model.js';
 import { useEffect, useRef, useState } from 'react';
 
 export const TONE = { run: '#30d158', pause: '#ff9f0a', off: '#8e8e93', busy: '#0a84ff', bad: '#ff453a' };
@@ -342,6 +342,8 @@ export async function gvtUp(m) {
   const r = typeof lord.vm?.gpus === 'function' ? lord.vm.gpus() : null;
   const gpu = gvtGpu(r);
   if (!gpu) throw new Error(tr('machines.win.gvtOff'));
+  // its memory is locked while it runs: it must fit "Memory machines may lock" (lord-server's vm-memlock checks again)
+  if (!memlockFits(m, r.memlock)) throw new Error(tr('machines.win.gvtMemlock', { mem: gb(m.memoryMb), cap: gb(r.memlock.capMb) }));
   // with none free, the type anyway: the machine's own vGPU may still be there (a restart takes it again, which
   // vm-gvt-create allows); anyone else's is refused by the helper
   const type = gvtType(gpu, m.gpu, m.resolution, true) || gvtType(gpu, m.gpu, m.resolution, false);

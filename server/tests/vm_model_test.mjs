@@ -650,6 +650,11 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('shared, free only: none free', M.gvtType({ ...igpu, types: types.map((t) => ({ ...t, available: 0 })) }, 'intel-shared', 'follow', true), null);
   eq('gvt arg', M.gvtArg({ id: '0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b' }, types[2]), '0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b i915-GVTg_V5_4');
   eq('gvt arg without a type', [M.gvtArg({ id: 'x' }, null), M.gvtArg({}, types[0])], ['', '']);
+  eq('memlock need: memory + 512', [M.memlockNeed({ memoryMb: 8192 }), M.memlockNeed({}), M.memlockNeed(null)], [8704, 0, 0]);
+  const ml = { capMb: 12288, defaultMb: 12288, totalMb: 16384, minMb: 2048, maxMb: 14336, custom: false };
+  eq('memlock fits', [M.memlockFits({ memoryMb: 8192 }, ml), M.memlockFits({ memoryMb: 11776 }, ml), M.memlockFits({ memoryMb: 12032 }, ml)], [true, true, false]);
+  eq('memlock fits without a cap', [M.memlockFits({ memoryMb: 999999 }, null), M.memlockFits({ memoryMb: 999999 }, { capMb: 0 })], [true, true]);
+  eq('memlock max memory', [M.memlockMaxMemory(ml), M.memlockMaxMemory({ capMb: 12000 }), M.memlockMaxMemory(null)], [11776, 11264, Infinity]);
   eq('no suspend: a graphics card, or 3D running', [M.noSuspend(null, 'intel-shared'), M.noSuspend({ sandbox: 512 }, ''), M.noSuspend({ sandbox: 1 }, '')], [true, true, false]);
 }
 

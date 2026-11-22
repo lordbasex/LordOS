@@ -775,5 +775,13 @@
   "gpus.restartHint": "Nowe zastosowanie karty graficznej zacznie działać po ponownym uruchomieniu.",
   "gpus.restartNow": "Uruchom ponownie teraz",
   "gpus.applying": "Stosowanie… może to potrwać minutę.",
-  "gpus.needAdmin": "Tylko administrator może zmienić zastosowanie karty graficznej."
+  "gpus.needAdmin": "Tylko administrator może zmienić zastosowanie karty graficznej.",
+  "gpus.memlock": "Pamięć, którą maszyna może zablokować",
+  "gpus.memlockCap": "Najwięcej dla jednej maszyny",
+  "gpus.memlockHint": "Maszyna z kartą graficzną trzyma swoją pamięć w RAM, dopóki działa (nie można jej przenieść do swapu). To najwięcej, ile jedna taka maszyna może zablokować; ustaw tak, by reszta z {total} tego komputera mu wystarczyła. Zmiana działa od razu.",
+  "gpus.memlockRecommended": "Zalecane",
+  "gpus.memlockDefault": "Zalecane: {n}",
+  "gpus.memlockApply": "Zastosuj",
+  "gpus.memlockUseDefault": "Użyj zalecanej",
+  "gpus.gb": "{n} GB"
 }

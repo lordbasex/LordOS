@@ -169,5 +169,7 @@
   "gpu.roleSet": "Ekran kartının kullanımı kaydedildi ({card}): uygulamak için yeniden başlatın",
   "vm.gvtReady": "Ekran kartı payı hazır ({name})",
   "vm.gvtGone": "Ekran kartı payı kaldırıldı",
-  "gpu.freqSet": "Ekran kartının en düşük frekansı ayarlandı"
+  "gpu.freqSet": "Ekran kartının en düşük frekansı ayarlandı",
+  "gpu.memlockSet": "Bir makinenin kilitleyebileceği bellek kaydedildi",
+  "vm.memlockSet": "Makinenin belleği kilitlendi"
 }

@@ -768,5 +768,13 @@
   "gpus.restartHint": "La nouvelle utilisation de la carte graphique prend effet après un redémarrage.",
   "gpus.restartNow": "Redémarrer maintenant",
   "gpus.applying": "Application… cela peut prendre une minute.",
-  "gpus.needAdmin": "Seul un administrateur peut changer l’utilisation d’une carte graphique."
+  "gpus.needAdmin": "Seul un administrateur peut changer l’utilisation d’une carte graphique.",
+  "gpus.memlock": "Mémoire qu’une machine peut verrouiller",
+  "gpus.memlockCap": "Maximum verrouillable par une machine",
+  "gpus.memlockHint": "Une machine avec carte graphique garde sa mémoire en RAM pendant qu’elle tourne (elle ne peut pas être déplacée vers le swap). Voici le maximum qu’une telle machine peut verrouiller ; réglez-le pour que le reste des {total} de cet ordinateur lui suffise. Une modification s’applique immédiatement.",
+  "gpus.memlockRecommended": "Recommandé",
+  "gpus.memlockDefault": "Recommandé : {n}",
+  "gpus.memlockApply": "Appliquer",
+  "gpus.memlockUseDefault": "Utiliser la valeur recommandée",
+  "gpus.gb": "{n} Go"
 }

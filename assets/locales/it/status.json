@@ -169,5 +169,7 @@
   "gpu.roleSet": "Uso della scheda grafica salvato ({card}): riavvia per applicarlo",
   "vm.gvtReady": "Quota della scheda grafica pronta ({name})",
   "vm.gvtGone": "Quota della scheda grafica rimossa",
-  "gpu.freqSet": "Frequenza minima della scheda grafica impostata"
+  "gpu.freqSet": "Frequenza minima della scheda grafica impostata",
+  "gpu.memlockSet": "Memoria bloccabile da una macchina salvata",
+  "vm.memlockSet": "Memoria della macchina bloccata"
 }

@@ -768,5 +768,13 @@
   "gpus.restartHint": "The graphics card's new use takes effect after a restart.",
   "gpus.restartNow": "Restart Now",
   "gpus.applying": "Applying… this can take a minute.",
-  "gpus.needAdmin": "Only an administrator can change what a graphics card is used for."
+  "gpus.needAdmin": "Only an administrator can change what a graphics card is used for.",
+  "gpus.memlock": "Memory a machine may lock",
+  "gpus.memlockCap": "Most one machine may lock",
+  "gpus.memlockHint": "A machine with a graphics card keeps its memory in RAM while it runs (it can't be swapped out). This is the most one such machine may lock; set it so the rest of this computer's {total} is enough for it. A change applies at once.",
+  "gpus.memlockRecommended": "Recommended",
+  "gpus.memlockDefault": "Recommended: {n}",
+  "gpus.memlockApply": "Apply",
+  "gpus.memlockUseDefault": "Use Recommended",
+  "gpus.gb": "{n} GB"
 }

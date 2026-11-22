@@ -160,5 +160,7 @@
   "gpu.roleSet": "已儲存顯示卡的用途（{card}）：重新啟動後生效",
   "vm.gvtReady": "顯示卡配額已就緒（{name}）",
   "vm.gvtGone": "已移除顯示卡配額",
-  "gpu.freqSet": "已設定顯示卡的最低頻率"
+  "gpu.freqSet": "已設定顯示卡的最低頻率",
+  "gpu.memlockSet": "已儲存虛擬機器可鎖定的記憶體",
+  "vm.memlockSet": "已鎖定虛擬機器的記憶體"
 }

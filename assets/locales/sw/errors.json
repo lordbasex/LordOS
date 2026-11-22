@@ -905,5 +905,8 @@
   "vm.gvtNone": "Hakuna sehemu ya kadi ya michoro inayopatikana kwa mashine sasa",
   "vm.gvtBusy": "Sehemu ya kadi ya michoro ya mashine hiyo ni ya mtu mwingine",
   "vm.gvtInUse": "Sehemu hiyo ya kadi ya michoro bado inatumiwa na mashine inayoendeshwa",
-  "vm.gvtFailed": "Sehemu ya kadi ya michoro haikuweza kuundwa"
+  "vm.gvtFailed": "Sehemu ya kadi ya michoro haikuweza kuundwa",
+  "vm.memlockCap": "Mashine hii ingefunga MB {need}, zaidi ya MB {cap} ambazo mashine yenye kadi ya michoro inaweza kufunga (Mipangilio → Kadi za michoro)",
+  "vm.memlockRefused": "Kumbukumbu ya mashine hii haikuweza kufungwa",
+  "gpu.memlockRange": "Kiasi hicho kiko nje ya kile kompyuta hii inaruhusu mashine kufunga"
 }

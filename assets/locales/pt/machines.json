@@ -1044,5 +1044,9 @@
   "win.gvtOff": "Nenhuma placa de vídeo está compartilhada com máquinas agora (Ajustes → Placas de vídeo).",
   "win.gvtNone": "Todas as partes da placa de vídeo estão em uso por outras máquinas.",
   "win.gvtFailed": "Não foi possível entregar a placa de vídeo à máquina: {why}",
-  "close.noGpuSuspend": "Com uma placa de vídeo ela não pode ser suspensa."
+  "close.noGpuSuspend": "Com uma placa de vídeo ela não pode ser suspensa.",
+  "cfg.memlockNote": "Com placa de vídeo, a memória desta máquina fica reservada para ela enquanto roda ({n} de {cap}).",
+  "cfg.memlockOver": "Com placa de vídeo, a memória desta máquina fica reservada para ela enquanto roda, e {n} é mais do que uma máquina pode bloquear ({cap}): ela não vai iniciar até você diminuir a memória dela ou aumentar esse limite.",
+  "cfg.memlockChange": "Alterar em Ajustes → Placas de vídeo",
+  "win.gvtMemlock": "Esta máquina tem {mem} de memória, mas uma máquina com placa de vídeo só pode bloquear {cap} (Ajustes → Placas de vídeo)."
 }

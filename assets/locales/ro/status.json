@@ -178,5 +178,7 @@
   "gpu.roleSet": "Utilizarea plăcii video a fost salvată ({card}): reporniți pentru a aplica",
   "vm.gvtReady": "Partea din placa video este gata ({name})",
   "vm.gvtGone": "Partea din placa video a fost eliminată",
-  "gpu.freqSet": "Frecvența minimă a plăcii video a fost setată"
+  "gpu.freqSet": "Frecvența minimă a plăcii video a fost setată",
+  "gpu.memlockSet": "Memoria pe care o mașină o poate bloca a fost salvată",
+  "vm.memlockSet": "Memoria mașinii a fost blocată"
 }

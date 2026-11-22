@@ -1044,5 +1044,9 @@
   "win.gvtOff": "Saat ini tidak ada kartu grafis yang dibagi dengan mesin (Pengaturan → Kartu grafis).",
   "win.gvtNone": "Setiap bagian kartu grafis sedang dipakai mesin lain.",
   "win.gvtFailed": "Kartu grafis tidak dapat diberikan ke mesin: {why}",
-  "close.noGpuSuspend": "Dengan kartu grafis, mesin tidak bisa ditangguhkan."
+  "close.noGpuSuspend": "Dengan kartu grafis, mesin tidak bisa ditangguhkan.",
+  "cfg.memlockNote": "Dengan kartu grafis, memori mesin ini dicadangkan untuknya selama berjalan ({n} dari {cap}).",
+  "cfg.memlockOver": "Dengan kartu grafis, memori mesin ini dicadangkan untuknya selama berjalan, dan {n} lebih besar dari yang boleh dikunci satu mesin ({cap}): mesin tidak akan mulai sampai Anda mengurangi memorinya atau menaikkan batas itu.",
+  "cfg.memlockChange": "Ubah di Pengaturan → Kartu grafis",
+  "win.gvtMemlock": "Mesin ini memiliki memori {mem}, tetapi mesin dengan kartu grafis hanya boleh mengunci {cap} (Pengaturan → Kartu grafis)."
 }

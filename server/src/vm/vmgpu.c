@@ -394,3 +394,69 @@ char *vmgpu_json(const VmGpu *g, int n, int configured) {
     if (b.bad) { free(b.p); return NULL; }
     return b.p;
 }
+
+/* ---- memory machines may lock ---- */
+
+long vmgpu_total_mb(const char *root) {
+    char p[600], b[4096];
+    snprintf(p, sizeof p, "%s/proc/meminfo", root);
+    if (read_text(p, b, sizeof b)) return 0;
+    const char *m = strstr(b, "MemTotal:");
+    if (!m) return 0;
+    long kb = strtol(m + 9, NULL, 10);
+    return kb > 0 ? kb / 1024 : 0;
+}
+
+long vmgpu_memlock_default_mb(long total) {
+    long keep = total / 4 > 4096 ? total / 4 : 4096;
+    long d = (total - keep) / 1024 * 1024;
+    return d < VMGPU_MEMLOCK_MIN_MB ? VMGPU_MEMLOCK_MIN_MB : d;
+}
+
+long vmgpu_memlock_cap_mb(const char *root, long total, int *custom) {
+    char p[600], b[64];
+    if (custom) *custom = 0;
+    snprintf(p, sizeof p, "%s" VMGPU_MEMLOCK_CONF, root);
+    long v = 0;
+    if (!read_text(p, b, sizeof b) && !strncmp(b, "cap_mb=", 7)) {
+        char *e;
+        v = strtol(b + 7, &e, 10);
+        if (*e != '\n' && *e) v = 0;
+    }
+    if (v >= VMGPU_MEMLOCK_MIN_MB && v <= total - VMGPU_MEMLOCK_MIN_MB) { if (custom) *custom = 1; return v; }
+    return vmgpu_memlock_default_mb(total);
+}
+
+int vmgpu_memlock_arg(const char *arg, size_t len, long *mb) {
+    char v[16];
+    if (words(arg, len, v, sizeof v, NULL, 0)) return -1;
+    if (!strcmp(v, "default")) { *mb = 0; return 0; }
+    if (strlen(v) > 8 || v[0] == '0') return -1;
+    for (const char *q = v; *q; q++) if (!isdigit((unsigned char)*q)) return -1;
+    *mb = atol(v);
+    return 0;
+}
+
+int vmgpu_pid_arg(const char *arg, size_t len, int *pid) {
+    char v[16];
+    if (words(arg, len, v, sizeof v, NULL, 0) || strlen(v) > 9 || v[0] == '0') return -1;
+    for (const char *q = v; *q; q++) if (!isdigit((unsigned char)*q)) return -1;
+    *pid = atoi(v);
+    return *pid > 1 ? 0 : -1;
+}
+
+char *vmgpu_json_full(const char *root, const VmGpu *g, int n, int configured) {
+    char *j = vmgpu_json(g, n, configured);
+    if (!j) return NULL;
+    long total = vmgpu_total_mb(root);
+    int custom = 0;
+    long cap = vmgpu_memlock_cap_mb(root, total, &custom);
+    char tail[256];
+    snprintf(tail, sizeof tail, ",\"memlock\":{\"capMb\":%ld,\"defaultMb\":%ld,\"totalMb\":%ld,\"minMb\":%d,\"maxMb\":%ld,\"custom\":%s}}",
+             cap, vmgpu_memlock_default_mb(total), total, VMGPU_MEMLOCK_MIN_MB, total - VMGPU_MEMLOCK_MIN_MB, custom ? "true" : "false");
+    size_t l = strlen(j);
+    char *r = realloc(j, l + strlen(tail) + 1);
+    if (!r) { free(j); return NULL; }
+    strcpy(r + l - 1, tail);            /* over the closing brace */
+    return r;
+}

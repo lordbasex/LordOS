@@ -768,5 +768,13 @@
   "gpus.restartHint": "Il nuovo uso della scheda grafica avrà effetto dopo un riavvio.",
   "gpus.restartNow": "Riavvia ora",
   "gpus.applying": "Applicazione in corso… può richiedere un minuto.",
-  "gpus.needAdmin": "Solo un amministratore può cambiare l’uso di una scheda grafica."
+  "gpus.needAdmin": "Solo un amministratore può cambiare l’uso di una scheda grafica.",
+  "gpus.memlock": "Memoria che una macchina può bloccare",
+  "gpus.memlockCap": "Massimo bloccabile da una macchina",
+  "gpus.memlockHint": "Una macchina con scheda grafica tiene la sua memoria nella RAM mentre è in funzione (non può essere spostata nello swap). Questo è il massimo che una macchina del genere può bloccare; impostalo in modo che il resto dei {total} di questo computer le basti. La modifica si applica subito.",
+  "gpus.memlockRecommended": "Consigliato",
+  "gpus.memlockDefault": "Consigliato: {n}",
+  "gpus.memlockApply": "Applica",
+  "gpus.memlockUseDefault": "Usa il consigliato",
+  "gpus.gb": "{n} GB"
 }

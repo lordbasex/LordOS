@@ -31,7 +31,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     use; the one that draws the desktop is fixed; an unused iGPU is suggested ("You have a graphics card that isn't
     used. Use it for Machines?"); Unused / Machines (shared) for a GVT-g iGPU, a note that dedicated cards come in a
     later version; a restart notice and Restart Now. All 35 languages.
-  - **Four closed admin actions** (AGENTS.md "Machines' graphics cards", approved 2026-11-21; `server/src/vm/vmgpu.c`,
+  - **Closed admin actions** (AGENTS.md "Machines' graphics cards", approved 2026-11-21; `server/src/vm/vmgpu.c`,
     `vmgpu_admin.c`): `gpu-role` writes only `/etc/modprobe.d/lordos-gpu.conf` (`options i915 enable_gvt=1
     enable_guc=0`) and `/etc/modules-load.d/lordos-gpu.conf` (`kvmgt`) and runs `update-initramfs -u`, adopting
     hand-written `i915-gvt.conf`/`kvmgt.conf` that say exactly that (no duplicate options) and removing them with
@@ -40,7 +40,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     process holds its group; `gpu-min-freq` sets the iGPU's minimum frequency within RPn..RP0 while a machine uses it
     (lord-server asks for two thirds of RP0, 800 MHz on a UHD 630, then "default"). The GPU lord-server draws on is
     always refused, checked on the root side from the cards it holds open. Leftover vGPUs are swept when a session's
-    helper starts and ends. `vmgpu-test`: the parsers and the four actions under a fake root folder (92 checks).
+    helper starts and ends. `vmgpu-test`: the parsers and the six actions under a fake root folder (113 checks).
   - **Configure → Display → Graphics card**: None / Whole (for this machine, the largest type) / Shared (the smallest
     type that shows the machine's resolution), with each choice's free instances; refused when none is free; it
     replaces 3D graphics; such a machine can't be suspended (Suspend becomes Shut Down) or keep snapshots with memory.
@@ -48,9 +48,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **lord-vm**: `vfio-pci-nohotplug,sysfsdev=/sys/bus/mdev/devices/<uuid>,display=on,x-igd-opregion=on,xres,yres,
     romfile=/usr/lib/lordos/firmware/lordos-gvt-gop.rom` as the machine's only display, `-display dbus,gl=on` on the
     iGPU's render node, `-action reboot=shutdown` (a reset crashes a GVT-g guest) and Machines starts it again after a
-    guest restart (also the one reset of the first boot with a vGPU). QEMU's memlock: the machine's memory plus 512 MB;
-    lord-server raises the session's hard limit to the computer's memory before it drops root, only when an iGPU runs
-    GVT-g. QEMU's Landlock widens only for `/dev/vfio/vfio`, that vGPU's `/dev/vfio/<group>` and its sysfs folder (the
+    guest restart (also the one reset of the first boot with a vGPU). Its QEMU's locked-memory limit (VFIO pins
+    the guest's pages): the machine's memory plus 512 MB, set on that one process by a fifth closed admin action,
+    `vm-memlock "<pid>"` (root checks the pid is the caller's QEMU under the caller's lord-vm, running a vGPU the caller
+    made), within "Memory a machine may lock" (`gpu-memlock-cap`, `/etc/lordos/gpu-memlock.conf`; by default the
+    computer's memory less max(4 GB, 25 %), to a whole GB), shown and set in Settings → Graphics cards; the vCPUs wait
+    for it and the start ends after 30 s saying why; Configure → CPU & memory keeps such a machine's memory under it.
+    QEMU's Landlock widens only for `/dev/vfio/vfio`, that vGPU's `/dev/vfio/<group>` and its sysfs folder (the
     seccomp denylist already allows the VFIO ioctls); without Landlock's rules applied the machine doesn't start.
   - **lord-server**: Intel-tiled dmabufs (`I915_FORMAT_MOD_Y_TILED`) are imported on the iGPU's own render node in a
     second EGL context and read back, imports cached per buffer, with the desktop on another GPU or on the CPU path;

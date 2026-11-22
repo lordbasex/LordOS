@@ -1044,5 +1044,9 @@
   "win.gvtOff": "Ara cap targeta gràfica no es comparteix amb màquines (Configuració → Targetes gràfiques).",
   "win.gvtNone": "Totes les parts de la targeta gràfica estan en ús per altres màquines.",
   "win.gvtFailed": "No s’ha pogut donar la targeta gràfica a la màquina: {why}",
-  "close.noGpuSuspend": "Amb una targeta gràfica no es pot suspendre."
+  "close.noGpuSuspend": "Amb una targeta gràfica no es pot suspendre.",
+  "cfg.memlockNote": "Amb targeta gràfica, la memòria d’aquesta màquina queda reservada per a ella mentre funciona ({n} de {cap}).",
+  "cfg.memlockOver": "Amb targeta gràfica, la memòria d’aquesta màquina queda reservada per a ella mentre funciona, i {n} és més del que pot bloquejar una màquina ({cap}): no s’engegarà fins que no en redueixis la memòria o augmentis aquest límit.",
+  "cfg.memlockChange": "Canvia-ho a Configuració → Targetes gràfiques",
+  "win.gvtMemlock": "Aquesta màquina té {mem} de memòria, però una màquina amb targeta gràfica només pot bloquejar {cap} (Configuració → Targetes gràfiques)."
 }

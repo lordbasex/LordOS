@@ -877,6 +877,7 @@ static struct {
      * makes the picture's dmabufs), /dev/vfio/<group>, the picture's size, and whether the guest asked for a restart
      * (QEMU runs with -action reboot=shutdown: a reset is an exit, and Machines starts it again) */
     int vgpu, vgpu_group, vgpu_w, vgpu_h, vgpu_reset;
+    long long ml_wait;                  /* waiting for vm-memlock until then (ms), 0 not waiting */
     char vgpu_render[32], vgpu_dev[96];
     int notify_fd;
     int display_n;
@@ -1653,14 +1654,14 @@ static void decide_graphics(void) {
 #define GVT_ROM VMGPU_ROM
 #endif
 
-/* QEMU's memlock limit for a machine with a vGPU: VFIO pins the guest's pages the vGPU uses (about 50 MB idle, 200 MB
- * under 3D, measured 2026-11-21), counted against RLIMIT_MEMLOCK; the budget is the machine's memory plus 512 MB, never
- * above the hard limit lord-server's start raised for this session (vmgpu.h) */
-static rlim_t vgpu_memlock(void) {
+/* the locked memory QEMU needs with a vGPU: VFIO pins the guest pages the vGPU uses (about 50 MB idle, 200 MB under 3D,
+ * measured 2026-11-21), counted against QEMU's RLIMIT_MEMLOCK. Only root raises it (the hard limit is 8 MB): lord-server
+ * asks the admin helper's vm-memlock for this QEMU, which sets the machine's memory + 512 MB within the cap "Memory
+ * machines may lock"; until then the vCPUs don't run (vgpu_memlock_tick) */
+static rlim_t vgpu_memlock(void) { return ((rlim_t)S.m.memory_mb + VMGPU_MEMLOCK_EXTRA_MB) << 20; }
+static int vgpu_memlock_ok(void) {
     struct rlimit rl;
-    rlim_t want = ((rlim_t)S.m.memory_mb + 512) << 20;
-    if (getrlimit(RLIMIT_MEMLOCK, &rl)) return 0;
-    return rl.rlim_max != RLIM_INFINITY && rl.rlim_max < want ? rl.rlim_max : want;
+    return S.qemu > 0 && !prlimit(S.qemu, RLIMIT_MEMLOCK, NULL, &rl) && (rl.rlim_cur == RLIM_INFINITY || rl.rlim_cur >= vgpu_memlock());
 }
 
 /* machine.json asks for a vGPU: the mdev Machines asked the admin helper for (vm-gvt-create, named after the machine's
@@ -1717,7 +1718,7 @@ static int decide_vgpu(void) {
     }
     S.vgpu = 1; S.vgpu_group = grp; S.vgpu_w = w; S.vgpu_h = h;
     snprintf(S.vgpu_dev, sizeof S.vgpu_dev, "%s", dev);
-    vlog("graphics card: Intel vGPU %s of %s (group %d), %dx%d, on %s; memlock %llu MB", S.m.id, parent + 1, grp, w, h, S.vgpu_render,
+    vlog("graphics card: Intel vGPU %s of %s (group %d), %dx%d, on %s; it locks %llu MB while it runs", S.m.id, parent + 1, grp, w, h, S.vgpu_render,
          (unsigned long long)(vgpu_memlock() >> 20));
     return 0;
 }
@@ -1985,6 +1986,7 @@ static void fail_start(const char *fmt, ...) {
 static int suspend_usable(char *err, size_t n);
 static const char *snap_devices(void);
 static void send_job(int kind, int status, int pct, const char *text);
+static void start_vcpus(void);
 static int start_machine(void) {
     VmHost h;
     vm_host_probe(&h);
@@ -2141,8 +2143,6 @@ static int start_machine(void) {
         VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
                          S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
                          S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL };
-        /* a vGPU: VFIO pins guest pages against this limit (vgpu_memlock); lowered and raised only up to the hard one */
-        if (S.vgpu) { rlim_t ml = vgpu_memlock(); struct rlimit rl = { ml, ml }; setrlimit(RLIMIT_MEMLOCK, &rl); }
         int mask = vm_jail_qemu(&j);
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
@@ -2197,6 +2197,20 @@ static int start_machine(void) {
     S.oom0 = read_oom_kills();
     qmp_do("query-version", NULL, P_VERSION, -1, 0, -1, -1);
     if (S.resuming) return 0;
+    /* a vGPU: its vCPUs run once QEMU may lock the machine's memory (vm-memlock, asked by lord-server) */
+    if (S.vgpu && !vgpu_memlock_ok()) {
+        S.ml_wait = now_ms() + 30000;
+        vlog("graphics card: waiting until this machine's memory may be locked (%llu MB)", (unsigned long long)(vgpu_memlock() >> 20));
+        /* run.json now names this QEMU: lord-server reads its pid from there for vm-memlock */
+        set_state(VS_STARTING, VR_NONE, 0, "waiting for the machine's memory to be locked");
+        return 0;
+    }
+    start_vcpus();
+    return 0;
+}
+
+/* the vCPUs of a fresh start: a snapshot's memory first, or paused, or running */
+static void start_vcpus(void) {
     if (S.loadvm[0]) {
         /* -loadvm would take the first snapshot-capable disk for the memory (the UEFI variables, which hold none): the
          * job names the system disk, before a vCPU runs; cont follows when it's done (snap_concluded) */
@@ -2206,11 +2220,22 @@ static int start_machine(void) {
         snprintf(S.snap_tag, sizeof S.snap_tag, "%s", S.loadvm);
         qmp_do("snapshot-load", a, P_SNAPJOB, -1, 0, -1, -1);
         send_job(VJ_REVERT, VJS_RUNNING, -1, S.loadvm);
-        return 0;
+        return;
     }                   /* the state goes in first (P_VERSION → begin_resume), then cont */
     if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "started paused");
     else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
-    return 0;
+}
+
+/* the loop's turn while a vGPU machine waits for its locked memory: on with the start, or ended after 30 s saying why */
+static void vgpu_memlock_tick(long long now) {
+    if (!S.ml_wait || S.qemu_done) return;
+    if (vgpu_memlock_ok()) { S.ml_wait = 0; vlog("graphics card: the machine's memory may be locked"); start_vcpus(); return; }
+    if (now < S.ml_wait) return;
+    S.ml_wait = 0;
+    fail_start("this machine's memory (%d MB + %d MB) couldn't be locked for its graphics card: Settings, Graphics cards, sets how much a machine may lock",
+               S.m.memory_mb, VMGPU_MEMLOCK_EXTRA_MB);
+    kill(S.qemu, SIGKILL);
+    S.killed = 1;
 }
 
 /* ---- requests ---- */
@@ -5371,6 +5396,7 @@ static void loop(void) {
         open_tick(now);
         wi_tick(now);
         host_stop_tick(now);
+        vgpu_memlock_tick(now);
         if (S.shut_deadline && now >= S.shut_deadline) {
             S.shut_deadline = 0;
             vlog("the guest didn't shut down in time: turning it off");

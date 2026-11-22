@@ -905,5 +905,8 @@
   "vm.gvtNone": "Aucune part de carte graphique n’est disponible pour les machines pour l’instant",
   "vm.gvtBusy": "La part de carte graphique de cette machine appartient à quelqu’un d’autre",
   "vm.gvtInUse": "Cette part de la carte graphique est encore utilisée par une machine en cours d’exécution",
-  "vm.gvtFailed": "La part de la carte graphique n’a pas pu être créée"
+  "vm.gvtFailed": "La part de la carte graphique n’a pas pu être créée",
+  "vm.memlockCap": "Cette machine verrouillerait {need} Mo, plus que les {cap} Mo qu’une machine avec carte graphique peut verrouiller (Réglages → Cartes graphiques)",
+  "vm.memlockRefused": "Impossible de verrouiller la mémoire de cette machine",
+  "gpu.memlockRange": "Cette quantité sort de ce que cet ordinateur permet aux machines de verrouiller"
 }

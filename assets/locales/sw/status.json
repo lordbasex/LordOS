@@ -169,5 +169,7 @@
   "gpu.roleSet": "Matumizi ya kadi ya michoro yamehifadhiwa ({card}): anzisha upya ili kutekeleza",
   "vm.gvtReady": "Sehemu ya kadi ya michoro iko tayari ({name})",
   "vm.gvtGone": "Sehemu ya kadi ya michoro imeondolewa",
-  "gpu.freqSet": "Masafa ya chini ya kadi ya michoro yamewekwa"
+  "gpu.freqSet": "Masafa ya chini ya kadi ya michoro yamewekwa",
+  "gpu.memlockSet": "Kumbukumbu ambayo mashine inaweza kufunga imehifadhiwa",
+  "vm.memlockSet": "Kumbukumbu ya mashine imefungwa"
 }

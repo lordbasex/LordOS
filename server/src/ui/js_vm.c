@@ -271,6 +271,35 @@ static void gvt_freq(int running) {
     at = now;
 }
 
+/* A machine with a vGPU starts with its vCPUs held until its QEMU may lock the machine's memory (lordvm.c,
+ * vgpu_memlock_tick): only root raises that limit, so the admin helper's vm-memlock does it for that one QEMU, which it
+ * checks itself (the caller's, under the caller's lord-vm, with that machine's vGPU) and caps (maintainer's decision
+ * 2026-11-21). Asked once per QEMU, from run.json's qemu_pid while the machine starts */
+static void gvt_memlock(const char *dir) {
+    static long sent[16];
+    static int next;
+    char p[PATH_MAX + 16], buf[2048];
+    snprintf(p, sizeof p, "%s/run.json", dir);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (n <= 0) return;
+    long qpid = 0;
+    JDoc d;
+    if (!json_parse(buf, (size_t)n, &d, NULL, 0)) {
+        const char *st = json_str(d.root, "state");
+        if (st && (!strcmp(st, "starting") || !strcmp(st, "running") || !strcmp(st, "paused"))) qpid = (long)json_num(d.root, "qemu_pid", 0);
+        json_free(&d);
+    }
+    if (qpid <= 1 || qpid > 999999999) return;
+    for (int i = 0; i < 16; i++) if (sent[i] == qpid) return;
+    char a[16];
+    snprintf(a, sizeof a, "%ld", qpid);
+    if (admin_fd() < 0 || admin_send("vm-memlock", a, strlen(a)) < 0) return;
+    sent[next] = qpid;
+    next = (next + 1) % 16;
+}
+
 /* gpus() → { gpus: [...], configured, restart } (vmgpu.h's vmgpu_json): Settings → Graphics cards and Machines'
  * Configure. The desktop's GPU is the card this process holds */
 static JSValue f_gpus(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -278,7 +307,7 @@ static JSValue f_gpus(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     VmGpu g[VMGPU_MAX];
     int n = vmgpu_list("", g, VMGPU_MAX);
     vmgpu_mark_desktop("", "/proc/self/fd", g, n);
-    char *j = vmgpu_json(g, n, vmgpu_configured(""));
+    char *j = vmgpu_json_full("", g, n, vmgpu_configured(""));
     if (!j) return JS_NULL;
     JSValue v = JS_ParseJSON(c, j, strlen(j), "<gpus>");
     free(j);
@@ -461,6 +490,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
                 unbridge_idle(&m, ss);
                 if (m.vgpu) {
                     gvt_idle(&m, ss);
+                    gvt_memlock(dir);
                     if (!strcmp(ss, "running") || !strcmp(ss, "paused") || !strcmp(ss, "starting")) gvt_running++;
                 }
                 JS_FreeCString(c, ss);
@@ -1235,6 +1265,7 @@ typedef struct {
     char errtail[400];
     char creds[PATH_MAX];               /* the first-boot settings file, removed once lord-vm read it */
     uint8_t *cur;                       /* the guest's pointer (VD_CURSOR) until there's a picture to give it to */
+    int vgpu;                           /* the machine has an Intel vGPU (gvt_memlock while it starts) */
     int windows;                        /* a Windows guest: its display driver draws the pointer into the picture until
                                          * it hands one over (viogpudo's HWCursor, 7.1.2) */
     int ptr_guest;                      /* machine.json "pointer": "guest": a shape QEMU still holds from before (a saved
@@ -1355,6 +1386,7 @@ static void init_sess(Sess *s, const char *dir) {
     if (!vm_machine_load(dir, &m, NULL, 0)) {
         s->snd_on = m.sound; s->snd_vol = m.volume; s->mic_allowed = m.microphone; snprintf(s->name, sizeof s->name, "%s", m.name);
         s->windows = m.devices == VM_DEV_WINDOWS;
+        s->vgpu = m.vgpu != VM_VGPU_NONE;
         s->ptr_guest = s->windows && m.pointer_guest;
         memcpy(s->snd_out, m.sound_out, sizeof s->snd_out);
         memcpy(s->snd_in, m.sound_in, sizeof s->snd_in);
@@ -2214,6 +2246,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     Sess *s = get(c, argv[0]);
     if (!s) return JS_NULL;
     from_vm(s);
+    if (s->vgpu && (s->state == VS_STARTING || s->state == VS_PAUSED)) gvt_memlock(s->dir);
     /* the picture's frames are read by lord-server's loop (js_vm_dispatch) and acknowledged after each paint
      * (js_vm_painted); this poll only reports the state */
     read_err(s);

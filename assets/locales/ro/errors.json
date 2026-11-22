@@ -906,5 +906,8 @@
   "vm.gvtNone": "Nicio porțiune de placă video nu este disponibilă acum pentru mașini",
   "vm.gvtBusy": "Porțiunea plăcii video a acelei mașini aparține altcuiva",
   "vm.gvtInUse": "Acea porțiune a plăcii video este încă folosită de o mașină pornită",
-  "vm.gvtFailed": "Porțiunea plăcii video nu a putut fi creată"
+  "vm.gvtFailed": "Porțiunea plăcii video nu a putut fi creată",
+  "vm.memlockCap": "Această mașină ar bloca {need} MB, mai mult decât cei {cap} MB pe care îi poate bloca o mașină cu placă video (Setări → Plăci video)",
+  "vm.memlockRefused": "Memoria acestei mașini nu a putut fi blocată",
+  "gpu.memlockRange": "Această cantitate depășește ce permite acest computer mașinilor să blocheze"
 }

@@ -905,5 +905,8 @@
   "vm.gvtNone": "Derzeit ist kein Grafikkarten-Anteil für Maschinen verfügbar",
   "vm.gvtBusy": "Der Grafikkarten-Anteil dieser Maschine gehört jemand anderem",
   "vm.gvtInUse": "Dieser Anteil der Grafikkarte wird noch von einer laufenden Maschine verwendet",
-  "vm.gvtFailed": "Der Anteil der Grafikkarte konnte nicht erstellt werden"
+  "vm.gvtFailed": "Der Anteil der Grafikkarte konnte nicht erstellt werden",
+  "vm.memlockCap": "Diese Maschine würde {need} MB sperren, mehr als die {cap} MB, die eine Maschine mit Grafikkarte sperren darf (Einstellungen → Grafikkarten)",
+  "vm.memlockRefused": "Der Arbeitsspeicher dieser Maschine konnte nicht gesperrt werden",
+  "gpu.memlockRange": "Dieser Wert liegt außerhalb dessen, was dieser Computer Maschinen zum Sperren erlaubt"
 }

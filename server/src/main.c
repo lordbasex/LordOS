@@ -42,7 +42,6 @@
 #include "kms.h"
 #include "drmcard.h"
 #include <sys/resource.h>
-#include "vm/vmgpu.h"
 #include "term/term.h"
 #include "ui/js.h"
 #include "ui/js_input.h"
@@ -2774,21 +2773,6 @@ int main(int argc, char **argv) {
      * up at boot) and net-restore only confirms; without it (a standalone lord-server) this
      * session's helper brings it up (see net_act_restore and docs/NETWORK.md) */
     else if (session_user) admin_send("net-restore", "", 0);
-    /* Machines' Intel vGPU (docs/MACHINES-GPU.md, Mode A): VFIO counts the guest pages a vGPU pins against QEMU's
-     * RLIMIT_MEMLOCK, which only root can raise above the hard limit (8 MB here). When an iGPU runs GVT-g, the session's
-     * hard limit becomes this computer's memory; the soft one stays, and only lord-vm raises it, for the QEMU of a machine
-     * with a vGPU, to that machine's memory plus 512 MB (vgpu_memlock in lordvm.c) */
-    if (session_user && geteuid() == 0) {
-        VmGpu gg[VMGPU_MAX];
-        int ng = vmgpu_list("", gg, VMGPU_MAX), on = 0;
-        for (int i = 0; i < ng; i++) on |= gg[i].gvt_on;
-        long pages = sysconf(_SC_PHYS_PAGES), psz = sysconf(_SC_PAGESIZE);
-        struct rlimit ml;
-        if (on && pages > 0 && psz > 0 && !getrlimit(RLIMIT_MEMLOCK, &ml) && ml.rlim_max != RLIM_INFINITY && ml.rlim_max < (rlim_t)pages * (rlim_t)psz) {
-            ml.rlim_max = (rlim_t)pages * (rlim_t)psz;
-            if (setrlimit(RLIMIT_MEMLOCK, &ml)) perror("lord-server: memlock for Machines' vGPU");
-        }
-    }
     int ok = drop_privileges(user) == 0;
     /* the log folder (lordlog.h): /var/log/lordos/users/<user>, which lord-sessiond made at login, or
      * ~/.cache/lordos; worked out once, here, before anything forks a child that opens a log */

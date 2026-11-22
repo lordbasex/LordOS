@@ -25,6 +25,22 @@ extern const char VMGPU_MODPROBE_TEXT[], VMGPU_MODLOAD_TEXT[];
  * iGPU's minimum frequency before gpu-min-freq first changed it: /run/lordos/vm-gvt/minfreq-<pci address> */
 #define VMGPU_RUN "/run/lordos/vm-gvt"
 
+/* "Memory machines may lock" (maintainer's decision 2026-11-21): a machine with a vGPU has its memory locked while it runs
+ * (VFIO pins its pages), its memory + 512 MB set on its own QEMU by vm-memlock, never above this cap. gpu-memlock-cap
+ * writes it ("cap_mb=<N>\n") or removes it (the default: total - max(4 GB, 25 %), down to a whole GB). Range 2048 MB to
+ * total - 2048 MB */
+#define VMGPU_MEMLOCK_CONF "/etc/lordos/gpu-memlock.conf"
+#define VMGPU_MEMLOCK_EXTRA_MB 512
+#define VMGPU_MEMLOCK_MIN_MB 2048
+long vmgpu_total_mb(const char *root);                 /* MemTotal of <root>/proc/meminfo, MB; 0 unknown */
+long vmgpu_memlock_default_mb(long total_mb);
+/* the cap in effect (the file's, when valid for this total, else the default); *custom 1 when the file set it */
+long vmgpu_memlock_cap_mb(const char *root, long total_mb, int *custom);
+/* gpu-memlock-cap's argument, "<MB>" or "default" (*mb 0). 0 ok (the range is checked against the total apart) */
+int vmgpu_memlock_arg(const char *arg, size_t len, long *mb);
+/* vm-memlock's, "<pid>". 0 ok */
+int vmgpu_pid_arg(const char *arg, size_t len, int *pid);
+
 /* our GVT-g GOP option ROM (firmware/gvt-gop), from the signed package */
 #define VMGPU_ROM "/usr/lib/lordos/firmware/lordos-gvt-gop.rom"
 
@@ -94,5 +110,7 @@ int vmgpu_configured(const char *root);
  * "types": [{ "name", "lowMb", "highMb", "maxW", "maxH", "weight", "available" }] }], "configured":
  * "unused"|"machines-shared", "restart": bool }. malloc'd, NULL on out of memory */
 char *vmgpu_json(const VmGpu *g, int n, int configured);
+/* the same with "memlock": { "capMb", "defaultMb", "totalMb", "minMb", "maxMb", "custom" } read under root */
+char *vmgpu_json_full(const char *root, const VmGpu *g, int n, int configured);
 
 #endif

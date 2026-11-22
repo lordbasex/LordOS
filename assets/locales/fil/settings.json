@@ -768,5 +768,13 @@
   "gpus.restartHint": "Magkakabisa ang bagong gamit ng graphics card pagkatapos mag-restart.",
   "gpus.restartNow": "I-restart Ngayon",
   "gpus.applying": "Inilalapat… maaari itong tumagal nang isang minuto.",
-  "gpus.needAdmin": "Administrator lang ang makapagpapalit kung para saan ginagamit ang isang graphics card."
+  "gpus.needAdmin": "Administrator lang ang makapagpapalit kung para saan ginagamit ang isang graphics card.",
+  "gpus.memlock": "Memory na puwedeng i-lock ng isang makina",
+  "gpus.memlockCap": "Pinakamarami para sa isang makina",
+  "gpus.memlockHint": "Ang makinang may graphics card ay nagpapanatili ng memory nito sa RAM habang tumatakbo (hindi ito maililipat sa swap). Ito ang pinakamaraming puwedeng i-lock ng ganoong makina; itakda ito para sapat pa sa kanya ang natitira sa {total} ng computer na ito. Agad na nalalapat ang pagbabago.",
+  "gpus.memlockRecommended": "Inirerekomenda",
+  "gpus.memlockDefault": "Inirerekomenda: {n}",
+  "gpus.memlockApply": "Ilapat",
+  "gpus.memlockUseDefault": "Gamitin ang inirerekomenda",
+  "gpus.gb": "{n} GB"
 }

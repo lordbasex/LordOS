@@ -169,5 +169,7 @@
   "gpu.roleSet": "Qrafik kartın istifadəsi saxlanıldı ({card}): tətbiq etmək üçün yenidən başladın",
   "vm.gvtReady": "Qrafik kart payı hazırdır ({name})",
   "vm.gvtGone": "Qrafik kart payı silindi",
-  "gpu.freqSet": "Qrafik kartın minimum tezliyi təyin edildi"
+  "gpu.freqSet": "Qrafik kartın minimum tezliyi təyin edildi",
+  "gpu.memlockSet": "Maşının kilidləyə biləcəyi yaddaş saxlanıldı",
+  "vm.memlockSet": "Maşının yaddaşı kilidləndi"
 }

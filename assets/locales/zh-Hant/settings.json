@@ -761,5 +761,13 @@
   "gpus.restartHint": "顯示卡的新用途會在重新啟動後生效。",
   "gpus.restartNow": "立即重新啟動",
   "gpus.applying": "正在套用…可能需要一分鐘。",
-  "gpus.needAdmin": "只有管理員可以變更顯示卡的用途。"
+  "gpus.needAdmin": "只有管理員可以變更顯示卡的用途。",
+  "gpus.memlock": "虛擬機器可鎖定的記憶體",
+  "gpus.memlockCap": "單台虛擬機器最多可鎖定",
+  "gpus.memlockHint": "有顯示卡的虛擬機器在執行時會把記憶體保留在 RAM 中（無法換出）。這是單台這類虛擬機器最多可鎖定的量；請設定成讓這部電腦 {total} 中剩下的部分足夠它使用。變更會立即生效。",
+  "gpus.memlockRecommended": "建議",
+  "gpus.memlockDefault": "建議：{n}",
+  "gpus.memlockApply": "套用",
+  "gpus.memlockUseDefault": "使用建議值",
+  "gpus.gb": "{n} GB"
 }

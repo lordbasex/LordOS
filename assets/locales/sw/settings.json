@@ -768,5 +768,13 @@
   "gpus.restartHint": "Matumizi mapya ya kadi ya michoro yanaanza kufanya kazi baada ya kuwasha upya.",
   "gpus.restartNow": "Washa Upya Sasa",
   "gpus.applying": "Inatekeleza… hii inaweza kuchukua dakika moja.",
-  "gpus.needAdmin": "Ni msimamizi pekee anayeweza kubadilisha matumizi ya kadi ya michoro."
+  "gpus.needAdmin": "Ni msimamizi pekee anayeweza kubadilisha matumizi ya kadi ya michoro.",
+  "gpus.memlock": "Kumbukumbu ambayo mashine inaweza kufunga",
+  "gpus.memlockCap": "Kiwango cha juu kwa mashine moja",
+  "gpus.memlockHint": "Mashine yenye kadi ya michoro huweka kumbukumbu yake kwenye RAM inapoendesha (haiwezi kuhamishiwa swap). Hiki ndicho kiwango cha juu ambacho mashine moja kama hiyo inaweza kufunga; kiweke ili sehemu iliyobaki ya {total} ya kompyuta hii itoshe. Mabadiliko yanaanza kutumika mara moja.",
+  "gpus.memlockRecommended": "Inapendekezwa",
+  "gpus.memlockDefault": "Inapendekezwa: {n}",
+  "gpus.memlockApply": "Tumia",
+  "gpus.memlockUseDefault": "Tumia kinachopendekezwa",
+  "gpus.gb": "GB {n}"
 }

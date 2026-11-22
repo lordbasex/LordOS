@@ -160,5 +160,7 @@
   "gpu.roleSet": "已保存显卡的用途（{card}）：重新启动后生效",
   "vm.gvtReady": "显卡份额已就绪（{name}）",
   "vm.gvtGone": "已移除显卡份额",
-  "gpu.freqSet": "已设置显卡的最低频率"
+  "gpu.freqSet": "已设置显卡的最低频率",
+  "gpu.memlockSet": "已保存虚拟机可锁定的内存",
+  "vm.memlockSet": "已锁定虚拟机的内存"
 }

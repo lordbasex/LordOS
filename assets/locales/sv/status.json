@@ -169,5 +169,7 @@
   "gpu.roleSet": "Grafikkortets användning sparad ({card}): starta om för att tillämpa",
   "vm.gvtReady": "Grafikkortsandel klar ({name})",
   "vm.gvtGone": "Grafikkortsandel borttagen",
-  "gpu.freqSet": "Grafikkortets lägsta frekvens inställd"
+  "gpu.freqSet": "Grafikkortets lägsta frekvens inställd",
+  "gpu.memlockSet": "Minne som en maskin får låsa sparat",
+  "vm.memlockSet": "Maskinens minne låst"
 }

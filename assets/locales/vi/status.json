@@ -160,5 +160,7 @@
   "gpu.roleSet": "Đã lưu cách dùng card đồ họa ({card}): khởi động lại để áp dụng",
   "vm.gvtReady": "Phần card đồ họa đã sẵn sàng ({name})",
   "vm.gvtGone": "Đã gỡ phần card đồ họa",
-  "gpu.freqSet": "Đã đặt tần số tối thiểu của card đồ họa"
+  "gpu.freqSet": "Đã đặt tần số tối thiểu của card đồ họa",
+  "gpu.memlockSet": "Đã lưu bộ nhớ một máy được phép khóa",
+  "vm.memlockSet": "Đã khóa bộ nhớ của máy"
 }

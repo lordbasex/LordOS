@@ -768,5 +768,13 @@
   "gpus.restartHint": "El nou ús de la targeta gràfica s’aplica després de reiniciar.",
   "gpus.restartNow": "Reinicia ara",
   "gpus.applying": "S’està aplicant… pot trigar un minut.",
-  "gpus.needAdmin": "Només un administrador pot canviar per a què es fa servir una targeta gràfica."
+  "gpus.needAdmin": "Només un administrador pot canviar per a què es fa servir una targeta gràfica.",
+  "gpus.memlock": "Memòria que pot bloquejar una màquina",
+  "gpus.memlockCap": "Màxim que pot bloquejar una màquina",
+  "gpus.memlockHint": "Una màquina amb targeta gràfica manté la memòria a la RAM mentre funciona (no es pot moure a l’intercanvi). Aquest és el màxim que pot bloquejar una màquina així; tria’l perquè la resta dels {total} d’aquest ordinador n’hi tingui prou. El canvi s’aplica de seguida.",
+  "gpus.memlockRecommended": "Recomanat",
+  "gpus.memlockDefault": "Recomanat: {n}",
+  "gpus.memlockApply": "Aplica",
+  "gpus.memlockUseDefault": "Usa el recomanat",
+  "gpus.gb": "{n} GB"
 }

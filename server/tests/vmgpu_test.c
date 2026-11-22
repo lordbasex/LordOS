@@ -20,6 +20,11 @@
 
 extern const char *vmgpu_admin_root, *vmgpu_admin_fd_dir;
 extern int (*vmgpu_admin_initramfs)(void);
+#include <sys/resource.h>
+extern int (*vmgpu_admin_prlimit)(pid_t pid, const struct rlimit *rl);
+static pid_t pl_pid;
+static rlim_t pl_cur, pl_max;
+static int fake_prlimit(pid_t pid, const struct rlimit *rl) { pl_pid = pid; pl_cur = rl->rlim_cur; pl_max = rl->rlim_max; return 0; }
 
 static int fails, checks;
 #define CHECK(c, ...) do { checks++; if (!(c)) { fails++; fprintf(stderr, "FAIL %s:%d: ", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); } } while (0)
@@ -354,6 +359,108 @@ static void test_actions(void) {
     waitpid(kernel_pid, NULL, 0);
 }
 
+static void test_memlock(void) {
+    AdminReq req = { .id = 1, .user = "t", .home = "/tmp", .uid = getuid(), .gid = getgid(), .admin = 1 };
+    AdminReq other = req;
+    other.uid = req.uid + 1;
+    vmgpu_admin_prlimit = fake_prlimit;
+    char t[1024];
+    /* the default cap: total - max(4 GB, 25 %), down to a whole GB */
+    CHECK(vmgpu_memlock_default_mb(32768) == 24576 && vmgpu_memlock_default_mb(16384) == 12288 && vmgpu_memlock_default_mb(8192) == 4096 &&
+          vmgpu_memlock_default_mb(6000) == 2048 && vmgpu_memlock_default_mb(65536 + 700) == 49152, "default caps");
+    long mb;
+    int pid;
+    CHECK(!vmgpu_memlock_arg("8192", 4, &mb) && mb == 8192 && !vmgpu_memlock_arg("default", 7, &mb) && mb == 0, "cap args");
+    CHECK(vmgpu_memlock_arg("08192", 5, &mb) && vmgpu_memlock_arg("-1", 2, &mb) && vmgpu_memlock_arg("8 GB", 4, &mb) && vmgpu_memlock_arg("", 0, &mb), "bad cap args");
+    CHECK(!vmgpu_pid_arg("4242", 4, &pid) && pid == 4242 && vmgpu_pid_arg("1", 1, &pid) && vmgpu_pid_arg("0", 1, &pid) && vmgpu_pid_arg("12 3", 4, &pid) &&
+          vmgpu_pid_arg("-5", 2, &pid) && vmgpu_pid_arg("1234567890", 10, &pid), "pid args");
+    /* gpu-memlock-cap, 32 GB of memory */
+    put("proc/meminfo", "MemTotal:       32768000 kB\nMemFree: 1 kB\n");
+    long total = vmgpu_total_mb(root);
+    CHECK(total == 32000, "total %ld", total);
+    int custom = 1;
+    CHECK(vmgpu_memlock_cap_mb(root, total, &custom) == vmgpu_memlock_default_mb(total) && !custom, "no file: default");
+    ACT(vm_act_gpu_memlock_cap, "1024");
+    CHECK(err("gpu.memlockRange"), "below 2 GB: %s", last);
+    ACT(vm_act_gpu_memlock_cap, "31000");
+    CHECK(err("gpu.memlockRange"), "above total - 2 GB: %s", last);
+    ACT(vm_act_gpu_memlock_cap, "8192");
+    get("etc/lordos/gpu-memlock.conf", t, sizeof t);
+    CHECK(ok("gpu.memlockSet") && !strcmp(t, "cap_mb=8192\n") && vmgpu_memlock_cap_mb(root, total, &custom) == 8192 && custom, "set 8 GB: %s", t);
+    char *j = vmgpu_json_full(root, NULL, 0, VMGPU_ROLE_UNUSED);
+    CHECK(j && strstr(j, "\"memlock\":{\"capMb\":8192,") && strstr(j, "\"custom\":true}}") && strstr(j, "\"totalMb\":32000"), "json: %s", j ? j : "");
+    free(j);
+    put("etc/lordos/gpu-memlock.conf", "cap_mb=99999\n");
+    CHECK(vmgpu_memlock_cap_mb(root, total, &custom) == vmgpu_memlock_default_mb(total) && !custom, "a value out of range counts as the default");
+    ACT(vm_act_gpu_memlock_cap, "default");
+    CHECK(ok("gpu.memlockSet") && !exists("etc/lordos/gpu-memlock.conf"), "default removes");
+    ACT(vm_act_gpu_memlock_cap, "8192");
+
+    /* vm-memlock: a real child stands for QEMU (its pidfd), its /proc under the fake root */
+    pid_t q = fork();
+    if (!q) { pause(); _exit(0); }
+    char st[256], rel[128];
+    snprintf(st, sizeof st, "Name:\tqemu\nPPid:\t5151\nUid:\t%u\t%u\t%u\t%u\n", (unsigned)req.uid, (unsigned)req.uid, (unsigned)req.uid, (unsigned)req.uid);
+    snprintf(rel, sizeof rel, "proc/%d/status", (int)q); put(rel, st);
+    snprintf(rel, sizeof rel, "proc/%d/exe", (int)q); lnk(rel, "/usr/bin/qemu-system-x86_64");
+    snprintf(st, sizeof st, "Name:\tlord-vm\nPPid:\t1\nUid:\t%u\t%u\t%u\t%u\n", (unsigned)req.uid, (unsigned)req.uid, (unsigned)req.uid, (unsigned)req.uid);
+    put("proc/5151/status", st);
+    lnk("proc/5151/exe", "/usr/lib/lordos/bin/lord-vm");
+    /* QEMU's command line: NUL-separated */
+    static const char cl[] = "/usr/bin/qemu-system-x86_64\0-uuid\0" ID1 "\0-m\0" "4096\0-device\0vfio-pci-nohotplug,id=video0,sysfsdev=/sys/bus/mdev/devices/" ID1 ",display=on\0";
+    char clp[1100];
+    snprintf(clp, sizeof clp, "%s/proc/%d/cmdline", root, (int)q);
+    FILE *f = fopen(clp, "w");
+    if (f) { fwrite(cl, 1, sizeof cl - 1, f); fclose(f); }
+    /* the vGPU: root's note and the mdev */
+    mk("sys/kernel/iommu_groups/16");
+    mk("sys/bus/mdev/devices/" ID1);
+    lnk("sys/bus/mdev/devices/" ID1 "/iommu_group", "../../../../kernel/iommu_groups/16");
+    snprintf(st, sizeof st, "%u\n", (unsigned)req.uid);
+    put("run/lordos/vm-gvt/" ID1, st);
+    char a[16];
+    snprintf(a, sizeof a, "%d", (int)q);
+    pl_pid = 0;
+    ACT(vm_act_memlock, a);
+    CHECK(ok("vm.memlockSet") && pl_pid == q && pl_cur == (rlim_t)4608 << 20 && pl_max == pl_cur, "set 4096 + 512 MB: %s", last);
+    /* above the cap */
+    ACT(vm_act_gpu_memlock_cap, "4096");
+    pl_pid = 0;
+    ACT(vm_act_memlock, a);
+    CHECK(err("vm.memlockCap") && strstr(last, "need=4608") && strstr(last, "cap=4096") && !pl_pid, "cap: %s", last);
+    ACT(vm_act_gpu_memlock_cap, "8192");
+    /* someone else's QEMU, another binary, another parent, no vGPU, another's vGPU: refused, nothing set */
+    last[0] = 0; vm_act_memlock(&other, a, strlen(a));
+    CHECK(err("vm.memlockRefused") && !pl_pid, "another user's: %s", last);
+    snprintf(rel, sizeof rel, "proc/%d/exe", (int)q); lnk(rel, "/home/x/qemu-system-x86_64");
+    ACT(vm_act_memlock, a);
+    CHECK(err("vm.memlockRefused") && !pl_pid, "not the system's QEMU: %s", last);
+    lnk(rel, "/usr/bin/qemu-system-x86_64");
+    lnk("proc/5151/exe", "/usr/bin/bash");
+    ACT(vm_act_memlock, a);
+    CHECK(err("vm.memlockRefused") && !pl_pid, "parent not lord-vm: %s", last);
+    lnk("proc/5151/exe", "/usr/lib/lordos/bin/lord-vm");
+    put("run/lordos/vm-gvt/" ID1, "99999\n");
+    ACT(vm_act_memlock, a);
+    CHECK(err("vm.memlockRefused") && !pl_pid, "another's vGPU: %s", last);
+    snprintf(st, sizeof st, "%u\n", (unsigned)req.uid);
+    put("run/lordos/vm-gvt/" ID1, st);
+    static const char cl2[] = "/usr/bin/qemu-system-x86_64\0-uuid\0" ID1 "\0-m\0" "4096\0-device\0vfio-pci-nohotplug,sysfsdev=/sys/bus/mdev/devices/" ID2 ",display=on\0";
+    f = fopen(clp, "w");
+    if (f) { fwrite(cl2, 1, sizeof cl2 - 1, f); fclose(f); }
+    ACT(vm_act_memlock, a);
+    CHECK(err("vm.memlockRefused") && !pl_pid, "the vGPU of another machine: %s", last);
+    f = fopen(clp, "w");
+    if (f) { fwrite(cl, 1, sizeof cl - 1, f); fclose(f); }
+    ACT(vm_act_memlock, "4242 x");
+    CHECK(err("admin.invalidArgument"), "bad arg: %s", last);
+    /* a QEMU that ended */
+    kill(q, SIGKILL);
+    waitpid(q, NULL, 0);
+    ACT(vm_act_memlock, a);
+    CHECK(err("vm.memlockRefused") && !pl_pid, "ended: %s", last);
+}
+
 int main(void) {
     snprintf(root, sizeof root, "/tmp/vmgpu-test-XXXXXX");
     const char *tmp = getenv("TMPDIR");
@@ -363,6 +470,7 @@ int main(void) {
     test_parsers();
     test_list();
     test_actions();
+    test_memlock();
     char cmd[700];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", root);
     if (system(cmd)) {}

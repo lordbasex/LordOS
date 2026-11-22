@@ -856,6 +856,14 @@ export function gvtType(gpu, choice, resolution, free = false) {
 export const gvtArg = (m, type) => (m?.id && type?.name ? `${m.id} ${type.name}` : '');
 // a machine that can't be suspended or keep snapshots with its memory: 3D (virgl) running, or a graphics card
 export const noSuspend = (st, gpu) => !!gpu || runs3d(st);
+// a machine with a graphics card has its memory locked while it runs (VFIO): its memory plus QEMU's 512 MB, in MB
+export const MEMLOCK_EXTRA_MB = 512;
+export const memlockNeed = (m) => ((m?.memoryMb | 0) > 0 ? (m.memoryMb | 0) + MEMLOCK_EXTRA_MB : 0);
+// whether that fits "Memory machines may lock" (lord.vm.gpus().memlock.capMb); true when the cap isn't known
+export const memlockFits = (m, memlock) => !(memlock && memlock.capMb > 0) || memlockNeed(m) <= memlock.capMb;
+// the largest memory (MB, a multiple of step) a machine with a graphics card may have under that cap; Infinity when unknown
+export const memlockMaxMemory = (memlock, step = 256) => (memlock && memlock.capMb > 0
+  ? Math.floor(Math.max(0, memlock.capMb - MEMLOCK_EXTRA_MB) / step) * step : Infinity);
 // the summary line of Configure's Network section
 export function netSummary(m) {
   const n = NET_MODES.includes(m?.network) ? m.network : 'shared';

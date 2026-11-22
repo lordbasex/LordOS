@@ -1044,5 +1044,9 @@
   "win.gvtOff": "Żadna karta graficzna nie jest teraz współdzielona z maszynami (Ustawienia → Karty graficzne).",
   "win.gvtNone": "Wszystkie części karty graficznej są używane przez inne maszyny.",
   "win.gvtFailed": "Nie udało się przydzielić karty graficznej maszynie: {why}",
-  "close.noGpuSuspend": "Z kartą graficzną nie można jej uśpić."
+  "close.noGpuSuspend": "Z kartą graficzną nie można jej uśpić.",
+  "cfg.memlockNote": "Z kartą graficzną pamięć tej maszyny jest dla niej zarezerwowana, dopóki działa ({n} z {cap}).",
+  "cfg.memlockOver": "Z kartą graficzną pamięć tej maszyny jest dla niej zarezerwowana, dopóki działa, a {n} to więcej, niż jedna maszyna może zablokować ({cap}): nie uruchomi się, dopóki nie zmniejszysz jej pamięci lub nie podniesiesz tego limitu.",
+  "cfg.memlockChange": "Zmień w Ustawienia → Karty graficzne",
+  "win.gvtMemlock": "Ta maszyna ma {mem} pamięci, ale maszyna z kartą graficzną może zablokować tylko {cap} (Ustawienia → Karty graficzne)."
 }

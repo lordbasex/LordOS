@@ -1044,5 +1044,9 @@
   "win.gvtOff": "Nicio placă video nu este partajată acum cu mașinile (Setări → Plăci video).",
   "win.gvtNone": "Toate porțiunile plăcii video sunt folosite de alte mașini.",
   "win.gvtFailed": "Placa video nu a putut fi atribuită mașinii: {why}",
-  "close.noGpuSuspend": "Cu o placă video nu poate fi suspendată."
+  "close.noGpuSuspend": "Cu o placă video nu poate fi suspendată.",
+  "cfg.memlockNote": "Cu o placă video, memoria acestei mașini îi este rezervată cât timp rulează ({n} din {cap}).",
+  "cfg.memlockOver": "Cu o placă video, memoria acestei mașini îi este rezervată cât timp rulează, iar {n} depășește cât poate bloca o mașină ({cap}): nu va porni până nu îi micșorați memoria sau nu măriți acea limită.",
+  "cfg.memlockChange": "Modificați în Setări → Plăci video",
+  "win.gvtMemlock": "Această mașină are {mem} de memorie, dar o mașină cu placă video poate bloca doar {cap} (Setări → Plăci video)."
 }

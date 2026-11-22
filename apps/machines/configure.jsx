@@ -4,7 +4,7 @@
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, PROFILES, profileSize, profileOf, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds } from './model.js';
+  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
@@ -248,7 +248,13 @@ export function Configure({ dir, section: section0, onClose }) {
     {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}
   </>;
   else if (sec === 'cpu') {
-    const cpus = host?.cpus || m.vcpus, memMax = host?.memMaxMb || m.memoryMb;
+    const memMax0 = host?.memMaxMb || m.memoryMb;
+    // a machine with a graphics card has its memory locked while it runs, within "Memory machines may lock" (Settings →
+    // Graphics cards): the slider stops where memory + 512 MB reaches that cap (a machine already over it keeps its value)
+    const memlock = cur.gpu ? gpus?.memlock || null : null;
+    const lockMax = memlock ? memlockMaxMemory(memlock) : Infinity;
+    const cpus = host?.cpus || m.vcpus, memMax = Math.max(Math.min(memMax0, lockMax), Math.min(m.memoryMb, memMax0), 256);
+    const lockOver = memlock && !memlockFits({ memoryMb: cur.memoryMb }, memlock);
     pane = <>
       <Group>
         <Row label={tr('machines.cfg.cores')} value={tr('machines.cfg.ofN', { a: cur.vcpus, b: cpus })}>
@@ -265,7 +271,12 @@ export function Configure({ dir, section: section0, onClose }) {
         </Row>
       </Group>
       <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
-        {tr('machines.cfg.cpuNote', { limit: gb(memLimit({ ...m, ...cur })), max: gb(memMax) })}{offNote ? ` ${offNote}` : ''}</Text>
+        {tr('machines.cfg.cpuNote', { limit: gb(memLimit({ ...m, ...cur })), max: gb(memMax0) })}{offNote ? ` ${offNote}` : ''}</Text>
+      {memlock ? <View style={{ gap: 8, alignItems: 'flex-start' }}>
+        <Text style={{ fontSize: 12, lineHeight: 1.5, color: lockOver ? '#ff9f0a' : p.dim, textAlign: 'start' }}>
+          {tr(lockOver ? 'machines.cfg.memlockOver' : 'machines.cfg.memlockNote', { n: gb(memlockNeed({ memoryMb: cur.memoryMb })), cap: gb(memlock.capMb) })}</Text>
+        <Btn label={tr('machines.cfg.memlockChange')} onClick={() => wm.open('settings', { args: { section: 'gpus', nonce: Date.now() } })} />
+      </View> : null}
       {cur.vcpus > (host?.vcpusRecommended || 99) ? <Text style={{ fontSize: 12, color: '#ff9f0a', textAlign: 'start' }}>{tr('machines.new.warn.vcpus', { n: host.vcpusRecommended })}</Text> : null}
     </>;
   } else if (sec === 'display') {

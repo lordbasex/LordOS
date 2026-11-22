@@ -169,5 +169,7 @@
   "gpu.roleSet": "Graphics card's use saved ({card}): restart to apply",
   "vm.gvtReady": "Graphics card share ready ({name})",
   "vm.gvtGone": "Graphics card share removed",
-  "gpu.freqSet": "Graphics card's minimum frequency set"
+  "gpu.freqSet": "Graphics card's minimum frequency set",
+  "gpu.memlockSet": "Memory a machine may lock saved",
+  "vm.memlockSet": "Machine's memory locked"
 }

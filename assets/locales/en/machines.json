@@ -1044,5 +1044,9 @@
   "win.gvtOff": "No graphics card is shared with machines now (Settings → Graphics cards).",
   "win.gvtNone": "Every share of the graphics card is in use by other machines.",
   "win.gvtFailed": "The graphics card couldn't be given to the machine: {why}",
-  "close.noGpuSuspend": "With a graphics card it can't be suspended."
+  "close.noGpuSuspend": "With a graphics card it can't be suspended.",
+  "cfg.memlockNote": "With a graphics card, this machine's memory is reserved for it while it runs ({n} of {cap}).",
+  "cfg.memlockOver": "With a graphics card, this machine's memory is reserved for it while it runs, and {n} is more than one machine may lock ({cap}): it won't start until you lower its memory or raise that limit.",
+  "cfg.memlockChange": "Change in Settings → Graphics cards",
+  "win.gvtMemlock": "This machine has {mem} of memory, but a machine with a graphics card may lock only {cap} (Settings → Graphics cards)."
 }

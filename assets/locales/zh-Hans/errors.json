@@ -904,5 +904,8 @@
   "vm.gvtNone": "目前没有可供虚拟机使用的显卡份额",
   "vm.gvtBusy": "该机器的显卡份额属于其他人",
   "vm.gvtInUse": "该显卡份额仍被一台正在运行的机器使用",
-  "vm.gvtFailed": "无法创建显卡份额"
+  "vm.gvtFailed": "无法创建显卡份额",
+  "vm.memlockCap": "这台虚拟机将锁定 {need} MB，超过带显卡的虚拟机可锁定的 {cap} MB（设置 → 显卡）",
+  "vm.memlockRefused": "无法锁定这台虚拟机的内存",
+  "gpu.memlockRange": "该数量超出了这台电脑允许虚拟机锁定的范围"
 }

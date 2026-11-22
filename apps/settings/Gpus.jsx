@@ -4,7 +4,7 @@
 // gpu-role writes LordOS's fixed module files and the initramfs, and the change takes effect after a restart. Other
 // spare cards get no option yet (Machines: dedicated comes later). lord.vm.gpus() is read here; root checks everything
 // again (vmgpu_admin.c).
-import { View, Text, useTheme, useLocale, Segmented, Button, admin, session, useSystemInfo, spacing, typeScale } from '@lordos/sdk';
+import { View, Text, useTheme, useLocale, Segmented, Button, Stepper, admin, session, useSystemInfo, spacing, typeScale } from '@lordos/sdk';
 import { useState } from 'react';
 import { GroupBox, SettingRow, ValueRow, Note, Stack, StatusDot, tint } from './ui.jsx';
 
@@ -25,6 +25,36 @@ export function gpuKind(g) {
   if (g.desktop) return 'desktop';
   if (g.vendor === INTEL) return g.gvtCapable ? 'shared' : 'noGvt';
   return 'later';
+}
+
+// "Memory machines may lock" (maintainer, 2026-11-21): a machine with a graphics card has its memory locked in RAM while
+// it runs (VFIO), and all such machines together stay within this cap. gpu-memlock-cap writes it (or "default" removes
+// it); it applies at once. memlock: lord.vm.gpus()'s { capMb, defaultMb, totalMb, minMb, maxMb, custom }
+function MemlockBox({ memlock, isAdmin, onDone }) {
+  const { t: tr } = useLocale();
+  const minGb = Math.ceil((memlock.minMb | 0) / 1024), maxGb = Math.max(minGb, Math.floor((memlock.maxMb | 0) / 1024));
+  const capGb = Math.floor((memlock.capMb | 0) / 1024), defGb = Math.floor((memlock.defaultMb | 0) / 1024);
+  const [want, setWant] = useState(null);       // the value being chosen, in GB; null: the current cap
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const shown = want ?? capGb;
+  const run = (arg) => {
+    setBusy(true);
+    setErr('');
+    admin.run('gpu-memlock-cap', arg, null, { quiet: true }).then(() => setWant(null), (e) => setErr(e.message))
+      .finally(() => { setBusy(false); onDone(); });
+  };
+  const gb = (n) => tr('settings.gpus.gb', { n });
+  return (
+    <GroupBox title={tr('settings.gpus.memlock')} footer={err || tr('settings.gpus.memlockHint', { total: gb(Math.round((memlock.totalMb | 0) / 1024)) })}>
+      <SettingRow label={tr('settings.gpus.memlockCap')} hint={shown === defGb ? tr('settings.gpus.memlockRecommended') : tr('settings.gpus.memlockDefault', { n: gb(defGb) })}
+        disabled={!isAdmin || busy}>
+        <Stepper value={shown} min={minGb} max={maxGb} step={1} width={80} format={gb} onChange={(v) => isAdmin && setWant(v)} />
+        {want != null && want !== capGb ? <Button small primary label={tr('settings.gpus.memlockApply')} disabled={!isAdmin || busy} onClick={() => run(String(want * 1024))} /> : null}
+        {memlock.custom ? <Button small label={tr('settings.gpus.memlockUseDefault')} disabled={!isAdmin || busy} onClick={() => run('default')} /> : null}
+      </SettingRow>
+    </GroupBox>
+  );
 }
 
 export function GpusSettings() {
@@ -99,6 +129,7 @@ export function GpusSettings() {
           </GroupBox>
         );
       })}
+      {r.memlock && gpus.some((g) => gpuKind(g) === 'shared') ? <MemlockBox memlock={r.memlock} isAdmin={isAdmin} onDone={() => setR(readGpus())} /> : null}
       {!isAdmin && gpus.some((g) => gpuKind(g) === 'shared') ? <Note>{tr('settings.gpus.needAdmin')}</Note> : null}
       {msg ? <Note tone={msg.ok ? 'ok' : 'error'}>{msg.text}</Note> : null}
     </Stack>

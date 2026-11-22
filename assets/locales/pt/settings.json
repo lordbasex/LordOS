@@ -768,5 +768,13 @@
   "gpus.restartHint": "O novo uso da placa de vídeo passa a valer depois de reiniciar.",
   "gpus.restartNow": "Reiniciar agora",
   "gpus.applying": "Aplicando… isso pode levar um minuto.",
-  "gpus.needAdmin": "Só um administrador pode mudar para que uma placa de vídeo é usada."
+  "gpus.needAdmin": "Só um administrador pode mudar para que uma placa de vídeo é usada.",
+  "gpus.memlock": "Memória que uma máquina pode bloquear",
+  "gpus.memlockCap": "Máximo que uma máquina pode bloquear",
+  "gpus.memlockHint": "Uma máquina com placa de vídeo mantém sua memória na RAM enquanto roda (ela não pode ir para o swap). Este é o máximo que uma máquina assim pode bloquear; ajuste para que o restante dos {total} deste computador seja suficiente para ele. A mudança vale na hora.",
+  "gpus.memlockRecommended": "Recomendado",
+  "gpus.memlockDefault": "Recomendado: {n}",
+  "gpus.memlockApply": "Aplicar",
+  "gpus.memlockUseDefault": "Usar o recomendado",
+  "gpus.gb": "{n} GB"
 }

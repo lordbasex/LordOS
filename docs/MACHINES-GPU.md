@@ -241,7 +241,8 @@ RELEASE and DEBUG, reproducible (the same bytes from two work folders). Not wire
 
 ### Mode A — built (2026-11-21, in development; the latest release is 0.8.9.4)
 
-Approved by the maintainer on 2026-11-21 with its four closed admin actions (AGENTS.md "Machines' graphics cards").
+Approved by the maintainer on 2026-11-21 with its four closed admin actions and, the same day, `vm-memlock` and
+`gpu-memlock-cap` (AGENTS.md "Machines' graphics cards").
 
 | Piece | What it does | Where |
 |---|---|---|
@@ -249,10 +250,11 @@ Approved by the maintainer on 2026-11-21 with its four closed admin actions (AGE
 | `gpu-role` | Machines (shared): writes `/etc/modprobe.d/lordos-gpu.conf` and `/etc/modules-load.d/lordos-gpu.conf` (fixed text), adopts the hand-written `i915-gvt.conf` and `kvmgt.conf` of the feasibility test when they say exactly the same (removed, so no option is said twice), runs `update-initramfs -u`. Unused removes them. Dedicated and AI answer `gpu.roleNotYet` | `server/src/vm/vmgpu_admin.c` |
 | `vm-gvt-create` / `vm-gvt-remove` | The mdev named after the machine's UUID, of a listed type with an instance free; root notes the caller in `/run/lordos/vm-gvt/<id>`; `/dev/vfio/<group>` to the caller 0600. Removal: only the caller's, never while a process holds the group. The helper sweeps the caller's leftovers when it starts and ends | same |
 | `gpu-min-freq` | `rps_min_freq_mhz` within RPn..RP0 while the caller has a vGPU; the first value is kept in `/run/lordos/vm-gvt/minfreq-<address>` and comes back with "default" once no vGPU is left. lord-server asks for two thirds of RP0 (800 MHz on the UHD 630) while a vGPU machine runs | same, `js_vm.c` (`gvt_freq`) |
-| Settings → Graphics cards | Shown with more than one GPU. The desktop's card fixed; Unused / Machines (shared) for a GVT-g iGPU; a suggestion when such an iGPU is unused; "Machines: dedicated — coming in a later version" as a note for other cards; restart notice | `apps/settings/Gpus.jsx` |
+| `vm-memlock`, `gpu-memlock-cap` | Maintainer's decision 2026-11-21, instead of raising the session's limit: lord-server asks `vm-memlock <qemu pid>` (from run.json) while a vGPU machine starts; root checks the pid is the caller's `/usr/bin/qemu-system-*` under the caller's `lord-vm`, whose `-uuid` and `sysfsdev` name a vGPU the caller made, and sets that one process's RLIMIT_MEMLOCK to its `-m` + 512 MB, refused above "Memory a machine may lock" (`/etc/lordos/gpu-memlock.conf`, default total − max(4 GB, 25 %) to a whole GB, 2 GB to total − 2 GB) | `vmgpu_admin.c`, `js_vm.c` (`gvt_memlock`) |
+| Settings → Graphics cards | Shown with more than one GPU. Memory a machine may lock (a stepper in GB, the recommended value marked). The desktop's card fixed; Unused / Machines (shared) for a GVT-g iGPU; a suggestion when such an iGPU is unused; "Machines: dedicated — coming in a later version" as a note for other cards; restart notice | `apps/settings/Gpus.jsx` |
 | Configure → Display → Graphics card | None / Whole (the largest type) / Shared (the smallest type that shows the machine's resolution; 1920×1080 when it follows the window), free instances shown, a choice with none free disabled; a card replaces 3D graphics. machine.json schema 11 `"gpu"` | `apps/machines/configure.jsx`, `model.js` (`gvtType`) |
 | Start | Machines asks `vm-gvt-create` before the start (`startPrep`, with the bridged network's `vm-net-bridge`) | `apps/machines/ui.jsx` |
-| lord-vm | `vfio-pci-nohotplug,id=video0,sysfsdev=…,display=on,x-igd-opregion=on,xres,yres,romfile=/usr/lib/lordos/firmware/lordos-gvt-gop.rom,addr=0x4` as the only display; `-display dbus,gl=on,rendernode=<the iGPU's>`; `-action reboot=shutdown`, and every reset (the guest's, Restart's) ends with reason `reset`, which the machine's window starts again (the first boot's OVMF reset included); no suspend, no snapshot with memory. QEMU's soft and hard memlock: the machine's memory + 512 MB, within the session's hard limit, which lord-server raises to the computer's memory before it drops root, only when an iGPU runs GVT-g | `server/src/vm/lordvm.c` (`decide_vgpu`), `server/src/main.c` |
+| lord-vm | `vfio-pci-nohotplug,id=video0,sysfsdev=…,display=on,x-igd-opregion=on,xres,yres,romfile=/usr/lib/lordos/firmware/lordos-gvt-gop.rom,addr=0x4` as the only display; `-display dbus,gl=on,rendernode=<the iGPU's>`; `-action reboot=shutdown`, and every reset (the guest's, Restart's) ends with reason `reset`, which the machine's window starts again (the first boot's OVMF reset included); no suspend, no snapshot with memory. QEMU starts with its vCPUs held (`-S`) until its locked-memory limit is the machine's memory + 512 MB (`vgpu_memlock_tick`; 30 s, then the start ends saying why) | `server/src/vm/lordvm.c` (`decide_vgpu`) |
 | QEMU's sandbox | Landlock adds `/dev/vfio/vfio` and that vGPU's `/dev/vfio/<group>` (read, write, ioctl), the mdev's real sysfs folder (read) and the ROM (read; under `/usr` in the package). Our seccomp is a denylist that already allows the VFIO ioctls. A vGPU machine doesn't start unless those Landlock rules applied | `server/src/vm/vmsandbox.c` |
 | lord-server's picture | Intel-tiled dmabufs are imported on the iGPU's render node in a second EGL context (`dmaread.c`, surfaceless GLES2, its own GBM device) and read back as BGRX, one import per buffer kept; it works with the desktop on another GPU or on the CPU path. drm hotplug uevents from another card than the desktop's are ignored | `server/src/gpu/dmaread.c`, `js_vm.c`, `server/src/hw/uevent.c` |
 | Guest tools w6 | With a vGPU, one fixed SYSTEM script (`GVTWIN_PS`): hibernation and Fast Startup off; Intel's 27.20.100.8681 from the vendor catalog (fixed URL, SHA-256 `b5db0c71…21a0`, INF version, the catalog's WHCP signature and `igdkmd64.sys`'s Intel signature checked) only when the device lacks it; then a device installation restriction (DenyDeviceIDs, not retroactive) for that one device id | `server/src/vm/vmgvtwin.c` |
@@ -274,7 +276,11 @@ with the committed ROM):
   `vm-test` now refuses two names that differ only in case). Restart from the host ended QEMU with
   `host-qmp-system-reset` (now also a restart); the next start: "already 27.20.100.8681 … its updates are blocked now;
   hibernation and Fast Startup stay off". The machine's own shutdown was clean.
-- `vmgpu-test` (the four actions under a fake root), `dmaread-test` (a Y-tiled XRGB8888 buffer made with GBM on the
+- Locked memory: a start without `vm-memlock` held the vCPUs and ended after 30 s with "this machine's memory (4096 MB +
+  512 MB) couldn't be locked for its graphics card"; with `vm-memlock <the qemu_pid of run.json>` (as root through
+  `vm-gvt-cli`) QEMU's limit became 4,831,838,208 bytes for soft and hard and the machine ran on (1976 frames, 0 dmabuf
+  failures).
+- `vmgpu-test` (the six actions under a fake root), `dmaread-test` (a Y-tiled XRGB8888 buffer made with GBM on the
   Intel node read back exactly, with the other EGL context current on the AMD node), `uevent-test`.
 
 **Not checked yet:** the whole path inside a running lord-server (Machines' window, Settings → Graphics cards) with a

@@ -169,5 +169,7 @@
   "gpu.roleSet": "Ús de la targeta gràfica desat ({card}): reinicieu per aplicar-lo",
   "vm.gvtReady": "Part de la targeta gràfica a punt ({name})",
   "vm.gvtGone": "Part de la targeta gràfica eliminada",
-  "gpu.freqSet": "Freqüència mínima de la targeta gràfica establerta"
+  "gpu.freqSet": "Freqüència mínima de la targeta gràfica establerta",
+  "gpu.memlockSet": "S’ha desat la memòria que pot bloquejar una màquina",
+  "vm.memlockSet": "S’ha bloquejat la memòria de la màquina"
 }

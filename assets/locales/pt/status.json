@@ -169,5 +169,7 @@
   "gpu.roleSet": "Uso da placa de vídeo salvo ({card}): reinicie para aplicar",
   "vm.gvtReady": "Parte da placa de vídeo pronta ({name})",
   "vm.gvtGone": "Parte da placa de vídeo removida",
-  "gpu.freqSet": "Frequência mínima da placa de vídeo definida"
+  "gpu.freqSet": "Frequência mínima da placa de vídeo definida",
+  "gpu.memlockSet": "Memória que uma máquina pode bloquear salva",
+  "vm.memlockSet": "Memória da máquina bloqueada"
 }

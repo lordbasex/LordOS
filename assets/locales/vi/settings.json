@@ -761,5 +761,13 @@
   "gpus.restartHint": "Mục đích mới của card đồ họa có hiệu lực sau khi khởi động lại.",
   "gpus.restartNow": "Khởi động lại ngay",
   "gpus.applying": "Đang áp dụng… việc này có thể mất một phút.",
-  "gpus.needAdmin": "Chỉ quản trị viên mới có thể thay đổi mục đích sử dụng của card đồ họa."
+  "gpus.needAdmin": "Chỉ quản trị viên mới có thể thay đổi mục đích sử dụng của card đồ họa.",
+  "gpus.memlock": "Bộ nhớ một máy được phép khóa",
+  "gpus.memlockCap": "Tối đa một máy được khóa",
+  "gpus.memlockHint": "Một máy có card đồ họa giữ bộ nhớ của nó trong RAM khi đang chạy (không thể đẩy ra swap). Đây là mức tối đa một máy như vậy được khóa; hãy đặt sao cho phần còn lại trong {total} của máy tính này vẫn đủ dùng. Thay đổi có hiệu lực ngay.",
+  "gpus.memlockRecommended": "Khuyên dùng",
+  "gpus.memlockDefault": "Khuyên dùng: {n}",
+  "gpus.memlockApply": "Áp dụng",
+  "gpus.memlockUseDefault": "Dùng mức khuyên dùng",
+  "gpus.gb": "{n} GB"
 }

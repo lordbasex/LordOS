@@ -50,6 +50,14 @@
  *   gpu-min-freq    "<pci address> <MHz|default>"   the GVT iGPU's minimum frequency (rps_min_freq_mhz) within its own
  *              RPn..RP0, only while the caller has a vGPU; default puts back the value read before the first change
  *              once no vGPU is left                                                                            anyone
+ *   vm-memlock      "<pid>"                         the locked-memory limit of the caller's QEMU of a machine with a vGPU
+ *              (maintainer's decision 2026-11-21): a live /usr/bin/qemu-system-* of the caller whose parent is the
+ *              caller's lord-vm, whose -uuid and vfio-pci-nohotplug sysfsdev name a vGPU the caller made; soft and hard
+ *              RLIMIT_MEMLOCK of that one process = its -m + 512 MB, refused above the cap (vm.memlockCap need= cap=).
+ *              Nothing else in the session changes. Answers vm.memlockSet                                      anyone
+ *   gpu-memlock-cap "<MB|default>"                  "Memory machines may lock": writes /etc/lordos/gpu-memlock.conf
+ *              (cap_mb=<MB>, 2048 to total - 2048) or removes it (default: total - max(4 GB, 25 %), down to a GB)
+ *              Answers gpu.memlockSet                                                                          admin
  * At the helper's start and end (vm_net_sweep, vm_gvt_sweep) the caller's macvtaps that no process holds are removed; a restart takes
  * them all (they are never written to disk).
  * The downloads run in lordos-net-machines.scope (firewall app lordos:machines), with the Store's downloader
@@ -74,6 +82,8 @@ void vm_act_gpu_role(const AdminReq *r, const char *arg, size_t len);
 void vm_act_gvt_create(const AdminReq *r, const char *arg, size_t len);
 void vm_act_gvt_remove(const AdminReq *r, const char *arg, size_t len);
 void vm_act_gpu_min_freq(const AdminReq *r, const char *arg, size_t len);
+void vm_act_memlock(const AdminReq *r, const char *arg, size_t len);
+void vm_act_gpu_memlock_cap(const AdminReq *r, const char *arg, size_t len);
 /* removes uid's vGPUs no process holds; the iGPU's minimum frequency back when none is left */
 void vm_gvt_sweep(uid_t uid);
 
@@ -93,6 +103,8 @@ int vm_missing_packages(int arches, char *out, size_t n);
     { "gpu-role", vm_act_gpu_role, A_FORK }, \
     { "vm-gvt-create", vm_act_gvt_create, A_ANYONE }, \
     { "vm-gvt-remove", vm_act_gvt_remove, A_ANYONE }, \
-    { "gpu-min-freq", vm_act_gpu_min_freq, A_ANYONE },
+    { "gpu-min-freq", vm_act_gpu_min_freq, A_ANYONE }, \
+    { "vm-memlock", vm_act_memlock, A_ANYONE }, \
+    { "gpu-memlock-cap", vm_act_gpu_memlock_cap, 0 },
 
 #endif

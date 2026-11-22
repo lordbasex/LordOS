@@ -178,5 +178,7 @@
   "gpu.roleSet": "Vaizdo plokštės paskirtis išsaugota ({card}): paleiskite iš naujo, kad būtų pritaikyta",
   "vm.gvtReady": "Vaizdo plokštės dalis paruošta ({name})",
   "vm.gvtGone": "Vaizdo plokštės dalis pašalinta",
-  "gpu.freqSet": "Nustatytas mažiausias vaizdo plokštės dažnis"
+  "gpu.freqSet": "Nustatytas mažiausias vaizdo plokštės dažnis",
+  "gpu.memlockSet": "Atmintis, kurią mašina gali užrakinti, išsaugota",
+  "vm.memlockSet": "Mašinos atmintis užrakinta"
 }

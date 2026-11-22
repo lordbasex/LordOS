@@ -1044,5 +1044,9 @@
   "win.gvtOff": "Hiện không có card đồ họa nào dùng chung với các máy (Cài đặt → Card đồ họa).",
   "win.gvtNone": "Mọi phần chia của card đồ họa đều đang được các máy khác dùng.",
   "win.gvtFailed": "Không thể cấp card đồ họa cho máy: {why}",
-  "close.noGpuSuspend": "Khi có card đồ họa, máy không thể tạm ngưng."
+  "close.noGpuSuspend": "Khi có card đồ họa, máy không thể tạm ngưng.",
+  "cfg.memlockNote": "Với card đồ họa, bộ nhớ của máy này được dành riêng cho nó khi đang chạy ({n} trên {cap}).",
+  "cfg.memlockOver": "Với card đồ họa, bộ nhớ của máy này được dành riêng cho nó khi đang chạy, và {n} nhiều hơn mức một máy được khóa ({cap}): máy sẽ không khởi động cho đến khi bạn giảm bộ nhớ của nó hoặc nâng giới hạn đó.",
+  "cfg.memlockChange": "Thay đổi trong Cài đặt → Card đồ họa",
+  "win.gvtMemlock": "Máy này có {mem} bộ nhớ, nhưng một máy có card đồ họa chỉ được khóa {cap} (Cài đặt → Card đồ họa)."
 }

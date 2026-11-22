@@ -761,5 +761,13 @@
   "gpus.restartHint": "グラフィックカードの新しい用途は再起動後に有効になります。",
   "gpus.restartNow": "今すぐ再起動",
   "gpus.applying": "適用中… 1 分ほどかかることがあります。",
-  "gpus.needAdmin": "グラフィックカードの用途を変更できるのは管理者だけです。"
+  "gpus.needAdmin": "グラフィックカードの用途を変更できるのは管理者だけです。",
+  "gpus.memlock": "マシンがロックできるメモリ",
+  "gpus.memlockCap": "1 台のマシンの上限",
+  "gpus.memlockHint": "グラフィックカードを使うマシンは、実行中はメモリを RAM 上に保持します（スワップへ移せません）。これはそのようなマシン 1 台がロックできる上限です。このコンピューターの {total} の残りで足りるように設定してください。変更はすぐに適用されます。",
+  "gpus.memlockRecommended": "推奨",
+  "gpus.memlockDefault": "推奨: {n}",
+  "gpus.memlockApply": "適用",
+  "gpus.memlockUseDefault": "推奨値を使う",
+  "gpus.gb": "{n} GB"
 }
