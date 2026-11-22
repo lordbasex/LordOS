@@ -1911,6 +1911,7 @@ Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: a
 | Linux | Any Mesa GPU | virgl: OpenGL; venus: Vulkan, needs blob resources, guest kernel ≥ 5.16 (**Reported**, Mesa docs) |
 | Linux | Pi V3D | virgl: QEMU 10.0.13 aborts on every UEFI boot with `gl=on` (3.2), works only with a directly booted kernel, picture not yet checked (**Measured**, 2026-11-04); venus **To test**: V3D's Vulkan features may not be enough |
 | virtio-win | Any | 2D only: no good free 3D driver exists (Configure says so; machine.json refuses `3d` with the windows devices) |
+| Any amd64 UEFI | Intel GVT-g iGPU not drawing the desktop | the vendor's driver on a vGPU (6.10.1) |
 | Emulated | Any | 2D |
 
 Reported notes: Intel Meteor Lake or `xe` hosts need kernel 6.16+ and QEMU 11.0+ with `honor-guest-pat=on` for venus; Debian 13 has 10.0 (**Measured**), so venus on those hosts waits for a newer QEMU. NVIDIA proprietary needs 570.86+ for venus (**Reported**). Recent security fixes around virtio-gpu blob scanouts are a reason to keep 3D opt-in. In the sandbox, 3D gives QEMU a render node: a larger attack surface, stated in Security. `vhost-user-gpu` would put rendering in its own process: to evaluate in Phase 3.
@@ -1920,6 +1921,16 @@ for Linux machines only, the Design profile picks it where it can.
 
 **Decision (changed): 3D isn't offered on arm64 hosts with Debian 13's QEMU** until the reset abort of 3.2 is fixed there, by Debian, by
 a patch of ours (open decision 5) or upstream. The fault is guest-triggerable, so a direct-kernel-boot workaround isn't enough to ship it.
+
+#### 6.10.1 A real graphics card: Intel GVT-g (built 2026-11-21, in development)
+
+A machine (amd64, UEFI; Windows or Linux) can get a share of an Intel iGPU of the GVT-g generations (Broadwell to
+Comet Lake) that doesn't draw the desktop: the guest runs the vendor's own driver (Direct3D 12, OpenGL, Vulkan) on the
+real iGPU, and the picture comes back as dmabufs through the D-Bus display like a virgl machine's. Settings → Graphics
+cards turns the iGPU's GVT-g on (a restart); Configure → Display → Graphics card picks None, Whole or Shared
+(machine.json schema 11 `"gpu"`). Such a machine can't be suspended or keep snapshots with memory, and every reset
+ends QEMU and the machine starts again. Design, admin actions, sandbox and what was checked live:
+[MACHINES-GPU.md](MACHINES-GPU.md) "Mode A — built"; the rules: AGENTS.md "Machines' graphics cards".
 
 ### 6.11 Migrate from another PC
 

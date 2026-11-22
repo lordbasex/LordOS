@@ -22,6 +22,45 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   lordos|guest`. Machines with older tools are offered the update. `lordvm-dev`: `lat`, `fps`,
   `LORDVM_DEV_NODISPLAY`, `LORDVM_DEV_CURSOR_PNG`.
 
+- **Machines: a real graphics card for a machine (Intel GVT-g), and Settings → Graphics cards, in development**
+  (`docs/MACHINES-GPU.md` Part 2 Mode A, "Mode A — built"; `docs/VIRTUALIZATION.md` 6.10.1). On a computer whose
+  Intel iGPU (Broadwell to Comet Lake) is enabled in the firmware but doesn't show the desktop, a machine gets a share of
+  it as its own GPU: the vendor's own driver in the guest, its 3D computed by the real iGPU, and the picture back in the
+  machine's window as dmabufs.
+  - **Settings → Graphics cards** (shown on computers with more than one GPU): every GPU with its address, driver and
+    use; the one that draws the desktop is fixed; an unused iGPU is suggested ("You have a graphics card that isn't
+    used. Use it for Machines?"); Unused / Machines (shared) for a GVT-g iGPU, a note that dedicated cards come in a
+    later version; a restart notice and Restart Now. All 35 languages.
+  - **Four closed admin actions** (AGENTS.md "Machines' graphics cards", approved 2026-11-21; `server/src/vm/vmgpu.c`,
+    `vmgpu_admin.c`): `gpu-role` writes only `/etc/modprobe.d/lordos-gpu.conf` (`options i915 enable_gvt=1
+    enable_guc=0`) and `/etc/modules-load.d/lordos-gpu.conf` (`kvmgt`) and runs `update-initramfs -u`, adopting
+    hand-written `i915-gvt.conf`/`kvmgt.conf` that say exactly that (no duplicate options) and removing them with
+    "unused"; `vm-gvt-create` makes an mdev of a listed type with an instance free, named after the machine's UUID,
+    and gives its `/dev/vfio/<group>` to the caller 0600; `vm-gvt-remove` removes only the caller's, never while a
+    process holds its group; `gpu-min-freq` sets the iGPU's minimum frequency within RPn..RP0 while a machine uses it
+    (lord-server asks for two thirds of RP0, 800 MHz on a UHD 630, then "default"). The GPU lord-server draws on is
+    always refused, checked on the root side from the cards it holds open. Leftover vGPUs are swept when a session's
+    helper starts and ends. `vmgpu-test`: the parsers and the four actions under a fake root folder (92 checks).
+  - **Configure → Display → Graphics card**: None / Whole (for this machine, the largest type) / Shared (the smallest
+    type that shows the machine's resolution), with each choice's free instances; refused when none is free; it
+    replaces 3D graphics; such a machine can't be suspended (Suspend becomes Shut Down) or keep snapshots with memory.
+    machine.json schema 11 `"gpu": "intel-whole" | "intel-shared"`; `lord-vm --set --gpu`; `lord.vm.gpus()`.
+  - **lord-vm**: `vfio-pci-nohotplug,sysfsdev=/sys/bus/mdev/devices/<uuid>,display=on,x-igd-opregion=on,xres,yres,
+    romfile=/usr/lib/lordos/firmware/lordos-gvt-gop.rom` as the machine's only display, `-display dbus,gl=on` on the
+    iGPU's render node, `-action reboot=shutdown` (a reset crashes a GVT-g guest) and Machines starts it again after a
+    guest restart (also the one reset of the first boot with a vGPU). QEMU's memlock: the machine's memory plus 512 MB;
+    lord-server raises the session's hard limit to the computer's memory before it drops root, only when an iGPU runs
+    GVT-g. QEMU's Landlock widens only for `/dev/vfio/vfio`, that vGPU's `/dev/vfio/<group>` and its sysfs folder (the
+    seccomp denylist already allows the VFIO ioctls); without Landlock's rules applied the machine doesn't start.
+  - **lord-server**: Intel-tiled dmabufs (`I915_FORMAT_MOD_Y_TILED`) are imported on the iGPU's own render node in a
+    second EGL context and read back, imports cached per buffer, with the desktop on another GPU or on the CPU path;
+    hotplug uevents from a DRM card that doesn't drive the desktop are ignored (a vGPU start makes two).
+  - **Guest tools w6**: when the machine has a vGPU, lord-vm runs one fixed SYSTEM script that installs Intel's display
+    driver 27.20.100.8681 from the vendor catalog only when it is missing (fixed URL, SHA-256 checked, the catalog file's
+    and the kernel driver's signatures checked), blocks later drivers for that one device (device installation
+    restriction) and turns off hibernation and Fast Startup.
+  - **Packaging**: the GOP option ROM ships at `/usr/lib/lordos/firmware/lordos-gvt-gop.rom` from the reproducible
+    build committed in `firmware/gvt-gop/prebuilt` (SHA-256 checked by `mkdeb.sh`).
 - **Machines: LordOS's own UEFI GOP option ROM for Intel GVT-g vGPUs, in development** (`firmware/gvt-gop`,
   `tools/firmware/build-gvt-gop.sh`, `docs/MACHINES-GPU.md` "Our own GVT-g GOP driver"). An EDK2 UEFI driver, MIT,
   written from public, licensed sources only (MIT-licensed Linux i915/GVT-g files, QEMU's IGD and fw_cfg documents,
@@ -36,7 +75,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the vGPU's own display, the guest's desktop at 1920×1080 74 Hz with resizes following the EDID, WebGL aquarium 75
   fps with vsync and 314–432 fps uncapped (the old ROM: 75 and 333–410 the same day), 21 minutes at 99 % guest 3D with
   53,392 dmabuf frames and 0 read failures, a clean guest restart, Secure Boot on, and with a policy-0x04 OVMF a
-  test-signed ROM runs while an unsigned one is refused. Not wired into lord-vm yet.
+  test-signed ROM runs while an unsigned one is refused. Machines uses it for a machine's Intel graphics card (next entry).
 - **Files: "Open with" a machine, like VMware Fusion** (`docs/VIRTUALIZATION.md` 7.3, `docs/FILES.md`). A file's Open with
   lists, after the apps, each machine whose LordOS guest tools open files ("‹name› (…)", for the guests of the card in
   `docs/VIRTUALIZATION.md` 4.3 with `lordos-guest-win` w3). Choosing one opens the machine's window, starts the machine

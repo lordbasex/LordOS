@@ -1,7 +1,8 @@
 # Machines: a smoother picture, and a real GPU for a machine (plan)
 
 Status: **plan, approved in principle by the maintainer on 2026-11-21**. Part 1 steps 1, 2, 3 and 6 are built (in
-development, 2026-11-21: "Part 1 — done" below); the rest is not built yet. Each step that needs
+development, 2026-11-21: "Part 1 — done" below), and so are Part 2's Mode A (Intel GVT-g) and Settings → Graphics cards
+("Mode A — built" below); the rest is not built yet. Each step that needs
 root or widens a sandbox goes through the maintainer's review and an AGENTS.md entry before it is built. Design and
 status of Machines as a whole: [VIRTUALIZATION.md](VIRTUALIZATION.md).
 
@@ -238,7 +239,51 @@ RELEASE and DEBUG, reproducible (the same bytes from two work folders). Not wire
     lord-vm should turn off hibernation/Fast Startup in the guest tools or shut down without it, and the minimum iGPU
     frequency action above still matters.
 
-### Settings → Graphics cards (approved in principle 2026-11-21)
+### Mode A — built (2026-11-21, in development; the latest release is 0.8.9.4)
+
+Approved by the maintainer on 2026-11-21 with its four closed admin actions (AGENTS.md "Machines' graphics cards").
+
+| Piece | What it does | Where |
+|---|---|---|
+| GPU list | Every PCI class 0x03 device: ids, driver, IOMMU group, `boot_vga`, card and render node, GVT-g family (Broadwell, Skylake, Kaby/Amber Lake, Coffee/Whiskey Lake, Comet Lake, Broxton by device id), GVT on (it lists `mdev_supported_types`), each type's sizes, largest resolution, weight and free instances. The desktop's GPU is the card lord-server holds open (root reads it from lord-server's descriptors); with none held, the firmware's primary display | `server/src/vm/vmgpu.c`, `lord.vm.gpus()` |
+| `gpu-role` | Machines (shared): writes `/etc/modprobe.d/lordos-gpu.conf` and `/etc/modules-load.d/lordos-gpu.conf` (fixed text), adopts the hand-written `i915-gvt.conf` and `kvmgt.conf` of the feasibility test when they say exactly the same (removed, so no option is said twice), runs `update-initramfs -u`. Unused removes them. Dedicated and AI answer `gpu.roleNotYet` | `server/src/vm/vmgpu_admin.c` |
+| `vm-gvt-create` / `vm-gvt-remove` | The mdev named after the machine's UUID, of a listed type with an instance free; root notes the caller in `/run/lordos/vm-gvt/<id>`; `/dev/vfio/<group>` to the caller 0600. Removal: only the caller's, never while a process holds the group. The helper sweeps the caller's leftovers when it starts and ends | same |
+| `gpu-min-freq` | `rps_min_freq_mhz` within RPn..RP0 while the caller has a vGPU; the first value is kept in `/run/lordos/vm-gvt/minfreq-<address>` and comes back with "default" once no vGPU is left. lord-server asks for two thirds of RP0 (800 MHz on the UHD 630) while a vGPU machine runs | same, `js_vm.c` (`gvt_freq`) |
+| Settings → Graphics cards | Shown with more than one GPU. The desktop's card fixed; Unused / Machines (shared) for a GVT-g iGPU; a suggestion when such an iGPU is unused; "Machines: dedicated — coming in a later version" as a note for other cards; restart notice | `apps/settings/Gpus.jsx` |
+| Configure → Display → Graphics card | None / Whole (the largest type) / Shared (the smallest type that shows the machine's resolution; 1920×1080 when it follows the window), free instances shown, a choice with none free disabled; a card replaces 3D graphics. machine.json schema 11 `"gpu"` | `apps/machines/configure.jsx`, `model.js` (`gvtType`) |
+| Start | Machines asks `vm-gvt-create` before the start (`startPrep`, with the bridged network's `vm-net-bridge`) | `apps/machines/ui.jsx` |
+| lord-vm | `vfio-pci-nohotplug,id=video0,sysfsdev=…,display=on,x-igd-opregion=on,xres,yres,romfile=/usr/lib/lordos/firmware/lordos-gvt-gop.rom,addr=0x4` as the only display; `-display dbus,gl=on,rendernode=<the iGPU's>`; `-action reboot=shutdown`, and every reset (the guest's, Restart's) ends with reason `reset`, which the machine's window starts again (the first boot's OVMF reset included); no suspend, no snapshot with memory. QEMU's soft and hard memlock: the machine's memory + 512 MB, within the session's hard limit, which lord-server raises to the computer's memory before it drops root, only when an iGPU runs GVT-g | `server/src/vm/lordvm.c` (`decide_vgpu`), `server/src/main.c` |
+| QEMU's sandbox | Landlock adds `/dev/vfio/vfio` and that vGPU's `/dev/vfio/<group>` (read, write, ioctl), the mdev's real sysfs folder (read) and the ROM (read; under `/usr` in the package). Our seccomp is a denylist that already allows the VFIO ioctls. A vGPU machine doesn't start unless those Landlock rules applied | `server/src/vm/vmsandbox.c` |
+| lord-server's picture | Intel-tiled dmabufs are imported on the iGPU's render node in a second EGL context (`dmaread.c`, surfaceless GLES2, its own GBM device) and read back as BGRX, one import per buffer kept; it works with the desktop on another GPU or on the CPU path. drm hotplug uevents from another card than the desktop's are ignored | `server/src/gpu/dmaread.c`, `js_vm.c`, `server/src/hw/uevent.c` |
+| Guest tools w6 | With a vGPU, one fixed SYSTEM script (`GVTWIN_PS`): hibernation and Fast Startup off; Intel's 27.20.100.8681 from the vendor catalog (fixed URL, SHA-256 `b5db0c71…21a0`, INF version, the catalog's WHCP signature and `igdkmd64.sys`'s Intel signature checked) only when the device lacks it; then a device installation restriction (DenyDeviceIDs, not retroactive) for that one device id | `server/src/vm/vmgvtwin.c` |
+| Option ROM | The reproducible build committed in `firmware/gvt-gop/prebuilt` (SHA-256 `aca1ff08…0759`), checked and installed by `mkdeb.sh`: building EDK2 in each package build was too heavy for an 8.7 KB file that doesn't change | `tools/iso/mkdeb.sh` |
+
+**Checked live** (the maintainer's computer: i9-10900 UHD 630 with GVT-g on, RX 580 as the desktop's card; a fresh copy
+of the Windows 11 test machine, `win-gvt`; QEMU 10.0.13; `lordvm-dev` in lord-server's place, the test build of lord-vm
+with the committed ROM):
+
+- `vm-gvt-create` (run as root through `build/vm-gvt-cli`, the action's own code): `i915-GVTg_V5_4` made with the
+  machine's UUID, `/dev/vfio/16` given to the user 0600; `vm-gvt-remove` refused while QEMU held the group
+  (`vm.gvtInUse`) and removed it after the shutdown; `gpu-min-freq 800` set 800 MHz, 5000 was refused (`gpu.freqRange`),
+  "default" kept 800 while the vGPU was there and put back 350 once it was gone.
+- First start: Landlock, our seccomp and no_new_privs on with `vgpu=1`; the ROM refused at first (outside Landlock's
+  paths in the test build: a read rule for the ROM was added); then the first boot's OVMF reset ended QEMU with reason
+  `reset`, as planned; the next start booted to the desktop at 1920×1080 on the vGPU, 0 dmabuf failures.
+- The guest tools w6 then ran the driver script: "27.20.100.8681 installed (PCI\VEN_8086&DEV_9BC5) … hibernation and
+  Fast Startup turned off"; the block failed on the first run because PowerShell's `$k` and `$K` are one variable (fixed;
+  `vm-test` now refuses two names that differ only in case). Restart from the host ended QEMU with
+  `host-qmp-system-reset` (now also a restart); the next start: "already 27.20.100.8681 … its updates are blocked now;
+  hibernation and Fast Startup stay off". The machine's own shutdown was clean.
+- `vmgpu-test` (the four actions under a fake root), `dmaread-test` (a Y-tiled XRGB8888 buffer made with GBM on the
+  Intel node read back exactly, with the other EGL context current on the AMD node), `uevent-test`.
+
+**Not checked yet:** the whole path inside a running lord-server (Machines' window, Settings → Graphics cards) with a
+screenshot on the dev VM's real display; `gpu-role` for real (it writes `/etc` and runs `update-initramfs`; only under
+the fake root); a guest restart from inside Windows with this build (the QMP reset and the first-boot reset were); the
+WebGL numbers with this build (the earlier hands-on numbers stand); other gen9 iGPUs than 0x9BC5; a restart when the
+machine has no window open (only the machine's window starts it again).
+
+### Settings → Graphics cards (approved in principle 2026-11-21; built, "Mode A — built" above)
 
 The person never runs a command: a computer with more than one GPU is managed from **Settings → Graphics cards**.
 
