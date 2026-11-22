@@ -12,6 +12,39 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Store: a Flathub home with collections, categories and subcategories, in development (the latest release is
+  0.8.9.4).** Flathub's section no longer opens on one long list: like the app centres on other desktops it opens on a
+  home, and every page keeps the install rules as they were (Flathub's verified apps unless the section's switch shows
+  every app, x86-64 PCs only). See `docs/FLATPAK.md`, "The Store's home".
+  - **The home** (`apps/store/flathubpages.js`): a banner with the app released most recently (**Latest release on
+    Flathub**), the ten main categories as tiles with how many apps each has, the **Recently updated** row (eight
+    cards, **See all** opens the whole collection in release order with endless scroll) and, while the unverified apps
+    are shown too, a **Verified apps** row; then every app, as before. A category (the second column, or a tile) shows
+    its **subcategories** as chips with their counts (Games: Arcade, Action, Strategy, Emulators, Logic, Shooters,
+    Kids, Simulation, Board, Adventure, Role-playing, Sports, Card; Graphics: 2D, Viewers, Raster, Photography, 3D,
+    Vector, Scanning; and so on, 60 in all, those Flathub's catalog has most apps in), and a chip narrows the grid.
+    The toolbar's title says where you are (Flathub · Games · Emulators, Flathub · Recently updated).
+  - **Verified badge**: every Flathub card now says **✓ Verified** or **Not verified** at its foot.
+  - **Where the data comes from:** only the catalog LordOS already reads, Flathub's signed AppStream fetched by
+    Flatpak itself and parsed by the sandboxed `lord-appstream` (E7). No new download, host, helper or exception.
+    `lord-appstream` now also writes each app's newest `<release timestamp>` as a tenth field (1 to 11 digits; a
+    release nested in another element, a signed, zero-led or longer number is ignored), lord-server checks it again
+    (`fpakas_line`: exactly ten fields, digits only, no leading zero) and `lord.flatpak.catalog()` gives it as
+    `updated`. Measured on Flathub's catalog of 2026-11-22: 3381 x86-64 apps, every one with a release date, 2243
+    verified.
+  - **Not yet: Popular, Trending, Recently added and the app of the day/week.** Flathub computes them on its web API
+    (`flathub.org/api/v2/collection/…`, `app-picks/…`), which nothing in LordOS may reach today: it would be a new
+    network job and needs the maintainer's review first (proposed in `docs/FLATPAK.md`, "Rankings from Flathub's API").
+  - The logic is plain data in `sdk/flathubmodel.js` (`SUBCATS`, `subcategoryCounts`, `recentlyUpdated` (a release
+    more than a day in the future, before 2000 or not a whole number never counts), `verifiedApps`, `collection`,
+    `homeRows`, `spotlight`, `filterCatalog`'s `sub`). New texts `flathub.verifiedShort`, `flathub.home.*`,
+    `flathub.coll.*` and the 60 `flathub.sub.*` in all 35 languages.
+  - Tests: `build/fpakas-test` gains release dates (the newest wins, a release's nested one, 14 digits, a leading zero,
+    a sign, an exponent are left out) and index lines lord-server must refuse (no date, a leading zero, a sign, 12
+    digits, a space, an old nine-field line); `tests/flathub_model_test.mjs` gains a recorded piece of Flathub's real
+    catalog (`tests/data/flathub/catalog-2026-11-22.json`, 38 apps, public data only) for the collections, the banner
+    and the subcategories, hostile entries (future, fractional, text, negative, NaN, infinite and missing dates, a
+    category listed twice, entries that aren't objects) and every new text in every language.
 - **Always on top, in every theme, in development (the latest release is 0.8.9.4).** A window can be kept over every
   normal window, and X11 apps' `_NET_WM_STATE_ABOVE`, `_NET_WM_STATE_BELOW` and `_NET_WM_STATE_SKIP_PAGER` are now
   honoured and listed in `_NET_SUPPORTED`: the last X11 conformance point below 100 % (`ewmh.wm_state` 96.2 % → 100 %,

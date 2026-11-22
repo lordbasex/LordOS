@@ -649,7 +649,8 @@ for every decoder. The website's API is never used.
 **Built on 2026-11-19 (E7):** the helper is a new small binary, `lord-appstream` (open question 5: not a mode of
 `lord-doc`, so it needs neither Poppler nor libarchive: only the C library), reading the uncompressed `appstream.xml`
 Flatpak keeps next to the `.gz`. Its index line: id, branch, name, summary, icon (`64x64/` or `128x128/<file>.png`),
-categories, license, developer, verified (`flathub::verification::verified`). The Store shows the verified ones by
+categories, license, developer, verified (`flathub::verification::verified`) and, since 2026-11-22, the newest release's
+date ("The Store's home" below). The Store shows the verified ones by
 default (maintainer's decision); the filter is the shell's, the index carries every app.
 
 **Descriptions (in development, after 0.8.9.4):** an app's page shows what it says about itself, AppStream's
@@ -667,6 +668,52 @@ which the Store reads at every load: the page asks for one app's with `lord.flat
 Flathub's catalog of 2026-11-22 (52 MB of XML, 3381 apps): the index grew from 0.6 MB to 2.5 MB, every app has a
 description, four were cut at 4 KB, and the helper still reads the whole file in about 0.1 s, far under its 512 MB cap
 (it keeps one 4 KB buffer per app being read, nothing more).
+
+### The Store's home (in development, after 0.8.9.4)
+
+The maintainer asked on 2026-11-22 for a larger catalog the way Bazaar (GNOME's Flatpak app centre) shows it:
+collections, categories and subcategories. The Store's Flathub section now opens on a home built only from the catalog
+above, so nothing about where data comes from changed:
+
+- **A banner** with the shown app released most recently (`spotlight`), the **ten main categories** as tiles with
+  their counts, the **Recently updated** row (newest release first; **See all** opens the whole collection, endless
+  scroll), and **Verified apps** while the unverified ones are shown too (otherwise every app shown is verified and
+  the row would repeat the catalog); then every app, as before.
+- **Subcategories**: a category page shows chips for the subcategories Flathub's catalog has most apps in under it
+  (`SUBCATS` in `sdk/flathubmodel.js`, counted on the catalog of 2026-11-22; 60 in all, each a `flathub.sub.*` text),
+  only those with apps, and a chip narrows the grid (`filterCatalog`'s `sub`).
+- **A verified badge** on every card (**✓ Verified** / **Not verified**).
+- The install rules are unchanged: the verified subset unless the setting shows every app, x86-64 only, and an app is
+  installed only from its own page after its metadata was read.
+- **The release date** comes from the same helper: `lord-appstream` writes each app's newest
+  `<releases><release timestamp>` (a direct child of the component's `<releases>`; 1 to 11 digits, no sign or
+  leading zero, else none) as the index line's tenth field, lord-server checks it again (`fpakas_line`) and
+  `lord.flatpak.catalog()` gives it as `updated` (seconds). The model ignores a date before 2000, more than a day in
+  the future or not a whole number. On the catalog of 2026-11-22 every one of the 3381 x86-64 apps has one.
+
+**Rankings from Flathub's API (proposed, not approved).** Bazaar's Popular, Trending, Recently added and the app of the
+day/week come from Flathub's web API (`https://flathub.org/api/v2/collection/{popular,trending,recently-added,
+recently-updated,verified}`, `collection/category/<cat>[/subcategories?subcategory=<sub>]`,
+`app-picks/app-of-the-day/<date>`, `app-picks/apps-of-the-week/<date>`; checked on 2026-11-22: a collection is a
+search result of up to 250 hits a page with `app_id`, `installs_last_month`, `trending`, `added_at`, `updated_at` and
+the app's texts; a pick is `{"app_id", "day"}` or `{"apps": [{"app_id", "position", …}]}`). Nothing in LordOS may
+reach that API today: the design above says "The website's API is never used", lord-server has no HTTP client of its
+own, and `lord-fetch` may do only its two approved jobs ("no other host, no other job"). Built without that, the home
+shows only what the signed catalog can say. If the maintainer wants the rankings, the smallest shape would be a third
+`lord-fetch` job, **E10**:
+
+- `FQ_FLATHUB` with a number only (which of a closed list of paths, built by the helper: the five collections, the two
+  picks with today's date); a socket lord-server connects through its own connector to `flathub.org:443` only
+  (`lordos-net-flathub.scope`, firewall app `lordos:flathub`, which the person can already block); no redirect, at most
+  1 MB read, a timeout, once a day at most (kept with its date).
+- The helper parses the JSON strictly and sends back **only app ids** (`fpak_id_ok`, at most 250, in order); no text,
+  number or address from the answer ever leaves it. lord-server checks every id again; the Store keeps only ids that
+  are in the signed catalog (names, icons and summaries still come from there, never from the API) and the install
+  rules stay as they are.
+- What it would reveal: that this computer uses Flathub's site once a day (its address and the time), nothing about
+  the person's apps. Off with the Flathub section.
+
+Until it is approved, no code for it exists.
 
 ### Updates (Design)
 

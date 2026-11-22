@@ -1,6 +1,7 @@
 // flathub_model_test.mjs — the Store's Flathub section as plain data (sdk/flathubmodel.js, docs/FLATPAK.md): metadata
 // from `flatpak remote-info --show-metadata` (real outputs from Flathub, 2026-11-19), the permission rows and LordOS's
-// changes, the Chromium/Electron apps marked "not yet supported", the catalog filter, `flatpak list`, progress lines;
+// changes, the Chromium/Electron apps marked "not yet supported", the catalog filter, `flatpak list`, progress lines; the
+// home's collections, categories and subcategories on a recorded piece of Flathub's real catalog and on hostile entries;
 // and every permission and change key in every language.
 //
 //   node tests/flathub_model_test.mjs        (from server/; run_suites.sh runs it when node exists)
@@ -222,6 +223,74 @@ for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, 
   eq('cut to the lines left', V(`a\n\n${longP}`).paras.map((p) => p.clamp), [0, 5]);
   eq('characters, not UTF-16 units', V('😀'.repeat(90 * 6)).long, false);
   eq('custom line budget', V('a\n\nb\n\nc', { lines: 2 }), { paras: [{ text: 'a', clamp: 0 }, { text: 'b', clamp: 0 }], long: true });
+}
+
+// ---- the home: collections, categories, subcategories ----
+// tests/data/flathub/catalog-2026-11-22.json: 38 apps of Flathub's real catalog as lord.flatpak.catalog() gives them
+// (read from Flathub's appstream.xml of 2026-11-22; public data only)
+{
+  const real = JSON.parse(fs.readFileSync(path.join(here, 'data/flathub/catalog-2026-11-22.json'), 'utf8'));
+  const at = Date.UTC(2026, 10, 22) + 12 * 3600e3;            // noon 2026-11-22 (the newest release, OBS's, is that day)
+  eq('fixture: real shape', real.every((a) => M.idOk(a.id) && M.branchOk(a.branch) && Number.isInteger(a.updated) && typeof a.verified === 'boolean'), true);
+  const upd = M.recentlyUpdated(real, { now: at });
+  eq('recently updated: verified only, newest first', upd.slice(0, 4).map((a) => a.id),
+    ['com.obsproject.Studio', 'com.discordapp.Discord', 'org.mozilla.firefox', 'org.gnome.Evince']);
+  eq('recently updated: no unverified while showAll is off', upd.some((a) => !a.verified), false);
+  eq('recently updated: showAll lets the unverified in', M.recentlyUpdated(real, { now: at, showAll: true })[1].id, 'org.signal.Signal');
+  eq('recently updated: every app has a date (the real catalog)', upd.length, real.filter((a) => a.verified).length);
+  eq('recently updated in a category', M.recentlyUpdated(real, { now: at, category: 'Game' }).map((a) => a.id),
+    ['net.pcsx2.PCSX2', 'org.libretro.RetroArch', 'net.supertuxkart.SuperTuxKart']);
+  eq('spotlight: newest with an icon and summary', M.spotlight(real, { now: at }).id, 'com.obsproject.Studio');
+  eq('verified collection only with showAll', [M.collection(real, 'verified', { now: at }).length, M.collection(real, 'verified', { now: at, showAll: true }).length],
+    [0, real.filter((a) => a.verified).length]);
+  eq('home rows', M.homeRows(real, { now: at }).map((r) => r.key), ['updated']);
+  eq('home rows with showAll', M.homeRows(real, { now: at, showAll: true }).map((r) => r.key), ['updated', 'verified']);
+  eq('unknown collection', [M.collection(real, 'popular', { now: at }), M.collectionOk('popular'), M.collectionOk('__proto__'), M.collectionOk('updated')],
+    [[], false, false, true]);
+  eq('subcategories of Game (verified)', M.subcategoryCounts(real, 'Game', false), { ArcadeGame: 1, Emulator: 2 });
+  eq('subcategories of Game (all)', M.subcategoryCounts(real, 'Game', true), { ArcadeGame: 1, Emulator: 3 });
+  eq('subcategories in SUBCATS order', Object.keys(M.subcategoryCounts(real, 'Graphics', true)), ['2DGraphics', 'Viewer', 'RasterGraphics', '3DGraphics', 'VectorGraphics']);
+  eq('a subcategory needs its main category', M.subcategoryCounts(real, 'Utility', true).Viewer, undefined);
+  eq('filter by subcategory', ids(M.filterCatalog(real, { category: 'Game', sub: 'Emulator', showAll: true })), ['dolphin-emu', 'PCSX2', 'RetroArch']);
+  eq('subcategory checks', [M.subOk('Game', 'Emulator'), M.subOk('Game', 'Viewer'), M.subOk('toString', 'x'), M.subOk('__proto__', 'Audio'), M.subcatsOf('constructor')],
+    [true, false, false, false, []]);
+}
+// hostile or broken catalog entries: never thrown on, never first
+{
+  const now = Date.UTC(2026, 10, 22);
+  const s = Math.floor(now / 1000);
+  const hostile = [
+    { id: 'org.x.Future', name: 'Future', summary: 's', icon: 'i.png', verified: true, updated: s + 10 * 86400 },
+    { id: 'org.x.Float', name: 'Float', verified: true, updated: s - 1.5 },
+    { id: 'org.x.Str', name: 'Str', verified: true, updated: String(s) },
+    { id: 'org.x.Neg', name: 'Neg', verified: true, updated: -5 },
+    { id: 'org.x.Old', name: 'Old', verified: true, updated: 12345 },
+    { id: 'org.x.NaN', name: 'NaN', verified: true, updated: NaN },
+    { id: 'org.x.Inf', name: 'Inf', verified: true, updated: Infinity },
+    { id: 'org.x.None', name: 'None', verified: true },
+    { id: 'org.x.Ok', name: 'Ok', summary: '', icon: '', verified: true, updated: s - 100 },
+    { id: 'org.x.Okay', name: 'Okay', summary: 'yes', icon: 'o.png', verified: true, updated: s - 200, categories: 'Game;Emulator;Emulator;' },
+    { id: 'org.x.Unv', name: 'Unv', summary: 'x', icon: 'u.png', verified: false, updated: s },
+    null, undefined, 5, 'org.x.String',
+  ].filter((a) => a && typeof a === 'object');
+  eq('hostile dates left out', M.recentlyUpdated(hostile, { now }).map((a) => a.name), ['Ok', 'Okay']);
+  eq('a release up to a day ahead counts', M.updatedAt({ updated: s + 3600 }, now) > 0, true);
+  eq('spotlight skips an app without icon or summary', M.spotlight(hostile, { now }).name, 'Okay');
+  eq('spotlight: none', M.spotlight([], { now }), null);
+  eq('a category listed twice counts once', M.subcategoryCounts(hostile, 'Game', false), { Emulator: 1 });
+  eq('verified apps: dated first, then by name', M.verifiedApps(hostile, { now }).map((a) => a.name).slice(0, 4), ['Ok', 'Okay', 'Float', 'Future']);
+  eq('nothing at all', [M.recentlyUpdated(null), M.homeRows(undefined), M.subcategoryCounts(null, 'Game', true), M.collection(null, 'updated')], [[], [], {}, []]);
+}
+// every collection, subcategory and home text in every language
+{
+  const keys = ['verifiedShort', 'home.spotlight', 'home.categories', ...M.COLLECTIONS.map((k) => `coll.${k}`),
+    ...[...new Set(Object.values(M.SUBCATS).flat())].map((s) => `sub.${s}`)];
+  const dir = path.join(root, 'assets/locales');
+  for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, d)).isDirectory())) {
+    const cat2 = JSON.parse(fs.readFileSync(path.join(dir, lang, 'flathub.json'), 'utf8'));
+    eq(`home texts in ${lang}`, keys.filter((k) => typeof cat2[k] !== 'string' || !cat2[k].trim()), []);
+  }
+  eq('every main category has subcategories', M.MAIN_CATS.every((c) => M.subcatsOf(c).length > 0), true);
 }
 
 console.log(bad ? `flathub-model: ${bad} of ${n} failed` : `flathub-model: ${n}/${n} ok`);

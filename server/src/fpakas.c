@@ -232,8 +232,8 @@ static int emit(Comp *c, const char *arch, int (*out)(void *, const char *, size
     char *f[] = { c->a.name, c->a.summary, c->a.icon, c->a.categories, c->a.license, c->a.developer };
     for (size_t i = 0; i < sizeof f / sizeof f[0]; i++) clean_field(f[i]);
     char line[2048];
-    int n = snprintf(line, sizeof line, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n", c->a.id, c->a.branch, c->a.name, c->a.summary,
-                     c->a.icon, c->a.categories, c->a.license, c->a.developer, c->a.verified ? 1 : 0);
+    int n = snprintf(line, sizeof line, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%lld\n", c->a.id, c->a.branch, c->a.name, c->a.summary,
+                     c->a.icon, c->a.categories, c->a.license, c->a.developer, c->a.verified ? 1 : 0, c->a.updated);
     if (n <= 0 || n >= (int)sizeof line) return 1;
     if (out(ud, line, (size_t)n)) return -1;
     if (!c->desc[0]) return 0;
@@ -388,6 +388,16 @@ int fpakas_index(const char *xml, size_t len, const char *lang, const char *arch
             else if (!strcmp(name, "icon")) { attr(ne, gt, "type", icon_type, sizeof icon_type - 1); attr(ne, gt, "width", icon_w, sizeof icon_w - 1); }
             else if (!strcmp(name, "value")) attr(ne, gt, "key", value_key, sizeof value_key - 1);
             else if (!strcmp(name, "bundle")) attr(ne, gt, "type", bundle_type, sizeof bundle_type - 1);
+            else if (!strcmp(name, "release") && !strcmp(parent, "releases") && depth > 1 && !strcmp(stack[depth - 2], "component")) {
+                /* the newest release's time (Flathub writes timestamp="<seconds>"): 1 to 11 digits, else none */
+                char ts[16];
+                attr(ne, gt, "timestamp", ts, sizeof ts - 1);
+                size_t tl = strlen(ts);
+                int digits = tl > 0 && tl <= 11 && ts[0] != '0';
+                for (size_t k = 0; k < tl && digits; k++) digits = isdigit((unsigned char)ts[k]);
+                long long v = digits ? strtoll(ts, NULL, 10) : 0;
+                if (v > c.a.updated) c.a.updated = v;
+            }
         }
         (void)parent;
         if (!self) {
@@ -415,11 +425,11 @@ static int text_ok(const char *s, size_t n, size_t max) {
 int fpakas_line(const char *line, size_t n, FpakasApp *a) {
     if (!line || !a || !n || n > 2048) return -1;
     if (line[n - 1] == '\n') n--;
-    const char *f[9];
-    size_t fl[9];
+    const char *f[10];
+    size_t fl[10];
     int k = 0;
     const char *s = line, *e = line + n;
-    while (k < 9) {
+    while (k < 10) {
         const char *tab = memchr(s, '\t', (size_t)(e - s));
         f[k] = s;
         fl[k] = (size_t)((tab ? tab : e) - s);
@@ -427,7 +437,7 @@ int fpakas_line(const char *line, size_t n, FpakasApp *a) {
         if (!tab) break;
         s = tab + 1;
     }
-    if (k != 9 || f[8] + fl[8] != e) return -1;            /* exactly nine fields, the last to the end */
+    if (k != 10 || f[9] + fl[9] != e) return -1;           /* exactly ten fields, the last to the end */
     memset(a, 0, sizeof *a);
     if (fl[0] >= sizeof a->id || fl[1] >= sizeof a->branch) return -1;
     memcpy(a->id, f[0], fl[0]);
@@ -446,6 +456,13 @@ int fpakas_line(const char *line, size_t n, FpakasApp *a) {
     if (fl[5] > FPAKAS_CATS_MAX) return -1;
     for (size_t i = 0; i < fl[5]; i++) if (!isalnum((unsigned char)f[5][i]) && f[5][i] != ';' && f[5][i] != '-') return -1;
     if (fl[8] != 1 || (f[8][0] != '0' && f[8][0] != '1')) return -1;
+    /* updated: "0", or 1 to 11 digits without a leading zero */
+    if (!fl[9] || fl[9] > 11 || (fl[9] > 1 && f[9][0] == '0')) return -1;
+    long long up = 0;
+    for (size_t i = 0; i < fl[9]; i++) {
+        if (!isdigit((unsigned char)f[9][i])) return -1;
+        up = up * 10 + (f[9][i] - '0');
+    }
     memcpy(a->name, f[2], fl[2]);
     memcpy(a->summary, f[3], fl[3]);
     memcpy(a->icon, f[4], fl[4]);
@@ -453,5 +470,6 @@ int fpakas_line(const char *line, size_t n, FpakasApp *a) {
     memcpy(a->license, f[6], fl[6]);
     memcpy(a->developer, f[7], fl[7]);
     a->verified = f[8][0] == '1';
+    a->updated = up;
     return 0;
 }

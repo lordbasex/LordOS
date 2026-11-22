@@ -57,6 +57,9 @@ static const char *doc =
     "  <icon type=\"remote\" width=\"64\">https://example.org/x.png</icon>\n"
     "  <categories><category>Utility</category><category>Calculator</category></categories>\n"
     "  <project_license>GPL-3.0-or-later</project_license>\n"
+    "  <releases><release timestamp=\"1700000000\" version=\"2\"/><release timestamp=\"1790000000\" version=\"3\">"
+    "<description><release timestamp=\"1999999999\"/></description></release><release timestamp=\"99999999999999\"/>"
+    "<release timestamp=\"0123\"/><release timestamp=\"-5\"/><release timestamp=\"17e9\"/></releases>\n"
     "  <bundle type=\"flatpak\" runtime=\"org.gnome.Platform/x86_64/48\">app/org.gnome.Calculator/x86_64/stable</bundle>\n"
     "  <custom><value key=\"flathub::verification::verified\">true</value><value key=\"other\">x</value></custom>\n"
     "</component>\n"
@@ -77,9 +80,10 @@ int main(void) {
     int n = run(doc, "es-AR");
     CHECK(n == 6);                                              /* every component counted */
     CHECK(lines_ok == 2);                                       /* two kept, both pass the check */
-    CHECK(strstr(got, "org.gnome.Calculator\tstable\tCalculadora\tHacer cálculos rápido\t64x64/org.gnome.Calculator.png\tUtility;Calculator;\tGPL-3.0-or-later\tThe GNOME Project\t1\n") != NULL);
+    CHECK(strstr(got, "org.gnome.Calculator\tstable\tCalculadora\tHacer cálculos rápido\t64x64/org.gnome.Calculator.png\tUtility;Calculator;\tGPL-3.0-or-later\tThe GNOME Project\t1\t1790000000\n") != NULL);
     CHECK(!strstr(got, "Not this") && !strstr(got, "GNOME\t") && !strstr(got, "Arm only") && !strstr(got, "Bad id"));
-    CHECK(strstr(got, "com.example.Tabby\tbeta\tTab name\t\t") != NULL);    /* a tab in a field never splits it */
+    CHECK(strstr(got, "com.example.Tabby\tbeta\tTab name\t\t") != NULL);
+    CHECK(strstr(got, "\tOld Style Dev\t0\t0\n") != NULL);                /* no release: updated 0 */    /* a tab in a field never splits it */
     CHECK(strstr(got, "Old Style Dev") != NULL);
     run(doc, "en");
     CHECK(strstr(got, "\tCalculator\tPerform & check <calculations> é😀\t") != NULL);
@@ -115,26 +119,34 @@ int main(void) {
     /* lines that must not pass */
     FpakasApp a;
     const char *bad[] = {
-        "org.x.Y\tstable\tName\tS\t64x64/../../a.png\t\t\t\t1\n",
-        "org.x.Y\tstable\tName\tS\t64x64/a.svg\t\t\t\t1\n",
-        "org.x.Y\tstable\tName\tS\t32x32/a.png\t\t\t\t1\n",
-        "org.x\tstable\tName\tS\t\t\t\t\t1\n",
-        "org.x.Y\t../b\tName\tS\t\t\t\t\t1\n",
-        "org.x.Y\tstable\t\tS\t\t\t\t\t1\n",
-        "org.x.Y\tstable\tName\tS\t\tUtil ity\t\t\t1\n",
-        "org.x.Y\tstable\tName\tS\t\t\t\t\t2\n",
+        "org.x.Y\tstable\tName\tS\t64x64/../../a.png\t\t\t\t1\t0\n",
+        "org.x.Y\tstable\tName\tS\t64x64/a.svg\t\t\t\t1\t0\n",
+        "org.x.Y\tstable\tName\tS\t32x32/a.png\t\t\t\t1\t0\n",
+        "org.x\tstable\tName\tS\t\t\t\t\t1\t0\n",
+        "org.x.Y\t../b\tName\tS\t\t\t\t\t1\t0\n",
+        "org.x.Y\tstable\t\tS\t\t\t\t\t1\t0\n",
+        "org.x.Y\tstable\tName\tS\t\tUtil ity\t\t\t1\t0\n",
+        "org.x.Y\tstable\tName\tS\t\t\t\t\t2\t0\n",
         "org.x.Y\tstable\tName\tS\t\t\t\t\t1\textra\n",
-        "org.x.Y\tstable\tNa\x01me\tS\t\t\t\t\t1\n",
+        "org.x.Y\tstable\tNa\x01me\tS\t\t\t\t\t1\t0\n",
         "org.x.Y\tstable\tName\tS\t\t\t\t\n",
+        "org.x.Y\tstable\tName\tS\t\t\t\t\t1\t\n",                 /* updated: empty */
+        "org.x.Y\tstable\tName\tS\t\t\t\t\t1\t017\n",              /* a leading zero */
+        "org.x.Y\tstable\tName\tS\t\t\t\t\t1\t-17\n",
+        "org.x.Y\tstable\tName\tS\t\t\t\t\t1\t123456789012\n",     /* 12 digits */
+        "org.x.Y\tstable\tName\tS\t\t\t\t\t1\t17 \n",
+        "org.x.Y\tstable\tName\tS\t\t\t\t\t1\n",                   /* nine fields (an old index) */
     };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) if (fpakas_line(bad[i], strlen(bad[i]), &a) == 0) { failc++; printf("FAIL bad line %zu passed\n", i); } else pass++;
-    const char *good = "org.x.Y\tstable\tName\tSum\t128x128/org.x.Y.png\tGame;\tMIT\tDev\t0\n";
-    CHECK(fpakas_line(good, strlen(good), &a) == 0 && !strcmp(a.icon, "128x128/org.x.Y.png") && !a.verified && !strcmp(a.name, "Name"));
+    const char *good = "org.x.Y\tstable\tName\tSum\t128x128/org.x.Y.png\tGame;\tMIT\tDev\t0\t1790000000\n";
+    CHECK(fpakas_line(good, strlen(good), &a) == 0 && !strcmp(a.icon, "128x128/org.x.Y.png") && !a.verified && !strcmp(a.name, "Name") && a.updated == 1790000000LL);
+    const char *zero = "org.x.Y\tstable\tName\tSum\t\t\t\t\t1\t0\n";
+    CHECK(fpakas_line(zero, strlen(zero), &a) == 0 && a.updated == 0 && a.verified);
 
     /* ---- descriptions ---- */
     run(doc, "en");                                             /* the calculator's, CDATA left out; Tabby has none */
     CHECK(descs_ok == 1 && descs_bad == 0 && !strcmp(desc_id, "org.gnome.Calculator") && !strcmp(desc, "Long text"));
-    CHECK(strstr(got, "\t1\n#d\torg.gnome.Calculator\tLong text\n") != NULL);   /* right after its app's line */
+    CHECK(strstr(got, "\t1\t1790000000\n#d\torg.gnome.Calculator\tLong text\n") != NULL);   /* right after its app's line */
     /* markup flattened: paragraphs apart, items on their own line, inline markup gone, spaces collapsed */
     CHECK(!strcmp(desc_of_body("<description>\n  <p>First  <em>big</em>\n  para<code>graph</code>.</p>\n"
                                "  <p>Second.</p><ul><li>One</li>\n<li> Two </li></ul><p>After.</p><ol><li>A</li><li>B</li></ol></description>", "en"),
