@@ -25,7 +25,15 @@ function List({ total, k }) {
   shown = { limit, more };
   return h(rt.View, null, h(MoreButton, { left: total - limit, onMore: more }));
 }
-const render = (props) => rt.render(h(EndsContext.Provider, { value: ends }, props ? h(List, props) : null));
+// one root (rt.render makes a new one each call); the scene changes what it shows
+let setProps = null;
+function Host() {
+  const [props, set] = React.useState({ total: 200, k: 'a' });
+  setProps = set;
+  return h(EndsContext.Provider, { value: ends }, props ? h(List, props) : null);
+}
+let mounted = false;
+const render = (props) => { if (!mounted) { mounted = true; rt.render(h(Host)); } else setProps(props); };
 const inTree = (id) => { for (let n = id; n; n = parents.get(n)) if (removed.has(n)) return false; return true; };
 const label = () => [...texts].filter(([id]) => inTree(id)).map(([, x]) => x).find((x) => x.startsWith('flathub.showMore')) || '';
 
@@ -76,4 +84,11 @@ ends.reset(); content = 5000;
 ends.check(4500, 800);
 await flush();
 check('after reset the same height pages again', shown.limit === 2 * PAGE, shown.limit);
+// a shelf not opened with "See all" pages nothing (total 0: flathubpages.js FlathubCategory)
+render({ total: 0, k: 'shelf' });
+await flush();
+content = 7000; ends.reset();
+ends.check(6500, 800);
+await flush();
+check('a list with nothing to page never grows', shown.limit === PAGE && label() === '', `${shown.limit} ${label()}`);
 process.exit(0);

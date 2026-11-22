@@ -15,7 +15,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 - **The Store's long lists load as you scroll, in development** (`apps/store/endless.js`, `index.jsx`,
   `flathubpages.js`, `debian.js`). Flathub's catalog (thousands of apps) and each Debian category no longer end in
   "Show more (2183 left)": the next 60 cards are drawn when the list is scrolled within a screen of its end, and a tall
-  window fills itself. Only the new cards are drawn (stable keys, memoized cards with a stable `onOpen`), so the grid is
+  window fills itself. The same for every Store list that can grow long: Debian search results (now up to the
+  engine's 500, apps then other packages; before, 60 with the other packages cut at 30), Installed (every app),
+  Updates (every Debian package with an update), and a Flathub category's "See all" (it stopped at 240). The web apps
+  (37) and LordOS's picks (18) are small bundled catalogs and stay whole; shelves with "See all" keep their few cards. Only the new cards are drawn (stable keys, memoized cards with a stable `onOpen`), so the grid is
   never redrawn whole per page. A small "Show more" stays at the end for the keyboard. Back from an app's page, the list
   is as long as it was, so it returns to where it was. Tested by `server/tests/store_endless_scene.mjs` (run by
   `run_suites.sh`).
