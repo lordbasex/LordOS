@@ -1624,6 +1624,39 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Test: `tests/theme_switch_headless.sh` (in `run_suites.sh`) switches a headless lord-server to a theme that throws,
   after the running theme's file was removed. The ws123 binary crashes there with the same `segfault at 170` at
   `2b8f60`. Now lord-server goes on with the recovery screen.
+- **Theme switches work after a package update, without logging out, in development (the latest release is
+  0.8.9.4)** (`server/src/sec/codesig.c` `codesig_reload`, approved by the maintainer on 2026-11-22). lord-server read
+  and verified the signed code manifest only once, at login, so after `dpkg` updated LordOS under a running session
+  every theme switch was refused ("size differs from the manifest") until the next log in; this is also what led to the
+  crash above. Now, before each bundle check, the verified-code check looks at the manifest pair's identity
+  (`code-manifest.json` and `code-manifest.sig`: device, inode, size, change and modification times), and when it
+  changed, or when a bundle does not match the manifest in use, it reads the pair again:
+  - From the same LordOS folder, through the descriptor opened at login (never a path the user can change), with the
+    same reader as the login check (now shared): each file read whole from one descriptor, `O_NOFOLLOW` (a link is
+    refused, at login too), regular files only, the same size limits.
+  - Only in a **verified** session (signed manifest at login), only a **signed** manifest whose signature verifies with
+    the key compiled into lord-server, through the same `codesig_parse` as at login, and only when the folder and both
+    files are owned by root and writable by nobody else.
+  - **Never an older version**: the manifest's `version` is compared in dpkg's order and an older one is refused; the
+    same version (a rebuild signed again) is accepted.
+  - **Rate-limited:** each pair on disk is read at most once (a pair caught half-written by `dpkg`, new manifest and
+    old signature, is refused, and read again when the signature arrives), and reads are at least one second apart.
+  - Only when everything verifies is the new manifest put in place, with one atomic pointer store (the app host's
+    bytecode thread sees the old one or the new one, never a mix; the replaced one is kept until the process ends, at
+    most 32 per session). The bundle is then checked once more, with the same bytes already read, so what is checked
+    is still what runs. Otherwise the manifest read before stays, and the refusal says why ("the updated manifest was
+    not accepted: …").
+  - A theme the check refused during an update can be chosen again once a newer manifest is in use
+    (`codesig_generation`; Settings → Appearance no longer marks it as failed). The running theme keeps working; a
+    development session (unsigned manifest) never reads a changed manifest.
+
+  Tests: `build/codesig-test` (100 checks, a throwaway key): a valid new manifest is accepted and the updated bundle
+  loads; a bad signature, another key, a truncated manifest, no signature, a symlinked manifest, a manifest, signature
+  or folder writable by others, a manifest not owned by the trusted owner and an older version are all refused with the
+  old manifest kept; the rate limit; no reload in a development session; a symlinked manifest at login; dpkg's version
+  order. `tests/theme_switch_headless.sh` adds "package updated under the session": a headless lord-server with a code
+  manifest, theme b and the manifest replaced as `dpkg` does, then the switch: b is refused, the changed unsigned
+  manifest is not taken, and the running theme comes back and keeps working.
 - **Two lord-server crashes in the maintainer's session: what was found, the fixes, and a crash report for the next
   one** (reported by the maintainer, 2026-11-22). Neither crash left a stack: the package's `lord-server` is stripped
   and no core is kept. What could be established, and what was changed:

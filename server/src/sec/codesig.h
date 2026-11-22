@@ -8,10 +8,16 @@
  * the 64-byte signature over the exact bytes of the manifest). <root> is the folder that holds
  * assets/ and themes/ (/usr/lib/lordos when installed).
  *
- * lord-server checks the signature once per process, with the public key compiled in, and the hash
+ * lord-server checks the signature at the start of each process, with the public key compiled in, and the hash
  * of every file before it runs it: codesig_load() reads the file from one descriptor (opened under
  * <root>, never following a link out of it), hashes exactly the bytes it read and returns those same
  * bytes, so what is checked is what runs (no TOCTOU).
+ *
+ * A package update under a running session replaces the manifest pair: codesig_load sees it (the files'
+ * dev/inode/size/times changed, or a bundle no longer matches) and codesig_reload reads it again from
+ * the same root folder, with the same reader and the same signature check as at the start, and uses it
+ * only if it verifies, is owned by root and writable by nobody else, and is not an older version; else
+ * the manifest read before stays. Only in the VERIFIED state (never for an unsigned manifest).
  *
  * States:
  *   VERIFIED     signed manifest, signature good: only listed files with the right hash load.
@@ -76,8 +82,24 @@ CodeState codesig_state(void);
 const char *codesig_state_name(CodeState s);     /* "verified", "development", "invalid", "unchecked" */
 const char *codesig_root(void);
 const char *codesig_reason(void);                /* why INVALID (or a DEVELOPMENT detail) */
-const CodeManifest *codesig_manifest(void);      /* NULL without a manifest */
+const CodeManifest *codesig_manifest(void);      /* the one in use, NULL without; stays valid until the next codesig_init_root */
 int codesig_release_build(void);                 /* 1 if built with RELEASE=1 */
+/* Reads the manifest pair again if it is no longer the one in use (see above). 1: a newer (or the
+ * same version's) signed manifest is now in use; 0: nothing changed, or not now (each pair on disk is
+ * read once, reads are at least a second apart); -1: refused, the manifest in use stays. Thread-safe;
+ * codesig_load calls it, so callers rarely need to. */
+int codesig_reload(void);
+/* How many manifests replaced the login one in this process (a refused theme may be tried again
+ * after it changes). */
+unsigned codesig_generation(void);
+/* dpkg's version order (<0, 0, >0): a reload never takes an older manifest. */
+int codesig_version_cmp(const char *a, const char *b);
+#ifdef LORD_CODESIG_TEST
+#include <sys/types.h>
+/* codesig-test only: who must own the manifest pair for a reload (root otherwise) and the
+ * minimum time between two reads (1000 ms otherwise). */
+void codesig_test_policy(uid_t owner, int interval_ms);
+#endif
 double codesig_ms(void);                         /* time spent verifying in this process */
 
 /* Reads one file of LordOS's code. On success returns a malloc'd, NUL-terminated buffer with exactly

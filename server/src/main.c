@@ -2589,6 +2589,8 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
     if (r == JS_REFUSED) {              /* lord.themes.use won't go back to it */
         snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", theme);
         snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "refused by the verified-code check (sec/codesig.c)");
+        ui.theme_failed_code = 1;
+        ui.theme_failed_gen = codesig_generation();
     }
     if (!greeter && codesig_state() != CODE_INVALID) {
         char root[PATH_MAX], tmp[PATH_MAX];
@@ -2706,11 +2708,13 @@ static int switch_theme(const char *current) {
         const char *why = js_init_error();     /* kept before the old theme's own start can overwrite it */
         snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", r == JS_REFUSED ? "refused by the verified-code check (sec/codesig.c)"
                  : why[0] ? why : "the theme's code did not load (see the log)");
+        ui.theme_failed_code = r == JS_REFUSED;
+        ui.theme_failed_gen = codesig_generation();
         js_shutdown();
         ui_reset();
         if (js_init(current)) {
             /* the theme that was running is refused too (its file changed under the running session: a package
-             * update rewrote it, and the code manifest checked is the one read at login). Never no JavaScript at
+             * update rewrote it and the new code manifest did not verify, sec/codesig.c codesig_reload). Never no JavaScript at
              * all: the main loop's next js_tick would call into a freed context (the 2026-11-22 13:41 crash,
              * JS_GetGlobalObject(NULL)). The recovery screen instead, as at start (start_theme). */
             fprintf(stderr, "lord-server: %s did not load again either: the recovery screen\n", current);

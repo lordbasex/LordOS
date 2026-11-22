@@ -166,23 +166,52 @@ int codesig_check_buf(const CodeManifest *m, const char *rel, const void *buf, s
 
 /* ---- the process's state ---- */
 
+/* What identifies one file of the manifest pair: a package update replaces it (new inode, new
+ * times), so a change is seen without reading it. present = 0: there is no such file. */
+typedef struct { int present; dev_t dev; ino_t ino; off_t size; long mts, mtn, cts, ctn; } FileId;
+typedef struct { FileId m, s; } PairId;
+
+#define CODE_RELOADS_MAX 32         /* manifests replaced in one process; then a log in is needed */
+
 static struct {
     CodeState state;
     char root[PATH_MAX];
     int rootfd;
     int release;
-    int have_manifest;
-    CodeManifest m;
+    CodeManifest *m;                /* the manifest in use (NULL without one); read with cur() */
+    CodeManifest *retired[CODE_RELOADS_MAX];   /* replaced ones, kept until reset: a caller may still hold one */
+    int nretired;
+    uint8_t pub[32];                /* the key the login check used; a reload uses the same one */
+    PairId id;                      /* the files the manifest in use was read from */
+    PairId tried;                   /* the last pair a reload looked at (each pair is read at most once) */
+    double last_try;                /* when (now_ms), for the rate limit */
+    unsigned generation;            /* manifests accepted so far in this process (0: the login one) */
+    char reload_why[96];            /* why the last reload was refused, for the refusal's reason */
     char reason[160];
     double ms;
     CodeRefusal refused[16];
     int nrefused;
 } cs = { .state = CODE_UNCHECKED, .rootfd = -1 };
 /* codesig_load also runs on the app host's bytecode thread (app/apphost_bc.c), after the state
- * was set up on the main thread: the manifest is read-only then, only the time spent and the
- * refusals change, under this lock */
+ * was set up on the main thread: only the time spent and the refusals change, under this lock;
+ * a reload (a new manifest after a package update) runs under rl_mu and publishes the new manifest
+ * with one atomic pointer store, so a reader sees the old manifest or the new one, never a mix */
 static pthread_mutex_t cs_mu = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t rl_mu = PTHREAD_MUTEX_INITIALIZER;
 static void add_ms(double dt) { pthread_mutex_lock(&cs_mu); cs.ms += dt; pthread_mutex_unlock(&cs_mu); }
+static CodeManifest *cur(void) { return __atomic_load_n(&cs.m, __ATOMIC_ACQUIRE); }
+
+/* Who may own the manifest pair for a reload: root; and the minimum time between two reads. Only
+ * codesig-test (built with LORD_CODESIG_TEST) may change them (codesig_test_policy); lord-server
+ * has no way to. */
+#ifndef LORD_CODESIG_TEST
+static const uid_t trusted_uid = 0;
+static const double reload_interval_ms = 1000;
+#else
+static uid_t trusted_uid = 0;
+static double reload_interval_ms = 1000;
+void codesig_test_policy(uid_t owner, int interval_ms) { trusted_uid = owner; reload_interval_ms = interval_ms; }
+#endif
 
 static double now_ms(void) {
     struct timespec t;
@@ -198,10 +227,12 @@ int codesig_release_build(void) {
 #endif
 }
 
-/* Reads a whole regular file from fd: at most max bytes; NULL if bigger, not regular or unreadable. */
-static char *read_fd(int fd, size_t max, size_t *len) {
+/* Reads a whole regular file from fd: at most max bytes; NULL if bigger, not regular or unreadable.
+ * stp (may be NULL) gets the file's stat. */
+static char *read_fd_st(int fd, size_t max, size_t *len, struct stat *stp) {
     struct stat st;
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size < 0 || (uint64_t)st.st_size > max) return NULL;
+    if (stp) *stp = st;
     size_t cap = (size_t)st.st_size + 1, n = 0;
     char *buf = malloc(cap + 1);
     if (!buf) return NULL;
@@ -216,6 +247,7 @@ static char *read_fd(int fd, size_t max, size_t *len) {
     *len = n;
     return buf;
 }
+static char *read_fd(int fd, size_t max, size_t *len) { return read_fd_st(fd, max, len, NULL); }
 
 /* Opens rel under the root without leaving it (no "..", no absolute links, no /proc magic). */
 static int open_beneath(const char *rel) {
@@ -236,12 +268,83 @@ static char *read_beneath(const char *rel, size_t max, size_t *len) {
     return b;
 }
 
+static void file_id(FileId *f, const struct stat *st) {
+    memset(f, 0, sizeof *f);
+    if (!st) return;
+    f->present = 1;
+    f->dev = st->st_dev;
+    f->ino = st->st_ino;
+    f->size = st->st_size;
+    f->mts = (long)st->st_mtim.tv_sec;
+    f->mtn = st->st_mtim.tv_nsec;
+    f->cts = (long)st->st_ctim.tv_sec;
+    f->ctn = st->st_ctim.tv_nsec;
+}
+static int file_id_eq(const FileId *a, const FileId *b) {
+    if (a->present != b->present) return 0;
+    return !a->present || (a->dev == b->dev && a->ino == b->ino && a->size == b->size && a->mts == b->mts &&
+                           a->mtn == b->mtn && a->cts == b->cts && a->ctn == b->ctn);
+}
+static int pair_id_eq(const PairId *a, const PairId *b) { return file_id_eq(&a->m, &b->m) && file_id_eq(&a->s, &b->s); }
+
+/* The pair as it is on disk now, without opening it (a link is seen as the link itself). */
+static void pair_id_now(PairId *id) {
+    struct stat st;
+    file_id(&id->m, fstatat(cs.rootfd, CODE_MANIFEST, &st, AT_SYMLINK_NOFOLLOW) ? NULL : &st);
+    file_id(&id->s, fstatat(cs.rootfd, CODE_SIGNATURE, &st, AT_SYMLINK_NOFOLLOW) ? NULL : &st);
+}
+
+/* Owned by the trusted owner (root) and not writable by its group or by others. */
+static int owner_ok(const struct stat *st) { return st->st_uid == trusted_uid && !(st->st_mode & (S_IWGRP | S_IWOTH)); }
+
+/* Opens one file of the pair, directly in the root: never a link (O_NOFOLLOW; the name has no '/'),
+ * never a FIFO left waiting (O_NONBLOCK; read_fd_st takes only a regular file). */
+static int open_pair_file(const char *name) {
+    return openat(cs.rootfd, name, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK);
+}
+
+/* Reads code-manifest.json and code-manifest.sig from the root folder held open since the login
+ * check: the one reader for the login check and for a reload. Each is read whole from one
+ * descriptor, regular files only, never through a link, within the size limits. *mtext / *stext are
+ * NULL when missing (or refused: a link, not a regular file, too big; mwhy says which for the
+ * manifest). id gets what was read; *trusted is 1 when the root folder and both files are owned by
+ * root and writable by nobody else (a reload needs that; the login check only records it). */
+static void read_pair(char **mtext, size_t *mlen, char **stext, size_t *slen, PairId *id, int *trusted,
+                      char *mwhy, size_t mwhylen) {
+    struct stat st, rst;
+    *mtext = *stext = NULL;
+    *mlen = *slen = 0;
+    memset(id, 0, sizeof *id);
+    snprintf(mwhy, mwhylen, "no %s", CODE_MANIFEST);
+    int ok = !fstat(cs.rootfd, &rst) && owner_ok(&rst);
+    int fd = open_pair_file(CODE_MANIFEST);
+    if (fd >= 0) {
+        if ((*mtext = read_fd_st(fd, CODE_MANIFEST_MAX, mlen, &st))) { file_id(&id->m, &st); ok = ok && owner_ok(&st); }
+        else snprintf(mwhy, mwhylen, "%s is not a regular file within the size limit", CODE_MANIFEST);
+        close(fd);
+    } else if (errno == ELOOP) snprintf(mwhy, mwhylen, "%s is a link", CODE_MANIFEST);
+    fd = open_pair_file(CODE_SIGNATURE);
+    if (fd >= 0) {
+        if ((*stext = read_fd_st(fd, 4096, slen, &st))) { file_id(&id->s, &st); ok = ok && owner_ok(&st); }
+        else ok = 0;                /* there is something, but not a signature that can be read */
+        close(fd);
+    } else if (errno != ENOENT) ok = 0;
+    *trusted = ok && *mtext;
+}
+
 static void reset(void) {
-    codesig_free(&cs.m);
+    CodeManifest *m = cur();
+    if (m) { codesig_free(m); free(m); }
+    for (int i = 0; i < cs.nretired; i++) { codesig_free(cs.retired[i]); free(cs.retired[i]); }
+    __atomic_store_n(&cs.m, NULL, __ATOMIC_RELEASE);
+    cs.nretired = 0;
     if (cs.rootfd >= 0) close(cs.rootfd);
     cs.rootfd = -1;
-    cs.have_manifest = 0;
-    cs.root[0] = cs.reason[0] = 0;
+    cs.root[0] = cs.reason[0] = cs.reload_why[0] = 0;
+    memset(&cs.id, 0, sizeof cs.id);
+    memset(&cs.tried, 0, sizeof cs.tried);
+    cs.last_try = 0;
+    cs.generation = 0;
     cs.nrefused = 0;
     cs.ms = 0;
     cs.state = CODE_UNCHECKED;
@@ -251,6 +354,8 @@ CodeState codesig_init_root(const char *root, const uint8_t pub[32], int release
     reset();
     double t0 = now_ms();
     cs.release = release;
+    memcpy(cs.pub, pub, 32);
+    int trusted = 0;
     if (!root || !realpath(root, cs.root) || (cs.rootfd = open(cs.root, O_RDONLY | O_DIRECTORY | O_CLOEXEC)) < 0) {
         snprintf(cs.reason, sizeof cs.reason, "no LordOS folder");
         cs.root[0] = 0;
@@ -258,23 +363,29 @@ CodeState codesig_init_root(const char *root, const uint8_t pub[32], int release
         goto done;
     }
     size_t mlen = 0, slen = 0;
-    char *mtext = read_beneath(CODE_MANIFEST, CODE_MANIFEST_MAX, &mlen);
-    char *stext = read_beneath(CODE_SIGNATURE, 4096, &slen);
+    char *mtext, *stext, mwhy[96];
+    read_pair(&mtext, &mlen, &stext, &slen, &cs.id, &trusted, mwhy, sizeof mwhy);
+    cs.tried = cs.id;
     if (!mtext) {
-        snprintf(cs.reason, sizeof cs.reason, "no %s", CODE_MANIFEST);
+        snprintf(cs.reason, sizeof cs.reason, "%s", mwhy);
         cs.state = release ? CODE_INVALID : CODE_DEVELOPMENT;
     } else if (!stext && release) {
         snprintf(cs.reason, sizeof cs.reason, "unsigned manifest in a release build");
         cs.state = CODE_INVALID;
     } else {
         char err[128];
-        if (codesig_parse(mtext, mlen, stext, slen, pub, &cs.m, err, sizeof err)) {
+        CodeManifest *m = calloc(1, sizeof *m);
+        if (!m) {
+            snprintf(cs.reason, sizeof cs.reason, "out of memory");
+            cs.state = CODE_INVALID;
+        } else if (codesig_parse(mtext, mlen, stext, slen, pub, m, err, sizeof err)) {
+            free(m);
             snprintf(cs.reason, sizeof cs.reason, "%s", err);
             cs.state = CODE_INVALID;
         } else {
-            cs.have_manifest = 1;
-            cs.state = cs.m.signed_ok ? CODE_VERIFIED : CODE_DEVELOPMENT;
-            if (!cs.m.signed_ok) snprintf(cs.reason, sizeof cs.reason, "unsigned manifest");
+            __atomic_store_n(&cs.m, m, __ATOMIC_RELEASE);
+            cs.state = m->signed_ok ? CODE_VERIFIED : CODE_DEVELOPMENT;
+            if (!m->signed_ok) snprintf(cs.reason, sizeof cs.reason, "unsigned manifest");
         }
     }
     free(mtext);
@@ -282,7 +393,9 @@ CodeState codesig_init_root(const char *root, const uint8_t pub[32], int release
 done:
     cs.ms += now_ms() - t0;
     fprintf(stderr, "code: %s (%s%s%s) in %.2f ms, %d files listed\n", codesig_state_name(cs.state), cs.root[0] ? cs.root : "-",
-            cs.reason[0] ? ": " : "", cs.reason, cs.ms, cs.have_manifest ? cs.m.nfiles : 0);
+            cs.reason[0] ? ": " : "", cs.reason, cs.ms, cur() ? cur()->nfiles : 0);
+    if (cs.state == CODE_VERIFIED && !trusted)
+        fprintf(stderr, "code: the manifest is not owned by root or others can write it: an update under this session needs a new log in\n");
     return cs.state;
 }
 
@@ -308,7 +421,8 @@ CodeState codesig_init(const char *assets_dir) {
 CodeState codesig_state(void) { return cs.state; }
 const char *codesig_root(void) { return cs.root; }
 const char *codesig_reason(void) { return cs.reason; }
-const CodeManifest *codesig_manifest(void) { return cs.have_manifest ? &cs.m : NULL; }
+const CodeManifest *codesig_manifest(void) { return cur(); }
+unsigned codesig_generation(void) { return __atomic_load_n(&cs.generation, __ATOMIC_ACQUIRE); }
 double codesig_ms(void) { pthread_mutex_lock(&cs_mu); double v = cs.ms; pthread_mutex_unlock(&cs_mu); return v; }
 int codesig_refused_count(void) { pthread_mutex_lock(&cs_mu); int v = cs.nrefused; pthread_mutex_unlock(&cs_mu); return v; }
 CodeRefusal *codesig_refused(int i) { return i >= 0 && i < codesig_refused_count() ? &cs.refused[i] : NULL; }
@@ -335,6 +449,96 @@ static void refuse(const char *rel, const char *why) {
         cs.nrefused++;                  /* after the entry is complete */
     }
     pthread_mutex_unlock(&cs_mu);
+}
+
+/* ---- a new manifest under a running session (a package update) ---- */
+
+/* dpkg's order of versions (verrevcmp): digits compare as numbers; between them '~' sorts before
+ * everything, even the end, letters before other characters. The manifest's version is the
+ * package's (package.json: "0.8.9.4", "0.8.6+v087.21"). <0, 0, >0. */
+static int vorder(int c) {
+    if (c >= '0' && c <= '9') return 0;
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) return c;
+    if (c == '~') return -1;
+    return c ? c + 256 : 0;
+}
+int codesig_version_cmp(const char *a, const char *b) {
+    while (*a || *b) {
+        int first = 0;
+        while ((*a && !(*a >= '0' && *a <= '9')) || (*b && !(*b >= '0' && *b <= '9'))) {
+            int ac = vorder((unsigned char)*a), bc = vorder((unsigned char)*b);
+            if (ac != bc) return ac - bc;
+            a++;
+            b++;
+        }
+        while (*a == '0') a++;
+        while (*b == '0') b++;
+        while (*a >= '0' && *a <= '9' && *b >= '0' && *b <= '9') {
+            if (!first) first = *a - *b;
+            a++;
+            b++;
+        }
+        if (*a >= '0' && *a <= '9') return 1;
+        if (*b >= '0' && *b <= '9') return -1;
+        if (first) return first;
+    }
+    return 0;
+}
+
+/* Reads the manifest pair again when it is not the one in use: only in a verified session, only
+ * from the root folder held open since login, only root-owned files nobody else can write, only
+ * with a good signature by the same compiled-in key (codesig_parse, as at login), and never an
+ * older version. Each pair on disk is read at most once and reads are at least reload_interval_ms
+ * apart. 1: a new manifest is in use; 0: nothing to do (unchanged, or not now); -1: refused, the
+ * one in use stays (cs.reload_why says why). */
+int codesig_reload(void) {
+    if (cs.state != CODE_VERIFIED || cs.rootfd < 0 || !cur()) return 0;
+    pthread_mutex_lock(&rl_mu);
+    int r = 0;
+    PairId now;
+    pair_id_now(&now);
+    double t = now_ms();
+    if (pair_id_eq(&now, &cs.id)) { cs.reload_why[0] = 0; goto out; }
+    if (pair_id_eq(&now, &cs.tried)) goto out;
+    if (cs.last_try > 0 && t - cs.last_try < reload_interval_ms) goto out;
+    cs.tried = now;
+    cs.last_try = t;
+    r = -1;
+    CodeManifest *old = cur(), *m = NULL;
+    size_t mlen, slen;
+    char *mtext, *stext, mwhy[96], err[128];
+    PairId id;
+    int trusted;
+    /* cs.tried stays what the stat saw (a link or a missing file has no read identity): if the pair
+     * changed again between the stat and the read, the next call reads it once more */
+    read_pair(&mtext, &mlen, &stext, &slen, &id, &trusted, mwhy, sizeof mwhy);
+    if (!mtext) snprintf(cs.reload_why, sizeof cs.reload_why, "%s", mwhy);
+    else if (!stext) snprintf(cs.reload_why, sizeof cs.reload_why, "unsigned manifest");
+    else if (!trusted) snprintf(cs.reload_why, sizeof cs.reload_why, "the manifest is not owned by root or others can write it");
+    else if (cs.nretired >= CODE_RELOADS_MAX) snprintf(cs.reload_why, sizeof cs.reload_why, "too many updates in this session");
+    else if (!(m = calloc(1, sizeof *m))) snprintf(cs.reload_why, sizeof cs.reload_why, "out of memory");
+    else if (codesig_parse(mtext, mlen, stext, slen, cs.pub, m, err, sizeof err)) snprintf(cs.reload_why, sizeof cs.reload_why, "%.90s", err);
+    else if (!m->signed_ok) snprintf(cs.reload_why, sizeof cs.reload_why, "unsigned manifest");
+    else if (codesig_version_cmp(m->version, old->version) < 0)
+        snprintf(cs.reload_why, sizeof cs.reload_why, "version %.20s is older than %.20s", m->version, old->version);
+    else {
+        cs.retired[cs.nretired++] = old;            /* a caller may still hold it: freed at reset */
+        __atomic_store_n(&cs.m, m, __ATOMIC_RELEASE);
+        __atomic_add_fetch(&cs.generation, 1, __ATOMIC_ACQ_REL);
+        cs.id = id;
+        cs.reload_why[0] = 0;
+        m = NULL;
+        r = 1;
+        fprintf(stderr, "code: the signed manifest changed under this session (%s -> %s, %d files): verified and in use\n",
+                old->version, cur()->version, cur()->nfiles);
+    }
+    if (m) { codesig_free(m); free(m); }
+    if (r < 0) fprintf(stderr, "code: the manifest changed under this session but was not accepted: %s; the one read before stays\n", cs.reload_why);
+    free(mtext);
+    free(stext);
+out:
+    pthread_mutex_unlock(&rl_mu);
+    return r;
 }
 
 char *codesig_load(const char *path, size_t max, size_t *len, char *why, size_t whylen) {
@@ -366,13 +570,29 @@ char *codesig_load(const char *path, size_t max, size_t *len, char *why, size_t 
     }
     buf = read_beneath(rel, max, &n);
     if (!buf) { snprintf(why, whylen, "cannot read it"); return NULL; }   /* missing: not a modification */
-    if (!cs.have_manifest) {
+    /* a package update replaced the manifest pair: the new one, if it verifies (codesig_reload) */
+    int reloaded = codesig_reload() > 0;
+    const CodeManifest *m = cur();
+    if (!m) {
         /* development build without a manifest: runs, flagged in About */
         add_ms(now_ms() - t0);
         *len = n;
         return buf;
     }
-    if (codesig_check_buf(&cs.m, rel, buf, n, why, whylen)) {
+    int bad = codesig_check_buf(m, rel, buf, n, why, whylen);
+    if (bad && !reloaded && codesig_reload() > 0) {
+        /* the file differs from the manifest in use and a newer signed one just verified: the same
+         * bytes are checked once more against it (never read again: what is checked is what runs) */
+        m = cur();
+        bad = codesig_check_buf(m, rel, buf, n, why, whylen);
+    }
+    if (bad) {
+        pthread_mutex_lock(&rl_mu);
+        if (cs.reload_why[0]) {
+            size_t k = strlen(why);
+            snprintf(why + k, whylen - k, " (the updated manifest was not accepted: %s)", cs.reload_why);
+        }
+        pthread_mutex_unlock(&rl_mu);
         free(buf);
         refuse(rel, why);
         return NULL;

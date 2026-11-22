@@ -152,6 +152,8 @@ typedef struct {
     char theme_request[1024];       /* lord.themes.use(): bundle to load */
     char theme_failed[1024];        /* last bundle that failed to load */
     char theme_failed_why[1024];    /* why (the exception, or the verified-code check): Settings → Appearance's report */
+    int theme_failed_code;          /* it was the verified-code check: tried again once a newer manifest is in use */
+    unsigned theme_failed_gen;      /* codesig_generation() when it was refused */
     uint64_t serial;                /* the last node's serial (node_new) */
 } Ui;
 

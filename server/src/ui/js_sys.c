@@ -33,6 +33,7 @@
 #include "../sec/pkgapp.h"
 #include "../sec/pkgstate.h"
 #include "../sec/perms.h"
+#include "../sec/codesig.h"
 #include "../app/app.h"
 #include "../ime.h"
 #include "../meminfo.h"
@@ -461,6 +462,16 @@ static void themes_root(char *out, size_t size) {
     snprintf(out, size, "%s", dirname(tmp));
 }
 
+/* lord.themes.use won't go back to a theme that failed in this session; one the verified-code check
+ * refused may be tried again once a newer signed manifest is in use (a package update under the
+ * session: sec/codesig.c, codesig_reload) */
+static int theme_blocked(const char *bundle) {
+    if (strcmp(bundle, ui.theme_failed)) return 0;
+    if (!ui.theme_failed_code) return 1;
+    codesig_reload();
+    return codesig_generation() == ui.theme_failed_gen;
+}
+
 static JSValue f_themes_list(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
     char root[PATH_MAX], cur[PATH_MAX];
@@ -484,7 +495,7 @@ static JSValue f_themes_list(JSContext *c, JSValueConst this_val, int argc, JSVa
         JS_SetPropertyStr(c, o, "meta", json ? JS_NewString(c, json) : JS_NULL);
         JS_SetPropertyStr(c, o, "current", JS_NewBool(c, realpath(meta, real) && !strcmp(real, cur)));
         /* it failed to start in this session (lord.themes.use refuses it): Settings → Appearance says so */
-        if (!strcmp(bundle, ui.theme_failed)) {
+        if (theme_blocked(bundle)) {
             JS_SetPropertyStr(c, o, "failed", JS_TRUE);
             JS_SetPropertyStr(c, o, "failedWhy", JS_NewString(c, ui.theme_failed_why));
         }
@@ -505,7 +516,7 @@ static JSValue f_themes_use(JSContext *c, JSValueConst this_val, int argc, JSVal
         themes_root(root, sizeof root);
         snprintf(bundle, sizeof bundle, "%s/%s/theme.bundle.js", root, id);
         ok = access(bundle, R_OK) == 0 && strlen(bundle) < sizeof ui.theme_request &&
-             strcmp(bundle, ui.theme_failed) != 0;
+             !theme_blocked(bundle);
         if (ok) snprintf(ui.theme_request, sizeof ui.theme_request, "%s", bundle);
     }
     JS_FreeCString(c, id);

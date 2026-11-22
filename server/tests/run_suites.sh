@@ -269,7 +269,8 @@ EOF
         77) skip "wayland-fuzz" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "wayland-fuzz (tests/wlfuzz_client.c, headless lord-server)"; cat "$T/out" ;;
     esac
-    # a theme switch where the new theme and the running one both fail: the recovery screen, never no JS at all
+    # a theme switch where the new theme and the running one both fail: the recovery screen, never no JS at all; and
+    # one after a package update under the session: the running theme comes back, a changed unsigned manifest is never taken
     sh tests/theme_switch_headless.sh >"$T/out" 2>&1
     case $? in
         0) ok "theme-switch-fails (tests/theme_switch_headless.sh, headless lord-server)" ;;
