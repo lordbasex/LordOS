@@ -35,6 +35,7 @@
 #include "../wl/wl.h"
 #include "../gpu/gpu.h"
 #include "../gpu/dmaread.h"
+#include "../gpu/gband.h"
 #include <drm/drm_fourcc.h>
 #include "../sec/json.h"
 #include "../sec/perms.h"
@@ -1400,7 +1401,7 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 #define MAX_SESS 4
 /* one dmabuf of a 3D machine's picture (VD_DMABUF) and its import: a texture of the desktop's GPU (tex) or of the reader
  * on the buffer's own render node (ri, gpu/dmaread.h); gfail/rfail: that one refused it (not tried again for this dmabuf) */
-typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; DmaImg *ri; int gfail, rfail; unsigned used; } VmDmabuf;
+typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; DmaImg *ri; int gfail, rfail; unsigned used, gen; } VmDmabuf;
 typedef struct {
     int used, vm, vd, err;              /* channels; lord-vm's stderr (until its log is open) */
     pid_t vm_pid, vd_pid;
@@ -1480,10 +1481,14 @@ typedef struct {
      * picture without a readback"): the desktop GPU's own import of QEMU's dmabuf (VmDmabuf.tex, a Linux 3D machine),
      * or for an Intel vGPU's picture two linear copies made on the iGPU (gout), imported by the desktop's GPU: one is
      * shown (gshow) while the next frame is copied into the other (gpend, until its fence on the copy's dmabuf
-     * signals). y0..y1: rows that copy lacks (the frames copied into the other one since). The copy also tests whether
+     * signals). gstale: the rows each copy lacks (gpu/gband.h: the frames copied into the other one since; all of them
+     * for a copy just made or imported, and for both when the picture's source changes). The copy also tests whether
      * anything changed (QEMU's vfio display sends the whole picture every refresh, changed or not): a frame that
      * didn't is acknowledged at once and nothing is presented */
-    struct { DmaOut *o; GpuTex *tex; int w, h, y0, y1; } gout[2];
+    struct { DmaOut *o; GpuTex *tex; int w, h; } gout[2];
+    GBand gstale[2];
+    unsigned gsrc;                      /* the dmabuf (VmDmabuf.gen) the copies were last made from; 0 none */
+    unsigned db_gen;
     int gshow, gpend, gfail;
     int gcopy_y0, gcopy_y1;             /* the frame's rows in the copy in flight */
     int db_more;                        /* frames came while a copy was in flight: another copy after it */
@@ -1916,6 +1921,7 @@ static void gout_free(Sess *s) {
         memset(&s->gout[k], 0, sizeof s->gout[k]);
     }
     s->gshow = s->gpend = -1;
+    s->gsrc = 0;
 }
 
 static void db_free(Sess *s, int i) {
@@ -1953,6 +1959,7 @@ static void db_take(Sess *s, const VdMsg *m, int fd) {
         db_free(s, k);
         s->db[k].fd = fd; s->db[k].ino = st.st_ino; s->db[k].w = m->a; s->db[k].h = m->b; s->db[k].stride = st_stride;
         s->db[k].fourcc = (uint32_t)m->d; s->db[k].mod = mod;
+        s->db[k].gen = ++s->db_gen ? s->db_gen : ++s->db_gen;
     }
     s->db[k].flip = flip;
     s->db[k].used = ++s->db_tick;
@@ -1979,7 +1986,7 @@ static int gout_ready(Sess *s, const VmDmabuf *d) {
             s->gout[k].w = d->w; s->gout[k].h = d->h;
             if (!s->gout[k].o) return -1;
             s->gout[k].tex = NULL;
-            s->gout[k].y0 = 0; s->gout[k].y1 = d->h;    /* nothing in it yet */
+            gband_all(&s->gstale[k], d->h);             /* nothing in it yet */
             if (s->gshow == k) s->gshow = -1;
         }
         if (!s->gout[k].tex) {
@@ -1988,7 +1995,7 @@ static int gout_ready(Sess *s, const VmDmabuf *d) {
                             .fd = { fd, -1, -1, -1 }, .offset = { 0 }, .stride = { (uint32_t)stride } };
             s->gout[k].tex = fd >= 0 ? gpu_tex_dmabuf(&b) : NULL;
             if (!s->gout[k].tex) return -1;
-            s->gout[k].y0 = 0; s->gout[k].y1 = d->h;    /* a new import: copied whole next time */
+            gband_all(&s->gstale[k], d->h);             /* a new import: copied whole next time */
             if (s->gshow == k) s->gshow = -1;
         }
     }
@@ -2080,18 +2087,15 @@ static int db_read(Sess *s, MediaSrc *ms, int *ry0, int *ry1) {
     if (show && d->ri && !s->gfail) {
         if (!gout_ready(s, d)) {
             int k = s->gshow == 0 ? 1 : 0;
-            int cy0 = s->gout[k].y1 > s->gout[k].y0 && s->gout[k].y0 < y0 ? s->gout[k].y0 : y0;
-            int cy1 = s->gout[k].y1 > s->gout[k].y0 && s->gout[k].y1 > y1 ? s->gout[k].y1 : y1;
+            /* another dmabuf than the copies were made from (a new attach, the guest flipped to another buffer): what
+             * either copy holds says nothing about it, so every row is copied (both copies, in turn) */
+            if (s->gsrc != d->gen) { gband_all(&s->gstale[0], d->h); gband_all(&s->gstale[1], d->h); s->gsrc = d->gen; }
+            GBand c = gband_copy(&s->gstale[k], y0, y1, d->h);
             const DmaOut *prev = s->gshow >= 0 ? s->gout[s->gshow].o : NULL;
-            if (!dmaread_copy(d->ri, s->gout[k].o, cy0, cy1 - cy0, d->flip, prev)) {
-                s->gout[k].y0 = s->gout[k].y1 = 0;
-                if (s->gshow >= 0) {        /* the shown copy lacks this frame's rows now */
-                    int o = s->gshow;
-                    if (s->gout[o].y1 <= s->gout[o].y0) { s->gout[o].y0 = y0; s->gout[o].y1 = y1; }
-                    else { if (y0 < s->gout[o].y0) s->gout[o].y0 = y0; if (y1 > s->gout[o].y1) s->gout[o].y1 = y1; }
-                }
+            if (!dmaread_copy(d->ri, s->gout[k].o, c.y0, c.y1 - c.y0, d->flip, prev)) {
+                gband_copied(s->gstale, k, y0, y1);     /* the other copy lacks this frame's rows now */
                 s->gpend = k;
-                s->gcopy_y0 = y0; s->gcopy_y1 = y1;
+                s->gcopy_y0 = c.y0; s->gcopy_y1 = c.y1;   /* the rows copied: all of them for a new source */
                 /* frames that come while it's in flight start a new band */
                 s->db_y0 = INT_MAX; s->db_y1 = INT_MIN; s->db_more = 0;
                 s->db_reads++;
@@ -2391,6 +2395,10 @@ static void set_picture(Sess *s, int w, int h) {
     uint8_t *map = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (map == MAP_FAILED) { close(fd); return; }
     MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
+    /* a new picture (an attach, another size): no texture of the one before is shown over it, and the copies of a
+     * vGPU's picture start again, whole */
+    gout_free(s);
+    if (m && m->gtex) { m->gtex = NULL; m->gpu_drawn = 0; }
     if (!m) m = media_src_new(SK_IMAGE, "machines");
     if (!m) { munmap(map, len); close(fd); return; }
     if (m->map) munmap(m->map, m->map_len);

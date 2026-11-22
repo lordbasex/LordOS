@@ -29,6 +29,7 @@
 #include "vmimport.h"
 #include "vmunattend.h"
 #include "vmgvtwin.h"
+#include "vmlog.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -119,8 +120,17 @@ static const char *const REASON_NAME[VR_COUNT] = {
 
 /* ---- log ---- */
 
+static long long now_ms_log(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
 static int log_fd = -1, log_stderr = 1;
 static off_t log_bytes;
+/* the folder lord-vm.log is rotated in when it reaches LOG_CAP (vmlog.h); "" none: that log stops at its cap */
+static char log_dir[PATH_MAX];
+#define LOG_KEEP 3                      /* lord-vm.log, .1 and .2: at most 3 x LOG_CAP */
 
 static void vlog(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void vlog(const char *fmt, ...) {
@@ -137,20 +147,58 @@ static void vlog(const char *fmt, ...) {
     va_end(ap);
     n += k < 0 ? 0 : k >= (int)(sizeof line - (size_t)n - 1) ? (int)(sizeof line - (size_t)n - 2) : k;
     line[n++] = '\n';
+    /* full: rotated, never silent for the rest of the run (before 2026-11-22 it stopped writing at the cap) */
+    if (log_fd >= 0 && log_dir[0] && log_bytes + n > LOG_CAP) {
+        close(log_fd);
+        log_fd = vmlog_rotate(log_dir, "lord-vm", LOG_KEEP);
+        log_bytes = 0;
+        static const char head[] = "lord-vm: the log goes on in a new file (lord-vm.1.log holds what came before)\n";
+        if (log_fd >= 0 && write(log_fd, head, sizeof head - 1) > 0) log_bytes += (off_t)sizeof head - 1;
+    }
     if (log_fd >= 0 && log_bytes < LOG_CAP) { if (write(log_fd, line, (size_t)n) > 0) log_bytes += n; }
     if (log_stderr) { ssize_t w = write(2, line, (size_t)n); (void)w; }
 }
 
-/* raw bytes from a child's stderr into the log, line by line */
+/* A child's stderr (QEMU, passt) into the log: whole lines, however its writes were cut, and a line that comes again
+ * logged once, then counted (vmlog.h): QEMU calling a closed D-Bus listener wrote the same error every 30 ms */
+typedef struct { const char *who; VmLineBuf lines; VmLogRep rep; } ChildLog;
+static ChildLog child_log[] = { { .who = "qemu" }, { .who = "passt" }, { .who = "child" } };
+#define CHILD_LOGS ((int)(sizeof child_log / sizeof child_log[0]))
+
+static ChildLog *child_of(const char *who) {
+    for (int i = 0; i < CHILD_LOGS - 1; i++) if (!strcmp(child_log[i].who, who)) return &child_log[i];
+    return &child_log[CHILD_LOGS - 1];
+}
+
+static void child_line(void *ctx, const char *line, size_t n) {
+    ChildLog *c = ctx;
+    char sum[160];
+    int say = vmlog_repeat(&c->rep, line, n, now_ms_log(), sum, sizeof sum);
+    if (sum[0]) vlog("%s: %s", c->who, sum);
+    if (say) vlog("%s: %.*s", c->who, (int)(n > 900 ? 900 : n), line);
+}
+
 static void log_child(const char *who, const char *buf, size_t n) {
-    while (n) {
-        const char *nl = memchr(buf, '\n', n);
-        size_t l = nl ? (size_t)(nl - buf) : n;
-        if (l) vlog("%s: %.*s", who, (int)(l > 900 ? 900 : l), buf);
-        if (!nl) break;
-        buf = nl + 1;
-        n -= l + 1;
+    ChildLog *c = child_of(who);
+    vmlog_lines(&c->lines, buf, n, child_line, c);
+}
+
+/* the loop's tick: repeats not said yet (force: the run ends, and a line cut short is said too) */
+static void child_logs_tick(long long now, int force) {
+    for (int i = 0; i < CHILD_LOGS; i++) {
+        ChildLog *c = &child_log[i];
+        if (force) vmlog_lines_flush(&c->lines, child_line, c);
+        char sum[160];
+        if (vmlog_repeat_tick(&c->rep, force ? c->rep.said_at + VMLOG_SUMMARY_MS : now, sum, sizeof sum)) vlog("%s: %s", c->who, sum);
     }
+}
+
+/* when the next summary of repeats is due, or -1 */
+static long long child_logs_next(void) {
+    long long next = -1;
+    for (int i = 0; i < CHILD_LOGS; i++)
+        if (child_log[i].rep.rep && (next < 0 || child_log[i].rep.said_at + VMLOG_SUMMARY_MS < next)) next = child_log[i].rep.said_at + VMLOG_SUMMARY_MS;
+    return next;
 }
 
 /* ---- small utilities ---- */
@@ -1001,6 +1049,9 @@ static struct {
     int lag_open, lag_place;
     uint32_t lag_win_ids[LAG_WIN_MAX];      /* the guest's last window list (apps mode), for a drop on one of them */
     int lag_win_n;
+    /* the icons of the windows in that list, as VM_WINDATA gave them (lag_windata): given again to a client that turns
+     * apps mode on (lord-server re-attached after a restart), since the guest sends each window's icon once */
+    struct { uint32_t id; uint8_t *data; size_t n; } lag_icons[LAG_WIN_MAX];
     char fx_otok[AG_OPEN_TOKEN + 1];
     Sha256 fx_hs;
     OpWait opw[OP_MAX];
@@ -4497,8 +4548,40 @@ static int clip_waiting(uint32_t gen, int form) {
 }
 
 /* ---- apps mode (7.2): the guest's windows, icons and apps, checked here and handed to lord-server ---- */
+static void lag_icons_forget(int all) {
+    for (int i = 0; i < LAG_WIN_MAX; i++) {
+        if (!S.lag_icons[i].data) continue;
+        int listed = 0;
+        for (int k = 0; k < S.lag_win_n && !all && !listed; k++) listed = S.lag_win_ids[k] == S.lag_icons[i].id;
+        if (!listed) { free(S.lag_icons[i].data); memset(&S.lag_icons[i], 0, sizeof S.lag_icons[i]); }
+    }
+}
+
+static void lag_icon_keep(uint32_t id, const uint8_t *data, size_t n) {
+    int k = -1;
+    for (int i = 0; i < LAG_WIN_MAX && k < 0; i++) if (S.lag_icons[i].data && S.lag_icons[i].id == id) k = i;
+    for (int i = 0; i < LAG_WIN_MAX && k < 0; i++) if (!S.lag_icons[i].data) k = i;
+    uint8_t *c = k >= 0 ? malloc(n) : NULL;
+    if (!c) return;
+    memcpy(c, data, n);
+    free(S.lag_icons[k].data);
+    S.lag_icons[k].id = id; S.lag_icons[k].data = c; S.lag_icons[k].n = n;
+}
+
+/* VM_WINDATA as a sealed memfd to one client (ci) or all (-1) */
+static void windata_send(int ci, const uint8_t *out, size_t n, int kind) {
+    if (!n || n > VM_WINDATA_MAX) return;
+    int fd = memfd_create("lordos-vm-windows", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    if (fd >= 0 && !write_all(fd, out, n) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+        VmMsg m = vm_msg(VM_WINDATA, 0, (int)n, kind, S.lag_applist_gen, 0, "");
+        for (int i = 0; i < MAX_CLIENTS; i++) if (ci < 0 || i == ci) send_to(i, &m, fd);
+    }
+    if (fd >= 0) close(fd);
+}
+
 static void lag_windows_off(void) {
     S.lag_apps = 0;
+    lag_icons_forget(1);
     free(S.lag_applist);
     S.lag_applist = NULL;
 }
@@ -4514,6 +4597,7 @@ static void lag_windata(const AgFrame *f) {
         if (lag_winlist_read(f->data, f->len, &wl)) { vlog("agent: a window list that doesn't parse: dropped"); return; }
         S.lag_win_n = wl.n;
         for (int i = 0; i < wl.n; i++) S.lag_win_ids[i] = wl.w[i].id;
+        lag_icons_forget(0);
         out = malloc(LAG_WINDOWS_BYTES);
         n = out ? lag_windows_write(&wl, out, LAG_WINDOWS_BYTES) : 0;
         if (S.dev_qmp) {
@@ -4526,6 +4610,7 @@ static void lag_windata(const AgFrame *f) {
         if (lag_winicon_parse(f->data, f->len, &id, &w, &h, &px)) { vlog("agent: a window icon that doesn't parse: dropped"); return; }
         out = malloc(8 + LAG_ICON_MAX * LAG_ICON_MAX * 4);
         n = out ? lag_icon_write(id, w, h, px, out, 8 + LAG_ICON_MAX * LAG_ICON_MAX * 4) : 0;
+        if (n) lag_icon_keep(id, out, n);
     } else {
         LagAppList *al = malloc(sizeof *al);
         if (!al || lag_applist_read(f->data, f->len, al)) { free(al); vlog("agent: a program list that doesn't parse: dropped"); return; }
@@ -4536,14 +4621,7 @@ static void lag_windata(const AgFrame *f) {
         n = out ? lag_applist_write(al, out, LAG_APPLIST_BYTES) : 0;
         vlog("agent: the guest lists %d programs", al->n);
     }
-    if (n && n <= VM_WINDATA_MAX) {
-        int fd = memfd_create("lordos-vm-windows", MFD_CLOEXEC | MFD_ALLOW_SEALING);
-        if (fd >= 0 && !write_all(fd, out, n) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
-            VmMsg m = vm_msg(VM_WINDATA, 0, (int)n, f->kind, S.lag_applist_gen, 0, "");
-            for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, fd);
-        }
-        if (fd >= 0) close(fd);
-    }
+    windata_send(-1, out, n, f->kind);
     free(out);
 }
 
@@ -4919,6 +4997,8 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         lag_send(LAG_APPS, &on, 1);
         vlog("agent: apps mode %s", m->a ? "on" : "off");
         reply(ci, m->seq, VME_OK, "");
+        /* the icons the guest already sent (it sends each window's once): a re-attached lord-server has none */
+        if (on) for (int i = 0; i < LAG_WIN_MAX; i++) if (S.lag_icons[i].data) windata_send(ci, S.lag_icons[i].data, S.lag_icons[i].n, LAG_WINICON);
         return;
     }
     case VM_WINACT: {
@@ -5480,9 +5560,12 @@ static void loop(void) {
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
         if (S.win_key_at && (next < 0 || S.win_key_at < next)) next = S.win_key_at;
         if (mice_watched() && S.mice_at && (next < 0 || S.mice_at < next)) next = S.mice_at;
+        long long cl = child_logs_next();
+        if (cl >= 0 && (next < 0 || cl < next)) next = cl;
         int to = next < 0 ? -1 : next <= now ? 0 : (int)(next - now);
         if (poll(p, (nfds_t)n, to) < 0 && errno != EINTR) { vlog("poll: %s", strerror(errno)); break; }
         now = now_ms();
+        child_logs_tick(now, 0);
         if (S.migq_next && now >= S.migq_next) { S.migq_next = now + 500; qmp_do("query-migrate", NULL, P_MIGQ, -1, 0, -1, -1); }
         if (S.qga_fd >= 0 && S.ag_next && now >= S.ag_next) ag_tick(now);
         if (S.win_key_at && now >= S.win_key_at) {
@@ -5570,6 +5653,7 @@ static void loop(void) {
     /* what QEMU said last */
     for (int k = 0; k < 20 && S.qemu_err >= 0; k++) pump_fd(&S.qemu_err, "qemu");
     for (int k = 0; k < 20 && S.passt_err >= 0; k++) pump_fd(&S.passt_err, "passt");
+    child_logs_tick(now_ms(), 1);
     if (S.passt > 0) {
         for (int k = 0; k < 20; k++) { if (waitpid(S.passt, NULL, WNOHANG) == S.passt) { S.passt = 0; break; } struct timespec ts = { 0, 50000000 }; nanosleep(&ts, NULL); }
         if (S.passt > 0) { kill(S.passt, SIGKILL); waitpid(S.passt, NULL, 0); }
@@ -5882,6 +5966,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     rotate_logs();
     snprintf(p, sizeof p, "%s/log/lord-vm.log", S.dir);
     log_fd = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0600);
+    snprintf(log_dir, sizeof log_dir, "%s/log", S.dir);
     snprintf(p, sizeof p, "%s/log/serial.log", S.dir);
     S.serial_log = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
     vlog("lord-vm %d: machine %s \"%s\" (%s, %s, %d vCPU, %d MB, %s)", (int)getpid(), S.m.id, S.m.name, vm_arch_name(S.m.arch),

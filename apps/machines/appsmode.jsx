@@ -15,7 +15,7 @@ import {
 import { useEffect, useRef } from 'react';
 import { ClipAskBar } from './clipask.jsx';
 import { menus } from './ui.jsx';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune } from './model.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, iconsToAsk, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune } from './model.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
@@ -96,12 +96,18 @@ export function useAppsMode({ dir, sid, st, name, mid, home, on, ready, onLeave,
   useEffect(() => {
     if (!active) return;
     if (st.guestAppsSeq !== seen.current.a) { seen.current.a = st.guestAppsSeq; publish(dir, { apps: guestAppItems(lord.vm.guestApps(sid)) }); }
-    if (st.windowsSeq !== seen.current.w) { seen.current.w = st.windowsSeq; sync(dir, sid, mid, name, lord.vm.windows(sid), st.w, st.h); }
-    if (st.iconsSeq !== seen.current.i) {
+    const listed = st.windowsSeq !== seen.current.w;
+    if (listed) { seen.current.w = st.windowsSeq; sync(dir, sid, mid, name, lord.vm.windows(sid), st.w, st.h); }
+    // icons: for every window that has none yet (one opened from a later list than its icon came with, as after a
+    // re-attach), and again for all when the guest's icons changed (model.js iconsToAsk)
+    if (listed || st.iconsSeq !== seen.current.i) {
       seen.current.i = st.iconsSeq;
       const icons = {};
-      for (const tr0 of trackOf(dir).values()) { const px = lord.vm.winIcon(sid, tr0.gid); if (px) icons[tr0.winId] = px; }
-      windowPixelIcons.set((m) => ({ ...m, ...icons }));
+      for (const tr0 of iconsToAsk(trackOf(dir).values(), st.iconsSeq)) {
+        const px = lord.vm.winIcon(sid, tr0.gid);
+        if (px) { icons[tr0.winId] = px; tr0.icon = true; tr0.iconSeq = st.iconsSeq; }
+      }
+      if (Object.keys(icons).length) windowPixelIcons.set((m) => ({ ...m, ...icons }));
     }
   }, [active, st?.windowsSeq, st?.iconsSeq, st?.guestAppsSeq]);
   // a close the guest refused (its window runs as administrator in Windows): the windows' side says so

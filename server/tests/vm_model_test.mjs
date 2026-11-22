@@ -468,6 +468,16 @@ eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, 
   eq('at most PLACE_MAX at once', [many.items.length, many.left, many.items[7].place.count, many.items[0].place.batch >= 1], [M.PLACE_MAX, 3, M.PLACE_MAX, true]);
   eq('offsetRect without offset', M.offsetRect({ x: 1, y: 2, w: 3, h: 4 }, null), { x: 1, y: 2, w: 3, h: 4 });
   eq('minimized by our move: restored', [M.minimizedByUs(1000, 2000, false), M.minimizedByUs(1000, 5000, false), M.minimizedByUs(1000, 2000, true), M.minimizedByUs(0, 2000, false)], [true, false, false, false]);
+  // a window's Dock icon: asked for every window that has none yet, on each new list, not only when the icons change
+  // (a window opened from a later list than its icon came with, as after a re-attach, kept a letter tile)
+  {
+    const a = { gid: 1, winId: 'machines#ga-m-1' }, b = { gid: 2, winId: 0 }, c = { gid: 3, winId: 'machines#ga-m-3', icon: true, iconSeq: 4 };
+    eq('icons: windows without one, not those without a LordOS window', M.iconsToAsk([a, b, c], 4).map((x) => x.gid), [1]);
+    eq('icons: all again when the guest\'s icons changed', M.iconsToAsk([a, b, c], 5).map((x) => x.gid), [1, 3]);
+    a.icon = true; a.iconSeq = 4;
+    eq('icons: nothing to ask once each has its own', M.iconsToAsk(new Map([[1, a], [3, c]]).values(), 4), []);
+    eq('icons: no tracks', M.iconsToAsk(null, 1), []);
+  }
 }
 }
 eq('popup', [M.isPopup({ owner: 5, topmost: true }), M.isPopup({ owner: 5, topmost: false }), M.isPopup({ owner: 0, topmost: true })], [true, false, false]);

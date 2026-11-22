@@ -1037,6 +1037,13 @@ build/dmaread-test: tests/dmaread_test.c src/gpu/dmaread.c src/gpu/dmaread.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/dmaread_test.c src/gpu/dmaread.c $(shell pkg-config --libs gbm egl glesv2)
 	./$@ || { rm -f $@; exit 1; }
 endif
+# which rows each linear copy of a vGPU's picture lacks (src/gpu/gband.h, ui/js_vm.c gout): a model of both copies
+# over random bands, attaches, re-imports and dmabuf changes; no GPU needed
+test: build/gband-test
+build/gband-test: tests/gband_test.c src/gpu/gband.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/gband_test.c
+	./$@ || { rm -f $@; exit 1; }
 # what slows the GPU under CPU load (tests/gpu_contention.c, docs/GPU.md): a test tool, never installed
 GC_PKGS := gbm egl glesv2
 build/gpu-contention: tests/gpu_contention.c src/gpu/gcontend.c src/gpu/gcontend.h

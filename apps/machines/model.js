@@ -1102,6 +1102,17 @@ export function planWindows(list, have) {
   return { open, close, follow, minimize, restore };
 }
 
+// The tracks (Map gid → { winId, icon }) whose icon is asked of lord.vm.winIcon now (appsmode.jsx): every one with a
+// LordOS window but no icon yet, on each new list or new icons. Before 2026-11-22 the icons were asked only when the
+// guest's icons changed, so a window opened from a later list (one minimized in the guest when apps mode began, or
+// opened after the icons came, as on a re-attach) kept a letter tile in the Dock for good. iconsSeq: an icon already
+// taken is asked again when the guest's icons changed since (an app that changed its icon)
+export function iconsToAsk(tracks, iconsSeq) {
+  const out = [];
+  for (const x of tracks || []) if (x && x.winId && (!x.icon || x.iconSeq !== iconsSeq)) out.push(x);
+  return out;
+}
+
 // The guest's apps for the Applications menu: by name, no repeats of a token
 export function guestAppItems(apps) {
   const seen = new Set();
