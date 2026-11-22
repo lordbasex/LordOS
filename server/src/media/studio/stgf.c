@@ -253,3 +253,27 @@ void st_resize_rgb(const float *src, int sw, int sh, float *dst, int dw, int dh,
         }
     }
 }
+
+/* the largest value in a (2r+1)² square, as two passes (rows, then columns); r is small (a few guide cells) */
+void st_dilate(float *p, int w, int h, int r, float *tmp) {
+    if (r < 1) return;
+    for (int y = 0; y < h; y++) {
+        const float *row = p + (size_t)y * w;
+        float *o = tmp + (size_t)y * w;
+        for (int x = 0; x < w; x++) {
+            int a = x - r < 0 ? 0 : x - r, b = x + r >= w ? w - 1 : x + r;
+            float m = row[a];
+            for (int k = a + 1; k <= b; k++) if (row[k] > m) m = row[k];
+            o[x] = m;
+        }
+    }
+    for (int y = 0; y < h; y++) {
+        int a = y - r < 0 ? 0 : y - r, b = y + r >= h ? h - 1 : y + r;
+        float *o = p + (size_t)y * w;
+        memcpy(o, tmp + (size_t)a * w, (size_t)w * sizeof(float));
+        for (int k = a + 1; k <= b; k++) {
+            const float *q = tmp + (size_t)k * w;
+            for (int x = 0; x < w; x++) if (q[x] > o[x]) o[x] = q[x];
+        }
+    }
+}

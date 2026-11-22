@@ -916,5 +916,7 @@
   "studio.badPicture": "该图片无法用作背景。",
   "studio.invalid": "该 LordOS Studio 设置无效。",
   "studio.noCamera": "未连接摄像头。",
-  "studio.unavailable": "此电脑上无法使用 LordOS Studio。"
+  "studio.unavailable": "此电脑上无法使用 LordOS Studio。",
+  "studio.downloadFailed": "无法下载背景。",
+  "studio.removeFailed": "无法移除背景。"
 }

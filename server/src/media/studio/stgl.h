@@ -6,6 +6,8 @@
 
 #include <stdint.h>
 
+#include "st.h"
+
 typedef struct StGl StGl;
 
 typedef struct {
@@ -17,6 +19,14 @@ typedef struct {
     int pic_changed;                             /* 1: upload the picture again */
     int mirror;
     uint8_t *out; int ostride;                   /* BGRA out */
+    /* phase 3's looks (st.h); all off when zero */
+    int matte;                                   /* the matte is wanted (a background, or Face Light) */
+    int key;                                     /* ST_KEY_*: the green screen, with dil (gw × gh) */
+    const float *dil;
+    float keycbcr[2]; int similarity, smoothness; float spill;
+    int match; float m[9], o[3];                 /* colour match: rgb' = m·rgb + o (0..255) */
+    int light; int has_face; float face[4];      /* Face Light 0..100; the face in the frame's pixels */
+    const uint8_t *lut; int lut_changed; float lut_amt;   /* the filter's 3D LUT (ST_LUT_N³ RGB) or NULL */
 } StGlJob;
 
 #ifdef LORD_GPU

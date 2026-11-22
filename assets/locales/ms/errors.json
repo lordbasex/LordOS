@@ -916,5 +916,7 @@
   "studio.badPicture": "Gambar itu tidak boleh digunakan sebagai latar belakang.",
   "studio.invalid": "Tetapan LordOS Studio itu tidak sah.",
   "studio.noCamera": "Tiada kamera disambungkan.",
-  "studio.unavailable": "LordOS Studio tidak tersedia pada komputer ini."
+  "studio.unavailable": "LordOS Studio tidak tersedia pada komputer ini.",
+  "studio.downloadFailed": "Latar belakang tidak dapat dimuat turun.",
+  "studio.removeFailed": "Latar belakang tidak dapat dialih keluar."
 }

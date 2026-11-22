@@ -65,14 +65,15 @@ static int open_model(void) { return open("../assets/studio/models/" STUDIO_SEG_
 static void probe(int render) {
     pid_t pid;
     int s = spawn(&pid);
-    int model = open_model();
+    int model = open_model(), face = open("../assets/studio/models/" STUDIO_FACE_FILE, O_RDONLY | O_CLOEXEC);
     char params[64];
-    snprintf(params, sizeof params, "probe=1\nrender=%d\n", render >= 0);
-    int fds[2] = { render, model }, n = 0, f2[2];
-    for (int i = 0; i < 2; i++) if (fds[i] >= 0) f2[n++] = fds[i];
+    snprintf(params, sizeof params, "probe=1\nrender=%d\nface=1\n", render >= 0);
+    int fds[3] = { render, model, face }, n = 0, f2[3];
+    for (int i = 0; i < 3; i++) if (fds[i] >= 0) f2[n++] = fds[i];
     int64_t v[6] = { MK_CAMERA, 0, 0, 0, 0, 0 };
-    CHECK(s >= 0 && model >= 0 && !mp_send(s, MM_JOB, 0, v, params, strlen(params), f2, n), "probe: send");
+    CHECK(s >= 0 && model >= 0 && face >= 0 && !mp_send(s, MM_JOB, 0, v, params, strlen(params), f2, n), "probe: send");
     close(model);
+    close(face);
     static char payload[MP_PAYLOAD_MAX + 1];
     MediaMsg m;
     int got = 0;
@@ -80,8 +81,42 @@ static void probe(int render) {
     CHECK(got && m.v[0] == 0, "probe%s: no result (%s)", render >= 0 ? " (GPU)" : "", got ? payload : "nothing");
     if (got) printf("probe%s: %s\n", render >= 0 ? " with a render node" : " without a render node", payload);
     if (render >= 0 && got && strstr(payload, "\"gl\":true")) CHECK(strstr(payload, "\"gpu\":true"), "the GPU path did not run inside the sandbox");
+    /* phase 3: BlazeFace was loaded from its fd and every look ran inside the sandbox */
+    if (got) CHECK(strstr(payload, "\"faces\":true") && strstr(payload, "\"looks\":true"), "the looks or BlazeFace failed inside the sandbox");
     CHECK(reap(pid, 5000) == 0, "probe: the helper did not end well");
     close(s);
+}
+
+/* phase 3: a background video (a 0.2 s H.264 clip made by the ffmpeg program) decoded and looped inside the sandbox */
+static void video_probe(void) {
+    const char *clip = "build/studio-helper-test-clip.mp4";
+    unlink(clip);
+    if (system("ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=320x180:rate=30 -t 0.2 -c:v libx264 -pix_fmt yuv420p "
+               "build/studio-helper-test-clip.mp4 </dev/null >/dev/null 2>&1") != 0) {
+        printf("video background: skipped: needs ffmpeg with libx264\n");
+        return;
+    }
+    pid_t pid;
+    int s = spawn(&pid);
+    int model = open_model(), bg = open(clip, O_RDONLY | O_CLOEXEC);
+    const char *params = "probe=1\nrender=0\nbg=1\n";
+    int fds[2] = { model, bg };
+    int64_t v[6] = { MK_CAMERA, 0, 0, 0, 0, 0 };
+    CHECK(s >= 0 && model >= 0 && bg >= 0 && !mp_send(s, MM_JOB, 0, v, params, strlen(params), fds, 2), "video probe: send");
+    close(model);
+    close(bg);
+    static char payload[MP_PAYLOAD_MAX + 1];
+    MediaMsg m;
+    int got = 0;
+    while (next(s, &m, payload, 20000)) if (m.type == MM_RESULT) { got = 1; break; }
+    CHECK(got && m.v[0] == 0, "video probe: no result (%s)", got ? payload : "nothing");
+    if (got) printf("video background: %s\n", payload);
+    CHECK(got && strstr(payload, "\"video\":true"), "the clip wasn't taken as a video");
+    const char *vf = got ? strstr(payload, "\"videoFrames\":") : NULL;
+    CHECK(vf && atoi(vf + 14) >= 8, "too few of the video's pictures were shown (it has 6: it must loop)");
+    CHECK(reap(pid, 5000) == 0, "video probe: the helper did not end well");
+    close(s);
+    unlink(clip);
 }
 
 int main(int argc, char **argv) {
@@ -97,6 +132,7 @@ int main(int argc, char **argv) {
     }
     if (render >= 0) { probe(render); close(render); }
     else printf("probe with a render node: skipped (none)\n");
+    video_probe();
     static char payload[MP_PAYLOAD_MAX + 1];
     MediaMsg m;
     {   /* not a camera */

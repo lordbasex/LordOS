@@ -917,5 +917,7 @@
   "studio.badPicture": "Picha hiyo haiwezi kutumika kama mandharinyuma.",
   "studio.invalid": "Mpangilio huo wa LordOS Studio si sahihi.",
   "studio.noCamera": "Hakuna kamera iliyounganishwa.",
-  "studio.unavailable": "LordOS Studio haipatikani kwenye kompyuta hii."
+  "studio.unavailable": "LordOS Studio haipatikani kwenye kompyuta hii.",
+  "studio.downloadFailed": "Mandharinyuma hayakuweza kupakuliwa.",
+  "studio.removeFailed": "Mandharinyuma hayakuweza kuondolewa."
 }

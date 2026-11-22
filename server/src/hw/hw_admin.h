@@ -133,6 +133,8 @@ void hw_act_wallpaper_remove(const AdminReq *r, const char *arg, size_t len);
 void hw_act_wallpaper_login(const AdminReq *r, const char *arg, size_t len);
 void hw_act_wallpaper_image(const AdminReq *r, const char *arg, size_t len);
 void hw_act_wallpaper_login_image(const AdminReq *r, const char *arg, size_t len);
+void hw_act_studio_bg_get(const AdminReq *r, const char *arg, size_t len);        /* studio_bg_admin.c (LordOS Studio) */
+void hw_act_studio_bg_remove(const AdminReq *r, const char *arg, size_t len);
 
 #define HW_ADMIN_ACTIONS \
     { "wallpaper-get", hw_act_wallpaper_get, A_ANYONE }, \
@@ -140,6 +142,8 @@ void hw_act_wallpaper_login_image(const AdminReq *r, const char *arg, size_t len
     { "wallpaper-login", hw_act_wallpaper_login, 0 }, \
     { "wallpaper-image", hw_act_wallpaper_image, A_FORK | A_ANYONE }, \
     { "wallpaper-login-image", hw_act_wallpaper_login_image, A_FORK }, \
+    { "studio-bg-get", hw_act_studio_bg_get, A_ANYONE }, \
+    { "studio-bg-remove", hw_act_studio_bg_remove, 0 }, \
     { "display-brightness", hw_act_brightness, A_ANYONE }, \
     { "keyboard-light", hw_act_keyboard_light, A_ANYONE }, \
     { "power-profile", hw_act_power_profile, A_ANYONE }, \

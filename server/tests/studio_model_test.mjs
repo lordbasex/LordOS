@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import {
   normalizeStudio, STUDIO_DEFAULTS, realCameras, hasStudioCamera, deviceFor, chosenCamera, serverConfig, portraitOn, backgroundOn,
   withPortrait, withBackground, withPicture, withMode, previewSize, usersOf, previewSource, perfLine,
-  loopbackState, studioUseOf, studioWhat,
+  loopbackState, studioUseOf, studioWhat, MATCH_MAX, STUDIO_FILTERS, effectsOn, filterOf, isVideoPath, isPicturePath, activeBackground,
+  BG_CATEGORIES, bgItems, bgThumb, bgVariant, bgSrc, bgReady, bgItemOf, bgCredit, VOICE_SOURCE, VOICE_CAPTURE, voiceAvailable, hardwareMics,
+  micModeOf, micPlan, withoutVoiceInternals,
 } from '../../sdk/studiomodel.js';
 import { captureRows, rowStops, captureGlyph } from '../../sdk/capturemodel.js';
 
@@ -20,7 +22,7 @@ const cams = [
 t('defaults and validation', () => {
   assert.deepEqual(normalizeStudio(undefined), { ...STUDIO_DEFAULTS });
   assert.deepEqual(normalizeStudio({ mode: 'sparkles', blur: 900, mirror: 'yes', camera: 7, extra: 1 }),
-    { on: true, camera: '', mode: 'blur', blur: 100, mirror: false, background: null });
+    { ...STUDIO_DEFAULTS, blur: 100 });
   assert.equal(normalizeStudio({ on: false }).on, false);
   assert.equal(normalizeStudio({ on: 'no' }).on, true);           // only false turns it off
   assert.equal(normalizeStudio({ blur: -4 }).blur, 0);
@@ -51,9 +53,10 @@ t('cameras: the studio entry is not a real camera, and a camera is kept by its b
 });
 
 t('what lord.studio.set gets', () => {
+  const looksOff = { key: 'none', similarity: 40, smoothness: 20, spill: 50, match: 0, framing: 0, light: 0, filter: 'none', filterStrength: 100, retouch: 0 };
   assert.deepEqual(serverConfig({ camera: 'usb-0000:00:14.0-3', mode: 'none', blur: 20, mirror: true }, cams),
-    { on: true, camera: '/dev/video0', mode: 'none', blur: 20, mirror: true });
-  assert.deepEqual(serverConfig({}, cams), { on: true, camera: '', mode: 'blur', blur: 50, mirror: false });
+    { on: true, camera: '/dev/video0', mode: 'none', blur: 20, mirror: true, ...looksOff });
+  assert.deepEqual(serverConfig({}, cams), { on: true, camera: '', mode: 'blur', blur: 50, mirror: false, ...looksOff });
   assert.equal(serverConfig({ on: false }, cams).on, false);
 });
 
@@ -141,6 +144,127 @@ t('phase 2: the camera for every app, its readers and the indicator', () => {
   // nobody reads it: no row, no glyph (the camera's light is off too: lord-studio closed the real camera)
   assert.deepEqual(captureRows({ studio: { apps: [], camera: '', effects: false } }), []);
   assert.equal(captureGlyph(captureRows({ studio: null })), null);
+});
+
+t('phase 3: the looks reach lord.studio.set only as numbers and names it knows', () => {
+  const c = normalizeStudio({ green: true, greenKey: 'pink', similarity: 140, match: 99, stage: true, stageAmount: 0, light: true,
+    lightAmount: 70.4, filter: 'lomo', filterStrength: -3, retouch: 'yes', retouchAmount: 20 });
+  assert.equal(c.greenKey, 'green');
+  assert.equal(c.similarity, 100);
+  assert.equal(c.match, MATCH_MAX);
+  assert.equal(c.filter, 'none');
+  assert.equal(c.filterStrength, 0);
+  assert.equal(c.retouch, false);                                  // only true turns it on
+  const s = serverConfig({ ...c, mode: 'blur' }, cams);
+  assert.equal(s.key, 'none');                                     // a green screen only with a picture or a video
+  assert.equal(s.match, 0);                                        // the same for the colour match
+  assert.equal(s.framing, 1);                                      // on at its widest is still on
+  assert.equal(s.light, 70);
+  assert.equal(s.retouch, 0);
+  const p = serverConfig({ mode: 'picture', background: '/home/a/p.jpg', green: true, greenKey: 'blue', match: 25, filter: 'film', filterStrength: 60 }, cams);
+  assert.deepEqual([p.mode, p.key, p.match, p.filter, p.filterStrength], ['picture', 'blue', 25, 'film', 60]);
+  for (const f of STUDIO_FILTERS) assert.equal(normalizeStudio({ filter: f }).filter, f);
+  assert.equal(effectsOn({ mode: 'none' }), false);
+  assert.equal(effectsOn({ mode: 'none', filter: 'mono' }), true);
+  assert.equal(effectsOn({ mode: 'none', filter: 'mono', filterStrength: 0 }), false);
+  assert.equal(effectsOn({ mode: 'none', stage: true }), true);
+  assert.equal(filterOf({ filter: 'warm' }), 'warm');
+  assert.equal(filterOf({}), null);
+});
+
+t('phase 3: pictures and videos as the background', () => {
+  const v = '/var/lib/lordos/studio/' + 'a'.repeat(64) + '.mp4';
+  assert.equal(isVideoPath(v), true);
+  assert.equal(isVideoPath('/home/a/clip.webm'), true);
+  assert.equal(isVideoPath('/home/a/../clip.mp4'), false);
+  assert.equal(isVideoPath('/home/a/clip.jpg'), false);
+  assert.equal(isPicturePath('asset:studio/backgrounds/office-loft.jpg'), true);
+  assert.equal(isPicturePath('asset:studio/models/x.jpg'), false);
+  assert.equal(isPicturePath('asset:wallpapers/a/b/c.jpg'), false);
+  // a video chosen: the Video mode, the picture remembered; and back
+  let c = withPicture({ mode: 'picture', background: '/home/a/p.jpg' }, v);
+  assert.deepEqual([c.mode, c.video, c.background], ['video', v, '/home/a/p.jpg']);
+  assert.equal(activeBackground(c), v);
+  c = withMode(c, 'picture');
+  assert.equal(activeBackground(c), '/home/a/p.jpg');
+  assert.equal(withMode({ mode: 'blur' }, 'video').mode, 'blur');               // no video yet
+  assert.equal(normalizeStudio({ mode: 'video', background: '/home/a/p.jpg' }).mode, 'picture');
+  assert.equal(normalizeStudio({ mode: 'video' }).mode, 'blur');
+  assert.equal(activeBackground({ mode: 'blur', background: '/home/a/p.jpg' }), '/home/a/p.jpg');   // kept ready for the switch back
+  assert.equal(backgroundOn({ mode: 'video', video: v }), true);
+  // Background on again: what was chosen last
+  assert.equal(withBackground({ mode: 'none', video: v }, true, []).mode, 'video');
+  assert.equal(withBackground({ mode: 'video', video: v }, false, []).mode, 'none');
+});
+
+t('phase 3: the background catalog', () => {
+  const sha = 'b'.repeat(64);
+  const cat = { items: [
+    { id: 'office-a', kind: 'picture', category: 'office', builtin: true, name: 'A', author: 'X', license: 'CC0', source: 'https://polyhaven.com/a/x',
+      variants: [{ name: '1080', h: 1080, sha256: 'c'.repeat(64) }] },
+    { id: 'sky-b', kind: 'video', category: 'nature', name: 'B', author: 'Y', license: 'CC BY 4.0', credit: 'Video: Y, CC BY 4.0', source: 'https://commons.wikimedia.org/x',
+      variants: [{ name: '720.h264', h: 720, sha256: sha }, { name: '1080.h264', h: 1080, sha256: 'd'.repeat(64) }] },
+  ] };
+  assert.deepEqual(bgItems(cat, 'video').map((x) => x.id), ['sky-b']);
+  assert.deepEqual(bgItems(null, 'video'), []);
+  assert.equal(bgThumb(cat.items[0]), 'asset:studio/backgrounds/office-a.thumb.jpg');
+  assert.equal(bgVariant(cat.items[1]).name, '720.h264');
+  assert.equal(bgVariant(cat.items[1], { big: true }).name, '1080.h264');
+  assert.equal(bgVariant(cat.items[0]).name, '1080');
+  assert.equal(bgSrc(cat.items[0]), 'asset:studio/backgrounds/office-a.jpg');                  // built in
+  assert.equal(bgSrc(cat.items[1], '720.h264'), `/var/lib/lordos/studio/${sha}.mp4`);
+  assert.equal(bgSrc(cat.items[1], 'nope'), null);
+  assert.equal(bgReady(cat.items[0], {}), true);
+  assert.equal(bgReady(cat.items[1], {}), false);
+  assert.equal(bgReady(cat.items[1], { 'sky-b': '720.h264' }), true);
+  assert.equal(bgItemOf(cat, `/var/lib/lordos/studio/${sha}.mp4`).id, 'sky-b');
+  assert.equal(bgItemOf(cat, 'asset:studio/backgrounds/office-a.jpg').id, 'office-a');
+  assert.equal(bgItemOf(cat, '/home/a/me.jpg'), null);
+  assert.equal(bgCredit(cat.items[1]), 'B — Video: Y, CC BY 4.0 — CC BY 4.0 — https://commons.wikimedia.org/x');
+  assert.equal(bgCredit(cat.items[0]), 'A — X — CC0 — https://polyhaven.com/a/x');
+  assert.deepEqual(normalizeStudio({ bgFiles: { 'sky-b': '720.h264', '../x': 'y', ok: 'a b' } }).bgFiles, { 'sky-b': '720.h264' });
+  assert.ok(BG_CATEGORIES.includes('office') && BG_CATEGORIES.includes('space'));
+});
+
+t('phase 3: Mic Mode through the PulseAudio client', () => {
+  const st = {
+    defaultSource: 'alsa_input.usb-mic',
+    sources: [
+      { index: 1, name: 'alsa_input.usb-mic', monitorOf: -1, default: true },
+      { index: 2, name: 'alsa_output.hdmi.monitor', monitorOf: 5 },
+      { index: 3, name: 'alsa_input.pci-builtin', monitorOf: -1 },
+      { index: 9, name: VOICE_SOURCE, monitorOf: -1 },
+    ],
+    sinks: [{ index: 5, name: 'alsa_output.hdmi' }, { index: 6, name: 'lordos_voice_reference' }],
+    inputs: [{ index: 40, name: 'lordos_voice_playback' }, { index: 41, name: 'Firefox' }],
+    outputs: [{ index: 30, name: VOICE_CAPTURE, source: 3 }, { index: 31, name: 'Meet', source: 1 }],
+  };
+  assert.equal(voiceAvailable(st), true);
+  assert.deepEqual(hardwareMics(st).map((m) => m.name), ['alsa_input.usb-mic', 'alsa_input.pci-builtin']);
+  // Voice Isolation: the filter listens to the microphone in use, which stays remembered; then it is the default
+  let p = micPlan(st, 'voice');
+  assert.deepEqual(p, { ok: true, mic: 'alsa_input.usb-mic', calls: [['move', 'output', 30, 'alsa_input.usb-mic'], ['setDefault', 'source', VOICE_SOURCE]] });
+  const on = { ...st, defaultSource: VOICE_SOURCE, outputs: [{ index: 30, name: VOICE_CAPTURE, source: 1 }] };
+  assert.equal(micModeOf(on, {}), 'voice');
+  assert.deepEqual(micPlan(on, 'voice', 'alsa_input.usb-mic').calls, []);                  // already so
+  // back to Standard: the remembered microphone is the default again
+  p = micPlan(on, 'standard', 'alsa_input.usb-mic');
+  assert.deepEqual(p.calls, [['setDefault', 'source', 'alsa_input.usb-mic']]);
+  assert.equal(micModeOf(st, { mic: 'wide' }), 'wide');
+  assert.equal(micModeOf(st, { mic: 'voice' }), 'standard');                               // the default says otherwise
+  assert.deepEqual(micPlan(st, 'wide').calls, []);
+  // without the drop-in's source, or without a microphone: nothing to do
+  const plain = { ...st, sources: st.sources.filter((s) => s.name !== VOICE_SOURCE) };
+  assert.equal(micPlan(plain, 'voice').ok, false);
+  assert.equal(micPlan({ sources: [] }, 'standard').ok, false);
+  assert.equal(micPlan(st, 'loud').ok, false);
+  // the sound lists never show the filter's own echo reference or its streams
+  const shown = withoutVoiceInternals(st);
+  assert.deepEqual(shown.sinks.map((x) => x.name), ['alsa_output.hdmi']);
+  assert.deepEqual(shown.inputs.map((x) => x.name), ['Firefox']);
+  assert.deepEqual(shown.outputs.map((x) => x.name), ['Meet']);
+  assert.equal(shown.sources.length, 4);                                                    // Voice Isolation is a microphone
+  assert.equal(withoutVoiceInternals(null), null);
 });
 
 console.log(`studio model: ${n} groups ok`);

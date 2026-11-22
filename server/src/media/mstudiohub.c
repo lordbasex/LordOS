@@ -120,3 +120,59 @@ int studio_use_format(const char *apps, size_t stride, int n, const char *camera
     if (w < 0 || (size_t)w >= cap - at) return -1;
     return 0;
 }
+
+/* ---- phase 3 ---- */
+
+static const char *const FILTERS[STUDIO_FILTERS + 1] = { "none", "warm", "cool", "vivid", "mono", "noir", "film", "fade", "sepia" };
+
+const char *studio_filter_name(int id) { return id >= 0 && id <= STUDIO_FILTERS ? FILTERS[id] : "none"; }
+
+int studio_filter_id(const char *name) {
+    for (int i = 0; name && i <= STUDIO_FILTERS; i++) if (!strcmp(name, FILTERS[i])) return i;
+    return -1;
+}
+
+static int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+void studio_pack_config(int mode, int key, int filter, int mirror, int blur, int similarity, int smoothness, int spill, int framing,
+                        int light, int match, int filter_amt, int retouch, int64_t v[6]) {
+#define P(a, b, c, d) ((int64_t)(a) | (int64_t)(b) << 8 | (int64_t)(c) << 16 | (int64_t)(d) << 24)
+    v[0] = P(clampi(mode, 0, 3), clampi(key, 0, 2), clampi(filter, 0, STUDIO_FILTERS), mirror != 0);
+    v[1] = P(clampi(blur, 0, 100), clampi(similarity, 0, 100), clampi(smoothness, 0, 100), clampi(spill, 0, 100));
+    v[2] = P(clampi(framing, 0, 100), clampi(light, 0, 100), clampi(match, 0, 60), clampi(filter_amt, 0, 100));
+    v[3] = clampi(retouch, 0, 100);
+    v[4] = v[5] = 0;
+#undef P
+}
+
+/* a file name with nothing but [A-Za-z0-9._-], not starting with a dot */
+static int plain_name(const char *s) {
+    if (!*s || *s == '.') return 0;
+    for (; *s; s++) if (!(isalnum((unsigned char)*s) || *s == '.' || *s == '_' || *s == '-')) return 0;
+    return 1;
+}
+
+int studio_bg_path_ok(const char *path) {
+    if (!path || !*path || strlen(path) >= 4096) return -1;
+    for (const char *p = path; *p; p++) if ((unsigned char)*p < 0x20 || *p == 0x7f) return -1;
+    if (strstr(path, "..")) return -1;
+    if (!strncmp(path, "asset:wallpapers/", 17)) {
+        /* category/file.jpg: plain names, one folder at most */
+        const char *a = path + 17, *sl = strchr(a, '/');
+        if (!sl) return plain_name(a) ? 0 : -1;
+        char dir[64];
+        if ((size_t)(sl - a) >= sizeof dir || strchr(sl + 1, '/')) return -1;
+        memcpy(dir, a, (size_t)(sl - a));
+        dir[sl - a] = 0;
+        return plain_name(dir) && plain_name(sl + 1) ? 0 : -1;
+    }
+    if (!strncmp(path, "asset:studio/backgrounds/", 25)) return plain_name(path + 25) ? 0 : -1;
+    if (!strncmp(path, "asset:", 6)) return -1;
+    if (!strncmp(path, "/var/lib/lordos/studio/", 23)) {
+        const char *n = path + 23;
+        if (strlen(n) != 68) return -1;
+        for (int i = 0; i < 64; i++) if (!((n[i] >= '0' && n[i] <= '9') || (n[i] >= 'a' && n[i] <= 'f'))) return -1;
+        return !strcmp(n + 64, ".jpg") || !strcmp(n + 64, ".mp4") ? 0 : -1;
+    }
+    return path[0] == '/' ? 0 : -1;
+}

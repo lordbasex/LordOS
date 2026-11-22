@@ -1,0 +1,3124 @@
+{
+ "format": 1,
+ "base": "https://raw.githubusercontent.com/lordbasex/LordOS-wallpapers/main/studio",
+ "items": [
+  {
+   "id": "office-bright-lounge",
+   "kind": "picture",
+   "category": "office",
+   "name": "Bright lounge",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/aft_lounge",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/office-bright-lounge.1080.jpg",
+     "size": 265355,
+     "sha256": "2073575c760c4d1c440a5865d79a82e553087292f892043b34b6b423bc860e97"
+    }
+   ]
+  },
+  {
+   "id": "office-brick-hall",
+   "kind": "picture",
+   "category": "office",
+   "name": "Brick loft hall",
+   "author": "Dimitrios Savva, Jarod Guest",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/events_hall_interior",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/office-brick-hall.1080.jpg",
+     "size": 413089,
+     "sha256": "63751d607175f7ddd8363fe781c67a8f80faa84b331e42ce34fb173f4a97a3ab"
+    }
+   ]
+  },
+  {
+   "id": "office-pine-attic",
+   "kind": "picture",
+   "category": "office",
+   "name": "Pine attic",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/pine_attic",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/office-pine-attic.1080.jpg",
+     "size": 284090,
+     "sha256": "63a920a28eb0719d3178ba2d5b6c499396a62c4f26a0e83dc3d65b0ec7c48cb7"
+    }
+   ]
+  },
+  {
+   "id": "office-palm-lobby",
+   "kind": "picture",
+   "category": "office",
+   "name": "Palm lobby",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/cinema_lobby",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/office-palm-lobby.1080.jpg",
+     "size": 406543,
+     "sha256": "63240362b4875e42ce1ad6fbbcb94d5a68c473bd3be4934caffeb44f6a95758b"
+    }
+   ]
+  },
+  {
+   "id": "office-reading-room",
+   "kind": "picture",
+   "category": "office",
+   "name": "Reading room",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/reading_room",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/office-reading-room.1080.jpg",
+     "size": 302793,
+     "sha256": "07e70d636dd8a762faeef1e8801fcf563c87de44e9bc24d4306ee1cac99c6a36"
+    }
+   ],
+   "builtin": true
+  },
+  {
+   "id": "office-classic-hall",
+   "kind": "picture",
+   "category": "office",
+   "name": "Classic hall",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/entrance_hall",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/office-classic-hall.1080.jpg",
+     "size": 256781,
+     "sha256": "15916abd53bd1bd297d4ae9e57b229ec928be92bc55b8c1dfe41539f393da93a"
+    }
+   ]
+  },
+  {
+   "id": "office-brick-cafe",
+   "kind": "picture",
+   "category": "office",
+   "name": "Brick cafe",
+   "author": "Greg Zaal, Jarod Guest",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/warm_restaurant",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/office-brick-cafe.1080.jpg",
+     "size": 476429,
+     "sha256": "0f3c02b625940fc11747363ae7bb9b891ae515cb0e743d053fdb63a1535cce58"
+    }
+   ]
+  },
+  {
+   "id": "home-curtained-window",
+   "kind": "picture",
+   "category": "home",
+   "name": "Curtained window",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/anniversary_lounge",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/home-curtained-window.1080.jpg",
+     "size": 374067,
+     "sha256": "22951613f396a08ab3485df71fa989ad8f4f86dfb7567c9dececdfb37e0c2e3e"
+    }
+   ]
+  },
+  {
+   "id": "home-cream-sofa",
+   "kind": "picture",
+   "category": "home",
+   "name": "Cream sofa",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/brown_photostudio_01",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/home-cream-sofa.1080.jpg",
+     "size": 317326,
+     "sha256": "384ccb4fef15969a575d5dd3abc41a1965113c0c82949c787918514d26b5b95d"
+    }
+   ]
+  },
+  {
+   "id": "home-white-fireplace",
+   "kind": "picture",
+   "category": "home",
+   "name": "White fireplace",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/brown_photostudio_03",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/home-white-fireplace.1080.jpg",
+     "size": 259530,
+     "sha256": "de3a13ec5a3170c1170a06e2bc3c1472244350a83380cd74cd1c86d333fa1a4c"
+    }
+   ]
+  },
+  {
+   "id": "home-brick-loft",
+   "kind": "picture",
+   "category": "home",
+   "name": "Brick loft",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/brown_photostudio_07",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/home-brick-loft.1080.jpg",
+     "size": 420035,
+     "sha256": "d6ed4a303ebe242876f5649892e42b33bd75139ee84d23bbcce9647713acab82"
+    }
+   ]
+  },
+  {
+   "id": "home-glasshouse",
+   "kind": "picture",
+   "category": "home",
+   "name": "Glasshouse view",
+   "author": "Dario Barresi",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/glasshouse_interior",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/home-glasshouse.1080.jpg",
+     "size": 366826,
+     "sha256": "58b75eb81a953c41b32e4ae9207ec7f2da38872bde3d9a26a76791270930684a"
+    }
+   ]
+  },
+  {
+   "id": "home-sunny-lounge",
+   "kind": "picture",
+   "category": "home",
+   "name": "Sunny lounge",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/lythwood_lounge",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/home-sunny-lounge.1080.jpg",
+     "size": 274628,
+     "sha256": "0e4a43b6ce2e5c80ef46f82bdc90783068c8b10460c69dc6c0f57d614380c74b"
+    }
+   ],
+   "builtin": true
+  },
+  {
+   "id": "home-garden-window",
+   "kind": "picture",
+   "category": "home",
+   "name": "Garden window",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/lythwood_room",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/home-garden-window.1080.jpg",
+     "size": 302627,
+     "sha256": "08154ab2b97de8d2e2103bfd1096fa7895a02e4dbdaf69b526ffcf8f02c48a1e"
+    }
+   ]
+  },
+  {
+   "id": "home-plant-corner",
+   "kind": "picture",
+   "category": "home",
+   "name": "Plant corner",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/photo_studio_london_hall",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/home-plant-corner.1080.jpg",
+     "size": 234075,
+     "sha256": "01fef2f5a2027b037df284a29be50837592eb720838988b300805e1e74960e8a"
+    }
+   ]
+  },
+  {
+   "id": "home-country-kitchen",
+   "kind": "picture",
+   "category": "home",
+   "name": "Country kitchen",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/studio_country_hall",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/home-country-kitchen.1080.jpg",
+     "size": 259115,
+     "sha256": "9787ea46b02628adcc7eb438e7a0568ce87ab8d290fac8c7517dabc2558ee976"
+    }
+   ]
+  },
+  {
+   "id": "home-blue-room",
+   "kind": "picture",
+   "category": "home",
+   "name": "Blue room",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/blue_photo_studio",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/home-blue-room.1080.jpg",
+     "size": 173964,
+     "sha256": "fd232fcc5e84d5f412e20e0df5314bd1b71866bd4a90875a82332f2c95035fbf"
+    }
+   ]
+  },
+  {
+   "id": "studio-white-arches",
+   "kind": "picture",
+   "category": "studio",
+   "name": "White arches",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/blocky_photo_studio",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-white-arches.1080.jpg",
+     "size": 170910,
+     "sha256": "3d782b4175e4cdb32b09cfbd71b689053ddb1f147209e9d9b52badfc545d867b"
+    }
+   ]
+  },
+  {
+   "id": "studio-yellow-sofa",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Yellow sofa",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/colorful_studio",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-yellow-sofa.1080.jpg",
+     "size": 257881,
+     "sha256": "804e60762a38d687f8f07950b26d20273ecfbe93b6ea9c505c8ca96fa2441db3"
+    }
+   ]
+  },
+  {
+   "id": "studio-paneled-window",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Paneled window",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/brown_photostudio_04",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-paneled-window.1080.jpg",
+     "size": 216558,
+     "sha256": "1d82434c21c244deeec1a8ab90f1c8c6c3795250a0185fc6e71f5f617227c3b8"
+    }
+   ]
+  },
+  {
+   "id": "studio-blue-armchairs",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Blue armchairs",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/brown_photostudio_05",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-blue-armchairs.1080.jpg",
+     "size": 150319,
+     "sha256": "8ff961a0dadc0c4031ff82779eb0d1e68e1e9a15c8272f50040562a2bd4d5ccd"
+    }
+   ]
+  },
+  {
+   "id": "studio-neon-wall",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Neon wall",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/neon_photostudio",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-neon-wall.1080.jpg",
+     "size": 251243,
+     "sha256": "bb50d5d5aad43769cd75beee354934fcc611b710d9b7afa41d40c7ca1f0ad820"
+    }
+   ]
+  },
+  {
+   "id": "studio-grey-room",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Grey studio",
+   "author": "Grzegorz Wronkowski",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/monochrome_studio_01",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-grey-room.1080.jpg",
+     "size": 170712,
+     "sha256": "ee4fb760b869bf5d485f1b30da0e804d0b3ce449562ea2610984a6aaf70df7e6"
+    }
+   ]
+  },
+  {
+   "id": "studio-white-curtain",
+   "kind": "picture",
+   "category": "studio",
+   "name": "White curtain",
+   "author": "Grzegorz Wronkowski",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/pav_studio_01",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-white-curtain.1080.jpg",
+     "size": 100681,
+     "sha256": "27170f3dca05c9c78f6cf262ea3507e2fbd1223a6364c737b017b6f835dd2c99"
+    }
+   ]
+  },
+  {
+   "id": "studio-green-wall",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Green wall",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/photo_studio_loft_hall",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-green-wall.1080.jpg",
+     "size": 139597,
+     "sha256": "7769c70f5e99e0ef5a23e725f7e7d9e3581ecfa0c12925b26b43380d5ecf5f83"
+    }
+   ]
+  },
+  {
+   "id": "studio-moulded-wall",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Moulded wall",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/photo_studio_broadway_hall",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-moulded-wall.1080.jpg",
+     "size": 255931,
+     "sha256": "aedd023990b49da6ad288edffdd4511ebcd54f9da004279ba514718f1aa86491"
+    }
+   ]
+  },
+  {
+   "id": "studio-white-loft",
+   "kind": "picture",
+   "category": "studio",
+   "name": "White loft",
+   "author": "Grzegorz Wronkowski",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/white_studio_01",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-white-loft.1080.jpg",
+     "size": 118243,
+     "sha256": "baac354cadcfa0dc30ac80f055f932184b289d8c6645fe69cc772d7a2f8fc268"
+    }
+   ]
+  },
+  {
+   "id": "studio-blue-drapes",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Blue drapes",
+   "author": "Sergej Majboroda",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/small_empty_room_3",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-blue-drapes.1080.jpg",
+     "size": 278499,
+     "sha256": "6cf3b4213341041ed99729ca24a5829e69f47d1f9f30200390e03a009802d326"
+    }
+   ]
+  },
+  {
+   "id": "nature-alpine-valley",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Alpine valley",
+   "author": "Andreas Mischok",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/alps_field",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-alpine-valley.1080.jpg",
+     "size": 607171,
+     "sha256": "32cfbe120a082771025f458cfb4a7f6f95512a1865845666c5439ca64a0a129d"
+    }
+   ]
+  },
+  {
+   "id": "nature-autumn-forest",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Autumn forest",
+   "author": "Andreas Mischok",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/autumn_forest_01",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-autumn-forest.1080.jpg",
+     "size": 801983,
+     "sha256": "10e37ba9b0ae6d15435671e5a9991dabbcdee848e46167e40c8c4ad754502358"
+    }
+   ]
+  },
+  {
+   "id": "nature-chinese-garden",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Chinese garden",
+   "author": "Andreas Mischok",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/chinese_garden",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-chinese-garden.1080.jpg",
+     "size": 464496,
+     "sha256": "990756b2300438d23ff5d693a1ec70812247a9a570c913dd68ebeec3a86ad056"
+    }
+   ]
+  },
+  {
+   "id": "nature-highland-ridge",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Highland ridge",
+   "author": "Dimitrios Savva, Jarod Guest",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/drakensberg_solitary_mountain",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-highland-ridge.1080.jpg",
+     "size": 372950,
+     "sha256": "a5027a22e7cc4c5a07a6cf8f77d0c0a4d034fa29b73fc328ba514329664c5297"
+    }
+   ]
+  },
+  {
+   "id": "nature-pond-trees",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Pond and trees",
+   "author": "Alexander Scholten",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/frozen_lake",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-pond-trees.1080.jpg",
+     "size": 626784,
+     "sha256": "833fcccc1b4fe743c2007b1502e3a80a02e10f352afae9986453477b76235b5f"
+    }
+   ]
+  },
+  {
+   "id": "nature-golden-hills",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Golden hills",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/kiara_8_sunset",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-golden-hills.1080.jpg",
+     "size": 364923,
+     "sha256": "54ebfc5c9cbc03cf6ea118e4c035089c5c662f3840ebe6a03d81e3d4af0210da"
+    }
+   ]
+  },
+  {
+   "id": "nature-lake-horizon",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Lake horizon",
+   "author": "Alexander Scholten",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/lake_pier",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-lake-horizon.1080.jpg",
+     "size": 336154,
+     "sha256": "d4ffdb3f0cc8f81cc07efe04bf63ab1ae30b8e6cde0b1e7f30d67ae69b314059"
+    }
+   ]
+  },
+  {
+   "id": "nature-lake-sunrise",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Lake sunrise",
+   "author": "Greg Zaal, Jarod Guest",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/lakeside_sunrise",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-lake-sunrise.1080.jpg",
+     "size": 334250,
+     "sha256": "093c4cadf502ca90d7882a1dede1bdb218568d44eaf087afa635155d49879554"
+    }
+   ]
+  },
+  {
+   "id": "nature-forest-stream",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Forest stream",
+   "author": "Andreas Mischok",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/lauter_waterfall",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-forest-stream.1080.jpg",
+     "size": 691038,
+     "sha256": "8922072a016d43953f8b8ec24aa34d26939f04f8e2e280980d7e308429024490"
+    }
+   ]
+  },
+  {
+   "id": "nature-misty-pines",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Misty pines",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/misty_pines",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-misty-pines.1080.jpg",
+     "size": 410955,
+     "sha256": "cd9f24f4e93753d1520ef2ef023dd2645b9ae677bf93b4c3a276ca8927796817"
+    }
+   ],
+   "builtin": true
+  },
+  {
+   "id": "nature-mossy-forest",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Mossy forest",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/mossy_forest",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-mossy-forest.1080.jpg",
+     "size": 588108,
+     "sha256": "aefd5c240380c5f75518b07394000f10a6ee4708865be77e8ea07ab3fd066d7c"
+    }
+   ]
+  },
+  {
+   "id": "nature-rocky-beach",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Rocky beach",
+   "author": "Greg Zaal, Rico Cilliers",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/secluded_beach",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-rocky-beach.1080.jpg",
+     "size": 293376,
+     "sha256": "0f998c9b75ce67456b5555bc13e056c9c9a9643cc05637188a6b62d4c6f3dfe0"
+    }
+   ]
+  },
+  {
+   "id": "nature-meadow-sunset",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Meadow sunset",
+   "author": "Elvis Posa",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/sunset_meadow_path",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-meadow-sunset.1080.jpg",
+     "size": 371543,
+     "sha256": "acf2821d47320684b4362b0e63bde4cb13d3deadf93c05d728f87109d3d5f99d"
+    }
+   ]
+  },
+  {
+   "id": "nature-beach-sunrise",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Beach sunrise",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/umhlanga_sunrise",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-beach-sunrise.1080.jpg",
+     "size": 213238,
+     "sha256": "cd32e5d777152a9cccbae0756b126e5b4a301acf1f39dfcc4fc86f809cdc9616"
+    }
+   ]
+  },
+  {
+   "id": "nature-fountain-garden",
+   "kind": "picture",
+   "category": "nature",
+   "name": "Fountain garden",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/symmetrical_garden",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/nature-fountain-garden.1080.jpg",
+     "size": 400343,
+     "sha256": "dd11ba6319f287a0592c66ab27f5098c8241fdcb98d7c5c7068dbbc0ce94b172"
+    }
+   ]
+  },
+  {
+   "id": "city-lakeside",
+   "kind": "picture",
+   "category": "city",
+   "name": "Lakeside city",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/binnenalster",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/city-lakeside.1080.jpg",
+     "size": 164701,
+     "sha256": "c098e89a219a144f544efbd0d9cfed13fc56f9da9fb2526927ec88155258f550"
+    }
+   ]
+  },
+  {
+   "id": "city-river-harbour",
+   "kind": "picture",
+   "category": "city",
+   "name": "River harbour",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/dusseldorf_bridge",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/city-river-harbour.1080.jpg",
+     "size": 212121,
+     "sha256": "61292aee3725dbfeacc8fa8cb606e16b16229fcb703a98ba95143496930a5deb"
+    }
+   ]
+  },
+  {
+   "id": "city-brick-canal",
+   "kind": "picture",
+   "category": "city",
+   "name": "Brick canal",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/hamburg_canal",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/city-brick-canal.1080.jpg",
+     "size": 389642,
+     "sha256": "b6374cb4232d09ea06e0e7af1e6a53d8dbf5313d499f8f90a6bb139fec2e31be"
+    }
+   ]
+  },
+  {
+   "id": "city-rooftop-view",
+   "kind": "picture",
+   "category": "city",
+   "name": "Rooftop view",
+   "author": "Dimitrios Savva, Jarod Guest",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/hotel_rooftop_balcony",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/city-rooftop-view.1080.jpg",
+     "size": 221832,
+     "sha256": "3a28af352eb043b7e7c1d9c41bfb0752b4bf84f867882e3e0696703005ecdbaa"
+    }
+   ]
+  },
+  {
+   "id": "city-riverside-glass",
+   "kind": "picture",
+   "category": "city",
+   "name": "Riverside glass",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/modern_buildings",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/city-riverside-glass.1080.jpg",
+     "size": 304824,
+     "sha256": "71e030961470aea0c3918977c9aee2f2babc1513b4cd9501b4f3521e16ec113e"
+    }
+   ]
+  },
+  {
+   "id": "city-night-bridge",
+   "kind": "picture",
+   "category": "city",
+   "name": "Night bridge",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/modern_buildings_night",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/city-night-bridge.1080.jpg",
+     "size": 287955,
+     "sha256": "6bfebff59e0b5085507cafbf883245573974a62736dc68866ccd6819703cf2fd"
+    }
+   ]
+  },
+  {
+   "id": "city-lagoon-dawn",
+   "kind": "picture",
+   "category": "city",
+   "name": "Lagoon at dawn",
+   "author": "Greg Zaal, Rico Cilliers",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/venice_dawn_1",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/city-lagoon-dawn.1080.jpg",
+     "size": 158413,
+     "sha256": "889ce4aa817ea77cee14ce3e5baff51dd3781d6254175c0a04a6dc91266f1cf0"
+    }
+   ],
+   "builtin": true
+  },
+  {
+   "id": "city-lagoon-sunset",
+   "kind": "picture",
+   "category": "city",
+   "name": "Lagoon sunset",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/venice_sunset",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/city-lagoon-sunset.1080.jpg",
+     "size": 220522,
+     "sha256": "0225b2dab93839f46c37370c2fc48a00dc02ee3ee0e20694b509bbbeb83daeaf"
+    }
+   ]
+  },
+  {
+   "id": "city-palace-night",
+   "kind": "picture",
+   "category": "city",
+   "name": "Palace at night",
+   "author": "Greg Zaal",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/zwinger_night",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/city-palace-night.1080.jpg",
+     "size": 356365,
+     "sha256": "80e3af9ba5b09e3c22a5cb8e5a0c2e8935f3ccae75e620b30430c20b18d45059"
+    }
+   ]
+  },
+  {
+   "id": "city-rooftops-dusk",
+   "kind": "picture",
+   "category": "city",
+   "name": "Rooftops at dusk",
+   "author": "Greg Zaal, Dimitrios Savva",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://polyhaven.com/a/sunset_jhbcentral",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/city-rooftops-dusk.1080.jpg",
+     "size": 302529,
+     "sha256": "001377bac713d78df6debc8b19431bce58607aca78f5f7df65b0ec8537f54c9c"
+    }
+   ]
+  },
+  {
+   "id": "abstract-concrete",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Grey concrete",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Concrete036",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/abstract-concrete.1080.jpg",
+     "size": 486212,
+     "sha256": "c7cf1a5d7ca33bb99b4b36470f75e1a25323751066204eccf3b9b8a0ba12ef80"
+    }
+   ]
+  },
+  {
+   "id": "abstract-plaster",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "White plaster",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Plaster002",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/abstract-plaster.1080.jpg",
+     "size": 472954,
+     "sha256": "defac42e041bb770ed472a769f28a08948e299b58717cdfdc2a0f93a2a022d84"
+    }
+   ]
+  },
+  {
+   "id": "abstract-bricks",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Light bricks",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Bricks105",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/abstract-bricks.1080.jpg",
+     "size": 455286,
+     "sha256": "bf1fe9a6079f72f6d21d95578785757eacfb78e11ec47bc3c84a687f3824a2bf"
+    }
+   ]
+  },
+  {
+   "id": "abstract-terrazzo",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Terrazzo",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Terrazzo013",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/abstract-terrazzo.1080.jpg",
+     "size": 319579,
+     "sha256": "531b531347615b252c97c0a2d8e8705982a16386b321b44870bd944376078222"
+    }
+   ]
+  },
+  {
+   "id": "abstract-marble",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "White marble",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Marble012",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/abstract-marble.1080.jpg",
+     "size": 608493,
+     "sha256": "fc4028546c40e2a9b4a24fe262a8678965a455d2b8f36d6138e8e478c68fc0e9"
+    }
+   ]
+  },
+  {
+   "id": "abstract-wood",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Warm wood",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Wood098",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/abstract-wood.1080.jpg",
+     "size": 252845,
+     "sha256": "755feb3f8b1dbe58308e0a512529ae37a9753362bba31a893ce6415985859230"
+    }
+   ]
+  },
+  {
+   "id": "abstract-linen",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "White linen",
+   "author": "ambientCG (Lennart Demes)",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://ambientcg.com/a/Fabric086",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/abstract-linen.1080.jpg",
+     "size": 401029,
+     "sha256": "79ece32935eb690ca420bc1ce71f58c31d42965ee6a537e1744cfa696829d1bf"
+    }
+   ]
+  },
+  {
+   "id": "space-aurora-manitoba",
+   "kind": "picture",
+   "category": "space",
+   "name": "Aurora over Canada",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss072e159172",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/space-aurora-manitoba.1080.jpg",
+     "size": 299871,
+     "sha256": "551ba251a22c1cb8a02d3cd7af728c1b44c609dd362f240c11c1c388105128d4"
+    }
+   ]
+  },
+  {
+   "id": "space-aurora-stars",
+   "kind": "picture",
+   "category": "space",
+   "name": "Aurora and stars",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss071e564695",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/space-aurora-stars.1080.jpg",
+     "size": 389872,
+     "sha256": "9ced30f960c51fb231c6dd8c2f7cdee70a910f1d2b0d31828c30a052ab23c26f"
+    }
+   ]
+  },
+  {
+   "id": "space-aurora-red",
+   "kind": "picture",
+   "category": "space",
+   "name": "Red aurora",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss072e451023",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/space-aurora-red.1080.jpg",
+     "size": 420249,
+     "sha256": "a211c5d7d17ac1c7479255682344807903eed7fa159a5a7266c351653926f3b6"
+    }
+   ]
+  },
+  {
+   "id": "space-aurora-swirl",
+   "kind": "picture",
+   "category": "space",
+   "name": "Aurora swirl",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss073e0256896",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/space-aurora-swirl.1080.jpg",
+     "size": 422129,
+     "sha256": "2beda593b6d156cf2675205a537981698d458b14cbca5673655e6fde6f8d077c"
+    }
+   ]
+  },
+  {
+   "id": "space-city-lights",
+   "kind": "picture",
+   "category": "space",
+   "name": "City lights",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss073e0685684",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/space-city-lights.1080.jpg",
+     "size": 723607,
+     "sha256": "9640e9f6c44757b0860b1659d7fe9ae2ca34af5729cbac67940e9e79bc1872f6"
+    }
+   ]
+  },
+  {
+   "id": "space-milky-way",
+   "kind": "picture",
+   "category": "space",
+   "name": "Milky Way airglow",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss073e0982679",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/space-milky-way.1080.jpg",
+     "size": 657326,
+     "sha256": "15292f7d30057b788d2f27e9712c91c6466b571570377cc7b2f17677ba3c109f"
+    }
+   ]
+  },
+  {
+   "id": "space-orbital-sunset",
+   "kind": "picture",
+   "category": "space",
+   "name": "Orbital sunset",
+   "author": "NASA/Chris Williams",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss074e0046371",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/space-orbital-sunset.1080.jpg",
+     "size": 201869,
+     "sha256": "3b68f7e7e7b97f9edc973439bf6fce0a116d13cdcedd773dcb51a87f62c97498"
+    }
+   ],
+   "builtin": true
+  },
+  {
+   "id": "space-orbital-sunrise",
+   "kind": "picture",
+   "category": "space",
+   "name": "Orbital sunrise",
+   "author": "NASA/Jessica Meir",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss074e0796544",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/space-orbital-sunrise.1080.jpg",
+     "size": 116721,
+     "sha256": "541a6c0377cb5a770c4d199baa6d45102a0ff2042f46d1dd6b0d92692981a686"
+    }
+   ]
+  },
+  {
+   "id": "space-horizon-glow",
+   "kind": "picture",
+   "category": "space",
+   "name": "Horizon glow",
+   "author": "NASA/Chris Williams",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://images.nasa.gov/details/iss074e0722845",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/space-horizon-glow.1080.jpg",
+     "size": 107854,
+     "sha256": "b84d3b8f647dfc5d095814231d328f6bd2aa88b328934f34d7c9afaf20f5aa7e"
+    }
+   ]
+  },
+  {
+   "id": "studio-backdrop-warm",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Warm backdrop",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-backdrop-warm.1080.jpg",
+     "size": 32180,
+     "sha256": "0471f9be73a65399141fc7726e7c12328fb3f4e608b03f5392ce3f963b8ee7e2"
+    }
+   ],
+   "builtin": true
+  },
+  {
+   "id": "studio-backdrop-navy",
+   "kind": "picture",
+   "category": "studio",
+   "name": "Navy backdrop",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/studio-backdrop-navy.1080.jpg",
+     "size": 22724,
+     "sha256": "a5f728eacf3d2d55d45cc3a945a564a58688f3d41d48f38d9d90ebf0cce0f750"
+    }
+   ]
+  },
+  {
+   "id": "abstract-dawn-gradient",
+   "kind": "picture",
+   "category": "abstract",
+   "name": "Dawn gradient",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "1080",
+     "w": 1920,
+     "h": 1080,
+     "file": "pictures/abstract-dawn-gradient.1080.jpg",
+     "size": 27412,
+     "sha256": "9f88960b3262cf68efb9b4c28f28ee4c1cb677ee1c311f65faaf957138e2376d"
+    }
+   ],
+   "builtin": true
+  },
+  {
+   "id": "loop-wetland-clouds",
+   "kind": "video",
+   "category": "nature",
+   "name": "Wetland big sky",
+   "author": "Bureau of Land Management Oregon and Washington",
+   "license": "CC BY 2.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Warner_Wetlands_big_sky_time-lapse_video.webm",
+   "credit": "Video: Bureau of Land Management Oregon and Washington, CC BY 2.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-wetland-clouds.720.h264.mp4",
+     "size": 2270085,
+     "sha256": "16307a2bf1e4913ffa1b226ae3f81e908a42c2b1771712ec47d20bf83c24bb83"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-wetland-clouds.1080.h264.mp4",
+     "size": 4405925,
+     "sha256": "0f06d60fd635d9ab47bd444a47114d879b36efe785f293faa9c8781586048872"
+    }
+   ]
+  },
+  {
+   "id": "loop-iceland-waves",
+   "kind": "video",
+   "category": "nature",
+   "name": "Black sand waves",
+   "author": "Alexander Grebenkov",
+   "license": "CC BY 3.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Ocean_waves_at_L%C3%A6kjavik_beach,_Iceland.webm",
+   "credit": "Video: Alexander Grebenkov, CC BY 3.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 25.0,
+     "seconds": 7,
+     "file": "videos/loop-iceland-waves.720.h264.mp4",
+     "size": 1951060,
+     "sha256": "aa19400d5d05a9e5a0ab361a5f7daf6d96223ea24a7ab73553fa42c12d776942"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 7,
+     "file": "videos/loop-iceland-waves.1080.h264.mp4",
+     "size": 3677198,
+     "sha256": "546d8d80567f9c8e95b5036439b084282bbad235ef99fd516b209458988d6add"
+    }
+   ]
+  },
+  {
+   "id": "loop-sea-nettle",
+   "kind": "video",
+   "category": "nature",
+   "name": "Sea nettle",
+   "author": "Fastily",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Jellyfish_at_Monterey_Bay_Aquarium_6_2024-01-11.webm",
+   "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-sea-nettle.720.h264.mp4",
+     "size": 2183696,
+     "sha256": "f738d7cb1a41fb040b52a375654166474cdb4c24424ad3e4f74d75ecf0f040ea"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-sea-nettle.1080.h264.mp4",
+     "size": 4201320,
+     "sha256": "0800bd2e02c686060a06f733a399cae4c21bd5e5f584c3ce5573546e60c4213e"
+    }
+   ]
+  },
+  {
+   "id": "loop-snowy-woods",
+   "kind": "video",
+   "category": "nature",
+   "name": "Snowy woods",
+   "author": "Peter Cooper Jr.",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Snow_falling_in_Charlton_MA_2025-12-14.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-snowy-woods.720.h264.mp4",
+     "size": 3064188,
+     "sha256": "b94901960546cf922f555c15dec25895cc5cc68991c0167f9ff461f5cd4dc56e"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-snowy-woods.1080.h264.mp4",
+     "size": 5793644,
+     "sha256": "d3ab063a28b59dde7af97dc9d6334c7c95cb7471dac65cf87395f2246b8fcbff"
+    }
+   ]
+  },
+  {
+   "id": "loop-sunset-afterglow",
+   "kind": "video",
+   "category": "nature",
+   "name": "Sunset afterglow",
+   "author": "John Fowler (away)",
+   "license": "CC BY 2.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Second_Glow_(video).webm",
+   "credit": "Video: John Fowler (away), CC BY 2.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-sunset-afterglow.720.h264.mp4",
+     "size": 1589646,
+     "sha256": "09af04ca519d7ef574ff532830fe3ac91754ee59c06b4d10664842b34d4e8b68"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-sunset-afterglow.1080.h264.mp4",
+     "size": 3345852,
+     "sha256": "bc23f0c161569183c14bc8a92a34847b85b7f0ab7e1054ae91d85b1ebfd7312f"
+    }
+   ]
+  },
+  {
+   "id": "loop-cumulus",
+   "kind": "video",
+   "category": "nature",
+   "name": "Cumulus clouds",
+   "author": "John Fowler (away)",
+   "license": "CC BY 2.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Cloud_timelapse.webm",
+   "credit": "Video: John Fowler (away), CC BY 2.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-cumulus.720.h264.mp4",
+     "size": 1488034,
+     "sha256": "9add4f9a9fb0f485bbc993a6ff40605d5e7f465fae0c32d54dde8b97dc46fc33"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-cumulus.1080.h264.mp4",
+     "size": 3083050,
+     "sha256": "03e92b6b44cfdd1f44ebd15bc487255a890ae3e72f9c6ca1df99e0724dfbce53"
+    }
+   ]
+  },
+  {
+   "id": "loop-lake-sunrise",
+   "kind": "video",
+   "category": "nature",
+   "name": "Lake sunrise",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:30s_Time_lapse_of_Sunrise_at_the_shore_line_of_Raymer_Bay_on_Okanagan_Lake,_24fps.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-lake-sunrise.720.h264.mp4",
+     "size": 3049419,
+     "sha256": "10b59ddbace66400d573a0a7cbd0f04e2c30273adbb91d5c62cde6b347b9d2e9"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-lake-sunrise.1080.h264.mp4",
+     "size": 5816987,
+     "sha256": "f907e4a490b54d5138290bada9a61e062403de23fd4d88a6f188b48632fe9047"
+    }
+   ]
+  },
+  {
+   "id": "loop-mossy-river",
+   "kind": "video",
+   "category": "nature",
+   "name": "Mossy river",
+   "author": "BLM Oregon & Washington",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Little_Applegate_River_(50982975823).webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-mossy-river.720.h264.mp4",
+     "size": 2974578,
+     "sha256": "2e344bcbaad63eef60196c496f0bdcefb68b4bbab0371411c21dfe5a01d6aa42"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-mossy-river.1080.h264.mp4",
+     "size": 5480996,
+     "sha256": "22b9b6f603a4704c36a631d7f6cf4615c2e6d7802364be85d86d85521885e9ce"
+    }
+   ]
+  },
+  {
+   "id": "loop-valley-pasture",
+   "kind": "video",
+   "category": "nature",
+   "name": "Valley pasture",
+   "author": "Rose Abrams",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Pasture_in_Tay_Valley_-_timelapse.webm",
+   "credit": "Video: Rose Abrams, CC BY 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-valley-pasture.720.h264.mp4",
+     "size": 3057394,
+     "sha256": "d39d2e8c2c20f563e174367ab5d3477f182dfa8958ec173296bcb5112058bd22"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-valley-pasture.1080.h264.mp4",
+     "size": 5768902,
+     "sha256": "f3261478f254612b280dee101a125b66915b613fa1abbf2f77fd3051f3646db6"
+    }
+   ]
+  },
+  {
+   "id": "loop-shore-waves",
+   "kind": "video",
+   "category": "nature",
+   "name": "Shore waves",
+   "author": "דוד שי",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Water_waves_in_Herzliya_beach.webm",
+   "credit": "Video: דוד שי, CC BY-SA 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 25.0,
+     "seconds": 7,
+     "file": "videos/loop-shore-waves.720.h264.mp4",
+     "size": 3055729,
+     "sha256": "afa0b9685def459af41e9eaf3537784c4be010a842a86092392091cd2c512f80"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 7,
+     "file": "videos/loop-shore-waves.1080.h264.mp4",
+     "size": 5733193,
+     "sha256": "9cb28f1930461ee1e5405aa892e32cb7c6c64c26f9f941e6a4b7ccce4a2567ce"
+    }
+   ]
+  },
+  {
+   "id": "loop-freezing-fog",
+   "kind": "video",
+   "category": "nature",
+   "name": "Freezing fog",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Okanagan_Wila_wafting_on_branches_in_freezing_fog.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-freezing-fog.720.h264.mp4",
+     "size": 2685556,
+     "sha256": "3978d4b54d08988da0fc6be307979da656a6c185dde7eb6a26a105760da630c7"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-freezing-fog.1080.h264.mp4",
+     "size": 5298610,
+     "sha256": "96a2af2363f47bcd6626bf216b2b568557bb410bfbb3335790ce8cc030f9607e"
+    }
+   ]
+  },
+  {
+   "id": "loop-mountain-clouds",
+   "kind": "video",
+   "category": "nature",
+   "name": "Mountain clouds",
+   "author": "BLM Oregon & Washington",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Time_Lapse_Clouds_above_Steens_Mountain_(36203941112).webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-mountain-clouds.720.h264.mp4",
+     "size": 1946040,
+     "sha256": "0abdbf6996608cfd6793e62d8478ba4dfe752ceac1e4c179099f8cf55bacfa64"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-mountain-clouds.1080.h264.mp4",
+     "size": 3958843,
+     "sha256": "d4619ea7959330c8a09cf0054598508c49983d05fad60e4e6c2b47256193ccdf"
+    }
+   ]
+  },
+  {
+   "id": "loop-foggy-forest",
+   "kind": "video",
+   "category": "nature",
+   "name": "Foggy forest",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Aerial_View_of_freezing_fog_in_the_Okanagan_Highlands.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-foggy-forest.720.h264.mp4",
+     "size": 3067844,
+     "sha256": "b566a216940279d33914e6f880607b990ae217b8bc3cf5b4ce15f8df0950a57b"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-foggy-forest.1080.h264.mp4",
+     "size": 5781505,
+     "sha256": "24d04a93997c6aaea249172cdb41a57ee1d884189f3de8c1ae555a1c108e2e94"
+    }
+   ]
+  },
+  {
+   "id": "loop-snowy-evergreens",
+   "kind": "video",
+   "category": "nature",
+   "name": "Snowy evergreens",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Snow_falls_on_evergreens_protected_by_a_rocky_outcrop.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-snowy-evergreens.720.h264.mp4",
+     "size": 2881086,
+     "sha256": "ab3f57b2f28b8c9678a543040323ed101d5d53e07570c555532ee81b726e4bdb"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-snowy-evergreens.1080.h264.mp4",
+     "size": 5245871,
+     "sha256": "8256cd873311206c6e9258d981d5300930ffc0624635726e7c79f50e5db06d3d"
+    }
+   ]
+  },
+  {
+   "id": "loop-wetland-creek",
+   "kind": "video",
+   "category": "nature",
+   "name": "Wetland creek",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Creek_babbling_through_Benvoulin_wetlands.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-wetland-creek.720.h264.mp4",
+     "size": 3112396,
+     "sha256": "7d31945547bb77da34d7cb92420a8e8e7236bf9be9cbcfe773a4641fd0177764"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-wetland-creek.1080.h264.mp4",
+     "size": 5822513,
+     "sha256": "0e8a2dc05f23d979029a77a284aa647f0b1488ea170c5b52d4c990a4bac339e1"
+    }
+   ]
+  },
+  {
+   "id": "loop-comb-jelly",
+   "kind": "video",
+   "category": "nature",
+   "name": "Comb jelly",
+   "author": "Fastily",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Jellyfish_at_Monterey_Bay_Aquarium_3_2024-01-11.webm",
+   "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-comb-jelly.720.h264.mp4",
+     "size": 788665,
+     "sha256": "71b4304f1f413967695890b752ab14f03211ca2daf38bcc933804867ab360bf8"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-comb-jelly.1080.h264.mp4",
+     "size": 1686728,
+     "sha256": "042572eba3afd3ff937320233de889ceff272a1b7997d36490a4d2bfa7dbdcbe"
+    }
+   ]
+  },
+  {
+   "id": "loop-powder-creek",
+   "kind": "video",
+   "category": "nature",
+   "name": "Powder creek",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Falling_Powder_overlies_melt-water_flowing_down_Hachey_Creek_in_Myra-Bellevue_Park,_British_Columbia.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-powder-creek.720.h264.mp4",
+     "size": 2528648,
+     "sha256": "16ba69607752a4f91dac2d28528ee69db9bb691dc1a6b442f72e5f32d730cefd"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-powder-creek.1080.h264.mp4",
+     "size": 4684858,
+     "sha256": "2ca2a3215dcfddfc854eb2da9bebc37947065d8461e36fecb1fd6b54abb8b07d"
+    }
+   ]
+  },
+  {
+   "id": "loop-big-aquarium",
+   "kind": "video",
+   "category": "nature",
+   "name": "Big aquarium",
+   "author": "Sebastian Wallroth",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Ozeaneum_Stralsund_2019-04_002.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-big-aquarium.720.h264.mp4",
+     "size": 3059209,
+     "sha256": "c7c6c704c46569d14eb86018dcb4f9c6ea1905d47285473efcb141e035fe2978"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-big-aquarium.1080.h264.mp4",
+     "size": 5786150,
+     "sha256": "99bbb82b936a6ebb685b6c279bed25a6b53a2689a2b98ec12547f0bf5a106843"
+    }
+   ]
+  },
+  {
+   "id": "loop-granite-dusk",
+   "kind": "video",
+   "category": "nature",
+   "name": "Granite dusk",
+   "author": "G. Edward Johnson",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Sunset_on_Halfdome_timelapse_Yosemite_CA_2023-07-15_20-11-06_1.webm",
+   "credit": "Video: G. Edward Johnson, CC BY 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-granite-dusk.720.h264.mp4",
+     "size": 897734,
+     "sha256": "6ce72bc6f584a9943976a415f20c9a3b7c3f7feb36b15654151af87e24c0c914"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-granite-dusk.1080.h264.mp4",
+     "size": 2068267,
+     "sha256": "b5f76f44df101a125e5dce930211f1efacf5ad9acab6cf4f8bba5fab918f5d77"
+    }
+   ]
+  },
+  {
+   "id": "loop-cliff-waterfall",
+   "kind": "video",
+   "category": "nature",
+   "name": "Cliff waterfall",
+   "author": "Psypherium",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Delaneys_Falls.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-cliff-waterfall.720.h264.mp4",
+     "size": 3071495,
+     "sha256": "5dd305a6791bb95e415c2164dcba50865600b142becd617710370e82e8a8b3af"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-cliff-waterfall.1080.h264.mp4",
+     "size": 5731636,
+     "sha256": "dfb716efb6c697354446880173b60cbea62613252fa65225b0ff3fbc32586475"
+    }
+   ]
+  },
+  {
+   "id": "loop-sardine-school",
+   "kind": "video",
+   "category": "nature",
+   "name": "Sardine school",
+   "author": "Fastily",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Fish_at_Monterey_Bay_Aquarium_1_2024-01-11.webm",
+   "credit": "Video: Fastily, CC BY-SA 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-sardine-school.720.h264.mp4",
+     "size": 3123751,
+     "sha256": "b81227763ac61d7e07c2070cea1fc298a67f6089ff759d2cbb95f9611a75754c"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-sardine-school.1080.h264.mp4",
+     "size": 5826065,
+     "sha256": "ff8fd54b52e7cffdd25d0eadd76c8768fb0c72b919d259b492ca4383e5f2a30d"
+    }
+   ]
+  },
+  {
+   "id": "loop-snowy-creek",
+   "kind": "video",
+   "category": "nature",
+   "name": "Snowy creek",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:KLO_Creek_gurgles_during_an_early_winter_snowfall.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-snowy-creek.720.h264.mp4",
+     "size": 3110942,
+     "sha256": "3a76cd06aad7619c55c90e8255ef2e119cf65feaf5666071e29da4d265157ce2"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-snowy-creek.1080.h264.mp4",
+     "size": 5846769,
+     "sha256": "586df967ceb20c62a421b528f32d03a2254780c5808f0a7e72b88ed970349245"
+    }
+   ]
+  },
+  {
+   "id": "loop-snow-sky",
+   "kind": "video",
+   "category": "nature",
+   "name": "Snow against sky",
+   "author": "Роман Рябенко",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:%D0%A1%D0%BD%D1%96%D0%B3_%D0%BD%D0%B0_%D1%82%D0%BB%D1%96_%D0%BB%D0%B5%D0%B3%D0%BA%D0%BE%D1%97_%D1%85%D0%BC%D0%B0%D1%80%D0%B8_%D0%B2_%D0%BD%D0%B5%D0%B1%D1%96.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-snow-sky.720.h264.mp4",
+     "size": 1146772,
+     "sha256": "048ae4332d0618a50a3b1eef8219b8d481a7f1af67e6382759d492f1072bc006"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-snow-sky.1080.h264.mp4",
+     "size": 3505821,
+     "sha256": "f8f20846d05ac612028be45a1d45d2cdde6bce777880f2064d84e8ce13c2e645"
+    }
+   ]
+  },
+  {
+   "id": "loop-roof-clouds",
+   "kind": "video",
+   "category": "city",
+   "name": "Clouds over roofs",
+   "author": "Thomas Bresson",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:2020-04-03_timelapse-nuages-Belfort.webm",
+   "credit": "Video: Thomas Bresson, CC BY 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-roof-clouds.720.h264.mp4",
+     "size": 1487371,
+     "sha256": "60e25d9196daeb6cb26eca1157e8dabfffff51e4a41b7539e30d914d6de87c8c"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-roof-clouds.1080.h264.mp4",
+     "size": 3258230,
+     "sha256": "70924684b1fd88c3753a7c7760f646e10dacfd3e11eb99c597b2bb8fb14d7d48"
+    }
+   ]
+  },
+  {
+   "id": "loop-river-city-dusk",
+   "kind": "video",
+   "category": "city",
+   "name": "River city dusk",
+   "author": "Ecelan",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Zaragoza_-_Vistas_del_Pilar_-_Anochecer.webm",
+   "credit": "Video: Ecelan, CC BY-SA 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-river-city-dusk.720.h264.mp4",
+     "size": 2858657,
+     "sha256": "722c72cb2d270d5d396f3368f6a375cff52ba684df8253fb9ffccd08d065046f"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-river-city-dusk.1080.h264.mp4",
+     "size": 5627920,
+     "sha256": "a358f51e0591ee0cfc9cb41b56c786815f8232f7e460c74ecee3a4c1236f1415"
+    }
+   ]
+  },
+  {
+   "id": "loop-fireplace",
+   "kind": "video",
+   "category": "home",
+   "name": "Fireplace",
+   "author": "FASTILY",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Fireplace_1_2021-02-14.webm",
+   "credit": "Video: FASTILY, CC BY-SA 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-fireplace.720.h264.mp4",
+     "size": 3090400,
+     "sha256": "52c692fb7f5663b16ad0cfef4b6f3bdd50aaaf5f471fa924f03a8f55e236f84a"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-fireplace.1080.h264.mp4",
+     "size": 5791082,
+     "sha256": "4486271e4eb4648cb44f2cf77b8cb7de327cd9adcb103dc043f2e7d5868020de"
+    }
+   ]
+  },
+  {
+   "id": "loop-fire-pit",
+   "kind": "video",
+   "category": "home",
+   "name": "Fire pit",
+   "author": "FASTILY",
+   "license": "CC BY-SA 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Fire_pit_1_2017-11-21.webm",
+   "credit": "Video: FASTILY, CC BY-SA 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-fire-pit.720.h264.mp4",
+     "size": 3103931,
+     "sha256": "74ae691f236035e8292d2456ca03aac3bec2d1ed93e9524ce0cfc8aeb7d3fa0c"
+    }
+   ]
+  },
+  {
+   "id": "loop-candle",
+   "kind": "video",
+   "category": "home",
+   "name": "Candle",
+   "author": "Bautsch",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Corona.Candle.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 25.0,
+     "seconds": 7,
+     "file": "videos/loop-candle.720.h264.mp4",
+     "size": 463407,
+     "sha256": "e4c16f6bc494e6b2684931505ea71cff006feb8fe00fe67f98b2bec57d504781"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 25.0,
+     "seconds": 7,
+     "file": "videos/loop-candle.1080.h264.mp4",
+     "size": 868006,
+     "sha256": "d8f32adbd050de873791d125d682db5c3999afcbbddffd402d3e394a39b44530"
+    }
+   ]
+  },
+  {
+   "id": "loop-snow-fence",
+   "kind": "video",
+   "category": "home",
+   "name": "Snow by the fence",
+   "author": "Extemporalist",
+   "license": "CC0",
+   "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:FluffySnowfallByFence.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-snow-fence.720.h264.mp4",
+     "size": 1771656,
+     "sha256": "b21a29b130649f3292f70a4771f127da970f0f0f6c9d5b3611db5d16c6d47642"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-snow-fence.1080.h264.mp4",
+     "size": 4537615,
+     "sha256": "b13f88caec94ee60b816a756dfa5b9ef493d750fd4312d5b5420a003b2b274f7"
+    }
+   ]
+  },
+  {
+   "id": "loop-aurora-iceland",
+   "kind": "video",
+   "category": "space",
+   "name": "Aurora over Iceland",
+   "author": "G. Edward Johnson",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Aurora-Iceland_Northern_Lights_timelapse_2026-02-06.hd.webm",
+   "credit": "Video: G. Edward Johnson, CC BY 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-aurora-iceland.720.h264.mp4",
+     "size": 2951900,
+     "sha256": "ccd7db608b3c8c59c25288e6de27deeb0272513f4e4f8fae1db4d4a0c4ada28e"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-aurora-iceland.1080.h264.mp4",
+     "size": 5755032,
+     "sha256": "a1dd5e658938dccac0e0cb59d05714121e5c8b2b6c29f77996fbe3198e8cb67e"
+    }
+   ]
+  },
+  {
+   "id": "loop-desert-stars",
+   "kind": "video",
+   "category": "space",
+   "name": "Desert stars",
+   "author": "Joshua Tree National Park",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Stars_and_Clouds_Over_Headstone_Rock_(30230087163).webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-desert-stars.720.h264.mp4",
+     "size": 1774282,
+     "sha256": "021fe88a72a4c9bd7433446e6dddb677d95da24d213819ca0e0b77b146372664"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 23.976,
+     "seconds": 7,
+     "file": "videos/loop-desert-stars.1080.h264.mp4",
+     "size": 3538403,
+     "sha256": "42c02c9d964210d099a38b6ea929dee5c7544a35b99fd2c8c5287dda8b99ba78"
+    }
+   ]
+  },
+  {
+   "id": "loop-earth-solar-array",
+   "kind": "video",
+   "category": "space",
+   "name": "Earth from orbit",
+   "author": "NASA",
+   "license": "Public domain",
+   "licenseUrl": "",
+   "source": "https://commons.wikimedia.org/wiki/File:Earth-solar-array-timelapse.webm",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-earth-solar-array.720.h264.mp4",
+     "size": 1775834,
+     "sha256": "79de2b110820a8740a5aa4a1baeae4d6129c3db81fc681f148a9272ce73b8426"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 7,
+     "file": "videos/loop-earth-solar-array.1080.h264.mp4",
+     "size": 3164899,
+     "sha256": "5788a7a3f14cd316fa490878cf3d6de6040684beace65bcc2a25dd309b33ef5c"
+    }
+   ]
+  },
+  {
+   "id": "loop-rain-drops",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Rain drops",
+   "author": "Nesnad",
+   "license": "CC BY 4.0",
+   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+   "source": "https://commons.wikimedia.org/wiki/File:Rain_drops_-_Japan_-2016_July_20.webm",
+   "credit": "Video: Nesnad, CC BY 4.0, via Wikimedia Commons",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-rain-drops.720.h264.mp4",
+     "size": 2242981,
+     "sha256": "a2afe36d452409f856f11dffe1de3c89e994e2ae30f1010ff4835f7c26eeedb4"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 29.97,
+     "seconds": 7,
+     "file": "videos/loop-rain-drops.1080.h264.mp4",
+     "size": 4186843,
+     "sha256": "b036c793b011e2829953cf674c71c9842d41ffff7542bbd991ae4f30bb1629cf"
+    }
+   ]
+  },
+  {
+   "id": "loop-flow-ocean",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Ocean flow",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-flow-ocean.720.h264.mp4",
+     "size": 373333,
+     "sha256": "4b7a30c7e95870f21dc105fca34b410afb4461546b7b1b3e2c08b749401aad15"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-flow-ocean.1080.h264.mp4",
+     "size": 683438,
+     "sha256": "6db5f1a1d47f131ca6f32e3fa0eadca228fb2b62ce8b284a549369f5107e0b8b"
+    }
+   ]
+  },
+  {
+   "id": "loop-flow-peach",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Peach flow",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-flow-peach.720.h264.mp4",
+     "size": 382654,
+     "sha256": "104d3239b3b34bfb90c69870548a39f674ea97528d5b5fa7ddc2e422dab42eba"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-flow-peach.1080.h264.mp4",
+     "size": 744467,
+     "sha256": "0bbe979332f83fe662c9abcbec4b7b28e7f0d1dcd56abbcb666b9d6e5d39384b"
+    }
+   ]
+  },
+  {
+   "id": "loop-flow-violet",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Violet flow",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-flow-violet.720.h264.mp4",
+     "size": 425877,
+     "sha256": "cc8390e42e37767d30bf8d5955214e271a6e0fc91c30fc769751e7f08cadf55e"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-flow-violet.1080.h264.mp4",
+     "size": 829732,
+     "sha256": "cad94919ab7ad8487a6dde8a846d2a0c7de1842b3471918820eae5370ccfd3ec"
+    }
+   ]
+  },
+  {
+   "id": "loop-flow-mint",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Mint flow",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-flow-mint.720.h264.mp4",
+     "size": 471997,
+     "sha256": "45d25adfada3ff6df99022d21bfe01cebb7452469745e9ec64a93b6dcd1df33c"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-flow-mint.1080.h264.mp4",
+     "size": 875124,
+     "sha256": "a38ffd3dbac8d5800ec5fbefe69f3d3bdc7f0a378711ffc586ecef2bd9a7cd1b"
+    }
+   ]
+  },
+  {
+   "id": "loop-flow-graphite",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Graphite flow",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-flow-graphite.720.h264.mp4",
+     "size": 261803,
+     "sha256": "17d935999634a4afa8d2cd3624047b5795eb0107162807760bb6a4a2ee87ba72"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-flow-graphite.1080.h264.mp4",
+     "size": 580503,
+     "sha256": "3677fd76dfb321145bceef3b657cc11d089233607818cafe8a10ea2cf199065e"
+    }
+   ]
+  },
+  {
+   "id": "loop-bokeh-amber",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Amber bokeh",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-bokeh-amber.720.h264.mp4",
+     "size": 551625,
+     "sha256": "2dc46b05495c0af138683957a61086efa07149775fdd233ed5561a85e54a52e4"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-bokeh-amber.1080.h264.mp4",
+     "size": 902813,
+     "sha256": "8943c8a969b5a53930b7e09f4e1b3ad91db34eee83d597b4ea58bb8770fa1b87"
+    }
+   ]
+  },
+  {
+   "id": "loop-bokeh-blue",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Blue bokeh",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-bokeh-blue.720.h264.mp4",
+     "size": 483428,
+     "sha256": "f6154609b3ef5068b675a9d06e5e94d431762da16a9203c5a19378611910b403"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-bokeh-blue.1080.h264.mp4",
+     "size": 800729,
+     "sha256": "19b5791bab74a19fca217ce169ce9c2b79a6976f0f50822334c29fb67220ec56"
+    }
+   ]
+  },
+  {
+   "id": "loop-bokeh-city",
+   "kind": "video",
+   "category": "city",
+   "name": "City lights bokeh",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-bokeh-city.720.h264.mp4",
+     "size": 705321,
+     "sha256": "fcc6789da6e7799e8d63c648b3d960fba35528d73b386fce97d336edae6ce4bc"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-bokeh-city.1080.h264.mp4",
+     "size": 1116500,
+     "sha256": "2c566b4ac76f40efa8b1c588a2e4d366098b72662c8191e6022d165bc5a55d25"
+    }
+   ]
+  },
+  {
+   "id": "loop-aurora-green",
+   "kind": "video",
+   "category": "space",
+   "name": "Green aurora",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-aurora-green.720.h264.mp4",
+     "size": 619023,
+     "sha256": "19e0a926c6927dee1477f6d0e02e1c31cad126d2915a16c396e99b81828f2294"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-aurora-green.1080.h264.mp4",
+     "size": 1281846,
+     "sha256": "a175c3462e1725bdcba56640937862c94dd1874893a00b32a2634506d3b986e7"
+    }
+   ]
+  },
+  {
+   "id": "loop-aurora-violet",
+   "kind": "video",
+   "category": "space",
+   "name": "Violet aurora",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-aurora-violet.720.h264.mp4",
+     "size": 662007,
+     "sha256": "24ef3d0747661135f09e4248e1562c3159823e2fd7076111298647b47e2cc3cb"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-aurora-violet.1080.h264.mp4",
+     "size": 1313239,
+     "sha256": "b0fecf7fab7770d8f5de796ab84f7b4455a4b47a756562779389d12f3687b9eb"
+    }
+   ]
+  },
+  {
+   "id": "loop-starfield",
+   "kind": "video",
+   "category": "space",
+   "name": "Starfield nebula",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-starfield.720.h264.mp4",
+     "size": 428066,
+     "sha256": "2cdab41e9908c8eb0879beb4432b12f0b3225e62f4d5ed60fea9083a8c6e62b3"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-starfield.1080.h264.mp4",
+     "size": 784955,
+     "sha256": "a7637c5dce4c0fd5aa3908d71b07e59d84d76a99805195084d266c4bc3c12fb0"
+    }
+   ]
+  },
+  {
+   "id": "loop-waves-dusk",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Dusk waves",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-waves-dusk.720.h264.mp4",
+     "size": 254836,
+     "sha256": "81da023d33353911a02be2eb66434b4887183aed4fdd8ba87c58ec16993c99a9"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-waves-dusk.1080.h264.mp4",
+     "size": 494233,
+     "sha256": "863c27ea413219cb1db89dc8a4fbf3a607c04cf9e3279df7c2a911b9116ea964"
+    }
+   ]
+  },
+  {
+   "id": "loop-waves-mint",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Mint waves",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-waves-mint.720.h264.mp4",
+     "size": 296248,
+     "sha256": "23b48e7f3437b64b5a9c08cdfdfea06714db17f9302d1d23362c76fa6b16009c"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-waves-mint.1080.h264.mp4",
+     "size": 553016,
+     "sha256": "59566ba451dd0bbeaed0f1ba04d5c1fd8d2ac2e2a0f39c1011a9cb7f5d8ca209"
+    }
+   ]
+  },
+  {
+   "id": "loop-floating-dust",
+   "kind": "video",
+   "category": "abstract",
+   "name": "Floating dust",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-floating-dust.720.h264.mp4",
+     "size": 696676,
+     "sha256": "51301dd2a24ae947f50b2307fb595c32570c4b6aa56a259538678d6b53989ef8"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-floating-dust.1080.h264.mp4",
+     "size": 1088353,
+     "sha256": "eb06ce3c27668697eae8147b469524f08e976a03cab694df9f52ef905a29da9c"
+    }
+   ]
+  },
+  {
+   "id": "loop-backdrop-grey",
+   "kind": "video",
+   "category": "studio",
+   "name": "Grey backdrop",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-backdrop-grey.720.h264.mp4",
+     "size": 273257,
+     "sha256": "ddb3afa04dbd481b0c0bb5c0d355ec56c39361e1377fdd388b017bd40befe87b"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-backdrop-grey.1080.h264.mp4",
+     "size": 567198,
+     "sha256": "029f2806ede82d48ec2e93553b0087f3258961d3029b50fc7b62c1389465b631"
+    }
+   ]
+  },
+  {
+   "id": "loop-backdrop-teal",
+   "kind": "video",
+   "category": "studio",
+   "name": "Teal backdrop",
+   "author": "LordOS",
+   "license": "MIT",
+   "licenseUrl": "https://opensource.org/license/mit",
+   "source": "https://lordos.org",
+   "variants": [
+    {
+     "name": "720.h264",
+     "codec": "h264",
+     "w": 1280,
+     "h": 720,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-backdrop-teal.720.h264.mp4",
+     "size": 286425,
+     "sha256": "44f3437c2f775e5a76cd5b031178615057590f4969369d0d058a8ced1245b5ed"
+    },
+    {
+     "name": "1080.h264",
+     "codec": "h264",
+     "w": 1920,
+     "h": 1080,
+     "fps": 30.0,
+     "seconds": 8,
+     "file": "videos/loop-backdrop-teal.1080.h264.mp4",
+     "size": 539971,
+     "sha256": "1a149a8960878f29dc86a3f40dfee102a12a5ff56901478084c85b2c57ed3f62"
+    }
+   ]
+  }
+ ]
+}

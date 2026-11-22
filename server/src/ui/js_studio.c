@@ -3,12 +3,22 @@
  * Registered only in the desktop's own JS context (js.c session_context), never in an isolated app's: apps see
  * "LordOS Studio" as one more camera (lord.media.cameras(), device "studio") under the camera permission, and never
  * control it. Every value is a number, a mode name or a path that lord-server checks itself (media/mstudio.c).
- *   status()                       → { available, on, camera, mode, blur, mirror, background, fps, segMs, fxMs, gpu,
+ *   status()                       → { available, on, camera, mode, blur, mirror, background, video, key, similarity,
+ *                                      smoothness, spill, framing, light, match, filter, filterStrength, retouch, faces,
+ *                                      fps, segMs, fxMs, frameMs, videoMs, gpu,
  *                                      loopback: 'missing'|'ready'|'running', hub, readers, cameraOpen, shows, cameraName,
  *                                      stopped, apps: [linux app ids reading the loopback], sources }
- *   set({ on, camera, mode, blur, mirror })   on: LordOS Studio's camera for every app (the loopback; phase 2);
- *                                  mode 'none' | 'blur' | 'picture'; camera '/dev/videoN' or '' (the first one)
- *   setBackground(path | null)     'asset:wallpapers/…' or a picture inside lord.fs's roots; throws studio.badPicture
+ *   set({ on, camera, mode, blur, mirror, key, similarity, smoothness, spill, framing, light, match, filter,
+ *         filterStrength, retouch })
+ *                                  on: LordOS Studio's camera for every app (the loopback; phase 2);
+ *                                  mode 'none' | 'blur' | 'picture' | 'video' (picture and video: the background file,
+ *                                  whichever it is); camera '/dev/videoN' or '' (the first one); phase 3: key 'none' |
+ *                                  'green' | 'blue' (a real green screen), filter 'none' | 'warm' | 'cool' | 'vivid' |
+ *                                  'mono' | 'noir' | 'film' | 'fade' | 'sepia', match 0..60, the rest 0..100 (framing:
+ *                                  Auto Framing, light: Face Light; 0 off); throws studio.invalid for anything else
+ *   setBackground(path | null)     'asset:wallpapers/…', 'asset:studio/backgrounds/…', a catalog download
+ *                                  ('/var/lib/lordos/studio/<sha256>.jpg|.mp4', studio-bg-get) or a picture or short
+ *                                  video inside lord.fs's roots; throws studio.badPicture
  *   preview(width, height) → id    the popover's own live preview: the loopback writer's own frames while it runs (the
  *                                  real camera opened for it), else a LordOS Studio camera source of the desktop (the
  *                                  "no camera" restriction for LordOS's apps applies to both)
@@ -18,6 +28,7 @@
 #include "js_err.h"
 #include "../media/media_int.h"
 #include "../media/mstudio.h"
+#include "../media/mstudiohub.h"
 #include "../sec/restrict.h"
 #include "../fw/rules.h"
 
@@ -40,6 +51,20 @@ static int opt_int(JSContext *c, JSValueConst o, const char *k, int def) {
     return r;
 }
 
+/* a string property that must be one of names (index), def when absent; -1 when present but not one of them */
+static int opt_enum(JSContext *c, JSValueConst o, const char *k, const char *const *names, int n, int def) {
+    JSValue v = JS_GetPropertyStr(c, o, k);
+    int r = def;
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        r = -1;
+        for (int i = 0; s && i < n; i++) if (!strcmp(s, names[i])) r = i;
+        if (s) JS_FreeCString(c, s);
+    } else if (!JS_IsUndefined(v) && !JS_IsNull(v)) r = -1;
+    JS_FreeValue(c, v);
+    return r;
+}
+
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 1 || !JS_IsObject(argv[0])) return js_throw_code(c, "studio.invalid", NULL);
@@ -53,18 +78,22 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         if (s) JS_FreeCString(c, s);
     }
     JS_FreeValue(c, v);
-    int mode = 1;
-    v = JS_GetPropertyStr(c, o, "mode");
-    if (JS_IsString(v)) {
-        const char *s = JS_ToCString(c, v);
-        mode = s && !strcmp(s, "none") ? 0 : s && !strcmp(s, "picture") ? 2 : s && !strcmp(s, "blur") ? 1 : -1;
-        if (s) JS_FreeCString(c, s);
-    }
-    JS_FreeValue(c, v);
-    if (mode < 0) return js_throw_code(c, "studio.invalid", NULL);
-    int blur = opt_int(c, o, "blur", 50), mirror = opt_int(c, o, "mirror", 0), on = opt_int(c, o, "on", 1);
-    if (blur < 0 || blur > 100) return js_throw_code(c, "studio.invalid", NULL);
-    if (mstudio_set(on, have_cam ? camera : NULL, mode, blur, mirror)) return js_throw_code(c, "studio.invalid", NULL);
+    static const char *const modes[] = { "none", "blur", "picture", "video" }, *const keys[] = { "none", "green", "blue" };
+    const char *filters[STUDIO_FILTERS + 1];
+    for (int i = 0; i <= STUDIO_FILTERS; i++) filters[i] = studio_filter_name(i);
+    MStudioSet s = {
+        .on = opt_int(c, o, "on", 1), .camera = have_cam ? camera : NULL,
+        .mode = opt_enum(c, o, "mode", modes, 4, 1), .blur = opt_int(c, o, "blur", 50), .mirror = opt_int(c, o, "mirror", 0),
+        .key = opt_enum(c, o, "key", keys, 3, 0), .similarity = opt_int(c, o, "similarity", 40), .smoothness = opt_int(c, o, "smoothness", 20),
+        .spill = opt_int(c, o, "spill", 50), .framing = opt_int(c, o, "framing", 0), .light = opt_int(c, o, "light", 0),
+        .match = opt_int(c, o, "match", 0), .filter = opt_enum(c, o, "filter", filters, STUDIO_FILTERS + 1, 0),
+        .filter_amt = opt_int(c, o, "filterStrength", 100), .retouch = opt_int(c, o, "retouch", 0),
+    };
+    if (s.mode < 0 || s.key < 0 || s.filter < 0) return js_throw_code(c, "studio.invalid", NULL);
+    const int pct[] = { s.blur, s.similarity, s.smoothness, s.spill, s.framing, s.light, s.filter_amt, s.retouch };
+    for (size_t i = 0; i < sizeof pct / sizeof pct[0]; i++) if (pct[i] < 0 || pct[i] > 100) return js_throw_code(c, "studio.invalid", NULL);
+    if (s.match < 0 || s.match > 60) return js_throw_code(c, "studio.invalid", NULL);
+    if (mstudio_set(&s)) return js_throw_code(c, "studio.invalid", NULL);
     return JS_TRUE;
 }
 

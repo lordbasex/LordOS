@@ -916,5 +916,7 @@
   "studio.badPicture": "이 사진은 배경으로 사용할 수 없습니다.",
   "studio.invalid": "해당 LordOS Studio 설정이 올바르지 않습니다.",
   "studio.noCamera": "연결된 카메라가 없습니다.",
-  "studio.unavailable": "이 컴퓨터에서는 LordOS Studio를 사용할 수 없습니다."
+  "studio.unavailable": "이 컴퓨터에서는 LordOS Studio를 사용할 수 없습니다.",
+  "studio.downloadFailed": "배경을 다운로드할 수 없습니다.",
+  "studio.removeFailed": "배경을 제거할 수 없습니다."
 }

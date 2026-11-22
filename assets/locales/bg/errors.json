@@ -917,5 +917,7 @@
   "studio.badPicture": "Това изображение не може да се използва като фон.",
   "studio.invalid": "Тази настройка на LordOS Studio е невалидна.",
   "studio.noCamera": "Няма свързана камера.",
-  "studio.unavailable": "LordOS Studio не е налично на този компютър."
+  "studio.unavailable": "LordOS Studio не е налично на този компютър.",
+  "studio.downloadFailed": "Фонът не можа да бъде изтеглен.",
+  "studio.removeFailed": "Фонът не можа да бъде премахнат."
 }

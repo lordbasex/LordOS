@@ -54,6 +54,7 @@ typedef struct {
     int pid_sec, pid_app, pulse;/* pipewire.sec.pid (kernel), application.process.id (app-reported), a client of the real pipewire-pulse */
     int unverified;             /* who it is can't be established: treated as restricted while restricted apps run */
     int daemon;                 /* pipewire-pulse's own connection: the streams of modules a pulse client loaded */
+    int main_daemon;            /* the session's pipewire itself (its modules: LordOS's Voice Isolation filter) */
     int resolved;               /* app worked out (needs the client's info) */
     char fpid[64];              /* pipewire.access.portal.app_id: the Flatpak app pipewire-pulse says it is (checked) */
     char app[FW_APP_MAX];
@@ -61,7 +62,7 @@ typedef struct {
     int live;
 } PgClient;
 
-typedef struct { uint32_t id, client, flag, stream; int live; } PgNode;   /* flag: capture node; stream: capture stream */
+typedef struct { uint32_t id, client, flag, stream; int live, voice; } PgNode;   /* flag: capture node; stream: capture stream; voice: Voice Isolation's own capture */
 typedef struct { uint32_t id, node; int live; } PgPort;
 /* a link from a capture node (a microphone, a camera, a shared screen) into an app's capture stream: what the capture
  * indicator says is in use (pwguard_on_use) */
@@ -250,6 +251,10 @@ uint32_t pwguard_node_flag(const char *mc, const char *role, const char *name) {
     if (mc && !strncmp(mc, "Video/Source", 12) && ((role && !strcmp(role, "Screen")) || (name && !strncmp(name, "lordos-screencast-", 18))))
         return FW_R_NO_SCREEN;
     return pwguard_capture_flag(mc);
+}
+
+int pwguard_voice_capture(const char *mc, const char *name) {
+    return mc && name && !strcmp(mc, "Stream/Input/Audio") && !strcmp(name, "lordos_voice_capture");
 }
 
 uint32_t pwguard_stream_flag(const char *mc) {
@@ -674,7 +679,12 @@ static void use_report(void) {
         PgNode *src = node_by_id(l->out), *dst = node_by_id(l->in);
         if (!src || !dst || !src->flag || !dst->stream) continue;
         char app[FW_APP_MAX];
-        if (capture_owner(client_by_id(dst->client), app, sizeof app)) continue;
+        PgClient *owner = client_by_id(dst->client);
+        /* Voice Isolation's own capture (lordos-voice.conf, a module of the session's pipewire itself): the microphone
+         * goes into the filter, not to an app; the app that reads the "LordOS Voice Isolation" source is the use, and its
+         * own link (that source is an Audio/Source) is counted. Only when the node really is the daemon's. */
+        if (dst->voice && (!dst->client || (owner && owner->main_daemon))) continue;
+        if (capture_owner(owner, app, sizeof app)) continue;
         snprintf(u[n].app, sizeof u[n].app, "%s", app);
         u[n].flags = src->flag;
         n++;
@@ -738,6 +748,7 @@ static void on_global(PwPod body) {
         nd->flag = flag;
         nd->stream = stream;
         nd->client = cid ? (uint32_t)strtoul(cid, NULL, 10) : 0;
+        nd->voice = pwguard_voice_capture(mc, dict_get(props, "node.name"));
         if (flag)                                               /* a new microphone or camera: hidden from the restricted at once */
             for (int i = 0; i < MAX_CLIENTS; i++) if (P.cl[i].live && (P.cl[i].applied & flag)) apply_permissions(&P.cl[i], P.cl[i].applied);
         if (stream) kill_streams();
@@ -791,6 +802,7 @@ static void on_client_info(uint32_t proxy, PwPod body) {
     int pulse_conn = c->pid_sec > 0 && is_pulse_daemon(c->pid_sec);
     c->pulse = dict_get(props, "pulse.server.type") != NULL && pulse_conn;
     c->daemon = pulse_conn && !c->pulse;
+    c->main_daemon = c->pid_sec > 0 && runs_exe(c->pid_sec, "/usr/bin/pipewire") && in_user_unit(c->pid_sec, "pipewire.service");
     arm();
     resolve(c);
     evaluate(c);

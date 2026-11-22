@@ -6,6 +6,7 @@
 #define LORD_MEDIA_MSTUDIOHUB_H
 
 #include <stddef.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 /* the loopback LordOS Studio writes: the number and the label the package's /etc/modprobe.d file sets
@@ -35,5 +36,22 @@ int studio_scan_readers(const char *proc, dev_t rdev, pid_t self, uid_t uid, pid
  * fixed width stride ("" an app LordOS can't name); duplicates said once; an id that isn't plain is said as ""; the
  * camera's name is escaped. -1 when it doesn't fit. */
 int studio_use_format(const char *apps, size_t stride, int n, const char *camera, int effects, char *out, size_t cap);
+
+/* ---- phase 3: the effects' settings and the background's name (docs/CAMERA-STUDIO-PLAN.md 4.4, 5, 6) ---- */
+
+/* the filters, in st.h's order (ST_FILTER_*): "none", "warm", … "sepia" */
+#define STUDIO_FILTERS 8
+const char *studio_filter_name(int id);             /* "none" for an unknown id */
+int studio_filter_id(const char *name);             /* -1 for an unknown name */
+/* MM_STUDIO's numbers (proto.h): one byte per value, each 0..255 (out-of-range values are clamped to 0..100, or 0..3
+ * for the modes and keys, 0..8 for the filter) */
+void studio_pack_config(int mode, int key, int filter, int mirror, int blur, int similarity, int smoothness, int spill, int framing,
+                        int light, int match, int filter_amt, int retouch, int64_t v[6]);
+/* The background's name as lord.studio.setBackground gives it, before any file is looked at: 0 when it is one of
+ *   "asset:wallpapers/<file>", "asset:studio/backgrounds/<file>" (plain names, no "..")
+ *   "/var/lib/lordos/studio/<64 hex>.jpg" or ".mp4" (what studio-bg-get writes)
+ *   another absolute path (checked against lord.fs's roots by the caller)
+ * and nothing longer than PATH_MAX or with a control character; -1 otherwise. */
+int studio_bg_path_ok(const char *path);
 
 #endif

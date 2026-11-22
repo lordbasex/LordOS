@@ -153,12 +153,42 @@ static void test_event(void) {
     CHECK(st_client_usage(ST_EVENT_CLIENT_USAGE, d, sizeof d) == 1024, "clamped");
 }
 
+/* phase 3: the filters' names, MM_STUDIO's bytes and the background's name */
+static void test_phase3(void) {
+    CHECK(!strcmp(studio_filter_name(0), "none") && !strcmp(studio_filter_name(8), "sepia") && !strcmp(studio_filter_name(9), "none") &&
+          !strcmp(studio_filter_name(-1), "none"), "filter names");
+    CHECK(studio_filter_id("film") == 6 && studio_filter_id("Film") == -1 && studio_filter_id(NULL) == -1 && studio_filter_id("") == -1, "filter ids");
+    int64_t v[6];
+    studio_pack_config(3, 1, 6, 1, 70, 40, 20, 50, 60, 55, 30, 80, 25, v);
+    CHECK(v[0] == (3 | 1 << 8 | 6 << 16 | 1 << 24) && v[1] == (70 | 40 << 8 | 20 << 16 | 50LL << 24) && v[2] == (60 | 55 << 8 | 30 << 16 | 80LL << 24) &&
+          v[3] == 25 && v[4] == 0 && v[5] == 0, "packed config");
+    studio_pack_config(9, 7, 99, 5, 300, -4, 101, 1000, -1, 200, 99, 101, 500, v);
+    CHECK(v[0] == (3 | 2 << 8 | 8 << 16 | 1 << 24) && v[1] == (100 | 0 << 8 | 100 << 16 | 100LL << 24) && v[2] == (0 | 100 << 8 | 60 << 16 | 100LL << 24) &&
+          v[3] == 100, "clamped config");
+    static const char *const good[] = {
+        "asset:wallpapers/lumo/lordos-lumo-aurora.jpg", "asset:wallpapers/x.jpg", "asset:studio/backgrounds/office-loft.jpg",
+        "/var/lib/lordos/studio/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.jpg",
+        "/var/lib/lordos/studio/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.mp4", "/home/u/Pictures/me.png",
+    };
+    for (size_t i = 0; i < sizeof good / sizeof good[0]; i++) CHECK(studio_bg_path_ok(good[i]) == 0, "refused %s", good[i]);
+    static const char *const badp[] = {
+        "", "relative.jpg", "asset:wallpapers/../../etc/passwd", "asset:wallpapers/a/b/c.jpg", "asset:wallpapers/.hidden.jpg",
+        "asset:studio/backgrounds/sub/x.jpg", "asset:studio/models/x.lnn", "asset:fonts/x.jpg", "/var/lib/lordos/studio/abc.jpg",
+        "/var/lib/lordos/studio/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef.png",
+        "/var/lib/lordos/studio/0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef.jpg", "/home/u/a\nb.jpg",
+        "/home/u/../../etc/shadow", "asset:studio/backgrounds/a b.jpg",
+    };
+    for (size_t i = 0; i < sizeof badp / sizeof badp[0]; i++) CHECK(studio_bg_path_ok(badp[i]) == -1, "accepted %s", badp[i]);
+    CHECK(studio_bg_path_ok(NULL) == -1, "NULL");
+}
+
 int main(void) {
     test_show();
     test_scan();
     test_use();
     test_cards();
     test_event();
+    test_phase3();
     if (fails) { printf("studio-hub-test: %d failures\n", fails); return 1; }
     printf("studio-hub-test: ok\n");
     return 0;

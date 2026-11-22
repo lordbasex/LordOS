@@ -917,5 +917,7 @@
   "studio.badPicture": "Die afbeelding kan niet als achtergrond worden gebruikt.",
   "studio.invalid": "Die instelling van LordOS Studio is ongeldig.",
   "studio.noCamera": "Er is geen camera aangesloten.",
-  "studio.unavailable": "LordOS Studio is niet beschikbaar op deze computer."
+  "studio.unavailable": "LordOS Studio is niet beschikbaar op deze computer.",
+  "studio.downloadFailed": "De achtergrond kon niet worden gedownload.",
+  "studio.removeFailed": "De achtergrond kon niet worden verwijderd."
 }
