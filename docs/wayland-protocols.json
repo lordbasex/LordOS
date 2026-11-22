@@ -366,7 +366,7 @@
           "zwp_tablet_manager_v2": 2
         },
         "since": "0.8.9.5",
-        "note": "Pens (pressure, tilt, distance, rotation, slider, buttons) and pads (buttons, rings, strips, dials) read from evdev by LordOS's own tablet.c, without libinput or libwacom. Not the tool's wheel or pad modes beyond one. Not yet checked with a real tablet.",
+        "note": "Pens (pressure, tilt, distance, rotation, slider, buttons, a mouse or lens tool's wheel) and pads (buttons, rings, strips, dials; set_feedback kept) read from evdev by LordOS's own tablet.c, without libinput or libwacom. One mode per pad group (no libwacom data to know the mode-switch button). Not yet checked with a real tablet.",
         "checked": "build/tablet-test, build/wltablet-test; headless lord-server",
         "checkedDate": "2026-11-22"
       }
@@ -623,10 +623,13 @@
       "kwin": {},
       "mutter": {},
       "lordos": {
-        "status": "missing",
-        "globals": {},
-        "note": "lord-server starts Xwayland itself and matches its windows with WL_SURFACE_ID (server/src/wl/xwm.c).",
-        "checked": "not in server/src/wl",
+        "status": "supported",
+        "globals": {
+          "xwayland_shell_v1": 1
+        },
+        "since": "0.8.9.5",
+        "note": "Offered to Xwayland only (hidden from every other client; a bind by anyone else is an error). X windows are matched to their surfaces by serial (WL_SURFACE_SERIAL), so a recycled surface id can't show another window; WL_SURFACE_ID still works for older Xwayland (server/src/wl/xwshell.c, xwm.c).",
+        "checked": "Xwayland 24.1.6 with xterm on a headless lord-server (docs/wayland-proofs/x11-xwayland.startup.png); x11-conformance-client",
         "checkedDate": "2026-11-22"
       }
     },

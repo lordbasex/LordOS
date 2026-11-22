@@ -76,6 +76,8 @@ Global shortcuts, drags with X11 apps, sharp X11 apps and Terminal apps are buil
 
 **Check it from the outside** (since 0.8.5): the **Test Bench** (`lordos-testbench`) is a test-pattern window that checks the display server as any app sees it: frame timing and when frames really reach the screen, every key of the keyboard, the mouse and wheel, and the Wayland protocols the system offers.
 
+**Scored against the specifications** (in development; the latest release is 0.8.9.4): a script checks every protocol LordOS offers point by point against its official definition, and runs each one's normal use and its misuses against a test session. On 22 November 2026 all 48 protocols score 100 %, and X11 apps 99.9 %: the one point left is "always on top", which LordOS doesn't have. An app that breaks a rule gets the exact error the specification names, as on GNOME or KDE, and a test of hundreds of misbehaving connections never takes the compositor or the other apps down. foot, a GTK 4 dialog, a Qt 6 editor, Chromium 156 and xterm were checked working with these rules.
+
 Deliberately absent: any protocol that lets an app capture the screen or other apps' windows. Since 0.8.8.8 an app can only ask through the ScreenCast portal, and gets only the screen or window you pick, while the sharing indicator shows it.
 
 [[shot:4]]

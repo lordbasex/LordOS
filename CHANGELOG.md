@@ -323,6 +323,107 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - First results, 2026-11-22 (`docs/wayland-conformance.json`): 31 globals, mean 94 %, 19 complete; X11 74 %. The gaps
     found (xdg-shell errors not raised, subsurface stacking and sync ignored, `_NET_WM_ICON`, `_NET_WORKAREA`,
     xwayland-shell-v1, ...) are listed in `docs/WAYLAND.md`.
+- **Wayland conformance at 100 % for all 48 globals, X11 at 99.9 %, in development** (`tools/wl-conformance.mjs`,
+  `docs/wayland-conformance.json`, `docs/WAYLAND.md` "Conformance"; the maintainer asked for every gap to be closed).
+  Every protocol error below is the one the specification names, raised only where Mutter or wlroots raise it too; most
+  have a flow in `server/tests/wl_conformance.c` checking that a misbehaving client gets exactly that error, the rest
+  (dmabuf bounds, the icon's buffer, the tablet's role) are covered by unit tests and the fuzz client below.
+  - **xdg-shell (`server/src/wl/wl.c`):** `xdg_wm_base.ping` is sent when a window takes the keyboard and `pong` is
+    tracked (an app that doesn't answer for 5 s is logged; like Mutter and KWin it is never disconnected, so
+    `unresponsive` stays unused, listed in `tools/wl-conformance/allow.json`); `defunct_surfaces` (the wm_base destroyed
+    with xdg_surfaces alive); `invalid_surface_state` (an xdg_surface for a wl_surface that already has a buffer);
+    `invalid_positioner` (get_popup or reposition with no size or anchor rectangle); `not_the_topmost_popup` (a popup
+    destroyed while a popup of its own is alive, as wlroots); `xdg_surface.unconfigured_buffer` (a buffer before the
+    first configure is acked), `invalid_serial` (an ack of a serial that was never a configure, or was acked already:
+    the last 16 configure serials are kept per surface), `invalid_size` (a window geometry of zero or less) and
+    `defunct_role_object` (the xdg_surface destroyed before its toplevel or popup); `xdg_toplevel.invalid_parent` (a
+    parent that is the window itself or one of its descendants), `invalid_size` (a negative minimum or maximum, or a
+    maximum below the minimum when they are committed), `invalid_resize_edge`; `xdg_popup.invalid_grab` (a grab on a
+    mapped popup); `xdg_positioner.invalid_input` (a size of zero or less, a negative anchor rectangle or parent size,
+    an anchor or gravity outside its enum). `set_reactive`, `set_parent_size` and `set_parent_configure` are kept: a
+    reactive popup is placed again, and told with a new configure, when its parent window changes.
+  - **wl_compositor:** `invalid_offset` (attach with an offset from version 5, where wl_surface.offset does it),
+    `invalid_size` (a buffer not a multiple of the buffer scale, except for cursors, drag icons and surfaces with a
+    viewport destination, as wlroots), `defunct_role_object` (from version 6, the wl_surface destroyed before its
+    xdg_toplevel or xdg_popup; a wl_subsurface becomes inert instead, as wayland.xml says), and
+    `preferred_buffer_transform` (normal: the displays are never turned) with the first preferred scale.
+  - **wl_subcompositor:** `place_above` and `place_below` work: a subsurface can go under its parent or between its
+    siblings; the order is pending until the parent's commit (as wayland.xml says) and every walk of the tree (CPU
+    paint, GPU draw, fullscreen blit, hit test) follows it. A reference that is neither the parent nor a sibling (or the
+    subsurface itself) is `bad_surface`. Children are removed keeping their order (they were swapped before).
+  - **Viewporter:** `bad_size` (a fractional source with no destination) and `out_of_buffer` (a source outside the
+    buffer, with its scale and transform), checked when the state is applied.
+  - **Data devices:** `wl_data_offer.finish` and `set_actions` on a selection offer are `invalid_finish` and
+    `invalid_offer`; a source with drag-and-drop actions used as the selection is `invalid_source` (as Mutter).
+  - **wl_seat:** `get_touch` on a seat that never had a touchscreen is `missing_capability` (as wlroots);
+    `wl_pointer.set_cursor` with a surface that has another role is `role`; `wl_touch.orientation` is sent (version 6)
+    from the touchscreen's `ABS_MT_ORIENTATION` (0 along the y axis, the maximum 90° clockwise, turned with the
+    picture; `tp.c` `tp_orient_degrees`, checked in `tp-test`; not yet checked on a real touchscreen).
+  - **xdg-decoration:** `invalid_mode`, `unconfigured_buffer` (a decoration for a toplevel that has a buffer) and
+    `orphaned` (the toplevel destroyed before its decoration, as wlroots).
+  - **xdg-activation:** any request on a committed token is `already_used`; `set_surface` is kept, and a token asked
+    by the app with the keyboard is granted only when the surface it names is that window or one of its menus.
+  - **Pointer constraints:** `set_region` and the region given with `lock_pointer`/`confine_pointer` work: the
+    constraint activates only with the pointer inside the region (and the surface's input region), and a confinement
+    keeps the pointer inside it (the nearest point of its rectangles). Pending until the surface's commit.
+  - **Tablets:** a mouse or lens tool's wheel (`REL_WHEEL`, hi-res when the device has it) is sent as
+    `zwp_tablet_tool_v2.wheel` (15° a click; `tablet-test`); `set_cursor` with a surface of another role is `role`;
+    the pads', rings', strips' and dials' `set_feedback` texts are kept when they come with the last mode_switch serial
+    (LordOS draws no pad help yet). A pad group has one mode, so `modes` is not sent, as tablet-v2 says (allowed).
+  - **dmabuf:** `out_of_bounds` (an offset, a row or the first plane's rows past the dmabuf's size, or an overflowing
+    offset + stride, as wlroots). **Explicit sync:** its errors are posted with the protocol's own codes (named).
+    **Toplevel icon:** `no_buffer` when a buffer given to an icon is destroyed before the icon (posted from an idle
+    callback, never while a disconnecting client's objects go). **Colour management:** ICC profiles are an optional
+    feature lord-server doesn't advertise (`create_icc_creator` is `unsupported_feature`): allowed with that reason.
+  - **The tool, where its expectation was wrong:** its own client acked the same configure serial twice (invalid in
+    xdg-shell: it now acks each once); an error on an object the request destroyed (a refused destructor) comes back
+    with no interface in libwayland-client, so those checks compare the code; an event handed to a helper as a
+    function (`info_prim(..., wp_image_description_info_v1_send_primaries)`) counts as sent. The headless server is
+    stopped with SIGTERM and then SIGKILL.
+  - **Security:** a new test, `server/tests/wlfuzz_client.c` (in `make -C server test`), opens 400 connections that
+    misuse these requests at random (orders, serials, sizes, regions, destroys in the wrong order) while a
+    well-behaved window stays mapped: lord-server answers every one, the window is never disconnected and still gets
+    its frames, and a new client maps afterwards (also run with 6 seeds × 1,500 connections, and against an
+    AddressSanitizer/UBSan build of lord-server).
+  - **Proof with real programs** (`tools/wl-proof.mjs`, `docs/wayland-proofs/`): on a headless lord-server, screenshots
+    of foot 1.21, zenity 4.1.90 (GTK 4.18), FeatherPad 1.6.1 (Qt 6.8), vkcube, es2gears and Chromium 156 working with
+    the new checks (each answered ping with pong, acked each configure once, no protocol error), and of a purpose-built
+    client showing subsurface order and a cropped, scaled viewport.
+  - **Results (2026-11-22):** 48 globals, mean 100 %, 29 complete (before: 47, 95.8 %, 19); X11 mean 99.9 % (before 74 %).
+    The globals that score 100 % without being "complete" have no protocol-specific flow in this tool (only the
+    generic bind; most have their own headless test), or skip a check that needs a pointer over a window (`wl_seat`).
+- **X11 apps (Xwayland) handled as GNOME and KDE handle them, in development** (`server/src/wl/xwm.c`, new
+  `xwshell.c`; `docs/WAYLAND.md`, "X11 apps" and "Conformance").
+  - **Window matching:** lord-server offers `xwayland-shell-v1` to Xwayland only (hidden from every other client's
+    registry; a bind by anyone else is an error). Each X window is matched to its surface by serial
+    (`WL_SURFACE_SERIAL`) instead of `WL_SURFACE_ID`, so a recycled surface id can never show another window; `role`,
+    `already_associated` and `invalid_serial` are raised; `WL_SURFACE_ID` still works for older Xwayland.
+  - **Attention:** the ICCCM urgency hint (an xterm with `bellIsUrgent`) and `_NET_WM_STATE_DEMANDS_ATTENTION` mark the
+    window in the Dock; the mark clears when the window gets the keyboard, and the window in front never demands
+    attention (as KWin and Mutter).
+  - **Size limits:** `WM_NORMAL_HINTS` minimum and maximum are enforced, when the app asks for a size and when the
+    limits change.
+  - **Dialogs:** `WM_TRANSIENT_FOR` and `_NET_WM_STATE_MODAL` give X dialogs an owner and modality, as Wayland dialogs
+    have; a modal one takes its owner's input. An owner destroyed or unmapped is forgotten, so a reused X window id is
+    never taken as a dialog's owner (found with real xterms).
+  - **Icons:** an X app's own `_NET_WM_ICON` becomes its window's icon in the Dock: the image closest to 128 px, at most
+    256 px a side, every length checked against the property, copied within the session's icon budget (non-square
+    images centred; `x11_net_wm_icon_pick`, `wlicon_from_net`, checked with hostile lengths in `build/xwm-test`).
+  - **Activation:** `_NET_ACTIVE_WINDOW` is granted only from a pager while an X window has the keyboard, or from the
+    app whose window has it (and then a minimized window comes back); any other request only asks for attention.
+  - **Taskbar and types:** `_NET_WM_STATE_SKIP_TASKBAR` keeps a window out of the Dock (`sdk/dock.js`); utility and
+    toolbar windows are placed where the app asks and not remembered.
+  - **More EWMH:** `_NET_CLIENT_LIST` in mapping order, `_NET_CLIENT_LIST_STACKING`, `_NET_REQUEST_FRAME_EXTENTS`
+    answered, `_NET_WORKAREA` (the theme's work area, without the menu bar and Dock), `_NET_CLOSE_WINDOW` (closes as the
+    theme's close button), `_NET_WM_PID` read for diagnostics only, never trusted.
+  - **Not supported:** `_NET_WM_STATE_ABOVE` and `SKIP_PAGER` are kept in the property for the app but not listed in
+    `_NET_SUPPORTED`: LordOS has no always-on-top layer (the keyboard always goes to the window in front) and no pager.
+    This is the one X11 point below 100 %.
+  - **The tool:** its `DEMANDS_ATTENTION` check set the state on the window in front, which KWin and Mutter refuse; it now
+    uses a window that isn't in front, and checks that the focused window refuses it. New dynamic checks: frame extents
+    answered, stacking order, above/modal/skip-taskbar add and remove, maximum size, urgency set and cleared, utility
+    windows, `_NET_CLOSE_WINDOW`. Screenshots with xterm 398, xprop, xwininfo and zenity on X11
+    (`tools/wl-conformance/x11-proofs.sh`, `docs/wayland-proofs/x11-*.png`).
 - **Linux apps: tab tear-off, window tags, the bell, session management and blur behind windows, in development**
   (approved by the maintainer 2026-11-22; five Wayland protocols, one file each in `server/src/wl/`, `wlshell.h`;
   `docs/WAYLAND.md`, "Shell extras"; the latest release is 0.8.9.4).

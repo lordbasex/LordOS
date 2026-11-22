@@ -995,7 +995,14 @@ asynchronously, so lord-server never waits on Xwayland while Xwayland waits on t
   (updated as the theme moves it), so Xwayland routes the pointer right; the focused window is put
   on top of X's stack and a minimized one at the bottom (iconic). Focus uses `SetInputFocus` and
   `WM_TAKE_FOCUS` (ICCCM); an X app can't move the keyboard to another X app's window (that
-  `FocusIn` is reverted); `_NET_ACTIVE_WINDOW` from an app is ignored (no focus stealing).
+  `FocusIn` is reverted); `_NET_ACTIVE_WINDOW` is granted only from a pager (source 2) while an X window has the
+  keyboard, or from the app whose window has it, and then also brings back a minimized window; any other request only
+  marks the window as wanting attention (no focus stealing). The urgency hint and `DEMANDS_ATTENTION` mark it too.
+  `WM_TRANSIENT_FOR` and `_NET_WM_STATE_MODAL` give a dialog its owner and modality, as `xdg_toplevel.set_parent` and
+  xdg-dialog-v1 do; `WM_NORMAL_HINTS` minimum and maximum sizes are enforced; `_NET_WM_ICON` becomes the window's
+  icon; `_NET_WORKAREA` is the theme's work area; `_NET_CLOSE_WINDOW` closes as the theme's button does. The
+  association of X windows and surfaces is xwayland-shell-v1's serial (`xwshell.c`), offered to Xwayland only
+  ("Conformance", below).
 - **Requests.** Close (`WM_DELETE_WINDOW`, else `KillClient`), maximize and fullscreen
   (`_NET_WM_STATE`, also set before mapping), minimize (`WM_CHANGE_STATE`), and moves and resizes
   asked by apps that draw their own frame (`_NET_WM_MOVERESIZE`) go to the theme like a Wayland
@@ -1724,8 +1731,8 @@ trusted programs show as not offered). The number is the version of the protocol
 [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/). To change a row, edit `docs/wayland-protocols.json` and run
 `node tools/gen-wayland-table.mjs`; `server/tests/wayland_table_test.mjs` fails when the JSON and `server/src/wl` disagree.
 
-108 protocols. LordOS offers 46; KWin 6.7 63; Mutter 51 40. Of the 37 that both KWin and Mutter offer, LordOS offers 37;
-30 are left out on purpose and 32 are not offered (yet).
+108 protocols. LordOS offers 47; KWin 6.7 63; Mutter 51 40. Of the 37 that both KWin and Mutter offer, LordOS offers 37;
+30 are left out on purpose and 31 are not offered (yet).
 
 | Protocol | Category | LordOS | KWin 6.7 | Mutter 51 | Note |
 |---|---|---|---|---|---|
@@ -1741,7 +1748,7 @@ trusted programs show as not offered). The number is the version of the protocol
 | [viewporter](https://wayland.app/protocols/viewporter) | stable | 1 | 1 | 1 |  |
 | [xdg-shell](https://wayland.app/protocols/xdg-shell) | stable | 7 (6 before 0.8.9.5) | 6 | 7 | Version 7 (constrained_* states) since 0.8.9.5. |
 | [linux-dmabuf-v1](https://wayland.app/protocols/linux-dmabuf-v1) | stable | 5 (4 before 0.8.9.5) | 5 | 5 | Version 5 (one modifier for every plane) since 0.8.9.5. |
-| [tablet-v2](https://wayland.app/protocols/tablet-v2) | stable | 2 (since 0.8.9.5) | 2 | 2 | Pens (pressure, tilt, distance, rotation, slider, buttons) and pads (buttons, rings, strips, dials) read from evdev by LordOS's own tablet.c, without libinput or libwacom. Not the tool's wheel or pad modes beyond one. Not yet checked with a real tablet. |
+| [tablet-v2](https://wayland.app/protocols/tablet-v2) | stable | 2 (since 0.8.9.5) | 2 | 2 | Pens (pressure, tilt, distance, rotation, slider, buttons, a mouse or lens tool's wheel) and pads (buttons, rings, strips, dials; set_feedback kept) read from evdev by LordOS's own tablet.c, without libinput or libwacom. One mode per pad group (no libwacom data to know the mode-switch button). Not yet checked with a real tablet. |
 | [xdg-activation-v1](https://wayland.app/protocols/xdg-activation-v1) | staging | 1 | 1 | 1 |  |
 | [drm-lease-v1](https://wayland.app/protocols/drm-lease-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 | Only a connector the kernel marks non-desktop (a VR headset), only to an app the person allowed (the vr permission: Allow once, Always allow, Don't allow), never to a sandboxed or isolated app or Xwayland; revoked on unplug, permission taken back, lock, user switch or text console. Approved by the maintainer 2026-11-22. Not yet checked with a real headset. |
 | [linux-drm-syncobj-v1](https://wayland.app/protocols/linux-drm-syncobj-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 | A dmabuf frame is applied once its acquire point is signalled, without blocking, and its release point is signalled when LordOS is done with it. Offered when a render node has timeline syncobjs and SYNCOBJ_EVENTFD (Linux 6.6), on the GPU and the CPU path (docs/WAYLAND.md, "Explicit sync"). |
@@ -1752,7 +1759,7 @@ trusted programs show as not offered). The number is the version of the protocol
 | [ext-image-capture-source-v1](https://wayland.app/protocols/ext-image-capture-source-v1) | staging | no, on purpose | — | — | No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md "Sharing a screen or a window"). |
 | [ext-image-copy-capture-v1](https://wayland.app/protocols/ext-image-copy-capture-v1) | staging | no, on purpose | — | — | No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md "Sharing a screen or a window"). |
 | [tearing-control-v1](https://wayland.app/protocols/tearing-control-v1) | staging | 1 | 1 | — | The hint is kept; "async" tears only a fullscreen app's own buffer scanned out alone, when the driver reports DRM_CAP_ASYNC_PAGE_FLIP; composed frames wait for vblank. The torn flip is not yet checked on hardware (docs/WAYLAND.md "Frame timing"). |
-| [xwayland-shell-v1](https://wayland.app/protocols/xwayland-shell-v1) | staging | — | — | — | lord-server starts Xwayland itself and matches its windows with WL_SURFACE_ID (server/src/wl/xwm.c). |
+| [xwayland-shell-v1](https://wayland.app/protocols/xwayland-shell-v1) | staging | 1 (since 0.8.9.5) | — | — | Offered to Xwayland only (hidden from every other client; a bind by anyone else is an error). X windows are matched to their surfaces by serial (WL_SURFACE_SERIAL), so a recycled surface id can't show another window; WL_SURFACE_ID still works for older Xwayland (server/src/wl/xwshell.c, xwm.c). |
 | [fractional-scale-v1](https://wayland.app/protocols/fractional-scale-v1) | staging | 1 | 1 | 1 |  |
 | [cursor-shape-v1](https://wayland.app/protocols/cursor-shape-v1) | staging | 2 (1 before 0.8.9.5) | 2 | 2 | Version 2 (dnd_ask, all_resize) since 0.8.9.5. |
 | [ext-foreign-toplevel-list-v1](https://wayland.app/protocols/ext-foreign-toplevel-list-v1) | staging | no, on purpose | — | — | A program could list and control other apps' windows (third-party docks and taskbars). LordOS's Dock, switcher and window list are part of the desktop (docs/DESKTOP-PARITY.md). |
@@ -1842,7 +1849,7 @@ trusted programs show as not offered). The number is the version of the protocol
 ## Conformance (`tools/wl-conformance.mjs`, in development)
 
 A script checks the compositor **point by point** against the protocol XML files and gives every advertised
-global, and every X11 area, a score from 0 to 100 %. The numbers below are from 2026-11-22, commit `3bee4dcc`
+global, and every X11 area, a score from 0 to 100 %. The numbers below are from 2026-11-22, commit `06a59239`
 (`docs/wayland-conformance.json` has every check, its result and a `file:line` hint).
 
 ```sh
@@ -1883,86 +1890,80 @@ bind is never called complete. Exceptions the protocol itself allows (an optimiz
 error no request can trigger) are listed with their reason in `tools/wl-conformance/allow.json`; they count as passed and
 the report shows them. Real programs that are installed (foot, vkcube, xterm here; `weston-simple-*`, `wayland-info`,
 GTK and Qt demos when present) run for 6 s each and are reported with the globals they bound (`WAYLAND_DEBUG`), not
-scored. Not yet covered: Firefox and Chromium (on the VM), and pointer/touch input (headless has no pointer over the
-windows, so checks that need a real enter serial are skipped).
+scored (Chromium, GTK 4 and Qt 6 are run by `tools/wl-proof.mjs`, below). Not yet covered: Firefox (not installed
+here), and pointer/touch input (headless has no pointer over the windows, so checks that need a real enter serial are
+skipped).
 
-**Wayland (2026-11-22): 31 globals, mean 94 %, 19 complete.**
+**Wayland (2026-11-22, after the conformance work): 48 globals, mean 100 %, 29 complete.** Every advertised global
+scores 100 %: every request has a real handler, every event is sent, every protocol error is raised where the
+specification names it, and every flow of `server/tests/wl_conformance.c` passes. Before that work (commit `a597e93c`):
+47 globals, mean 95.8 %, 19 complete.
 
-| Global | Version | Score | Checks | Failing | Complete |
-|---|---|---|---|---|---|
-| `ext_idle_notifier_v1` | 1 | 100 % | 8 | 0 | yes |
-| `org_kde_kwin_server_decoration_manager` | 1 | 100 % | 4 | 0 | no (no XML on the system: dynamic only) |
-| `wl_compositor` | 6 | 86.2 % | 43 | 7 | no |
-| `wl_data_device_manager` | 3 | 85.2 % | 44 | 6 | no |
-| `wl_output` | 4 | 100 % | 20 | 0 | yes |
-| `wl_seat` | 9 | 93.5 % | 55 | 4 | no |
-| `wl_shm` (libwayland) | 2 | 100 % | 19 | 0 | yes |
-| `wl_subcompositor` | 1 | 51.2 % | 17 | 8 | no |
-| `wp_alpha_modifier_v1` | 1 | 100 % | 11 | 0 | yes |
-| `wp_cursor_shape_manager_v1` | 2 | 100 % | 12 | 0 | yes |
-| `wp_fractional_scale_manager_v1` | 1 | 100 % | 10 | 0 | yes |
-| `wp_presentation` | 2 | 100 % | 14 | 0 | yes |
-| `wp_security_context_manager_v1` | 1 | 100 % | 20 | 0 | yes |
-| `wp_single_pixel_buffer_manager_v1` | 1 | 100 % | 8 | 0 | yes |
-| `wp_viewporter` | 1 | 81.3 % | 19 | 4 | no |
-| `xdg_activation_v1` | 1 | 84.2 % | 15 | 2 | no |
-| `xdg_toplevel_icon_manager_v1` | 1 | 97.4 % | 17 | 1 | no |
-| `xdg_wm_base` | 7 | 71.3 % | 107 | 34 | no |
-| `xdg_wm_dialog_v1` | 1 | 100 % | 10 | 0 | yes |
-| `zwp_idle_inhibit_manager_v1` | 1 | 100 % | 6 | 0 | yes |
-| `zwp_keyboard_shortcuts_inhibit_manager_v1` | 1 | 100 % | 10 | 0 | yes |
-| `zwp_linux_dmabuf_v1` | 5 | 98.9 % | 48 | 1 | no |
-| `zwp_pointer_constraints_v1` | 1 | 85.3 % | 17 | 2 | no |
-| `zwp_pointer_gestures_v1` | 3 | 100 % | 18 | 0 | yes |
-| `zwp_primary_selection_device_manager_v1` | 1 | 100 % | 17 | 0 | yes |
-| `zwp_relative_pointer_manager_v1` | 1 | 100 % | 6 | 0 | yes |
-| `zwp_text_input_manager_v3` | 1 | 100 % | 20 | 0 | yes |
-| `zxdg_decoration_manager_v1` | 1 | 78.0 % | 18 | 5 | no |
-| `zxdg_exporter_v2` | 1 | 100 % | 10 | 0 | yes |
-| `zxdg_importer_v2` | 1 | 100 % | 11 | 0 | yes |
-| `zxdg_output_manager_v1` | 3 | 100 % | 20 | 0 | yes |
+| Global | Version | Before | After | Complete |
+|---|---|---|---|---|
+| `xdg_wm_base` | 7 | 71.7 % | 100 % | yes |
+| `wl_subcompositor` | 1 | 75.6 % | 100 % | yes |
+| `zxdg_decoration_manager_v1` | 1 | 78.0 % | 100 % | yes |
+| `wp_viewporter` | 1 | 81.3 % | 100 % | yes |
+| `wp_linux_drm_syncobj_manager_v1` | 1 | 83.8 % | 100 % | no (generic bind only; its flow is `tests/syncobj_headless.sh`) |
+| `xdg_activation_v1` | 1 | 84.2 % | 100 % | yes |
+| `wl_data_device_manager` | 3 | 85.2 % | 100 % | yes |
+| `zwp_pointer_constraints_v1` | 1 | 85.3 % | 100 % | yes |
+| `wl_compositor` | 6 | 86.2 % | 100 % | yes |
+| `zwp_tablet_manager_v2` | 2 | 89.1 % | 100 % | no (generic bind only; `build/wltablet-test`, no real tablet) |
+| `wp_color_manager_v1` | 1 | 92.3 % | 100 % | no (generic bind only; its flow is `tests/color_headless.sh`) |
+| `wl_seat` | 9 | 93.5 % | 100 % | no (`pointer.role` is skipped: headless has no pointer over the windows) |
+| `xdg_toplevel_icon_manager_v1` | 1 | 97.4 % | 100 % | yes |
+| `zwp_linux_dmabuf_v1` | 5 | 98.9 % | 100 % | yes |
+| `xwayland_shell_v1` (new) | 1 | — | 100 % | no (offered to Xwayland only: static checks; X11 `xwayland.startup` checks it in use) |
+| the 33 others | | 100 % | 100 % | 19 of them; the rest have no flow in this tool, only the generic bind (most have their own headless test) |
 
-What keeps the others below 100 % (every one is listed with its `file:line` in the JSON):
+What changed for each one is in `CHANGELOG.md` ([Unreleased]). The errors are raised where Mutter or wlroots raise them,
+never stricter where they are lenient; where the specification and the big compositors differ, the more lenient
+choice was kept: a wl_surface destroyed before its role object is an error only from version 6 and only for an
+`xdg_toplevel`/`xdg_popup` (a wl_subsurface becomes inert, as wayland.xml says); a positioner's unknown adjustment bits
+are ignored; a popup's grab is refused only once it is mapped. Four exceptions are allowed with the protocol's own
+words (`tools/wl-conformance/allow.json`): `xdg_wm_base.error.unresponsive` (LordOS pings and logs an app that
+doesn't answer, but never disconnects it, as Mutter and KWin), `zwp_tablet_pad_group_v2.modes` (only sent with more
+than one mode; a pad group has one), and the ICC parts of color-management-v1 (an optional feature that isn't
+advertised).
 
-- **xdg-shell errors are almost never raised**: a buffer before the first `ack_configure`, an unknown serial, a 0×0
-  window geometry, `set_parent` to itself, negative or crossed min/max sizes, an invalid resize edge, an
-  incomplete positioner, a popup destroyed under its child, `xdg_wm_base` destroyed with surfaces alive, a role object
-  outliving its `xdg_surface`, `grab` on a mapped popup: each one is accepted silently. `xdg_wm_base.ping` is never sent
-  (an app that hangs isn't detected, `pong` is a no-op), and `xdg_positioner.set_reactive`, `set_parent_size` and
-  `set_parent_configure` are ignored (a popup doesn't follow its moving parent).
-- **Subsurfaces**: `place_above`/`place_below` and `set_sync`/`set_desync` are stubs (`wl.c`, `sub_place`, `sub_sync`), a
-  surface as its own parent raises `bad_surface` instead of `bad_parent`, and placing against a non-sibling isn't an error.
-- **wl_surface**: `invalid_offset` (attach with x, y ≠ 0 at v5+), `invalid_size` (a buffer not a multiple of the
-  scale) and `defunct_role_object` are never raised; `preferred_buffer_transform` is never sent.
-- **Data devices**: `wl_data_offer.finish` and `set_actions` on a selection offer are no-ops instead of
-  `invalid_finish`/`invalid_offer`, and a drag-and-drop source used as the selection isn't `invalid_source`.
-- **wl_seat**: `get_touch` without touch isn't `missing_capability`, `wl_pointer.set_cursor` with another role's surface
-  isn't checked (`role`), `wl_touch.orientation` is never sent.
-- **Viewporter**: `out_of_buffer` and `bad_size` never raised. **xdg-decoration**: `unconfigured_buffer`, `orphaned` and
-  `invalid_mode` never raised. **xdg-activation**: a request on a committed token isn't `already_used`, and
-  `set_surface` is ignored. **Pointer constraints**: `set_region` is ignored. **dmabuf**: `out_of_bounds` never raised.
-  **Toplevel icon**: `no_buffer` never raised.
+Where the tool was wrong and was fixed: its client acked the same configure serial twice (that is `invalid_serial` in
+xdg-shell, and wlroots raises it too; it now acks each once); an error posted on an object the request destroyed (a
+refused destructor: `defunct_role_object`, `defunct_surfaces`) reaches libwayland-client with no interface, so those
+checks compare the code; an event handed to a helper as a function (`wlcolor.c` `info_prim(...,
+wp_image_description_info_v1_send_primaries)`) counts as sent; and the headless server is stopped with SIGTERM, then
+SIGKILL.
 
-**Xwayland / X11 (2026-11-22, Xwayland 24.1.6, run headless): 28 items, mean 74 %.** Complete: startup and surface
-association aside from xwayland-shell-v1 (92.3 %), `WM_NAME`/`_NET_WM_NAME`, `WM_CLASS`, `WM_PROTOCOLS`
-(`WM_DELETE_WINDOW` when LordOS closes a window, `WM_TAKE_FOCUS` for `input=False`), the focus model, `WM_STATE` and
-`WM_CHANGE_STATE`, `_NET_SUPPORTING_WM_CHECK`, `_NET_SUPPORTED`, `_NET_WM_MOVERESIZE`, `_MOTIF_WM_HINTS` and the
-selections (CLIPBOARD and PRIMARY X11 → Wayland, CLIPBOARD Wayland → X11, INCR both ways with 1 and 2 MiB). XDND,
-HiDPI, the root cursor and the isolation are at 100 % from source patterns and unit tests only (no dynamic check yet).
-Below 100 %:
+**Hostile clients** (`server/tests/wlfuzz_client.c`, in `make -C server test`): 400 connections send a random mix of
+the requests whose misuse is an error (subsurface order against strangers and itself, unknown and repeated acks,
+destroys in the wrong order, incomplete positioners, viewports outside their buffers, odd scales and size limits,
+decoration modes, constraint regions, data sources, activation tokens) while a well-behaved window stays mapped on its
+own connection. lord-server answers every one, the window is never disconnected and still gets its frame callbacks,
+and a new client maps a window afterwards. Also run on 2026-11-22 with six more seeds × 1,500 connections, and with three
+seeds × 800 against an AddressSanitizer/UBSan build of lord-server (no report).
 
-| Item | Score | What fails |
-|---|---|---|
-| Startup and surface association | 92.3 % | the association is `WL_SURFACE_ID`; `xwayland-shell-v1` isn't offered |
-| `_NET_WM_STATE` | 63.9 % | `ABOVE`, `DEMANDS_ATTENTION`, `MODAL` (and `SKIP_TASKBAR`) aren't supported (fullscreen, maximized, hidden and focused pass) |
-| `_NET_WM_WINDOW_TYPE` | 78.9 % | `UTILITY` isn't known |
-| `_NET_ACTIVE_WINDOW` | 70 % | a request is ignored even from a pager (source 2): deliberate, no focus stealing (`xwm.c`) |
-| `_NET_CLIENT_LIST` | 71.4 % | no `_NET_CLIENT_LIST_STACKING` |
-| `_NET_FRAME_EXTENTS` | 63.6 % | no `_NET_REQUEST_FRAME_EXTENTS` |
-| `WM_TRANSIENT_FOR` | 57.1 % | the theme is told the window is a dialog, not whose: no parent for X dialogs |
-| `WM_HINTS` | 50 % | the urgency hint isn't read |
-| `WM_NORMAL_HINTS` | 25 % | a ConfigureRequest below the minimum size is granted (300×200 minimum, 100×80 given) |
-| `_NET_WM_PID`, `_NET_WM_ICON`, `_NET_WORKAREA`, `_NET_CLOSE_WINDOW` | 0 % | not supported: an X app's own icon never reaches the Dock, X apps get no work area, pagers can't close windows; the pid lord-server trusts comes from X-Resource, not from `_NET_WM_PID` (which the app writes), but it isn't listed in `_NET_SUPPORTED` either |
+**Xwayland / X11 (2026-11-22, Xwayland 24.1.6, run headless): 28 items, mean 99.9 %** (74 % before). Every item is at
+100 % except `_NET_WM_STATE` (96.2 %): `_NET_WM_STATE_ABOVE` is kept in the property, so an app's toggle sticks, but it
+isn't listed in `_NET_SUPPORTED`, because LordOS has no always-on-top layer: the keyboard always goes to the window in
+front (`focusedOn`, `sdk/desktopmodel.js`), and keeping a window above another one that has the keyboard needs stacking
+and focus apart in the SDK, in every theme. `SKIP_PAGER` is kept the same way (there is no pager). What was added:
+xwayland-shell-v1 (the serial association, offered to Xwayland only), the `WM_HINTS` urgency hint and
+`DEMANDS_ATTENTION` (the Dock's attention mark), `WM_NORMAL_HINTS` minimum and maximum enforced, `WM_TRANSIENT_FOR` and
+`MODAL` as the window's owner and modality, `_NET_WM_ICON` as the window's icon, `_NET_ACTIVE_WINDOW` from a pager,
+`SKIP_TASKBAR`, the utility and toolbar types, `_NET_CLIENT_LIST_STACKING`, `_NET_REQUEST_FRAME_EXTENTS`,
+`_NET_WORKAREA`, `_NET_CLOSE_WINDOW` and `_NET_WM_PID` (read for diagnostics only, never trusted). The tool's
+`DEMANDS_ATTENTION` check used to set it on the window in front, which KWin and Mutter refuse; it now uses a window
+that isn't in front.
+
+**Proof with real programs** (`docs/wayland-proofs/`, its `README.md` lists each image): `tools/wl-proof.mjs` runs
+foot, zenity (GTK 4), FeatherPad (Qt 6), vkcube, es2gears and Chromium, and a purpose-built client for subsurface
+order and viewports, on a headless lord-server and screenshots each; `tools/wl-conformance/x11-proofs.sh` does the
+same for the X11 items with xterm, xprop, xwininfo and zenity on X11. Not installed here, so not tried: Firefox, mpv,
+GTK demos, xdotool and wmctrl (the `_NET_ACTIVE_WINDOW`, `_NET_CLOSE_WINDOW` and state requests are checked only by
+`x11-conformance-client`). Not checkable without hardware: the tablet wheel and pad feedback (no tablet), touch
+orientation (no touchscreen), and pointer-constraint regions with a real pointer (headless has no pointer over the
+windows; the region logic is covered by the fuzz client and the protocol checks).
 
 **Adding to it.** A new global is scored as soon as it's advertised: static checks from its XML and the generic bind.
 To call it complete, add its flow to `server/tests/wl_conformance.c` (a function, under `#ifdef CONF_HAVE_<XML FILE
