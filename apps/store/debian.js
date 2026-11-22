@@ -2,7 +2,7 @@
 // server/src/pkg) and makes changes through the administration helper (pkg-update, pkg-install,
 // pkg-remove, pkg-upgrade, pkg-install-file). Before changing anything it shows the plan: what is
 // installed, upgraded or removed, and how much is downloaded and used. See docs/PACKAGES.md.
-import { createElement as h, useEffect, useState } from 'react';
+import { createElement as h, memo as memoComponent, useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, Image, Button, EmptyState, GroupBox, useTheme, useStore, createStore, admin, formatBytes, formatDate,
   refreshApps, launchApp, useLauncherApps, LetterIcon, typeScale, spacing, direction, t, locale, errorText, statusText,
@@ -13,6 +13,7 @@ import { Card, CardGrid, Facts, Pill, Shelf } from './ui.js';
 import { sysPkgKey, snapshotDate, companionsOf } from './syspkg.js';
 import { AdminRescue, isNotAdmin } from './rescue.js';
 import { search } from './search.js';
+import { MoreButton, usePaged } from './endless.js';
 
 const available = () => typeof lord.pkg !== 'undefined';
 const ready = () => available() && lord.pkg.available();
@@ -204,7 +205,8 @@ const catOf = (a) => (a.categories || []).find((c) => CATS.includes(c));
 
 // A Debian app's card: Get (the app page and its plan), Open when it is installed and has a window,
 // View otherwise.
-function DebCard({ a, onOpen }) {
+// memo: a category that grows by a page doesn't draw the cards it already showed again (the items are cached objects)
+const DebCard = memoComponent(function DebCard({ a, onOpen }) {
   const launcher = useLauncherApps();
   const app = a.app || a;
   const name = a.package || a.name;
@@ -214,7 +216,7 @@ function DebCard({ a, onOpen }) {
     : h(Pill, { label: a.installed ? t('store.ai.view') : t('store.get'), onClick: () => onOpen(name) });
   return h(Card, { icon: h(PkgIcon, { app, name, size: 56 }), name: app.name || name, tag: 'Debian', kind: cat ? t(`store.cat.${cat}`) : '',
     summary: app.summary || a.summary || '', note: a.size ? formatBytes(a.size) : '', action, onClick: () => onOpen(name) });
-}
+});
 
 const Grid = ({ items, onOpen }) => h(CardGrid, null, ...items.map((a) => h(DebCard, { key: `${a.package || a.name}:${a.id || ''}`, a, onOpen })));
 
@@ -227,7 +229,6 @@ function StoreGlyph() {
     h(View, { style: { position: 'absolute', left: 4, top: 12, width: 40, height: 34, borderRadius: 7, backgroundColor: c } }));
 }
 
-const CAT_PAGE = 60;
 export const CATS = ['AudioVideo', 'Development', 'Education', 'Game', 'Graphics', 'Network', 'Office', 'Science', 'System', 'Utility'];
 // The package index's answers, kept until it (or what is installed) changes (gen) or the language does: each one walks
 // the whole index on lord-server's thread and builds thousands of objects, and pages asked again on every render, so
@@ -298,18 +299,20 @@ function SuggestedPage() {
 function Category({ cat, query, onOpen }) {
   const { gen } = useStore(state);
   void gen;
-  // a page of cards at a time: hundreds of cards redrawn on every change were most of the cost
-  const [limit, setLimit] = useState(CAT_PAGE);
-  useEffect(() => setLimit(CAT_PAGE), [cat, query]);
-  if (!ready()) return h(NoIndex);
-  const all = cached(`cat:${cat}`, () => lord.pkg.apps({ category: cat, limit: 2000, lang: lang2() }));
+  // a page of cards at a time (hundreds of cards redrawn on every change were most of the cost), the next one when the
+  // list is scrolled near its end (endless.js)
+  const all = ready() ? cached(`cat:${cat}`, () => lord.pkg.apps({ category: cat, limit: 2000, lang: lang2() })) : [];
   const q = query.trim();
   const list = q ? cached(`cat:${cat}:${q}`, () => search(all, q, (a) => ({ names: [a.name, a.package], texts: [a.summary] }))) : all;
+  const { limit, more } = usePaged(list.length, `${cat}|${q}`);
+  const openRef = useRef(onOpen);
+  openRef.current = onOpen;
+  const open = useCallback((name) => openRef.current(name), []);
+  if (!ready()) return h(NoIndex);
   return h(View, { style: { gap: spacing.l } },
     h(Progress),
-    list.length ? h(Grid, { items: list.slice(0, limit), onOpen }) : null,
-    list.length > limit ? h(View, { style: { alignItems: 'center' } },
-      h(Button, { label: t('flathub.showMore', { count: list.length - limit }), onClick: () => setLimit(limit + CAT_PAGE) })) : null,
+    list.length ? h(Grid, { items: list.slice(0, limit), onOpen: open }) : null,
+    h(MoreButton, { left: list.length - limit, onMore: more }),
     list.length ? null
       : h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }));
 }

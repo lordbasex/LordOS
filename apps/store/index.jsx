@@ -11,6 +11,7 @@ import { AiDetail, AiDiscover, AiPage, CatalogCategory, CatalogResults, catalogA
 import { matches } from './search.js';
 import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
+import { EndsContext, makeEnds } from './endless.js';
 import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits, webCategoryCounts } from './webapps.js';
 import { WebAppDetail } from './webdetail.js';
 import { FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts } from './flathubpages.js';
@@ -383,8 +384,12 @@ export default function Store() {
   };
   // Each page, search and app opens at the top (#20); back from an app returns to where the list was.
   const scroll = useRef(null);
+  // the long lists load their next page near the end of the scroll (endless.js)
+  const ends = useMemo(() => makeEnds(scroll), []);
   const listAt = useRef(null);
   const listKey = `${page}|${sub}|${query}`;
+  useEffect(() => { ends.reset(); }, [listKey, app]);
+  useEffect(() => { ends.limits.clear(); }, [listKey]);      // a list is as long as it was only back from an app's page
   useEffect(() => {
     const at = listAt.current;
     if (app || !at) return;
@@ -521,7 +526,8 @@ export default function Store() {
           </View>
           {!app ? <SearchField value={query} onChange={onSearch} placeholder={tr('store.search')} width={side.narrow ? 150 : 200} /> : null}
         </Toolbar>
-        <ScrollView scrollRef={scroll} resetKey={app ? `app:${app.flathub ? 'flathub' : app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
+        <EndsContext.Provider value={ends}>
+        <ScrollView scrollRef={scroll} onScroll={ends.check} resetKey={app ? `app:${app.flathub ? 'flathub' : app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
           {subCounts && !app && side.narrow ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
               {[null, ...CATS.filter((c) => subCounts[c])].map((c) => (
@@ -536,6 +542,7 @@ export default function Store() {
           {body}
           <View style={{ height: 24 }} />
         </ScrollView>
+        </EndsContext.Provider>
       </View>
       {side.narrow && side.shown ? <SidebarOverlay width={sideW} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
     </View>

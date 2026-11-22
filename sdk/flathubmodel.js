@@ -101,6 +101,38 @@ export function permissionRows(meta) {
   return rows;
 }
 
+// How the app shows its windows, from the sockets it declares, by Flatpak's own rule (1.16, Debian 13's:
+// common/flatpak-run-sockets.c, `allow_x11 = !has_wayland` when fallback-x11 is set): 'wayland' (Wayland only),
+// 'waylandFallback' (wayland and fallback-x11: X11 only when it gets no Wayland, and LordOS always gives it, so Wayland;
+// a declared x11 is ignored then too), 'both' (wayland and x11: it gets both and its toolkit chooses), 'x11' (X11 only,
+// or fallback-x11 without wayland: through Xwayland in LordOS) or 'none' (neither); null without metadata.
+// The keys are under "flathub.display.".
+export function displayOf(meta) {
+  if (!meta || !meta.context) return null;
+  const s = meta.context.sockets;
+  const wl = s.includes('wayland'), x = s.includes('x11'), fb = s.includes('fallback-x11');
+  if (fb) return wl ? 'waylandFallback' : 'x11';
+  if (wl) return x ? 'both' : 'wayland';
+  return x ? 'x11' : 'none';
+}
+
+// The toolkit an app is built with, from its runtime and base app: { kind, runtime, version } with kind a key under
+// "flathub.toolkit." ('electron' and 'chromium' from the base, Electron's old io.atom base too; 'gtk' on GNOME's or
+// elementary's platform; 'qt' on KDE's or a Qt base; else 'other': the app brings its own on the Freedesktop platform)
+// and the runtime's id and branch as written; null without metadata. Only for showing, like the permission rows.
+export function toolkitOf(meta) {
+  if (!meta) return null;
+  const rt = String(meta.runtime || '').split('/');
+  const base = String(meta.base || '').split('/')[1] || '';
+  const id = rt[0] || '';
+  let kind = 'other';
+  if (base === 'org.electronjs.Electron2.BaseApp' || base === 'io.atom.electron.BaseApp') kind = 'electron';
+  else if (base === 'org.chromium.Chromium.BaseApp') kind = 'chromium';
+  else if (id === 'org.gnome.Platform' || id === 'io.elementary.Platform') kind = 'gtk';
+  else if (id === 'org.kde.Platform' || base.startsWith('io.qt.')) kind = 'qt';
+  return { kind, runtime: id, version: rt[2] || '' };
+}
+
 // The catalog language from LordOS's ('zh-Hant' → AppStream's 'zh_TW'); lord.flatpak.loadCatalog takes [A-Za-z0-9_-].
 export function catalogLang(lang) {
   const l = String(lang || 'en');

@@ -120,6 +120,26 @@ eq('home read-only is still the home', keys(M.permissionRows(M.parseMetadata(['[
 eq('host-etc is the computer', keys(M.permissionRows(M.parseMetadata(['[Context]', 'filesystems=host-etc;']))), ['filesHost:files:limited']);
 eq('rows of null', M.permissionRows(null), []);
 
+// ---- display and toolkit (real metadata above; Flatpak 1.16's fallback-x11 rule) ----
+eq('display: marktext wayland+x11', M.displayOf(mt), 'both');
+eq('display: calculator fallback', M.displayOf(M.parseMetadata(calculator)), 'waylandFallback');
+eq('display: obs fallback', M.displayOf(M.parseMetadata(obs)), 'waylandFallback');
+const sock = (v) => M.displayOf(M.parseMetadata(['[Context]', `sockets=${v}`]));
+eq('display: by sockets', ['wayland;', 'x11;', 'fallback-x11;', 'x11;fallback-x11;wayland;', 'pulseaudio;', '!x11;wayland;', 'wayland;!x11;x11;'].map(sock),
+  ['wayland', 'x11', 'x11', 'waylandFallback', 'none', 'wayland', 'both']);
+eq('display: no metadata', M.displayOf(null), null);
+eq('toolkit: electron', M.toolkitOf(mt), { kind: 'electron', runtime: 'org.freedesktop.Platform', version: '26.08' });
+eq('toolkit: gtk', M.toolkitOf(M.parseMetadata(calculator)), { kind: 'gtk', runtime: 'org.gnome.Platform', version: '51' });
+eq('toolkit: its own', M.toolkitOf(M.parseMetadata(obs)), { kind: 'other', runtime: 'org.freedesktop.Platform', version: '26.08' });
+const tk = (...l) => M.toolkitOf(M.parseMetadata(['[Application]', ...l])).kind;
+eq('toolkit: by runtime and base', [
+  tk('runtime=org.kde.Platform/x86_64/6.9'), tk('runtime=org.kde.Platform/x86_64/6.9', 'base=app/io.qt.qtwebengine.BaseApp/x86_64/6.9'),
+  tk('runtime=org.freedesktop.Platform/x86_64/24.08', 'base=app/org.chromium.Chromium.BaseApp/x86_64/24.08'),
+  tk('runtime=io.elementary.Platform/x86_64/8'), tk('runtime=org.freedesktop.Platform/x86_64/24.08', 'base=app/io.qt.PySide.BaseApp/x86_64/6.8'), tk(),
+  tk('runtime=org.freedesktop.Platform/x86_64/19.08', 'base=app/io.atom.electron.BaseApp/x86_64/stable')],
+  ['qt', 'qt', 'chromium', 'gtk', 'qt', 'other', 'electron']);
+eq('toolkit: no metadata', M.toolkitOf(null), null);
+
 // ---- ids, refs ----
 eq('ids', ['org.gnome.Calculator', 'com.example.App-x', 'io.github.a_b.c', 'org.x', 'org.-a.b', 'com.ex-ample.App', '1org.a.b', `org.a.${'b'.repeat(60)}`].map(M.idOk),
   [true, true, true, false, false, false, false, false]);
@@ -164,7 +184,10 @@ const dir = path.join(root, 'assets/locales');
 for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, d)).isDirectory())) {
   const f = path.join(dir, lang, 'flathub.json');
   const cat2 = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {};
-  const missing = [...[...perms].map((p) => `perm.${p}`), ...[...changes].map((c) => `change.${c}`), 'note.obsVideos'].filter((k) => typeof cat2[k] !== 'string' && typeof cat2[k] !== 'object');
+  const look = ['look.title', 'look.display', 'look.toolkit', 'look.runtime',
+    ...['wayland', 'waylandFallback', 'both', 'x11', 'none'].flatMap((d) => [`display.${d}`, `display.${d}Hint`]),
+    ...['gtk', 'qt', 'electron', 'chromium', 'other'].map((k) => `toolkit.${k}`)];
+  const missing = [...[...perms].map((p) => `perm.${p}`), ...[...changes].map((c) => `change.${c}`), 'note.obsVideos', ...look].filter((k) => typeof cat2[k] !== 'string' && typeof cat2[k] !== 'object');
   eq(`rows translated in ${lang}`, missing, []);
 }
 
