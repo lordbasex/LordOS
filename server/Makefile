@@ -928,6 +928,11 @@ test: build/hwfall-test
 build/hwfall-test: tests/hwfall_test.c src/media/helper/lm_hwfall.h
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/hwfall_test.c
 	./$@ || { rm -f $@; exit 1; }
+# how much decoded audio the player has queued, counted exactly (src/media/helper/lm_aqlevel.h)
+test: build/aqlevel-test
+build/aqlevel-test: tests/aqlevel_test.c src/media/helper/lm_aqlevel.h
+	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/aqlevel_test.c
+	./$@ || { rm -f $@; exit 1; }
 
 MEDIA_PKGS := libavcodec libavformat libavutil libswscale libswresample
 MEDIA_VA := $(shell pkg-config --exists libva libva-drm 2>/dev/null && echo 1 || echo 0)
