@@ -59,5 +59,11 @@
   "ask.idle": "«{app}» vuole sapere quando sei lontano dal computer",
   "ask.idleNote": "Viene avvisata quando smetti di usare tastiera e mouse per un po’ e quando torni; nient’altro. Puoi cambiarlo in seguito in Impostazioni → Privacy.",
   "perm.idle": "Assenza dal computer",
-  "permHint.idle": "App avvisate quando smetti di usare il computer per un po’ e quando torni, come le app di chat che ti mostrano assente. Non sanno nient’altro; un video o una presentazione che tiene acceso lo schermo conta come presenza."
+  "permHint.idle": "App avvisate quando smetti di usare il computer per un po’ e quando torni, come le app di chat che ti mostrano assente. Non sanno nient’altro; un video o una presentazione che tiene acceso lo schermo conta come presenza.",
+  "allowOnce": "Consenti una volta",
+  "allowAlways": "Consenti sempre",
+  "ask.vr": "«{app}» vuole usare il visore VR {headset}",
+  "ask.vrNote": "Il suo display passa alla sola app; LordOS non vi mostra mai la tua scrivania. Viene ripreso quando l’app si chiude, il visore viene scollegato o lo schermo si blocca. Puoi cambiarlo in seguito in Impostazioni → Privacy.",
+  "perm.vr": "Visori VR",
+  "permHint.vr": "App che possono pilotare direttamente il display di un visore VR. Vengono prestati solo visori, mai i tuoi monitor, e vengono ripresi quando lo schermo si blocca, cambi utente o scegli Nega."
 }

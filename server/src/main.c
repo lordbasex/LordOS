@@ -63,6 +63,7 @@
 #include "wl/wl_warp.h"
 #include "tablet.h"
 #include "wl/xwayland.h"
+#include "wl/drmlease.h"
 #include "vault/dbus.h"
 #include "media/media.h"
 #include "media/svgicon.h"
@@ -973,6 +974,7 @@ static void outputs_apply(Server *s) {
     paint_blur_cache_reset();            /* kept blurred pixels belong to the old displays */
     Kms *k0 = K0(s);
     if (s->headless || k0->fd < 0) return;
+    if (!s->greeter) drmlease_card(k0->fd);    /* a VR headset plugged in or out: offered for lease, or its lease ends */
     KmsOutput ko[KMS_MAX_OUTPUTS];
     int n = kms_outputs(k0->fd, ko, KMS_MAX_OUTPUTS);
     DisplayPlan p;
@@ -1197,6 +1199,9 @@ static void display_attach(const int *fds, int n, int flags) {
 static unsigned tab_emul;               /* DOM buttons a pen holds down as a mouse (graphics tablets, below) */
 static void display_detach(void) {
     Server *s = remote_server;
+    /* every DRM lease ends first, revoked while the card is still open (a lock, a user switch, a text console; under
+     * lord-sessiond master is already gone and the lessee with it, docs/WAYLAND.md "DRM leases") */
+    drmlease_card(-1);
     parked_drop();
     splash_wait = 0;
     sleeplock_monitor_taken();          /* a lock before sleep: the computer may sleep now (hw/sleeplock.c) */
@@ -2990,6 +2995,7 @@ int main(int argc, char **argv) {
     if (ok && wl_start()) fprintf(stderr, "lord-server: no Wayland (Linux apps will not be able to open)\n");
     /* X11 apps: an X socket now, Xwayland only when one connects (wl/xwayland.c); not on the login screen */
     else if (ok && !s.greeter && session_user) xwl_init();
+    if (ok && !s.headless && !s.greeter) drmlease_card(K0(&s)->fd);   /* a VR headset already plugged in (wl/drmlease.c) */
     /* the session bus's address for every app the session starts (a terminal, the launcher, session
      * restore): without it Google Chrome has no bus, so no LordOS notifications, tray or portal */
     if (ok && !s.greeter && dbus_session_export()) fprintf(stderr, "lord-server: DBUS_SESSION_BUS_ADDRESS=%s\n", getenv("DBUS_SESSION_BUS_ADDRESS"));

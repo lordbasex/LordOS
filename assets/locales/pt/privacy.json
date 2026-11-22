@@ -59,5 +59,11 @@
   "ask.idle": "«{app}» quer saber quando você está longe do computador",
   "ask.idleNote": "Ele é avisado quando você para de usar o teclado e o mouse por um tempo, e quando volta; nada mais. Você pode mudar isso depois em Ajustes → Privacidade.",
   "perm.idle": "Ausência do computador",
-  "permHint.idle": "Apps avisados quando você para de usar o computador por um tempo e quando volta, como apps de chat que mostram você como ausente. Não sabem de mais nada; um vídeo ou uma apresentação que mantém a tela ligada conta como você presente."
+  "permHint.idle": "Apps avisados quando você para de usar o computador por um tempo e quando volta, como apps de chat que mostram você como ausente. Não sabem de mais nada; um vídeo ou uma apresentação que mantém a tela ligada conta como você presente.",
+  "allowOnce": "Permitir uma vez",
+  "allowAlways": "Permitir sempre",
+  "ask.vr": "«{app}» quer usar o headset de realidade virtual {headset}",
+  "ask.vrNote": "A tela dele passa a ser só do app; o LordOS nunca mostra sua área de trabalho ali. Ela é retomada quando o app fecha, o headset é desconectado ou a tela é bloqueada. Você pode mudar isso depois em Ajustes → Privacidade.",
+  "perm.vr": "Headsets de realidade virtual",
+  "permHint.vr": "Apps que podem controlar diretamente a tela de um headset de realidade virtual. Só headsets são emprestados, nunca seus monitores, e são retomados quando a tela é bloqueada, você troca de usuário ou escolhe Negar."
 }

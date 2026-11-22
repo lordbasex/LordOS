@@ -59,5 +59,11 @@
   "ask.idle": "“{app}” ingin tahu kapan Anda tidak di depan komputer",
   "ask.idleNote": "Aplikasi ini diberi tahu saat Anda berhenti memakai keyboard dan mouse sebentar, dan saat Anda kembali; tidak lebih. Anda dapat mengubahnya nanti di Pengaturan → Privasi.",
   "perm.idle": "Tidak di depan komputer",
-  "permHint.idle": "Aplikasi yang diberi tahu saat Anda berhenti memakai komputer sebentar dan saat Anda kembali, seperti aplikasi obrolan yang menampilkan Anda sedang pergi. Mereka tidak tahu hal lain; video atau presentasi yang menjaga layar tetap menyala dihitung sebagai Anda hadir."
+  "permHint.idle": "Aplikasi yang diberi tahu saat Anda berhenti memakai komputer sebentar dan saat Anda kembali, seperti aplikasi obrolan yang menampilkan Anda sedang pergi. Mereka tidak tahu hal lain; video atau presentasi yang menjaga layar tetap menyala dihitung sebagai Anda hadir.",
+  "allowOnce": "Izinkan sekali",
+  "allowAlways": "Selalu izinkan",
+  "ask.vr": "“{app}” ingin menggunakan headset VR {headset}",
+  "ask.vrNote": "Layarnya hanya untuk aplikasi itu; LordOS tidak pernah menampilkan desktop Anda di sana. Layar diambil kembali saat aplikasi ditutup, headset dicabut, atau layar terkunci. Anda dapat mengubahnya nanti di Pengaturan → Privasi.",
+  "perm.vr": "Headset VR",
+  "permHint.vr": "Aplikasi yang boleh mengendalikan layar headset VR secara langsung. Hanya headset yang dipinjamkan, tidak pernah monitor Anda, dan diambil kembali saat layar terkunci, Anda berganti pengguna, atau memilih Tolak."
 }

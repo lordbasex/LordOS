@@ -59,5 +59,11 @@
   "ask.idle": "« {app} » veut savoir quand vous n’êtes pas devant l’ordinateur",
   "ask.idleNote": "Il est prévenu quand vous cessez d’utiliser le clavier et la souris un moment, et quand vous revenez ; rien d’autre. Vous pourrez changer cela dans Réglages → Confidentialité.",
   "perm.idle": "Absence de l’ordinateur",
-  "permHint.idle": "Apps prévenues quand vous cessez d’utiliser l’ordinateur un moment et quand vous revenez, comme les messageries qui vous affichent absent. Elles n’apprennent rien d’autre ; une vidéo ou une présentation qui garde l’écran allumé compte comme une présence."
+  "permHint.idle": "Apps prévenues quand vous cessez d’utiliser l’ordinateur un moment et quand vous revenez, comme les messageries qui vous affichent absent. Elles n’apprennent rien d’autre ; une vidéo ou une présentation qui garde l’écran allumé compte comme une présence.",
+  "allowOnce": "Autoriser une fois",
+  "allowAlways": "Toujours autoriser",
+  "ask.vr": "« {app} » veut utiliser le casque de réalité virtuelle {headset}",
+  "ask.vrNote": "Son écran est confié à l’app seule ; LordOS n’y affiche jamais votre bureau. Il est repris quand l’app se ferme, que le casque est débranché ou que l’écran se verrouille. Vous pourrez changer cela dans Réglages → Confidentialité.",
+  "perm.vr": "Casques de réalité virtuelle",
+  "permHint.vr": "Apps qui peuvent piloter directement l’écran d’un casque de réalité virtuelle. Seuls des casques sont prêtés, jamais vos moniteurs, et ils sont repris quand l’écran se verrouille, que vous changez d’utilisateur ou que vous choisissez Refuser."
 }

@@ -6,12 +6,14 @@ import { settings } from './settings.js';
 import { windows, workAreaOf, getApp, setWindowMemory, assignedDisplayOf, isLiveSystem } from './windows.js';
 import { dockIdOfWindow } from './dock.js';
 import { placeOf, putPlace, restoreFrame } from './placemodel.js';
+import { placeKeyOf } from './shellxmodel.js';
 
 const SAVE_MS = 800;
 let timer = 0;
 const last = new Map();                 // window id → the JSON of the place saved for it
 
-const keyOf = (w) => dockIdOfWindow(w) || w.app;
+// a Linux window with a tag (xdg-toplevel-tag: "main window", "preferences") has a place of its own beside its app's
+const keyOf = (w) => placeKeyOf(dockIdOfWindow(w) || w.app, w.args?.tag);
 
 function save() {
   timer = 0;
@@ -20,7 +22,8 @@ function save() {
   for (const w of windows.get()) {
     if (w.args?.dialog || (getApp(w.app)?.builtin && !String(w.id).startsWith('linux#'))) continue;
     if (w.args?.guest) continue;                       // a guest's window: the guest says where it is (Machines' apps mode)
-    if (keyOf(w).startsWith('linux:linux#') || keyOf(w) === 'linux:') continue;   // nothing names this app
+    const base = dockIdOfWindow(w) || w.app;
+    if (base.startsWith('linux:linux#') || base === 'linux:') continue;   // nothing names this app
     const p = placeOf(w, displayFor(w.snapped && w.restore ? w.restore : w));
     if (!p) continue;
     const json = JSON.stringify(p);

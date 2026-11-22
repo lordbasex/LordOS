@@ -66,9 +66,11 @@ export function shortcutsWhoText(key) {
 
 // A prompt whose decision lord-server keeps itself: a Linux app that asks for the desktop's shortcuts
 // (sdk/wayland.js, server/src/wl/kbinhibit.h). name: what the person reads; done(allow) reports the answer.
-export function promptForServer({ app, perm, name, done }) {
+// once: three answers (Don't allow, Allow once, Always allow), and done gets 'deny', 'once' or 'always' (the VR
+// headset's lease, server/src/wl/drmlease.c); headset: the device it names.
+export function promptForServer({ app, perm, name, done, once = false, headset = '' }) {
   if (queue.get().some((x) => x.app === app && x.perm === perm)) return;
-  queue.set((q) => [...q, { id: seq++, app, perm, name, done }]);
+  queue.set((q) => [...q, { id: seq++, app, perm, name, done, once, headset }]);
 }
 
 // The server (compositor) receives prompts from isolated apps through the broker: it shows the
@@ -99,9 +101,12 @@ if (typeof globalThis !== 'undefined') {
   };
 }
 
-function answer(item, allow) {
+function answer(item, allow, how) {
   queue.set((q) => q.filter((x) => x.id !== item.id));
-  if (item.broker != null) {
+  if (item.once && item.done) {
+    // three answers, lord-server saves "always" and "no" itself (a VR headset's lease)
+    try { item.done(how || (allow ? 'once' : 'deny')); } finally { permsRev.set((v) => v + 1); }
+  } else if (item.broker != null) {
     // prompt from an isolated app: lord-server saves the decision and answers the app
     try { lord.broker.resolve(item.broker, allow); } catch (e) { /* server without broker */ }
   } else if (item.done) {
@@ -120,11 +125,11 @@ export function PermissionPrompt() {
   const item = q[0];
   const name = item.name || appName(getApp(item.app)) || item.app;
   const owner = item.owner ? appName(getApp(item.owner)) || item.owner : '';
-  const msg = t(`privacy.ask.${item.perm}`, { app: name, owner });
+  const msg = t(`privacy.ask.${item.perm}`, { app: name, owner, headset: item.headset || '' });
   const note = item.perm === 'keyring' ? 'privacy.ask.keyringNote' : item.perm === 'shortcuts' ? 'privacy.ask.shortcutsNote'
-    : item.perm === 'idle' ? 'privacy.ask.idleNote' : 'privacy.ask.where';
+    : item.perm === 'idle' ? 'privacy.ask.idleNote' : item.perm === 'vr' ? 'privacy.ask.vrNote' : 'privacy.ask.where';
   // a Linux app's "shortcuts" or "idle": who lord-server checked it is, under its name (the name alone could be anyone's)
-  const who = item.done && (item.perm === 'shortcuts' || item.perm === 'idle') ? shortcutsWhoText(item.app) : '';
+  const who = item.done && (item.perm === 'shortcuts' || item.perm === 'idle' || item.perm === 'vr') ? shortcutsWhoText(item.app) : '';
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start',
     backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 100000 } },
     h(View, { style: { marginTop: 80, width: 320, borderRadius: 14, padding: 20, gap: 14, backgroundColor: '#2b2b30',
@@ -134,9 +139,14 @@ export function PermissionPrompt() {
       h(Text, { style: { alignSelf: 'stretch', fontSize: 14, fontWeight: 700, color: '#f5f5f7', textAlign: 'center', lineHeight: 1.4 } }, msg),
       who ? h(Text, { style: { alignSelf: 'stretch', fontSize: 11, color: 'rgba(235,235,245,0.75)', textAlign: 'center' } }, who) : null,
       h(Text, { style: { alignSelf: 'stretch', fontSize: 11, color: 'rgba(235,235,245,0.55)', textAlign: 'center' } }, t(note)),
-      h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 4 } },
-        h(Btn, { label: t('privacy.deny'), onClick: () => answer(item, false) }),
-        h(Btn, { primary: true, label: t('privacy.allow'), onClick: () => answer(item, true) }))));
+      item.once
+        ? h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 4 } },
+          h(Btn, { label: t('privacy.deny'), onClick: () => answer(item, false, 'deny') }),
+          h(Btn, { label: t('privacy.allowOnce'), onClick: () => answer(item, true, 'once') }),
+          h(Btn, { primary: true, label: t('privacy.allowAlways'), onClick: () => answer(item, true, 'always') }))
+        : h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 4 } },
+          h(Btn, { label: t('privacy.deny'), onClick: () => answer(item, false) }),
+          h(Btn, { primary: true, label: t('privacy.allow'), onClick: () => answer(item, true) }))));
 }
 
 function Btn({ label, primary, onClick }) {
@@ -145,7 +155,7 @@ function Btn({ label, primary, onClick }) {
     h(Text, { style: { fontSize: 13, fontWeight: 600, color: '#fff' } }, label));
 }
 
-const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p === 'screen' ? '▦' : p === 'network' ? '⇅' : p === 'keyring' ? '🔑' : p === 'shortcuts' ? '❖' : p === 'idle' ? '☾' : '●');
+const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p === 'screen' ? '▦' : p === 'network' ? '⇅' : p === 'keyring' ? '🔑' : p === 'shortcuts' ? '❖' : p === 'idle' ? '☾' : p === 'vr' ? '◎' : '●');
 
 // ---- camera/microphone indicators ----
 // Own source (isolated .lpk apps: the broker knows and reflects it here with markDeviceUse) +

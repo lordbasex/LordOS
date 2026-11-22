@@ -48,6 +48,12 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
 | `xdg_toplevel_icon_manager_v1` | 1 | a window's own icon, shown only when its app has no installed icon (an AppImage, Wine, a game); buffers copied, re-encoded and size-limited, names ignored (see "Window icons", 0.8.9.5) |
 | `ext_idle_notifier_v1` | 1 | an app is told when the person is away from the computer and back, only once they allowed it (the `idle` permission, asked once per app; see "Idle notifications", 0.8.9.5) |
+| `xdg_toplevel_drag_manager_v1` | 1 | tab tear-off: during a drag a window follows the pointer at the app's offset, is never the drag's target and stays where it is let go (`tldrag.c`; checked 2026-11-22 with Chromium 156 on a headless lord-server, tear-off and reattach, and `tests/shellx_headless.sh`; see "Shell extras", in development) |
+| `xdg_toplevel_tag_manager_v1` | 1 | a window's untranslated tag keys its own remembered place (each kind of window of an app reopens where it was); its description names it while it has no title (`tltag.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
+| `xdg_system_bell_v1` | 1 | the bell: LordOS's alert sound (not in Do Not Disturb) and a window not in front marked as wanting attention; at most one ring every 250 ms per app (`sysbell.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
+| `xdg_session_manager_v1` | 1 | an app's windows come back where they were when it starts again: sessions with random ids, scoped to the program lord-server checked, kept in `~/.config/lordos/wl-sessions` (`xsession.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
+| `ext_background_effect_manager_v1` | 1 | blur behind a region of a window, drawn with the UI's own backdrop blur; offered only on the CPU path with transparency and blur on, none on the GPU path (`bgeffect.c`; checked 2026-11-22, headless CPU path; see "Shell extras", in development) |
+| `wp_drm_lease_device_v1` | 1 | a VR headset's connector (one the kernel marks `non-desktop`) leased to an app the person allowed: Allow once, Always allow or Don't allow (the `vr` permission); only while a headset is plugged into lord-server's card, never to a sandboxed or isolated app or Xwayland, revoked on unplug, permission taken back, lock, user switch or text console (0.8.9.5, approved by the maintainer 2026-11-22, checked with `drmlease-test` and `drmlease-e2e-test`, not yet with a real headset; see "DRM leases") |
 | `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
 | `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
 | `wl_fixes` | 1 | core protocol (wayland.xml 1.24): `destroy_registry` destroys a `wl_registry` the client no longer needs, so a long-lived client's registries don't pile up in lord-server and keep getting `global` events; lord-server sends `delete_id` and the id is reused. Debian 13's libwayland is 1.23, so the interface is generated from `third_party/wayland/wl-fixes.xml`, vendored from wayland.xml 1.24 (`wlfixes.c`, `mk/wlfixes.mk`). In development; checked 2026-11-22 against a headless lord-server (`tests/wlfixes_client.c`, the "fixes" part of `tests/wlperf_headless.sh`): the destroyed registry's id comes back for a new registry, which gets every global once, and a non-registry argument is a display error; not yet checked with a real app |
@@ -61,6 +67,10 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_content_type_manager_v1` (content-type-v1) | 1 | none, photo, video or game, kept per surface and applied on commit; nothing uses it yet (see "Frame timing"; 0.8.9.5, in development, checked headless 2026-11-22) |
 | `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 | `wp_linux_drm_syncobj_manager_v1` (explicit sync) | 1 | a dmabuf frame comes with an acquire point (its rendering is done) and a release point (LordOS is done with it): the frame is applied once its acquire point is signalled, without blocking, and the release point is signalled after the CPU copy or after the frame that replaced it on the GPU path; every protocol error, per-client limits. Offered when a render node has timeline syncobjs and `SYNCOBJ_EVENTFD` (Linux 6.6), on the GPU and the CPU path (0.8.9.5, in development; checked 2026-11-22 with `tests/syncobj_client.c` against a headless lord-server on the CPU path, and Mesa 25.0.7's Vulkan WSI, `vkcube`, on an AMD RX 580: 600 frames at 60 fps in FIFO and 1500 at 330 fps in mailbox, every one with `set_acquire_point`/`set_release_point`; see "Explicit sync") |
+
+Every protocol, with what lord-server offers next to KDE's KWin and GNOME's Mutter and why some are left out on
+purpose, is in "Protocol table (generated)" below and on [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/),
+both made from `docs/wayland-protocols.json`.
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
 `linux#<surface>`): the theme sees them like any other, with their title, focus, maximize,
@@ -1142,6 +1152,8 @@ display.
 
 ### Tests
 
+- `make -C server wl-conformance`: ICCCM, EWMH, the selections with INCR and the XWM's unit tests, scored per item (see
+  "Conformance" below).
 - `build/xwm-test` (in `make -C server test`): request encoding, the setup reply, packet framing,
   sequence numbers, `WM_CLASS`, titles (UTF-8, Latin-1, invalid), Motif hints, size hints,
   `WM_HINTS`, `_NET_WM_MOVERESIZE`, text targets, the same-client check, the display choice, the XDND
@@ -1603,6 +1615,72 @@ without input and again when the person is back. That says when someone is at th
   `wlperf-client idle` in `tests/wlperf_headless.sh`: the first notification asks and gets nothing before the answer,
   an allowed one is told `idled`, a denied one never (`WLPERF_IDLE=deny`).
 
+## DRM leases (`wp_drm_lease_device_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
+
+A VR runtime (Monado, and anything built on it) drives the headset's display itself: it asks the compositor for a DRM
+lease of the headset's connector and gets a file descriptor that may modeset and page-flip only that connector, a CRTC
+and a plane. That hands an app direct control of a display, so LordOS gates it twice: only headsets, and only with the
+person's yes. Approved by the maintainer as a security exception (recorded in `AGENTS.md`).
+
+- **Only non-desktop connectors.** The kernel sets a connector's `non-desktop` property from the EDID (or a quirk) for
+  head-mounted displays. `kms.c` reads it (`drm_conn_non_desktop`, `drmcard.h`) and counts such a connector as not
+  connected (`KmsOutput.non_desktop`): no head, no Settings → Displays choice, no mirror and no hotplug plan ever lights
+  it, and `drm_card_score` doesn't take a card with only a headset for the display card. A connector LordOS drives as a
+  desktop display is never offered. The leased CRTCs are kept from LordOS's own heads (`kms_set_leased_crtcs`) while a
+  lease lasts.
+- **The global.** One `wp_drm_lease_device_v1` (version 1), for the card lord-server is DRM master of, and only while a
+  headset is plugged into it (`drmlease_card`, called after the card is attached and at every hotplug from
+  `outputs_apply`); with none it is removed (`wl_global_remove`, destroyed 5 s later). It is hidden by the display's
+  global filter (`secctx_set_gate`) from every client that may never lease: a sandboxed one (Flatpak, a security
+  context), an isolated LordOS app, Xwayland (it speaks for every X11 app, so an X11 VR runtime such as SteamVR's RandR
+  lease path can't be told apart; not supported), lord-server itself, and every client on the login screen. A client
+  that binds it anyway gets nothing and its leases end at once.
+- **`drm_fd`.** A fresh `open()` of the same `/dev/dri/cardN` (the session user is in `video`), done only while
+  lord-server is master (so the new file never becomes master), checked to be the same device and not master, never
+  authenticated, sent once per bind. A file that was ever master is never handed out (it could take master back later).
+  If it can't be made, `drm_fd` (and the connectors after it) wait for the next attach or hotplug, as the protocol allows.
+- **Connectors.** Each headset is offered with `name` (`DP-2`, as a `wl_output` would be named), `description` (the
+  EDID's name, else the connector) and `connector_id`, then `done`. A connector leased to anyone is `withdrawn` from
+  every client while the lease lasts and offered again after; an unplugged one is `withdrawn`.
+- **The request and the prompt.** `request_connector` checks the device (`wrong_device`) and duplicates
+  (`duplicate_connector`); `submit` with none is `empty_lease`; at most 4 connectors per lease. On submit
+  (`drml_submit`, `drmlcore.c`): the client must be trusted (above) and named by the identity lord-server checked when
+  it connected (`program:<path>`, `kbinhibit.h`, never an app_id it set). The `vr` permission (`PERM_VR`,
+  `permisos.json`) decides: **deny** → `finished` at once; **allow** → leased; **ask** → lord-server emits `drmlease`
+  (`{app, name, headset}`, one prompt per app while one waits) and `sdk/wayland.js` shows the system-drawn prompt
+  ("‹App› wants to use the VR headset ‹Valve Index (DP-2)›") with the checked identity under it and three answers:
+  **Don't allow** (saved as deny), **Allow once** (nothing saved: this request only) and **Always allow** (saved as
+  allow). The answer comes back through `lord.wayland.leaseAnswer(app, "once" | "always" | "deny")`, which only answers
+  a request lord-server is waiting on. `vr` can't be declared in a manifest (`perm_declarable`), is refused to the broker
+  (`BOP_PERM`), is set by `lord.perms.set` only for a checked identity, and is listed and changed in Settings → Privacy
+  under VR headsets.
+- **The lease.** `DRM_IOCTL_MODE_CREATE_LEASE` (no libdrm) with, per connector, the connector, a free CRTC that can
+  drive it (not a head's, not another lease's) and that CRTC's primary plane (`kms_lease_objects`; the card's fd has
+  `UNIVERSAL_PLANES`, so the plane is named), `O_CLOEXEC`; its fd goes out as `lease_fd`. No free CRTC or a refused
+  ioctl → `finished`.
+- **When it ends** (`DRM_IOCTL_MODE_REVOKE_LEASE`, then `finished` while the object is there): the client destroys the
+  lease object or disconnects; the permission is taken back in Settings (a lease from Always allow ends when it is set
+  to Ask or Deny, one from Allow once only on Deny); the headset is unplugged or no longer `non-desktop`; the session
+  leaves the monitor (`display_detach`: lock, Switch User, logging out, Ctrl+Alt+F*n*).
+- **Session switching and lord-sessiond.** `lord-sessiond` takes master away (`DROP_MASTER` on its copy of the lent
+  file) *before* it sends `RP_UNDISPLAY`, so on a lock or a user switch lord-server's revoke fails (`EACCES`, logged) and
+  only `finished` reaches the client. That still ends the lease: the kernel counts a lessee as master only while its
+  lessor is the device's current master (`drm_is_current_master`), and the lent file never is again (the next session,
+  or this one coming back, gets a freshly opened card); `black_out` in lord-sessiond also puts a black frame on every
+  lit CRTC it finds driving a connector, which should include the headset's (not checked with one). After the lock the
+  client must ask again (Always allow leases at once). A standalone lord-server on its own text console (VT_PROCESS)
+  revokes for real: `display_detach` runs while it is still master. Nothing in lord-sessiond changed.
+- **Tests.** `build/drmlease-test` (`drmlcore.c` against a fake DRM layer: only non-desktop connectors offered, who may
+  lease, the prompt once per app, Allow once / Always / Don't allow, revoked on destroy, Settings, unplug, a lost
+  `non-desktop`, leaving the monitor with and without master, no free CRTC, two headsets on two CRTCs) and
+  `build/drmlease-e2e-test` (`drmlease.c` end to end with two clients over socketpairs and the card faked: the global
+  only with a headset and only for the trusted client, `drm_fd`, the headset and never the desktop display, the prompt
+  before any lease, `lease_fd`, `withdrawn` while leased and offered again after, Always allow saved, `finished` and the
+  global removed when leaving the monitor and on unplug, `empty_lease`). `wlperf-client protocols` checks a headless
+  lord-server offers no lease device. **Not checked with a real headset:** no VR headset was available and neither the
+  dev VM (virtio-gpu, QXL) nor VKMS has a non-desktop connector, so the real `CREATE_LEASE`/`REVOKE_LEASE` path and a VR
+  runtime on top are untested.
+
 ## Window icons (`xdg_toplevel_icon_manager_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
 
 An app may hand its window an icon. LordOS's rule: **the official icon wins.** A window whose app has an installed icon
@@ -1625,6 +1703,350 @@ the icon belongs to that window, and the Dock entry of an app id nobody installe
   `invalid_buffer`).
 
 ## Colour management (`wp_color_manager_v1`, `wp_color_representation_manager_v1`, 0.8.9.5, in development, approved by the maintainer 2026-11-22)
+## Protocol table (generated)
+
+<!-- BEGIN wayland-protocols table: generated by tools/gen-wayland-table.mjs from docs/wayland-protocols.json; edit the JSON, not this -->
+
+Compared on 2026-11-22: LordOS's own globals (`server/src/wl/*.c`) against KDE Plasma's KWin 6.7 and GNOME's Mutter 51 as [wayland.app](https://wayland.app/protocols/) lists them
+(its data from 2026-09-04 and 2026-09-06: the globals each advertised to an ordinary client, so protocols a compositor keeps for its own
+trusted programs show as not offered). The number is the version of the protocol's first global; "—" is not advertised. Published as
+[lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/). To change a row, edit `docs/wayland-protocols.json` and run
+`node tools/gen-wayland-table.mjs`; `server/tests/wayland_table_test.mjs` fails when the JSON and `server/src/wl` disagree.
+
+108 protocols. LordOS offers 30; KWin 6.7 63; Mutter 51 40. Of the 37 that both KWin and Mutter offer, LordOS offers 24;
+30 are left out on purpose and 48 are not offered (yet). Offered by both and not by LordOS: `wayland-wl_fixes`, `tablet-v2`, `drm-lease-v1`, `linux-drm-syncobj-v1`, `xdg-toplevel-drag-v1`, `fifo-v1`, `xdg-system-bell-v1`, `color-management-v1`, `color-representation-v1`, `xdg-toplevel-tag-v1`, `pointer-warp-v1`, `ext-background-effect-v1`, `xdg-session-management-v1`.
+
+| Protocol | Category | LordOS | KWin 6.7 | Mutter 51 | Note |
+|---|---|---|---|---|---|
+| [wayland-wl_compositor](https://wayland.app/protocols/wayland#wl_compositor) | core | 6 | 6 | 6 |  |
+| [wayland-wl_shm](https://wayland.app/protocols/wayland#wl_shm) | core | 2 | 2 | 2 | Created by libwayland's wl_display_init_shm (version 2 since libwayland 1.22; Debian 13 has 1.23). |
+| [wayland-wl_data_device_manager](https://wayland.app/protocols/wayland#wl_data_device_manager) | core | 3 | 3 | 3 |  |
+| [wayland-wl_shell](https://wayland.app/protocols/wayland#wl_shell) (deprecated) | core | — | — | — | Deprecated; replaced by xdg-shell. |
+| [wayland-wl_seat](https://wayland.app/protocols/wayland#wl_seat) | core | 9 | 10 | 10 |  |
+| [wayland-wl_output](https://wayland.app/protocols/wayland#wl_output) | core | 4 | 4 | 4 |  |
+| [wayland-wl_subcompositor](https://wayland.app/protocols/wayland#wl_subcompositor) | core | 1 | 1 | 1 |  |
+| [wayland-wl_fixes](https://wayland.app/protocols/wayland#wl_fixes) | core | — | 2 | 1 |  |
+| [presentation-time](https://wayland.app/protocols/presentation-time) | stable | 2 (1 before 0.8.9.5) | 2 | 2 | Version 2 (feedback per display) since 0.8.9.5. |
+| [viewporter](https://wayland.app/protocols/viewporter) | stable | 1 | 1 | 1 |  |
+| [xdg-shell](https://wayland.app/protocols/xdg-shell) | stable | 7 (6 before 0.8.9.5) | 6 | 7 | Version 7 (constrained_* states) since 0.8.9.5. |
+| [linux-dmabuf-v1](https://wayland.app/protocols/linux-dmabuf-v1) | stable | 5 (4 before 0.8.9.5) | 5 | 5 | Version 5 (one modifier for every plane) since 0.8.9.5. |
+| [tablet-v2](https://wayland.app/protocols/tablet-v2) | stable | — | 2 | 2 | Planned: pressure, tilt and pen buttons from evdev, without libinput (docs/DESKTOP-PARITY.md, phase 6). |
+| [xdg-activation-v1](https://wayland.app/protocols/xdg-activation-v1) | staging | 1 | 1 | 1 |  |
+| [drm-lease-v1](https://wayland.app/protocols/drm-lease-v1) | staging | — | 1 | 1 | In progress (approved by the maintainer 2026-11-22): a VR headset or another non-desktop display leased to an app, gated by a permission; only non-desktop connectors are offered, never the session's displays. |
+| [linux-drm-syncobj-v1](https://wayland.app/protocols/linux-drm-syncobj-v1) | staging | — | 1 | 1 | Explicit sync: designed, waiting for the maintainer's review (docs/SYNCOBJ-PLAN.md). |
+| [ext-session-lock-v1](https://wayland.app/protocols/ext-session-lock-v1) | staging | no, on purpose | — | — | LordOS locks the screen itself; an outside locker would draw over the session (docs/DESKTOP-PARITY.md). |
+| [single-pixel-buffer-v1](https://wayland.app/protocols/single-pixel-buffer-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 |  |
+| [content-type-v1](https://wayland.app/protocols/content-type-v1) | staging | — | 1 | — |  |
+| [ext-idle-notify-v1](https://wayland.app/protocols/ext-idle-notify-v1) | staging | 1 (since 0.8.9.5) | 2 | — | Only once the person allowed the app (the idle permission). |
+| [ext-image-capture-source-v1](https://wayland.app/protocols/ext-image-capture-source-v1) | staging | no, on purpose | — | — | No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md "Sharing a screen or a window"). |
+| [ext-image-copy-capture-v1](https://wayland.app/protocols/ext-image-copy-capture-v1) | staging | no, on purpose | — | — | No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md "Sharing a screen or a window"). |
+| [tearing-control-v1](https://wayland.app/protocols/tearing-control-v1) | staging | — | 1 | — | Planned with VRR (docs/DESKTOP-PARITY.md, phase 6). |
+| [xwayland-shell-v1](https://wayland.app/protocols/xwayland-shell-v1) | staging | — | — | — | lord-server starts Xwayland itself and matches its windows with WL_SURFACE_ID (server/src/wl/xwm.c). |
+| [fractional-scale-v1](https://wayland.app/protocols/fractional-scale-v1) | staging | 1 | 1 | 1 |  |
+| [cursor-shape-v1](https://wayland.app/protocols/cursor-shape-v1) | staging | 2 (1 before 0.8.9.5) | 2 | 2 | Version 2 (dnd_ask, all_resize) since 0.8.9.5. |
+| [ext-foreign-toplevel-list-v1](https://wayland.app/protocols/ext-foreign-toplevel-list-v1) | staging | no, on purpose | — | — | A program could list and control other apps' windows (third-party docks and taskbars). LordOS's Dock, switcher and window list are part of the desktop (docs/DESKTOP-PARITY.md). |
+| [security-context-v1](https://wayland.app/protocols/security-context-v1) | staging | 1 (since 0.8.8.8) | 1 | — | Built; not yet checked on the VM with a real Flatpak. |
+| [ext-transient-seat-v1](https://wayland.app/protocols/ext-transient-seat-v1) | staging | — | — | — | Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). |
+| [xdg-toplevel-drag-v1](https://wayland.app/protocols/xdg-toplevel-drag-v1) | staging | — | 1 | 1 |  |
+| [xdg-toplevel-icon-v1](https://wayland.app/protocols/xdg-toplevel-icon-v1) | staging | 1 (since 0.8.9.5) | 1 | — | Used only when the app has no installed icon; buffers re-encoded and size-limited, icon names ignored. |
+| [xdg-dialog-v1](https://wayland.app/protocols/xdg-dialog-v1) | staging | 1 (since 0.8.8.8) | 1 | 1 |  |
+| [alpha-modifier-v1](https://wayland.app/protocols/alpha-modifier-v1) | staging | 1 (since 0.8.9.5) | 1 | — |  |
+| [commit-timing-v1](https://wayland.app/protocols/commit-timing-v1) | staging | — | — | 1 |  |
+| [ext-data-control-v1](https://wayland.app/protocols/ext-data-control-v1) | staging | no, on purpose | 1 | — | A program could read every copy, or replace the clipboard, without having the focus. LordOS gives the clipboard only to the focused app; GNOME doesn't offer it either (docs/DESKTOP-PARITY.md). |
+| [fifo-v1](https://wayland.app/protocols/fifo-v1) | staging | — | 1 | 1 |  |
+| [xdg-system-bell-v1](https://wayland.app/protocols/xdg-system-bell-v1) | staging | — | 1 | 1 |  |
+| [ext-workspace-v1](https://wayland.app/protocols/ext-workspace-v1) | staging | — | — | — | Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). |
+| [color-management-v1](https://wayland.app/protocols/color-management-v1) | staging | — | 2 | 2 | Planned: ICC per output first, then HDR (docs/DESKTOP-PARITY.md, phase 6). |
+| [color-representation-v1](https://wayland.app/protocols/color-representation-v1) | staging | — | 1 | 1 |  |
+| [xdg-toplevel-tag-v1](https://wayland.app/protocols/xdg-toplevel-tag-v1) | staging | — | 1 | 1 |  |
+| [pointer-warp-v1](https://wayland.app/protocols/pointer-warp-v1) | staging | — | 1 | 1 |  |
+| [ext-background-effect-v1](https://wayland.app/protocols/ext-background-effect-v1) | staging | — | 1 | 1 |  |
+| [xdg-session-management-v1](https://wayland.app/protocols/xdg-session-management-v1) | staging | — | 1 | 1 |  |
+| [xx-input-method-v2](https://wayland.app/protocols/xx-input-method-v2) | experimental | no, on purpose | — | — | An outside input method would read every key. LordOS's own input methods (server/src/ime.c) compose into apps through text-input-v3 (docs/WAYLAND.md, "Input methods"). |
+| [xx-session-management-v1](https://wayland.app/protocols/xx-session-management-v1) | experimental | — | — | — |  |
+| [xx-cutouts-v1](https://wayland.app/protocols/xx-cutouts-v1) | experimental | — | — | — |  |
+| [xx-keyboard-filter-v1](https://wayland.app/protocols/xx-keyboard-filter-v1) | experimental | — | — | — |  |
+| [xx-hotkey-v1](https://wayland.app/protocols/xx-hotkey-v1) | experimental | — | — | — |  |
+| [xx-image-capture-color-management-v1](https://wayland.app/protocols/xx-image-capture-color-management-v1) | experimental | — | — | — |  |
+| [xx-text-input-v3](https://wayland.app/protocols/xx-text-input-v3) | experimental | — | — | — |  |
+| [xx-zones-v1](https://wayland.app/protocols/xx-zones-v1) | experimental | — | — | — |  |
+| [xx-fractional-scale-v2](https://wayland.app/protocols/xx-fractional-scale-v2) | experimental | — | — | — |  |
+| [fullscreen-shell-unstable-v1](https://wayland.app/protocols/fullscreen-shell-unstable-v1) | unstable | — | — | — |  |
+| [idle-inhibit-unstable-v1](https://wayland.app/protocols/idle-inhibit-unstable-v1) | unstable | 1 (since 0.8.5) | 1 | 1 |  |
+| [input-method-unstable-v1](https://wayland.app/protocols/input-method-unstable-v1) | unstable | no, on purpose | 1 | — | An outside input method would read every key. LordOS's own input methods (server/src/ime.c) compose into apps through text-input-v3 (docs/WAYLAND.md, "Input methods"). |
+| [input-timestamps-unstable-v1](https://wayland.app/protocols/input-timestamps-unstable-v1) | unstable | — | — | — |  |
+| [keyboard-shortcuts-inhibit-unstable-v1](https://wayland.app/protocols/keyboard-shortcuts-inhibit-unstable-v1) | unstable | 1 (since 0.8.8.8) | 1 | 1 | Once the person allowed the app; ❖Esc gives the shortcuts back. |
+| [linux-explicit-synchronization-unstable-v1](https://wayland.app/protocols/linux-explicit-synchronization-unstable-v1) (deprecated) | unstable | — | — | — |  |
+| [pointer-constraints-unstable-v1](https://wayland.app/protocols/pointer-constraints-unstable-v1) | unstable | 1 | 1 | 1 |  |
+| [pointer-gestures-unstable-v1](https://wayland.app/protocols/pointer-gestures-unstable-v1) | unstable | 3 | 3 | 3 |  |
+| [primary-selection-unstable-v1](https://wayland.app/protocols/primary-selection-unstable-v1) | unstable | 1 (since 0.8.3) | 1 | 1 |  |
+| [relative-pointer-unstable-v1](https://wayland.app/protocols/relative-pointer-unstable-v1) | unstable | 1 | 1 | 1 |  |
+| [text-input-unstable-v3](https://wayland.app/protocols/text-input-unstable-v3) | unstable | 1 (since 0.8.7) | 2 | 2 |  |
+| [xdg-decoration-unstable-v1](https://wayland.app/protocols/xdg-decoration-unstable-v1) | unstable | 1 (since 0.8.4) | 2 | — |  |
+| [xdg-foreign-unstable-v2](https://wayland.app/protocols/xdg-foreign-unstable-v2) | unstable | 1 (since 0.8.8.8) | 1 | 1 |  |
+| [xdg-output-unstable-v1](https://wayland.app/protocols/xdg-output-unstable-v1) | unstable | 3 | 3 | 3 |  |
+| [xwayland-keyboard-grab-unstable-v1](https://wayland.app/protocols/xwayland-keyboard-grab-unstable-v1) | unstable | — | — | — |  |
+| [wlr-data-control-unstable-v1](https://wayland.app/protocols/wlr-data-control-unstable-v1) | wlr | no, on purpose | — | — | A program could read every copy, or replace the clipboard, without having the focus. LordOS gives the clipboard only to the focused app; GNOME doesn't offer it either (docs/DESKTOP-PARITY.md). |
+| [wlr-export-dmabuf-unstable-v1](https://wayland.app/protocols/wlr-export-dmabuf-unstable-v1) | wlr | no, on purpose | — | — | No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md "Sharing a screen or a window"). |
+| [wlr-foreign-toplevel-management-unstable-v1](https://wayland.app/protocols/wlr-foreign-toplevel-management-unstable-v1) | wlr | no, on purpose | — | — | A program could list and control other apps' windows (third-party docks and taskbars). LordOS's Dock, switcher and window list are part of the desktop (docs/DESKTOP-PARITY.md). |
+| [wlr-gamma-control-unstable-v1](https://wayland.app/protocols/wlr-gamma-control-unstable-v1) | wlr | — | — | — | Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). Night Light is LordOS's own (Settings → Displays). |
+| [wlr-input-inhibitor-unstable-v1](https://wayland.app/protocols/wlr-input-inhibitor-unstable-v1) | wlr | — | — | — | Deprecated in favour of ext-session-lock-v1. |
+| [wlr-layer-shell-unstable-v1](https://wayland.app/protocols/wlr-layer-shell-unstable-v1) | wlr | no, on purpose | 5 | — | Panels, docks and overlays from other programs would draw above every window. LordOS draws its own Dock, menu bar and notifications (docs/DESKTOP-PARITY.md, "Left out on purpose"). |
+| [wlr-output-management-unstable-v1](https://wayland.app/protocols/wlr-output-management-unstable-v1) | wlr | — | — | — | Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). Displays are set in LordOS's Settings. |
+| [wlr-output-power-management-unstable-v1](https://wayland.app/protocols/wlr-output-power-management-unstable-v1) | wlr | — | — | — | Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). |
+| [wlr-screencopy-unstable-v1](https://wayland.app/protocols/wlr-screencopy-unstable-v1) | wlr | no, on purpose | — | — | No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md "Sharing a screen or a window"). |
+| [wlr-virtual-pointer-unstable-v1](https://wayland.app/protocols/wlr-virtual-pointer-unstable-v1) | wlr | no, on purpose | — | — | Made-up keys and pointer motion from other programs. LordOS has its own on-screen keyboard, and RemoteDesktop input is not offered: it would be a new security exception (docs/WAYLAND.md, "Sharing a screen or a window"). |
+| [input-method-unstable-v2](https://wayland.app/protocols/input-method-unstable-v2) | other | no, on purpose | — | — | An outside input method would read every key. LordOS's own input methods (server/src/ime.c) compose into apps through text-input-v3 (docs/WAYLAND.md, "Input methods"). |
+| [kde-appmenu](https://wayland.app/protocols/kde-appmenu) | kde | — | 2 | — |  |
+| [kde-blur](https://wayland.app/protocols/kde-blur) | kde | — | — | — |  |
+| [kde-contrast](https://wayland.app/protocols/kde-contrast) | kde | — | — | — |  |
+| [kde-dpms](https://wayland.app/protocols/kde-dpms) | kde | no, on purpose | 1 | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-external-brightness-v1](https://wayland.app/protocols/kde-external-brightness-v1) | kde | no, on purpose | 3 | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-fake-input](https://wayland.app/protocols/kde-fake-input) | kde | no, on purpose | — | — | Made-up keys and pointer motion from other programs. LordOS has its own on-screen keyboard, and RemoteDesktop input is not offered: it would be a new security exception (docs/WAYLAND.md, "Sharing a screen or a window"). |
+| [kde-idle](https://wayland.app/protocols/kde-idle) (deprecated) | kde | — | 1 | — | Deprecated; ext-idle-notify-v1 is offered instead. |
+| [kde-keystate](https://wayland.app/protocols/kde-keystate) | kde | — | 5 | — |  |
+| [kde-lockscreen-overlay-v1](https://wayland.app/protocols/kde-lockscreen-overlay-v1) | kde | no, on purpose | — | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-output-management](https://wayland.app/protocols/kde-output-management) | kde | no, on purpose | — | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-output-management-v2](https://wayland.app/protocols/kde-output-management-v2) | kde | no, on purpose | 21 | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-outputdevice](https://wayland.app/protocols/kde-outputdevice) | kde | no, on purpose | — | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-output-device-v2](https://wayland.app/protocols/kde-output-device-v2) | kde | no, on purpose | 23 | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-output-order-v1](https://wayland.app/protocols/kde-output-order-v1) | kde | no, on purpose | 1 | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-plasma-shell](https://wayland.app/protocols/kde-plasma-shell) | kde | no, on purpose | 8 | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-plasma-virtual-desktop](https://wayland.app/protocols/kde-plasma-virtual-desktop) | kde | no, on purpose | 4 | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-plasma-window-management](https://wayland.app/protocols/kde-plasma-window-management) | kde | no, on purpose | — | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-primary-output-v1](https://wayland.app/protocols/kde-primary-output-v1) | kde | no, on purpose | — | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-screen-edge-v1](https://wayland.app/protocols/kde-screen-edge-v1) | kde | no, on purpose | 1 | — | Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22. |
+| [kde-zkde-screencast-unstable-v1](https://wayland.app/protocols/kde-zkde-screencast-unstable-v1) | kde | no, on purpose | — | — | No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md "Sharing a screen or a window"). |
+| [kde-server-decoration](https://wayland.app/protocols/kde-server-decoration) (deprecated) | kde | 1 (since 0.8.4) | 1 | — | GTK 3's way to ask for the theme's frame (Firefox, Mousepad). |
+| [kde-server-decoration-palette](https://wayland.app/protocols/kde-server-decoration-palette) | kde | — | 1 | — |  |
+| [kde-shadow](https://wayland.app/protocols/kde-shadow) | kde | — | 2 | — |  |
+| [kde-slide](https://wayland.app/protocols/kde-slide) | kde | — | — | — |  |
+| [frog-color-management-v1](https://wayland.app/protocols/frog-color-management-v1) | other | — | 1 | — |  |
+| [virtual-keyboard-unstable-v1](https://wayland.app/protocols/virtual-keyboard-unstable-v1) | other | no, on purpose | — | — | Made-up keys and pointer motion from other programs. LordOS has its own on-screen keyboard, and RemoteDesktop input is not offered: it would be a new security exception (docs/WAYLAND.md, "Sharing a screen or a window"). |
+| [gtk-shell](https://wayland.app/protocols/gtk-shell) | other | — | — | 7 | GNOME's own extensions to GTK windows. |
+| [xdg-foreign-unstable-v1](https://wayland.app/protocols/) (deprecated) | unstable | — | — | 1 | Superseded; xdg-foreign-unstable-v2 is offered. |
+| [text-input-unstable-v2](https://wayland.app/protocols/) (deprecated) | kde | — | 1 | — | KDE's older text input; text-input-unstable-v3 is offered. |
+
+<!-- END wayland-protocols table -->
+## Conformance (`tools/wl-conformance.mjs`, in development)
+
+A script checks the compositor **point by point** against the protocol XML files and gives every advertised
+global, and every X11 area, a score from 0 to 100 %. The numbers below are from 2026-11-22, commit `3bee4dcc`
+(`docs/wayland-conformance.json` has every check, its result and a `file:line` hint).
+
+```sh
+npm run build && make -C server -j4      # the theme bundle and lord-server
+make -C server wl-conformance            # static + dynamic + X11 + real clients, about a minute
+node tools/wl-conformance.mjs --static-only            # only the source (no server, seconds)
+node tools/wl-conformance.mjs --only xdg_wm_base,wl_seat --verbose
+make -C server wl-conformance WLCONF_ARGS=--record     # rewrites docs/wayland-conformance.json
+```
+
+It never touches a session: it starts its own `lord-server --headless 1280x800` on the CPU path, in a private
+runtime folder and home (with `--user`, so the X socket exists and Xwayland starts on the first X11 client), and the
+theme with a small hook that logs what it gets for the test windows, closes the one titled `wlconf-close` and answers
+the idle and shortcuts permission prompts (an open prompt holds the keyboard).
+
+**What it reads.** The protocol XML files: the ones the build names in `server/Makefile` and `server/mk/*.mk` first, then
+copies vendored in the repository, then `/usr/share/wayland`, `/usr/share/wayland-protocols` and
+`/usr/share/plasma-wayland-protocols` (`--xml-dirs` adds more). The globals: `wl_global_create` in `server/src` and what a
+client really sees (`build/wl-globals`), and `docs/wayland-protocols.json` when it exists (`--claims`: each global's
+claimed version becomes a check). From each global it follows every `new_id` to the interfaces it creates, at the
+advertised version. A protocol added to the compositor is picked up with no change to the script.
+
+**The checks**, with their weights:
+
+| Kind | Weight | Passes when |
+|---|---|---|
+| Request (static) | 3 | every implementation table of the interface has a handler for it (a NULL one makes libwayland abort lord-server when a client sends it), the handler isn't a stub (an empty body, only `(void)` casts, or "not implemented"/TODO), and a destructor calls `wl_resource_destroy` |
+| Event (static) | 2 | `<interface>_send_<event>()` (or `wl_resource_post_event` with its opcode) is called somewhere |
+| Error (static) | 1 | `<INTERFACE>_ERROR_<NAME>` is raised somewhere |
+| Protocol flow (dynamic) | 3 | `server/tests/wl_conformance.c` against the headless server: the protocol's main flow (objects created and destroyed, the events expected and their order) and each misuse answered with exactly the protocol error the specification names |
+| Generic (dynamic) | 1 | binding at every version from 1 to the advertised one, and the destructor at each, end without an error (any protocol, even one with no flow yet) |
+| X11 (dynamic) | 3 | `server/tests/x11_conformance.c` (xcb) against Xwayland on that server, and what the theme got for its windows |
+| X11 source pattern, unit test | 1 | the item's patterns in `xwm.c`/`xwayland.c` (`tools/wl-conformance/xwayland.json`), and `build/xwm-test`, `xwscale-test`, `xauth-test`, `dndgate-test`, `urilist-test` |
+
+Score = points of the passed checks / points of all checks (skipped ones don't count). An item is **complete** only at
+100 % with nothing skipped, its XML found and at least one protocol-specific flow: a protocol checked only by the generic
+bind is never called complete. Exceptions the protocol itself allows (an optimization hint the compositor may ignore, an
+error no request can trigger) are listed with their reason in `tools/wl-conformance/allow.json`; they count as passed and
+the report shows them. Real programs that are installed (foot, vkcube, xterm here; `weston-simple-*`, `wayland-info`,
+GTK and Qt demos when present) run for 6 s each and are reported with the globals they bound (`WAYLAND_DEBUG`), not
+scored. Not yet covered: Firefox and Chromium (on the VM), and pointer/touch input (headless has no pointer over the
+windows, so checks that need a real enter serial are skipped).
+
+**Wayland (2026-11-22): 31 globals, mean 94 %, 19 complete.**
+
+| Global | Version | Score | Checks | Failing | Complete |
+|---|---|---|---|---|---|
+| `ext_idle_notifier_v1` | 1 | 100 % | 8 | 0 | yes |
+| `org_kde_kwin_server_decoration_manager` | 1 | 100 % | 4 | 0 | no (no XML on the system: dynamic only) |
+| `wl_compositor` | 6 | 86.2 % | 43 | 7 | no |
+| `wl_data_device_manager` | 3 | 85.2 % | 44 | 6 | no |
+| `wl_output` | 4 | 100 % | 20 | 0 | yes |
+| `wl_seat` | 9 | 93.5 % | 55 | 4 | no |
+| `wl_shm` (libwayland) | 2 | 100 % | 19 | 0 | yes |
+| `wl_subcompositor` | 1 | 51.2 % | 17 | 8 | no |
+| `wp_alpha_modifier_v1` | 1 | 100 % | 11 | 0 | yes |
+| `wp_cursor_shape_manager_v1` | 2 | 100 % | 12 | 0 | yes |
+| `wp_fractional_scale_manager_v1` | 1 | 100 % | 10 | 0 | yes |
+| `wp_presentation` | 2 | 100 % | 14 | 0 | yes |
+| `wp_security_context_manager_v1` | 1 | 100 % | 20 | 0 | yes |
+| `wp_single_pixel_buffer_manager_v1` | 1 | 100 % | 8 | 0 | yes |
+| `wp_viewporter` | 1 | 81.3 % | 19 | 4 | no |
+| `xdg_activation_v1` | 1 | 84.2 % | 15 | 2 | no |
+| `xdg_toplevel_icon_manager_v1` | 1 | 97.4 % | 17 | 1 | no |
+| `xdg_wm_base` | 7 | 71.3 % | 107 | 34 | no |
+| `xdg_wm_dialog_v1` | 1 | 100 % | 10 | 0 | yes |
+| `zwp_idle_inhibit_manager_v1` | 1 | 100 % | 6 | 0 | yes |
+| `zwp_keyboard_shortcuts_inhibit_manager_v1` | 1 | 100 % | 10 | 0 | yes |
+| `zwp_linux_dmabuf_v1` | 5 | 98.9 % | 48 | 1 | no |
+| `zwp_pointer_constraints_v1` | 1 | 85.3 % | 17 | 2 | no |
+| `zwp_pointer_gestures_v1` | 3 | 100 % | 18 | 0 | yes |
+| `zwp_primary_selection_device_manager_v1` | 1 | 100 % | 17 | 0 | yes |
+| `zwp_relative_pointer_manager_v1` | 1 | 100 % | 6 | 0 | yes |
+| `zwp_text_input_manager_v3` | 1 | 100 % | 20 | 0 | yes |
+| `zxdg_decoration_manager_v1` | 1 | 78.0 % | 18 | 5 | no |
+| `zxdg_exporter_v2` | 1 | 100 % | 10 | 0 | yes |
+| `zxdg_importer_v2` | 1 | 100 % | 11 | 0 | yes |
+| `zxdg_output_manager_v1` | 3 | 100 % | 20 | 0 | yes |
+
+What keeps the others below 100 % (every one is listed with its `file:line` in the JSON):
+
+- **xdg-shell errors are almost never raised**: a buffer before the first `ack_configure`, an unknown serial, a 0×0
+  window geometry, `set_parent` to itself, negative or crossed min/max sizes, an invalid resize edge, an
+  incomplete positioner, a popup destroyed under its child, `xdg_wm_base` destroyed with surfaces alive, a role object
+  outliving its `xdg_surface`, `grab` on a mapped popup: each one is accepted silently. `xdg_wm_base.ping` is never sent
+  (an app that hangs isn't detected, `pong` is a no-op), and `xdg_positioner.set_reactive`, `set_parent_size` and
+  `set_parent_configure` are ignored (a popup doesn't follow its moving parent).
+- **Subsurfaces**: `place_above`/`place_below` and `set_sync`/`set_desync` are stubs (`wl.c`, `sub_place`, `sub_sync`), a
+  surface as its own parent raises `bad_surface` instead of `bad_parent`, and placing against a non-sibling isn't an error.
+- **wl_surface**: `invalid_offset` (attach with x, y ≠ 0 at v5+), `invalid_size` (a buffer not a multiple of the
+  scale) and `defunct_role_object` are never raised; `preferred_buffer_transform` is never sent.
+- **Data devices**: `wl_data_offer.finish` and `set_actions` on a selection offer are no-ops instead of
+  `invalid_finish`/`invalid_offer`, and a drag-and-drop source used as the selection isn't `invalid_source`.
+- **wl_seat**: `get_touch` without touch isn't `missing_capability`, `wl_pointer.set_cursor` with another role's surface
+  isn't checked (`role`), `wl_touch.orientation` is never sent.
+- **Viewporter**: `out_of_buffer` and `bad_size` never raised. **xdg-decoration**: `unconfigured_buffer`, `orphaned` and
+  `invalid_mode` never raised. **xdg-activation**: a request on a committed token isn't `already_used`, and
+  `set_surface` is ignored. **Pointer constraints**: `set_region` is ignored. **dmabuf**: `out_of_bounds` never raised.
+  **Toplevel icon**: `no_buffer` never raised.
+
+**Xwayland / X11 (2026-11-22, Xwayland 24.1.6, run headless): 28 items, mean 74 %.** Complete: startup and surface
+association aside from xwayland-shell-v1 (92.3 %), `WM_NAME`/`_NET_WM_NAME`, `WM_CLASS`, `WM_PROTOCOLS`
+(`WM_DELETE_WINDOW` when LordOS closes a window, `WM_TAKE_FOCUS` for `input=False`), the focus model, `WM_STATE` and
+`WM_CHANGE_STATE`, `_NET_SUPPORTING_WM_CHECK`, `_NET_SUPPORTED`, `_NET_WM_MOVERESIZE`, `_MOTIF_WM_HINTS` and the
+selections (CLIPBOARD and PRIMARY X11 → Wayland, CLIPBOARD Wayland → X11, INCR both ways with 1 and 2 MiB). XDND,
+HiDPI, the root cursor and the isolation are at 100 % from source patterns and unit tests only (no dynamic check yet).
+Below 100 %:
+
+| Item | Score | What fails |
+|---|---|---|
+| Startup and surface association | 92.3 % | the association is `WL_SURFACE_ID`; `xwayland-shell-v1` isn't offered |
+| `_NET_WM_STATE` | 63.9 % | `ABOVE`, `DEMANDS_ATTENTION`, `MODAL` (and `SKIP_TASKBAR`) aren't supported (fullscreen, maximized, hidden and focused pass) |
+| `_NET_WM_WINDOW_TYPE` | 78.9 % | `UTILITY` isn't known |
+| `_NET_ACTIVE_WINDOW` | 70 % | a request is ignored even from a pager (source 2): deliberate, no focus stealing (`xwm.c`) |
+| `_NET_CLIENT_LIST` | 71.4 % | no `_NET_CLIENT_LIST_STACKING` |
+| `_NET_FRAME_EXTENTS` | 63.6 % | no `_NET_REQUEST_FRAME_EXTENTS` |
+| `WM_TRANSIENT_FOR` | 57.1 % | the theme is told the window is a dialog, not whose: no parent for X dialogs |
+| `WM_HINTS` | 50 % | the urgency hint isn't read |
+| `WM_NORMAL_HINTS` | 25 % | a ConfigureRequest below the minimum size is granted (300×200 minimum, 100×80 given) |
+| `_NET_WM_PID`, `_NET_WM_ICON`, `_NET_WORKAREA`, `_NET_CLOSE_WINDOW` | 0 % | not supported: an X app's own icon never reaches the Dock, X apps get no work area, pagers can't close windows; the pid lord-server trusts comes from X-Resource, not from `_NET_WM_PID` (which the app writes), but it isn't listed in `_NET_SUPPORTED` either |
+
+**Adding to it.** A new global is scored as soon as it's advertised: static checks from its XML and the generic bind.
+To call it complete, add its flow to `server/tests/wl_conformance.c` (a function, under `#ifdef CONF_HAVE_<XML FILE
+NAME>`, in the `flows` table with the global it's scored under) with its main flow and one check per protocol error. An X11
+item or pattern goes in `tools/wl-conformance/xwayland.json`, its dynamic checks in `server/tests/x11_conformance.c`
+under the same item id.
+## Shell extras (in development, approved by the maintainer 2026-11-22)
+
+Five protocols that make Linux windows behave as on a full desktop, one file each in `server/src/wl/` (`wlshell.h`
+lists them and the few hooks `wl.c` calls; they read `wl.c`'s state only through its `wl__` helpers). The latest
+release is 0.8.9.4; these are in development. None of them reads another app's windows, the screen, the clipboard or
+input, so none is hidden from sandboxed clients (`secctx_hidden`).
+
+| | |
+|---|---|
+| ![tear-off](wayland-tab-tearoff.png) | ![dropped](wayland-tab-dropped.png) |
+| Chromium 156: a tab dragged out of the window follows the pointer as its own window (headless lord-server, CPU path) | Let go on the desktop, it stays there as a window; dragged back onto the first window's tabs, it is reattached |
+
+| Protocol | Version | Supported | How it was checked (2026-11-22) |
+|---|---|---|---|
+| `xdg_toplevel_drag_manager_v1` | 1 | yes | **Chromium 156** (Debian 13, `--ozone-platform=wayland`) on a headless lord-server, the pointer driven through the session's `remote.sock`: a tab dragged out became a window that followed the pointer, let go on the desktop it stayed there as its own window, and dragged back onto the first window's tab strip it was reattached (Chromium's `WAYLAND_DEBUG`: `attach`, `dnd_drop_performed`, `dnd_finished`, no error). `tests/shellx_headless.sh` with `SHELLX_DRAG=1`: a new window attached at (20, 10) follows the pointer, the drag never enters it (it entered the window under it twice), let go over nothing it is dropped (not cancelled) at the pointer less the offset; `invalid_source` and `toplevel_attached`. Firefox not yet tried |
+| `xdg_toplevel_tag_manager_v1` | 1 | yes | `tests/shellx_headless.sh`: the tag set before the first frame comes with the window, a later one as a `tag` event, a control character cleaned out |
+| `xdg_system_bell_v1` | 1 | yes | `tests/shellx_headless.sh`: a burst of ten rings is one, a ring with no window reaches window 0; `build/shellx-units-test` (the limits) |
+| `xdg_session_manager_v1` | 1 | yes | `tests/shellx_headless.sh`: a new session is saved with its window; a saved one is restored (`restored`, and the window's `restored` before its first configure) at its saved place and size; another program's session id gives a new session; `in_use`, `already_mapped`; the file is 0600 |
+| `ext_background_effect_manager_v1` | 1 | yes, CPU path | `tests/shellx_headless.sh`: blur offered on the CPU path, the region reaches the shell as rectangles in the window's coordinates, `background_effect_exists`; `build/shellx-units-test` (regions cut into rectangles) |
+
+- **Tab tear-off (`xdg-toplevel-drag-v1`, `tldrag.c`).** A browser starts an ordinary drag (`wl_data_device.start_drag`)
+  and attaches a window to the drag's source with the point of the window under the pointer (its offset, window
+  geometry coordinates): a new window for the torn tab, attached before it is mapped, or the whole window. From the
+  drag's start until it ends, lord-server sends `tldrag` to the shell (on, with the offset and the pointer; off), and
+  `sdk/wayland.js` moves the window so that point stays under the pointer (`lord.wayland.toplevelDrag(window,
+  frameNode)` gives the offset and where its geometry is now, so the theme's frame is accounted for exactly;
+  `sdk/shellxmodel.js` `dragFrameAt`). The window doesn't take part in choosing the drag's target: `tldrag_hit` runs
+  the UI's hit test again with the window's frame left out (its surface until the shell named the frame), so dropping
+  it over another window of the browser reattaches the tab there, and the drag's `enter`/`leave` go to that window.
+  Let go where nothing takes the drop, it stays there, as after a move: lord-server then ends the drag with
+  `dnd_drop_performed` and `dnd_finished` instead of `cancelled` (a browser takes a cancelled tab back), as Mutter and
+  KWin do; such a drag never hands files to LordOS (it is a window, not a file list). Rules: only a window of the client that owns the source
+  follows (no app moves another app's window); a source used as the selection, before or after, is `invalid_source`;
+  `attach` while an attached window still has its role is `toplevel_attached`; `destroy` while the drag runs is
+  `ongoing_drag`; a window unmapped while attached is detached; a maximized window is restored first; a locked window
+  (`isWindowLocked`) doesn't move.
+- **Window tags (`xdg-toplevel-tag-v1`, `tltag.c`).** The tag ("main window", "preferences") and the description are the
+  app's own words: kept per window as text only (at most 127 and 255 bytes of valid UTF-8, cut on a character,
+  control characters out). The shell reads them at `map` (`lord.wayland.tag`) and gets a `tag` event when they change.
+  The tag keys the window's **remembered place** (`sdk/windowmemory.js`, `settings.windowPlaces`): the key is the app's
+  Dock id plus `#<tag>` (`placeKeyOf`: letters, digits, spaces and `. _ : -`, at most 64 characters), so each kind of
+  window of a multi-window app (GIMP's toolboxes, an e-mail composer, a preferences window) reopens where that kind of
+  window was, instead of every window taking the last one's place. A tag can only ever name places beside its own
+  app's Dock id; the 200-place limit (`placemodel.js`) still applies. The description is the window's name while it
+  has no title.
+- **The bell (`xdg-system-bell-v1`, `sysbell.c`).** `ring` becomes a `bell` event on the window the surface belongs to
+  (its toplevel), or on window 0 with no surface. The shell plays LordOS's own alert sound (`lord.sound.play('error')`,
+  synthesized by lord-server and played as a PipeWire event sound, so the system volume and mute apply) unless Do Not
+  Disturb is on, and marks a window that isn't in front as wanting attention in the Dock and the taskbar (the visual
+  bell, as `xdg_activation_v1` does). LordOS has no separate "visual bell" setting; this is it. Rate limit
+  (`bellgate.h`): per app at most one ring every 250 ms and five in 10 s, at most one every 100 ms from all apps; a ring
+  held back is dropped.
+- **Session management (`xdg-session-management-v1`, `xsession.c`, `xsstore.c`).** An app gets a session (new, or by the
+  id it was given), adds its windows by name, and when it starts again restores each by name before its first commit.
+  LordOS keeps, per window of a session, its geometry on screen and whether it was maximized (updated every 2 s while
+  it is open and when it closes), and a restored window opens there: the shell asks once (`lord.wayland.sessionFrame`),
+  adds the theme's frame (`restoredFrame`) and fits it on today's displays with session restore's own `fitFrame`
+  (`sdk/sessionmodel.js`). With LordOS's session restore: that one relaunches the apps after a login; a window its app
+  then restores by name takes its own place first, ahead of session restore's frame and the remembered place.
+  - **Security.** Ids are 16 bytes from `getrandom`, as 32 hex characters. A session belongs to who lord-server checked
+    the app is (`program:<exe>`, `flatpak:<id>`, `app:<isolated LordOS app>`, the same identity as the `shortcuts` and
+    `idle` permissions), never to an app_id or id the app sent, and is found only by id **and** that owner: an app
+    that learns another app's id gets a new, empty session, and nothing of the other's is told. Xwayland, the login
+    screen and clients LordOS can't identify get sessions that live in memory only. The file
+    (`~/.config/lordos/wl-sessions/sessions`, 0600 in a 0700 folder, replaced whole by write and rename) is written by
+    lord-server only: the folder is on `fsops_protected`'s list, so `lord.fs` can't touch it. It holds window places for
+    windows that already exist and can't launch anything; every line is checked again when read (`xs_load`: a bad
+    line is skipped, a bad session with its windows). Limits: 128 sessions, 16 per app (the least recently used goes,
+    never one in use), 32 windows each, names up to 255 bytes without control characters (a longer name works while
+    the app runs, but isn't kept), 256 KB.
+  - Not kept: the desktop a window was on and its stacking order (the protocol's `recover` reason could use them).
+- **Blur behind windows (`ext-background-effect-v1`, `bgeffect.c`, `bgregion.h`).** The region (double-buffered, set on
+  the window's commit) is cut into at most 16 rectangles clipped to the window geometry (a region of more than 64
+  rectangles, or one needing more than 16, becomes its bounding box) and sent to the shell (`blur`), which draws a box
+  with the UI's own backdrop blur (`backdropFilter: blur(24px)`, as the theme's panels, with its damage rules and
+  cache in `ui/paint.c`) under the window's surface for each one (`LinuxWindow`, `sdk/wayland.js`). **The capability is
+  honest:** blur is offered (`capabilities` = `blur`) only while it can really be drawn, which is on the CPU path
+  (windows are painted into the same canvas as the UI, so the blur sees what is under them) with Settings →
+  transparency with blur on (`lord.wayland.effects`). With GPU compositing (windows are textures under the UI's
+  layer, and the GPU path has no blur shader yet) or effects off, the capabilities are none, the boxes go away and
+  every bound manager is told again when it changes (`bgeffect_caps_changed`, also on a GPU switch). Only a window's
+  main surface is blurred behind; a region on a popup or a subsurface is kept, never drawn.
+- **Tests:** `build/shellx-units-test` (the bell's limits, regions cut into rectangles, the session store and its file
+  read back and edited by hand, the per-app limit), `tests/shellx_model_test.mjs` (`sdk/shellxmodel.js`),
+  `tests/shellx_headless.sh` (all five against a headless lord-server, `build/shellx-client`; the pointer-driven
+  tear-off with `SHELLX_DRAG=1` and root for the session's `remote.sock`, through `tests/shellx_inject.py`) and
+  `build/fsops-test` (the sessions folder is protected).
+
+## Pending
 
 LordOS drives every display as an **SDR sRGB display**: sRGB (BT.709) primaries, D65 white, encoded for a gamma 2.2
 display, 8 bits a channel. HDR output (PQ, HLG, more than 8 bits, the display's HDR metadata) is **out of scope**: it

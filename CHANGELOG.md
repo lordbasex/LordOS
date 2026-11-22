@@ -198,6 +198,100 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     timestamp on every present, 55 frames a second; MAILBOX 16 896 commits with points in 5 s, no error. `tests/wlperf_headless.sh` now marks the welcome tour as shown, so the Help window no longer covers its test
     windows (its frame test got 19 callbacks a second, the rate of a covered window), and so does
     `tests/guestwin_headless.sh` (the Help window was one more window in the lists it checks).
+- **The Wayland protocol table, on lordos.org and in `docs/WAYLAND.md`, in development.** A new page,
+  [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/) (English, Spanish and Portuguese,
+  linked from the footer, the sitemap and the site's search), lists 108 Wayland protocols (the core protocol's globals,
+  every wayland-protocols one, wlroots', KDE's, and the others KWin, Mutter or LordOS offer) with the version LordOS,
+  KDE Plasma's KWin 6.7 and GNOME's Mutter 51 advertise, compared on 2026-11-22 (KWin's and Mutter's data as
+  wayland.app lists it: the globals each advertised to an ordinary client, from 2026-09-04 and 2026-09-06). For LordOS
+  each row has a status (offered, partly, left out on purpose, not offered), a note, how it was checked and when, and
+  "in development" when it is in the code after the latest release (0.8.9.4). Today: LordOS offers 30 of the 108,
+  KWin 63 and Mutter 40; of the 37 both KWin and Mutter offer, LordOS offers 24; 30 are left out on purpose, each with
+  its reason (layer-shell, data-control, foreign-toplevel, session-lock, screencopy and image capture, virtual
+  keyboard and pointer, input methods, Plasma's own shell protocols). The page has a search, filters by category,
+  LordOS's status and who offers it (including "both KDE and GNOME, not LordOS"), kept in the address, a legend, and
+  turns each row into a card on a phone; its script and stylesheet (`web/src/wayland.js`, `wayland.css`) load on that
+  page only.
+  - **One source of truth:** `docs/wayland-protocols.json`. `tools/gen-wayland-table.mjs` writes from it the
+    "Protocol table (generated)" section of `docs/WAYLAND.md` (between marker comments) and the page's data,
+    `web/content/wayland/protocols.json`; `--check` only checks. `tools/wayland-app-import.mjs` refreshes KWin's and
+    Mutter's columns and the protocol list from wayland.app's own data, keeping LordOS's entries.
+  - **Drift test:** `server/tests/wayland_table_test.mjs` (in `make -C server test`) reads every
+    `wl_global_create(…, &X_interface, VERSION, …)` in `server/src` (hand-written interface tables and libwayland's
+    `wl_shm` included) and fails when a global is created and not in the JSON, listed and not created, or at another
+    version, and when the generated section or the page's data is stale.
+  - **Hardened against its external input** (part of the data comes from wayland.app): the generator's `validate()`,
+    the importer (which refuses to write) and `web/build.mjs` (which refuses to build, `validateWeb()`) accept only
+    positive integer versions, interface names matching `^[a-z][a-z0-9_]*$`, protocol ids `^[a-z][a-z0-9_-]*$`,
+    sources, stabilities, categories and statuses from fixed sets, `https://wayland.app/protocols/` links and plain
+    text without markup; every value the page prints is also escaped. The drift test feeds hostile rows (for example a
+    category `"><script>`) to both checks and fails if one is accepted.
+  - **Maintainer's decisions of 2026-11-22 recorded:** the 13 KDE Plasma shell, output and settings protocols stay left
+    out on purpose (confirmed); `drm-lease-v1` is in progress (a permission, non-desktop connectors only), shown as
+    not offered yet with that note.
+- **Wayland and Xwayland conformance, scored point by point, in development** (`tools/wl-conformance.mjs`,
+  `make -C server wl-conformance`; `docs/WAYLAND.md`, "Conformance").
+  - Every advertised global, and every interface it creates, is checked against its protocol XML up to the advertised
+    version: each request has a real handler (not a stub, and a destructor that destroys), each event is sent somewhere,
+    each protocol error is raised somewhere. A new protocol is picked up with no change to the script.
+  - A test client (`server/tests/wl_conformance.c`) against a headless lord-server binds every global at every version
+    and runs each protocol's main flow and misuses (about 150 checks: configure order, maximize and fullscreen,
+    popups, the clipboard through the compositor, dmabuf feedback, security contexts, each error code the
+    specification names).
+  - An xcb client (`server/tests/x11_conformance.c`) against Xwayland checks ICCCM and EWMH (WM_STATE, WM_PROTOCOLS,
+    focus, `_NET_WM_STATE`, client list, frame extents, ...) and the selections both ways, with INCR at 1 and 2 MiB.
+  - Each item gets a weighted score from 0 to 100 % and is called complete only with a protocol-specific flow and nothing
+    skipped; justified exceptions are listed with their reason (`tools/wl-conformance/allow.json`). Installed real
+    clients (foot, vkcube, xterm, ...) are run and reported with the globals they bound.
+  - First results, 2026-11-22 (`docs/wayland-conformance.json`): 31 globals, mean 94 %, 19 complete; X11 74 %. The gaps
+    found (xdg-shell errors not raised, subsurface stacking and sync ignored, `_NET_WM_ICON`, `_NET_WORKAREA`,
+    xwayland-shell-v1, ...) are listed in `docs/WAYLAND.md`.
+- **Linux apps: tab tear-off, window tags, the bell, session management and blur behind windows, in development**
+  (approved by the maintainer 2026-11-22; five Wayland protocols, one file each in `server/src/wl/`, `wlshell.h`;
+  `docs/WAYLAND.md`, "Shell extras"; the latest release is 0.8.9.4).
+  - **Tab tear-off (`xdg-toplevel-drag-v1` 1, `tldrag.c`):** a tab dragged out of Firefox or Chromium becomes a window
+    that follows the pointer during the drag (at the point of the window the browser gave), is never the drag's target
+    (the hit test leaves its frame out, so it can be dropped back onto another window of the browser), and stays where
+    it is let go: a drop nothing takes ends with `dnd_drop_performed` and `dnd_finished`, not `cancelled` (the browser
+    would take the tab back), as Mutter and KWin do, and such a drag never hands files to LordOS. Only a window of the app
+    that owns the drag follows; `invalid_source`, `toplevel_attached` and `ongoing_drag` as the protocol says. Checked
+    with Chromium 156 on a headless lord-server (the pointer driven through the session's `remote.sock`): a tab torn off
+    followed the pointer, stayed on the desktop as its own window, and dragged back onto the first window it was
+    reattached (`docs/wayland-tab-tearoff.png`, `docs/wayland-tab-dropped.png`). Firefox not yet tried.
+  - **Window tags (`xdg-toplevel-tag-v1` 1, `tltag.c`):** a window's tag keys its own remembered place
+    (`sdk/windowmemory.js`: the app's Dock id plus `#<tag>`), so each kind of window of a multi-window app reopens where
+    that kind was; its description names it while it has no title. Both kept as text only, cut and cleaned in C and
+    again in the shell (`sdk/shellxmodel.js`).
+  - **The bell (`xdg-system-bell-v1` 1, `sysbell.c`):** LordOS's alert sound (silent in Do Not Disturb; the system volume
+    and mute apply) and, for a window that isn't in front, the Dock's and taskbar's attention mark. At most one ring
+    every 250 ms and five in 10 s per app (`bellgate.h`).
+  - **Session management (`xdg-session-management-v1` 1, `xsession.c`, `xsstore.c`):** an app's windows come back at
+    their place and size (and maximized) when it starts again, ahead of session restore's frame and the remembered
+    place, fitted on today's displays. Session ids are random (getrandom), scoped to the program lord-server checked the
+    app runs (or its Flatpak id, or the isolated LordOS app), never to an id the app sent: another app's id finds
+    nothing. Kept in `~/.config/lordos/wl-sessions/sessions` (0600), written by lord-server only and protected from
+    `lord.fs` (`fsops_protected`); limits of 128 sessions, 16 per app, 32 windows each.
+  - **Blur behind windows (`ext-background-effect-v1` 1, `bgeffect.c`, `bgregion.h`):** the region an app asks for is
+    blurred with the UI's own backdrop blur, under the window. Offered honestly: only on the CPU path with transparency
+    and blur on; with GPU compositing (no blur there yet) or effects off the capabilities are none and every app is told
+    when that changes.
+  - The protocol files for `ext-background-effect-v1` and `xdg-session-management-v1`, newer than Debian 13's
+    wayland-protocols 1.44, are copied unchanged from wayland-protocols 1.50 into `server/protocols/` (MIT).
+  - New native calls, for the shell only: `lord.wayland.toplevelDrag`, `tag`, `sessionFrame` and `effects`.
+  - Tests: `build/shellx-units-test`, `tests/shellx_model_test.mjs`, `tests/shellx_headless.sh` (all five against a
+    headless lord-server, `tests/shellx_client.c`; the pointer-driven tear-off with `SHELLX_DRAG=1`), and
+    `build/fsops-test` for the protected folder.
+- **VR headsets for Linux apps, only if you allow it, in development** (`drm-lease-v1`, approved by the maintainer
+  2026-11-22; `docs/WAYLAND.md`, "DRM leases"). A VR runtime such as Monado can lease a headset's display from LordOS
+  and drive it directly. Only connectors the kernel marks as non-desktop (head-mounted displays) are ever offered, never
+  a monitor, and LordOS itself no longer lights such a connector as a desktop display (Settings → Displays lists it as
+  not connected). The first time an app asks, LordOS shows its own prompt ("‹App› wants to use the VR headset ‹name›",
+  Don't allow / Allow once / Always allow), remembered per app by the identity lord-server checks itself and changed in
+  Settings → Privacy → VR headsets (the new `vr` permission, which a manifest can't declare and the broker refuses).
+  Sandboxed (Flatpak) and isolated apps and X11 apps through Xwayland are never offered a lease. A lease ends when the
+  app lets it go, the permission is taken back, the headset is unplugged, or the session leaves the screen (lock, Switch
+  User, logging out, a text console). No libdrm: the lease is made with the kernel's own ioctls. Checked with a fake
+  card (`drmlease-test`, `drmlease-e2e-test`); not yet with a real headset. Texts in all 35 languages.
 
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;

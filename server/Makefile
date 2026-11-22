@@ -36,16 +36,20 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
            staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
            staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1 \
-           staging/linux-drm-syncobj/linux-drm-syncobj-v1
+           staging/linux-drm-syncobj/linux-drm-syncobj-v1 \
+           staging/drm-lease/drm-lease-v1
 # color-management-v1 and color-representation-v1 (src/wl/wlcolor.c, docs/WAYLAND.md "Colour management")
 WL_MORE += staging/color-management/color-management-v1 staging/color-representation/color-representation-v1
 # frame timing and presentation hints (src/wl/timing.c, docs/WAYLAND.md "Frame timing")
 WL_MORE += staging/fifo/fifo-v1 staging/commit-timing/commit-timing-v1 staging/tearing-control/tearing-control-v1 \
            staging/content-type/content-type-v1
+# shell extras (src/wl/wlshell.h, docs/WAYLAND.md "Shell extras"): tab tear-off, window tags, the bell
+WL_MORE += staging/xdg-toplevel-drag/xdg-toplevel-drag-v1 staging/xdg-toplevel-tag/xdg-toplevel-tag-v1 staging/xdg-system-bell/xdg-system-bell-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
-# Newer than Debian 13's wayland-protocols (1.44): the XML is kept in protocols/, unmodified (THIRD_PARTY.md)
-WL_LOCAL := pointer-warp-v1
+# Newer than Debian 13's wayland-protocols (1.44): the XML is kept in protocols/, unmodified (THIRD_PARTY.md):
+# pointer-warp from 1.45, ext-background-effect and xdg-session-management from 1.50
+WL_LOCAL := pointer-warp-v1 ext-background-effect-v1 xdg-session-management-v1
 WL_GEN  += $(foreach p,$(WL_LOCAL),build/gen/$(p)-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_LOCAL),build/gen/$(p)-protocol.o)
 
@@ -71,7 +75,7 @@ MEDIA_SRC := src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/m
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/syncobj.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/timing.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/osk.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/syncobj.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/timing.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/osk.c \ src/wl/drmlease.c src/wl/drmlcore.c
        src/ui/wave.c src/sound/spectrum.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c \
@@ -94,6 +98,9 @@ SRC += src/ui/js_vmcli.c src/vm/vmcli.c
 # Machines' pictures the desktop's GPU can't import (an Intel GVT-g machine's Y-tiled dmabufs): read on their own render node
 SRC += src/gpu/dmaread.c
 SRC += src/wl/wlcolor.c src/wl/colorconv.c
+# Shell extras (src/wl/wlshell.h): xdg-toplevel-drag, xdg-toplevel-tag, xdg-system-bell, xdg-session-management,
+# ext-background-effect, one file each
+SRC += src/wl/wlshell.c src/wl/tldrag.c src/wl/tltag.c src/wl/sysbell.c src/wl/xsession.c src/wl/xsstore.c src/wl/bgeffect.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)
@@ -455,6 +462,22 @@ build/buftf-test: tests/buftf_test.c src/wl/buftf.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/buftf_test.c
 	./$@ || { rm -f $@; exit 1; }
+# drm-lease-v1, only non-desktop connectors and only with the "vr" permission: the state machine against a fake DRM layer
+# (src/wl/drmlcore.c, docs/WAYLAND.md "DRM leases")
+test: build/drmlease-test
+build/drmlease-test: tests/drmlease_test.c src/wl/drmlcore.c src/wl/drmlcore.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/drmlease_test.c src/wl/drmlcore.c
+	./$@ || { rm -f $@; exit 1; }
+# the same, end to end: drmlease.c's protocol, the gate in secctx.c's filter, two clients over socketpairs, the card's
+# kernel part faked
+test: build/drmlease-e2e-test
+build/drmlease-e2e-test: tests/drmlease_e2e_test.c src/wl/drmlease.c src/wl/drmlease.h src/wl/drmlcore.c src/wl/drmlcore.h \
+                         src/wl/secctx.c src/wl/secctx.h build/gen/client/drm-lease-v1-client-protocol.h $(WL_GEN)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -DDRMLEASE_TEST $(CFLAGS) $(WARN) -std=c11 -o $@ tests/drmlease_e2e_test.c src/wl/drmlease.c src/wl/drmlcore.c \
+	    src/wl/secctx.c build/gen/drm-lease-v1-protocol.c build/gen/security-context-v1-protocol.c -lwayland-server -lwayland-client
+	./$@ || { rm -f $@; exit 1; }
 # ext-idle-notify with the person's permission (src/wl/idlenotify.h, docs/WAYLAND.md "Idle notifications")
 test: build/idlenotify-test
 build/idlenotify-test: tests/idlenotify_test.c src/wl/idlenotify.h
@@ -730,6 +753,12 @@ build/pwguard-test: tests/pwguard_test.c $(PWGUARD_SRC) $(wildcard src/sec/*.h s
 build/wl-globals: tests/wl_globals.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ $< -lwayland-client
+# Wayland and Xwayland conformance, point by point, scored 0–100 % per protocol (tools/wl-conformance.mjs, docs/WAYLAND.md,
+# "Conformance"): a headless lord-server, build/wl-conformance-client and build/x11-conformance-client (built by the tool).
+# Needs the theme bundle (npm run build). WLCONF_ARGS=--record writes docs/wayland-conformance.json.
+wl-conformance: build/lord-server build/wl-globals
+	node ../tools/wl-conformance.mjs $(WLCONF_ARGS)
+.PHONY: wl-conformance
 build/fw-rules-test: tests/fw_rules_test.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c $(wildcard src/fw/*.h) src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fw_rules_test.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
@@ -892,7 +921,8 @@ CLIENT_PROTO := stable/xdg-shell/xdg-shell unstable/xdg-decoration/xdg-decoratio
                 unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
                 staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
                 staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1 \
-                staging/linux-drm-syncobj/linux-drm-syncobj-v1
+                staging/linux-drm-syncobj/linux-drm-syncobj-v1 \
+                staging/drm-lease/drm-lease-v1
 CLIENT_PROTO += staging/fifo/fifo-v1 staging/commit-timing/commit-timing-v1 staging/tearing-control/tearing-control-v1 \
                 staging/content-type/content-type-v1
 CLIENT_GEN := $(foreach p,$(CLIENT_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
@@ -947,6 +977,18 @@ build/syncobj-test: tests/syncobj_test.c src/wl/syncobj.h
 build/syncobj-kernel-test: tests/syncobj_kernel_test.c src/wl/syncobj.c src/wl/syncobj.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/syncobj_kernel_test.c src/wl/syncobj.c
+# The shell extras (tests/shellx_client.c, src/wl/wlshell.h): run by tests/shellx_headless.sh against a headless lord-server;
+# their pure parts (the bell's limit, blur regions, the session store and its file) in tests/shellx_units_test.c
+test: build/shellx-client build/shellx-units-test
+build/shellx-units-test: tests/shellx_units_test.c src/wl/xsstore.c src/wl/xsstore.h src/wl/bgregion.h src/wl/bellgate.h src/wl/wlregion.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/shellx_units_test.c src/wl/xsstore.c
+	./$@ || { rm -f $@; exit 1; }
+SHELLX_PROTO := staging/xdg-toplevel-drag/xdg-toplevel-drag-v1 staging/xdg-toplevel-tag/xdg-toplevel-tag-v1 staging/xdg-system-bell/xdg-system-bell-v1
+$(foreach p,$(SHELLX_PROTO),$(eval $(call wl_client_proto,$(p))))
+SHELLX_GEN := $(foreach p,$(notdir $(SHELLX_PROTO)) $(WL_LOCAL),build/gen/client/$(p)-client-protocol.h build/gen/client/$(p)-protocol.c)
+build/shellx-client: tests/shellx_client.c $(CLIENT_GEN) $(SHELLX_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/shellx_client.c $(filter build/gen/client/xdg-shell-protocol.c,$(CLIENT_GEN)) $(filter %.c,$(SHELLX_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag

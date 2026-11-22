@@ -59,5 +59,11 @@
   "ask.idle": "“{app}” bilgisayardan uzakta olduğunuzu bilmek istiyor",
   "ask.idleNote": "Klavye ve fareyi bir süre kullanmadığınızda ve döndüğünüzde ona haber verilir; başka bir şey değil. Bunu daha sonra Ayarlar → Gizlilik bölümünden değiştirebilirsiniz.",
   "perm.idle": "Bilgisayardan uzakta olma",
-  "permHint.idle": "Bilgisayarı bir süre kullanmadığınızda ve döndüğünüzde haber alan uygulamalar; örneğin sizi uzakta gösteren sohbet uygulamaları. Başka bir şey öğrenmezler; ekranı açık tutan bir video veya sunum orada olduğunuz sayılır."
+  "permHint.idle": "Bilgisayarı bir süre kullanmadığınızda ve döndüğünüzde haber alan uygulamalar; örneğin sizi uzakta gösteren sohbet uygulamaları. Başka bir şey öğrenmezler; ekranı açık tutan bir video veya sunum orada olduğunuz sayılır.",
+  "allowOnce": "Bir kez izin ver",
+  "allowAlways": "Her zaman izin ver",
+  "ask.vr": "“{app}” {headset} VR başlığını kullanmak istiyor",
+  "ask.vrNote": "Ekranı yalnızca uygulamaya verilir; LordOS orada asla masaüstünüzü göstermez. Uygulama kapandığında, başlık çıkarıldığında veya ekran kilitlendiğinde geri alınır. Bunu daha sonra Ayarlar → Gizlilik bölümünden değiştirebilirsiniz.",
+  "perm.vr": "VR başlıkları",
+  "permHint.vr": "Bir VR başlığının ekranını doğrudan sürebilen uygulamalar. Yalnızca başlıklar ödünç verilir, monitörleriniz asla; ekran kilitlendiğinde, kullanıcı değiştirdiğinizde veya Reddet’i seçtiğinizde geri alınır."
 }

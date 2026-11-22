@@ -89,6 +89,14 @@
         },
         {
           "label": {
+            "en": "Wayland protocols",
+            "es": "Protocolos Wayland",
+            "pt": "Protocolos Wayland"
+          },
+          "href": "/wayland-protocols-table/"
+        },
+        {
+          "label": {
             "en": "Release notes",
             "es": "Notas de versión",
             "pt": "Notas de versão"

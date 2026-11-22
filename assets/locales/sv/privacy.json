@@ -59,5 +59,11 @@
   "ask.idle": "”{app}” vill veta när du är borta från datorn",
   "ask.idleNote": "Den får veta när du slutar använda tangentbordet och musen en stund och när du är tillbaka; inget annat. Du kan ändra detta senare i Inställningar → Integritet.",
   "perm.idle": "Borta från datorn",
-  "permHint.idle": "Appar som får veta när du slutar använda datorn en stund och när du kommer tillbaka, till exempel chattappar som visar dig som borta. De får inte veta något annat; en video eller presentation som håller skärmen tänd räknas som att du är där."
+  "permHint.idle": "Appar som får veta när du slutar använda datorn en stund och när du kommer tillbaka, till exempel chattappar som visar dig som borta. De får inte veta något annat; en video eller presentation som håller skärmen tänd räknas som att du är där.",
+  "allowOnce": "Tillåt en gång",
+  "allowAlways": "Tillåt alltid",
+  "ask.vr": "”{app}” vill använda VR-headsetet {headset}",
+  "ask.vrNote": "Dess skärm går bara till appen; LordOS visar aldrig ditt skrivbord där. Den tas tillbaka när appen stängs, headsetet kopplas ur eller skärmen låses. Du kan ändra detta senare i Inställningar → Integritet.",
+  "perm.vr": "VR-headset",
+  "permHint.vr": "Appar som får styra ett VR-headsets skärm direkt. Bara headset lånas ut, aldrig dina bildskärmar, och de tas tillbaka när skärmen låses, du byter användare eller väljer Neka."
 }

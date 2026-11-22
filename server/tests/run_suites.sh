@@ -234,6 +234,7 @@ EOF
     if have node; then run "photos-trash-test (apps/photos/trash.js)" node tests/photos_trash_test.mjs; fi
     if have node; then run "bt-power-model-test (sdk/btpowermodel.js)" node tests/bt_power_model_test.mjs; fi
     if have node; then run "archive-vol-test (sdk/archivevol.js)" node tests/archive_vol_test.mjs; fi
+    if have node; then run "wayland-table-test (docs/wayland-protocols.json against server/src/wl's globals, generated table up to date)" node tests/wayland_table_test.mjs; else skip "wayland-table-test" "node"; fi
     if have node; then run "bt-audio-model-test (sdk/btaudiomodel.js)" node tests/bt_audio_model_test.mjs; fi
     if have node; then run "bt-list-model-test (sdk/btlistmodel.js)" node tests/bt_list_model_test.mjs; fi
     if have node; then run "kbinhibit-model-test (sdk/kbinhibitmodel.js)" node tests/kbinhibit_model_test.mjs; fi
@@ -285,6 +286,15 @@ EOF
         0) ok "wltiming (tests/wltiming_client.c, headless lord-server: fifo, commit timing, errors, vkcube)" ;;
         77) skip "wltiming" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "wltiming (tests/wltiming_client.c, headless lord-server: fifo, commit timing, errors, vkcube)" ;;
+    esac
+    # the shell extras: tab tear-off errors, window tags, the bell, blur behind windows, session management, against a
+    # headless lord-server (tests/shellx_headless.sh; the pointer-driven tear-off with SHELLX_DRAG=1, as root)
+    if have node; then run "shellx-model-test (sdk/shellxmodel.js)" node tests/shellx_model_test.mjs; fi
+    sh tests/shellx_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "shellx (tests/shellx_client.c, headless lord-server: globals, tag, bell, blur, session)" ;;
+        77) skip "shellx" "build/lord-server, build/shellx-client and the default theme (make, npm run build)" ;;
+        *) bad "shellx (tests/shellx_client.c, headless lord-server: globals, tag, bell, blur, session)" ;;
     esac
     # apps mode's guest side: lord-server's window endpoint, directly and through lordos-guest (tests/guestwin_client.c)
     sh tests/guestwin_headless.sh >"$T/out" 2>&1
