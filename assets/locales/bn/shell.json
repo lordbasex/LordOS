@@ -931,5 +931,9 @@
   "shot.area": "এলাকা নির্বাচন করুন…",
   "shot.take": "স্ক্রিনশট নিন",
   "shot.areaHint": "{app}-কে যে এলাকা দিতে চান তার উপর টেনে আনুন। Esc বাতিল করে।",
-  "shot.colorHint": "{app}-কে যে রং দিতে চান তাতে ক্লিক করুন। Esc বাতিল করে।"
+  "shot.colorHint": "{app}-কে যে রং দিতে চান তাতে ক্লিক করুন। Esc বাতিল করে।",
+  "capture.what.viaStudio": "LordOS Studio-র মাধ্যমে ক্যামেরা ({camera})",
+  "capture.what.viaStudioPlain": "LordOS Studio-র মাধ্যমে ক্যামেরা",
+  "capture.what.effectsOn": "এফেক্ট চালু",
+  "capture.what.effectsOff": "কোনো এফেক্ট নেই"
 }

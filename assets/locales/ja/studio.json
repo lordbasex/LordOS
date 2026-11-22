@@ -24,5 +24,12 @@
   "perfGpu": "毎秒 {fps} フレーム・グラフィックスカード",
   "perfCpu": "毎秒 {fps} フレーム・プロセッサ",
   "howTo": "「LordOS Studio」カメラを選んだアプリにこれらのエフェクトが適用されます。",
-  "cameraHint": "LordOS Studio が映像を取り込むカメラです。"
+  "cameraHint": "LordOS Studio が映像を取り込むカメラです。",
+  "everyApp": "すべてのアプリ",
+  "everyAppHint": "ストアから LordOS Studio Camera をインストールすると、ブラウザやほかのアプリでも「LordOS Studio」カメラを選べます。",
+  "everyAppOn": "ブラウザやほかのアプリで「LordOS Studio」カメラを選べます。カメラはいずれかのアプリが使っている間だけオンになります。",
+  "everyAppOff": "「LordOS Studio」を選んだアプリには「カメラオフ」の画像が表示され、実際のカメラは映りません。",
+  "notInstalled": "未インストール",
+  "getCamera": "ストアで入手…",
+  "stopped": "LordOS Studio のカメラが何度も停止したため、オフにしました。もう一度試すには、オフにしてから再びオンにしてください。"
 }

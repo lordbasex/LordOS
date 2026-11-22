@@ -24,5 +24,12 @@
   "perfGpu": "Saniyədə {fps} kadr · videokart",
   "perfCpu": "Saniyədə {fps} kadr · prosessor",
   "howTo": "“LordOS Studio” kamerasını seçən tətbiqlər bu effektləri alır.",
-  "cameraHint": "LordOS Studio-nun görüntünü götürdüyü kamera."
+  "cameraHint": "LordOS Studio-nun görüntünü götürdüyü kamera.",
+  "everyApp": "Bütün tətbiqlər",
+  "everyAppHint": "Brauzerlər və digər tətbiqlər də “LordOS Studio” kamerasını seçə bilsin deyə Mağazadan LordOS Studio Camera quraşdırın.",
+  "everyAppOn": "Brauzerlər və digər tətbiqlər “LordOS Studio” kamerasını seçə bilər. Kameranız yalnız onlardan biri istifadə etdikdə açılır.",
+  "everyAppOff": "“LordOS Studio”nu seçən tətbiqlər “kamera söndürülüb” şəklini görür, heç vaxt sizin kameranızı yox.",
+  "notInstalled": "Quraşdırılmayıb",
+  "getCamera": "Mağazadan əldə edin…",
+  "stopped": "LordOS Studio kamerası bir neçə dəfə dayandı və söndürüldü. Yenidən cəhd etmək üçün söndürüb yenidən yandırın."
 }

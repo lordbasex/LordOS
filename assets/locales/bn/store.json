@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "Android অ্যাপ",
   "soon": "শীঘ্রই",
-  "sub.all": "সব"
+  "sub.all": "সব",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "আমরা একটি ক্যামেরা শনাক্ত করেছি।",
+  "suggest.studioCamera.detail": "ব্রাউজার ও ভিডিও কলসহ সব অ্যাপকে আপনার এফেক্টসহ “LordOS Studio” ক্যামেরা দেয়: ঝাপসা পটভূমি বা আপনার পেছনে একটি ছবি ({packages})।",
+  "suggest.studioCamera.unavailable": "{packages} এই কম্পিউটারের প্যাকেজ উৎসে নেই।",
+  "suggest.studioCamera.note.dkms": "পিসিতে এর কার্নেল মডিউল এই কম্পিউটারে আপনার কার্নেলের জন্য তৈরি হয় (DKMS), যা প্রায় 500 MB কম্পাইলার ও কার্নেল হেডার আনে, এবং প্রতিটি কার্নেল আপডেটের পর আবার তৈরি হয়। Raspberry Pi-তে এটি LordOS কার্নেলের সঙ্গে আসে।",
+  "suggest.studioCamera.note.secureBoot": "Secure Boot চালু থাকলে পরের রিস্টার্টে মডিউলের সাইনিং কী নিবন্ধন করতে হবে, নইলে ক্যামেরা দেখা যাবে না।"
 }

@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 import {
   normalizeStudio, STUDIO_DEFAULTS, realCameras, hasStudioCamera, deviceFor, chosenCamera, serverConfig, portraitOn, backgroundOn,
   withPortrait, withBackground, withPicture, withMode, previewSize, usersOf, previewSource, perfLine,
+  loopbackState, studioUseOf, studioWhat,
 } from '../../sdk/studiomodel.js';
+import { captureRows, rowStops, captureGlyph } from '../../sdk/capturemodel.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n++; };
@@ -18,7 +20,9 @@ const cams = [
 t('defaults and validation', () => {
   assert.deepEqual(normalizeStudio(undefined), { ...STUDIO_DEFAULTS });
   assert.deepEqual(normalizeStudio({ mode: 'sparkles', blur: 900, mirror: 'yes', camera: 7, extra: 1 }),
-    { camera: '', mode: 'blur', blur: 100, mirror: false, background: null });
+    { on: true, camera: '', mode: 'blur', blur: 100, mirror: false, background: null });
+  assert.equal(normalizeStudio({ on: false }).on, false);
+  assert.equal(normalizeStudio({ on: 'no' }).on, true);           // only false turns it off
   assert.equal(normalizeStudio({ blur: -4 }).blur, 0);
   assert.equal(normalizeStudio({ blur: 33.6 }).blur, 34);
   assert.equal(normalizeStudio({ blur: NaN }).blur, 50);
@@ -48,8 +52,9 @@ t('cameras: the studio entry is not a real camera, and a camera is kept by its b
 
 t('what lord.studio.set gets', () => {
   assert.deepEqual(serverConfig({ camera: 'usb-0000:00:14.0-3', mode: 'none', blur: 20, mirror: true }, cams),
-    { camera: '/dev/video0', mode: 'none', blur: 20, mirror: true });
-  assert.deepEqual(serverConfig({}, cams), { camera: '', mode: 'blur', blur: 50, mirror: false });
+    { on: true, camera: '/dev/video0', mode: 'none', blur: 20, mirror: true });
+  assert.deepEqual(serverConfig({}, cams), { on: true, camera: '', mode: 'blur', blur: 50, mirror: false });
+  assert.equal(serverConfig({ on: false }, cams).on, false);
 });
 
 t('Portrait and Background exclude each other', () => {
@@ -100,6 +105,42 @@ t('the indicator text and the preview source', () => {
   assert.equal(previewSource({ sources: [{ id: 4, app: 'studio' }] }), null);
   assert.equal(perfLine({ fps: 0 }), null);
   assert.deepEqual(perfLine({ fps: 29.6, gpu: true, segMs: 4.21, fxMs: 6.04 }), { fps: 30, gpu: true, ms: 10.3 });
+});
+
+t('phase 2: the camera for every app, its readers and the indicator', () => {
+  assert.equal(loopbackState(null, {}), 'missing');
+  assert.equal(loopbackState({ loopback: 'missing' }, {}), 'missing');
+  assert.equal(loopbackState({ loopback: 'running' }, { on: false }), 'off');
+  assert.equal(loopbackState({ loopback: 'ready', stopped: true }, {}), 'stopped');
+  assert.equal(loopbackState({ loopback: 'running' }, {}), 'ready');
+  // "In use" names the Linux apps reading the device too; one LordOS can't name is said once
+  const names = { camera: 'Camera', 'desktop:chromium': 'Chromium' };
+  assert.deepEqual(usersOf({ sources: [{ id: 7, app: 'camera' }], apps: ['desktop:chromium', '', 'desktop:chromium', ''] }, (a) => names[a], 'An app'),
+    ['Camera', 'Chromium', 'An app']);
+  // the event, cleaned
+  assert.deepEqual(studioUseOf({ apps: ['desktop:chromium', 3, 'desktop:chromium', ''], camera: 'Logitech C930e', effects: true }),
+    { apps: ['desktop:chromium', ''], camera: 'Logitech C930e', effects: true });
+  assert.deepEqual(studioUseOf(null), { apps: [], camera: '', effects: false });
+  // "Camera via LordOS Studio (Logitech C930e) · effects on"
+  assert.deepEqual(studioWhat({ camera: 'Logitech C930e', effects: true }).map((p) => p.key),
+    ['shell.capture.what.viaStudio', 'shell.capture.what.effectsOn']);
+  assert.equal(studioWhat({ camera: 'Logitech C930e', effects: true })[0].params.camera, 'Logitech C930e');
+  assert.deepEqual(studioWhat({ camera: ' ', effects: false }).map((p) => p.key), ['shell.capture.what.viaStudioPlain', 'shell.capture.what.effectsOff']);
+  assert.deepEqual(studioWhat(null), []);
+  // the indicator's rows: a Linux app reading the device is a camera row with "via"; Turn off is its firewall's no-camera
+  // (which blocks /dev/video50 too: lord-netperm's cgroup/dev, major 81) and only for an app the firewall can name
+  const rows = captureRows({ studio: { apps: ['desktop:chromium', ''], camera: 'Logitech C930e', effects: true } },
+    { name: (a) => names[a] || a, enforceable: (a) => a === 'desktop:chromium' });
+  assert.equal(rows.length, 2);
+  const chrome = rows.find((r) => r.app === 'desktop:chromium');
+  assert.equal(chrome.camera, true);
+  assert.deepEqual(chrome.via, { camera: 'Logitech C930e', effects: true });
+  assert.deepEqual(rowStops(chrome).off.flags, ['no-camera']);
+  assert.equal(rowStops(rows.find((r) => !r.app)).off, null);
+  assert.equal(captureGlyph(rows), 'camera');
+  // nobody reads it: no row, no glyph (the camera's light is off too: lord-studio closed the real camera)
+  assert.deepEqual(captureRows({ studio: { apps: [], camera: '', effects: false } }), []);
+  assert.equal(captureGlyph(captureRows({ studio: null })), null);
 });
 
 console.log(`studio model: ${n} groups ok`);

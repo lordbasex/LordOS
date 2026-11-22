@@ -1,7 +1,8 @@
 #!/bin/bash
 # devices.sh — "no camera" and "no USB" for Linux apps: lord-netperm's cgroup/dev program
 # (docs/FIREWALL.md, "Linux apps"). Needs a video device (v4l2loopback is enough) and
-# v4l2-ctl. Applies immediately: the next open() of an app that is already running.
+# v4l2-ctl. Applies immediately: the next open() of an app that is already running. With the lordos-studio-camera
+# package it also checks LordOS Studio's camera, /dev/video50 (step 6).
 #
 #   bash server/tests/fwlinux/devices.sh [/dev/videoN]
 . "$(dirname "$0")/lib.sh"
@@ -61,4 +62,18 @@ if [ -d "$PWCG" ]; then             # no exemption a process could join: an esca
     expect EPERM "$got" "an escapee that moved itself into pipewire.service"
 fi
 wait
+
+# LordOS Studio's camera for every app (docs/CAMERA-STUDIO-PLAN.md 8.3): the lordos-studio-camera package's
+# v4l2loopback device is a V4L2 device like any other (major 81), so "no camera" refuses it too, while lord-studio (in
+# lord-server's own scope) keeps writing it
+LB=/dev/video50
+if [ -c "$LB" ] && v4l2-ctl -d "$LB" --info 2>/dev/null | grep -q "LordOS Studio"; then
+    echo "6. no-camera also refuses LordOS Studio's camera ($LB)"
+    restrict $APP no-camera
+    expect EPERM "$(op "$LB")" "open $LB (LordOS Studio)"
+    restrict $APP ""
+    expect ok "$(op "$LB")" "open $LB once lifted"
+else
+    echo "6. skipped: no LordOS Studio camera ($LB; install lordos-studio-camera on the VM)"
+fi
 fwlinux_done

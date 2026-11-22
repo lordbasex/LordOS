@@ -938,5 +938,9 @@
   "shot.area": "Pažymėti sritį…",
   "shot.take": "Padaryti ekrano kopiją",
   "shot.areaHint": "Vilkite per sritį, kurią norite duoti {app}. „Esc“ atšaukia.",
-  "shot.colorHint": "Spustelėkite spalvą, kurią norite duoti {app}. „Esc“ atšaukia."
+  "shot.colorHint": "Spustelėkite spalvą, kurią norite duoti {app}. „Esc“ atšaukia.",
+  "capture.what.viaStudio": "Kamera per LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Kamera per LordOS Studio",
+  "capture.what.effectsOn": "efektai įjungti",
+  "capture.what.effectsOff": "be efektų"
 }

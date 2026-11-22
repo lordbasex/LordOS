@@ -354,5 +354,11 @@
   "src.wine": "Wine",
   "src.android": "تطبيقات Android",
   "soon": "قريبًا",
-  "sub.all": "الكل"
+  "sub.all": "الكل",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "اكتشفنا كاميرا.",
+  "suggest.studioCamera.detail": "يمنح كل التطبيقات، بما فيها المتصفحات ومكالمات الفيديو، كاميرا «LordOS Studio» بتأثيراتك: خلفية ضبابية أو صورة خلفك ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} غير موجود في مصادر الحزم على هذا الحاسوب.",
+  "suggest.studioCamera.note.dkms": "على الحاسوب الشخصي تُبنى وحدة النواة الخاصة به لنواتك على هذا الحاسوب (DKMS)، ما يجلب نحو 500 ميغابايت من المترجمات وترويسات النواة، ثم يُعاد بناؤها بعد كل تحديث للنواة. على Raspberry Pi تأتي مع نواة LordOS.",
+  "suggest.studioCamera.note.secureBoot": "عند تفعيل Secure Boot يجب تسجيل مفتاح توقيع الوحدة عند إعادة التشغيل التالية، وإلا فلن تظهر الكاميرا."
 }

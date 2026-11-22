@@ -4,7 +4,7 @@
 # on the CPU. It links what lord-media links plus Mesa's GBM, EGL and GLES when GPU=1, and nothing else (AGENTS.md,
 # E-S1). Without FFmpeg's -dev packages it isn't built, like lord-media.
 STUDIO_NN_SRC := src/media/studio/nn.c src/media/studio/face.c
-STUDIO_FX_SRC := src/media/studio/stfx.c src/media/studio/stgf.c
+STUDIO_FX_SRC := src/media/studio/stfx.c src/media/studio/stgf.c src/media/studio/stout.c
 STUDIO_GL_SRC := $(if $(filter 1,$(GPU)),src/media/studio/stgl.c)
 STUDIO_GL_FLAGS := $(if $(filter 1,$(GPU)),-DLORD_GPU $(shell pkg-config --cflags gbm egl glesv2))
 STUDIO_GL_LIBS := $(if $(filter 1,$(GPU)),$(shell pkg-config --libs gbm egl glesv2))
@@ -46,3 +46,10 @@ test-full: build/studio-helper-test
 build/studio-helper-test: tests/studio_helper_test.c src/media/proto.c src/media/proto.h src/media/studio/models.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/studio_helper_test.c src/media/proto.c
+
+# phase 2, LordOS Studio's camera for every app: what the loopback shows, its readers named for the indicator, the idle
+# and off cards and the YUYV conversion (no v4l2loopback needed; tests/run_suites.sh runs it)
+test: build/studio-hub-test
+build/studio-hub-test: tests/studio_hub_test.c src/media/mstudiohub.c src/media/mstudiohub.h src/media/studio/stout.c src/media/studio/stout.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/studio_hub_test.c src/media/mstudiohub.c src/media/studio/stout.c -lm

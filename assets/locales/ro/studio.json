@@ -24,5 +24,12 @@
   "perfGpu": "{fps} cadre pe secundă · placă video",
   "perfCpu": "{fps} cadre pe secundă · procesor",
   "howTo": "Aplicațiile care aleg camera „LordOS Studio” primesc aceste efecte.",
-  "cameraHint": "Camera din care LordOS Studio preia imaginea."
+  "cameraHint": "Camera din care LordOS Studio preia imaginea.",
+  "everyApp": "Toate aplicațiile",
+  "everyAppHint": "Instalează LordOS Studio Camera din Magazin ca și browserele și alte aplicații să poată alege camera „LordOS Studio”.",
+  "everyAppOn": "Browserele și alte aplicații pot alege camera „LordOS Studio”. Camera ta pornește doar cât timp una dintre ele o folosește.",
+  "everyAppOff": "Aplicațiile care au ales „LordOS Studio” văd o imagine „cameră oprită”, niciodată camera ta.",
+  "notInstalled": "Neinstalat",
+  "getCamera": "Obține-l din Magazin…",
+  "stopped": "Camera LordOS Studio s-a oprit de mai multe ori și a fost dezactivată. Dezactiveaz-o și activeaz-o din nou pentru a încerca iar."
 }

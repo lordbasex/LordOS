@@ -710,7 +710,10 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
                     (long long)m->v[2], (long long)m->v[3]);
         break;
     case MM_STUDIO_STATS:
-        if (s->studio) mstudio_stats(s->id, m->v[0], m->v[1], m->v[2], m->v[3]);
+        if (s->studio == STUDIO_SRC_OWN || s->studio == STUDIO_SRC_HUB) mstudio_stats(s->id, m->v[0], m->v[1], m->v[2], m->v[3]);
+        break;
+    case MM_STUDIO_READERS:
+        if (s->studio == STUDIO_SRC_HUB) mstudio_readers(s->id, m->v[0], m->v[1], m->v[2]);
         break;
     case MM_STATS:
         memcpy(s->stats, m->v, sizeof s->stats);
@@ -975,9 +978,12 @@ static void worker_overdue(double t) {
 void media_reap(void) {
     if (workers[0].deadline || workers[1].deadline) worker_overdue(now_ms());
     if (nzombies) reap();
+    mstudio_tick();                             /* LordOS Studio's loopback: its lord-studio, the camera, the readers */
 }
 double media_reap_timeout(void) {
     double d = nzombies ? 100 : -1, t = now_ms();
+    double st = mstudio_timeout();
+    if (st >= 0 && (d < 0 || st < d)) d = st;
     for (int bg = 0; bg < 2; bg++)
         if (workers[bg].cur && workers[bg].deadline) {
             double left = workers[bg].deadline - t;
@@ -1120,7 +1126,8 @@ int media_cameras(char *json, size_t n) {
         memset(&cap, 0, sizeof cap);
         if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
             uint32_t caps = (cap.capabilities & V4L2_CAP_DEVICE_CAPS) ? cap.device_caps : cap.capabilities;
-            if ((caps & V4L2_CAP_VIDEO_CAPTURE) && (caps & V4L2_CAP_STREAMING)) {
+            /* LordOS Studio's own loopback is its "studio" entry below, never a real camera */
+            if ((caps & V4L2_CAP_VIDEO_CAPTURE) && (caps & V4L2_CAP_STREAMING) && !mstudio_is_loopback_card((const char *)cap.card)) {
                 char name[80], bus[80];
                 media_json_str(name, sizeof name, (const char *)cap.card);
                 media_json_str(bus, sizeof bus, (const char *)cap.bus_info);

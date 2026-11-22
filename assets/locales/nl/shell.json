@@ -931,5 +931,9 @@
   "shot.area": "Gebied selecteren…",
   "shot.take": "Schermafbeelding maken",
   "shot.areaHint": "Sleep over het gebied dat {app} krijgt. Esc annuleert.",
-  "shot.colorHint": "Klik op de kleur die {app} krijgt. Esc annuleert."
+  "shot.colorHint": "Klik op de kleur die {app} krijgt. Esc annuleert.",
+  "capture.what.viaStudio": "Camera via LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Camera via LordOS Studio",
+  "capture.what.effectsOn": "effecten aan",
+  "capture.what.effectsOff": "geen effecten"
 }

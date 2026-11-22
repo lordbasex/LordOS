@@ -261,7 +261,9 @@ static JSValue f_control(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc ? media_src_get(arg_id(c, argv[0])) : NULL;
-    if (s) media_src_close(s);
+    /* LordOS Studio's loopback writer belongs to the session (media/mstudio.c): the popover lets go of its preview
+     * with lord.studio.endPreview() instead */
+    if (s && !mstudio_is_hub(s->id)) media_src_close(s);
     return JS_UNDEFINED;
 }
 
@@ -822,10 +824,11 @@ static JSValue f_camera(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         MediaSrc *s = media_src_new(SK_CAMERA, app);
         if (!s) { ret = js_throw_code(c, "media.tooMany", NULL); goto out; }
         const char *code = NULL;
-        s->sock = mstudio_spawn(opt_int(c, o, "width", 1280, 160, 3840), opt_int(c, o, "height", 720, 120, 2160), &s->pid, &code);
-        if (s->sock < 0) { media_src_close(s); ret = js_throw_code(c, code ? code : "studio.unavailable", NULL); goto out; }
-        s->studio = 1;
-        mstudio_attach(s->sock);
+        if (mstudio_open(s, opt_int(c, o, "width", 1280, 160, 3840), opt_int(c, o, "height", 720, 120, 2160), &code)) {
+            media_src_close(s);
+            ret = js_throw_code(c, code ? code : "studio.unavailable", NULL);
+            goto out;
+        }
         ret = JS_NewInt32(c, s->id);
         goto out;
     }

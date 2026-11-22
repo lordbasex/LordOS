@@ -931,5 +931,9 @@
   "shot.area": "Pumili ng Bahagi…",
   "shot.take": "Kumuha ng Screenshot",
   "shot.areaHint": "I-drag sa bahaging ibibigay sa {app}. Kinakansela ng Esc.",
-  "shot.colorHint": "I-click ang kulay na ibibigay sa {app}. Kinakansela ng Esc."
+  "shot.colorHint": "I-click ang kulay na ibibigay sa {app}. Kinakansela ng Esc.",
+  "capture.what.viaStudio": "Camera sa pamamagitan ng LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Camera sa pamamagitan ng LordOS Studio",
+  "capture.what.effectsOn": "naka-on ang effects",
+  "capture.what.effectsOff": "walang effects"
 }

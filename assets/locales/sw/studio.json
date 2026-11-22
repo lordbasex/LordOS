@@ -24,5 +24,12 @@
   "perfGpu": "Fremu {fps} kwa sekunde · kadi ya michoro",
   "perfCpu": "Fremu {fps} kwa sekunde · prosesa",
   "howTo": "Programu zinazochagua kamera ya “LordOS Studio” hupata madoido haya.",
-  "cameraHint": "Kamera ambayo LordOS Studio huchukua picha kutoka kwayo."
+  "cameraHint": "Kamera ambayo LordOS Studio huchukua picha kutoka kwayo.",
+  "everyApp": "Programu zote",
+  "everyAppHint": "Sakinisha LordOS Studio Camera kutoka Duka ili vivinjari na programu zingine pia ziweze kuchagua kamera ya “LordOS Studio”.",
+  "everyAppOn": "Vivinjari na programu zingine zinaweza kuchagua kamera ya “LordOS Studio”. Kamera yako huwaka tu wakati mojawapo inaitumia.",
+  "everyAppOff": "Programu zilizochagua “LordOS Studio” huona picha ya “kamera imezimwa”, kamwe si kamera yako.",
+  "notInstalled": "Haijasakinishwa",
+  "getCamera": "Ipate kwenye Duka…",
+  "stopped": "Kamera ya LordOS Studio ilisimama mara kadhaa na imezimwa. Izime kisha uiwashe tena ili kujaribu upya."
 }

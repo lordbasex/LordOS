@@ -931,5 +931,9 @@
   "shot.area": "Chagua Eneo…",
   "shot.take": "Piga Picha ya Skrini",
   "shot.areaHint": "Buruta juu ya eneo la kumpa {app}. Esc inaghairi.",
-  "shot.colorHint": "Bofya rangi ya kumpa {app}. Esc inaghairi."
+  "shot.colorHint": "Bofya rangi ya kumpa {app}. Esc inaghairi.",
+  "capture.what.viaStudio": "Kamera kupitia LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Kamera kupitia LordOS Studio",
+  "capture.what.effectsOn": "madoido yamewashwa",
+  "capture.what.effectsOff": "bila madoido"
 }

@@ -330,5 +330,11 @@
   "src.wine": "Wine",
   "src.android": "Android programos",
   "soon": "Netrukus",
-  "sub.all": "Visos"
+  "sub.all": "Visos",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Aptikome kamerą.",
+  "suggest.studioCamera.detail": "Suteikia visoms programoms, įskaitant naršykles ir vaizdo skambučius, kamerą „LordOS Studio“ su jūsų efektais: sulietas fonas arba paveikslėlis už jūsų ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} nėra šio kompiuterio paketų šaltiniuose.",
+  "suggest.studioCamera.note.dkms": "Kompiuteryje jo branduolio modulis sukompiliuojamas jūsų branduoliui šiame kompiuteryje (DKMS), o tai atneša apie 500 MB kompiliatorių ir branduolio antraščių, ir iš naujo po kiekvieno branduolio atnaujinimo. Raspberry Pi jis pateikiamas su LordOS branduoliu.",
+  "suggest.studioCamera.note.secureBoot": "Kai įjungtas Secure Boot, kito paleidimo metu turite užregistruoti modulio pasirašymo raktą, kitaip kamera nepasirodys."
 }

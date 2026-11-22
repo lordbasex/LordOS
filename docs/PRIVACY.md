@@ -926,6 +926,18 @@ PipeWire, no paths); an isolated app gets the same read-only ring as with a devi
 like any camera ("LordOS Studio"), and it closes with the popover. Nothing leaves the computer: the models ship in the
 package and the effects run locally.
 
+**For every app (phase 2, with the optional `lordos-studio-camera` package).** The "LordOS Studio" V4L2 device
+(`/dev/video50`, v4l2loopback) is what Linux apps read. Its only writer is the session's `lord-studio`, which gets the
+device's fd from lord-server and, while nobody reads, shows a still card with the **real camera closed**; lord-server
+hands it the real camera only while an app streams from the device (v4l2loopback's client-usage event) or the popover's
+preview is open, so the camera's light means somebody is watching. The capture indicator names the app reading it
+(lord-server looks at its own user's processes' open files, `appid_of_pid`), for example "Chromium · Camera via LordOS
+Studio (the real camera) · effects on", and its Turn off sets that app's "no camera" restriction, which blocks the
+device like any camera (major 81, `lord-netperm`'s `cgroup/dev`). Turned off while an app reads it, the device shows a
+"camera off" card, never the raw camera. Known limit (plan 8.4): an unsandboxed program of the same user could open the
+device as a writer before lord-studio does; lord-studio then stays off, as any program of the user can already open
+the real camera.
+
 ## Camera for isolated apps
 
 Consent, the green dot and revocation already existed. The frames now reach the app without the

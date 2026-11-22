@@ -931,5 +931,9 @@
   "shot.area": "Sahə seçin…",
   "shot.take": "Ekran şəkli çək",
   "shot.areaHint": "{app} tətbiqinə vermək istədiyiniz sahənin üzərindən sürükləyin. Esc ləğv edir.",
-  "shot.colorHint": "{app} tətbiqinə vermək istədiyiniz rəngə klikləyin. Esc ləğv edir."
+  "shot.colorHint": "{app} tətbiqinə vermək istədiyiniz rəngə klikləyin. Esc ləğv edir.",
+  "capture.what.viaStudio": "LordOS Studio vasitəsilə kamera ({camera})",
+  "capture.what.viaStudioPlain": "LordOS Studio vasitəsilə kamera",
+  "capture.what.effectsOn": "effektlər açıqdır",
+  "capture.what.effectsOff": "effektsiz"
 }

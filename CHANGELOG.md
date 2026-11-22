@@ -68,9 +68,81 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Studio's camera under the "no camera" restriction. `server/tests/studio_headless.sh` takes screenshots of the
     popover in a headless lord-server without ever opening a camera. The test frames are CC0 photographs from
     Wikimedia Commons (`server/tests/data/studio/README.md`).
-  - Not in this step: the virtual camera for every Linux app (v4l2loopback, phase 2), the other effects and Mic Mode
+  - Not in this step: the virtual camera for every Linux app (v4l2loopback, phase 2, below), the other effects and Mic Mode
     (phase 3), the PipeWire camera and its portal (phase 4) and the Studio app (phase 5). Each LordOS Studio camera
     starts its own lord-studio for now, so two apps can't read it at once, as with any camera.
+
+- **LordOS Studio's camera for every app, in development (phase 2 of `docs/CAMERA-STUDIO-PLAN.md`; exceptions E-S2
+  and E-S3 approved by the maintainer on 2026-11-22).** Browsers (and video calls in them), OBS and every other Linux
+  app can now choose a camera called "LordOS Studio" and get the person's effects (background blur or a picture),
+  once the new optional Store item is installed. Nothing of it was tried with a real v4l2loopback device yet: the
+  package is built and inspected, the helper's and lord-server's logic is unit-tested, and the device itself is
+  checked on a VM (open items below).
+  - **The Store item `lordos-studio-camera`** (`tools/iso/mkdeb-studiocamera.sh`): two static, root-owned
+    configuration files and nothing else. `/etc/modprobe.d/lordos-studio.conf` sets
+    `options v4l2loopback devices=1 video_nr=50 card_label="LordOS Studio" exclusive_caps=1 max_buffers=4` and
+    `/etc/modules-load.d/lordos-studio.conf` loads the module at boot; its postinst loads it at once when nothing
+    loaded it yet, its postrm unloads it when nothing uses it. On amd64 it depends on Debian's `v4l2loopback-dkms`
+    (main, GPL-2.0, 0.13.0 or later) and `linux-headers-amd64`, so DKMS builds the module for the running kernel; on
+    arm64 the module comes prebuilt in the LordOS Raspberry Pi kernel (below), so the package depends on nothing
+    else. There is no runtime root action: lord-server never creates or removes loopback devices, and the Store's
+    existing package engine installs and removes it. With Secure Boot on, the module's DKMS key has to be enrolled at
+    the next restart, which the card says, as the NVIDIA card does; the guided `dkms-mok-enroll` (NVIDIA plan A.5's
+    `gpu-mok-enroll`, renamed) is still awaiting its own approval and is not built.
+  - **The Store card** ("Suggested for your computer", `assets/store/suggestions.json`, rule `studioCamera`): shown
+    when a USB camera is plugged in (a new `usbClass` condition in `sdk/suggestengine.js`: an interface of class `0e`,
+    video), installs `lordos-studio-camera` through the usual plan and `pkg-install`, and explains in its "What
+    changes" notes the DKMS build (about 500 MB of compilers and kernel headers on a PC) and the Secure Boot step. A
+    camera glyph of our own in `apps/store/suggested.js`. Text in all 35 languages (`store.suggest.studioCamera.*`).
+  - **One lord-studio per session writes the device** (`stcam_hub` in `server/src/media/studio/stcam.c`,
+    `loopback=1`): lord-server opens `/dev/video50` read-write and checks it is a V4L2 character device (major 81)
+    whose driver is `v4l2 loopback` and whose card is "LordOS Studio" before the fd goes out; the helper checks the
+    driver again, sets YUYV at 1280×720 (640×360 on a Raspberry Pi compositing on its CPU) and never gets a path.
+    With nobody reading it writes an **idle card** once a second (a camera glyph drawn from numbers, no text or file:
+    `server/src/media/studio/stout.c`) with **the real camera closed**, so browsers keep listing the device
+    (`exclusive_caps` announces a camera only while a writer streams). v4l2loopback's client-usage event (subscribed
+    with its initial value) tells it when a reader starts or stops streaming; it reports that to lord-server
+    (`MM_STUDIO_READERS`), and lord-server opens the chosen real camera and sends its fd (`MM_STUDIO_CAM`) only while
+    a reader or the popover's preview wants it, and closes it again when the last one is gone: **the camera's light
+    goes off with no reader.** Frames go through the same pipeline as LordOS's own apps and are written in YUYV
+    (BT.601, limited range). Turning LordOS Studio's camera off while an app still reads it sends the **off card** (the
+    glyph crossed out), never the raw camera. The capture code of the camera job moved into a small `LmCam` API
+    (`lm_cam.c`) that both use; an unplugged camera now ends the camera job instead of looping, and in the hub it
+    brings back the idle card. lord-server starts it again at most 3 times a minute, then leaves the camera for apps
+    off until the setting changes.
+  - **One lord-studio shared by every reader** (phase 1's limit, fixed when the device is there): a LordOS app that
+    chooses the "LordOS Studio" camera (`lord.media.camera`, `BOP_CAMERA`) now reads the same device through
+    lord-media like any camera, after the same permission and restriction checks, so the real camera is opened once
+    and the effects run once; the popover's preview uses the hub's own frames (`lord.studio.preview` returns its id,
+    `lord.studio.endPreview()` lets go; `lord.media.close` can't close it). v4l2loopback 0.15 lets one reader stream
+    at a time, so a LordOS app and a browser still can't read it together (read in v4l2loopback's source; to verify
+    on the VM). Without the package, each LordOS Studio camera keeps its own lord-studio as in phase 1.
+  - **Who reads it, in the capture indicator**: lord-server finds the processes that hold the device open (its own
+    user's only, never itself nor its own helpers) by their `/proc/<pid>/fd`, every 2 s and only while the event says
+    somebody streams (always, if the module sends no event), names each by its app scope (`appid_of_pid`, as the
+    notification server does) and sends the shell a `studio-use` event (`server/src/media/mstudiohub.c`). The
+    indicator then shows, for example, "Chromium · Camera via LordOS Studio (Logitech Webcam C930e) · effects on";
+    **Turn off** sets that app's "no camera" restriction, which already blocks `/dev/video50` (a V4L2 device, major 81,
+    in `lord-netperm`'s `cgroup/dev` program); `server/tests/fwlinux/devices.sh` gained that check for the VM. The
+    popover's "In use" names those apps too.
+  - **The popover** gained **Every app**: a switch (`settings.studio.on`, a new key that defaults to on; no
+    migration) with what it means, or, without the package, "Not installed" and a link to the Store card. The
+    `lord.media.cameras()` list never shows the device as a real camera.
+  - **Raspberry Pi** (E-S3): `tools/rpi/build-kernel.sh` builds v4l2loopback (`umlaeute/v4l2loopback` tag v0.15.0,
+    the version Debian 13 ships; GPL-2.0) out of tree against the LordOS kernel, strips it (and signs it, when that
+    kernel signs its modules) with the kernel's own `modules_install`, puts it in the image package under `updates/`, checks it is there and records
+    its commit and tarball hash in `SOURCE` next to the kernel's. Its default package revision is now 4
+    (`6.18.57-lordos.4-rpi-*`); that kernel is not built yet.
+  - **Tests**: `build/studio-hub-test` (what the device shows and when the hub runs, finding a process that holds a
+    device and skipping lord-server's own children and other users, the indicator's event with duplicates and odd
+    ids, the idle and off cards, YUYV levels, the client-usage payload) and `server/tests/studio_package_test.sh`
+    (the package for amd64 and arm64: its files, options matching what lord-server checks, conffiles, ownership,
+    dependencies and maintainer scripts) in `make test`; `studio_model_test.mjs` and `suggest_engine_test.mjs` gained
+    the new logic and the card, and `build/studio-helper-test` (`make test-full`) checks that lord-studio refuses
+    `loopback=1` with a file that isn't a v4l2loopback device or with no device at all. **To verify on a VM** (never on the maintainer's PC): the package installing and the
+    module loading (with and without Secure Boot), Chromium, Google's browser, Firefox and Flatpak OBS listing
+    "LordOS Studio" and showing the effects in a video call, the camera's light going off with no reader, the
+    indicator naming the app, `devices.sh` step 6, and the Pi kernel build.
 
 - **`fastfetch` and `neofetch` run LordOS's `lordos-fetch` until the real package is installed, in development**
   (`packaging/fallback-bin/fastfetch`, `packaging/profile.d/lordos-fallback.sh`, `server/src/remote/sess.c`,

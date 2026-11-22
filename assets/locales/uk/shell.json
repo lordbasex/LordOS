@@ -938,5 +938,9 @@
   "shot.area": "Виділити область…",
   "shot.take": "Зробити знімок",
   "shot.areaHint": "Проведіть по області, яку отримає {app}. Esc — скасувати.",
-  "shot.colorHint": "Клацніть колір, який отримає {app}. Esc — скасувати."
+  "shot.colorHint": "Клацніть колір, який отримає {app}. Esc — скасувати.",
+  "capture.what.viaStudio": "Камера через LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Камера через LordOS Studio",
+  "capture.what.effectsOn": "ефекти ввімкнено",
+  "capture.what.effectsOff": "без ефектів"
 }

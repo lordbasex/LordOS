@@ -1,10 +1,12 @@
 # Camera Studio: plan and design for approval
 
-**Status (2026-11-22): approved by the maintainer; phases 0 and 1 built, in development (branch `feat/camera-studio`).**
+**Status (2026-11-22): approved by the maintainer; phases 0 and 1 built (branch `feat/camera-studio`) and phase 2 built
+(branch `feat/camera-studio-2`, 11.2), in development; phase 2's device is still to verify on a VM.**
 The maintainer approved the whole plan and the exceptions E-S1 to E-S7 on 2026-11-22; E-S8 (ONNX Runtime linked) was
 **not** approved: D3 is our own C inference, and ONNX Runtime is only the dev machine's reference in tests. The name is
-"LordOS Studio" and the status item's label "Camera" (D6); D5 and D7 to D10 take this plan's recommendations. Phases 2 to
-5 (the loopback package, the portal, the other effects, the app) are not built yet. Section 3.3 now has measured numbers.
+"LordOS Studio" and the status item's label "Camera" (D6); D5 and D7 to D10 take this plan's recommendations. D4: the
+package is an optional Store item (approved 2026-11-22). Phases 3 to 5 (the other effects, the portal, the app) are not
+built yet. Section 3.3 now has measured numbers.
 Facts are labelled the way `GO-LINK.md` does it:
 
 - **Read**: checked in this repository or in the cited source on 2026-11-22.
@@ -104,8 +106,9 @@ Fedora already defaults Firefox to it. They also give a cleaner permission story
 - **Chrome lists a loopback device only while it advertises CAPTURE**, which `exclusive_caps=1` ties to a writer being
   present. `lord-studio` therefore keeps the output open and writes an **idle card** at 1 fps: a static "LordOS Studio"
   picture from memory, with the real camera **closed**. It opens the real camera only when a reader starts streaming.
-  v4l2loopback signals this with its client-usage event (`V4L2_EVENT_PRI_CLIENT_USAGE`, 0.12.7 and later; **To
-  verify** on 0.15). This keeps the camera light honest.
+  v4l2loopback signals this with its client-usage event (`V4L2_EVENT_PRI_CLIENT_USAGE`, 0.13.0 and later, value
+  `V4L2_EVENT_PRIVATE_START + 0x08E00000 + 1`; **Read** in v0.15.0's source on 2026-11-22: its count is 0 or 1, because
+  only one reader holds the capture stream at a time). This keeps the camera light honest.
 - **Formats.** It writes YUYV or NV12 at the chosen output size: 1280×720 by default, 1920×1080 on request, and
   640×360 for Pi CPU mode. WebRTC accepts all three.
 
@@ -610,7 +613,47 @@ The effort is for one developer with the existing patterns. These are **estimate
   with their phases.
 - **Not verified yet:** the live camera through lord-studio on real hardware (the dev PC's camera was not opened in this
   pass; the pipeline, the helper inside its sandbox with the GPU, the popover and the broker path are tested without
-  one), the Pi 5, and the v4l2loopback matrix (phase 2).
+  one), the Pi 5, and the v4l2loopback matrix (phase 2, 11.2).
+
+### 11.2 Phase 2 as built (2026-11-22, in development)
+
+- **The package** `lordos-studio-camera` (`tools/iso/mkdeb-studiocamera.sh`): only the two static files of 2.2 (plus its
+  copyright), conffiles; amd64 depends on `v4l2loopback-dkms (>= 0.13.0)` and `linux-headers-amd64`, arm64 on nothing
+  but `lordos` (the module is in the LordOS Pi kernel). Its postinst loads the module when nothing loaded it yet; its
+  postrm unloads it when nothing uses it. `server/tests/studio_package_test.sh` builds and inspects it for both
+  architectures. It goes into the APT pool with each release like `lordos-disk-formats` (`docs/RELEASING.md`).
+- **The Store card**: rule `studioCamera` in `assets/store/suggestions.json` (Store → For this computer), shown when a USB
+  device has a video-class interface (`usbClass: ["0e"]`, new in `sdk/suggestengine.js`), with the notes `dkms` and
+  `secureBoot`. The guided MOK enrolment (`dkms-mok-enroll`, NVIDIA plan A.5) is **not** built: like the NVIDIA card, the
+  `secureBoot` note explains the manual step until that action is approved.
+- **The hub** (`stcam_hub`, `loopback=1`): one lord-studio per session, fds = render node, model, loopback (opened by
+  lord-server after checking major 81, driver `v4l2 loopback` and card "LordOS Studio"); the real camera arrives later by
+  `MM_STUDIO_CAM` (v[0] 0 idle card, 1 camera with its fd, 2 off card; v[1] the preview's frames wanted) and leaves the
+  same way. It reports `MM_STUDIO_READERS` (readers from the client-usage event, or -1 without it; camera open; what it
+  shows). Output YUYV 1280×720 (640×360 on an ARM board compositing on its CPU), written with `write()`; the cards in
+  `stout.c`. lord-server (`mstudio.c`, decisions in `mstudiohub.c`) starts it when LordOS Studio is on, the device is
+  there and the model is good, keeps it while an app still reads after the person turned it off (the off card), restarts
+  it at most 3 times a minute and ticks it once a second from the main loop (`media_reap`).
+- **Readers** (8.2): `/proc/<pid>/fd` of the user's own processes, skipping lord-server and its children, every 2 s and
+  only while the event says somebody streams (always without the event); `appid_of_pid` names each; the `studio-use` hw
+  event feeds `captureRows` (`studio` input; rows get `via`), and Turn off is the firewall's no-camera, which blocks
+  `/dev/video50` (major 81).
+- **LordOS apps** read the device through lord-media while the hub serves (`STUDIO_SRC_LOOP`); the popover previews the
+  hub's own ring (`lord.studio.preview` → the hub's id, `lord.studio.endPreview()`). Without the device, phase 1's own
+  lord-studio per source remains.
+- **E-S3**: `tools/rpi/build-kernel.sh` builds v4l2loopback v0.15.0 out of tree into the image package
+  (`updates/v4l2loopback.ko`), records its commit in `SOURCE`, and defaults to package revision 4.
+- **Tested here**: `build/studio-hub-test`, `studio_package_test.sh`, `studio_model_test.mjs`, `suggest_engine_test.mjs`,
+  the full build with and without the GPU. **To verify on a VM** (never on the maintainer's PC, which must not load
+  modules): installing the package and loading the module, with and without Secure Boot; Chromium, Google's browser,
+  Firefox ESR and Flatpak OBS listing "LordOS Studio" and Meet showing the effects; the idle card keeping the device
+  listed; the camera light off with no reader; the indicator naming the app; `tests/fwlinux/devices.sh` step 6; whether a
+  sandboxed browser's reader process is visible in `/proc` to the same uid; the Pi kernel with the module (v0.15.0 against
+  6.18: if it doesn't build, a later 0.15.x tag).
+- **Known limits**: one streaming reader at a time (v4l2loopback 0.15's tokens), so a LordOS app and a browser can't read
+  LordOS Studio together; OBS's own virtual camera finds the module already loaded with our single device (it would need a
+  second device, `devices=2`, which is a change to E-S2's file); a same-uid process could still open `/dev/video50` as a
+  writer before lord-studio does (8.4: lord-studio then fails to set its format and stays off, logged).
 
 Every phase also updates CHANGELOG, the paper (en, es, pt), the site and `THIRD_PARTY.md` (model cards, Apache-2.0
 NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).

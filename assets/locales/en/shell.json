@@ -931,5 +931,9 @@
   "shot.area": "Select Area…",
   "shot.take": "Take Screenshot",
   "shot.areaHint": "Drag over the area to give to {app}. Esc cancels.",
-  "shot.colorHint": "Click the color to give to {app}. Esc cancels."
+  "shot.colorHint": "Click the color to give to {app}. Esc cancels.",
+  "capture.what.viaStudio": "Camera via LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Camera via LordOS Studio",
+  "capture.what.effectsOn": "effects on",
+  "capture.what.effectsOff": "no effects"
 }

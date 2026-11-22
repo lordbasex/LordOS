@@ -5,7 +5,9 @@
 //   - the screen: the screen-sharing API (sdk/share.js), the ScreenCast and Screenshot portals (sdk/screencast.jsx);
 //   - the camera and the microphone LordOS hands out itself: native apps (lord.media) and isolated .lpk apps (the
 //     broker), brokerDevices in sdk/privacy.js;
-//   - what Linux and Flatpak apps capture through PipeWire, as lord-server's PipeWire guard sees it (linuxCapture).
+//   - what Linux and Flatpak apps capture through PipeWire, as lord-server's PipeWire guard sees it (linuxCapture);
+//   - the Linux apps reading LordOS Studio's camera device, which lord-server finds itself (studioUse): "Camera via
+//     LordOS Studio (the real camera) · effects on".
 //
 // It is a security indicator: there is no setting to hide it, and every theme draws it where the privacy dots were
 // (<PrivacyIndicators />, next to the status items; a Lord Classic taskbar on the side hides its status items but not
@@ -24,11 +26,12 @@ import { wm, windows, getApp } from './windows.js';
 import { linuxAppFor, flatpakAppFor } from './apps.js';
 import { share, shareHolder } from './share.js';
 import { castRuns, castShown, castStop, shotTaken, castAppName } from './screencast.jsx';
-import { perms, brokerDevices, linuxCapture } from './privacy.js';
+import { perms, brokerDevices, linuxCapture, studioUse } from './privacy.js';
 import { closeDevicesOf } from './media.js';
 import { firewall } from './monitor.js';
 import { captureRows, captureGlyph, captureSummary, rowStops } from './capturemodel.js';
 import { StudioPanel, studioAvailable } from './studio.jsx';
+import { studioWhat } from './studiomodel.js';
 
 const GREEN = '#30d158';
 
@@ -44,7 +47,8 @@ export function useCaptureRows() {
   const shots = useStore(shotTaken);
   const devices = useStore(brokerDevices);
   const linux = useStore(linuxCapture);
-  return captureRows({ share: holder, casts, shots, devices, linux }, { name: nameOf, enforceable: (id) => firewall.enforceable(id) });
+  const studio = useStore(studioUse);
+  return captureRows({ share: holder, casts, shots, devices, linux, studio }, { name: nameOf, enforceable: (id) => firewall.enforceable(id) });
 }
 
 // ---- the handshake: frames only once an indicator is on screen ----
@@ -149,7 +153,8 @@ function summaryLabel(rows) {
 function whatText(r) {
   const parts = [];
   if (r.screen) parts.push(t(`shell.capture.what.${r.screen}`));
-  if (r.camera) parts.push(t('shell.capture.what.camera'));
+  if (r.camera && r.via) for (const p of studioWhat(r.via)) parts.push(t(p.key, p.params));
+  else if (r.camera) parts.push(t('shell.capture.what.camera'));
   if (r.mic) parts.push(t('shell.capture.what.mic'));
   if (r.control) parts.push(t('shell.capture.what.control'));
   return parts.join(' · ');

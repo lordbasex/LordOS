@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "برنامه‌های Android",
   "soon": "به‌زودی",
-  "sub.all": "همه"
+  "sub.all": "همه",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "یک دوربین شناسایی کردیم.",
+  "suggest.studioCamera.detail": "به همه برنامه‌ها، از جمله مرورگرها و تماس‌های تصویری، دوربین «LordOS Studio» را با جلوه‌های شما می‌دهد: پس‌زمینه محو یا تصویری پشت سر شما ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} در منابع بسته‌های این رایانه نیست.",
+  "suggest.studioCamera.note.dkms": "روی رایانه شخصی، ماژول هسته آن روی همین رایانه برای هسته شما ساخته می‌شود (DKMS) که حدود ۵۰۰ مگابایت کامپایلر و سرآیند هسته می‌آورد، و پس از هر به‌روزرسانی هسته دوباره ساخته می‌شود. روی Raspberry Pi همراه با هسته LordOS می‌آید.",
+  "suggest.studioCamera.note.secureBoot": "وقتی Secure Boot روشن است، باید کلید امضای ماژول را در راه‌اندازی مجدد بعدی ثبت کنید، وگرنه دوربین ظاهر نمی‌شود."
 }

@@ -314,5 +314,11 @@
   "src.wine": "Wine",
   "src.android": "Ứng dụng Android",
   "soon": "Sắp có",
-  "sub.all": "Tất cả"
+  "sub.all": "Tất cả",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Chúng tôi phát hiện một camera.",
+  "suggest.studioCamera.detail": "Cho mọi ứng dụng, kể cả trình duyệt và cuộc gọi video, camera “LordOS Studio” với hiệu ứng của bạn: làm mờ nền hoặc một hình ảnh phía sau bạn ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} không có trong nguồn gói của máy tính này.",
+  "suggest.studioCamera.note.dkms": "Trên PC, mô-đun nhân của nó được biên dịch cho nhân của bạn ngay trên máy này (DKMS), kéo theo khoảng 500 MB trình biên dịch và tệp tiêu đề nhân, và biên dịch lại sau mỗi lần cập nhật nhân. Trên Raspberry Pi, nó đi kèm nhân LordOS.",
+  "suggest.studioCamera.note.secureBoot": "Khi bật Secure Boot, bạn phải đăng ký khóa ký của mô-đun ở lần khởi động lại tiếp theo, nếu không camera sẽ không xuất hiện."
 }

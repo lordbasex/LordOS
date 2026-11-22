@@ -166,6 +166,12 @@ passed through the pipeline first (`stcam.c` → `stfx.c`).
 - **The popover**: `sdk/studio.jsx`, from the camera capture item's "Video effects" (`sdk/capturestatus.jsx`).
 - **Tests**: `build/studio-nn-test`, `build/studio-test`, `tests/studio_model_test.mjs` (`make test`),
   `build/studio-helper-test` (`make test-full`), `tests/studio_headless.sh` (screenshots, no camera opened).
+- **Phase 2, the loopback** (with the optional `lordos-studio-camera` package; docs/CAMERA-STUDIO-PLAN.md 11.2): one
+  more lord-studio per session with `loopback=1` (`stcam_hub`): fds = render node, model and `/dev/video50`; the idle
+  card at 1 fps with no camera, the real camera only by `MM_STUDIO_CAM` while a reader streams (`MM_STUDIO_READERS`,
+  from v4l2loopback's client-usage event) or the popover previews it; YUYV out with `write()`. LordOS apps that choose
+  "LordOS Studio" then read the device through lord-media like any camera, so one lord-studio serves them all.
+  `build/studio-hub-test` and `tests/studio_package_test.sh` (`make test`).
 
 ### The `lord-media` helper
 

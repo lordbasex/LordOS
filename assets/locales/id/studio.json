@@ -24,5 +24,12 @@
   "perfGpu": "{fps} bingkai per detik · kartu grafis",
   "perfCpu": "{fps} bingkai per detik · prosesor",
   "howTo": "Aplikasi yang memilih kamera “LordOS Studio” mendapatkan efek ini.",
-  "cameraHint": "Kamera tempat LordOS Studio mengambil gambar."
+  "cameraHint": "Kamera tempat LordOS Studio mengambil gambar.",
+  "everyApp": "Semua aplikasi",
+  "everyAppHint": "Instal LordOS Studio Camera dari Toko agar peramban dan aplikasi lain juga bisa memilih kamera “LordOS Studio”.",
+  "everyAppOn": "Peramban dan aplikasi lain dapat memilih kamera “LordOS Studio”. Kamera Anda hanya menyala selama salah satunya menggunakannya.",
+  "everyAppOff": "Aplikasi yang memilih “LordOS Studio” melihat gambar “kamera mati”, tidak pernah kamera Anda.",
+  "notInstalled": "Belum diinstal",
+  "getCamera": "Dapatkan di Toko…",
+  "stopped": "Kamera LordOS Studio berulang kali berhenti dan dimatikan. Matikan lalu nyalakan lagi untuk mencoba kembali."
 }

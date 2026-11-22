@@ -931,5 +931,9 @@
   "shot.area": "Επιλογή περιοχής…",
   "shot.take": "Λήψη στιγμιότυπου",
   "shot.areaHint": "Σύρετε πάνω από την περιοχή που θα δοθεί στην εφαρμογή {app}. Το Esc ακυρώνει.",
-  "shot.colorHint": "Κάντε κλικ στο χρώμα που θα δοθεί στην εφαρμογή {app}. Το Esc ακυρώνει."
+  "shot.colorHint": "Κάντε κλικ στο χρώμα που θα δοθεί στην εφαρμογή {app}. Το Esc ακυρώνει.",
+  "capture.what.viaStudio": "Κάμερα μέσω LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Κάμερα μέσω LordOS Studio",
+  "capture.what.effectsOn": "εφέ ενεργά",
+  "capture.what.effectsOff": "χωρίς εφέ"
 }

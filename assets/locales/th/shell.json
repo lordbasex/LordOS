@@ -924,5 +924,9 @@
   "shot.area": "เลือกพื้นที่…",
   "shot.take": "ถ่ายภาพหน้าจอ",
   "shot.areaHint": "ลากผ่านพื้นที่ที่จะให้ {app} กด Esc เพื่อยกเลิก",
-  "shot.colorHint": "คลิกสีที่จะให้ {app} กด Esc เพื่อยกเลิก"
+  "shot.colorHint": "คลิกสีที่จะให้ {app} กด Esc เพื่อยกเลิก",
+  "capture.what.viaStudio": "กล้องผ่าน LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "กล้องผ่าน LordOS Studio",
+  "capture.what.effectsOn": "เปิดเอฟเฟกต์",
+  "capture.what.effectsOff": "ไม่มีเอฟเฟกต์"
 }

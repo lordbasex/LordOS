@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "Android-appok",
   "soon": "Hamarosan",
-  "sub.all": "Mind"
+  "sub.all": "Mind",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Kamerát észleltünk.",
+  "suggest.studioCamera.detail": "Minden alkalmazásnak, a böngészőknek és a videohívásoknak is, megadja a „LordOS Studio” kamerát az effektusaiddal: elmosott háttér vagy egy kép mögötted ({packages}).",
+  "suggest.studioCamera.unavailable": "A(z) {packages} nincs a számítógép csomagforrásai között.",
+  "suggest.studioCamera.note.dkms": "PC-n a kernelmodul ezen a számítógépen készül el a kerneledhez (DKMS), ami nagyjából 500 MB fordítót és kernelfejlécet hoz magával, és minden kernelfrissítés után újra. Raspberry Pi-n a LordOS kernellel érkezik.",
+  "suggest.studioCamera.note.secureBoot": "Bekapcsolt Secure Boot mellett a következő újraindításkor regisztrálnod kell a modul aláírókulcsát, különben a kamera nem jelenik meg."
 }

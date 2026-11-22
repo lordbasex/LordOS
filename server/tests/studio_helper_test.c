@@ -2,6 +2,7 @@
  *   - probe=1: the model through an fd, the pipeline inside the sandbox on synthetic frames, on the GPU when a render
  *     node is given (one MM_RESULT {"gpu","segMs","composeMs"});
  *   - a file that is not a camera is refused (camera.notACamera, MS_FAILED);
+ *   - phase 2: loopback=1 with a file that is not a v4l2loopback device, or with no loopback at all, is refused;
  *   - any job other than the camera is refused (the helper exits);
  *   - a model with one byte changed is refused (studio.failed).
  * build/studio-helper-test build/lord-studio   (run from server/) */
@@ -113,6 +114,36 @@ int main(int argc, char **argv) {
         CHECK(refused, "/dev/null was taken for a camera");
         close(s);
         reap(pid, 3000);
+    }
+    {   /* phase 2: loopback=1 with something that isn't a v4l2loopback device (/dev/null) is refused, nothing written */
+        pid_t pid;
+        int s = spawn(&pid);
+        int lb = open("/dev/null", O_RDWR | O_CLOEXEC), model = open_model();
+        int fds[2] = { model, lb };
+        const char *params = "loopback=1\nrender=0\nwidth=1280\nheight=720\n";
+        int64_t v[6] = { MK_CAMERA, 0, 0, 0, 0, 0 };
+        mp_send(s, MM_JOB, 0, v, params, strlen(params), fds, 2);
+        close(lb);
+        close(model);
+        int refused = 0, playing = 0;
+        while (next(s, &m, payload, 10000)) {
+            if (m.type == MM_STATE && m.v[0] == MS_PLAYING) playing = 1;
+            if (m.type == MM_STATE && m.v[0] == MS_FAILED) { refused = 1; break; }
+        }
+        CHECK(refused && !playing, "/dev/null was taken for LordOS Studio's loopback");
+        close(s);
+        reap(pid, 3000);
+    }
+    {   /* loopback=1 without the loopback's fd: it stops before the sandbox's work */
+        pid_t pid;
+        int s = spawn(&pid);
+        int model = open_model();
+        const char *params = "loopback=1\nrender=0\n";
+        int64_t v[6] = { MK_CAMERA, 0, 0, 0, 0, 0 };
+        mp_send(s, MM_JOB, 0, v, params, strlen(params), &model, 1);
+        close(model);
+        CHECK(reap(pid, 5000) == 1, "lord-studio ran the loopback job without a loopback");
+        close(s);
     }
     {   /* another job */
         pid_t pid;

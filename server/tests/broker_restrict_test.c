@@ -115,13 +115,15 @@ const char *media_hwaccel(void) { return "none"; }
 int media_cameras(char *json, size_t n) { snprintf(json, n, "[{\"dev\":\"/dev/video9\"}]"); return 1; }
 /* LordOS Studio's camera (media/mstudio.c): a helper like media_spawn's, counted */
 static int studio_spawns;
-int mstudio_spawn(int w, int h, pid_t *pid, const char **code) {
+int mstudio_open(void *src, int w, int h, const char **code) {
+    MediaSrc *s = src;
     (void)w; (void)h;
     studio_spawns++;
     *code = NULL;
-    return media_spawn(MK_CAMERA, NULL, NULL, 0, pid);
+    s->sock = media_spawn(MK_CAMERA, NULL, NULL, 0, &s->pid);
+    s->studio = 1;
+    return s->sock < 0 ? -1 : 0;
 }
-void mstudio_attach(int sock) { (void)sock; }
 
 /* /dev/video9 → /dev/null, so the broker's camera open succeeds without a camera */
 int __real_open(const char *path, int flags, ...);

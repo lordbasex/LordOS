@@ -24,5 +24,12 @@
   "perfGpu": "{fps} cuadros por segundo · tarjeta gráfica",
   "perfCpu": "{fps} cuadros por segundo · procesador",
   "howTo": "Las apps que eligen la cámara «LordOS Studio» reciben estos efectos.",
-  "cameraHint": "La cámara de la que LordOS Studio toma la imagen."
+  "cameraHint": "La cámara de la que LordOS Studio toma la imagen.",
+  "everyApp": "Todas las apps",
+  "everyAppHint": "Instalá LordOS Studio Camera desde la Tienda para que los navegadores y otras apps también puedan elegir la cámara «LordOS Studio».",
+  "everyAppOn": "Los navegadores y otras apps pueden elegir la cámara «LordOS Studio». Tu cámara se enciende solo mientras alguna la usa.",
+  "everyAppOff": "Las apps que eligieron «LordOS Studio» ven una imagen de «cámara apagada», nunca tu cámara.",
+  "notInstalled": "No instalado",
+  "getCamera": "Conseguilo en la Tienda…",
+  "stopped": "La cámara de LordOS Studio se detuvo varias veces y se apagó. Apagala y volvé a encenderla para intentarlo de nuevo."
 }

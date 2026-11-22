@@ -24,5 +24,12 @@
   "perfGpu": "{fps} khung hình mỗi giây · card đồ họa",
   "perfCpu": "{fps} khung hình mỗi giây · bộ xử lý",
   "howTo": "Các ứng dụng chọn máy ảnh “LordOS Studio” sẽ nhận các hiệu ứng này.",
-  "cameraHint": "Máy ảnh mà LordOS Studio lấy hình từ đó."
+  "cameraHint": "Máy ảnh mà LordOS Studio lấy hình từ đó.",
+  "everyApp": "Mọi ứng dụng",
+  "everyAppHint": "Cài LordOS Studio Camera từ Cửa hàng để trình duyệt và các ứng dụng khác cũng có thể chọn camera “LordOS Studio”.",
+  "everyAppOn": "Trình duyệt và các ứng dụng khác có thể chọn camera “LordOS Studio”. Camera của bạn chỉ bật khi một trong số chúng đang dùng.",
+  "everyAppOff": "Các ứng dụng đã chọn “LordOS Studio” thấy hình “camera tắt”, không bao giờ thấy camera của bạn.",
+  "notInstalled": "Chưa cài đặt",
+  "getCamera": "Tải trong Cửa hàng…",
+  "stopped": "Camera của LordOS Studio dừng nhiều lần nên đã bị tắt. Tắt rồi bật lại để thử lần nữa."
 }

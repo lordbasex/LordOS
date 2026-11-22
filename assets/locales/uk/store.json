@@ -330,5 +330,11 @@
   "src.wine": "Wine",
   "src.android": "Застосунки Android",
   "soon": "Незабаром",
-  "sub.all": "Усі"
+  "sub.all": "Усі",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Виявлено камеру.",
+  "suggest.studioCamera.detail": "Дає всім програмам, зокрема браузерам і відеодзвінкам, камеру «LordOS Studio» з вашими ефектами: розмитий фон або зображення позаду вас ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} немає в джерелах пакетів цього комп’ютера.",
+  "suggest.studioCamera.note.dkms": "На ПК його модуль ядра збирається для вашого ядра на цьому комп’ютері (DKMS), що додає близько 500 МБ компіляторів і заголовків ядра, і знову після кожного оновлення ядра. На Raspberry Pi він постачається з ядром LordOS.",
+  "suggest.studioCamera.note.secureBoot": "Якщо ввімкнено Secure Boot, під час наступного перезапуску потрібно зареєструвати ключ підпису модуля, інакше камера не з’явиться."
 }

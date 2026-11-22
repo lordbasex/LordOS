@@ -924,5 +924,9 @@
   "shot.area": "Pilih Kawasan…",
   "shot.take": "Ambil Tangkapan Skrin",
   "shot.areaHint": "Seret di atas kawasan untuk diberikan kepada {app}. Esc membatalkan.",
-  "shot.colorHint": "Klik warna untuk diberikan kepada {app}. Esc membatalkan."
+  "shot.colorHint": "Klik warna untuk diberikan kepada {app}. Esc membatalkan.",
+  "capture.what.viaStudio": "Kamera melalui LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Kamera melalui LordOS Studio",
+  "capture.what.effectsOn": "kesan dihidupkan",
+  "capture.what.effectsOff": "tiada kesan"
 }

@@ -931,5 +931,9 @@
   "shot.area": "Sélectionner une zone…",
   "shot.take": "Faire la capture",
   "shot.areaHint": "Faites glisser sur la zone à donner à {app}. Échap annule.",
-  "shot.colorHint": "Cliquez sur la couleur à donner à {app}. Échap annule."
+  "shot.colorHint": "Cliquez sur la couleur à donner à {app}. Échap annule.",
+  "capture.what.viaStudio": "Caméra via LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "Caméra via LordOS Studio",
+  "capture.what.effectsOn": "effets activés",
+  "capture.what.effectsOff": "sans effets"
 }

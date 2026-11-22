@@ -959,5 +959,9 @@
   "shot.area": "تحديد منطقة…",
   "shot.take": "التقاط صورة الشاشة",
   "shot.areaHint": "اسحب فوق المنطقة التي تريد إعطاءها لـ {app}. يلغي Esc.",
-  "shot.colorHint": "انقر على اللون الذي تريد إعطاءه لـ {app}. يلغي Esc."
+  "shot.colorHint": "انقر على اللون الذي تريد إعطاءه لـ {app}. يلغي Esc.",
+  "capture.what.viaStudio": "الكاميرا عبر LordOS Studio ({camera})",
+  "capture.what.viaStudioPlain": "الكاميرا عبر LordOS Studio",
+  "capture.what.effectsOn": "التأثيرات مفعّلة",
+  "capture.what.effectsOff": "بلا تأثيرات"
 }

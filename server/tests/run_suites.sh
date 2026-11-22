@@ -410,6 +410,9 @@ EOF
     # fuzz; the frame pipeline on fixed frames (CPU, and GPU when a render node opens); the popover's plain logic
     run "studio-nn-test (segmenter and BlazeFace against ONNX Runtime, the .lnn loader's fuzz)" build/studio-nn-test
     run "studio-test (matte, guided filter, blur, picture, mirror; CPU and GPU agree)" build/studio-test
+    run "studio-hub-test (the loopback: what it shows, its readers, the cards, YUYV)" build/studio-hub-test
+    # phase 2's package, built and inspected (never installed; the device itself is checked on a VM)
+    if have dpkg-deb; then run "studio-package-test (lordos-studio-camera)" sh tests/studio_package_test.sh; else skip "studio-package-test" dpkg-deb; fi
     if have node; then run "studio-model-test (sdk/studiomodel.js)" node tests/studio_model_test.mjs; else skip "studio-model-test" node; fi
     if have node; then run "widget-feed-test (sdk/widgetfeedmodel.js)" node tests/widget_feed_test.mjs; else skip "widget-feed-test" node; fi
     if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi

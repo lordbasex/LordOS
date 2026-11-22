@@ -137,56 +137,124 @@ static void on_link(const LiveHdr *h, const uint8_t *d, void *arg) {
     if (h->type == LL_KEYFRAME) link_key = 1;
 }
 
-void lm_camera(const char *params, int dev, int render) {
+/* ---- the capture itself (LmCam, lm.h): shared by the camera job and lord-studio's loopback output (../studio/stout.c) */
+struct LmCam {
+    int dev, W, H, nb;
+    uint32_t pixfmt;
+    Buf bufs[NBUF];
+    AVCodecContext *mj;
+    AVPacket *pkt;
+    char card[64];
+};
+
+/* code: the error's code line (camera.*) when it fails; the fd stays the caller's */
+LmCam *lm_cam_open(int dev, int want_w, int want_h, const char **code) {
     struct v4l2_capability cap;
     memset(&cap, 0, sizeof cap);
-    if (dev < 0 || xioctl(dev, VIDIOC_QUERYCAP, &cap)) { lm_error("camera.notACamera"); mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0); return; }
+    *code = "camera.notACamera";
+    if (dev < 0 || xioctl(dev, VIDIOC_QUERYCAP, &cap)) return NULL;
     uint32_t caps = (cap.capabilities & V4L2_CAP_DEVICE_CAPS) ? cap.device_caps : cap.capabilities;
-    if (!(caps & V4L2_CAP_VIDEO_CAPTURE) || !(caps & V4L2_CAP_STREAMING)) { lm_error("camera.noVideo"); mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0); return; }
-    char accel[24];
-    AVBufferRef *hw = lm_hw_device(lm_hw_accel(params, accel, sizeof accel), render);
-    lm_out_init(0);
+    *code = "camera.noVideo";
+    if (!(caps & V4L2_CAP_VIDEO_CAPTURE) || !(caps & V4L2_CAP_STREAMING)) return NULL;
+    LmCam *c = calloc(1, sizeof *c);
+    *code = "camera.startFailed";
+    if (!c) return NULL;
+    c->dev = dev;
     struct v4l2_format fmt;
-    if (choose_format(dev, &fmt, (int)mp_param_int(params, "width", 1280), (int)mp_param_int(params, "height", 720))) {
-        lm_error("camera.unsupportedFormat");
-        mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0);
-        return;
-    }
-    int W = (int)fmt.fmt.pix.width, H = (int)fmt.fmt.pix.height;
-    uint32_t pixfmt = fmt.fmt.pix.pixelformat;
+    if (choose_format(dev, &fmt, want_w, want_h)) { *code = "camera.unsupportedFormat"; free(c); return NULL; }
+    c->W = (int)fmt.fmt.pix.width;
+    c->H = (int)fmt.fmt.pix.height;
+    c->pixfmt = fmt.fmt.pix.pixelformat;
     struct v4l2_requestbuffers rb = { .count = NBUF, .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP };
-    Buf bufs[NBUF];
-    memset(bufs, 0, sizeof bufs);
-    if (xioctl(dev, VIDIOC_REQBUFS, &rb) || rb.count < 2) { lm_error("camera.busy"); mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0); return; }
-    int nb = rb.count > NBUF ? NBUF : (int)rb.count;
-    for (int i = 0; i < nb; i++) {
+    if (xioctl(dev, VIDIOC_REQBUFS, &rb) || rb.count < 2) { *code = "camera.busy"; free(c); return NULL; }
+    c->nb = rb.count > NBUF ? NBUF : (int)rb.count;
+    for (int i = 0; i < c->nb; i++) {
         struct v4l2_buffer b = { .index = (uint32_t)i, .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP };
         if (xioctl(dev, VIDIOC_QUERYBUF, &b)) continue;
-        bufs[i].len = b.length;
-        bufs[i].p = mmap(NULL, b.length, PROT_READ | PROT_WRITE, MAP_SHARED, dev, b.m.offset);   /* the driver's size and offset */
-        if (bufs[i].p == MAP_FAILED) { bufs[i].p = NULL; continue; }
+        c->bufs[i].len = b.length;
+        c->bufs[i].p = mmap(NULL, b.length, PROT_READ | PROT_WRITE, MAP_SHARED, dev, b.m.offset);   /* the driver's size and offset */
+        if (c->bufs[i].p == MAP_FAILED) { c->bufs[i].p = NULL; continue; }
         xioctl(dev, VIDIOC_QBUF, &b);
     }
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    if (xioctl(dev, VIDIOC_STREAMON, &type)) { lm_error("camera.startFailed"); mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0); return; }
-    AVCodecContext *mj = NULL;
-    if (pixfmt == V4L2_PIX_FMT_MJPEG) {
-        const AVCodec *c = avcodec_find_decoder(AV_CODEC_ID_MJPEG);
-        mj = c ? avcodec_alloc_context3(c) : NULL;
-        if (mj) { mj->thread_count = 2; if (avcodec_open2(mj, c, NULL) < 0) avcodec_free_context(&mj); }
+    if (xioctl(dev, VIDIOC_STREAMON, &type)) { lm_cam_close(c); *code = "camera.startFailed"; return NULL; }
+    if (c->pixfmt == V4L2_PIX_FMT_MJPEG) {
+        const AVCodec *d = avcodec_find_decoder(AV_CODEC_ID_MJPEG);
+        c->mj = d ? avcodec_alloc_context3(d) : NULL;
+        if (c->mj) { c->mj->thread_count = 2; if (avcodec_open2(c->mj, d, NULL) < 0) avcodec_free_context(&c->mj); }
     }
+    c->pkt = av_packet_alloc();
+    snprintf(c->card, sizeof c->card, "%s", (const char *)cap.card);
+    for (char *p = c->card; *p; p++) if (*p == '"' || *p == '\\' || (unsigned char)*p < 0x20) *p = ' ';
+    *code = NULL;
+    return c;
+}
+
+void lm_cam_size(const LmCam *c, int *w, int *h, uint32_t *pixfmt) { *w = c->W; *h = c->H; if (pixfmt) *pixfmt = c->pixfmt; }
+const char *lm_cam_card(const LmCam *c) { return c->card; }
+
+/* One picture, after POLLIN: 1 decoded into frame, 0 none this time, -1 the device went away (unplugged) */
+int lm_cam_read(LmCam *c, AVFrame *frame) {
+    struct v4l2_buffer b = { .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP };
+    if (xioctl(c->dev, VIDIOC_DQBUF, &b)) return errno == ENODEV ? -1 : 0;
+    int got = 0;
+    if (b.index < (unsigned)c->nb && c->bufs[b.index].p && b.bytesused > 0) {
+        av_frame_unref(frame);
+        if (c->pixfmt == V4L2_PIX_FMT_MJPEG && c->mj && c->pkt) {
+            c->pkt->data = c->bufs[b.index].p;
+            c->pkt->size = (int)b.bytesused;
+            if (avcodec_send_packet(c->mj, c->pkt) >= 0) got = avcodec_receive_frame(c->mj, frame) >= 0;
+            c->pkt->data = NULL;
+            c->pkt->size = 0;
+        } else if (c->pixfmt != V4L2_PIX_FMT_MJPEG) {
+            /* raw: copied into our own frame (the buffer goes back to the driver right away) */
+            frame->format = av_fmt(c->pixfmt);
+            frame->width = c->W;
+            frame->height = c->H;
+            if (av_frame_get_buffer(frame, 0) >= 0) {
+                uint8_t *src[4];
+                int ls[4];
+                if (av_image_fill_arrays(src, ls, c->bufs[b.index].p, frame->format, c->W, c->H, 1) > 0 &&
+                    (size_t)av_image_get_buffer_size(frame->format, c->W, c->H, 1) <= b.bytesused) {
+                    av_image_copy(frame->data, frame->linesize, (const uint8_t **)src, ls, frame->format, c->W, c->H);
+                    got = 1;
+                }
+            }
+        }
+    }
+    xioctl(c->dev, VIDIOC_QBUF, &b);
+    return got;
+}
+
+/* stops the stream and frees the buffers; the fd stays the caller's */
+void lm_cam_close(LmCam *c) {
+    if (!c) return;
+    enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    xioctl(c->dev, VIDIOC_STREAMOFF, &type);
+    for (int i = 0; i < c->nb; i++) if (c->bufs[i].p) munmap(c->bufs[i].p, c->bufs[i].len);
+    av_packet_free(&c->pkt);
+    avcodec_free_context(&c->mj);
+    free(c);
+}
+
+void lm_camera(const char *params, int dev, int render) {
+    char accel[24];
+    AVBufferRef *hw = lm_hw_device(lm_hw_accel(params, accel, sizeof accel), render);
+    lm_out_init(0);
+    const char *code = NULL;
+    LmCam *cam = lm_cam_open(dev, (int)mp_param_int(params, "width", 1280), (int)mp_param_int(params, "height", 720), &code);
+    if (!cam) { lm_error("%s", code); mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0); return; }
+    int W, H;
+    uint32_t pixfmt;
+    lm_cam_size(cam, &W, &H, &pixfmt);
     char info[512];
-    char card[64];
-    snprintf(card, sizeof card, "%s", (const char *)cap.card);
-    for (char *p = card; *p; p++) if (*p == '"' || *p == '\\' || (unsigned char)*p < 0x20) *p = ' ';
-    snprintf(info, sizeof info, "{\"camera\":\"%s\",\"width\":%d,\"height\":%d,\"format\":\"%.4s\",\"hwAvailable\":%s}", card, W, H,
+    snprintf(info, sizeof info, "{\"camera\":\"%s\",\"width\":%d,\"height\":%d,\"format\":\"%.4s\",\"hwAvailable\":%s}", lm_cam_card(cam), W, H,
              (const char *)&pixfmt, hw ? "true" : "false");
     mp_send(LM_SOCK, MM_INFO, 0, NULL, info, strlen(info), NULL, 0);
     mp_sendv(LM_SOCK, MM_STATE, 0, MS_PLAYING, 0, 0, 0);
 
     static char payload[MP_PAYLOAD_MAX + 1];
     AVFrame *frame = av_frame_alloc();
-    AVPacket *pkt = av_packet_alloc();
     void *ring = NULL;
     size_t ring_len = 0;
     int mic = 0, stop = 0;
@@ -247,58 +315,30 @@ void lm_camera(const char *params, int dev, int render) {
         stcam_tick();
 #endif
         if (!(pf[1].revents & POLLIN)) continue;
-        struct v4l2_buffer b = { .type = V4L2_BUF_TYPE_VIDEO_CAPTURE, .memory = V4L2_MEMORY_MMAP };
-        if (xioctl(dev, VIDIOC_DQBUF, &b)) continue;
-        if (b.index < (unsigned)nb && bufs[b.index].p && b.bytesused > 0) {
-            int got = 0;
-            av_frame_unref(frame);
-            if (pixfmt == V4L2_PIX_FMT_MJPEG && mj) {
-                pkt->data = bufs[b.index].p;
-                pkt->size = (int)b.bytesused;
-                if (avcodec_send_packet(mj, pkt) >= 0) got = avcodec_receive_frame(mj, frame) >= 0;
-            } else if (pixfmt != V4L2_PIX_FMT_MJPEG) {
-                /* raw: copied into our own frame (the buffer goes back to the driver right away) */
-                frame->format = av_fmt(pixfmt);
-                frame->width = W;
-                frame->height = H;
-                if (av_frame_get_buffer(frame, 0) >= 0) {
-                    uint8_t *src[4];
-                    int ls[4];
-                    if (av_image_fill_arrays(src, ls, bufs[b.index].p, frame->format, W, H, 1) > 0 &&
-                        (size_t)av_image_get_buffer_size(frame->format, W, H, 1) <= b.bytesused) {
-                        av_image_copy(frame->data, frame->linesize, (const uint8_t **)src, ls, frame->format, W, H);
-                        got = 1;
-                    }
-                }
-            }
-            if (got) {
-                int64_t t = (int64_t)(lm_now_ms() - t_start);
+        int got = lm_cam_read(cam, frame);
+        if (got < 0) { LM_LOG("camera: the device went away"); break; }
+        if (got) {
+            int64_t t = (int64_t)(lm_now_ms() - t_start);
 #ifdef LM_STUDIO
-                AVFrame *shown = stcam_frame(frame);    /* LordOS Studio: the same picture with its effects */
+            AVFrame *shown = stcam_frame(frame);    /* LordOS Studio: the same picture with its effects */
 #else
-                AVFrame *shown = frame;
+            AVFrame *shown = frame;
 #endif
-                lm_out_present(shown, t);
-                link_frame(shown, t);
-                nframes++;
-                if (enc) {
-                    if (enc_mirror) {
-                        AVFrame *bg = lm_to_bgra(shown, shown->width, shown->height, 0);
-                        if (bg) { flip_h(bg); lm_enc_video(enc, bg, (int64_t)lm_now_ms() - enc_t0); av_frame_free(&bg); }
-                    } else lm_enc_video(enc, shown, (int64_t)lm_now_ms() - enc_t0);
-                    mp_sendv(LM_SOCK, MM_LEVEL, 0, 0, (int64_t)lm_now_ms() - enc_t0, 0, 0);
-                }
+            lm_out_present(shown, t);
+            link_frame(shown, t);
+            nframes++;
+            if (enc) {
+                if (enc_mirror) {
+                    AVFrame *bg = lm_to_bgra(shown, shown->width, shown->height, 0);
+                    if (bg) { flip_h(bg); lm_enc_video(enc, bg, (int64_t)lm_now_ms() - enc_t0); av_frame_free(&bg); }
+                } else lm_enc_video(enc, shown, (int64_t)lm_now_ms() - enc_t0);
+                mp_sendv(LM_SOCK, MM_LEVEL, 0, 0, (int64_t)lm_now_ms() - enc_t0, 0, 0);
             }
         }
-        xioctl(dev, VIDIOC_QBUF, &b);
     }
     if (enc) { if (mic) munmap(ring, ring_len); lm_enc_close(enc); enc = NULL; }
     link_stop();
-    xioctl(dev, VIDIOC_STREAMOFF, &type);
-    for (int i = 0; i < nb; i++) if (bufs[i].p) munmap(bufs[i].p, bufs[i].len);
-    pkt->data = NULL;
-    av_packet_free(&pkt);
+    lm_cam_close(cam);
     av_frame_free(&frame);
-    avcodec_free_context(&mj);
     LM_DBG("camera: %ld frames", nframes);
 }

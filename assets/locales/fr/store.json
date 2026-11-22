@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "Apps Android",
   "soon": "Bientôt",
-  "sub.all": "Toutes"
+  "sub.all": "Toutes",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Nous avons détecté une caméra.",
+  "suggest.studioCamera.detail": "Donne à toutes les apps, navigateurs et appels vidéo compris, la caméra « LordOS Studio » avec vos effets : arrière-plan flou ou une image derrière vous ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} ne figure pas dans les sources de paquets de cet ordinateur.",
+  "suggest.studioCamera.note.dkms": "Sur un PC, son module noyau est compilé pour votre noyau sur cet ordinateur (DKMS), ce qui ajoute environ 500 Mo de compilateurs et d’en-têtes du noyau, puis de nouveau après chaque mise à jour du noyau. Sur un Raspberry Pi, il est fourni avec le noyau LordOS.",
+  "suggest.studioCamera.note.secureBoot": "Avec Secure Boot activé, vous devez enregistrer la clé de signature du module au prochain redémarrage, sinon la caméra n’apparaîtra pas."
 }

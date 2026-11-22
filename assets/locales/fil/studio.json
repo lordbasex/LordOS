@@ -24,5 +24,12 @@
   "perfGpu": "{fps} frame bawat segundo · graphics card",
   "perfCpu": "{fps} frame bawat segundo · processor",
   "howTo": "Ang mga app na pipili sa camera na “LordOS Studio” ay makakatanggap ng mga effect na ito.",
-  "cameraHint": "Ang camera na pinagkukunan ng larawan ng LordOS Studio."
+  "cameraHint": "Ang camera na pinagkukunan ng larawan ng LordOS Studio.",
+  "everyApp": "Lahat ng app",
+  "everyAppHint": "I-install ang LordOS Studio Camera mula sa Store para mapili rin ng mga browser at iba pang app ang camera na “LordOS Studio”.",
+  "everyAppOn": "Mapipili ng mga browser at iba pang app ang camera na “LordOS Studio”. Bumubukas lang ang camera mo habang ginagamit ito ng isa sa kanila.",
+  "everyAppOff": "Ang mga app na pumili sa “LordOS Studio” ay makakakita ng larawang “naka-off ang camera”, hindi kailanman ang camera mo.",
+  "notInstalled": "Hindi naka-install",
+  "getCamera": "Kunin sa Store…",
+  "stopped": "Ilang beses na huminto ang camera ng LordOS Studio kaya pinatay ito. I-off at i-on ulit para subukan muli."
 }

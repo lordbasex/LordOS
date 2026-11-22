@@ -82,6 +82,9 @@ enum {
     /* lord-studio only (LordOS Studio, src/media/studio, docs/CAMERA-STUDIO-PLAN.md); lord-media ignores them */
     MM_STUDIO,          /* v[0] = mode (ST_MODE_*: 0 none, 1 blur, 2 picture), v[1] = blur 0..100, v[2] = mirror */
     MM_STUDIO_BG,       /* fd = the background picture (a file lord-server opened and checked); no fd: none */
+    MM_STUDIO_CAM,      /* lord-studio with loopback=1: v[0] = what goes to the loopback (0 the idle card, 1 the camera, 2 the
+                           off card); fd = the real camera when v[0] = 1 and it changes (none: keep the open one); v[1] = 1
+                           the preview's frames are wanted in the ring too */
 
     /* lord-media → lord-server */
     MM_INFO = 64,       /* payload = JSON with the file's information */
@@ -102,6 +105,9 @@ enum {
                            v[3] = why skipped (VBS_*) */
     MM_STUDIO_STATS,    /* lord-studio, once a second: v[0] = frames done, v[1] = segmenter µs, v[2] = matte and composite µs,
                            v[3] = 1 when the GPU composites */
+    MM_STUDIO_READERS,  /* lord-studio with loopback=1, on every change: v[0] = readers streaming from the loopback (its
+                           client-usage event; -1 when the module doesn't send it), v[1] = 1 the real camera is open,
+                           v[2] = what the loopback shows (0 the idle card, 1 the camera, 2 the off card) */
 };
 
 /* MK_VBENCH's measurements, in order; lord-server maps them to its own ids (bench/lbvideo.c) */

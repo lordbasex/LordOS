@@ -24,5 +24,12 @@
   "perfGpu": "{fps} bilder per sekund · grafikkort",
   "perfCpu": "{fps} bilder per sekund · processor",
   "howTo": "Appar som väljer kameran ”LordOS Studio” får de här effekterna.",
-  "cameraHint": "Kameran som LordOS Studio tar bilden från."
+  "cameraHint": "Kameran som LordOS Studio tar bilden från.",
+  "everyApp": "Alla appar",
+  "everyAppHint": "Installera LordOS Studio Camera från Butik så att även webbläsare och andra appar kan välja kameran ”LordOS Studio”.",
+  "everyAppOn": "Webbläsare och andra appar kan välja kameran ”LordOS Studio”. Din kamera slås bara på medan någon av dem använder den.",
+  "everyAppOff": "Appar som valt ”LordOS Studio” ser en bild av ”kameran av”, aldrig din kamera.",
+  "notInstalled": "Inte installerad",
+  "getCamera": "Hämta i Butik…",
+  "stopped": "Kameran i LordOS Studio stannade flera gånger och stängdes av. Stäng av och slå på den igen för att försöka på nytt."
 }
