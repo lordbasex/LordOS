@@ -1048,6 +1048,59 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   X-Resource's list (resource base 0), runs in a user namespace of its own and counted as a sandboxed client; it is not
   a client and is left out. Last, a drop Files claimed at the release (before the app's `XdndDrop`) told the X app it was
   refused although the files were copied; it is now told the result. `build/xwm-test` covers the first two.
+- **Two lord-server crashes in the maintainer's session: what was found, the fixes, and a crash report for the next
+  one** (reported by the maintainer, 2026-11-22). Neither crash left a stack: the package's `lord-server` is stripped
+  and no core is kept. What could be established, and what was changed:
+  - *10:06, package ws119* (`segfault at 20 … in lord-server[2c45e7]`): `ff27c948` was rebuilt with the same flags,
+    and its `.text` is byte-for-byte the package's. Offset `0x2c45e7` is QuickJS's `find_own_property()` inlined in
+    `JS_DefineProperty()`, reading `p->shape->prop_hash_mask` with `shape == NULL`. `free_object()` sets the shape to
+    NULL, so a property was defined on a **JS object that had already been freed**. The caller is not known. A
+    reference-count audit of every native binding (`server/src/ui/js*.c`) found no over-release. The likeliest
+    remaining suspect, now removed, is the stall sampler: in that session it ran once a second (the log shows a stack
+    sample on every slow `__lordTick`) and it evaluated `new Error().stack` from QuickJS's interrupt handler. That
+    means compiling and running JavaScript and allocating objects at any point of the interpreter (a loop's back edge,
+    a call's entry, inside a regex). The sampler and the watchdog's JS stack now read QuickJS's frames directly with
+    `JS_GetStackText()`, a LordOS patch in `third_party/quickjs`: it runs no JavaScript, creates no JS value and
+    prints the same one-line format.
+  - *12:05, package ws122* (`segfault at 7fffeaa61e1c … error 6 in libc.so.6[6259d]`): a write 0x4c bytes above
+    the stack pointer, in the frame of glibc's printf engine (`sub $0x4f8,%rsp` just before). That is a **main-thread
+    stack overflow** with a printf at the bottom. A call graph of the ws122 build (`gcc -fcallgraph-info=su`, `.text`
+    byte-for-byte the package's) lists every recursive cycle. Each directory walk has a depth limit, and the
+    JavaScript engine's own limit (4 MB) is half the stack, so the overflow had to come from a cycle in a tree or
+    from re-entry. The ones found and closed:
+    - **wl_subcompositor accepted a surface as the child of itself or of its own descendant.** wayland.xml requires
+      `bad_parent`; only "itself" was refused, and with the wrong error. A cycle sent `damage_node()` and the paint,
+      hit-test and output walks round it for ever: against the ws122 binary, `tests/cycle_client.c` hangs the main
+      loop at 100 % CPU until the watchdog steps in. `get_subsurface` now refuses a parent that is the surface or one
+      of its descendants (`bad_parent`) and a surface that already has a window or menu role (`bad_surface`).
+      `xdg_surface.get_popup` refuses a parent that is the popup itself or one of its own menus
+      (`invalid_popup_parent`).
+    - **The X window manager could re-enter its own shutdown** (`src/wl/xwm.c`). When a write to Xwayland failed,
+      `lost()` called `xwm_stop()`, which ends a drag and unmaps every X window through wl.c. Those calls send to X
+      again, so a second failed write called `xwm_stop()` from inside itself and freed the same window twice. The
+      connection is now marked closed before anything is torn down, a nested call returns, and `free_win` unlinks the
+      window before it calls out.
+    - **UI node cycles:** `lord.appendChild`/`insertBefore` with a node and its own ancestor (a stale id: ids are
+      reused once a node is destroyed) closed a cycle that `invalidate_measure` would loop on for ever, and that
+      layout and paint would recurse on. Such a call is now ignored (`src/ui/node.c`).
+  - **Crash report** (`src/wdog.c` `wdog_crash_hooks`, called first thing in `main`): on SIGSEGV, SIGBUS, SIGILL,
+    SIGFPE or SIGABRT, lord-server writes the signal, the faulting address, its version and build, and the C stack
+    (`backtrace_symbols_fd`, `lord-server(+0x2c45e7)` frames) to the session log. The handler runs on an alternate
+    stack, so a stack overflow is reported too. It allocates nothing. A fault then happens again with the default
+    action, so the kernel still logs it; an abort is raised again. `tools/iso/mkdeb.sh` gains `DEBUG_SYMBOLS=1`, which
+    keeps lord-server's and lord-sessiond's symbols as `<package>.debug/*.debug` next to a test package (never inside
+    it), for `addr2line`.
+  - **Smaller bugs found on the way:**
+    - **Passwords were wiped inside QuickJS's own strings.** Five native functions wiped the pointer
+      `JS_ToCString` returns (Machines' unattended-install and root passwords, the Imager's password hash and Wi-Fi
+      key, the Terminal's SFTP request). For an ASCII string that pointer is the `JSString` itself, so the value
+      JavaScript still held turned into zeros. They now copy the secret and wipe the copy (`src/ui/js_secret.h`).
+    - `lord.sys` keyboard layouts read a string after freeing it (`f_kb_list`).
+  - Tests: `tests/cycle_client.c` (run by `tests/run_suites.sh` against a headless lord-server, through
+    `tests/popup_headless.sh cycle-client`) covers a subsurface of itself, under its child and under its grandchild,
+    a popup of itself, two popups each the other's parent, and a nested subsurface tree that must still work.
+    `wdog_test.c` covers the JS stack read from the interrupt handler and the crash report: a stack overflow ends in
+    SIGSEGV with a complete report on the alternate stack, and an abort ends in SIGABRT.
 - **Store → For this computer: no firmware card for a file no package has** (`sdk/suggestengine.js`,
   `assets/store/suggestions.json` `firmware.notShipped`; reported by the maintainer): on a computer that gives its Intel
   graphics to a machine (GVT-g), the kernel asks for `i915/gvt/vid_…_rid_….golden_hw_state`, a cache of the vGPU's

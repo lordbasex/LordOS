@@ -2,6 +2,7 @@
 #include "wdog.h"
 #include "par.h"
 
+#include <errno.h>
 #include <execinfo.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -51,6 +52,64 @@ static void on_where(int sig) {
     int n = backtrace(f, 40);
     if (write(2, h, sizeof h - 1) < 0) {}
     backtrace_symbols_fd(f, n, 2);
+}
+
+/* ---- crash report (wdog.h, wdog_crash_hooks) ---- */
+
+static char crash_what[96];
+
+/* async-signal-safe: no stdio, no allocation */
+static size_t put_str(char *b, size_t n, size_t o, const char *s) {
+    while (*s && o + 1 < n) b[o++] = *s++;
+    return o;
+}
+static size_t put_num(char *b, size_t n, size_t o, uintptr_t v, unsigned base) {
+    char t[24];
+    int k = 0;
+    do { t[k++] = "0123456789abcdef"[v % base]; v /= base; } while (v && k < (int)sizeof t);
+    if (base == 16) o = put_str(b, n, o, "0x");
+    while (k && o + 1 < n) b[o++] = t[--k];
+    return o;
+}
+
+static void on_crash(int sig, siginfo_t *si, void *uc) {
+    (void)uc;
+    int saved = errno;
+    const char *name = sig == SIGSEGV ? "SIGSEGV" : sig == SIGBUS ? "SIGBUS" : sig == SIGILL ? "SIGILL"
+                     : sig == SIGFPE ? "SIGFPE" : sig == SIGABRT ? "SIGABRT" : "signal";
+    char b[320];
+    size_t o = put_str(b, sizeof b, 0, "lord-server: crashed: ");
+    o = put_str(b, sizeof b, o, name);
+    o = put_str(b, sizeof b, o, " (code ");
+    o = put_num(b, sizeof b, o, (uintptr_t)(si ? si->si_code : 0), 10);
+    if (si && sig != SIGABRT) { o = put_str(b, sizeof b, o, ", address "); o = put_num(b, sizeof b, o, (uintptr_t)si->si_addr, 16); }
+    o = put_str(b, sizeof b, o, "), version ");
+    o = put_str(b, sizeof b, o, crash_what[0] ? crash_what : "?");
+    o = put_str(b, sizeof b, o, "; the C stack (innermost first):\n");
+    if (write(2, b, o) < 0) {}
+    void *f[64];
+    int n = backtrace(f, 64);               /* loaded in wdog_crash_hooks: nothing is allocated here */
+    backtrace_symbols_fd(f, n, 2);
+    static const char end[] = "lord-server: end of the crash report\n";
+    if (write(2, end, sizeof end - 1) < 0) {}
+    errno = saved;
+    /* SA_RESETHAND put the default action back: a fault the kernel raised happens again when this returns
+     * (and the kernel logs it); anything else (abort, a kill) is raised again */
+    if (si && si->si_code > 0 && sig != SIGABRT) return;
+    raise(sig);
+}
+
+void wdog_crash_hooks(const char *what) {
+    snprintf(crash_what, sizeof crash_what, "%s", what ? what : "");
+    static char alt[64 * 1024];             /* SIGSTKSZ is too small for the unwinder */
+    stack_t st = { .ss_sp = alt, .ss_size = sizeof alt };
+    if (sigaltstack(&st, NULL)) return;
+    void *f[2];
+    backtrace(f, 2);                        /* loads libgcc's unwinder now, not in the signal handler */
+    struct sigaction sa = { .sa_sigaction = on_crash, .sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESETHAND };
+    sigemptyset(&sa.sa_mask);
+    static const int sigs[] = { SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT };
+    for (size_t i = 0; i < sizeof sigs / sizeof sigs[0]; i++) sigaction(sigs[i], &sa, NULL);
 }
 
 /* The main thread's state ('R' running, 'S' or 'D' waiting), CPU time (ns) and what it waits in. */

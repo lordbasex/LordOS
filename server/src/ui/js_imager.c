@@ -13,6 +13,7 @@
  *   lord.imager.imageInfo(path)           { kind: 'raw'|'xz', size, raw } of an image in the user's
  *                                         folders (raw: uncompressed size from the .xz index), or null */
 #include "js_imager.h"
+#include "js_secret.h"
 #include "../fsops.h"
 #include "../imager/imgverify.h"
 #include "../net/netpriv.h"
@@ -32,8 +33,8 @@
 static JSValue f_hash(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 1 || !JS_IsString(argv[0])) return JS_NULL;
-    size_t n;
-    const char *p = JS_ToCStringLen(c, &n, argv[0]);
+    size_t n = 0;
+    char *p = js_secret_dup(c, argv[0], &n);
     if (!p) return JS_NULL;
     JSValue r = JS_NULL;
     if (n >= 1 && n <= 1024 && strlen(p) == n) {
@@ -44,17 +45,16 @@ static JSValue f_hash(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         if (cd) { memset(cd, 0, sizeof *cd); free(cd); }
         free(salt);
     }
-    memset((char *)p, 0, n);          /* QuickJS's own copy of the UTF-8 string */
-    JS_FreeCString(c, p);
+    js_secret_free(p, n);
     return r;
 }
 
 static JSValue f_psk(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) return JS_NULL;
-    size_t sn, pn;
+    size_t sn = 0, pn = 0;
     const char *ssid = JS_ToCStringLen(c, &sn, argv[0]);
-    const char *pass = JS_ToCStringLen(c, &pn, argv[1]);
+    char *pass = js_secret_dup(c, argv[1], &pn);
     JSValue r = JS_NULL;
     int ok = ssid && pass && sn >= 1 && sn <= 32 && strlen(ssid) == sn && pn >= 8 && pn <= 63;
     for (size_t i = 0; ok && i < pn; i++) if ((unsigned char)pass[i] < 0x20 || (unsigned char)pass[i] > 0x7e) ok = 0;
@@ -67,7 +67,7 @@ static JSValue f_psk(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         memset(psk, 0, sizeof psk);
         memset(hex, 0, sizeof hex);
     }
-    if (pass) { memset((char *)pass, 0, pn); JS_FreeCString(c, pass); }
+    js_secret_free(pass, pn);
     if (ssid) JS_FreeCString(c, ssid);
     return r;
 }

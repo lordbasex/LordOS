@@ -165,38 +165,15 @@ void js_stall_note(const char *kind, const char *what, double ms) {
 }
 
 /* QuickJS's interrupt handler: the first time a timed entry passes the limit, the JS stack (its innermost frames,
- * file names cut to their base name) */
+ * file names cut to their base name). Read straight from QuickJS's frames (JS_GetStackText, a LordOS patch): the
+ * handler runs at any point of the interpreter (a loop's back edge, the entry of a call, inside a regex), and it
+ * used to evaluate "new Error().stack" there, which compiled and ran JavaScript and made objects mid-instruction
+ * once a second in a session with slow ticks. */
 static void stall_sample(void) {
     if (!stall.depth || stall.sampled || !ctx || JS_HasException(ctx)) return;
     if (now_ms() - stall.t0 <= stall_limit()) return;
     stall.sampled = 1;
-    static const char probe[] = "new Error().stack";
-    JSValue st = JS_Eval(ctx, probe, sizeof probe - 1, "<stall>", JS_EVAL_TYPE_GLOBAL);
-    const char *s = JS_IsString(st) ? JS_ToCString(ctx, st) : NULL;
-    size_t o = 0;
-    int frames = 0;
-    stall.sample[0] = 0;
-    for (const char *p = s; p && *p && frames < 5; ) {
-        const char *nl = strchr(p, '\n');
-        size_t n = nl ? (size_t)(nl - p) : strlen(p);
-        char line[256];
-        snprintf(line, sizeof line, "%.*s", (int)(n < 255 ? n : 255), p);
-        p = nl ? nl + 1 : p + n;
-        char *a = strstr(line, "at ");
-        if (!a || strstr(line, "<stall>")) continue;
-        a += 3;
-        char *paren = strchr(a, '(');                  /* "name (/path/file.js:1:234)" → "name (file.js:1:234)" */
-        if (paren) {
-            char *slash = strrchr(paren, '/');
-            if (slash) memmove(paren + 1, slash + 1, strlen(slash + 1) + 1);
-        }
-        o += (size_t)snprintf(stall.sample + o, o < sizeof stall.sample ? sizeof stall.sample - o : 0, "%s%s", frames ? " < " : " at ", a);
-        if (o >= sizeof stall.sample) { o = sizeof stall.sample - 1; break; }
-        frames++;
-    }
-    if (s) JS_FreeCString(ctx, s);
-    if (JS_IsException(st)) JS_FreeValue(ctx, JS_GetException(ctx));
-    else JS_FreeValue(ctx, st);
+    JS_GetStackText(ctx, stall.sample, (int)sizeof stall.sample, 5);
 }
 
 /* A call from C (call_global_atom) and the promise jobs right after it (drain_jobs) are one run: React's
@@ -780,16 +757,11 @@ static int on_interrupt(JSRuntime *r, void *opaque) {
     (void)opaque;
     stall_sample();
     int w = wdog_js_poll();
-    if (w == 1 && ctx && !JS_HasException(ctx)) {
-        /* inside the interpreter QuickJS adds an error's stack only while it unwinds: an Error made by a
-         * line of JS called from here has every frame below it */
-        static const char probe[] = "new Error().stack";
-        JSValue st = JS_Eval(ctx, probe, sizeof probe - 1, "<watchdog>", JS_EVAL_TYPE_GLOBAL);
-        const char *s = JS_IsString(st) ? JS_ToCString(ctx, st) : NULL;
-        fprintf(stderr, "lord-server: watchdog: the JavaScript stack:\n%s\n", s ? s : "(none)");
-        if (s) JS_FreeCString(ctx, s);
-        if (JS_IsException(st)) JS_FreeValue(ctx, JS_GetException(ctx));
-        else JS_FreeValue(ctx, st);
+    if (w == 1 && ctx) {
+        /* read from QuickJS's frames, no JavaScript run here (stall_sample) */
+        char st[1024];
+        int n = JS_GetStackText(ctx, st, (int)sizeof st, 16);
+        fprintf(stderr, "lord-server: watchdog: the JavaScript stack:%s\n", n ? st : " (none)");
         return 0;
     }
     if (w == 2) fprintf(stderr, "lord-server: watchdog: the JavaScript task stopped (its stack follows)\n");

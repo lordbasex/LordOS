@@ -931,7 +931,8 @@ static JSValue f_kb_list(JSContext *c, JSValueConst this_val, int argc, JSValueC
                 JSValue o = JS_GetPropertyUint32(c, arr, i);
                 JSValue lid = JS_GetPropertyStr(c, o, "id");
                 const char *s = JS_ToCString(c, lid);
-                if (s && !strcmp(s, p)) {
+                int match = s && !strcmp(s, p);         /* s is freed below, before the loop tests it */
+                if (match) {
                     JSValue vs = JS_GetPropertyStr(c, o, "variants");
                     JSValue v = JS_NewObject(c);
                     JS_SetPropertyStr(c, v, "id", JS_NewString(c, id));
@@ -946,7 +947,7 @@ static JSValue f_kb_list(JSContext *c, JSValueConst this_val, int argc, JSValueC
                 if (s) JS_FreeCString(c, s);
                 JS_FreeValue(c, lid);
                 JS_FreeValue(c, o);
-                if (s && !strcmp(s, p)) break;
+                if (match) break;
             }
         }
     }

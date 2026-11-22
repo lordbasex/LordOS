@@ -1,6 +1,7 @@
 #!/bin/sh
 # mkdeb.sh — builds lordos_<version>_<arch>.deb from the already compiled tree.
 # Usage: tools/iso/mkdeb.sh <output.deb>     (from the repository root; needs dpkg-deb)
+#        DEBUG_SYMBOLS=1 tools/iso/mkdeb.sh ...   also keeps lord-server's and lord-sessiond's symbols in <output>.debug/
 #
 # Contents:
 #   /usr/lib/lordos/bin/lord-sessiond     sessions, login screen and remote desktop (root)
@@ -179,6 +180,20 @@ if [ -x server/build/lord-tts ]; then
 fi
 # isolated text recognition helper, Screenshots' "copy the text" (optional: make skips it without libtesseract-dev)
 [ -x server/build/lord-ocr ] && install -m 755 server/build/lord-ocr "$L/bin/lord-ocr"
+# DEBUG_SYMBOLS=1 (test packages): the symbols of lord-server and lord-sessiond, kept next to the package as
+# <output>.debug/<name>.debug (objcopy --only-keep-debug; never inside the .deb). A crash report's
+# "lord-server(+0x2c45e7)" (src/wdog.h) or the kernel's "segfault ... in lord-server[2c45e7,...]" then resolves with
+#   addr2line -f -i -e <output>.debug/lord-server.debug 0x2c45e7
+# (the stripped binary keeps its GNU build id, the same as the .debug file's)
+if [ "${DEBUG_SYMBOLS:-0}" = 1 ]; then
+    DBG="${OUT%.deb}.debug"
+    OBJCOPY="${STRIP%strip}objcopy"
+    mkdir -p "$DBG"
+    for b in lord-server lord-sessiond; do
+        "$OBJCOPY" --only-keep-debug "$L/bin/$b" "$DBG/$b.debug" || { echo "could not keep the symbols of $b" >&2; exit 1; }
+    done
+    echo "symbols: $DBG"
+fi
 "$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lord-browser-prefs" "$L/bin/lordos-firstrun" "$PKG/usr/lib/systemd/system-sleep/lordos-lid-wake" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
 [ -x "$L/bin/lord-ocr" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-ocr" 2>/dev/null || true; }

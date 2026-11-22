@@ -37,6 +37,7 @@
 #include "canvas.h"
 #include "par.h"
 #include "wdog.h"
+#include "lord_version.h"
 #include "input.h"
 #include "inputkind.h"
 #include "kms.h"
@@ -2847,6 +2848,7 @@ static void bss_no_huge_pages(void) {
 
 int main(int argc, char **argv) {
     bss_no_huge_pages();
+    wdog_crash_hooks(LORD_VERSION " (" LORD_BUILD ")");     /* a crash leaves its C stack in the log (wdog.h) */
     struct sigaction pipe_sa = { .sa_handler = on_sigpipe };
     sigemptyset(&pipe_sa.sa_mask);
     sigaction(SIGPIPE, &pipe_sa, NULL);
