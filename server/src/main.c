@@ -2708,7 +2708,16 @@ static int switch_theme(const char *current) {
                  : why[0] ? why : "the theme's code did not load (see the log)");
         js_shutdown();
         ui_reset();
-        if (js_init(current)) fprintf(stderr, "lord-server: %s did not load again either\n", current);
+        if (js_init(current)) {
+            /* the theme that was running is refused too (its file changed under the running session: a package
+             * update rewrote it, and the code manifest checked is the one read at login). Never no JavaScript at
+             * all: the main loop's next js_tick would call into a freed context (the 2026-11-22 13:41 crash,
+             * JS_GetGlobalObject(NULL)). The recovery screen instead, as at start (start_theme). */
+            fprintf(stderr, "lord-server: %s did not load again either: the recovery screen\n", current);
+            js_shutdown();
+            ui_reset();
+            if (js_init_recovery(0)) fprintf(stderr, "lord-server: the recovery screen did not load either\n");
+        }
         wl_remap_all();
         return -1;
     }

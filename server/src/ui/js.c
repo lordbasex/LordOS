@@ -1028,6 +1028,7 @@ void js_shutdown(void) {
 }
 
 double js_tick(double now) {
+    if (!ctx) return -1;                    /* no JavaScript (js_shutdown, a failed theme switch): nothing to run */
     JSValue arg = JS_NewFloat64(ctx, now);
     JSValue r = call_hot(HOT_TICK, 1, &arg);
     double next = -1;
@@ -1038,6 +1039,7 @@ double js_tick(double now) {
 }
 
 int js_wants_frame(void) {
+    if (!ctx) return 0;
     JSValue r = call_hot(HOT_WANTS_FRAME, 0, NULL);
     int w = JS_ToBool(ctx, r);
     JS_FreeValue(ctx, r);
@@ -1045,12 +1047,14 @@ int js_wants_frame(void) {
 }
 
 void js_frame(double now) {
+    if (!ctx) return;
     JSValue arg = JS_NewFloat64(ctx, now);
     JS_FreeValue(ctx, call_hot(HOT_FRAME, 1, &arg));
     drain_jobs();
 }
 
 void js_pointer(const char *type, int target, float x, float y, int button) {
+    if (!ctx) return;
     JSValueConst args[5] = {
         JS_NewString(ctx, type), JS_NewInt32(ctx, target),
         JS_NewFloat64(ctx, x), JS_NewFloat64(ctx, y), JS_NewInt32(ctx, button),
@@ -1064,6 +1068,7 @@ void js_pointer(const char *type, int target, float x, float y, int button) {
 }
 
 void js_gesture(const char *kind, const char *phase, int target, float x, float y, double a, double b, double c, double d) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValueConst args[9] = {
         JS_NewString(ctx, kind), JS_NewString(ctx, phase), JS_NewInt32(ctx, target), JS_NewFloat64(ctx, x), JS_NewFloat64(ctx, y),
@@ -1109,6 +1114,7 @@ static void ime_commit(const char *text) {
 int js_text_input_app(void) { return wl_has_key_focus() && wl_textinput_composing(); }
 
 int js_commit_text(const char *text) {
+    if (!ctx) return 0;
     if (!ctx || !text || !text[0]) return 0;
     if (wl_has_key_focus()) {
         if (!wl_textinput_composing()) return 0;            /* an app without text input (X11, a terminal) takes only keys */
@@ -1157,6 +1163,7 @@ static int ime_to_app(int code, int value, const KeyInfo *k) {
  * (portal.c) goes to that app before anything else, and then to nothing else. If there is an
  * active input method (ime.c) and a focused text field, the key goes through it first. */
 void js_key(int code, int value) {
+    if (!ctx) return;
     KeyInfo k;
     kb_key(code, value, &k);
     unsigned mods = (k.shift ? KG_SHIFT : 0u) | (k.ctrl ? KG_CTRL : 0u) | (k.alt ? KG_ALT : 0u) | (k.meta ? KG_META : 0u);
@@ -1191,6 +1198,7 @@ void js_key(int code, int value) {
 /* A keyboard was plugged in, removed, or typed for the first time → __lordKeyboards(present). */
 void js_keyboards_event(int present) {
     if (!ctx) return;
+    if (!ctx) return;
     JSValueConst arg = JS_NewBool(ctx, present);
     JS_FreeValue(ctx, call_global("__lordKeyboards", 1, &arg));
     drain_jobs();
@@ -1198,6 +1206,7 @@ void js_keyboards_event(int present) {
 
 /* Media (media/) → __lordMedia(id, type, JSON data). */
 void js_media_event(int id, const char *type, const char *json) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValueConst args[3] = { JS_NewInt32(ctx, id), JS_NewString(ctx, type), JS_ParseJSON(ctx, json, strlen(json), "<media>") };
     JS_FreeValue(ctx, call_global("__lordMedia", 3, args));
@@ -1209,12 +1218,14 @@ void js_media_event(int id, const char *type, const char *json) {
 /* The main loop ended (logout, or a signal): the session's last word (sdk/sessionrestore.jsx). */
 void js_before_exit(void) {
     if (!ctx) return;
+    if (!ctx) return;
     JS_FreeValue(ctx, call_global("__lordBeforeExit", 0, NULL));
     drain_jobs();
 }
 
 /* Wayland app windows (wl/wl.c) → __lordWayland(id, type, JSON data). */
 void js_wl_event(int id, const char *type, const char *json) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValueConst args[3] = { JS_NewInt32(ctx, id), JS_NewString(ctx, type), JS_ParseJSON(ctx, json, strlen(json), "<wayland>") };
     JS_FreeValue(ctx, call_global("__lordWayland", 3, args));
@@ -1226,6 +1237,7 @@ void js_wl_event(int id, const char *type, const char *json) {
 /* Sound (sound/snd.c): "state" with the full state, "peak" with the meter → __lordSound(type, data). */
 void js_sound_event(const char *type, const char *json) {
     if (!ctx) return;
+    if (!ctx) return;
     JSValueConst args[2] = { JS_NewString(ctx, type), JS_ParseJSON(ctx, json, strlen(json), "<sound>") };
     JS_FreeValue(ctx, call_global("__lordSound", 2, args));
     JS_FreeValue(ctx, args[0]);
@@ -1236,6 +1248,7 @@ void js_sound_event(const char *type, const char *json) {
 /* Backups (backup/backup.c): the status changed → __lordBackup(status). */
 void js_backup_event(const char *json) {
     if (!ctx) return;
+    if (!ctx) return;
     JSValueConst arg = JS_ParseJSON(ctx, json, strlen(json), "<backup>");
     JS_FreeValue(ctx, call_global("__lordBackup", 1, &arg));
     JS_FreeValue(ctx, arg);
@@ -1245,6 +1258,7 @@ void js_backup_event(const char *json) {
 /* Cloud (cloud/cloud.c): the state changed → __lordCloud(state); a link answer → __lordCloudReply(req, result). */
 void js_cloud_event(const char *json) {
     if (!ctx) return;
+    if (!ctx) return;
     JSValueConst arg = JS_ParseJSON(ctx, json, strlen(json), "<cloud>");
     JS_FreeValue(ctx, call_global("__lordCloud", 1, &arg));
     JS_FreeValue(ctx, arg);
@@ -1252,6 +1266,7 @@ void js_cloud_event(const char *json) {
 }
 
 void js_cloud_reply(int req, const char *json) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValueConst args[2] = { JS_NewInt32(ctx, req), JS_ParseJSON(ctx, json, strlen(json), "<cloud>") };
     JS_FreeValue(ctx, call_global("__lordCloudReply", 2, args));
@@ -1274,12 +1289,14 @@ static void fs_reply(void *ud, int req, const char *json) {
 }
 
 void js_fs_dispatch(void) {
+    if (!ctx) return;
     if (fsasync_dispatch(fs_reply, NULL)) drain_jobs();
 }
 
 /* Network (net/state.c): something changed in links, addresses or routes → __lordNet("link"|"addr"|"route"). */
 /* Disks (disk/disk.c): something was mounted, unmounted, plugged in or changed → __lordDisks(what). */
 void js_disk_event(const char *what) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValueConst arg = JS_NewString(ctx, what);
     JS_FreeValue(ctx, call_global("__lordDisks", 1, &arg));
@@ -1288,6 +1305,7 @@ void js_disk_event(const char *what) {
 }
 
 void js_net_event(const char *what) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValueConst arg = JS_NewString(ctx, what);
     JS_FreeValue(ctx, call_global("__lordNet", 1, &arg));
@@ -1300,6 +1318,7 @@ void js_net_event(const char *what) {
  * → __lordLogs(type, id, name). */
 void js_logs_event(const char *kind, int id, const char *name) {
     if (!ctx) return;
+    if (!ctx) return;
     JSValueConst args[3] = { JS_NewString(ctx, kind), JS_NewInt32(ctx, id), JS_NewString(ctx, name) };
     JS_FreeValue(ctx, call_global("__lordLogs", 3, args));
     JS_FreeValue(ctx, args[0]);
@@ -1310,6 +1329,7 @@ void js_logs_event(const char *kind, int id, const char *name) {
 /* Settings' hardware modules (src/hw): "display", "idle", "power", "bt", "bt-prompt", "bt-result",
  * "ppd", "ppd-result", "timedate" → __lordHw(kind, data). */
 void js_hw_event(const char *kind, const char *json) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValueConst args[2] = { JS_NewString(ctx, kind), JS_ParseJSON(ctx, json, strlen(json), "<hw>") };
     if (JS_IsException(args[1])) { JS_FreeValue(ctx, JS_GetException(ctx)); args[1] = JS_NULL; }
@@ -1322,6 +1342,7 @@ void js_hw_event(const char *kind, const char *json) {
 /* Privileged helper responses: kind = LOG | OK | ERR. */
 void js_admin_event(int id, const char *kind, const char *text) {
     if (!ctx) return;
+    if (!ctx) return;
     JSValueConst args[3] = { JS_NewInt32(ctx, id), JS_NewString(ctx, kind), JS_NewString(ctx, text) };
     JS_FreeValue(ctx, call_global("__lordAdmin", 3, args));
     JS_FreeValue(ctx, args[1]);
@@ -1332,6 +1353,7 @@ void js_admin_event(int id, const char *kind, const char *text) {
 /* The clipboard changed (copy in the terminal, in a field, in a Linux app): notifies JS
  * (history). Called on every loop iteration; it only compares two numbers. */
 void js_clipboard_poll(void) {
+    if (!ctx) return;
     static unsigned seen_text, seen_img;
     unsigned g = term_clipboard_gen(), gi = wl_clip_image_gen();
     if (!ctx || (g == seen_text && gi == seen_img)) return;
@@ -1344,6 +1366,7 @@ void js_clipboard_poll(void) {
 /* Remote desktop: who is watching this session from the network (JSON [{ip, user}]). */
 void js_remote_event(const char *json) {
     if (!ctx) return;
+    if (!ctx) return;
     JSValueConst args[1] = { JS_NewString(ctx, json) };
     JS_FreeValue(ctx, call_global("__lordRemote", 1, args));
     JS_FreeValue(ctx, args[0]);
@@ -1352,6 +1375,7 @@ void js_remote_event(const char *json) {
 
 /* The screen-sharing API (remote/share.c): its prompt and indicator → __lordShare(json), sdk/share.js. */
 void js_share_event(const char *json) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValueConst args[1] = { JS_NewString(ctx, json) };
     JS_FreeValue(ctx, call_global("__lordShare", 1, args));
@@ -1362,6 +1386,7 @@ void js_share_event(const char *json) {
 /* Remote desktop: lord-sessiond's notice for the user on the monitor (RP_NOTICE, e.g. a source blocked
  * after failed logins) → __lordRemoteNotice(object). sdk/remote.js shows it as a notification. */
 void js_remote_notice(const char *json) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValue v = JS_ParseJSON(ctx, json, strlen(json), "<remote-notice>");
     if (JS_IsException(v)) { JS_FreeValue(ctx, JS_GetException(ctx)); return; }
@@ -1375,6 +1400,7 @@ void js_remote_notice(const char *json) {
  * __lordBroker(kind, json). The theme handles it in sdk/privacy.js. */
 void js_broker_event(const char *kind, const char *json) {
     if (!ctx) return;
+    if (!ctx) return;
     JSValueConst args[2] = { JS_NewString(ctx, kind), JS_ParseJSON(ctx, json, strlen(json), "<broker>") };
     JS_FreeValue(ctx, call_global("__lordBroker", 2, args));
     JS_FreeValue(ctx, args[0]);
@@ -1386,6 +1412,7 @@ void js_broker_event(const char *kind, const char *json) {
  * __lordBrokerEvent(type, data). See runtime/app-host.js. */
 void js_broker_app_event(const char *kind, const char *json, size_t len) {
     if (!ctx) return;
+    if (!ctx) return;
     JSValueConst args[2] = { JS_NewString(ctx, kind), JS_ParseJSON(ctx, json, len, "<broker>") };
     if (JS_IsException(args[1])) { JS_FreeValue(ctx, JS_GetException(ctx)); args[1] = JS_NULL; }
     JS_FreeValue(ctx, call_global("__lordBrokerEvent", 2, args));
@@ -1396,6 +1423,7 @@ void js_broker_app_event(const char *kind, const char *json, size_t len) {
 
 /* Login screen (greeter theme): notices and responses from lord-sessiond. */
 void js_greeter_event(const char *json) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValueConst args[1] = { JS_NewString(ctx, json) };
     JS_FreeValue(ctx, call_global("__lordGreeter", 1, args));
@@ -1417,6 +1445,7 @@ static void set_screen_displays(JSValue screen) {
 
 void js_screen_resized(void) {
     if (!ctx) return;
+    if (!ctx) return;
     JSValue g = JS_GetGlobalObject(ctx);
     JSValue lord = JS_GetPropertyStr(ctx, g, "lord");
     JSValue screen = JS_GetPropertyStr(ctx, lord, "screen");
@@ -1433,6 +1462,7 @@ void js_screen_resized(void) {
 }
 
 void js_term_event(int id, const char *type, const char *data) {
+    if (!ctx) return;
     if (!ctx) return;
     JSValueConst args[3] = { JS_NewInt32(ctx, id), JS_NewString(ctx, type), JS_NewString(ctx, data) };
     JS_FreeValue(ctx, call_global("__lordTerm", 3, args));

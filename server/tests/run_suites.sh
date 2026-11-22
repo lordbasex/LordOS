@@ -260,6 +260,13 @@ EOF
         77) skip "surface-cycles" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "surface-cycles (tests/cycle_client.c, headless lord-server)"; cat "$T/out" ;;
     esac
+    # a theme switch where the new theme and the running one both fail: the recovery screen, never no JS at all
+    sh tests/theme_switch_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "theme-switch-fails (tests/theme_switch_headless.sh, headless lord-server)" ;;
+        77) skip "theme-switch-fails" "build/lord-server (make)" ;;
+        *) bad "theme-switch-fails (tests/theme_switch_headless.sh, headless lord-server)"; cat "$T/out" ;;
+    esac
     # explicit sync's kernel side (src/wl/syncobj.c) on this machine's render node
     ./build/syncobj-kernel-test >"$T/out" 2>&1
     case $? in

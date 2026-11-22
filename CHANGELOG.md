@@ -1138,6 +1138,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   X-Resource's list (resource base 0), runs in a user namespace of its own and counted as a sandboxed client; it is not
   a client and is left out. Last, a drop Files claimed at the release (before the app's `XdndDrop`) told the X app it was
   refused although the files were copied; it is now told the result. `build/xwm-test` covers the first two.
+- **lord-server crashed when a theme switch failed and the running theme could not be loaded back** (`src/main.c`
+  `switch_theme`, `src/ui/js.c`; reported by the maintainer, 2026-11-22 13:41, package ws123). The crash was
+  `segfault at 170 … lord-server[2b8f60]`. A rebuild of `test/ws123` (`ad983794`) has `.text` byte-for-byte the
+  package's, and 0x2b8f60 is the first instruction of QuickJS's `JS_GetGlobalObject()`, reading `ctx->global_obj`
+  with a NULL context. The session log shows the path:
+  - The maintainer chose another theme (Workspaces). The verified-code check refused it: "size differs from the
+    manifest". The package had been updated under the running session, and the code manifest checked is the one read
+    at login.
+  - Going back to Default was refused for the same reason ("did not load again either").
+  - That left lord-server with no JavaScript context at all, and the main loop's next `js_tick` → `call_hot` →
+    `call_global_atom` crashed on it.
+
+  Now a switch that can't go back shows the recovery screen, as a failed start already did (`start_theme`). Every
+  entry point from C into the theme (`js_tick`, `js_wants_frame`, `js_frame`, input, Wayland and the other events)
+  also does nothing when there is no context.
+
+  Test: `tests/theme_switch_headless.sh` (in `run_suites.sh`) switches a headless lord-server to a theme that throws,
+  after the running theme's file was removed. The ws123 binary crashes there with the same `segfault at 170` at
+  `2b8f60`. Now lord-server goes on with the recovery screen.
 - **Two lord-server crashes in the maintainer's session: what was found, the fixes, and a crash report for the next
   one** (reported by the maintainer, 2026-11-22). Neither crash left a stack: the package's `lord-server` is stripped
   and no core is kept. What could be established, and what was changed:
