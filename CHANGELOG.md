@@ -742,8 +742,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display it opened on (a second, shorter monitor too). Tests: `vm_model_test.mjs` (placement below, above, too tall
   both ways, the screen's edges, a second display).
 
-- **Machines: a Windows guest with more than one display shows the right one, in apps mode too, in development**
-  (Windows tools **w7**; Machines offers the update). On a Windows 11 guest with an Intel GVT-g vGPU, Windows had a
+- **Machines: a guest with more than one display shows the right one, in apps mode too, in development**
+  (`lordos-guest-win` **w7**; Machines offers the update). On a guest with an Intel GVT-g vGPU, the guest had a
   1022 × 724 primary display next to the 1920 × 1080 output the machine's window shows. `lordos-guest-win` measured and
   moved everything on the primary and the virtual desktop: lord-vm kept logging "the guest's display is 1022x724 (not
   the size asked for)", each apps mode window showed the wrong part of the picture (Explorer about 200 pixels lower, the
@@ -764,7 +764,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     32 bytes; cases in `vm-test`): `agent: guest displays: \\.\DISPLAY1 1022x724 at 0,0 primary; \\.\DISPLAY2
     1920x1080 at 1022,0 (shown)`. The tools' own log (`%LOCALAPPDATA%\LordOS\lordos-guest-win.log`) lists every adapter
     and monitor, the choice, and each apps mode translation and move.
-  - Still to check on the maintainer's guest. Not changed: Windows' taskbar and desktop icons stay on its primary display.
+  - Still to check on the maintainer's guest. Not changed: the guest's taskbar and desktop icons stay on its primary display.
 
 - **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
