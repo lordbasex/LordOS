@@ -60,6 +60,13 @@ build/lord-vmdisplay: $(VMDISPLAY_SRC) $(VM_HDR)
 build/lordvm-dev: tests/vm_dev.c src/vm/vmproto.h src/vm/vmagent.c src/vm/vmagent.h src/media/maudio.c src/media/mpulse.c src/sound/pulse.c src/media/aring.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/vm_dev.c src/vm/vmagent.c src/media/maudio.c src/media/mpulse.c src/sound/pulse.c -lm $(if $(filter 1,$(GPU)),$(shell pkg-config --libs gbm egl glesv2))
+# lord-vmdisplay against a mock QEMU (its D-Bus display) and a mock lord-server: QEMU's listener calls answered inside
+# its 1 s, and buttons after the pointer's position in both mouse modes. No QEMU, KVM or GPU
+test: build/vmdisplay-test
+build/vmdisplay-test: tests/vmdisplay_test.c src/vm/vmproto.h build/lord-vmdisplay
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ tests/vmdisplay_test.c $(shell pkg-config --libs libsystemd)
+	./$@ build/lord-vmdisplay 2>build/vmdisplay-test.err || { cat build/vmdisplay-test.err; rm -f $@; exit 1; }
 endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
