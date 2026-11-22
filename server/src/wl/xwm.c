@@ -746,8 +746,8 @@ static void sel_answer(uint32_t time_, uint32_t requestor, uint32_t selection, u
  *     (x11_xdnd_trusted, with the pids X-Resource gives, never the client's own _NET_WM_PID): one X client can
  *     always stand in for another's selection.
  * The X app's messages count only from the client that owns XdndSelection (XFixes tells), and an owner that
- * changes mid-drag ends it. Its data is read only from a SelectionNotify the X server made (never one sent
- * with SendEvent) that answers exactly our ConvertSelection, and right before each read (GetProperty, INCR
+ * changes mid-drag ends it. Its data is read only after a SelectionNotify that answers exactly our ConvertSelection
+ * (requestor, selection, type and property; the owner sends it with SendEvent, as ICCCM says), and right before each read (GetProperty, INCR
  * chunks too) XdndSelection must still be owned by the window that owned it at XdndEnter, with the same
  * client pid and trust answer (GetSelectionOwner and X-Resource asked again, x11_xdnd_same_owner): if not,
  * the drop is refused. Actions here are wl_data_device_manager's bits (1 copy, 2 move, 4 ask). */
@@ -1074,9 +1074,13 @@ static void xres_pids(ReplyFn fn, uint32_t a, uint32_t b) {
 }
 
 static void xi_owner_of(XdndOwner *o, uint32_t win, const uint8_t *r, size_t n) {
-    uint32_t base[256], pid[256];
+    uint32_t base[256] = { 0 }, pid[256] = { 0 };
     int k = r ? x11_xres_pids(r, n, base, pid, 256) : -1;
     x11_xdnd_owner(o, win, base, pid, k, X.su.id_mask, dndg_pid_sandboxed);
+    if (X.debug)                                /* who decided it: every client's pid and whether it counts as sandboxed */
+        for (int i = 0; i < k; i++)
+            fprintf(stderr, "xwm: X client 0x%x: pid %u%s\n", base[i], pid[i],
+                    !pid[i] || pid[i] > 0x7fffffffu ? " (none)" : dndg_pid_sandboxed((int)pid[i]) ? " sandboxed" : "");
 }
 
 static void xi_trust_reply(const uint8_t *r, size_t n, uint32_t gen, uint32_t b) {
@@ -1220,11 +1224,15 @@ static void xi_read(int stage) {
 static void xi_notify(const uint8_t *p) {
     if (XI.stage != 1 || !XI.nq) return;
     int r = x11_xdnd_notify(p, X.wmwin, AT(XdndSelection), XI.q[0].atom, AT(LORD_SEL_XDND));
-    if (r < 0) {                                                    /* forged (SendEvent) or not ours */
-        if (X.debug) fprintf(stderr, "xwm: X drag: a SelectionNotify ignored (%s)\n", p[0] & 0x80 ? "synthetic" : "not ours");
+    if (r < 0) {                                                    /* not the answer to our ConvertSelection */
+        if (X.debug) fprintf(stderr, "xwm: X drag: a SelectionNotify ignored (not ours)\n");
         return;
     }
-    if (!r) { xi_fetch_done(0); return; }                           /* the owner refused that type */
+    if (!r) {                                                       /* the owner refused that type */
+        if (X.debug) fprintf(stderr, "xwm: X drag from 0x%x: its owner refused the conversion%s\n", XI.src, XI.dropped ? "" : " (before its drop)");
+        xi_fetch_done(0);
+        return;
+    }
     XI.stage = 2;
     xi_read(2);
 }
@@ -1267,8 +1275,10 @@ static void dnd_message(uint32_t win, uint32_t type, const uint32_t d[5]) {
         XI.t_drop = time(NULL);
         int r = XI.started ? wlx_xdrag_drop() : 0;   /* 1 dropped on a Wayland window, 2 Files reads it */
         XI.started = 0;
-        if (!r) xi_finish(0, 0);
-        else if (XI.result >= 0) xi_finish(XI.result, XI.result_action);
+        /* Files may have read the list already: it claims the drop at the release, which reaches lord-server before
+         * the app's XdndDrop (the app sends it once X tells it of the release); its answer is the drop's */
+        if (XI.result >= 0) xi_finish(XI.result, XI.result_action);
+        else if (!r) xi_finish(0, 0);
     }
 }
 

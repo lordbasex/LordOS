@@ -268,6 +268,13 @@ static void test_xres(void) {
     CHECK(!x11_xdnd_trusted(0x400005, b, p, 3, mask, fake_sandboxed));
     sandboxed_pid = 1001;                                                   /* the owner is */
     CHECK(!x11_xdnd_trusted(0x400005, b, p, 3, mask, fake_sandboxed));
+    /* the server's own client (base 0, Xwayland's pid) is in a user namespace of its own: it doesn't count */
+    uint32_t b0[3] = { 0, 0x200000, 0x400000 }, p0[3] = { 999, 1000, 1001 };
+    sandboxed_pid = 999;
+    CHECK(x11_xdnd_trusted(0x400005, b0, p0, 3, mask, fake_sandboxed));
+    CHECK(!x11_xdnd_trusted(0x5, b0, p0, 3, mask, fake_sandboxed));          /* nor is it an owner */
+    sandboxed_pid = 1000;                                                   /* a real client still does */
+    CHECK(!x11_xdnd_trusted(0x400005, b0, p0, 3, mask, fake_sandboxed));
 }
 
 /* A paste request from another X client of the focused window's process (arboard's own connection, GitHub #125):
@@ -303,9 +310,11 @@ static void test_xdnd_owner(void) {
     CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == 1);
     notify_ev(ev, 31, me, sel, tgt, 0);
     CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == 0);                    /* the owner refused it */
-    notify_ev(ev, 31 | 0x80, me, sel, tgt, prop);                           /* SendEvent by any X client */
-    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == -1);
-    notify_ev(ev, 31 | 0x80, me, sel, tgt, 0);                              /* a forged refusal, too */
+    notify_ev(ev, 31 | 0x80, me, sel, tgt, prop);                           /* SendEvent: how every owner answers */
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == 1);
+    notify_ev(ev, 31 | 0x80, me, sel, tgt, 0);                              /* and how it refuses */
+    CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == 0);
+    notify_ev(ev, 31 | 0x80, 0xa00002, sel, tgt, prop);                     /* sent, but for another requestor */
     CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == -1);
     notify_ev(ev, 31, 0xa00002, sel, tgt, prop);                            /* another requestor */
     CHECK(x11_xdnd_notify(ev, me, sel, tgt, prop) == -1);

@@ -337,6 +337,9 @@ int x11_xdnd_trusted(uint32_t owner, const uint32_t *base, const uint32_t *pid, 
     if (!owner || n < 0) return 0;
     for (int i = 0; i < n; i++) {
         if (!pid[i] || pid[i] > 0x7fffffffu) continue;
+        /* client 0 (resource base 0) is the X server itself, Xwayland: lord-server starts it in a user namespace of
+         * its own (no network), so it always looked sandboxed and no X drag of files ever reached Files */
+        if (!base[i]) continue;
         if (sandboxed((int)pid[i])) return 0;
         if (x11_same_client(owner, base[i], id_mask)) known = 1;
     }
@@ -359,7 +362,10 @@ int x11_xdnd_same_owner(const XdndOwner *then, uint32_t cur, const XdndOwner *no
 }
 
 int x11_xdnd_notify(const uint8_t ev[32], uint32_t requestor, uint32_t selection, uint32_t target, uint32_t prop) {
-    if (ev[0] != X_SelectionNotify) return -1;              /* the 0x80 bit: sent by a client (SendEvent) */
+    /* the 0x80 bit (SendEvent) is not refused: an owner always answers ConvertSelection that way (ICCCM 2.2), the
+     * server makes one only when nobody owns the selection, so refusing it refused every real X drag. Who wrote the
+     * property is checked by the read that follows (XdndSelection's owner asked again first, xi_read) */
+    if ((ev[0] & 0x7f) != X_SelectionNotify) return -1;
     if (x11_get32(ev + 8) != requestor || x11_get32(ev + 12) != selection || x11_get32(ev + 16) != target) return -1;
     uint32_t p = x11_get32(ev + 20);
     return p == prop ? 1 : p == 0 ? 0 : -1;
