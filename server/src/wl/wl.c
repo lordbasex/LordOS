@@ -91,6 +91,8 @@
 #include "xdg-toplevel-icon-v1-protocol.h"
 #include "wlicon.h"
 #include "wl_input.h"
+#include "wl_tablet.h"
+#include "wl_warp.h"
 #include "../gpu/gpu.h"
 #include "../media/media.h"
 #include <drm/drm_fourcc.h>
@@ -1761,25 +1763,26 @@ static void csd_set_shape(struct wl_client *c, struct wl_resource *r, uint32_t s
         wl_resource_post_error(r, WP_CURSOR_SHAPE_DEVICE_V1_ERROR_INVALID_SHAPE, "invalid shape %u", shape);
         return;
     }
-    if (!pointer_focus || pointer_focus->client != c) return;
+    /* a tablet tool's device: only while that tool is over a surface of this app (wl_tablet.c) */
+    struct wl_resource *tool = wl_resource_get_user_data(r);
+    if (tool ? !wl_tablet_tool_over(tool, c) : !pointer_focus || pointer_focus->client != c) return;
     cursor_surf = NULL;
     cursor_mode = 3;
     cursor_shape = shape;
     cursor_gen++;
 }
 static const struct wp_cursor_shape_device_v1_interface csd_impl = { .destroy = res_release, .set_shape = csd_set_shape };
-static void csm_device(struct wl_client *c, struct wl_resource *r, uint32_t id) {
+static void csm_device(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *tool) {
     struct wl_resource *d = wl_resource_create(c, &wp_cursor_shape_device_v1_interface, wl_resource_get_version(r), id);
     if (!d) { wl_client_post_no_memory(c); return; }
-    wl_resource_set_implementation(d, &csd_impl, NULL, NULL);
+    wl_resource_set_implementation(d, &csd_impl, tool, NULL);   /* tool: only compared, never used (wl_tablet_tool_over) */
 }
 static void csm_get_pointer(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *pointer) {
     (void)pointer;
-    csm_device(c, r, id);
+    csm_device(c, r, id, NULL);
 }
 static void csm_get_tablet(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *tool) {
-    (void)tool;
-    csm_device(c, r, id);               /* no tablets: the device exists but is unused */
+    csm_device(c, r, id, tool);         /* a tablet tool's cursor (tablet-v2, wl_tablet.c) */
 }
 static const struct wp_cursor_shape_manager_v1_interface csm_impl = {
     .destroy = res_release, .get_pointer = csm_get_pointer, .get_tablet_tool_v2 = csm_get_tablet,
@@ -3845,6 +3848,7 @@ static Surf *surface_at(Surf *s, float lx, float ly, float *ox, float *oy) {
     return NULL;
 }
 
+static uint32_t enter_serial;           /* the serial of the last wl_pointer.enter (pointer-warp, wl_warp.c) */
 static void pointer_enter(Surf *s, float lx, float ly) {
     if (pointer_focus == s) return;
     if (!s || !pointer_focus || s->client != pointer_focus->client) { cursor_surf = NULL; cursor_mode = 0; cursor_gen++; }
@@ -3858,8 +3862,9 @@ static void pointer_enter(Surf *s, float lx, float ly) {
     pointer_focus = s;
     if (s) {
         if (xw_scaled(s->client)) { lx = (float)xws_to_xf(lx, xw_pct); ly = (float)xws_to_xf(ly, xw_pct); }
+        enter_serial = wl_display_next_serial(dpy);     /* one for all of the client's pointers */
         FOR_CLIENT(&pointers, s->client, p) {
-            wl_pointer_send_enter(p, wl_display_next_serial(dpy), s->res, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
+            wl_pointer_send_enter(p, enter_serial, s->res, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
             if (wl_resource_get_version(p) >= 5) wl_pointer_send_frame(p);
         }
     }
@@ -5749,6 +5754,7 @@ void wl_set_focus(int id) {
     }
     /* X11: the X focus follows (and with it whether X apps may read LordOS's clipboard) */
     xwm_focus(s && s->xw ? s->xw : NULL);
+    wl_tablet_key_focus(s ? s->res : NULL);   /* tablet pads follow the keyboard (wl_tablet.c) */
     constraint_update();                /* a pointer lock holds only with the keyboard (ptrlock.h) */
     wl_display_flush_clients(dpy);
 }
@@ -5992,6 +5998,8 @@ int wl_start(void) {
     wl_display_add_client_created_listener(dpy, &client_created);
     wl_global_create(dpy, &kde_mgr_interface, 1, NULL, bind_kde_deco);   /* theme frame for GTK 3 (Firefox) */
     wl_input_globals(dpy);              /* zwp_pointer_gestures_v1 (wl_input.c) */
+    wl_tablet_globals(dpy);             /* zwp_tablet_manager_v2 (wl_tablet.c) */
+    wl_warp_globals(dpy);               /* wp_pointer_warp_v1 (wl_warp.c) */
     wl_textinput_globals(dpy, text_field_report);    /* zwp_text_input_v3 (wl_textinput.c) */
     secctx_init(dpy, may_secctx);       /* a sandbox's own socket per app (secctx.c) */
     /* inherited by apps opened from the LordOS terminal */
@@ -6059,6 +6067,67 @@ struct wl_resource *wl__surface_at(float x, float y, float *lx, float *ly) {
     }
     return target ? target->res : NULL;
 }
+
+/* ---- for wl_tablet.c and wl_warp.c (tablet-v2 and pointer-warp) ---- */
+static Surf *surf_of(struct wl_resource *r) {
+    return r && wl_resource_instance_of(r, &wl_surface_interface, &surface_impl) ? wl_resource_get_user_data(r) : NULL;
+}
+/* A surface's box on screen (logical px): 0 if it isn't shown. */
+int wl__surface_box(struct wl_resource *surface, float *x, float *y, float *w, float *h) {
+    Surf *s = surf_of(surface);
+    if (!dpy || !s || !s->content || !origin(s, x, y)) return 0;
+    *w = (float)s->lw;
+    *h = (float)s->lh;
+    return 1;
+}
+/* Under a modal dialog: no presses (as wl_pointer). */
+int wl__surface_held(struct wl_resource *surface) {
+    Surf *t = toplevel_of(surf_of(surface));
+    return t && t->role == R_TOPLEVEL && modal_over(t) != NULL;
+}
+/* Both surfaces are of the same window (one may be a subsurface of the other's toplevel). */
+int wl__same_window(struct wl_resource *a, struct wl_resource *b) {
+    Surf *x = toplevel_of(surf_of(a)), *y = toplevel_of(surf_of(b));
+    return x && x == y;
+}
+struct wl_resource *wl__key_focus(void) { return dpy && key_focus ? key_focus->res : NULL; }
+uint32_t wl__pointer_enter_serial(void) { return pointer_focus ? enter_serial : 0; }
+int wl__dragging(void) { return drag.on; }
+/* A tablet tool's tip on a surface or off it: a press as a button's for move, resize, a drag's start and popups
+ * (the serial is the tool's down). On a press elsewhere than a menu the menus close. */
+void wl__tool_press(struct wl_resource *surface, float x, float y, int down, uint32_t serial) {
+    Surf *s = surf_of(surface);
+    if (!dpy) return;
+    if (!down) {
+        if (buttons_held > 0) buttons_held--;
+        if (!buttons_held) { npress = 0; press_surf = NULL; }
+        return;
+    }
+    if (!s) return;
+    if (npopups) {
+        Surf *t = s;
+        while (t && t->role == R_SUB) t = t->parent;
+        if (!t || t->role != R_POPUP) dismiss_popups();
+    }
+    npress = 0;
+    press_surf = s;
+    press_serials[npress++] = serial;
+    press_x = x;
+    press_y = y;
+    buttons_held++;
+    if (fs_surf && key_focus != fs_surf && toplevel_of(s) == fs_surf) wl_set_focus(fs_surf->id);
+}
+/* The cursor a tablet tool asked for over its app (zwp_tablet_tool_v2.set_cursor): as wl_pointer.set_cursor. */
+void wl__tool_cursor(struct wl_resource *surface, int32_t x, int32_t y) {
+    Surf *s = surf_of(surface);
+    if (s && s->role != R_NONE && s->role != R_CURSOR) return;
+    if (s) { s->role = R_CURSOR; s->cursor_hx = s->p_hx = x; s->cursor_hy = s->p_hy = y; }
+    cursor_surf = s;
+    cursor_mode = s ? 1 : 2;
+    cursor_gen++;
+}
+/* The pointer leaves the app while a tablet tool is over it: its toolkit takes the tool's events, not the mouse's. */
+void wl__pointer_leave(void) { if (dpy) pointer_enter(NULL, 0, 0); }
 
 /* ---- X11 windows (xwm.c): the role of Xwayland's surfaces ---- */
 

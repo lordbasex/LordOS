@@ -12,6 +12,7 @@ typedef struct {
     struct input_absinfo ax, ay;
     char name[80];
     struct TpDevice *tp;          /* touchpad or touchscreen (tp/tp.c), or NULL */
+    struct TabDev *tab;           /* a graphics tablet's pen or pad (tablet.c), or NULL */
     int wheel_hires, hwheel_hires;  /* high-resolution wheel (REL_*WHEEL_HI_RES): that one is sent */
     int keyboard;                 /* a full keyboard (osk.h), not a power button or a token */
     int bus;                      /* input_id.bustype */

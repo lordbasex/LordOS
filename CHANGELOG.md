@@ -84,6 +84,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     nothing opened by itself, Open from the keyboard opening the apps on that display in the usual layout and order,
     offered once, "Don't suggest" kept for that display only, Clear and off); `workspaces_model_test.mjs` (theme.json).
 
+- **Graphics tablets for Linux apps: pressure, tilt and pads, in development** (`tablet-v2` version 2, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Graphics tablets"). lord-server reads pens and pads straight from evdev with
+  its own code (`server/src/tablet.c`, no libinput or libwacom) and offers `zwp_tablet_manager_v2`: Krita, GIMP,
+  Inkscape, GTK 4 and Qt 6 apps get the pen's proximity, tip, motion, pressure, distance, tilt, rotation, slider and
+  buttons, with its name, USB ids, bus and device path; a tool's serial and Wacom id; and the pad's buttons, rings,
+  strips and dials, sent to the window with the keyboard. X apps get them through Xwayland, which binds tablet-v2
+  itself. Only the app under the pen hears of it. Where no app takes the pen (LordOS's own UI, an app without tablet-v2,
+  a window under a modal dialog) it is a mouse — and now one that clicks: the tip is the left button and the pen's
+  buttons the right and middle ones (before, a pen only moved the pointer). A pen display covers the main display, a
+  tablet every display; both follow a rotated display. An old Wacom pad is no longer taken for an absolute pointer.
+  Checked by `build/tablet-test` (synthetic evdev sequences) and `build/wltablet-test` (libwayland clients on the wire);
+  not yet with a real tablet or on the VM.
+
+- **Apps may move the pointer on their own window, in development** (`pointer-warp-v1`, approved by the maintainer
+  2026-11-22; `docs/WAYLAND.md`, "Pointer warp"). `wp_pointer_warp_v1` lets a game, a 3D tool or a VM put the pointer at
+  a point of its surface, only while the pointer is over that window and it has the keyboard, with the serial of the
+  enter it got, inside the surface, and never while the pointer is locked or in a drag; a confinement still holds. The
+  protocol's XML comes from wayland-protocols 1.45 (Debian 13 ships 1.44) and is kept unmodified in `server/protocols/`.
+
 - **A Linux window's own icon for apps with no installed one, in development** (`xdg-toplevel-icon-v1`, approved by the
   maintainer 2026-11-22; `docs/WAYLAND.md`, "Window icons"). An AppImage, a Wine program or a game without a `.desktop`
   entry now shows the icon it hands its window in the Dock, the switcher and the Overview instead of a letter. The

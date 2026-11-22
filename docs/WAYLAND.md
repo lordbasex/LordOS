@@ -50,6 +50,8 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `ext_idle_notifier_v1` | 1 | an app is told when the person is away from the computer and back, only once they allowed it (the `idle` permission, asked once per app; see "Idle notifications", 0.8.9.5) |
 | `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
 | `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
+| `zwp_tablet_manager_v2` (tablet-v2) | 2 | graphics tablets (in development, 2026-11-22): pens with pressure, tilt, distance, rotation, slider and their buttons, pads with buttons, rings, strips and dials (2: `bustype`, dials), read from evdev by our own `tablet.c` (no libinput or libwacom). Supported: everything the protocol has but the tool's `wheel` (a Wacom mouse's) and pad modes beyond one. Checked by `build/tablet-test` (synthetic evdev sequences) and `build/wltablet-test` (libwayland clients on the wire); the global and Xwayland's `get_tablet_seat` seen with a headless lord-server; **not yet with a real tablet or on the VM**. See "Graphics tablets" |
+| `wp_pointer_warp_v1` (pointer-warp) | 1 | an app moves the pointer to a point of its own window (in development, 2026-11-22): only with the pointer over it, the serial of the enter it got and the keyboard, inside the surface, never while the pointer is locked or in a drag (`pwarp.h`). The XML is wayland-protocols 1.45's, kept in `server/protocols/`. Checked by `build/wltablet-test`; **not yet with an app on the VM**. See "Pointer warp" |
 | `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
@@ -541,6 +543,94 @@ and
 `tests/kbinhibit_model_test.mjs` the session's side. `build/kbinhibit-client` (`tests/kbinhibit_client.c`, inside a
 session) checks a second inhibitor's error, destroy and ask again, a surface destroyed before its inhibitor and a
 client leaving with one; `hold 30` keeps a window with an inhibitor and prints `active`, `inactive` and its keys.
+
+### Graphics tablets (`zwp_tablet_manager_v2`, in development)
+
+Approved by the maintainer on 2026-11-22. Wacom, Huion, XP-Pen and pen displays reach Krita, GIMP, Inkscape, GTK 4 and
+Qt 6 apps with pressure and tilt, and X apps through Xwayland, which binds tablet-v2 itself (seen with a headless
+lord-server: `zwp_tablet_manager_v2.get_tablet_seat` in its `WAYLAND_DEBUG`).
+
+**Devices** (`server/src/tablet.c`, no libinput or libwacom). `tablet_kind` sorts an evdev device by its bits:
+
+- a **pen**: `ABS_X`/`ABS_Y` with `BTN_TOOL_PEN` (or another pen tool) or `BTN_STYLUS`, no multitouch slots (those are
+  `tp/tp.c`'s touch screens and touchpads), not a keyboard, mouse or accelerometer. Its axes are read when it has them:
+  `ABS_PRESSURE`, `ABS_DISTANCE`, `ABS_TILT_X`/`ABS_TILT_Y`, `ABS_Z` (rotation, Wacom's Art Pen), `ABS_WHEEL` (the
+  airbrush's slider); its tools from `BTN_TOOL_PEN`, `_RUBBER`, `_BRUSH`, `_PENCIL`, `_AIRBRUSH`, `_MOUSE`, `_LENS`;
+  its buttons `BTN_STYLUS`, `BTN_STYLUS2`, `BTN_STYLUS3`; a tool's serial from `MSC_SERIAL` and Wacom's tool id from
+  `ABS_MISC`. `INPUT_PROP_DIRECT` marks a pen display.
+- a **pad**: numbered buttons (`BTN_0`…) with no pen tool and no `BTN_TOUCH`. Its buttons are numbered in the kernel's
+  order (`BTN_0`…`BTN_9`, `BTN_A`…`BTN_Z`, `BTN_BASE`…, `BTN_LEFT`…); its rings are `ABS_WHEEL` and `ABS_THROTTLE`, its
+  strips `ABS_RX` and `ABS_RY`, its dials `REL_WHEEL` and `REL_HWHEEL` (`REL_WHEEL_HI_RES` when it has it). An old Wacom
+  pad also says `BTN_STYLUS` with X and Y: it is a pad, never a pointer (before this, it counted as an absolute pointer).
+  QEMU's USB tablet (`BTN_LEFT`, no pen tool) stays the absolute pointer it was.
+
+Each `SYN_REPORT` makes one frame (two when the tool changes in one report: the pen leaves, the eraser comes in). As
+libinput does: tilt in degrees from the axis's resolution (units per radian), or Wacom's −64…64° over the range without
+one; pressure and distance 0…65535; a ring's angle from north, 0 meaning the finger lifted (`stop`); a strip's position
+from its bit (1, 2, 4…), 0 meaning lifted. A pen with no `BTN_TOOL_*` comes in at its first report and has its tip when
+the pressure passes 5 % if it has no `BTN_TOUCH`. After `SYN_DROPPED` nothing counts until the next report.
+
+**Where the pen goes** (`server/src/wl/wl_tablet.c`, `tablet_pen` in `main.c`):
+
+- Over a surface whose app bound tablet-v2 (and isn't under a modal dialog), the tool gets `proximity_in` and then
+  everything it has (motion in surface coordinates, X pixels for a scaled Xwayland, its axes, `down` if the tip touches,
+  buttons held) in one frame; then only what changes; `up`, button releases and `proximity_out` when it leaves. The
+  pointer leaves that app (`wl_pointer.leave`), so its toolkit follows the tool; the pointer image moves with the pen
+  and shows the cursor the app asked for with `zwp_tablet_tool_v2.set_cursor` (only with the `proximity_in` serial) or
+  cursor-shape-v1's tablet tool device. The theme still sees the tip's presses, so a tap raises and focuses the window.
+- While the tip is down the surface it pressed keeps the tool, even past its edge. The press counts as one for
+  `xdg_toplevel.move` and `resize` and for closing menus; once a window move begins, the pen moves it as the mouse would
+  until the tip comes up.
+- Anywhere else — LordOS's own UI, an app that never bound tablet-v2, a window under a modal dialog, a drag, a pointer
+  lock — the pen is a mouse, as before: it moves the pointer, the tip is the left button, `BTN_STYLUS` the right,
+  `BTN_STYLUS2` the middle, `BTN_STYLUS3` back. (Before, a pen only moved the pointer: `BTN_TOUCH` and the stylus
+  buttons clicked nothing.) A
+  press made as a mouse stays one until released: a stroke never moves into an app half-way, and one that began in an
+  app stays the app's.
+- Only the app under the tool hears of it: no other app learns where the pen is. A tool with a hardware serial is the
+  same object on every tablet; one without belongs to its tablet and is removed with it.
+
+**Pads** follow the keyboard: `enter` (with the pen of the same USB device, else of the same vendor and product, else
+any pen) and the group's `mode_switch` to mode 0 go to the window with the keyboard, `leave` when it changes. One group
+holds every button, ring, strip and dial; there is one mode, so no `modes` event. `set_feedback` is accepted and not
+shown yet.
+
+**The area** a pen covers: a pen display (`INPUT_PROP_DIRECT`) the **main display**; a tablet **every display**, the
+space the mouse moves in (as the absolute pointer always did). Both follow a rotated display (the main one for a pen
+display; the single display for a tablet). A choice per tablet in Settings is not there yet.
+
+Not done yet: the tool's `wheel` (a Wacom 4D mouse's), a lens or mouse tool's rotation, several modes per pad group,
+a pen display mapped to a display other than the main one, and a drag and drop started with the pen.
+
+**Tests:** `build/tablet-test` (`tests/tablet_test.c`, `make -C server test`): which bits are a pen or a pad (an Intuos
+pen, a pen display, a pen with no `BTN_TOOL`, an old Wacom pad, an ExpressKey Remote; QEMU's tablet, a mouse, a
+keyboard, an accelerometer, applesmc and a joystick are not), and the frames of an Intuos's sequences: proximity in with
+serial and tool id, tilt from the resolution, the tip and pressure, drawing, both buttons, leaving with the tip and a
+button down, coming back with them, turning to the eraser in one report, `tablet_leave`, `SYN_DROPPED`, a pen without
+`BTN_TOOL` or `BTN_TOUCH`, tilt without resolution; a pad's buttons, ring (north, 90°, lifted), strip (both ends, the
+middle, lifted) and dial (detents and high resolution). `build/wltablet-test` (`tests/wltablet_test.c` with
+`tests/wltablet_srv.c`): real libwayland clients against `wl_tablet.c` and `wl_warp.c`, checking each event above on
+the wire (`WLTABLET_LOG=1` prints what the client heard). **Unverified:** a real Wacom (or other) tablet, and Krita or
+GTK 4 on the VM with a uinput tablet.
+
+### Pointer warp (`wp_pointer_warp_v1`, in development)
+
+Approved by the maintainer on 2026-11-22. An app asks to put the pointer at a point of its surface
+(`warp_pointer(surface, pointer, x, y, serial)`): a game or a 3D tool re-centring it, a VM's guest cursor. lord-server
+does it only for the app in front of the person, on its own window, from an event it really got (`pwarp.h`, every
+rule checked by `build/wltablet-test`):
+
+- the pointer is over one of its surfaces, and the request names that surface or another of the same window;
+- the serial is the one of the `wl_pointer.enter` it got for that focus (one serial for all its `wl_pointer`s);
+- it also has the keyboard: a window in the background never takes the pointer, not even one the pointer is over;
+- the point is inside the surface (X pixels from a scaled Xwayland are turned into logical ones);
+- the pointer is not locked (pointer-constraints: the app asked for it to stay, and can unlock it), and no drag, window
+  move, LordOS pointer lock (Machines' capture) or pen press as a mouse is running.
+
+A confinement still holds (the new position is clamped to it). The pointer moves with no relative motion, and the app
+gets its `wl_pointer.motion` with the next frame. A refused request is ignored (the protocol has no error for it);
+`LORD_WL_DEBUG=1` logs each one and why. The XML is wayland-protocols 1.45's (`staging/pointer-warp`, Debian 13 ships
+1.44), kept unmodified in `server/protocols/` (`THIRD_PARTY.md`). Xwayland 24.1 (Debian 13) does not use it yet.
 
 ## Frame and colors: Chromium, Firefox, GTK and GNOME
 
