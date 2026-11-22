@@ -798,8 +798,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     key, a missing, empty, garbage or OpenPGP signature, another list, malformed entries), `vmunattend-test`
     (`lordos-auto.conf`, the seed disk read back), `vm_catalog_test.mjs` (the card, the live ISO from the real list, the
     tag against `web/content/downloads.json`). Not run yet: a whole install on a machine, which needs the next ISO.
-- **Machines: an Android 13 card in New Machine, amd64 only, in development** (asked by the maintainer 2026-11-22: "one more
-  operating system ISO in Machines' cards"; docs/VIRTUALIZATION.md 4.2). The card downloads **Bliss OS 16.9.7, FOSS edition**
+- **Machines: an Android 13 card in New Machine, amd64 only, in development** (asked by the maintainer 2026-11-22: one more system to install from an ISO in Machines' cards; docs/VIRTUALIZATION.md 4.2). The card downloads **Bliss OS 16.9.7, FOSS edition**
   (no Google apps), the only installable Android ISO for PCs found: Android-x86 stopped at 9.0 in 2020, LineageOS's QEMU targets
   are built by nobody as an ISO, and no installable Android ISO exists for arm64, so the card isn't shown on arm64 hosts.
   - **Trust:** Bliss OS signs no list, so `assets/machines/systems.json` pins the one file, its SourceForge address and its
