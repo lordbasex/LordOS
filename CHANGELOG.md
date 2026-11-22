@@ -307,6 +307,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: a machine with an Intel graphics card (GVT-g) no longer takes most of a CPU core, in development**
+  (`docs/MACHINES-GPU.md`, "A vGPU's picture without a readback"). Live on the maintainer's computer (Windows 11 on
+  the vGPU at 1920 × 1080, an RX 580 drawing the desktop) lord-server's main thread used ~90 % of a core: QEMU's vfio
+  display sends the whole picture about 33 times a second, changed or not, and each time lord-server read all 8 MB back
+  from the iGPU on its main thread, scaled it into the window with the CPU and uploaded it to the desktop's GPU again.
+  - With the GPU composing, a machine's picture is now a GPU texture drawn below the UI like a Linux app's window and
+    scaled by the GPU (`wl_paint_media`, `media_paint_note`). An Intel vGPU's Y-tiled picture is copied on the iGPU into
+    one of two linear buffers that the desktop's GPU imports (PRIME, rows a multiple of 256 bytes), only the rows the
+    copy lacks; the main thread never waits: the copy's fence is in lord-server's poll. A Linux 3D machine is drawn
+    straight from the desktop GPU's import of QEMU's dmabuf (it was read back and uploaded again too). A new frame
+    presents only the displays its window is on, with no paint and no UI damage.
+  - Unchanged frames are found on the GPU (a pass that drops equal pixels, counted with
+    `GL_EXT_occlusion_query_boolean`) and acknowledged at once with nothing presented; on the CPU path (`LORD_GPU=0`)
+    the same test runs before the readback, and an unchanged frame isn't read.
+  - Measured with `build/dmaread-test bench` on that computer (1920 × 1080 at 33 frames a second, main-thread CPU):
+    13.4 ms a frame before (readback, CPU scaling and upload; 44 % of a core) → 0.37–0.38 ms on the GPU path, changed
+    or not (1.2–1.3 %); the CPU path 0.37 ms unchanged, 1.47 ms changing. The live session's numbers are still to
+    measure.
+  - The CPU's pixels are read back only when something needs them (a screenshot, a snapshot's thumbnail, a recording,
+    a rotated or transformed view). `LORD_VM_GPUTEX=0` goes back to the readback. `dmaread-test` checks the linear
+    copies on the other GPU, flipped too, and the change test.
+  - lord-vmdisplay answers an `UpdateDMABUF` that comes while there's no dmabuf picture without logging it (the vfio
+    display sends one every refresh during a mode change; the last picture stays).
+
+- **Machines: the pointer is shown over a machine with an Intel graphics card, in window, full screen and apps mode, in
+  development**. Intel's driver puts Windows' pointer on the vGPU's cursor plane, not in the picture, but LordOS hid its
+  own arrow over any Windows machine until the guest handed a shape over, which a vGPU machine didn't: there was no
+  pointer at all. A vGPU machine now shows the host's arrow until QEMU hands the plane's shape over (and again when
+  that shape is blank); lord-vmdisplay takes a cursor without a hotspot (VFIO's 0xffffffff) with its hotspot at the
+  top left instead of refusing it; Configure → Display → *Pointer drawn by* (the VirtIO driver's `HWCursor`) isn't
+  offered for a machine with an Intel graphics card.
+
 - **Machines: older LordOS tools in a machine are said, and Files explains a missing "Open with"** (`docs/FILES.md`,
   `docs/VIRTUALIZATION.md` 7.3). A machine still running the first guest tools (hello `w1`) never appeared in
   Files' Open with for a `.exe` (only tools that say `open`, `w3` and later, are listed), and nothing said why: the right

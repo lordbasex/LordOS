@@ -296,6 +296,61 @@ the fake root); a guest restart from inside Windows with this build (the QMP res
 WebGL numbers with this build (the earlier hands-on numbers stand); other gen9 iGPUs than 0x9BC5; a restart when the
 machine has no window open (only the machine's window starts it again).
 
+### A vGPU's picture without a readback (2026-11-22, in development; the latest release is 0.8.9.4)
+
+**Found live** on the maintainer's computer (Windows 11 on `i915-GVTg_V5_4`, 1920 × 1080, RX 580 desktop, three
+displays): lord-server's main thread at ~90 % of a core, ~87 % in total, QEMU ~49 %, 143 stall lines. No profiler was
+allowed on the session (perf_event_paranoid 3, lord-server not dumpable), so the path was read and measured apart:
+
+- QEMU's vfio display calls `UpdateDMABUF` for the **whole** picture on every GUI refresh (~33 a second), changed or
+  not. Each one made lord-server draw the Y-tiled buffer into a framebuffer on the iGPU and `glReadPixels` all 8 MB of
+  it **on the main thread** (`dmaread_rows`, waiting for the iGPU at its low clock);
+- then damage the whole node, so the media node **rescaled** the 1920 × 1080 picture into the window with mview.c's
+  per-pixel float bilinear loop (the window isn't 1:1), and the UI texture uploaded the result to the RX 580;
+- 30 ms apart, while the guest had no dmabuf picture (a mode change), each update was refused and logged.
+
+**Changed:**
+
+| Piece | What it does now | Where |
+|---|---|---|
+| GPU picture | With the GPU composing, a machine's picture is a texture drawn below the UI like an app window: the media node notes it for layer 0 and opens a hole (`wl_paint_media`, also re-noted in a moved layer by `media_paint_note`), and the GPU scales it. A new frame in it needs no paint and no UI damage: `media_src_present` marks only the displays the window is on (`media_present_take`, main.c), and the frame is acknowledged after that present | `media/mview.c`, `wl/wl.c`, `media/media.c`, `ui/paint.c`, `main.c` |
+| Intel vGPU on another GPU | Two linear buffers made on the iGPU (GBM, rows rounded to 64 pixels so they are a multiple of 256 bytes, amdgpu's pitch), exported as dmabufs and imported by the desktop's GPU once (PRIME). Each frame is drawn from the Y-tiled buffer into the copy not shown (only the rows that copy lacks), `glFlush`, and lord-server's loop polls the copy's dmabuf for its fence: the main thread never waits for the iGPU | `gpu/dmaread.c` (`dmaread_out_new`, `dmaread_copy`), `ui/js_vm.c` (`gout`) |
+| Linux 3D (virgl) | The desktop GPU's own import of QEMU's dmabuf is the texture (it was read back and uploaded again before); QEMU's bottom-first rows are drawn flipped | `ui/js_vm.c`, `wl/wl.c` (`draw_media`) |
+| Unchanged frames | The copy's pass also compares the new picture with the one shown (a second pass that discards equal pixels, counted with `GL_EXT_occlusion_query_boolean`, its answer read once the fence signalled, never waited for). A frame that changed nothing is acknowledged at once and nothing is presented. On the CPU path (`LORD_GPU=0`) the same test runs before `glReadPixels` against what the reader's framebuffer holds, and an unchanged frame isn't read | `gpu/dmaread.c` (`dmaread_changed`, `dmaread_rows_new`) |
+| The CPU's pixels | Kept for what needs them: a screenshot, a snapshot's thumbnail, a recording of the machine or of the screen (those read back every frame, as before), a rotated or transformed view, a capture paint; `media_src_need_cpu` reads back the shown frame on demand | `media/media.c`, `ui/js_vm.c` |
+| No dmabuf picture | lord-vmdisplay answers such an `UpdateDMABUF` and counts it, without a log line; the last picture stays | `vm/vmdisplay.c` |
+| `LORD_VM_GPUTEX=0` | The readback of before, for comparison | `ui/js_vm.c` |
+
+**Measured** (`build/dmaread-test bench 5`: the maintainer's i9-10900 UHD 630 and RX 580, a 1920 × 1080 Y-tiled
+buffer at QEMU's 33 updates a second; main-thread CPU per frame; "before" is the old readback plus mview.c's scaling
+loop into a 1000 × 562 box and the upload to the RX 580, which is what lord-server's main thread did per frame, without
+its paint of the rest of the window):
+
+| Case | ms per frame | % of a core |
+|---|---|---|
+| Before: readback, CPU scaling, upload | 13.4 (max 19.1) | 44.2 |
+| After, GPU path, picture unchanged | 0.38 | 1.3 |
+| After, GPU path, picture changing every frame | 0.37 | 1.2 |
+| After, CPU path (`LORD_GPU=0`), unchanged | 0.37 | 1.2 |
+| After, CPU path, changing every frame (readback only; the CPU paint stays) | 1.47 | 4.9 |
+
+The present of a changed frame (one `gpu_frame_ex` of the display the window is on) comes on top of the GPU path's
+numbers. `dmaread-test` checks the copies on the AMD card (exact pixels, flipped too), the change test both ways, and
+that the other EGL context stays current.
+
+**Not checked yet:** a running lord-server with the vGPU machine on this build (the maintainer's machine wasn't
+touched; no second vGPU instance was free for a test machine, `intel-whole` takes both), so the frames a second
+delivered and the session's total CPU are still to measure live, in a window, full screen and apps mode; a Linux 3D
+machine shown from its texture.
+
+**The pointer of a vGPU machine.** Intel's driver puts Windows' pointer on the vGPU's cursor plane, never in the
+picture. lord-server kept the host's arrow hidden because a Windows guest "draws its own pointer until it hands one
+over", so with no shape from QEMU there was no pointer at all (seen live in apps mode and full screen; the session's log
+had no refused `CursorDefine`, so no shape came). A shape could also have been refused: VFIO gives the plane no hotspot
+(0xffffffff, -1 in `CursorDefine`). Now lord-vmdisplay takes an unknown hotspot as 0, 0 (the
+arrow's tip); a vGPU machine never hides the host's arrow before a shape comes, and a blank shape from its plane shows
+the host's arrow; *Pointer drawn by* (viogpudo's `HWCursor`) isn't offered for a machine with an Intel graphics card.
+
 ### Settings → Graphics cards (approved in principle 2026-11-21; built, "Mode A — built" above)
 
 The person never runs a command: a computer with more than one GPU is managed from **Settings → Graphics cards**.
