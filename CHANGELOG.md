@@ -12,6 +12,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **`wp_single_pixel_buffer_manager_v1` and `wp_alpha_modifier_v1` for Linux apps, in development** (Wayland audit item
+  7, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Apps (GTK 4, video
+  players) can draw a solid colour from a one-pixel buffer stretched by a viewport instead of a full-size buffer, and
+  fade a surface with an opacity the compositor applies (both paths). Offered to sandboxed clients too: neither reads
+  anything of another client.
+
 - **xdg-shell 7 and newer protocol versions for Linux apps, in development** (Wayland audit item 4, approved by the
   maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Windows are offered the window menu and
   fullscreen (not during a screen share) besides maximize and minimize, told the work area of their display

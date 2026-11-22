@@ -46,6 +46,8 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
 | `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (0.8.8.8, checked on VM 127, `wl_textinput.c`, see "Input methods") |
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
+| `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
+| `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
 | `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
@@ -1354,6 +1356,16 @@ frame. `tests/wlperf_headless.sh` checks each part against a headless lord-serve
   logical size swaps for a quarter turn. The mapping is weston's and wlroots' (`buftf_point`); `build/buftf-test`
   checks all eight transforms pixel by pixel, and `wlperf-client transform` a 200 × 100 buffer at 90° mapping as a
   100 × 200 window. A transform out of range is `invalid_transform`.
+- **`wp_single_pixel_buffer_manager_v1` and `wp_alpha_modifier_v1`.** A single-pixel buffer is a `wl_buffer` of its own
+  kind (`spb_of`), taken as a 1 × 1 premultiplied pixel (a colour above its alpha is cut to it) and released at once;
+  the viewport stretches it like any buffer. The alpha multiplier is pending until commit, multiplies the surface's own
+  draw (CPU `blit_surface`, GPU `gpu_draw` at draw time, so a new opacity needs no UI repaint), not its subsurfaces, and
+  a new value repaints the whole window; destroying the object is `set_multiplier(UINT32_MAX)` from the next commit, and
+  using it after its surface is gone is `no_surface`. Both are generated from wayland-protocols 1.44 (`WL_MORE`) and
+  offered to every client, sandboxed ones too: they read nothing of other clients (`secctx_hidden` is unchanged).
+  Behind a window drawn with the multiplier on the GPU path is the compositor's black, not the desktop (the UI leaves a
+  hole there, as for any translucent app pixel). `wlperf-client protocols` binds both and shows a one-pixel window at
+  50 %.
 
 ## Pending
 

@@ -73,6 +73,8 @@
 #include "tiutf8.h"
 #include "xdg-foreign-unstable-v2-protocol.h"
 #include "xdg-dialog-v1-protocol.h"
+#include "single-pixel-buffer-v1-protocol.h"
+#include "alpha-modifier-v1-protocol.h"
 #include "keyboard-shortcuts-inhibit-unstable-v1-protocol.h"
 #include "xwm.h"
 #include "xwayland.h"
@@ -161,6 +163,9 @@ struct Surf {
     int dmg_full, tex_full;
     int p_tf, tf;                   /* wl_surface.set_buffer_transform: pending and current (buftf.h) */
     int tf_px;                      /* the transform px was turned from (px is always upright) */
+    /* wp_alpha_modifier_v1: its object, and the multiplier pending and current (UINT32_MAX: opaque as drawn) */
+    struct wl_resource *am;
+    uint32_t p_alpha, alpha;
     int lw, lh;                 /* logical size (viewporter; otherwise the buffer's) */
     /* wp_viewporter: pending and current (vsw < 0 = no crop, vdw <= 0 = no scaling) */
     struct wl_resource *viewport;
@@ -728,6 +733,68 @@ static void queue_release(Dmabuf *d) {
     dm_unref(d);
 }
 
+/* ---- wp_single_pixel_buffer_manager_v1: a buffer of one pixel (its own wl_buffer kind) ---- */
+typedef struct { uint32_t argb; } Spb;
+static void spb_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct wl_buffer_interface spb_buffer_impl = { .destroy = spb_destroy };
+static const Spb *spb_of(struct wl_resource *buf) {
+    return buf && wl_resource_instance_of(buf, &wl_buffer_interface, &spb_buffer_impl) ? wl_resource_get_user_data(buf) : NULL;
+}
+static void spb_gone(struct wl_resource *r) { free(wl_resource_get_user_data(r)); }
+/* r, g, b, a: premultiplied, 0 … UINT32_MAX each; kept as one 8-bit premultiplied ARGB pixel (a colour above its
+ * alpha, which premultiplied can't be, is cut to it) */
+static void spbm_create(struct wl_client *c, struct wl_resource *r, uint32_t id, uint32_t R, uint32_t G, uint32_t B, uint32_t A) {
+    (void)r;
+    Spb *p = calloc(1, sizeof *p);
+    struct wl_resource *b = p ? wl_resource_create(c, &wl_buffer_interface, 1, id) : NULL;
+    if (!b) { free(p); wl_client_post_no_memory(c); return; }
+    uint32_t a = A >> 24, rr = R >> 24, gg = G >> 24, bb = B >> 24;
+    if (rr > a) rr = a;
+    if (gg > a) gg = a;
+    if (bb > a) bb = a;
+    p->argb = a << 24 | rr << 16 | gg << 8 | bb;
+    wl_resource_set_implementation(b, &spb_buffer_impl, p, spb_gone);
+}
+static void spbm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct wp_single_pixel_buffer_manager_v1_interface spbm_impl = { .destroy = spbm_destroy, .create_u32_rgba_buffer = spbm_create };
+static void bind_spbm(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &wp_single_pixel_buffer_manager_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &spbm_impl, NULL, NULL);
+}
+
+/* ---- wp_alpha_modifier_v1: a surface's opacity, double-buffered (applied with its draw, not to its subsurfaces) ---- */
+static void ams_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void ams_set(struct wl_client *c, struct wl_resource *r, uint32_t factor) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s) { wl_resource_post_error(r, WP_ALPHA_MODIFIER_SURFACE_V1_ERROR_NO_SURFACE, "the wl_surface is gone"); return; }
+    s->p_alpha = factor;
+}
+static const struct wp_alpha_modifier_surface_v1_interface ams_impl = { .destroy = ams_destroy, .set_multiplier = ams_set };
+static void ams_gone(struct wl_resource *r) {       /* as set_multiplier(UINT32_MAX), from the next commit */
+    Surf *s = wl_resource_get_user_data(r);
+    if (s && s->am == r) { s->am = NULL; s->p_alpha = UINT32_MAX; }
+}
+static void am_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void am_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface) {
+    Surf *s = wl_resource_get_user_data(surface);
+    if (s && s->am) { wl_resource_post_error(r, WP_ALPHA_MODIFIER_V1_ERROR_ALREADY_CONSTRUCTED, "the wl_surface has one"); return; }
+    struct wl_resource *a = wl_resource_create(c, &wp_alpha_modifier_surface_v1_interface, wl_resource_get_version(r), id);
+    if (!a) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(a, &ams_impl, s, ams_gone);
+    if (s) s->am = a;
+}
+static const struct wp_alpha_modifier_v1_interface am_impl = { .destroy = am_destroy, .get_surface = am_get };
+static void bind_am(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &wp_alpha_modifier_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &am_impl, NULL, NULL);
+}
+static float surf_alpha(const Surf *s) { return s->alpha == UINT32_MAX ? 1.0f : (float)((double)s->alpha / (double)UINT32_MAX); }
+
 /* The buffer the app just sent becomes the surface's content. */
 static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
     Dmabuf *dm = dmabuf_of(buf), *old = s->dmabuf;
@@ -759,6 +826,20 @@ static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
         free(s->px);
         s->px = NULL;
         s->w = s->h = 0;
+        wl_buffer_send_release(buf);
+    } else if (spb_of(buf)) {
+        /* wp_single_pixel_buffer_v1: one premultiplied pixel, its size set by a viewport (a background, a fade) */
+        const Spb *p = spb_of(buf);
+        uint32_t *np = s->w == 1 && s->h == 1 && s->px ? s->px : realloc(s->px, 4);
+        if (np) {
+            s->px = np;
+            s->w = s->h = 1;
+            s->px[0] = p->argb;
+            s->opaque = (p->argb >> 24) == 255;
+            s->content = 1;
+            s->tf_px = s->tf;
+            s->tex_dirty = 1;
+        }
         wl_buffer_send_release(buf);
     } else {
         copy_buffer(s, buf, dmg);
@@ -897,6 +978,7 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     else if (s->p_ds_on || s->p_db_on) s->dmg_full = 1;     /* damage with no new buffer: shown again as it is */
     else { s->dmg_full = 0; s->dmg = (BufBox){ 0, 0, 0, 0 }; }  /* a commit of state only */
     s->p_ds_on = s->p_db_on = 0;
+    if (s->p_alpha != s->alpha) { s->alpha = s->p_alpha; s->dmg_full = 1; }   /* a new opacity: all of it again */
     s->bscale = s->p_bscale;
     apply_viewport(s);
     if (s->p_input_set) {
@@ -1192,6 +1274,7 @@ static void surface_gone(struct wl_resource *r) {
     if (s->viewport) wl_resource_set_user_data(s->viewport, NULL);
     if (s->sub) wl_resource_set_user_data(s->sub, NULL);
     if (s->frac) wl_resource_set_user_data(s->frac, NULL);
+    if (s->am) wl_resource_set_user_data(s->am, NULL);
     if (s->kde) wl_resource_set_user_data(s->kde, NULL);
     if (s->deco) wl_resource_set_user_data(s->deco, NULL);
     /* a client may destroy the wl_surface before its role objects: they must not keep the freed Surf, or set_parent,
@@ -1245,6 +1328,7 @@ static void comp_create_surface(struct wl_client *c, struct wl_resource *r, uint
     s->vsw = s->p_vsw = -1;
     s->bscale = s->p_bscale = 1;
     s->fslot = -1;
+    s->p_alpha = s->alpha = UINT32_MAX;
     surfs[slot] = s;
     wl_resource_set_implementation(res, &surface_impl, s, surface_gone);
     if (c == xwl_client) xwm_surface_created(id);   /* WL_SURFACE_ID may have come first */
@@ -3306,8 +3390,9 @@ static uint32_t *capture_readback(const Surf *s) {
     return NULL;
 }
 
-static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip) {
+static void paint_tree(Canvas *c, Surf *s, float x, float y, float op_tree, Rect clip) {
     uint32_t *tmp;
+    float op = op_tree * surf_alpha(s);         /* wp_alpha_modifier_v1: this surface only, not its subsurfaces */
     s->hole_sig = hole_sig(s);          /* the shape it was painted with: damage_box and the GPU path compare it */
     if (gpu_active() && !paint_capture_mode) {          /* in a screenshot they are always copied */
         Surf *tt = toplevel_of(s);
@@ -3316,7 +3401,7 @@ static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip
             if (s->content && !tfv.skip && ntf_holes < TF_HOLES && ndraws[0] < 128) {
                 float X = x * tfv.sx + tfv.tx, Y = y * tfv.sy + tfv.ty, W = s->lw * tfv.sx, H = s->lh * tfv.sy;
                 Rect m = tf_map(clip);
-                add_draw(0, s, X, Y, m, op * tfv.op);
+                add_draw(0, s, X, Y, m, op_tree * tfv.op);   /* (its opacity at draw time: surf_alpha) */
                 draws[0][ndraws[0] - 1].sx = tfv.sx;
                 draws[0][ndraws[0] - 1].sy = tfv.sy;
                 tf_holes[ntf_holes].x = X; tf_holes[ntf_holes].y = Y; tf_holes[ntf_holes].w = W; tf_holes[ntf_holes].h = H;
@@ -3327,9 +3412,9 @@ static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip
                 canvas_clear(c, 0);
                 canvas_set_clip(c, old);
             }
-        } else if (s->content && holes_off) add_draw(0, s, x, y, clip, op);
+        } else if (s->content && holes_off) add_draw(0, s, x, y, clip, op_tree);
         else if (s->content) {
-            add_draw(0, s, x, y, clip, op);
+            add_draw(0, s, x, y, clip, op_tree);
             /* hole in the UI: what was painted below shows the window */
             Rect old = c->clip;
             Rect h = rect_and(rect_and(old, phys_rect(clip)),
@@ -3345,7 +3430,7 @@ static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip
         s->px = NULL;
         free(tmp);
     }
-    for (int i = 0; i < s->nkids; i++) paint_tree(c, s->kids[i], x + s->kids[i]->sx, y + s->kids[i]->sy, op, clip);
+    for (int i = 0; i < s->nkids; i++) paint_tree(c, s->kids[i], x + s->kids[i]->sx, y + s->kids[i]->sy, op_tree, clip);
 }
 
 void wl_paint_begin(void) { ndraws[0] = ndraws[1] = 0; }
@@ -3466,7 +3551,7 @@ static void draw_surface(Surf *s, float x, float y, float dw, float dh, Rect cli
 }
 
 static void draw_tree(Surf *s, float x, float y, float scale_x, float scale_y, Rect clip) {
-    draw_surface(s, x, y, s->lw * scale_x, s->lh * scale_y, clip, 1);
+    draw_surface(s, x, y, s->lw * scale_x, s->lh * scale_y, clip, surf_alpha(s));
     for (int i = 0; i < s->nkids; i++)
         draw_tree(s->kids[i], x + s->kids[i]->sx * scale_x, y + s->kids[i]->sy * scale_y, scale_x, scale_y, clip);
 }
@@ -3547,10 +3632,10 @@ void wl_gpu_draw_layer(int layer) {
             if (d->media) { draw_media(d); continue; }
             Surf *s = find(d->sid);
             if (!s || !s->content) continue;
-            if (d->sx == 1 && d->sy == 1) { draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op); continue; }
+            if (d->sx == 1 && d->sy == 1) { draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op * surf_alpha(s)); continue; }
             Rect p = tf_pixels(d->x, d->y, s->lw * d->sx, s->lh * d->sy);
             GpuTex *t = surface_tex(s);
-            if (t) draw_tex(s, t, (float)p.x0, (float)p.y0, (float)(p.x1 - p.x0), (float)(p.y1 - p.y0), phys_rect(d->clip), d->op);
+            if (t) draw_tex(s, t, (float)p.x0, (float)p.y0, (float)(p.x1 - p.x0), (float)(p.y1 - p.y0), phys_rect(d->clip), d->op * surf_alpha(s));
         }
         return;
     }
@@ -3574,7 +3659,7 @@ static void blit_tree(Canvas *c, Surf *s, float x, float y, float sxk, float syk
     if (s->content) {
         uint32_t *tmp = s->px ? NULL : capture_readback(s);      /* a GPU app in a screenshot */
         if (tmp) s->px = tmp;
-        if (s->px) blit_surface(c, s, x, y, sxk, syk, 1);
+        if (s->px) blit_surface(c, s, x, y, sxk, syk, surf_alpha(s));
         if (tmp) { s->px = NULL; free(tmp); }
     }
     for (int i = 0; i < s->nkids; i++)
@@ -5703,6 +5788,8 @@ int wl_start(void) {
     wl_global_create(dpy, &zwp_linux_dmabuf_v1_interface, 5, NULL, bind_dmabuf);   /* 5: one modifier for every plane */
     wl_global_create(dpy, &wp_presentation_interface, 2, NULL, bind_presentation);
     wl_global_create(dpy, &wp_viewporter_interface, 1, NULL, bind_viewporter);
+    wl_global_create(dpy, &wp_single_pixel_buffer_manager_v1_interface, 1, NULL, bind_spbm);   /* one-pixel buffers (backgrounds) */
+    wl_global_create(dpy, &wp_alpha_modifier_v1_interface, 1, NULL, bind_am);                   /* a surface's opacity */
     wl_global_create(dpy, &zwp_relative_pointer_manager_v1_interface, 1, NULL, bind_relm);
     wl_global_create(dpy, &zwp_pointer_constraints_v1_interface, 1, NULL, bind_consm);
     wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 2, NULL, bind_csm);   /* cursors by name (2: dnd_ask, all_resize) */

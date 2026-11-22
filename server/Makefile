@@ -33,7 +33,8 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            unstable/text-input/text-input-unstable-v3 staging/xdg-activation/xdg-activation-v1 \
            unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 \
            staging/security-context/security-context-v1 \
-           unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1
+           unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
+           staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
 
