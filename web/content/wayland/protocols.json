@@ -28,6 +28,1033 @@
   "missing": 31,
   "gaps": []
  },
+ "conformance": {
+  "date": "2026-11-22",
+  "commit": "de240de5",
+  "dirty": true,
+  "tool": "tools/wl-conformance.mjs",
+  "schema": 1,
+  "env": {
+   "waylandProtocols": "1.44",
+   "libwayland": "1.23.1",
+   "xwayland": "2:24.1.6-1",
+   "mode": "static+dynamic (headless, CPU path)"
+  },
+  "summary": {
+   "protocols": 48,
+   "complete": 29,
+   "mean": 100,
+   "x11Items": 28,
+   "x11Complete": 23,
+   "x11Mean": 100
+  },
+  "globals": [
+   {
+    "global": "ext_background_effect_manager_v1",
+    "row": "ext-background-effect-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "ext_idle_notifier_v1",
+    "row": "ext-idle-notify-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 18,
+    "total": 18,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "org_kde_kwin_server_decoration_manager",
+    "row": "kde-server-decoration",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 12,
+    "total": 12,
+    "skipped": 1,
+    "depth": "partial",
+    "proofs": []
+   },
+   {
+    "global": "wl_compositor",
+    "row": "wayland-wl_compositor",
+    "version": 6,
+    "advertised": true,
+    "score": 100,
+    "points": 102,
+    "total": 102,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wl_data_device_manager",
+    "row": "wayland-wl_data_device_manager",
+    "version": 3,
+    "advertised": true,
+    "score": 100,
+    "points": 95,
+    "total": 95,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wl_fixes",
+    "row": "wayland-wl_fixes",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 5,
+    "total": 5,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wl_output",
+    "row": "wayland-wl_output",
+    "version": 4,
+    "advertised": true,
+    "score": 100,
+    "points": 42,
+    "total": 42,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wl_seat",
+    "row": "wayland-wl_seat",
+    "version": 9,
+    "advertised": true,
+    "score": 100,
+    "points": 109,
+    "total": 109,
+    "skipped": 1,
+    "depth": "partial",
+    "proofs": []
+   },
+   {
+    "global": "wl_shm",
+    "row": "wayland-wl_shm",
+    "version": 2,
+    "advertised": true,
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wl_subcompositor",
+    "row": "wayland-wl_subcompositor",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "wl_subcompositor-wp_viewporter"
+    ]
+   },
+   {
+    "global": "wp_alpha_modifier_v1",
+    "row": "alpha-modifier-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 25,
+    "total": 25,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_color_manager_v1",
+    "row": "color-management-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 118,
+    "total": 118,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_color_representation_manager_v1",
+    "row": "color-representation-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_commit_timing_manager_v1",
+    "row": "commit-timing-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 18,
+    "total": 18,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_content_type_manager_v1",
+    "row": "content-type-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_cursor_shape_manager_v1",
+    "row": "cursor-shape-v1",
+    "version": 2,
+    "advertised": true,
+    "score": 100,
+    "points": 26,
+    "total": 26,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_drm_lease_device_v1",
+    "row": "drm-lease-v1",
+    "version": 1,
+    "advertised": false,
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "code",
+    "proofs": []
+   },
+   {
+    "global": "wp_fifo_manager_v1",
+    "row": "fifo-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_fractional_scale_manager_v1",
+    "row": "fractional-scale-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 23,
+    "total": 23,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_linux_drm_syncobj_manager_v1",
+    "row": "linux-drm-syncobj-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 31,
+    "total": 31,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_pointer_warp_v1",
+    "row": "pointer-warp-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_presentation",
+    "row": "presentation-time",
+    "version": 2,
+    "advertised": true,
+    "score": 100,
+    "points": 26,
+    "total": 26,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_security_context_manager_v1",
+    "row": "security-context-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 46,
+    "total": 46,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_single_pixel_buffer_manager_v1",
+    "row": "single-pixel-buffer-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_tearing_control_manager_v1",
+    "row": "tearing-control-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_viewporter",
+    "row": "viewporter",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "wl_subcompositor-wp_viewporter"
+    ]
+   },
+   {
+    "global": "xdg_activation_v1",
+    "row": "xdg-activation-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 38,
+    "total": 38,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "xdg_session_manager_v1",
+    "row": "xdg-session-management-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 44,
+    "total": 44,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "xdg_system_bell_v1",
+    "row": "xdg-system-bell-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "xdg_toplevel_drag_manager_v1",
+    "row": "xdg-toplevel-drag-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 17,
+    "total": 17,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "xdg_toplevel_icon_manager_v1",
+    "row": "xdg-toplevel-icon-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 39,
+    "total": 39,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "xdg_toplevel_tag_manager_v1",
+    "row": "xdg-toplevel-tag-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 11,
+    "total": 11,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "xdg_wm_base",
+    "row": "xdg-shell",
+    "version": 7,
+    "advertised": true,
+    "score": 100,
+    "points": 248,
+    "total": 248,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "xdg_wm_base-foot",
+     "xdg_wm_base-gtk4-zenity",
+     "xdg_wm_base-qt-featherpad"
+    ]
+   },
+   {
+    "global": "xdg_wm_dialog_v1",
+    "row": "xdg-dialog-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 24,
+    "total": 24,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "xwayland_shell_v1",
+    "row": "xwayland-shell-v1",
+    "version": 1,
+    "advertised": false,
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "code",
+    "proofs": []
+   },
+   {
+    "global": "zwp_idle_inhibit_manager_v1",
+    "row": "idle-inhibit-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 14,
+    "total": 14,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_keyboard_shortcuts_inhibit_manager_v1",
+    "row": "keyboard-shortcuts-inhibit-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 22,
+    "total": 22,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_linux_dmabuf_v1",
+    "row": "linux-dmabuf-v1",
+    "version": 5,
+    "advertised": true,
+    "score": 100,
+    "points": 96,
+    "total": 96,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_pointer_constraints_v1",
+    "row": "pointer-constraints-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_pointer_gestures_v1",
+    "row": "pointer-gestures-unstable-v1",
+    "version": 3,
+    "advertised": true,
+    "score": 100,
+    "points": 39,
+    "total": 39,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_primary_selection_device_manager_v1",
+    "row": "primary-selection-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 42,
+    "total": 42,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_relative_pointer_manager_v1",
+    "row": "relative-pointer-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 14,
+    "total": 14,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_tablet_manager_v2",
+    "row": "tablet-v2",
+    "version": 2,
+    "advertised": true,
+    "score": 100,
+    "points": 156,
+    "total": 156,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "zwp_text_input_manager_v3",
+    "row": "text-input-unstable-v3",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 50,
+    "total": 50,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zxdg_decoration_manager_v1",
+    "row": "xdg-decoration-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zxdg_exporter_v2",
+    "row": "xdg-foreign-unstable-v2",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 23,
+    "total": 23,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zxdg_importer_v2",
+    "row": "xdg-foreign-unstable-v2",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 26,
+    "total": 26,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zxdg_output_manager_v1",
+    "row": "xdg-output-unstable-v1",
+    "version": 3,
+    "advertised": true,
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   }
+  ],
+  "x11": [
+   {
+    "id": "xwayland.startup",
+    "title": "Xwayland startup and surface association",
+    "score": 100,
+    "points": 13,
+    "total": 13,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-xwayland.startup"
+    ]
+   },
+   {
+    "id": "icccm.wm_name",
+    "title": "ICCCM WM_NAME / EWMH _NET_WM_NAME",
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "icccm.wm_class",
+    "title": "ICCCM WM_CLASS",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "icccm.wm_protocols",
+    "title": "ICCCM WM_PROTOCOLS (WM_DELETE_WINDOW, WM_TAKE_FOCUS)",
+    "score": 100,
+    "points": 9,
+    "total": 9,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "icccm.wm_hints",
+    "title": "ICCCM WM_HINTS (input, urgency)",
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-icccm.wm_hints"
+    ]
+   },
+   {
+    "id": "icccm.wm_normal_hints",
+    "title": "ICCCM WM_NORMAL_HINTS (min/max size)",
+    "score": 100,
+    "points": 7,
+    "total": 7,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-icccm.wm_normal_hints"
+    ]
+   },
+   {
+    "id": "icccm.transient_for",
+    "title": "ICCCM WM_TRANSIENT_FOR",
+    "score": 100,
+    "points": 7,
+    "total": 7,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-icccm.transient_for"
+    ]
+   },
+   {
+    "id": "icccm.focus",
+    "title": "ICCCM input focus model",
+    "score": 100,
+    "points": 5,
+    "total": 5,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "icccm.wm_state",
+    "title": "ICCCM WM_STATE and WM_CHANGE_STATE",
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.supporting_wm_check",
+    "title": "EWMH _NET_SUPPORTING_WM_CHECK",
+    "score": 100,
+    "points": 10,
+    "total": 10,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.net_supported",
+    "title": "EWMH _NET_SUPPORTED",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-ewmh.net_supported"
+    ]
+   },
+   {
+    "id": "ewmh.wm_name",
+    "title": "EWMH _NET_WM_NAME",
+    "score": 100,
+    "points": 3,
+    "total": 3,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.wm_state",
+    "title": "EWMH _NET_WM_STATE (fullscreen, maximized, hidden, above, below, demands attention, modal, skip taskbar and pager, focused)",
+    "score": 100,
+    "points": 127,
+    "total": 127,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-always-on-top"
+    ]
+   },
+   {
+    "id": "ewmh.window_type",
+    "title": "EWMH _NET_WM_WINDOW_TYPE",
+    "score": 100,
+    "points": 22,
+    "total": 22,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.active_window",
+    "title": "EWMH _NET_ACTIVE_WINDOW",
+    "score": 100,
+    "points": 10,
+    "total": 10,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.client_list",
+    "title": "EWMH _NET_CLIENT_LIST",
+    "score": 100,
+    "points": 17,
+    "total": 17,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.wm_pid",
+    "title": "EWMH _NET_WM_PID",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 1,
+    "depth": "partial",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.wm_icon",
+    "title": "EWMH _NET_WM_ICON",
+    "score": 100,
+    "points": 7,
+    "total": 7,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-ewmh.wm_icon"
+    ]
+   },
+   {
+    "id": "ewmh.moveresize",
+    "title": "EWMH _NET_WM_MOVERESIZE",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.frame_extents",
+    "title": "EWMH _NET_FRAME_EXTENTS",
+    "score": 100,
+    "points": 14,
+    "total": 14,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-ewmh.frame_extents"
+    ]
+   },
+   {
+    "id": "ewmh.workarea",
+    "title": "EWMH _NET_WORKAREA",
+    "score": 100,
+    "points": 7,
+    "total": 7,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.close_window",
+    "title": "EWMH _NET_CLOSE_WINDOW",
+    "score": 100,
+    "points": 7,
+    "total": 7,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "motif.wm_hints",
+    "title": "_MOTIF_WM_HINTS",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "xdnd",
+    "title": "XDND drag and drop (both ways)",
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "id": "selections",
+    "title": "CLIPBOARD and PRIMARY, both ways, INCR",
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "xwayland.hidpi",
+    "title": "HiDPI scale (xwscale.c)",
+    "score": 100,
+    "points": 3,
+    "total": 3,
+    "skipped": 1,
+    "depth": "partial",
+    "proofs": []
+   },
+   {
+    "id": "xwayland.cursor",
+    "title": "Cursor (root cursor; app cursors through wl_pointer)",
+    "score": 100,
+    "points": 1,
+    "total": 1,
+    "skipped": 0,
+    "depth": "code",
+    "proofs": []
+   },
+   {
+    "id": "xwayland.security",
+    "title": "Isolation (auth cookie, no TCP, own network namespace)",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   }
+  ],
+  "proofs": [
+   {
+    "id": "wl_subcompositor-wp_viewporter",
+    "png": "wl_subcompositor-wp_viewporter.png",
+    "kind": "wayland",
+    "app": "build/wlproof-client (tests/wlproof_client.c, purpose-built)",
+    "version": "this tree",
+    "shows": "Subsurface order and viewport: red placed above green (place_above), blue placed below the window (place_below, seen only through its transparent right third), and a 64×64 four-colour buffer cropped to its white quadrant and scaled to 100×100 (wp_viewport set_source + set_destination)."
+   },
+   {
+    "id": "xdg_wm_base-foot",
+    "png": "xdg_wm_base-foot.png",
+    "kind": "wayland",
+    "app": "foot",
+    "version": "foot 1.21.0-2",
+    "shows": "foot (wayland-native terminal) mapped and focused: it answered xdg_wm_base.ping with pong, acked each configure once (invalid_serial is now enforced), and asked for the theme's frame through xdg-decoration."
+   },
+   {
+    "id": "xdg_wm_base-gtk4-zenity",
+    "png": "xdg_wm_base-gtk4-zenity.png",
+    "kind": "wayland",
+    "app": "zenity (GTK 4, libadwaita)",
+    "version": "zenity 4.1.90-1, GTK 4.18.6+ds-2",
+    "shows": "A GTK 4 / libadwaita dialog with its own decorations: GTK 4 answers ping, acks configures once and creates its xdg_surface before any buffer (invalid_surface_state and unconfigured_buffer are now enforced)."
+   },
+   {
+    "id": "xdg_wm_base-qt-featherpad",
+    "png": "xdg_wm_base-qt-featherpad.png",
+    "kind": "wayland",
+    "app": "FeatherPad (Qt 6)",
+    "version": "featherpad 1.6.1-1, Qt 6.8.2+dfsg-9+deb13u2",
+    "shows": "A Qt 6 editor (FeatherPad) on Wayland: xdg-shell with the new error checks, xdg-decoration (server-side frame from the theme)."
+   },
+   {
+    "id": "linux-dmabuf-vkcube",
+    "png": "linux-dmabuf-vkcube.png",
+    "kind": "wayland",
+    "app": "vkcube (Vulkan)",
+    "version": "vkcube 1.4.304.0+dfsg1-1, Mesa 25.0.7-2+deb13u1",
+    "shows": "vkcube through the Vulkan WSI: its buffers pass the new zwp_linux_buffer_params_v1 out_of_bounds checks (offset + stride × height inside each dmabuf)."
+   },
+   {
+    "id": "egl-es2gears",
+    "png": "egl-es2gears.png",
+    "kind": "wayland",
+    "app": "es2gears_wayland (EGL / GLES2)",
+    "version": "mesa-utils 9.0.0-2+b2",
+    "shows": "An EGL client: its buffers (dmabuf or shm through Mesa's Wayland EGL) and xdg-shell flow pass the new checks."
+   },
+   {
+    "id": "chromium",
+    "png": "chromium.png",
+    "kind": "wayland",
+    "app": "Chromium",
+    "version": "Chromium 156.0.8078.79 built on Debian GNU/Linux 13 (trixie)",
+    "shows": "Chromium (Ozone/Wayland): subsurfaces, viewporter, xdg-shell, xdg-decoration, xdg-activation and the data device with the new error checks; no protocol error."
+   },
+   {
+    "id": "x11-always-on-top",
+    "png": "x11-always-on-top.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "EWMH _NET_WM_STATE (fullscreen, maximized, hidden, above, below, demands attention, modal, skip taskbar and pager, focused)"
+   },
+   {
+    "id": "x11-ewmh.frame_extents",
+    "png": "x11-ewmh.frame_extents.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "EWMH _NET_FRAME_EXTENTS"
+   },
+   {
+    "id": "x11-ewmh.net_supported",
+    "png": "x11-ewmh.net_supported.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "EWMH _NET_SUPPORTED"
+   },
+   {
+    "id": "x11-ewmh.wm_icon",
+    "png": "x11-ewmh.wm_icon.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "EWMH _NET_WM_ICON"
+   },
+   {
+    "id": "x11-icccm.transient_for",
+    "png": "x11-icccm.transient_for.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "ICCCM WM_TRANSIENT_FOR"
+   },
+   {
+    "id": "x11-icccm.wm_hints",
+    "png": "x11-icccm.wm_hints.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "ICCCM WM_HINTS (input, urgency)"
+   },
+   {
+    "id": "x11-icccm.wm_normal_hints",
+    "png": "x11-icccm.wm_normal_hints.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "ICCCM WM_NORMAL_HINTS (min/max size)"
+   },
+   {
+    "id": "x11-xwayland.startup",
+    "png": "x11-xwayland.startup.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "Xwayland startup and surface association"
+   }
+  ]
+ },
  "protocols": [
   {
    "id": "wayland-wl_compositor",
@@ -49,6 +1076,17 @@
     "note": "",
     "checked": "VM screenshots (docs/WAYLAND.md)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 102,
+    "total": 102,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wl_compositor"
+    ],
+    "proofs": []
    }
   },
   {
@@ -71,6 +1109,17 @@
     "note": "Created by libwayland's wl_display_init_shm (version 2 since libwayland 1.22; Debian 13 has 1.23).",
     "checked": "libwayland 1.23 (Debian 13)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wl_shm"
+    ],
+    "proofs": []
    }
   },
   {
@@ -93,6 +1142,17 @@
     "note": "",
     "checked": "VM 127 (clipboard and drag and drop, 0.8.8.8)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 95,
+    "total": 95,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wl_data_device_manager"
+    ],
+    "proofs": []
    }
   },
   {
@@ -115,7 +1175,8 @@
     "note": "Deprecated; replaced by xdg-shell.",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wayland-wl_seat",
@@ -137,6 +1198,17 @@
     "note": "",
     "checked": "VM screenshots (docs/WAYLAND.md)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 109,
+    "total": 109,
+    "skipped": 1,
+    "depth": "partial",
+    "globals": [
+     "wl_seat"
+    ],
+    "proofs": []
    }
   },
   {
@@ -159,6 +1231,17 @@
     "note": "",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 42,
+    "total": 42,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wl_output"
+    ],
+    "proofs": []
    }
   },
   {
@@ -181,6 +1264,19 @@
     "note": "",
     "checked": "VM screenshots (docs/WAYLAND.md)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wl_subcompositor"
+    ],
+    "proofs": [
+     "wl_subcompositor-wp_viewporter"
+    ]
    }
   },
   {
@@ -203,6 +1299,17 @@
     "note": "destroy_registry: a client drops a wl_registry it no longer needs and lord-server stops sending it global events. Debian 13's libwayland is 1.23, so the interface comes from wayland.xml 1.24, vendored. Not yet checked with a real app.",
     "checked": "headless lord-server: tests/wlfixes_client.c (tests/wlperf_headless.sh)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 5,
+    "total": 5,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wl_fixes"
+    ],
+    "proofs": []
    }
   },
   {
@@ -225,6 +1332,17 @@
     "note": "Version 2 (feedback per display) since 0.8.9.5.",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 26,
+    "total": 26,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_presentation"
+    ],
+    "proofs": []
    }
   },
   {
@@ -247,6 +1365,19 @@
     "note": "",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_viewporter"
+    ],
+    "proofs": [
+     "wl_subcompositor-wp_viewporter"
+    ]
    }
   },
   {
@@ -269,6 +1400,21 @@
     "note": "Version 7 (constrained_* states) since 0.8.9.5.",
     "checked": "VM screenshots (docs/WAYLAND.md); wlperf-client protocols",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 248,
+    "total": 248,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "xdg_wm_base"
+    ],
+    "proofs": [
+     "xdg_wm_base-foot",
+     "xdg_wm_base-gtk4-zenity",
+     "xdg_wm_base-qt-featherpad"
+    ]
    }
   },
   {
@@ -291,6 +1437,17 @@
     "note": "Version 5 (one modifier for every plane) since 0.8.9.5.",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 96,
+    "total": 96,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_linux_dmabuf_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -313,6 +1470,17 @@
     "note": "Pens (pressure, tilt, distance, rotation, slider, buttons, a mouse or lens tool's wheel) and pads (buttons, rings, strips, dials; set_feedback kept) read from evdev by LordOS's own tablet.c, without libinput or libwacom. One mode per pad group (no libwacom data to know the mode-switch button). Not yet checked with a real tablet.",
     "checked": "build/tablet-test, build/wltablet-test; headless lord-server",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 156,
+    "total": 156,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "zwp_tablet_manager_v2"
+    ],
+    "proofs": []
    }
   },
   {
@@ -335,6 +1503,17 @@
     "note": "",
     "checked": "tests/desktop_model_test.mjs; VM",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 38,
+    "total": 38,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "xdg_activation_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -357,6 +1536,17 @@
     "note": "Only a connector the kernel marks non-desktop (a VR headset), only to an app the person allowed (the vr permission: Allow once, Always allow, Don't allow), never to a sandboxed or isolated app or Xwayland; revoked on unplug, permission taken back, lock, user switch or text console. Approved by the maintainer 2026-11-22. Not yet checked with a real headset.",
     "checked": "build/drmlease-test, drmlease-e2e-test",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "code",
+    "globals": [
+     "wp_drm_lease_device_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -379,6 +1569,17 @@
     "note": "A dmabuf frame is applied once its acquire point is signalled, without blocking, and its release point is signalled when LordOS is done with it. Offered when a render node has timeline syncobjs and SYNCOBJ_EVENTFD (Linux 6.6), on the GPU and the CPU path (docs/WAYLAND.md, \"Explicit sync\").",
     "checked": "build/syncobj-test, tests/syncobj_headless.sh; vkcube (Mesa 25.0.7 Vulkan) on an AMD RX 580",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 31,
+    "total": 31,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_linux_drm_syncobj_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -401,7 +1602,8 @@
     "note": "LordOS locks the screen itself; an outside locker would draw over the session (docs/DESKTOP-PARITY.md).",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "single-pixel-buffer-v1",
@@ -423,6 +1625,17 @@
     "note": "",
     "checked": "tests/wlperf_headless.sh",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_single_pixel_buffer_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -445,6 +1658,17 @@
     "note": "Kept per surface and applied on commit; nothing uses it yet (docs/WAYLAND.md \"Frame timing\").",
     "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_content_type_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -467,6 +1691,17 @@
     "note": "Only once the person allowed the app (the idle permission).",
     "checked": "build/idlenotify-test; wlperf-client idle",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 18,
+    "total": 18,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "ext_idle_notifier_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -490,7 +1725,8 @@
     "note": "No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md \"Sharing a screen or a window\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "ext-image-copy-capture-v1",
@@ -512,7 +1748,8 @@
     "note": "No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md \"Sharing a screen or a window\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "tearing-control-v1",
@@ -534,6 +1771,17 @@
     "note": "The hint is kept; \"async\" tears only a fullscreen app's own buffer scanned out alone, when the driver reports DRM_CAP_ASYNC_PAGE_FLIP; composed frames wait for vblank. The torn flip is not yet checked on hardware (docs/WAYLAND.md \"Frame timing\").",
     "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_tearing_control_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -556,6 +1804,17 @@
     "note": "Offered to Xwayland only (hidden from every other client; a bind by anyone else is an error). X windows are matched to their surfaces by serial (WL_SURFACE_SERIAL), so a recycled surface id can't show another window; WL_SURFACE_ID still works for older Xwayland (server/src/wl/xwshell.c, xwm.c).",
     "checked": "Xwayland 24.1.6 with xterm on a headless lord-server (docs/wayland-proofs/x11-xwayland.startup.png); x11-conformance-client",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "code",
+    "globals": [
+     "xwayland_shell_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -578,6 +1837,17 @@
     "note": "",
     "checked": "VM (docs/DISPLAYS.md)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 23,
+    "total": 23,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_fractional_scale_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -600,6 +1870,17 @@
     "note": "Version 2 (dnd_ask, all_resize) since 0.8.9.5.",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 26,
+    "total": 26,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_cursor_shape_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -622,7 +1903,8 @@
     "note": "A program could list and control other apps' windows (third-party docks and taskbars). LordOS's Dock, switcher and window list are part of the desktop (docs/DESKTOP-PARITY.md).",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "security-context-v1",
@@ -644,6 +1926,17 @@
     "note": "Built; not yet checked on the VM with a real Flatpak.",
     "checked": "build/secctx-test",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 46,
+    "total": 46,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_security_context_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -666,7 +1959,8 @@
     "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list).",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "xdg-toplevel-drag-v1",
@@ -688,6 +1982,17 @@
     "note": "Tab tear-off: the window follows the pointer at the app's offset, is never the drag's target and stays where it is let go.",
     "checked": "Chromium 156 on a headless lord-server (tear-off and reattach); tests/shellx_headless.sh",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 17,
+    "total": 17,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "xdg_toplevel_drag_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -710,6 +2015,17 @@
     "note": "Used only when the app has no installed icon; buffers re-encoded and size-limited, icon names ignored.",
     "checked": "build/wlicon-test",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 39,
+    "total": 39,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "xdg_toplevel_icon_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -732,6 +2048,17 @@
     "note": "",
     "checked": "tests/dialog_model_test.mjs",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 24,
+    "total": 24,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "xdg_wm_dialog_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -754,6 +2081,17 @@
     "note": "",
     "checked": "tests/wlperf_headless.sh",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 25,
+    "total": 25,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_alpha_modifier_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -776,6 +2114,17 @@
     "note": "An update is not shown before its target on wp_presentation's clock: it applies at the latch of the first frame predicted at or after it (docs/WAYLAND.md \"Frame timing\").",
     "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 18,
+    "total": 18,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_commit_timing_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -798,7 +2147,8 @@
     "note": "A program could read every copy, or replace the clipboard, without having the focus. LordOS gives the clipboard only to the focused app; GNOME doesn't offer it either (docs/DESKTOP-PARITY.md).",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "fifo-v1",
@@ -820,6 +2170,17 @@
     "note": "An update waits until the surface's display has latched a frame since the one that set the barrier: Mesa's Vulkan FIFO mode runs at the display's rate. Held in explicit sync's queue; hidden windows and a screen that is off clear it once a second (docs/WAYLAND.md \"Frame timing\").",
     "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_fifo_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -842,6 +2203,17 @@
     "note": "LordOS's alert sound (not in Do Not Disturb) and a window not in front marked as wanting attention; at most one ring every 250 ms per app.",
     "checked": "tests/shellx_headless.sh; build/shellx-units-test",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "xdg_system_bell_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -864,7 +2236,8 @@
     "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list).",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "color-management-v1",
@@ -886,6 +2259,17 @@
     "note": "Parametric descriptions only (no ICC, no luminances or mastering metadata, no scRGB); pixels are converted to the SDR sRGB / gamma 2.2 every display is driven with. No HDR (docs/WAYLAND.md, \"Colour management\").",
     "checked": "tests/color_headless.sh; GTK 4.18.6 (GDK_DEBUG=color-mgmt)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 118,
+    "total": 118,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_color_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -908,6 +2292,17 @@
     "note": "Alpha modes premultiplied electrical, premultiplied optical and straight; coefficients and range identity / full only, since lord-server imports no YUV buffer.",
     "checked": "tests/color_headless.sh",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_color_representation_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -930,6 +2325,17 @@
     "note": "A window's tag keys its own remembered place; its description names the window while it has no title.",
     "checked": "tests/shellx_headless.sh",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 11,
+    "total": 11,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "xdg_toplevel_tag_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -952,6 +2358,17 @@
     "note": "Only within the app's own surface, with the pointer over it, the serial of its enter and the keyboard; never while the pointer is locked or in a drag. Not yet checked with an app on the VM.",
     "checked": "build/wltablet-test",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_pointer_warp_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -974,6 +2391,17 @@
     "note": "Blur behind a region of a window, drawn with the UI's own backdrop blur: offered only on the CPU path with transparency and blur on, not on the GPU path.",
     "checked": "tests/shellx_headless.sh (CPU path); build/shellx-units-test",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "ext_background_effect_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -996,6 +2424,17 @@
     "note": "An app's windows come back where they were: random session ids, scoped to the program lord-server checked, kept in ~/.config/lordos/wl-sessions (mode 0600).",
     "checked": "tests/shellx_headless.sh",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 44,
+    "total": 44,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "xdg_session_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1016,7 +2455,8 @@
     "note": "An outside input method would read every key. LordOS's own input methods (server/src/ime.c) compose into apps through text-input-v3 (docs/WAYLAND.md, \"Input methods\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "xx-session-management-v1",
@@ -1038,7 +2478,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "xx-cutouts-v1",
@@ -1060,7 +2501,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "xx-keyboard-filter-v1",
@@ -1082,7 +2524,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "xx-hotkey-v1",
@@ -1104,7 +2547,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "xx-image-capture-color-management-v1",
@@ -1126,7 +2570,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "xx-text-input-v3",
@@ -1148,7 +2593,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "xx-zones-v1",
@@ -1170,7 +2616,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "xx-fractional-scale-v2",
@@ -1192,7 +2639,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "fullscreen-shell-unstable-v1",
@@ -1214,7 +2662,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "idle-inhibit-unstable-v1",
@@ -1236,6 +2685,17 @@
     "note": "",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 14,
+    "total": 14,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_idle_inhibit_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1259,7 +2719,8 @@
     "note": "An outside input method would read every key. LordOS's own input methods (server/src/ime.c) compose into apps through text-input-v3 (docs/WAYLAND.md, \"Input methods\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "input-timestamps-unstable-v1",
@@ -1281,7 +2742,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "keyboard-shortcuts-inhibit-unstable-v1",
@@ -1303,6 +2765,17 @@
     "note": "Once the person allowed the app; ❖Esc gives the shortcuts back.",
     "checked": "VM 127; build/kbinhibit-client",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 22,
+    "total": 22,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_keyboard_shortcuts_inhibit_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1325,7 +2798,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "pointer-constraints-unstable-v1",
@@ -1347,6 +2821,17 @@
     "note": "",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_pointer_constraints_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1369,6 +2854,17 @@
     "note": "",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 39,
+    "total": 39,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_pointer_gestures_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1391,6 +2887,17 @@
     "note": "",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 42,
+    "total": 42,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_primary_selection_device_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1413,6 +2920,17 @@
     "note": "",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 14,
+    "total": 14,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_relative_pointer_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1435,6 +2953,17 @@
     "note": "",
     "checked": "VM 127 (input methods, 0.8.8.8)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 50,
+    "total": 50,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_text_input_manager_v3"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1457,6 +2986,17 @@
     "note": "",
     "checked": "VM screenshots (docs/WAYLAND.md)",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zxdg_decoration_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1480,6 +3020,18 @@
     "note": "",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 49,
+    "total": 49,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zxdg_exporter_v2",
+     "zxdg_importer_v2"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1502,6 +3054,17 @@
     "note": "",
     "checked": "wl_global_create in server/src/wl",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zxdg_output_manager_v1"
+    ],
+    "proofs": []
    }
   },
   {
@@ -1524,7 +3087,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wlr-data-control-unstable-v1",
@@ -1546,7 +3110,8 @@
     "note": "A program could read every copy, or replace the clipboard, without having the focus. LordOS gives the clipboard only to the focused app; GNOME doesn't offer it either (docs/DESKTOP-PARITY.md).",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wlr-export-dmabuf-unstable-v1",
@@ -1568,7 +3133,8 @@
     "note": "No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md \"Sharing a screen or a window\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wlr-foreign-toplevel-management-unstable-v1",
@@ -1590,7 +3156,8 @@
     "note": "A program could list and control other apps' windows (third-party docks and taskbars). LordOS's Dock, switcher and window list are part of the desktop (docs/DESKTOP-PARITY.md).",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wlr-gamma-control-unstable-v1",
@@ -1612,7 +3179,8 @@
     "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). Night Light is LordOS's own (Settings → Displays).",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wlr-input-inhibitor-unstable-v1",
@@ -1634,7 +3202,8 @@
     "note": "Deprecated in favour of ext-session-lock-v1.",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wlr-layer-shell-unstable-v1",
@@ -1656,7 +3225,8 @@
     "note": "Panels, docks and overlays from other programs would draw above every window. LordOS draws its own Dock, menu bar and notifications (docs/DESKTOP-PARITY.md, \"Left out on purpose\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wlr-output-management-unstable-v1",
@@ -1678,7 +3248,8 @@
     "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). Displays are set in LordOS's Settings.",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wlr-output-power-management-unstable-v1",
@@ -1700,7 +3271,8 @@
     "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list).",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wlr-screencopy-unstable-v1",
@@ -1722,7 +3294,8 @@
     "note": "No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md \"Sharing a screen or a window\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "wlr-virtual-pointer-unstable-v1",
@@ -1744,7 +3317,8 @@
     "note": "Made-up keys and pointer motion from other programs. LordOS has its own on-screen keyboard, and RemoteDesktop input is not offered: it would be a new security exception (docs/WAYLAND.md, \"Sharing a screen or a window\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "input-method-unstable-v2",
@@ -1766,7 +3340,8 @@
     "note": "An outside input method would read every key. LordOS's own input methods (server/src/ime.c) compose into apps through text-input-v3 (docs/WAYLAND.md, \"Input methods\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-appmenu",
@@ -1788,7 +3363,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-blur",
@@ -1810,7 +3386,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-contrast",
@@ -1832,7 +3409,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-dpms",
@@ -1854,7 +3432,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-external-brightness-v1",
@@ -1876,7 +3455,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-fake-input",
@@ -1898,7 +3478,8 @@
     "note": "Made-up keys and pointer motion from other programs. LordOS has its own on-screen keyboard, and RemoteDesktop input is not offered: it would be a new security exception (docs/WAYLAND.md, \"Sharing a screen or a window\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-idle",
@@ -1920,7 +3501,8 @@
     "note": "Deprecated; ext-idle-notify-v1 is offered instead.",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-keystate",
@@ -1942,7 +3524,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-lockscreen-overlay-v1",
@@ -1964,7 +3547,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-output-management",
@@ -1986,7 +3570,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-output-management-v2",
@@ -2008,7 +3593,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-outputdevice",
@@ -2030,7 +3616,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-output-device-v2",
@@ -2052,7 +3639,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-output-order-v1",
@@ -2074,7 +3662,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-plasma-shell",
@@ -2096,7 +3685,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-plasma-virtual-desktop",
@@ -2118,7 +3708,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-plasma-window-management",
@@ -2140,7 +3731,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-primary-output-v1",
@@ -2162,7 +3754,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-screen-edge-v1",
@@ -2184,7 +3777,8 @@
     "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
     "checked": "maintainer's decision",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-zkde-screencast-unstable-v1",
@@ -2206,7 +3800,8 @@
     "note": "No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md \"Sharing a screen or a window\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-server-decoration",
@@ -2228,6 +3823,17 @@
     "note": "GTK 3's way to ask for the theme's frame (Firefox, Mousepad).",
     "checked": "VM (docs/WAYLAND.md, \"Who draws the frame\")",
     "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 12,
+    "total": 12,
+    "skipped": 1,
+    "depth": "partial",
+    "globals": [
+     "org_kde_kwin_server_decoration_manager"
+    ],
+    "proofs": []
    }
   },
   {
@@ -2250,7 +3856,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-shadow",
@@ -2272,7 +3879,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "kde-slide",
@@ -2294,7 +3902,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "frog-color-management-v1",
@@ -2316,7 +3925,8 @@
     "note": "",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "virtual-keyboard-unstable-v1",
@@ -2338,7 +3948,8 @@
     "note": "Made-up keys and pointer motion from other programs. LordOS has its own on-screen keyboard, and RemoteDesktop input is not offered: it would be a new security exception (docs/WAYLAND.md, \"Sharing a screen or a window\").",
     "checked": "docs and server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "gtk-shell",
@@ -2360,7 +3971,8 @@
     "note": "GNOME's own extensions to GTK windows.",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "xdg-foreign-unstable-v1",
@@ -2383,7 +3995,8 @@
     "note": "Superseded; xdg-foreign-unstable-v2 is offered.",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   },
   {
    "id": "text-input-unstable-v2",
@@ -2405,7 +4018,8 @@
     "note": "KDE's older text input; text-input-unstable-v3 is offered.",
     "checked": "not in server/src/wl",
     "checkedDate": "2026-11-22"
-   }
+   },
+   "conf": null
   }
  ]
 }

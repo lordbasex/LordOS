@@ -487,6 +487,44 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Maintainer's decisions of 2026-11-22 recorded:** the 13 KDE Plasma shell, output and settings protocols stay left
     out on purpose (confirmed); `drm-lease-v1` is in progress (a permission, non-desktop connectors only), shown as
     not offered yet with that note.
+- **The Wayland protocol page shows the conformance results, in English, Spanish and Portuguese, in development**
+  ([lordos.org/wayland-protocols-table/#conformance](https://lordos.org/wayland-protocols-table/#conformance);
+  `tools/gen-wayland-table.mjs`, `web/build.mjs`, `web/src/wayland.{html,js,css}`, `web/i18n/pages.json`).
+  - **A Conformance column** in the protocol table: per protocol the score of its globals (0–100 %, with a ten-step bar
+    as `tools/wl-conformance.mjs` prints it), the points passed, any skipped, and the **depth** of the test:
+    *Complete* (protocol-specific tests of every request, event and error, all passed, nothing skipped), *Partial*
+    (protocol-specific, a point skipped headless: `wl_seat`'s pointer role, KDE's server decoration's generic bind),
+    *General* (the static code check and the generic bind at every version, no flow of its own yet) and *Code only*
+    (not usable headless: `drm-lease` needs a headset, `xwayland_shell` is offered to Xwayland only). A filter by
+    depth, kept in the address (`#cf=complete`), and a tile at the top (100 %, 48 globals, 29 complete).
+  - **A Conformance section:** the run (2026-11-22, `tools/wl-conformance.mjs` at commit `de240de5`, report schema 1,
+    wayland-protocols 1.44, libwayland 1.23.1, Xwayland 24.1.6), the summary (48 globals, mean 100 %, 29 complete;
+    28 X11 items, mean 100 %, 23 complete), what each depth means, a second table for the X11/Xwayland items (ICCCM,
+    EWMH, Motif, XDND, selections, HiDPI, cursor, isolation) with their scores and depths, and the 15 proof
+    screenshots of `docs/wayland-proofs/` (7 Wayland programs, 8 X11 items) as WebP thumbnails that open in the
+    site's lightbox, each linked from its protocol's or item's row.
+  - **The generator writes it:** `tools/gen-wayland-table.mjs` reads `docs/wayland-conformance.json` and
+    `docs/wayland-proofs/` and adds `conformance` (run, versions, summary, every global with its table row, the X11
+    items, the proofs) and a `conf` per row to `web/content/wayland/protocols.json`, and a second generated block to
+    `docs/WAYLAND.md`'s "Conformance": every global and every X11 item with its score, points and depth. Depths are
+    derived from the run (`complete`, and the tool's `protocol-specific`, `generic only`, `static only`), never typed by
+    hand. X11 screenshots are matched by name (`x11-<item>.png`; `x11-always-on-top.png` proves `ewmh.wm_state`).
+  - **Strict shapes for the new fields:** `validateWeb()` (which `web/build.mjs` runs before rendering) accepts scores
+    only as numbers 0–100, points and counts as integers, depths from the fixed set, X11 ids, proof names and `.png`
+    file names by pattern, a hex commit, Debian-style versions and plain text; every value is escaped on the page.
+  - **More drift checks** in `server/tests/wayland_table_test.mjs`: every scored global is a LordOS global of
+    `docs/wayland-protocols.json` at the same version and every LordOS global was scored; the run's summary agrees
+    with its items; `docs/WAYLAND.md`'s hand-written summary lines ("48 globals, mean 100 %, 29 complete", "28 items,
+    mean 100 %") match the run; the generated conformance block is current; every screenshot named exists and every one
+    in the folder is shown; and 24 hostile values in the new fields are refused.
+- **The paper and the site describe the work in development after 0.8.9.4** (paper edition of 2026-11-22, "0.8.9.4 Beta
+  + in development"; `docs/PAPER-VALIDATION.md`): conformance depths and the published table, the new Wayland protocols
+  and the X11 work, always on top, LordOS Studio and `lord-studio`, Machines' Keys panel, apps mode's status item and
+  panel, Capture mouse, Intel GVT-g and the `machines` command, `fastfetch`/`neofetch` through `lordos-fetch`, the
+  Store's endless lists and Flathub descriptions; corrected: the LordOS tools shipped are w10 (not w9), drags out of X11
+  apps now work and were checked on VM 127, and 3D through a share of an Intel GPU is built for guests that need it. The Linux
+  apps and Machines pages and the FAQ (Linux apps, Machines, and a new "Can I blur my background in video calls?") say
+  the same, in English, Spanish and Portuguese.
 - **Wayland and Xwayland conformance, scored point by point, in development** (`tools/wl-conformance.mjs`,
   `make -C server wl-conformance`; `docs/WAYLAND.md`, "Conformance").
   - Every advertised global, and every interface it creates, is checked against its protocol XML up to the advertised

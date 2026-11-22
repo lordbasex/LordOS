@@ -1258,6 +1258,14 @@ ${(c.items || []).map((it) => {
     const STS = ['supported', 'partial', 'on-purpose', 'missing'];
     const CATS = ['core', 'stable', 'staging', 'unstable', 'experimental', 'wlr', 'kde', 'other'].filter((k) => D.protocols.some((p) => p.cat === k));
     const pill = (st) => `<span class="wp-st wp-${esc(st)}">${esc(W.status[st])}</span>`;
+    // conformance (docs/wayland-conformance.json via the generator): a score bar like tools/wl-conformance.mjs prints, and the depth
+    const CF = D.conformance, DEPTHS = ['complete', 'partial', 'general', 'code'];
+    const bar = (score) => { const n = Math.round(score / 10); return `<span class="wp-bar" aria-hidden="true"><span>${'█'.repeat(n)}</span>${'·'.repeat(10 - n)}</span>`; };
+    const depthPill = (dp) => `<span class="wp-depth wp-d-${esc(dp)}" title="${esc(W.conf.depthText[dp])}">${esc(W.conf.depth[dp])}</span>`;
+    const proofHref = (id) => `#proof-${esc(id)}`;
+    const proofLinks = (ids) => (ids && ids.length ? `<span class="wp-pf">${ids.map((id, i) => `<a href="${proofHref(id)}">${esc(ids.length > 1 ? fill(W.conf.proofN, { n: i + 1 }) : W.conf.proof)}</a>`).join(' ')}</span>` : '');
+    const confCell = (F) => (F ? `<span class="wp-score">${bar(F.score)} <strong>${esc(F.score)} %</strong></span> ${depthPill(F.depth)}<span class="wp-pts">${esc(fill(W.conf.points, { p: F.points, t: F.total }))}${F.skipped ? ' · ' + esc(fill(W.conf.skipped, { n: F.skipped })) : ''}</span>${proofLinks(F.proofs)}`
+      : `<span class="wp-no">—<span class="vh"> ${esc(W.conf.none)}</span></span>`);
     const verCell = (v, who) => (v == null ? `<span class="wp-no" title="${esc(W.notOffered)}">—<span class="vh"> ${esc(W.notOffered)}</span></span>` : `<span class="wp-yes"><span class="vh">${esc(who)} </span>${esc(W.version)} ${esc(v)}</span>`);
     const rows = D.protocols.map((p) => {
       const L = p.lordos;
@@ -1268,18 +1276,73 @@ ${(c.items || []).map((it) => {
       if (dev) lc.push(`<span class="wp-dev" title="${esc(fill(W.inDevNote, { release: LATEST_RELEASE }))}">${esc(W.inDev)}</span>`);
       const q = [p.id, p.name, p.summary, ...p.globals, L.note].join(' ').toLowerCase();
       const both = p.kwin != null && p.mutter != null;
-      return `<tr data-cat="${esc(p.cat)}" data-st="${esc(L.status)}" data-l="${L.version != null ? 1 : 0}" data-k="${p.kwin != null ? 1 : 0}" data-m="${p.mutter != null ? 1 : 0}" data-dev="${dev ? 1 : 0}" data-q="${esc(q)}" id="p-${esc(p.id)}">
+      return `<tr data-cat="${esc(p.cat)}" data-st="${esc(L.status)}" data-cf="${esc(p.conf ? p.conf.depth : 'none')}" data-l="${L.version != null ? 1 : 0}" data-k="${p.kwin != null ? 1 : 0}" data-m="${p.mutter != null ? 1 : 0}" data-dev="${dev ? 1 : 0}" data-q="${esc(q)}" id="p-${esc(p.id)}">
 <th scope="row" data-label="${esc(W.hProtocol)}"><a href="${esc(p.url)}" rel="noopener">${esc(p.name)}</a>${p.deprecated ? ` <span class="wp-depr">${esc(W.deprecated)}</span>` : ''}<code>${esc(p.id)}</code>${p.summary.toLowerCase() !== p.name.toLowerCase() ? `<span class="wp-sumy">${esc(p.summary)}</span>` : ''}${p.globals.length && !(p.globals.length === 1 && p.globals[0] === p.name) ? `<span class="wp-gl">${p.globals.map((g) => `<code>${esc(g)}</code>`).join(' ')}</span>` : ''}</th>
 <td data-label="${esc(W.hCategory)}"><div><span class="wp-cat">${esc(W.cats[p.cat])}</span></div></td>
 <td data-label="LordOS" class="wp-l"><div>${lc.join(' ')}</div></td>
 <td data-label="${esc(W.kde)}"${both ? ' class="wp-both"' : ''}><div>${verCell(p.kwin, 'KWin')}</div></td>
 <td data-label="${esc(W.gnome)}"${both ? ' class="wp-both"' : ''}><div>${verCell(p.mutter, 'Mutter')}</div></td>
+<td data-label="${esc(W.conf.hConf)}" class="wp-cf"><div>${confCell(p.conf)}</div></td>
 <td data-label="${esc(W.hNote)}" class="wp-note"><div>${L.note ? `<span lang="en">${esc(L.note)}</span>` : ''}<span class="wp-chk">${esc(W.checked)} <span lang="en">${esc(L.checked)}</span>, <time datetime="${esc(L.checkedDate)}">${esc(L.checkedDate)}</time></span></div></td>
 </tr>`;
     }).join('\n');
     const opt = (v, label) => `<option value="${esc(v)}">${esc(label)}</option>`;
     const tile = (n, label) => `<li><strong>${esc(n)}</strong><span>${esc(label)}</span></li>`;
     const nDev = D.protocols.filter((p) => inDev(p.lordos.since) || inDev(p.lordos.bumped)).length;
+    // the conformance section: the run, the summary, the X11 table, the depths and the screenshots (each one a WebP of docs/wayland-proofs/*.png)
+    let confHtml = '';
+    if (CF) {
+      const S = CF.summary, E = CF.env;
+      const x11Rows = CF.x11.map((x) => `<tr id="x11-${esc(x.id)}">
+<th scope="row" data-label="${esc(W.conf.hItem)}"><span lang="en">${esc(x.title)}</span><code>${esc(x.id)}</code></th>
+<td data-label="${esc(W.conf.hConf)}" class="wp-cf"><div>${confCell(x)}</div></td>
+</tr>`).join('\n');
+      const proofCap = (pf) => (pf.kind === 'x11' ? `${pf.shows} (X11)` : `${pf.app}: ${pf.shows}`);
+      const figs = CF.proofs.map((pf) => {
+        const f = r('docs/wayland-proofs', pf.png);
+        if (!fs.existsSync(f)) throw new Error(`web/content/wayland/protocols.json: docs/wayland-proofs/${pf.png} is missing`);
+        const thumb = webp(f, 480, 80, `wl-proof-${pf.id}`), full = webp(f, 1600, 85, `wl-proof-${pf.id}`);
+        const cap = proofCap(pf);
+        return `<figure class="wp-proof" id="proof-${esc(pf.id)}"><a class="g-card" href="${full.url}" data-w="${full.w}" data-h="${full.h}" data-cap="${esc(cap)}" aria-label="${esc(t.gallery.open + ': ' + cap)}"><img src="${thumb.url}" width="${thumb.w}" height="${thumb.h}" alt="${esc(cap)}" loading="lazy" decoding="async"></a><figcaption><strong lang="en">${esc(pf.kind === 'x11' ? pf.shows : pf.app)}</strong> <span class="wp-pver" lang="en">${esc(pf.version)}</span>${pf.kind === 'wayland' ? `<span class="wp-pshows" lang="en">${esc(pf.shows)}</span>` : ''}</figcaption></figure>`;
+      });
+      const nW = CF.proofs.filter((x) => x.kind === 'wayland').length;
+      confHtml = `<section class="wp-sec" id="conformance" aria-labelledby="wp-h-conf">
+<h2 id="wp-h-conf">${esc(W.conf.title)}</h2>
+<p class="g-lead">${esc(W.conf.lead)}</p>
+<dl class="wp-meta">
+<div><dt>${esc(W.conf.runDate)}</dt><dd><time datetime="${esc(CF.date)}">${esc(fmtD(CF.date))}</time></dd></div>
+<div><dt>${esc(W.conf.runTool)}</dt><dd><code>${esc(CF.tool)}</code> · ${esc(fill(W.conf.runCommit, { commit: CF.commit, schema: CF.schema }))}${CF.dirty ? ` <span class="wp-dev">${esc(W.conf.dirty)}</span>` : ''}</dd></div>
+<div><dt>${esc(W.conf.runEnv)}</dt><dd>wayland-protocols ${esc(E.waylandProtocols)} · libwayland ${esc(E.libwayland)} · Xwayland ${esc(E.xwayland)}</dd></div>
+<div><dt>${esc(W.conf.runMode)}</dt><dd>${esc(W.conf.mode)}</dd></div>
+</dl>
+<ul class="wp-stats">
+${[tile(S.protocols, W.conf.tileGlobals), tile(`${S.mean} %`, W.conf.tileMean), tile(`${S.complete} / ${S.protocols}`, W.conf.tileComplete), tile(`${S.x11Mean} %`, fill(W.conf.tileX11, { n: S.x11Items }))].join('\n')}
+</ul>
+<p class="wp-sum">${esc(fill(W.conf.summary, { protocols: S.protocols, mean: S.mean, complete: S.complete, x11Items: S.x11Items, x11Mean: S.x11Mean, x11Complete: S.x11Complete }))}</p>
+<h3>${esc(W.conf.depthTitle)}</h3>
+<dl class="wp-legend">
+${DEPTHS.map((k) => `<div><dt>${depthPill(k)}</dt><dd>${esc(W.conf.depthText[k])}</dd></div>`).join('\n')}
+<div><dt><span class="wp-score">${bar(100)}</span></dt><dd>${esc(W.conf.barText)}</dd></div>
+</dl>
+<h3 id="x11">${esc(W.conf.x11Title)}</h3>
+<p>${esc(W.conf.x11Lead)}</p>
+<div class="wp-table wp-x11">
+<table>
+<thead><tr><th scope="col">${esc(W.conf.hItem)}</th><th scope="col">${esc(W.conf.hConf)}</th></tr></thead>
+<tbody>
+${x11Rows}
+</tbody>
+</table>
+</div>
+<h3 id="proofs">${esc(W.conf.proofsTitle)}</h3>
+<p>${esc(fill(W.conf.proofsLead, { n: CF.proofs.length, wayland: nW, x11: CF.proofs.length - nW }))}</p>
+<div class="wp-proofs">
+${figs.join('\n')}
+</div>
+<p class="hw-note">${esc(W.conf.limits)}</p>
+<p><a class="btn btn-ghost" href="${esc(`${GITHUB}/blob/main/docs/WAYLAND.md#conformance-toolswl-conformancemjs-in-development`)}" rel="noopener">${esc(W.conf.docsLink)}</a> <a class="btn btn-ghost" href="${esc(`${GITHUB}/blob/main/docs/wayland-conformance.json`)}" rel="noopener">${esc(W.conf.jsonLink)}</a></p>
+</section>`;
+    }
     write(path.join(pageUrl(l, 'wayland-protocols-table'), 'index.html'), render(tpl.wayland, {
       ...common('wayland-protocols-table', [W.metaTitle, W.metaDescription], 'wayland'),
       date: esc(c.date), dateText: esc(fmtD(c.date)),
@@ -1290,6 +1353,9 @@ ${(c.items || []).map((it) => {
       summary: esc(fill(W.summary, { total: s.total, lordos: s.lordos, kwin: s.kwin, mutter: s.mutter, both: s.both, lordosOfBoth: s.lordosOfBoth, onPurpose: s.onPurpose, missing: s.missing, either: s.either, lordosOfEither: s.lordosOfEither })),
       catOptions: opt('all', W.catAll) + CATS.map((k) => opt(k, W.cats[k])).join(''),
       statusOptions: opt('all', W.statusAll) + STS.map((k) => opt(k, W.status[k])).join('') + opt('dev', W.inDev),
+      confOptions: opt('all', W.conf.filterAll) + (CF ? DEPTHS.filter((k) => D.protocols.some((p) => p.conf && p.conf.depth === k)).map((k) => opt(k, W.conf.depth[k])).join('') : '') + opt('none', W.conf.none),
+      confSection: confHtml, hConf: esc(W.conf.hConf),
+      confTiles: CF ? `<li><a href="#conformance"><strong>${esc(CF.summary.mean)} %</strong><span>${esc(fill(W.conf.tileShort, { n: CF.summary.protocols, complete: CF.summary.complete }))}</span></a></li>` : '',
       compOptions: opt('all', W.compAll) + ['lordos', 'kwin', 'mutter', 'both', 'gap'].map((k) => opt(k, W.comp[k])).join(''),
       hKwin: esc(`${W.kde} (KWin ${c.kwin.version})`), hMutter: esc(`${W.gnome} (Mutter ${c.mutter.version})`),
       rows,
