@@ -115,6 +115,13 @@ int main(void) {
     CHECK(!strcmp(q->path, p) && q->ino == (uint64_t)st.st_ino && q->tino == q->ino && q->rw == 1 && q->kind == FPLEND_SAVE,
           "3: a save names the file itself, never its folder (F5)");
     CHECK(check("/saved.txt", FPLEND_SAVE, q) == 0, "3: a save right in the home folder is lent (only the file goes)");
+    /* a new dot-file that runs code later (shell, editor, npm, git, mime handlers): never saved, never lent writable */
+    const char *dots[] = { "/.npmrc", "/.vimrc", "/.bashrc", "/.config/mimeapps.list", "/.config/git/config", "/Docs/.hidden", NULL };
+    for (int i = 0; dots[i]; i++) { CHECK(check(dots[i], FPLEND_SAVE, q) == -1, "4: a save of a dot-file refused"); if (check(dots[i], FPLEND_SAVE, q) != -1) printf("  (%s)\n", dots[i]); }
+    snprintf(p, sizeof p, "%s/.config/x.conf", home); put(p, "x");
+    CHECK(check("/.config/x.conf", FPLEND_FILE, q) == 0 && q->rw == 0, "4: a chosen dot-file is lent read-only");
+    snprintf(p, sizeof p, "%s/Docs/.d", home); mkdir(p, 0700);
+    CHECK(check("/Docs/.d", FPLEND_DIR, q) == 0 && q->rw == 0, "4: a chosen hidden folder is lent read-only");
     CHECK(check("/Docs/a.txt", 9, q) == -1, "3: an unknown kind refused");
 
     free(q);

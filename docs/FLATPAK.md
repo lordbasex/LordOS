@@ -1062,6 +1062,9 @@ in every instance), and exactly that is mounted in its running view:
   `~/.thunderbird`, `~/.config/google-chrome`, `~/.config/chromium`, `~/.config/BraveSoftware`,
   `~/.config/microsoft-edge`, `~/.var/app`. Never lent as a folder or writable, nor a save into them; a file there the
   person opens is lent read-only.
+- **Hidden paths** (any segment starting with `.`: `~/.npmrc`, `~/.vimrc`, `~/.config/mimeapps.list`,
+  `~/.config/git/…`, many of which run code later): never a save, never lent writable; a dot-file or hidden folder the
+  person opens is lent read-only (`hidden_path` in `fplend.c`, 2026-11-22).
 - **Revoked** with the view: when the app's last process leaves, its mount namespace and every grant go.
 - A caller that isn't a Flatpak app LordOS started gets the real path, as before. A lend that fails is logged and the
   app gets the real path (which its own Flatpak permissions decide).
