@@ -544,12 +544,16 @@ static void test_fetch(const char *kind) {
     char root[] = "/tmp/sysreport-fetch-XXXXXX";
     if (!mkdtemp(root)) { printf("mkdtemp\n"); exit(2); }
     fixture(root, kind);
+    /* a default route with a global IPv6 address: on screen, never with --share */
+    put(root, "proc/net/route", "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\nsecnet0\t00000000\t0100A8C0\t0003\t0\t0\t100\n");
+    put(root, "proc/net/if_inet6", "20010db8000000000000000000000042 02 40 00 80   secnet0\n");
     SysReport *r = calloc(1, sizeof *r);
     sysreport_collect(r, root, NULL, NULL);
     snprintf(r->sw.lordos, sizeof r->sw.lordos, "0.8.5-beta");
     FetchLive l;
     fetch_live(&l, root, 1);
     CHECK(!l.user[0] && !l.host[0], "%s: --share has no names", kind);
+    CHECK(!l.ip[0], "%s: --share has no address", kind);
     FetchColor modes[3] = { FETCH_PLAIN, FETCH_256, FETCH_TRUECOLOR };
     for (int m = 0; m < 3; m++) {
         char *out = fetch_render(r, &l, modes[m]);
@@ -564,9 +568,112 @@ static void test_fetch(const char *kind) {
     fetch_live(&l, root, 0);
     char *out = fetch_render(r, &l, FETCH_PLAIN);
     CHECK(contains(out, "@secret-host"), "%s: without --share the host is on screen", kind);
+    CHECK(contains(out, "Local IP    2001:db8::42/64 (secnet0)"), "%s: without --share the address is on screen", kind);
     free(out);
     free(r);
     rmtree(root);
+}
+
+/* lordos-fetch's parsing helpers and the lines they feed (fetch.h) */
+static void test_fetch_helpers(void) {
+    unsigned long long t = 0, u = 0;
+    CHECK(!fetch_swap("MemTotal: 100 kB\nSwapCached: 1 kB\nSwapTotal:  4194300 kB\nSwapFree:   4000000 kB\n", &t, &u)
+          && t == 4194300 && u == 194300, "swap: total and used (SwapCached is not SwapTotal)");
+    CHECK(!fetch_swap("SwapTotal: 0 kB\nSwapFree: 0 kB\n", &t, &u) && !t && !u, "swap: none");
+    CHECK(fetch_swap("MemTotal: 1 kB\n", &t, &u) && fetch_swap(NULL, &t, &u), "swap: unknown");
+
+    char th[72], lg[24], name[64];
+    CHECK(!fetch_settings("{\"theme\":\"workspaces\",\"language\":\"pt\"}", th, sizeof th, lg, sizeof lg)
+          && !strcmp(th, "workspaces") && !strcmp(lg, "pt"), "settings: theme and language");
+    CHECK(!fetch_settings("{\"theme\":null,\"language\":null}", th, sizeof th, lg, sizeof lg) && !strcmp(th, "default") && !lg[0],
+          "settings: null theme is the default");
+    CHECK(!fetch_settings("{\"theme\":\"../../etc\"}", th, sizeof th, lg, sizeof lg) && !strcmp(th, "default"), "settings: unsafe theme id");
+    CHECK(fetch_settings("{broken", th, sizeof th, lg, sizeof lg) && !strcmp(th, "default"), "settings: broken file");
+    CHECK(!fetch_theme_name("{\"id\":\"default\",\"name\":\"Lord Flow\"}", name, sizeof name) && !strcmp(name, "Lord Flow"), "theme name");
+    CHECK(fetch_theme_name("{\"id\":\"x\"}", name, sizeof name), "theme without a name");
+
+    const char *status =
+        "Package: xwayland-extra\nStatus: install ok installed\nVersion: 9.9-1\n\n"
+        "Package: xwayland\nStatus: install ok installed\nPriority: optional\nVersion: 2:24.1.6-1+deb13u1\n\n"
+        "Package: neofetch\nStatus: deinstall ok config-files\nVersion: 7.1.0-4\n";
+    char ver[32];
+    CHECK(!fetch_dpkg_version(status, "xwayland", ver, sizeof ver) && !strcmp(ver, "24.1.6"), "dpkg: epoch and revision dropped (%s)", ver);
+    CHECK(!fetch_dpkg_version(status, "xwayland-extra", ver, sizeof ver) && !strcmp(ver, "9.9"), "dpkg: exact package name");
+    CHECK(fetch_dpkg_version(status, "neofetch", ver, sizeof ver), "dpkg: removed package");
+    CHECK(fetch_dpkg_version(status, "fastfetch", ver, sizeof ver), "dpkg: missing package");
+
+    const char *route =
+        "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n"
+        "wlan0\t00000000\t0100A8C0\t0003\t0\t0\t600\t00000000\t0\t0\t0\n"
+        "enp3s0\t00000000\t010011AC\t0003\t0\t0\t100\t00000000\t0\t0\t0\n"
+        "enp3s0\t000011AC\t00000000\t0001\t0\t0\t100\t00FFFFFF\t0\t0\t0\n";
+    char ifn[24];
+    CHECK(!fetch_route_iface(route, ifn, sizeof ifn) && !strcmp(ifn, "enp3s0"), "route: lowest metric default");
+    CHECK(fetch_route_iface("Iface\tDestination\n", ifn, sizeof ifn), "route: no default route");
+    const char *inet6 =
+        "fe80000000000000021122fffe334455 02 40 20 80   enp3s0\n"
+        "20010db8000000000000000000000001 02 40 00 80   wlan0\n"
+        "20010db8000000000000000000000099 02 40 00 c0   enp3s0\n"      /* tentative (duplicate address detection) */
+        "20010db8000000000000000000000042 02 40 00 80   enp3s0\n";
+    char a6[80];
+    CHECK(!fetch_inet6(inet6, "enp3s0", a6, sizeof a6) && !strcmp(a6, "2001:db8::42/64"), "inet6: global address of the interface (%s)", a6);
+    CHECK(fetch_inet6(inet6, "eth9", a6, sizeof a6), "inet6: other interface");
+
+    double s;
+    char shown[16];
+    const char *jl = "{\"bootId\":\"aa-1\",\"seconds\":9.5,\"shown\":\"login\"}\n"
+                     "{\"bootId\":\"bb-2\",\"seconds\":12.714,\"shown\":\"login\"}\n"
+                     "{\"bootId\":\"bb-2\",\"seconds\":7.25,\"shown\":\"session\"}\n";
+    CHECK(!fetch_boot_time(jl, "bb-2", &s, shown, sizeof shown) && s == 7.25 && !strcmp(shown, "session"), "boot time: this boot's last line");
+    CHECK(fetch_boot_time(jl, "cc-3", &s, shown, sizeof shown) && s == 0, "boot time: another boot");
+    CHECK(fetch_boot_time(jl, "bb\"-2", &s, shown, sizeof shown), "boot time: odd boot id");
+    CHECK(fetch_status_rss("Name:\tlord-server\nVmPeak:\t 900 kB\nVmRSS:\t  392812 kB\n") == 392812 && !fetch_status_rss("Name: x\n"), "VmRSS");
+
+    char term[64];
+    const char *anc[] = { "bash", "sudo", "foot", "systemd" };
+    fetch_terminal_pick("LordTerminal", "0.8.9.4", 0, "/dev/pts/1", anc, 4, term, sizeof term);
+    CHECK(!strcmp(term, "LordOS Terminal"), "terminal: LordOS Terminal");
+    fetch_terminal_pick("WezTerm", "20240203", 0, NULL, anc, 4, term, sizeof term);
+    CHECK(!strcmp(term, "WezTerm 20240203"), "terminal: TERM_PROGRAM");
+    fetch_terminal_pick(NULL, NULL, 1, "/dev/pts/1", anc, 4, term, sizeof term);
+    CHECK(!strcmp(term, "SSH"), "terminal: SSH");
+    fetch_terminal_pick(NULL, NULL, 0, "/dev/tty2", anc, 4, term, sizeof term);
+    CHECK(!strcmp(term, "Linux console"), "terminal: console");
+    fetch_terminal_pick("", NULL, 0, "/dev/pts/3", anc, 4, term, sizeof term);
+    CHECK(!strcmp(term, "foot"), "terminal: first ancestor that is not a shell (%s)", term);
+
+    /* the lines: identical monitors on one line, the new rows, a 12-column label */
+    SysReport *r = calloc(1, sizeof *r);
+    snprintf(r->sw.lordos, sizeof r->sw.lordos, "0.8.9.4-beta");
+    r->ndisplay = 4;
+    for (int i = 0; i < 4; i++) {
+        snprintf(r->display[i].name, sizeof r->display[i].name, i < 3 ? "S27F350" : "DELL U2720Q");
+        r->display[i].pref_w = i < 3 ? 1920 : 3840;
+        r->display[i].pref_h = i < 3 ? 1080 : 2160;
+        r->display[i].diag_tenths = 270;
+    }
+    FetchLive l;
+    memset(&l, 0, sizeof l);
+    l.uptime_s = -1;
+    l.swap_known = 1;
+    l.boot_s = 12.714;
+    snprintf(l.boot_shown, sizeof l.boot_shown, "login");
+    snprintf(l.session, sizeof l.session, "Wayland");
+    snprintf(l.xwayland, sizeof l.xwayland, "24.1.6");
+    snprintf(l.server, sizeof l.server, "lord-server 0.8.9.4");
+    snprintf(l.desktop, sizeof l.desktop, "Lord Flow");
+    snprintf(l.build, sizeof l.build, "20261122.adae1e89 · development build");
+    l.server_rss_kb = 392812;
+    char *out = fetch_render(r, &l, FETCH_PLAIN);
+    CHECK(contains(out, "Display     3 × S27F350, 1920 × 1080, 27\"\n") && contains(out, "Display     DELL U2720Q, 3840 × 2160, 27\"\n"),
+          "fetch: identical displays collapsed");
+    CHECK(contains(out, "Compositor  lord-server 0.8.9.4 (C · DRM/KMS · evdev) · Wayland · Xwayland 24.1.6\n"), "fetch: compositor");
+    CHECK(contains(out, "Swap        none\n") && contains(out, "DE          Lord Flow\n") && contains(out, "Boot time   12.714 s to the login screen\n")
+          && contains(out, "Server RAM  383.6 MB (lord-server)\n") && contains(out, "Build       20261122.adae1e89 · development build\n"),
+          "fetch: swap, DE, boot time, server RAM, build");
+    CHECK(!contains(out, "Local IP") && !contains(out, "Terminal"), "fetch: empty rows left out");
+    free(out);
+    free(r);
 }
 
 /* A type-17 structure: formatted area of fl bytes, then the strings. */
@@ -1059,6 +1166,7 @@ int main(int argc, char **argv) {
     test_facts();
     const char *kinds[] = { "amd", "intel", "nvidia", "rpi5", "vm" };
     for (size_t i = 0; i < sizeof kinds / sizeof kinds[0]; i++) { test_kind(kinds[i]); test_fetch(kinds[i]); }
+    test_fetch_helpers();
     setenv("NO_COLOR", "1", 1);
     CHECK(fetch_color_mode("auto", 1) == FETCH_PLAIN && fetch_color_mode("always", 0) != FETCH_PLAIN, "NO_COLOR and --color=always");
     unsetenv("NO_COLOR");

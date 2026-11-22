@@ -1198,7 +1198,28 @@ machine. `lordos-fetch` (the same binary under that name; `lordos-sysreport fetc
 the brand colors beside a short summary (system, computer, kernel, uptime, packages, shell, display, CPU,
 GPU, memory, disk, isolation); the user and host names appear only on screen and `--share` leaves them out
 for a screenshot to post; `--color=auto|always|never`, `NO_COLOR` respected, true color when `COLORTERM`
-says so, plain ASCII without color. **The app (2026-10-26):** `apps/sysinfo` (also About LordOS → System Report…) with Overview, Hardware and
+says so, plain ASCII without color. **More lines (in development):** what fastfetch-style tools show plus what
+About shows, all read locally, without root or network, in about 30 ms: `Host` (the machine model, formerly
+"Computer"), one `Display` line per kind of monitor ("3 × S27F350, 1920 × 1080, 27""), `DE` (the LordOS desktop in
+use: settings.json's `theme`, named by its `theme.json`), `Compositor` (lord-server's version, "C · DRM/KMS · evdev",
+Wayland, and Xwayland's version from dpkg when it runs for this user), `Terminal` (LordOS Terminal,
+`$TERM_PROGRAM`, SSH, the Linux console, or the nearest ancestor that is not a shell), `Swap` (or "none"),
+`Local IP` (the default route's interface, its IPv4 and first global IPv6 address; left out with `--share`),
+`Locale` (`LC_ALL`/`LANG` and settings.json's interface language), `UI engine` (QuickJS and React versions from the
+build), `Build` (the build id and the system code's state: "signed by LordOS · N components" when
+`code-manifest.json`'s signature verifies with the key this build trusts, "development build" without a signed
+manifest), `Boot time` (this boot's line in `/var/lib/lordos/boot-times.jsonl`, as About) and `Server RAM` (the
+RSS of this user's session lord-server, not an `--app` one; the JS heap is only known inside lord-server, so it is
+not shown). The labels stay in English and there is still no `--json`. Parsing helpers in `fetch.h`, tested by
+`tests/sysreport_test.c` (`test_fetch_helpers`). **`fastfetch` and `neofetch` (in development):** typed in a terminal, they
+run `lordos-fetch` until the real package is installed. `/usr/lib/lordos/fallback-bin/fastfetch` (and `neofetch`,
+a link to it; source `packaging/fallback-bin/fastfetch`) is the LAST folder in PATH: `/etc/profile.d/lordos-fallback.sh`
+appends it for login shells (the Terminal's bash reads `/etc/profile`), and lord-sessiond's session PATH ends with
+it (zsh and fish keep that one). `apt install fastfetch` or `neofetch` puts the real command in `/usr/bin`,
+ahead of it: different paths, so no file conflict and nothing to undo; a shell whose command hash still points
+to the fallback is sent on to the real one too. The wrapper passes `--share` and `--color=…`, turns `--pipe`
+(fastfetch) and `--stdout` (neofetch) into `--color=never`, and drops any other option with one line on stderr
+("install the fastfetch package for its options"). Test: `server/tests/fetch_fallback_test.sh`. **The app (2026-10-26):** `apps/sysinfo` (also About LordOS → System Report…) with Overview, Hardware and
 Compatibility, from `lord.sysinfo.report()` (`ui/js_hw.c`): the same report plus `session`, how this
 session composes the screen now (`lord_composition()` in `main.c`: `gpu`, `headless`, `no-display`,
 `rotated`, `capture` or `gpu-off`) and the GPU context (`gpu_info()`: the last `gpu_init` outcome as a

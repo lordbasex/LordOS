@@ -1271,10 +1271,14 @@ LORD_VERSION := $(shell sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' ../package.j
 LORD_CHANNEL := $(shell sed -n 's/.*"channel": *"\([^"]*\)".*/\1/p' ../package.json 2>/dev/null | head -1 | tr -cd 'a-z0-9-')
 LORD_BUILD ?= $(shell d=$$(date -u -d "@$${SOURCE_DATE_EPOCH:-$$(date +%s)}" +%Y%m%d 2>/dev/null || date -u +%Y%m%d); \
                       c=$$(git -C .. rev-parse --short=8 HEAD 2>/dev/null); echo "$$d$${c:+.$$c}")
+# lordos-fetch's "UI engine" line (About shows the same): React's version as package.json pins it, QuickJS's from its VERSION
+LORD_REACT_VERSION := $(shell sed -n 's/.*"react": *"[^0-9]*\([^"]*\)".*/\1/p' ../package.json 2>/dev/null | head -1 | tr -cd 'A-Za-z0-9.+~-')
+LORD_QJS_VERSION := $(shell head -1 ../third_party/quickjs/VERSION 2>/dev/null | tr -cd 'A-Za-z0-9.+~-')
 build/gen/lord_version.h: FORCE
 	@mkdir -p build/gen
-	@printf '#define LORD_VERSION "%s"\n#define LORD_CHANNEL "%s"\n#define LORD_BUILD "%s"\n' \
-	    '$(or $(LORD_VERSION),0.0.0)' '$(LORD_CHANNEL)' '$(shell printf %s '$(LORD_BUILD)' | tr -cd 'A-Za-z0-9.+~-')' > $@.new
+	@printf '#define LORD_VERSION "%s"\n#define LORD_CHANNEL "%s"\n#define LORD_BUILD "%s"\n#define LORD_REACT_VERSION "%s"\n#define LORD_QJS_VERSION "%s"\n' \
+	    '$(or $(LORD_VERSION),0.0.0)' '$(LORD_CHANNEL)' '$(shell printf %s '$(LORD_BUILD)' | tr -cd 'A-Za-z0-9.+~-')' \
+	    '$(LORD_REACT_VERSION)' '$(LORD_QJS_VERSION)' > $@.new
 	@if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
 build/obj/main.o build/obj/ui/js.o build/obj/ui/js_sys.o build/obj/ui/js_hw.o build/obj/term/pty.o build/obj/remote/sessiond.o: build/gen/lord_version.h
 # Verified system code (src/sec/codesig.c, docs/SIGNING.md "Verified system code"). RELEASE=1: a

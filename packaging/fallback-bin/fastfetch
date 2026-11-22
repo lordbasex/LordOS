@@ -1,0 +1,35 @@
+#!/bin/sh
+# fastfetch and neofetch on LordOS until the real package is installed: LordOS's own lordos-fetch.
+#
+# This file is /usr/lib/lordos/fallback-bin/fastfetch and neofetch is a link to it. That folder is the LAST one in
+# PATH (/etc/profile.d/lordos-fallback.sh and lord-sessiond's session PATH), so `apt install fastfetch` or
+# `apt install neofetch` puts the real command in /usr/bin, ahead of this one: no file conflict and nothing to
+# remove. A shell that already ran this one keeps its path in its command hash, so a real command found anywhere
+# else in PATH is run from here as well.
+#
+# lordos-fetch knows only --share and --color=auto|always|never. --pipe (fastfetch) and --stdout (neofetch) become
+# --color=never; anything else is dropped with a one-line hint. LORDOS_FETCH_BIN is for the test
+# (server/tests/fetch_fallback_test.sh).
+
+name=${0##*/}
+
+IFS=:
+for d in $PATH; do
+    [ -n "$d" ] && [ -f "$d/$name" ] && [ -x "$d/$name" ] && ! [ "$d/$name" -ef "$0" ] && exec "$d/$name" "$@"
+done
+unset IFS
+
+n=$#
+unknown=0
+while [ "$n" -gt 0 ]; do
+    a=$1
+    shift
+    n=$((n - 1))
+    case "$a" in
+        --share|--color=auto|--color=always|--color=never) set -- "$@" "$a" ;;
+        --pipe|--stdout) set -- "$@" --color=never ;;
+        *) unknown=1 ;;
+    esac
+done
+[ "$unknown" = 1 ] && echo "lordos-fetch: this is LordOS's fetch; install the $name package for its options" >&2
+exec "${LORDOS_FETCH_BIN:-/usr/bin/lordos-fetch}" "$@"

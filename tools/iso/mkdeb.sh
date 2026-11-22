@@ -18,6 +18,8 @@
 #                                         docs/BENCHMARK.md): a link to /usr/lib/lordos/bin/lordos-sysreport,
 #                                         which starts the lord-bench and lord-media next to it
 #   /usr/bin/lordos-fetch                 the crown and a summary of the computer (a link to the same binary)
+#   /usr/lib/lordos/fallback-bin/{fastfetch,neofetch}  lordos-fetch under those names until the real package is
+#                                         installed; /etc/profile.d/lordos-fallback.sh puts the folder last in PATH
 #   /usr/bin/machines                     Machines from the terminal (docs/VIRTUALIZATION.md "From the terminal"): a link to
 #                                         /usr/lib/lordos/bin/machines, which runs the lord-vm next to it; its bash completion
 #                                         in /usr/share/bash-completion/completions/machines
@@ -146,6 +148,11 @@ install -m 755 server/build/lordos-sysreport "$L/bin/lordos-sysreport"
 "$STRIP" --strip-unneeded "$L/bin/lordos-sysreport" 2>/dev/null || true
 ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-sysreport"
 ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-fetch"
+# `fastfetch` and `neofetch` run lordos-fetch until the real package is installed: the folder is the last one in
+# PATH (profile.d below and lord-sessiond's session PATH), so the real /usr/bin/fastfetch comes first
+install -D -m 755 packaging/fallback-bin/fastfetch "$L/fallback-bin/fastfetch"
+ln -s fastfetch "$L/fallback-bin/neofetch"
+install -D -m 644 packaging/profile.d/lordos-fallback.sh "$PKG/etc/profile.d/lordos-fallback.sh"
 install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
 # Machines from the terminal: in the LordOS folder because it runs the lord-vm next to its own binary (/proc/self/exe)
 # and reads its texts from ../assets

@@ -9,9 +9,11 @@ build/lordos-fetch: build/lordos-sysreport
 # `lordos-sysreport bench` links LordBench's lord-server side (mk/lordbench.mk), libc only too
 SYSREPORT_BENCH_SRC := src/bench/lbrun.c src/bench/lbcond.c src/bench/lbproto.c src/bench/bench.c src/bench/lbframes.c \
                        src/bench/lbvideo.c src/bench/boottest.c src/media/proto.c
-build/lordos-sysreport: src/sysreport/cli.c $(SYSREPORT_SRC) $(SYSREPORT_HDR) $(SYSREPORT_BENCH_SRC) $(wildcard src/bench/*.h) build/gen/lord_version.h
+# lordos-fetch's Build line checks the code manifest's signature as lord-server does (src/sec/codesig.c, own code)
+SYSREPORT_CODESIG_SRC := src/sec/codesig.c src/pkg/crypto.c
+build/lordos-sysreport: src/sysreport/cli.c $(SYSREPORT_SRC) $(SYSREPORT_HDR) $(SYSREPORT_BENCH_SRC) $(SYSREPORT_CODESIG_SRC) $(wildcard src/bench/*.h) src/sec/codesig.h build/gen/lord_version.h build/gen/codesig_build.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) -Ibuild/gen $(CFLAGS) $(WARN) -std=c11 -o $@ src/sysreport/cli.c $(SYSREPORT_SRC) $(SYSREPORT_BENCH_SRC) -lm -lpthread
+	$(CC) $(CPPFLAGS) -Ibuild/gen $(CFLAGS) $(WARN) -std=c11 -o $@ src/sysreport/cli.c $(SYSREPORT_SRC) $(SYSREPORT_BENCH_SRC) $(SYSREPORT_CODESIG_SRC) -lm -lpthread
 # five fake machines full of serials, UUIDs, MACs and names that must not reach a report (periph.c is
 # lord.sysinfo.peripherals(): on screen only, so it is not in SYSREPORT_SRC and the commands can't print it);
 # `build/sysreport-test fixture <dir> amd|intel|nvidia|rpi5|vm` writes one for `--root`
