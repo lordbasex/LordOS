@@ -17,22 +17,21 @@
  },
  "stats": {
   "total": 108,
-  "lordos": 30,
+  "lordos": 34,
   "kwin": 63,
   "mutter": 40,
   "both": 37,
-  "lordosOfBoth": 24,
+  "lordosOfBoth": 25,
   "either": 66,
-  "lordosOfEither": 30,
+  "lordosOfEither": 34,
   "onPurpose": 30,
-  "missing": 48,
+  "missing": 44,
   "gaps": [
    "wayland-wl_fixes",
    "tablet-v2",
    "drm-lease-v1",
    "linux-drm-syncobj-v1",
    "xdg-toplevel-drag-v1",
-   "fifo-v1",
    "xdg-system-bell-v1",
    "color-management-v1",
    "color-representation-v1",
@@ -452,12 +451,12 @@
    "kwin": 1,
    "mutter": null,
    "lordos": {
-    "status": "missing",
-    "version": null,
+    "status": "supported",
+    "version": 1,
     "since": null,
     "bumped": null,
-    "note": "",
-    "checked": "not in server/src/wl",
+    "note": "Kept per surface and applied on commit; nothing uses it yet (docs/WAYLAND.md \"Frame timing\").",
+    "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
     "checkedDate": "2026-11-22"
    }
   },
@@ -541,12 +540,12 @@
    "kwin": 1,
    "mutter": null,
    "lordos": {
-    "status": "missing",
-    "version": null,
+    "status": "supported",
+    "version": 1,
     "since": null,
     "bumped": null,
-    "note": "Planned with VRR (docs/DESKTOP-PARITY.md, phase 6).",
-    "checked": "not in server/src/wl",
+    "note": "The hint is kept; \"async\" tears only a fullscreen app's own buffer scanned out alone, when the driver reports DRM_CAP_ASYNC_PAGE_FLIP; composed frames wait for vblank. The torn flip is not yet checked on hardware (docs/WAYLAND.md \"Frame timing\").",
+    "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
     "checkedDate": "2026-11-22"
    }
   },
@@ -783,12 +782,12 @@
    "kwin": null,
    "mutter": 1,
    "lordos": {
-    "status": "missing",
-    "version": null,
+    "status": "supported",
+    "version": 1,
     "since": null,
     "bumped": null,
-    "note": "",
-    "checked": "not in server/src/wl",
+    "note": "An update is not shown before its target on wp_presentation's clock: it applies at the latch of the first frame predicted at or after it (docs/WAYLAND.md \"Frame timing\").",
+    "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
     "checkedDate": "2026-11-22"
    }
   },
@@ -827,12 +826,12 @@
    "kwin": 1,
    "mutter": 1,
    "lordos": {
-    "status": "missing",
-    "version": null,
+    "status": "supported",
+    "version": 1,
     "since": null,
     "bumped": null,
-    "note": "",
-    "checked": "not in server/src/wl",
+    "note": "An update waits until the surface's display has latched a frame since the one that set the barrier: Mesa's Vulkan FIFO mode runs at the display's rate. Held in explicit sync's queue; hidden windows and a screen that is off clear it once a second (docs/WAYLAND.md \"Frame timing\").",
+    "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
     "checkedDate": "2026-11-22"
    }
   },

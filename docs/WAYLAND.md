@@ -1713,8 +1713,8 @@ trusted programs show as not offered). The number is the version of the protocol
 [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/). To change a row, edit `docs/wayland-protocols.json` and run
 `node tools/gen-wayland-table.mjs`; `server/tests/wayland_table_test.mjs` fails when the JSON and `server/src/wl` disagree.
 
-108 protocols. LordOS offers 30; KWin 6.7 63; Mutter 51 40. Of the 37 that both KWin and Mutter offer, LordOS offers 24;
-30 are left out on purpose and 48 are not offered (yet). Offered by both and not by LordOS: `wayland-wl_fixes`, `tablet-v2`, `drm-lease-v1`, `linux-drm-syncobj-v1`, `xdg-toplevel-drag-v1`, `fifo-v1`, `xdg-system-bell-v1`, `color-management-v1`, `color-representation-v1`, `xdg-toplevel-tag-v1`, `pointer-warp-v1`, `ext-background-effect-v1`, `xdg-session-management-v1`.
+108 protocols. LordOS offers 34; KWin 6.7 63; Mutter 51 40. Of the 37 that both KWin and Mutter offer, LordOS offers 25;
+30 are left out on purpose and 44 are not offered (yet). Offered by both and not by LordOS: `wayland-wl_fixes`, `tablet-v2`, `drm-lease-v1`, `linux-drm-syncobj-v1`, `xdg-toplevel-drag-v1`, `xdg-system-bell-v1`, `color-management-v1`, `color-representation-v1`, `xdg-toplevel-tag-v1`, `pointer-warp-v1`, `ext-background-effect-v1`, `xdg-session-management-v1`.
 
 | Protocol | Category | LordOS | KWin 6.7 | Mutter 51 | Note |
 |---|---|---|---|---|---|
@@ -1736,11 +1736,11 @@ trusted programs show as not offered). The number is the version of the protocol
 | [linux-drm-syncobj-v1](https://wayland.app/protocols/linux-drm-syncobj-v1) | staging | — | 1 | 1 | Explicit sync: designed, waiting for the maintainer's review (docs/SYNCOBJ-PLAN.md). |
 | [ext-session-lock-v1](https://wayland.app/protocols/ext-session-lock-v1) | staging | no, on purpose | — | — | LordOS locks the screen itself; an outside locker would draw over the session (docs/DESKTOP-PARITY.md). |
 | [single-pixel-buffer-v1](https://wayland.app/protocols/single-pixel-buffer-v1) | staging | 1 (since 0.8.9.5) | 1 | 1 |  |
-| [content-type-v1](https://wayland.app/protocols/content-type-v1) | staging | — | 1 | — |  |
+| [content-type-v1](https://wayland.app/protocols/content-type-v1) | staging | 1 | 1 | — | Kept per surface and applied on commit; nothing uses it yet (docs/WAYLAND.md "Frame timing"). |
 | [ext-idle-notify-v1](https://wayland.app/protocols/ext-idle-notify-v1) | staging | 1 (since 0.8.9.5) | 2 | — | Only once the person allowed the app (the idle permission). |
 | [ext-image-capture-source-v1](https://wayland.app/protocols/ext-image-capture-source-v1) | staging | no, on purpose | — | — | No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md "Sharing a screen or a window"). |
 | [ext-image-copy-capture-v1](https://wayland.app/protocols/ext-image-copy-capture-v1) | staging | no, on purpose | — | — | No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md "Sharing a screen or a window"). |
-| [tearing-control-v1](https://wayland.app/protocols/tearing-control-v1) | staging | — | 1 | — | Planned with VRR (docs/DESKTOP-PARITY.md, phase 6). |
+| [tearing-control-v1](https://wayland.app/protocols/tearing-control-v1) | staging | 1 | 1 | — | The hint is kept; "async" tears only a fullscreen app's own buffer scanned out alone, when the driver reports DRM_CAP_ASYNC_PAGE_FLIP; composed frames wait for vblank. The torn flip is not yet checked on hardware (docs/WAYLAND.md "Frame timing"). |
 | [xwayland-shell-v1](https://wayland.app/protocols/xwayland-shell-v1) | staging | — | — | — | lord-server starts Xwayland itself and matches its windows with WL_SURFACE_ID (server/src/wl/xwm.c). |
 | [fractional-scale-v1](https://wayland.app/protocols/fractional-scale-v1) | staging | 1 | 1 | 1 |  |
 | [cursor-shape-v1](https://wayland.app/protocols/cursor-shape-v1) | staging | 2 (1 before 0.8.9.5) | 2 | 2 | Version 2 (dnd_ask, all_resize) since 0.8.9.5. |
@@ -1751,9 +1751,9 @@ trusted programs show as not offered). The number is the version of the protocol
 | [xdg-toplevel-icon-v1](https://wayland.app/protocols/xdg-toplevel-icon-v1) | staging | 1 (since 0.8.9.5) | 1 | — | Used only when the app has no installed icon; buffers re-encoded and size-limited, icon names ignored. |
 | [xdg-dialog-v1](https://wayland.app/protocols/xdg-dialog-v1) | staging | 1 (since 0.8.8.8) | 1 | 1 |  |
 | [alpha-modifier-v1](https://wayland.app/protocols/alpha-modifier-v1) | staging | 1 (since 0.8.9.5) | 1 | — |  |
-| [commit-timing-v1](https://wayland.app/protocols/commit-timing-v1) | staging | — | — | 1 |  |
+| [commit-timing-v1](https://wayland.app/protocols/commit-timing-v1) | staging | 1 | — | 1 | An update is not shown before its target on wp_presentation's clock: it applies at the latch of the first frame predicted at or after it (docs/WAYLAND.md "Frame timing"). |
 | [ext-data-control-v1](https://wayland.app/protocols/ext-data-control-v1) | staging | no, on purpose | 1 | — | A program could read every copy, or replace the clipboard, without having the focus. LordOS gives the clipboard only to the focused app; GNOME doesn't offer it either (docs/DESKTOP-PARITY.md). |
-| [fifo-v1](https://wayland.app/protocols/fifo-v1) | staging | — | 1 | 1 |  |
+| [fifo-v1](https://wayland.app/protocols/fifo-v1) | staging | 1 | 1 | 1 | An update waits until the surface's display has latched a frame since the one that set the barrier: Mesa's Vulkan FIFO mode runs at the display's rate. Held in explicit sync's queue; hidden windows and a screen that is off clear it once a second (docs/WAYLAND.md "Frame timing"). |
 | [xdg-system-bell-v1](https://wayland.app/protocols/xdg-system-bell-v1) | staging | — | 1 | 1 |  |
 | [ext-workspace-v1](https://wayland.app/protocols/ext-workspace-v1) | staging | — | — | — | Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). |
 | [color-management-v1](https://wayland.app/protocols/color-management-v1) | staging | — | 2 | 2 | Planned: ICC per output first, then HDR (docs/DESKTOP-PARITY.md, phase 6). |
