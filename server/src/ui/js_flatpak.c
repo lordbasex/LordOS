@@ -11,6 +11,9 @@
  *   lord.flatpak.loadCatalog(lang) → a job id: Flathub's AppStream read by the sandboxed lord-appstream (E7)
  *   lord.flatpak.catalog()        → [{ id, branch, ref, name, summary, icon, categories, license, developer, verified }]
  *                                   of the last load, every line checked again here (fpakas_line)
+ *   lord.flatpak.description(id)  → that app's description from the same load (plain text, paragraphs apart by an
+ *                                   empty line), checked again here (fpakas_desc_line), or "": kept out of catalog()
+ *                                   so the list the Store reads at every load stays small
  * Lines are the command's output, cut to printable UTF-8; nothing in them is acted on here. */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -87,7 +90,9 @@ static void job_pid(void *ud, pid_t pid) {
 
 /* ---- the catalog (E7) ---- */
 static FpakasApp *cat;                  /* the last catalog read, under mu */
+static char **cat_desc;                 /* its descriptions (cat_desc[i] cat[i]'s, or NULL), asked for one at a time */
 static int ncat;
+#define DESC_TOTAL (24u << 20)          /* every description together; Flathub's whole catalog is a few MB */
 static char cat_dir[PATH_MAX];          /* the appstream folder its icon names are in */
 
 /* the helper next to lord-server, root's (or the user's in development) and not writable by others */
@@ -173,22 +178,49 @@ static int load_catalog(const char *lang) {
     }
     close(mem);
     if (!buf) return 127;
-    int cap = 0, n = 0;
+    int cap = 0, n = 0, last_ok = 0;
+    size_t desc_total = 0;
     FpakasApp *list = NULL;
+    char **descs = NULL;
+    static char text[FPAKAS_DESC_MAX + 1];             /* only this worker thread loads */
     for (size_t at = 0; at < have;) {
         char *nl = memchr(buf + at, '\n', have - at);
         size_t len = (size_t)((nl ? nl + 1 : buf + have) - (buf + at));
         FpakasApp a;
-        if (fpakas_line(buf + at, len, &a) == 0 && n < 20000) {
-            if (n == cap) { cap = cap ? cap * 2 : 1024; FpakasApp *g = realloc(list, (size_t)cap * sizeof *g); if (!g) break; list = g; }
+        char id[64];
+        if (len > 3 && !memcmp(buf + at, "#d\t", 3)) {
+            /* a description: only right after its own app's line, and once; all of them kept to DESC_TOTAL bytes */
+            int dl = last_ok ? fpakas_desc_line(buf + at, len, id, text) : -1;
+            if (dl > 0 && !strcmp(id, list[n - 1].id) && !descs[n - 1] && desc_total + (size_t)dl <= DESC_TOTAL) {
+                descs[n - 1] = strdup(text);
+                if (descs[n - 1]) desc_total += (size_t)dl + 1;
+            }
+            last_ok = 0;
+        } else if (fpakas_line(buf + at, len, &a) == 0 && n < 20000) {
+            if (n == cap) {
+                int nc = cap ? cap * 2 : 1024;
+                FpakasApp *g = realloc(list, (size_t)nc * sizeof *g);
+                if (!g) break;
+                list = g;
+                char **gd = realloc(descs, (size_t)nc * sizeof *gd);
+                if (!gd) break;
+                descs = gd;
+                memset(descs + cap, 0, (size_t)(nc - cap) * sizeof *gd);
+                cap = nc;
+            }
+            descs[n] = NULL;
             list[n++] = a;
-        }
+            last_ok = 1;
+        } else last_ok = 0;
         at += len;
     }
     free(buf);
     pthread_mutex_lock(&mu);
+    for (int i = 0; i < ncat; i++) free(cat_desc[i]);
+    free(cat_desc);
     free(cat);
     cat = list;
+    cat_desc = descs;
     ncat = n;
     snprintf(cat_dir, sizeof cat_dir, "%s", dir);
     pthread_mutex_unlock(&mu);
@@ -335,6 +367,21 @@ static JSValue f_catalog(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return arr;
 }
 
+/* the description of one app of the last catalog (checked when it was loaded, fpakas_desc_line), or "" */
+static JSValue f_description(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *id = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    JSValue r = JS_UNDEFINED;
+    if (id && strlen(id) < 64 && fpak_id_ok(id)) {
+        pthread_mutex_lock(&mu);
+        for (int i = 0; i < ncat; i++)
+            if (!strcmp(cat[i].id, id)) { if (cat_desc && cat_desc[i]) r = JS_NewString(c, cat_desc[i]); break; }
+        pthread_mutex_unlock(&mu);
+    }
+    if (id) JS_FreeCString(c, id);
+    return JS_IsUndefined(r) ? JS_NewString(c, "") : r;
+}
+
 static JSValue f_take(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     JSValue arr = JS_NewArray(c);
@@ -381,6 +428,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("cancel", 1, f_cancel),
     JS_CFUNC_DEF("loadCatalog", 1, f_load_catalog),
     JS_CFUNC_DEF("catalog", 0, f_catalog),
+    JS_CFUNC_DEF("description", 1, f_description),
 };
 
 void js_flatpak_register(JSContext *c, JSValue lord) {

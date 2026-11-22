@@ -1,4 +1,7 @@
 {
+  "about.less": "Näytä vähemmän",
+  "about.more": "Näytä lisää",
+  "about.title": "Tietoja tästä sovelluksesta",
   "busy.appstream": "Haetaan Flathubin luetteloa…",
   "busy.catalog": "Luetaan luetteloa…",
   "busy.remote": "Lisätään Flathub…",

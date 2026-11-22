@@ -12,6 +12,28 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Store: a Flathub app's page shows its description, in development.** Under the header, **About this app** shows
+  what the app says about itself (AppStream's `<description>`), as Flathub's site and other app centres do, in the
+  person's language when the catalog has it (`es-AR`: `es_AR`, then `es`, then the untranslated one). Paragraphs are
+  spaced and list items have a bullet (or their number); a long text is shut to about six lines with **Show more** /
+  **Show less**; nothing is shown when the app has none. How it works (`docs/FLATPAK.md`, "The catalog"):
+  - The sandboxed `lord-appstream` (E7) reads it with nothing new: no syscall, no network, still only the C library. It
+    takes only the component's own `<description>` (never a release's), follows translations per paragraph too, and
+    flattens the markup to plain text (`<p>`, `<ul>`/`<ol>`/`<li>`, `<em>`, `<code>`; entities decoded, spaces
+    collapsed, control characters and bytes that aren't UTF-8 removed), at most 4 KB cut at a word with "…". It writes
+    it on its own line right after the app's (`#d`, the id, the text with `\n` and `\\` escaped).
+  - lord-server checks every such line again (`fpakas_desc_line`: the id, only those two escapes, no tab or control
+    character, valid UTF-8, the size) and keeps it only right after its own app's line, at most 24 MB in all. It stays
+    out of `lord.flatpak.catalog()`, which the Store reads at every load: the page asks for one app's with the new
+    `lord.flatpak.description(id)` (`sdk/flathub.js` `description`). Measured on Flathub's catalog (52 MB, 3381 apps):
+    the index grows from 0.6 to 2.5 MB and the helper still takes about 0.1 s.
+  - The layout (whole paragraphs while they fit in six lines, then the next one cut) is `descriptionView` in
+    `sdk/flathubmodel.js`. New texts `flathub.about.title`, `.more`, `.less` in all 35 languages.
+  - Tests: `build/fpakas-test` gains languages, markup flattening, entities, a release's description, the 4 KB cut (on
+    a word, on one long word, in a list), control characters and invalid UTF-8, deep nesting, description lines
+    lord-server must refuse, and 3000 rounds of random markup whose every line must pass the check;
+    `tests/flathub_model_test.mjs` covers `descriptionView`.
+
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).

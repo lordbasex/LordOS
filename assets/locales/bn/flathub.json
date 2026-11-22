@@ -1,4 +1,7 @@
 {
+  "about.less": "কম দেখান",
+  "about.more": "আরও দেখান",
+  "about.title": "এই অ্যাপ সম্পর্কে",
   "busy.appstream": "Flathub-এর ক্যাটালগ আনা হচ্ছে…",
   "busy.catalog": "ক্যাটালগ পড়া হচ্ছে…",
   "busy.remote": "Flathub যোগ করা হচ্ছে…",

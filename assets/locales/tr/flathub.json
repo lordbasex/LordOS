@@ -1,4 +1,7 @@
 {
+  "about.less": "Daha az göster",
+  "about.more": "Daha fazla göster",
+  "about.title": "Bu uygulama hakkında",
   "busy.appstream": "Flathub kataloğu alınıyor…",
   "busy.catalog": "Katalog okunuyor…",
   "busy.remote": "Flathub ekleniyor…",

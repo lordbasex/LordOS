@@ -1,4 +1,7 @@
 {
+  "about.less": "收合",
+  "about.more": "顯示更多",
+  "about.title": "關於此應用程式",
   "busy.appstream": "正在取得 Flathub 的目錄…",
   "busy.catalog": "正在讀取目錄…",
   "busy.remote": "正在加入 Flathub…",

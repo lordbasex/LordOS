@@ -1,4 +1,7 @@
 {
+  "about.less": "Thu gọn",
+  "about.more": "Hiện thêm",
+  "about.title": "Giới thiệu ứng dụng này",
   "busy.appstream": "Đang tải danh mục của Flathub…",
   "busy.catalog": "Đang đọc danh mục…",
   "busy.remote": "Đang thêm Flathub…",

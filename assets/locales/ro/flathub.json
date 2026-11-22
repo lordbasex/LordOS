@@ -1,4 +1,7 @@
 {
+  "about.less": "Arată mai puțin",
+  "about.more": "Arată mai mult",
+  "about.title": "Despre această aplicație",
   "busy.appstream": "Se obține catalogul Flathub…",
   "busy.catalog": "Se citește catalogul…",
   "busy.remote": "Se adaugă Flathub…",

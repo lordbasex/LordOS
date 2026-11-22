@@ -1,4 +1,7 @@
 {
+  "about.less": "Rodyti mažiau",
+  "about.more": "Rodyti daugiau",
+  "about.title": "Apie šią programą",
   "busy.appstream": "Gaunamas Flathub katalogas…",
   "busy.catalog": "Skaitomas katalogas…",
   "busy.remote": "Pridedamas Flathub…",

@@ -171,3 +171,25 @@ export const prefsOf = (s) => ({ on: !!(s && s.on), showAll: !!(s && s.showAll),
 // recordings can only go to the person's folders; OBS's Flatpak asks for Videos, where they go.
 const NOTES = { 'com.obsproject.Studio': 'obsVideos' };
 export const appNote = (id) => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(NOTES, id) ? NOTES[id] : null);
+
+// An app's description (lord.flatpak.description(id): plain text, paragraphs apart by an empty line, list items on
+// their own line) as the page shows it: { paras: [{ text, clamp }], long }. Shut, it keeps about `lines` lines (each
+// estimated at `perLine` characters): whole paragraphs while they fit, then the next one cut to the lines left (clamp,
+// 0 for none); long says there is more to open. Open, every paragraph whole.
+export const DESC_LINES = 6;
+export function descriptionView(text, { open = false, lines = DESC_LINES, perLine = 90 } = {}) {
+  const paras = String(text || '').split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const est = (p) => p.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil([...l].length / perLine)), 0);
+  const total = paras.reduce((n, p) => n + est(p), 0);
+  const long = total > lines;
+  if (open || !long) return { paras: paras.map((p) => ({ text: p, clamp: 0 })), long };
+  const out = [];
+  let left = lines;
+  for (const p of paras) {
+    if (left <= 0) break;
+    const e = est(p);
+    out.push({ text: p, clamp: e <= left ? 0 : left });
+    left -= e;
+  }
+  return { paras: out, long };
+}
