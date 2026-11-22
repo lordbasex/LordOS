@@ -1,6 +1,6 @@
 // Pieces the Machines windows share: the state dot, the system marks, the three lights, bars, a context menu and the
 // surfaces of the Control Center (docs/VIRTUALIZATION.md, "The app"; the approved mocks, Main and Toolbar).
-import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, useSettings, useStore, t as tr } from '@lordos/sdk';
+import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, useSettings, useStore, LordOSLogo, t as tr } from '@lordos/sdk';
 import { logoFor } from './logos.js';
 import { storeRev } from './store.js';
 import { COLOR_HEX } from './systems.js';
@@ -75,6 +75,8 @@ export function OsMark({ id, size = 40, color, letter }) {
       </View>
     );
   }
+  // LordOS is ours: its own icon (the brand's crown on its tile)
+  if (id === 'lordos' && !color) return <LordOSLogo size={size} />;
   // Machines' own drawn marks (assets/machines/marks): a whole tile, colors included
   if (DRAWN[id] && !color) {
     const px = Math.max(32, Math.min(256, Math.ceil(size * 2)));

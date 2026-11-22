@@ -16,6 +16,14 @@ Um cartão novo do assistente Nova máquina monta uma máquina que o Windows 11 
 - **Instalar sem perguntas.** A sua conta local e uma senha opcional, o nome do computador, a edição com a sua chave (ou a chave que a Microsoft publica para instalar sem ativar), sem pedir uma conta online, as opções de privacidade desligadas, e o idioma, o teclado e o fuso horário deste computador. No fim, o Máquinas apaga o disco pequeno que tinha a senha e tira os dois discos. Ou use o instalador do próprio Windows, guiado, com os drivers já lá.
 - **O TPM acompanha a máquina**: os snapshots o guardam, voltar a um o repõe e os clones o levam junto.
 
+## O LordOS numa máquina
+
+O primeiro cartão do assistente de Nova máquina é o próprio LordOS, em desenvolvimento:
+
+- **A ISO live** da versão que o cartão nomeia, para PCs de 64 bits e arm64, conferida com a chave de publicação do LordOS embutida no LordOS antes de confiar em um único byte.
+- **Instalação sem perguntas**: a sua conta e senha (guardada só como hash), o nome do computador, o fuso horário, o teclado e o seu idioma. Só o disco novo da própria máquina pode ser apagado.
+- **4 processadores, 4 GB, 32 GB e 3D** por padrão, e o agente do convidado rodando desde a primeira inicialização, então o modo apps funciona logo (com a próxima ISO).
+
 ## As ferramentas do LordOS para Windows
 
 Um programa pequeno que o LordOS constrói, instalado sozinho depois de uma instalação desassistida (ou pelo botão do agente), rodando como você, nunca como serviço:

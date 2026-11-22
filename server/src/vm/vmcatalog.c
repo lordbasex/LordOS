@@ -2,6 +2,7 @@
 #include "vmcatalog.h"
 #include "../sec/json.h"
 #include "../pkg/pgp.h"
+#include "../imager/imgverify.h"
 #include "../errcode.h"
 
 #include <ctype.h>
@@ -105,18 +106,23 @@ int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmC
         const JVal *mx = get(a, "maxMb");
         if (!a || !dir_ok(dir) || (fdir && !dir_ok(fdir)) || !re_ok(fre) || !mx || mx->type != J_NUM || mx->num < 1 || mx->num > (double)MAX_IMAGE_MB) break;
         if (!!sums == !!sre || (sums && (!vmcat_name_ok(sums) || strlen(sums) >= sizeof e->sums)) || (sre && !re_ok(sre))) break;
-        /* the list's signature: every entry has one, with its key file and at least one pinned fingerprint */
+        /* the list's signature: every entry has one, with its key file and at least one pinned fingerprint; LordOS's own
+         * releases are signed with the LordOS release key, compiled into LordOS, so that entry names no key file */
         const JVal *sg = get(s, "signature"), *fl = get(s, "fingerprints");
         const char *st = str(sg, "type"), *sn = str(sg, "name"), *kf = str(s, "keys");
-        if (!st || !kf || !vmcat_name_ok(kf) || strlen(kf) >= sizeof e->keys || !fl || fl->type != J_ARR) break;
-        if (!strcmp(st, "detached")) {
+        if (st && !strcmp(st, "lordos-release")) {
+            if (get(s, "keys") || fl || !sn || !vmcat_name_ok(sn) || strlen(sn) >= sizeof e->sig_name) break;
+            e->sig_type = VMCAT_SIG_LORDOS;
+            snprintf(e->sig_name, sizeof e->sig_name, "%s", sn);
+        } else if (!st || !kf || !vmcat_name_ok(kf) || strlen(kf) >= sizeof e->keys || !fl || fl->type != J_ARR) break;
+        else if (!strcmp(st, "detached")) {
             if (!sn || !vmcat_name_ok(sn) || strlen(sn) >= sizeof e->sig_name) break;
             e->sig_type = VMCAT_SIG_DETACHED;
             snprintf(e->sig_name, sizeof e->sig_name, "%s", sn);
         } else if (!strcmp(st, "clearsigned") && !sn) e->sig_type = VMCAT_SIG_CLEAR;
         else break;
         int bad = 0;
-        for (const JVal *f = fl->kid; f && !bad; f = f->next) {
+        for (const JVal *f = e->sig_type == VMCAT_SIG_LORDOS ? NULL : fl->kid; f && !bad; f = f->next) {
             if (f->type != J_STR || strlen(f->str) != 40 || e->nfprs == VMCAT_FPRS) { bad = 1; break; }
             for (int i = 0; i < 40; i++) {
                 if (!isxdigit((unsigned char)f->str[i])) { bad = 1; break; }
@@ -124,8 +130,8 @@ int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmC
             }
             e->fprs[e->nfprs++][40] = 0;
         }
-        if (bad || !e->nfprs) break;
-        snprintf(e->keys, sizeof e->keys, "%s", kf);
+        if (bad || (!e->nfprs && e->sig_type != VMCAT_SIG_LORDOS)) break;
+        snprintf(e->keys, sizeof e->keys, "%s", kf ? kf : "");
         snprintf(e->dir, sizeof e->dir, "%s", dir);
         snprintf(e->file_dir, sizeof e->file_dir, "%s", fdir ? fdir : dir);
         snprintf(e->sums, sizeof e->sums, "%s", sums ? sums : "");
@@ -174,6 +180,19 @@ int vmcat_verify_list(const VmCatEntry *e, const char *keys, size_t keys_len, co
     *body = NULL;
     *body_len = 0;
     err[0] = 0;
+    if (e && e->sig_type == VMCAT_SIG_LORDOS) {
+        /* LordOS's own release: SHA256SUMS.sig, base64 of the Ed25519 signature over the list's exact bytes, checked by
+         * the code that checks the LordOS Imager's official images (imgverify.c) with the key the helper passes: the
+         * compiled-in release key (codesig_release_key) */
+        if (!keys || keys_len != 32 || !list) { lerr_set(err, errlen, "imager.badSignature", NULL); return -1; }
+        if (!sig) return 0;
+        if (img_sig_verify((const uint8_t *)list, list_len, sig, sig_len, (const uint8_t *)keys)) { lerr_set(err, errlen, "imager.badSignature", NULL); return -1; }
+        if (!(*body = malloc(list_len + 1))) return -1;
+        memcpy(*body, list, list_len);
+        (*body)[list_len] = 0;
+        *body_len = list_len;
+        return 1;
+    }
     if (!e || !e->nfprs || !keys || !list) { lerr_set(err, errlen, "pkg.pgp.unknownKeys", "count", "0", NULL); return -1; }
     static const char clear[] = "-----BEGIN PGP SIGNED MESSAGE-----";
     if (e->sig_type == VMCAT_SIG_DETACHED && !sig) return 0;

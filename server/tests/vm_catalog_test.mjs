@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const C = await import(path.join(here, '../../apps/machines/catalog.js'));
 const CAT = JSON.parse(fs.readFileSync(path.join(here, '../../assets/machines/systems.json'), 'utf8'));
-const { systemsFor, entryOf, parseSums, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, compareNames, sizeMb, downloadedImages, IMAGES_DIR, unattendedOf, checkSetup, hostnameFor, userFor } = C;
+const { systemsFor, entryOf, parseSums, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, compareNames, sizeMb, downloadedImages, IMAGES_DIR, unattendedOf, checkSetup, hostnameFor, userFor, cardSize, lordosLang } = C;
 const M = await import(path.join(here, '../../apps/machines/model.js'));
 
 let n = 0, bad = 0;
@@ -22,10 +22,11 @@ const eq = (name, got, want) => {
 const H = (c) => c.repeat(64);
 
 // ---- the cards ----
-eq('amd64 cards, Debian first', systemsFor(CAT, 'amd64').map((s) => s.id), ['debian', 'ubuntu', 'fedora', 'kali', 'windows']);
-eq('arm64 cards', systemsFor(CAT, 'arm64').map((s) => s.id), ['debian', 'ubuntu', 'fedora', 'kali']);
+eq('amd64 cards, LordOS first', systemsFor(CAT, 'amd64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali', 'windows']);
+eq('arm64 cards', systemsFor(CAT, 'arm64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali']);
 eq('no cards for another arch', systemsFor(CAT, 'riscv64'), []);
-eq('Debian 13', [systemsFor(CAT, 'amd64')[0].name, systemsFor(CAT, 'amd64')[0].release], ['Debian', '13']);
+const card = (id, arch = 'amd64') => systemsFor(CAT, arch).find((s) => s.id === id);
+eq('Debian 13', [card('debian').name, card('debian').release], ['Debian', '13']);
 eq('every entry has its hash source and date', CAT.systems.every((s) => s.hashSource && /^\d{4}-\d\d-\d\d$/.test(s.checked)), true);
 // a pinned entry (Windows' evaluation, virtio-win; vmcatalog.h) names its files itself; every other entry has a folder
 const pinnedOf = (s) => Object.values(s.arch).some((a) => Array.isArray(a.pinned));
@@ -47,7 +48,7 @@ eq('windows: every language of the page, hashes unique', [WIN.arch.amd64.isos.le
   new Set(WIN.arch.amd64.isos.map((i) => i.sha256)).size === WIN.arch.amd64.isos.length], [true, true, true]);
 eq('windows: editions with Microsoft\'s KMS client keys, Home without', [WIN.editions.find((e) => e.name === 'Windows 11 Pro').kms, WIN.editions.find((e) => e.name === 'Windows 11 Home').kms,
   WIN.editions.every((e) => e.kms === '' || /^[A-Z0-9]{5}(-[A-Z0-9]{5}){4}$/.test(e.kms))], ['W269N-WFGWX-YVC9B-4J6C9-T83GX', '', true]);
-eq('Fedora list found in a listing', [systemsFor(CAT, 'amd64')[2].listed, systemsFor(CAT, 'amd64')[0].listed], [true, false]);
+eq('Fedora list found in a listing', [card('fedora').listed, card('debian').listed], [true, false]);
 eq('entryOf', [entryOf(CAT, 'debian', 'arm64').sums, entryOf(CAT, 'nothing', 'amd64'), entryOf(CAT, 'debian', 'riscv64')], ['SHA256SUMS', null, null]);
 eq('garbage catalog', systemsFor({ systems: [null, 3, { id: 'x' }] }, 'amd64'), []);
 
@@ -86,7 +87,7 @@ eq('sizes', [sizeMb(760, 0), sizeMb(760, 2925092864)], [760, 2790]);
 eq('resumed', [resumedOf('vm.downloadResumed from=412000000'), resumedOf('progress download 1 2'), resumedOf(null)], [412000000, 0, 0]);
 
 // ---- the makers' signed lists: every card names its signature, key file and fingerprints ----
-for (const s of CAT.systems.filter((x) => !pinnedOf(x))) {
+for (const s of CAT.systems.filter((x) => !pinnedOf(x) && x.signature?.type !== 'lordos-release')) {
   eq(`${s.id}: signed`, [['detached', 'clearsigned'].includes(s.signature?.type), /^[a-z0-9-]+\.asc$/.test(s.keys), (s.fingerprints || []).every((f) => /^[0-9A-F]{40}$/.test(f)) && s.fingerprints.length > 0,
     typeof s.keySource === 'string' && typeof s.fingerprintChecked === 'string' && s.fingerprintChecked.includes('https://')], [true, true, true, true]);
   eq(`${s.id}: key file pinned in the package`, fs.existsSync(path.join(here, '../../packaging/keys/machines', s.keys)), true);
@@ -96,6 +97,34 @@ const fed = fs.readFileSync(path.join(here, 'vmimage/fedora-amd64.checksum'), 'u
 const signed = fed.slice(fed.indexOf('\n\n') + 2, fed.indexOf('-----BEGIN PGP SIGNATURE-----'));
 eq('fedora signed text', pickImage(entryOf(CAT, 'fedora', 'amd64'), signed)?.name, 'Fedora-Workstation-Live-45-1.4.x86_64.iso');
 eq('debian published list', pickImage(entryOf(CAT, 'debian', 'amd64'), fs.readFileSync(path.join(here, 'vmimage/debian-amd64.sums'), 'utf8'))?.name, 'debian-13.7.0-amd64-netinst.iso');
+
+// ---- LordOS (its own release on GitHub, signed with the LordOS release key; vmcatalog.h VMCAT_SIG_LORDOS) ----
+const LOS = CAT.systems.find((s) => s.id === 'lordos');
+eq('lordos: the card', [card('lordos').name, card('lordos').kind, card('lordos', 'arm64').name, card('lordos').approxMb > 900 && card('lordos').approxMb < 2048], ['LordOS', 'iso', 'LordOS', true]);
+eq('lordos: the release key, no key file', [LOS.signature, LOS.keys, LOS.fingerprints], [{ type: 'lordos-release', name: 'SHA256SUMS.sig' }, undefined, undefined]);
+const tagOf = (dir) => (/\/releases\/download\/(v[0-9]+(?:\.[0-9]+){2,3}(?:-[a-z0-9.]+)?)\/$/.exec(dir) || [])[1] || '';
+eq('lordos: one pinned release tag for both', [!!tagOf(LOS.arch.amd64.dir), tagOf(LOS.arch.amd64.dir) === tagOf(LOS.arch.arm64.dir), LOS.arch.amd64.dir.startsWith('https://github.com/lordbasex/LordOS/releases/download/')], [true, true, true]);
+eq('lordos: the card says the tag\'s version', tagOf(LOS.arch.amd64.dir).replace(/^v/, '').replace(/-.*$/, ''), LOS.release);
+// the site's list of current images (web/content/downloads.json) is never newer than the release the card names: the release
+// process moves the tag (docs/RELEASING.md, step 1), so a release with new ISOs and an old card fails here
+const DL = JSON.parse(fs.readFileSync(path.join(here, '../../web/content/downloads.json'), 'utf8')).downloads;
+const vnum = (v) => String(v).replace(/^v/, '').replace(/-.*$/, '').split('.').map(Number);
+const cmpv = (a, b) => { const x = vnum(a), y = vnum(b); for (let i = 0; i < 4; i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
+eq('lordos: the card\'s release is the site\'s current ISO or newer', ['iso-amd64', 'iso-arm64'].every((k) => DL[k] && cmpv(tagOf(LOS.arch.amd64.dir), DL[k].release) >= 0), true);
+const lsums = fs.readFileSync(path.join(here, 'vmimage/lordos.sums'), 'utf8');
+eq('lordos: the live ISO from the signed list', [pickImage(entryOf(CAT, 'lordos', 'amd64'), lsums), pickImage(entryOf(CAT, 'lordos', 'arm64'), lsums)?.name],
+  [{ name: 'lordos-live-0.8.9-amd64.iso', sha: '2ef62214e5a5791bc03ccfbdc5fa0f310fa71fc14c810d23527840eaf0344848', size: 0 }, 'lordos-live-0.8.9-arm64.iso']);
+eq('lordos: the site\'s hash is the signed list\'s', [DL['iso-amd64'].sha256 === pickImage(entryOf(CAT, 'lordos', 'amd64'), lsums).sha || DL['iso-amd64'].release !== 'v0.8.9-beta'], [true]);
+eq('lordos: never the OVA or a source list', pickImage(entryOf(CAT, 'lordos', 'amd64'), `${H('a')}  lordos-0.8.9-amd64.ova\n${H('b')}  lordos-live-0.8.9-amd64.sources.tsv\n`), null);
+eq('lordos: the version', [versionIn('lordos-live-0.8.9-amd64.iso', '0.8.9'), versionIn('lordos-live-0.8.9.1-amd64.iso', '0.8.9')], ['0.8.9', '0.8.9.1']);
+eq('lordos: unattended from the live ISO itself', unattendedOf(CAT, 'lordos', 'arm64'), { kind: 'lordos', image: 'lordos', kernel: 'live/vmlinuz', initrd: 'live/initrd.img',
+  append: 'boot=live components loglevel=3 nosplash lordos.auto=1 console=tty1', release: '0.8.9' });
+eq('lordos: language', [lordosLang('es'), lordosLang('zh-Hans'), lordosLang(''), lordosLang('x y'), lordosLang(undefined)], ['es', 'zh-Hans', 'en', 'en', 'en']);
+const small = { vcpus: 2, memoryMb: 2048, diskGb: 20, gfx: '2d', network: 'shared' };
+eq('lordos: its least size over a small profile', cardSize(CAT, 'lordos', small, { cpus: 8 }), { vcpus: 4, memoryMb: 4096, diskGb: 32, gfx: '3d', network: 'shared' });
+eq('lordos: a bigger profile stays', cardSize(CAT, 'lordos', { vcpus: 8, memoryMb: 16384, diskGb: 80, gfx: '2d' }, { cpus: 16 }), { vcpus: 8, memoryMb: 16384, diskGb: 80, gfx: '3d' });
+eq('lordos: never more processors than here', cardSize(CAT, 'lordos', small, { cpus: 2 }).vcpus, 2);
+eq('other cards: the profile as is', cardSize(CAT, 'debian', small, { cpus: 8 }), small);
 
 // ---- downloaded images (Storage) ----
 const A = H('a'), B = H('b'), D = H('d');
@@ -123,6 +152,7 @@ eq('unattended: debian arm64', unattendedOf(CAT, 'debian', 'arm64')?.kernel, 'in
 eq('unattended: ubuntu from the server image', [unattendedOf(CAT, 'ubuntu', 'amd64')?.kind, unattendedOf(CAT, 'ubuntu', 'amd64')?.image], ['autoinstall', 'ubuntu-server']);
 eq('unattended: fedora from the network installer', [unattendedOf(CAT, 'fedora', 'arm64')?.kind, unattendedOf(CAT, 'fedora', 'arm64')?.image, unattendedOf(CAT, 'fedora', 'amd64')?.append.includes('{label}')], ['kickstart', 'fedora-netinst', true]);
 eq('unattended: none for kali', unattendedOf(CAT, 'kali', 'amd64'), null);
+eq('unattended: an unknown kind is none', unattendedOf({ systems: [{ id: 'x', unattended: { kind: 'other', arch: { amd64: { kernel: 'k', initrd: 'i' } } }, arch: { amd64: { file: '^x$' } } }] }, 'x', 'amd64'), null);
 eq('ubuntu server image in the signed list', pickImage(entryOf(CAT, 'ubuntu-server', 'amd64'), fs.readFileSync(path.join(here, 'vmimage/ubuntu-amd64.sums'), 'utf8'))?.name, 'ubuntu-26.04.1-live-server-amd64.iso');
 eq('ubuntu arm64 server image, not largemem', pickImage(entryOf(CAT, 'ubuntu-server', 'arm64'), fs.readFileSync(path.join(here, 'vmimage/ubuntu-arm64.sums'), 'utf8'))?.name, 'ubuntu-26.04.1-live-server-arm64.iso');
 eq('fedora netinst pattern', [new RegExp(entryOf(CAT, 'fedora-netinst', 'amd64').file).test('Fedora-Everything-netinst-x86_64-45-1.4.iso'), new RegExp(entryOf(CAT, 'fedora-netinst', 'amd64').sumsPattern).test('Fedora-Everything-45-1.4-x86_64-CHECKSUM')], [true, true]);

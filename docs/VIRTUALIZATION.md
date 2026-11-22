@@ -1237,10 +1237,64 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
   qemu-guest-agent first when it answers and presses the button 10 s later if the guest still runs (without the
   agent, the button first); the card's installs bring the standard task or a desktop (`dbus`, logind),
   `qemu-guest-agent` with the machine's agent on, and, on a console Debian, `acpid` and `acpi-support-base`.
-- *Deviation from the mock:* the mock's first card is LordOS; LordOS publishes no ISO as a release file yet (its
-  releases carry the `.deb` packages and the Pi image is written by the Imager), so its card is left out until one is,
-  and the fourth card is Kali (in 4.1's list). The mock's step names stay (*Install* is shown as *Create*, as in the
-  alpha).
+- *Deviation from the mock:* the mock's first card is LordOS; until 0.8.9 LordOS published no ISO as a release file,
+  so its card was left out and the fourth card is Kali (in 4.1's list). The LordOS card came after (below). The mock's
+  step names stay (*Install* is shown as *Create*, as in the alpha).
+- *The LordOS card (in development, 2026-11-22; maintainer's decision the same day).* The first card is **LordOS**,
+  with LordOS's own icon (`LordOSLogo`: LordOS is ours, no trademark question), for amd64 and arm64: the **live ISO**
+  (`lordos-live-<version>-<arch>.iso`, about 1.1 GB), not the OVA or the Pi image.
+  - *Which release:* the entry's folder is a GitHub release folder with a **pinned tag**
+    (`https://github.com/lordbasex/LordOS/releases/download/v0.8.9-beta/`), and `release` says its version
+    (*LordOS 0.8.9*). No GitHub API call: the downloader keeps to the catalog's folder (the image's download redirects
+    to GitHub's signed asset URL, as for the Imager), and the API's answers would be one more thing to parse and
+    rate-limit. The release process moves the tag (`RELEASING.md`, step 1) whenever a release ships new ISOs; a release
+    with a fourth number and no ISO keeps the card where it is. `vm_catalog_test.mjs` fails when the site's current ISO
+    (`web/content/downloads.json`) is newer than the card's tag, so a forgotten move shows up in `make test`. Pre-releases
+    (`-beta` tags) are what exists today; the card says the version only. An installed LordOS's card names the release
+    its own package was built with (or a newer one after an update).
+  - *The signature:* LordOS's own releases are signed with the **LordOS release key**: `SHA256SUMS.sig` is base64 of the
+    Ed25519 signature over `SHA256SUMS` (`SIGNING.md`, "Release files"). The entry's `signature` is
+    `{ "type": "lordos-release", "name": "SHA256SUMS.sig" }`, with no `keys` or `fingerprints` (a catalog entry of that
+    kind that names them is refused). `vmcatalog.c` checks it with `img_sig_verify`, the LordOS Imager's own check of
+    official images (`imager/imgverify.c`), and the key the helper passes is `codesig_release_key`, the release key
+    compiled into lord-server: no new crypto, no new key, no key file on disk. A missing `SHA256SUMS.sig` is
+    `vm.listUnsigned`; one that doesn't verify (a changed list, a line added, another key, an OpenPGP signature in its
+    place, another list) is `vm.listBadSignature` with `imager.badSignature`. Then the image is checked against that
+    signed list like any card's. `maxMb` is 4096 for both.
+  - *Size:* a card may carry `defaults`, the least a new machine of it gets over the chosen profile (`cardSize` in
+    `catalog.js`; processors never more than this computer has): LordOS asks for **4 vCPU, 4 GB, 32 GB and 3D
+    graphics** (3D where this computer can give it, 6.10).
+  - *Install without questions:* `unattended` kind **`lordos`**, the live ISO's own unattended install
+    (`UNATTENDED.md`, in the live ISO since 0.8.8.1): the live kernel and initrd (`live/vmlinuz`, `live/initrd.img`, the same
+    paths on both architectures) with `boot=live components loglevel=3 nosplash lordos.auto=1 console=tty1`, and a FAT
+    seed disk labelled **`LORDOSAUTO`** with `lordos-auto.conf` (`vmu_answer`): the account, the SHA-512 hash of the
+    password, the computer's name, time zone, keyboard, locale, LordOS's interface language (this LordOS's own), `mode =
+    erase`, `erase = yes`, `autologin = no`, `after = reboot`, and the disk: lord-vm fills `disk` (`vda`, or `sda`
+    with the compatible devices) and `disk_bytes`, the exact size of the system disk it just made, so
+    `lord-autoinstall` erases only that disk and stops, touching nothing, at anything else (the seed disk, the ISO, a
+    different size). A spec of kind `lordos` without `lordos.auto=1` on its command line is refused. Its restart at the
+    end ends QEMU as with the other installers, and the next start is the installed LordOS. No ISO-side change was
+    needed: the live ISO already reads `lordos-auto.conf` from a `LORDOSAUTO` file system of any kind. An older live ISO
+    without `lordos-autoinstall.service` (before 0.8.8.1) starts its live session instead and nothing is erased; the
+    card only names 0.8.9 or newer.
+  - *The guest agent from the first boot:* the `lordos` package ships `lordos-guest.service`, a user unit on by
+    default (`/usr/lib/systemd/user/default.target.wants`) that runs `/usr/lib/lordos/guest/lordos-guest` only where
+    `/dev/virtio-ports/org.lordos.agent` exists, which is only inside a Machines guest whose agent is on, and
+    `71-lordos-guest.rules` (the same rule the Install Agent writes in other guests: the seat's person may open the
+    port). On a computer, or a machine without the agent, nothing runs. The live ISO now also has `qemu-guest-agent`
+    (`ISO.md`): Debian's unit starts only when the host gives the `org.qemu.guest_agent.0` port. So a LordOS machine
+    made by the card has its agent connected and apps mode (7.2) offered from its first boot; both reach installed
+    systems with the next ISO and the next `lordos` package.
+  - *Checked:* `vmcatalog-test` with v0.8.9-beta's published `SHA256SUMS` and `SHA256SUMS.sig` (`tests/vmimage/lordos.*`)
+    and the compiled-in key: the list verifies; a changed hash, a line added, another key, a 31-byte or PEM key, no
+    signature, an empty, garbage or OpenPGP signature, the signature over Debian's list, and Debian's entry given the
+    release key are all refused; entries of that kind with a key file, fingerprints, no name or a path for a name are
+    refused. `vmunattend-test`: the `lordos-auto.conf` keys and values, no answers until lord-vm names the disk and its
+    size, refused languages and command lines, and `vmu_prepare` end to end (the `LORDOSAUTO` FAT image read back, the
+    file on it). `vm_catalog_test.mjs`: the card per architecture, the live ISO picked from the real list (never the
+    OVA or a `.sources.tsv`), the tag against `downloads.json`, `unattendedOf`, `cardSize`. **Not run yet:** the whole
+    path on a machine (download 1.1 GB, the unattended install to the installed desktop, the agent and apps mode on
+    first boot) needs the next ISO (with `qemu-guest-agent`) and a host with this branch.
 - *Tests:* `tests/vmcatalog_test.c` (ASan, UBSan; the real catalog for both architectures, names against patterns and
   what must never pass: paths, `.torrent`, the other architecture, Debian's *edu* and *mac* images; both list forms,
   capitals, CRLF, a NUL, odd spacing; fourteen malformed catalogs refused) and `tests/vm_catalog_test.mjs` (the cards,
@@ -1313,7 +1367,7 @@ Every current Linux has virtio drivers in its kernel. Cards: Ubuntu, Fedora, Deb
 
 **Always the newest image of a release.** The catalog doesn't pin a file. An entry names a release, the maker's list that names its images (a `SHA256SUMS` file, a directory listing, a releases file) and a file-name pattern, so "Ubuntu 26.04" keeps working when 26.04.2 appears. The app reads the list, takes the newest matching name, checks that it can really be downloaded (lists sometimes name removed files), and verifies the download against that same list, whose signature it checks with the maker's key (confirmed for all four cards on 2026-11-06: every maker signs its list, with the keys pinned in 3.9, "The Linux download cards"). So the catalog stays small and rarely needs an update, and our own signature covers only the entry: which list and which key are trusted. LordOS itself is a guest too, since we build UEFI ISOs for both architectures.
 
-Automatic install: Debian preseed, Ubuntu autoinstall, Fedora kickstart. The person gives a name and password once, in the assistant;
+Automatic install: Debian preseed, Ubuntu autoinstall, Fedora kickstart, and LordOS's own `lordos-auto.conf` (the live ISO's unattended install, in development: 3.9, "The LordOS card"). The person gives a name and password once, in the assistant;
 it reaches the guest through a small seed disk (Debian: inside the installer's initrd) that is deleted after the first boot, and only
 its hash is ever stored (built in 0.8.9: 3.9, "Install without questions").
 
@@ -1482,7 +1536,7 @@ A light never carries meaning by color alone: each has a tooltip and the state i
 Steps, each one screen, with Back always available:
 
 1. **Choose:** cards.
-   - Download: Debian, Ubuntu, Fedora, Kali (built 2026-11-06, 3.9, "The Linux download cards"); LordOS once it publishes an ISO; Android (later).
+   - Download: Debian, Ubuntu, Fedora, Kali (built 2026-11-06, 3.9, "The Linux download cards"); LordOS (its live ISO, signed with the release key; in development, 3.9, "The LordOS card"); Android (later).
    - "Install from an ISO file" (drag a file on it).
    - "Migrate from another app": a machine of another virtualization app (6.22). Built 2026-11-05; it took the tile the mock gave
      "Migrate from another PC" (6.11), which comes later.

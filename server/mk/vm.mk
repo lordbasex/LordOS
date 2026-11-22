@@ -74,11 +74,12 @@ endif
 test: build/vm-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test test-vm-import
 # the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
 # and invented lists, under ASan and UBSan
-# and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage
-VMCAT_SRC := src/vm/vmcatalog.c src/sec/json.c src/pkg/pgp.c src/pkg/crypto.c
-build/vmcatalog-test: tests/vmcatalog_test.c $(VMCAT_SRC) src/vm/vmcatalog.h src/pkg/pgp.h ../assets/machines/systems.json $(wildcard tests/vmimage/*) $(wildcard ../packaging/keys/machines/*)
+# and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage,
+# and LordOS's own release signature (imager/imgverify.c) with the compiled-in release key
+VMCAT_SRC := src/vm/vmcatalog.c src/sec/json.c src/pkg/pgp.c src/pkg/crypto.c src/imager/imgverify.c
+build/vmcatalog-test: tests/vmcatalog_test.c $(VMCAT_SRC) tests/imager_key.c src/vm/vmcatalog.h src/pkg/pgp.h src/imager/imgverify.h ../assets/machines/systems.json $(wildcard tests/vmimage/*) $(wildcard ../packaging/keys/machines/*)
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmcatalog_test.c $(VMCAT_SRC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmcatalog_test.c $(VMCAT_SRC) tests/imager_key.c
 	./$@ ../assets/machines/systems.json tests/vmimage ../packaging/keys/machines || { rm -f $@; exit 1; }
 # unattended installs (vmunattend.c): the spec, the answer files, the FAT seed disk, the cpio, ISO 9660 paths
 build/vmunattend-test: tests/vmunattend_test.c src/vm/vmunattend.c src/vm/vmunattend.h src/sec/json.c
@@ -126,7 +127,7 @@ build/obj/ui/js.o: src/ui/js_vm.h
 
 # vm-image-* like the admin helper runs them, against the makers' servers (tests/vm_image_cli.c; a manual check, not in
 # make test: it needs root, lord-tls beside it and the network). Its catalog, keys and store are under /var/tmp/lordos-vmimage-test (root's: sudo install the catalog and packaging/keys/machines there first).
-VMIMAGE_CLI_SRC := tests/vm_image_cli.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/pkg/http.c src/pkg/pubhost.c src/pkg/crypto.c src/pkg/pgp.c src/sec/cgroup.c src/sec/json.c
+VMIMAGE_CLI_SRC := tests/vm_image_cli.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/pkg/http.c src/pkg/pubhost.c src/pkg/crypto.c src/pkg/pgp.c src/sec/cgroup.c src/sec/json.c src/imager/imgverify.c tests/imager_key.c
 build/vm-image-cli: $(VMIMAGE_CLI_SRC) src/vm/vmcatalog.h src/vm/vm_admin.h src/pkg/http.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -DVM_CATALOG='"/var/tmp/lordos-vmimage-test/systems.json"' -DVM_STORE='"/var/tmp/lordos-vmimage-test/machines"' -DVM_KEYS='"/var/tmp/lordos-vmimage-test/keys"' -o $@ $(VMIMAGE_CLI_SRC)

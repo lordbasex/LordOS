@@ -1,0 +1,5 @@
+# LordOS inside a Machines virtual machine (docs/VIRTUALIZATION.md 6.17, 7.2): the person signed in at the guest's seat
+# may open the guest's end of org.lordos.agent, the virtio-serial port Machines adds only while the machine's guest
+# agent is on. lordos-guest (lordos-guest.service, a user unit) holds it as that person. The same rule Machines' Install
+# Agent writes into other Linux guests. On a computer that isn't such a guest the port doesn't exist: nothing matches.
+SUBSYSTEM=="virtio-ports", ATTR{name}=="org.lordos.agent", TAG+="uaccess"

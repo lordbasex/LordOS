@@ -138,16 +138,37 @@ export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m)
 }
 
 // ---- unattended installs (vmunattend.h) ----
+// the answer files lord-vm makes: Debian's preseed, Ubuntu's autoinstall, Fedora's kickstart and LordOS's own
+// lordos-auto.conf (the live ISO's unattended install, docs/UNATTENDED.md)
+export const UNATTENDED_KINDS = ['preseed', 'autoinstall', 'kickstart', 'lordos'];
 // how a card installs without questions on this architecture: { kind, image (the entry whose image it boots: the card's
 // own, or a hidden one), kernel, initrd, append } or null
 export function unattendedOf(cat, id, arch) {
   const s = (cat?.systems || []).find((x) => x?.id === id);
   const u = s?.unattended;
   const a = u?.arch?.[arch];
-  if (!u || !a || !['preseed', 'autoinstall', 'kickstart'].includes(u.kind) || typeof a.kernel !== 'string' || typeof a.initrd !== 'string') return null;
+  if (!u || !a || !UNATTENDED_KINDS.includes(u.kind) || typeof a.kernel !== 'string' || typeof a.initrd !== 'string') return null;
   const image = typeof u.image === 'string' ? u.image : id;
   if (!entryOf(cat, image, arch)) return null;
   return { kind: u.kind, image, kernel: a.kernel, initrd: a.initrd, append: String(u.append || ''), release: String(s.release || '') };
+}
+
+// LordOS's interface language for its unattended install: this LordOS's own, as a locale id ("es", "zh-Hans"), or "en"
+export function lordosLang(lang) {
+  const l = String(lang || '');
+  return /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(l) ? l : 'en';
+}
+
+// a card's own least size ("defaults" in the catalog: LordOS asks for 4 processors, 4 GB, 32 GB and 3D) over what the
+// profile gives: the processors never more than this computer has; size: { vcpus, memoryMb, diskGb, gfx, ... }
+export function cardSize(cat, id, size, host) {
+  const d = (cat?.systems || []).find((x) => x?.id === id)?.defaults;
+  if (!d || typeof d !== 'object') return size;
+  const n = (v) => (Number.isInteger(v) && v > 0 ? v : 0);
+  const want = n(d.vcpus);
+  const vcpus = Math.max(size.vcpus, Math.min(want, Math.max(1, host?.cpus || want)));
+  return { ...size, vcpus, memoryMb: Math.max(size.memoryMb, n(d.memoryMb)), diskGb: Math.max(size.diskGb, n(d.diskGb)),
+    gfx: d.graphics === '3d' ? '3d' : size.gfx };
 }
 
 // what the person types for an unattended install, checked as lord-vm checks it: { ok, errors: { user, password, hostname } }

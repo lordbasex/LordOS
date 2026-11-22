@@ -16,6 +16,14 @@ A new card in the New Machine assistant makes a machine Windows 11 accepts as it
 - **Install without questions.** Your local account and optional password, the computer's name, the edition with your key (or Microsoft's published key that installs it unactivated), no online account asked, privacy options off, and this computer's language, keyboard and time zone. When it's done, Machines erases the small disk that held the password and takes both discs out. Or use Windows' own installer, guided, with the drivers already there.
 - **The TPM goes with the machine**: snapshots keep it, reverts put it back and clones take it along.
 
+## LordOS in a machine
+
+The first card of the New Machine assistant is LordOS itself, in development:
+
+- **The live ISO** of the release the card names, for 64-bit PCs and arm64, checked with the LordOS release key built into LordOS before a byte of it is trusted.
+- **Install without questions**: your account and password (kept only as a hash), the computer's name, time zone, keyboard and your language. Only the machine's own new disk can be erased.
+- **4 processors, 4 GB, 32 GB and 3D** by default, and the guest agent running from the first boot, so apps mode works right away (with the next ISO).
+
 ## The LordOS tools for Windows
 
 A small program LordOS builds, installed for you after an unattended install (or from the agent's button), running as you, never as a service:

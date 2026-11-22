@@ -629,7 +629,7 @@ static int win_password(const char *pw, char *out, size_t on) {
 
 static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char *path, size_t pn) {
     static const char *const keys[] = { "kind", "user", "fullname", "hostname", "timezone", "keymap", "variant", "locale", "release",
-                                        "kernel", "initrd", "append", NULL };
+                                        "kernel", "initrd", "append", "lang", NULL };
     char buf[8192];
     size_t n = (size_t)snprintf(buf, sizeof buf, "{\"arch\":\"%s\"", arch);
     int ok = 1;

@@ -220,6 +220,54 @@ int main(void) {
     T("kickstart: workstation, reboot", a && strstr(a, "@^workstation-product-environment") && strstr(a, "\nreboot\n") && strstr(a, "keyboard --xlayouts='latam'"));
     free(a);
 
+    /* LordOS (lordos-auto.conf for the live ISO's own unattended install, docs/UNATTENDED.md) */
+    {
+        const char *la = "\"append\":\"boot=live components loglevel=3 nosplash lordos.auto=1 console=tty1\"";
+        char b[2400];
+        snprintf(b, sizeof b, "%s", spec("lordos", la));
+        VmUnattend l;
+        T("lordos: spec", !vmu_parse(b, strlen(b), &l, err, sizeof err) && l.kind == VMU_LORDOS && !l.lang[0] && !l.disk[0] && !l.disk_bytes);
+        a = vmu_answer(&l, &nm);
+        T("lordos: no answers until lord-vm names the disk", !a && nm && !strcmp(nm, "lordos-auto.conf"));
+        free(a);
+        snprintf(l.disk, sizeof l.disk, "vda");
+        l.disk_bytes = 32ull << 30;
+        a = vmu_answer(&l, &nm);
+        T("lordos: the disk, its exact size, erase", a && strstr(a, "\ndisk = vda\ndisk_bytes = 34359738368\nmode = erase\nerase = yes\n"));
+        T("lordos: account, hash, name", a && strstr(a, "\nuser = ana\n") && strstr(a, "\nfullname = Ana Pérez\n") && strstr(a, "\npassword_hash = " HASH "\n") &&
+          strstr(a, "\nhostname = debian-13\n"));
+        T("lordos: language, region, keyboard", a && strstr(a, "\nlang = en\n") && strstr(a, "\nlocale = en_US.UTF-8\n") &&
+          strstr(a, "\ntimezone = America/Argentina/Buenos_Aires\n") && strstr(a, "\nkeyboard = latam\n") && !strstr(a, "keyboard_variant"));
+        T("lordos: no autologin, restart at the end", a && strstr(a, "\nautologin = no\nafter = reboot\n"));
+        T("lordos: no other keys (lord-autoinstall stops on an unknown one)", a && !strstr(a, "ssh_key") && !strstr(a, "swap") && !strstr(a, "keydesc"));
+        free(a);
+        l.disk_bytes = 0;
+        T("lordos: no size, no answers", !vmu_answer(&l, &nm));
+        l.disk_bytes = 1;
+        snprintf(l.disk, sizeof l.disk, "../vda");
+        T("lordos: a disk that isn't a plain name, no answers", !vmu_answer(&l, &nm));
+        char o[400];
+        snprintf(o, sizeof o, "%s,\"lang\":\"zh-Hans\"", la);
+        snprintf(b, sizeof b, "%s", spec("lordos", o));
+        T("lordos: a language", !vmu_parse(b, strlen(b), &l, err, sizeof err) && !strcmp(l.lang, "zh-Hans"));
+        snprintf(l.variant, sizeof l.variant, "intl");
+        snprintf(l.disk, sizeof l.disk, "sda");
+        l.disk_bytes = 8ull << 30;
+        a = vmu_answer(&l, &nm);
+        T("lordos: they reach the file", a && strstr(a, "\nlang = zh-Hans\n") && strstr(a, "\nkeyboard_variant = intl\n") && strstr(a, "\ndisk = sda\ndisk_bytes = 8589934592\n"));
+        free(a);
+        static const char *const lbad[] = { "\"lang\":\"es es\"", "\"lang\":\"-es\"", "\"lang\":\"es\\nx\"", "\"lang\":\"aaaaaaaaaaaaaaaaaaaa\"", "\"lang\":\"e=s\"" };
+        for (size_t i = 0; i < sizeof lbad / sizeof lbad[0]; i++) {
+            char lab[64];
+            snprintf(o, sizeof o, "%s,%s", la, lbad[i]);
+            snprintf(b, sizeof b, "%s", spec("lordos", o));
+            snprintf(lab, sizeof lab, "lordos: language refused %zu", i);
+            T(lab, vmu_parse(b, strlen(b), &l, err, sizeof err) && !l.kind);
+        }
+        snprintf(b, sizeof b, "%s", spec("lordos", "\"append\":\"boot=live components quiet\""));
+        T("lordos: a command line without lordos.auto=1 is refused", vmu_parse(b, strlen(b), &l, err, sizeof err) && !l.kind);
+    }
+
     /* the command line */
     char cmd[640];
     T("cmdline: label", !vmu_cmdline(&u, "Fedora-E-dvd-x86_64-45", cmd, sizeof cmd) && !strcmp(cmd, "auto=true priority=critical inst.stage2=hd:LABEL=Fedora-E-dvd-x86_64-45 --- quiet"));
@@ -395,6 +443,38 @@ int main(void) {
     snprintf(sub, sizeof sub, "%s/unattended", dir);
     T("prepare: a kernel that isn't there fails and leaves nothing", vmu_prepare(dir, "/tmp/vmunattend-rr.iso", &u, "id-3", err, sizeof err) &&
       strstr(err, "no installer kernel") && access(sub, F_OK));
+    {
+        /* LordOS: the live kernel and initrd, a LORDOSAUTO seed disk with lordos-auto.conf, the command line as is */
+        s = spec("lordos", "\"append\":\"boot=live components nosplash lordos.auto=1\"");
+        vmu_parse(s, strlen(s), &u, err, sizeof err);
+        T("prepare: lordos without the disk fails and leaves nothing", vmu_prepare(dir, "/tmp/vmunattend-rr.iso", &u, "id-4", err, sizeof err) &&
+          strstr(err, "system disk") && access(sub, F_OK));
+        snprintf(u.disk, sizeof u.disk, "vda");
+        u.disk_bytes = 32ull << 30;
+        pr = vmu_prepare(dir, "/tmp/vmunattend-rr.iso", &u, "id-4", err, sizeof err);
+        T("prepare: lordos", !pr);
+        if (pr) printf("      %s\n", err);
+        snprintf(p, sizeof p, "%s/unattended/seed.img", dir);
+        FILE *fs = fopen(p, "rb");
+        static uint8_t sd[4096 * 512];
+        size_t got = fs ? fread(sd, 1, sizeof sd, fs) : 0;
+        if (fs) fclose(fs);
+        size_t csz = 0;
+        const uint8_t *conf = got == sizeof sd ? fat_file(sd, "lordos-auto.conf", &csz) : NULL;
+        T("prepare: a LORDOSAUTO seed disk", got == sizeof sd && !memcmp(sd + 43, "LORDOSAUTO ", 11));
+        T("prepare: lordos-auto.conf on it", conf && csz > 100 && memmem(conf, csz, "disk = vda\ndisk_bytes = 34359738368\n", 36) &&
+          memmem(conf, csz, HASH, strlen(HASH)));
+        snprintf(p, sizeof p, "%s/unattended/cmdline", dir);
+        FILE *fc = fopen(p, "r");
+        char line[700] = "";
+        if (fc) { if (!fgets(line, sizeof line, fc)) line[0] = 0; fclose(fc); }
+        T("prepare: lordos cmdline", !strcmp(line, "boot=live components nosplash lordos.auto=1"));
+        snprintf(p, sizeof p, "%s/unattended/initrd", dir);
+        T("prepare: lordos initrd as the ISO has it", !stat(p, &st) && st.st_size == 6000);
+        static const char *const names[] = { "vmlinuz", "initrd", "cmdline", "seed.img" };
+        for (int i = 0; i < 4; i++) { snprintf(p, sizeof p, "%s/unattended/%s", dir, names[i]); unlink(p); }
+        rmdir(sub);
+    }
     rmdir(dir);
     unlink("/tmp/vmunattend-rr.iso"); unlink("/tmp/vmunattend-plain.iso"); unlink("/tmp/vmunattend-joliet.iso");
     unlink("/tmp/vmunattend-bad.iso"); unlink("/tmp/vmunattend-big.iso"); unlink("/tmp/vmunattend-past.iso"); unlink("/tmp/vmunattend-none");

@@ -12,10 +12,10 @@
 // Windows 11 (windows.js, 4.3): the person's own multi-edition ISO from Microsoft's page (found in Downloads and checked
 // against Microsoft's published SHA-256) or Microsoft's 90-day evaluation (downloaded by the helper); the machine is
 // made ready for it (secure boot, TPM 2.0, virtio-win drivers) and installs without questions or with Windows' own.
-import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, locale, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
-import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor } from './catalog.js';
+import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, cardSize, lordosLang } from './catalog.js';
 import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard } from './model.js';
 import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
 import { customUnattended, systemState } from './systems.js';
@@ -97,7 +97,8 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   // card only when one is set up for machines)
   const pv = onHost(prof, host, { gpuReady, no3d: arch !== host.arch ? 'arch' : no3dReason(host, windows, arch) });
   const base = { vcpus: pv.vcpus, memoryMb: pv.memoryMb, diskGb: pv.diskGb, network: pv.network, gfx: prof.resources.graphics };
-  const size = windows ? windowsSize(base, host) : base;
+  // Windows 11's minimums; a download card's own least size (LordOS: 4 processors, 4 GB, 32 GB, 3D)
+  const size = windows ? windowsSize(base, host) : source === 'download' && dl ? cardSize(CATALOG, dl.id, base, host) : base;
   const home = typeof lord !== 'undefined' && lord.fs?.home ? lord.fs.home() : '';
   const shareDir = pv.share ? shareAbs(pv.share.path, home) : '';
   // a bridged machine joins the card chosen in Machines settings → Network (else the first wired one up): said in the review
@@ -348,6 +349,8 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     if (iso && unOn) {
       req.unattended = { kind: uo.kind, user: un.user, password: un.password, fullname: '', hostname: un.hostname, timezone: un.timezone,
         keymap: un.keymap, variant: '', locale: hd.locale || 'en_US.UTF-8', release: uo.release, kernel: uo.kernel, initrd: uo.initrd, append: uo.append, desktop: true };
+      // a LordOS machine starts in this LordOS's language
+      if (uo.kind === 'lordos') req.unattended.lang = lordosLang(locale.get().lang);
     }
     const id = lord.vm.create(req);
     if (req.unattended) { req.unattended.password = ''; setUn((u) => ({ ...u, password: '' })); }
