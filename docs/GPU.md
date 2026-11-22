@@ -697,6 +697,6 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
   graphics newer than Whiskey Lake.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).
-- `linux-drm-syncobj` (explicit sync, the one Nvidia prefers), `xdg_activation`, tearing control (`wp_tearing_control`) and VRR.
+- `linux-drm-syncobj` (explicit sync, the one Nvidia prefers; designed in `SYNCOBJ-PLAN.md`, for review), `xdg_activation`, tearing control (`wp_tearing_control`) and VRR.
 - Letting JS know a window is fullscreen (today it receives the `fullscreen` event, but the themes
   ignore it).

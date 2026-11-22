@@ -1416,6 +1416,9 @@ the icon belongs to that window, and the Dock entry of an app id nobody installe
 
 ## Pending
 
+- **Explicit sync (`linux-drm-syncobj-v1`)**: designed, not built, waiting for the maintainer's review: see
+  [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md).
+
 - **Firefox ESR 153 ignored mouse clicks on VM 119** (October 19, QEMU's USB tablet through QMP):
   the pointer reaches it (`enter`, `motion`, `button` on its content subsurface, checked with
   `WAYLAND_DEBUG`) and the keyboard works, but buttons, menus and pages don't react; the same with
