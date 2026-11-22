@@ -1352,7 +1352,13 @@ static void casts_changed(void) {
     int first = 1;
     for (int i = 0; i < CSM_MAX; i++) {
         if (csm.s[i].st != CS_STARTED) continue;
-        hb_printf(&j, "%s{\"id\":%d,\"who\":", first ? "" : ",", csm.s[i].id);
+        /* what it shows (the capture indicator's row): screens, windows or both */
+        int screens = 0, wins = 0;
+        for (int k = 0; k < cast_app[i].nsrc; k++) {
+            if (cast_app[i].src[k].kind == CAST_SRC_WINDOW) wins++;
+            else screens++;
+        }
+        hb_printf(&j, "%s{\"id\":%d,\"screens\":%d,\"windows\":%d,\"who\":", first ? "" : ",", csm.s[i].id, screens, wins);
         hb_str(&j, cast_app[i].who);
         hb_printf(&j, "}");
         first = 0;

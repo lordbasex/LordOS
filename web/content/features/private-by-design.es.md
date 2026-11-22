@@ -51,7 +51,7 @@ El proyecto mantiene una app de prueba maliciosa a propósito (`tests/lpk-evil`)
 
 - **El aviso.** La primera vez que una app pide algo, el sistema muestra: *«App» quiere usar el micrófono — Permitir / No permitir*. La respuesta queda guardada para esa app.
 - **Ajustes → Privacidad** lista cada permiso con las apps que lo pidieron y un control Permitir / Preguntar / Denegar.
-- **Indicadores.** Un punto verde en la barra de menú mientras se usa la cámara, uno naranja para el micrófono. Si lo tocás, te muestra qué app es.
+- **Indicadores.** Un punto verde en la barra de menú mientras se usa la cámara, uno naranja para el micrófono. Si lo tocás, te muestra qué app es. En desarrollo (último lanzamiento 0.8.9.4): una sola píldora verde junto al reloj reemplaza los puntos y la píldora de pantalla compartida. Su ícono dice qué se está capturando en este momento (la pantalla, la cámara, el micrófono o dos de ellos), no se puede ocultar, y al tocarla muestra cada app con Dejar de compartir y Desactivar para esta app.
 
 Permisos que una app puede declarar: archivos, portapapeles, notificaciones, red, cámara, micrófono, pantalla, escuchar conexiones, USB, Bluetooth y apps. Una app no puede obtener un permiso que no declaró.
 
@@ -104,7 +104,7 @@ Una ventana se puede marcar como protegida. La de Contraseñas lo está. Sus pí
 ## Límites honestos
 
 - **Las apps de Linux no están en caja de arena de forma predeterminada.** Se les aplican las reglas de red, la atribución y las restricciones que fijes; las restricciones no cubren el portapapeles, el Bluetooth a través de BlueZ en el bus del sistema, el bus del sistema en general ni los programas iniciados fuera del lanzador de apps.
-- **El uso de cámara y micrófono por apps de Linux todavía no se muestra** en los indicadores. La lista de dispositivos del Monitor está planeada.
+- **El uso de cámara y micrófono por apps de Linux no se muestra** en los indicadores de la 0.8.9.4. En desarrollo, la píldora verde muestra lo que capturan a través de PipeWire; un programa que abre la cámara o la placa de sonido por su cuenta, sin PipeWire, todavía no aparece.
 - **El broker todavía no cubre todo.** Permisos como Bluetooth o abrir otras apps se pueden declarar, pero no hay una llamada del broker para ellos, así que una app aislada directamente no puede hacer esas cosas.
 - **Si falta una función del kernel, la caja de arena de las apps se debilita sin hacer ruido.** Si faltan Landlock o un controlador de cgroup, las apps igual arrancan, con una advertencia en el registro. Los ayudantes, en cambio, se niegan a correr sin seccomp.
 

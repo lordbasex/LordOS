@@ -93,6 +93,7 @@ void hw_start(const DisplayHost *h, int with_bus) {
     apps_set_spawn_hook(fpspawn_add_view);         /* each Flatpak app's Spawn helper (fpspawner.h) */
     apps_set_lend_hook(fplend_add_view);           /* each Flatpak view's lending socket (fplend.h) */
     fpspawn_try();
+    pwguard_on_use(hw_emit);                       /* the capture indicator: what Linux apps capture (sdk/capturestatus.jsx) */
     if (with_bus && pwguard_start()) fprintf(stderr, "hw: PipeWire not reachable yet (the microphone and camera restrictions of Linux apps apply once it is)\n");
     if (with_bus && sysbus_start() == 0) {
         bt_start(hw_emit);

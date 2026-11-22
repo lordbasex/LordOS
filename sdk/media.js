@@ -190,7 +190,7 @@ export function openMarkup(path) {
 // Camera/microphone indicators while the source lives.
 const devices = new Map();            // id → { app, kind }
 function trackDevice(id, app, kind) {
-  markDeviceUse(app, kind, true);
+  markDeviceUse(app, kind, true, kind === 'camera' ? id : null);   // the capture indicator previews a camera from its source
   devices.set(id, { app, kind });
   const off = media.on(id, (type, d) => {
     if (type === 'closed' || type === 'done' || (type === 'state' && (d.state === 'done' || d.state === 'failed'))) { untrack(id); off(); }
@@ -384,3 +384,9 @@ export function NowPlayingTile({ style }) {
 }
 
 export { MediaView };
+
+// The capture indicator's "Turn off for this app" (sdk/capturestatus.jsx): a native app's camera or microphone sources
+// close now; its permission, turned off there too, keeps them from coming back.
+export function closeDevicesOf(app, kind) {
+  for (const [id, d] of [...devices]) if (d.app === app && d.kind === kind) media.close(id);
+}

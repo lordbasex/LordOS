@@ -8,8 +8,8 @@ the media and input formats. Code: `server/src/remote/share.c`, `sharewire.c` (f
 
 Linux apps (a browser's video call, a recorder) use neither door: they ask through LordOS's own ScreenCast portal (0.8.8.8,
 [WAYLAND.md](WAYLAND.md), "Sharing a screen or a window"), where the person picks a screen or a window every time and the frames go
-to a PipeWire stream. It shows in this API's indicator, a pill per session with the same Stop, and its frames also wait for the pill to
-be on screen. A lock or a user switch ends it, as it ends a share here.
+to a PipeWire stream. It shows in the same indicator, a row per session with the same Stop, and its frames also wait for the indicator
+to be on screen. A lock or a user switch ends it, as it ends a share here.
 
 ## Who may connect
 
@@ -80,8 +80,11 @@ the connection over a type it doesn't know.
 
 ## The indicator
 
-`ShareBadge`, in the `notification` layer of every theme, with the app's name and **Stop**. No frame leaves until the shell says it's on
-screen, and with no answer in 2 s the share ends with `no_indicator`. It ends the same way if the badge goes or the theme changes.
+The capture indicator by the clock (in development, `sdk/capturestatus.jsx`; before it, a red pill per share): a green pill in every theme's
+bar whose panel has a row per app with its name and **Stop sharing** ([PRIVACY.md](PRIVACY.md), "What is captured now"). It can't
+be hidden; while a window is full screen a copy of the pill stays in the corner of each display, in the `notification` layer. No
+frame leaves until the shell says it's on screen, and with no answer in 2 s the share ends with `no_indicator`. It ends the same way
+if every indicator goes or the theme changes.
 ⌃⌥⇧Esc ends a share in C, on the physical keyboard only ([SHORTCUTS.md](SHORTCUTS.md)).
 
 ## The lock

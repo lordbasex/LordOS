@@ -1,22 +1,21 @@
 // share.js — the shell's side of the screen-sharing API (server/src/remote/share.c, docs/SCREEN-SHARING.md).
 //
-// The system draws both things here, never the app: the permission prompt, and the indicator with its Stop.
-// lord-server sends no frame until <ShareBadge /> says it is on screen (lord.share.shown), and a share ends if
-// it leaves. The decisions live in a root-owned file, written by the share-grant admin action; a Linux app's
+// The system draws both, never the app: the permission prompt here, and the indicator with its Stop by the clock
+// (sdk/capturestatus.jsx). lord-server sends no frame until the indicator says it is on screen (lord.share.shown), and
+// a share ends if it leaves. The decisions live in a root-owned file, written by the share-grant admin action; a Linux app's
 // grant is tied to its program.
 //
 //   useStore(shareHolder)   → { app, name, input, token } | null
 //   share.grants()          → [{ id, exe, perm, state }]
 //   share.set(id, perm, state, exe) / share.forget(id) / share.stop()
-import { createElement as h, useEffect } from 'react';
-import { View, Text, screen } from '@lordos/runtime';
+import { createElement as h } from 'react';
+import { View, Text } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { t } from './i18n.js';
 import { admin } from './admin.js';
 import { appName } from './i18n.js';
 import { getApp } from './windows.js';
 import { shareAppId, shareAskList, staleGrants } from './sharemodel.js';
-import { castRuns, castShown, castStop, shotTaken } from './screencast.jsx';
 
 const api = () => typeof lord !== 'undefined' && lord.share;
 export const shareHolder = createStore(null);
@@ -70,40 +69,8 @@ export const share = {
   stop: () => (api() ? lord.share.stop() : false),
 };
 
-// One pill per display, in the notification layer, above fullscreen windows. Unlike the remote desktop's
-// notice this one takes clicks. It also shows what Linux apps are shown through the ScreenCast portal
-// (sdk/screencast.jsx), a pill each under the API's, with the same Stop; their frames wait for it too.
-export function ShareBadge() {
-  const c = useStore(shareHolder);
-  const casts = useStore(castRuns);
-  const shots = useStore(shotTaken);     // a screenshot or a color an app just took (no Stop: it is done)
-  const token = c ? c.token : 0;
-  useEffect(() => {
-    if (!token || !api()) return undefined;
-    lord.share.shown(token);
-    return () => { if (lord.share.status()?.token === token) lord.share.hidden(); };
-  }, [token]);
-  const castIds = casts.map((r) => r.id).join(',');
-  useEffect(() => { for (const r of casts) castShown(r.id); }, [castIds]);
-  const pills = [
-    ...(c ? [{ key: 'share', text: t(c.input ? 'shell.share.sharingInput' : 'shell.share.sharing', { app: c.name }), stop: () => share.stop() }] : []),
-    ...casts.map((r) => ({ key: `cast${r.id}`, text: t('shell.share.castSharing', { app: r.name }), stop: () => castStop(r.id) })),
-    ...shots.map((r) => ({ key: r.key, text: t(r.color ? 'shell.share.colorPicked' : 'shell.share.shotTaken', { app: r.name }), stop: null })),
-  ];
-  if (!pills.length) return null;
-  const list = screen.displays?.length ? screen.displays : [{ x: 0, y: 0, w: screen.width }];
-  return h(View, { style: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' } }, list.flatMap((d, i) => pills.map((p, k) => h(View, {
-    key: `${i}-${p.key}`,
-    style: {
-      position: 'absolute', left: (d.x || 0) + (d.w || screen.width) - 432, top: (d.y || 0) + 66 + k * 40, width: 420, flexDirection: 'row', alignItems: 'center', gap: 8,
-      paddingHorizontal: 12, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,69,58,0.95)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)',
-    },
-  },
-  h(View, { style: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' } }),
-  h(Text, { style: { flex: 1, fontSize: 12, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden' } }, p.text),
-  p.stop ? h(View, { onClick: p.stop, style: { paddingHorizontal: 10, height: 22, borderRadius: 11, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.3)' } },
-    h(Text, { style: { fontSize: 12, fontWeight: 700, color: '#fff' } }, t('shell.share.stop'))) : null))));
-}
+// The indicator with its Stop is the capture indicator by the clock (sdk/capturestatus.jsx): it shows the share, says
+// lord.share.shown when it is on screen, and lord.share.hidden when every indicator has left.
 
 async function answer(a, allow) {
   const perm = a.perms[a.step];

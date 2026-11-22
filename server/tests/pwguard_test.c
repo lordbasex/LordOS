@@ -62,6 +62,18 @@ int main(void) {
     CHECK(pwguard_node_flag("Video/Source", NULL, NULL) == FW_R_NO_CAMERA);
     CHECK(pwguard_node_flag("Audio/Source", "Screen", "lordos-screencast-0") == FW_R_NO_MIC);   /* only a video source is a screen */
     CHECK(pwguard_node_flag("Audio/Sink", NULL, NULL) == 0);
+
+    /* the capture indicator's list: one entry per app, its flags merged; "" an unknown program; a non-plain id refused */
+    {
+        char out[512];
+        PwUse u[4] = { { "desktop:obs", FW_R_NO_MIC }, { "", FW_R_NO_CAMERA }, { "desktop:obs", FW_R_NO_SCREEN }, { "flatpak:x", 0 } };
+        CHECK(pwguard_use_format(u, 4, out, sizeof out) == 0);
+        CHECK(!strcmp(out, "[{\"app\":\"desktop:obs\",\"mic\":1,\"camera\":0,\"screen\":1},{\"app\":\"\",\"mic\":0,\"camera\":1,\"screen\":0}]"));
+        CHECK(pwguard_use_format(u, 0, out, sizeof out) == 0 && !strcmp(out, "[]"));
+        PwUse q[1] = { { "desktop:a\"b", FW_R_NO_MIC } };
+        CHECK(pwguard_use_format(q, 1, out, sizeof out) == -1);
+        CHECK(pwguard_use_format(u, 4, out, 20) == -1);                 /* doesn't fit */
+    }
     printf("pwguard-test: %d/%d passed\n", total - fails, total);
     return fails ? 1 : 0;
 }
