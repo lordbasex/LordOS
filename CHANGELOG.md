@@ -665,6 +665,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Videos and songs with 44.1 kHz sound no longer freeze after about half a minute, in development** (lord-media's
+  player, `src/media/helper/lm_aqlevel.h`). The player counted the decoded sound waiting for lord-server in
+  milliseconds, rounded down every time a piece of it went into the audio ring. Sound at 44.1 kHz, resampled to the
+  ring's 48 kHz, comes in chunks that never fit the ring's free space whole, so each one was split and the count lost
+  about 1 ms per chunk: after 30–45 s it read a full second queued with nothing queued, the decoder stopped making
+  sound, the audio clock stopped and the picture froze with it (reported with a 4K60 AV1 video that VLC played; the
+  same happened with a 640 × 360 AV1 clip and with an audio-only 44.1 kHz file, while 48 kHz sound and playback
+  without sound were never affected). The level is now counted in bytes, which add up exactly. The 4K60 AV1 video
+  plays in software at 59.9 frames a second past 75 s (it stopped at 31.5 s before), and `build/aqlevel-test` checks
+  that the level comes back to zero after 70 s of 44.1 kHz chunks split as the ring takes them.
+
 - **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
   copied its whole buffer, uploaded the whole texture and, on the CPU path, repainted the whole window, whatever it

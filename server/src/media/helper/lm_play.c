@@ -34,6 +34,7 @@
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 
+#include "lm_aqlevel.h"
 #include "lm_hwfall.h"
 #ifdef LM_NET
 #include "../streamurl.h"
@@ -105,7 +106,7 @@ typedef struct {
     int vq_n;
     AChunk aq[256];
     int aq_n, aq_head;
-    int64_t aq_ms;
+    LmAqLevel aql;                  /* decoded PCM waiting, in bytes (lm_aqlevel.h) */
     SubEv subs[32];
     int sub_n;
     int64_t skip_before;            /* after a seek: discard what's before (ms) */
@@ -191,7 +192,7 @@ static void clear_outputs(void) {
     P.vq_n = 0;
     for (int i = 0; i < P.aq_n; i++) free(P.aq[(P.aq_head + i) % 256].pcm);
     P.aq_n = P.aq_head = 0;
-    P.aq_ms = 0;
+    lm_aq_clear(&P.aql);
     P.sub_n = 0;
 }
 
@@ -318,7 +319,8 @@ static int decode_video(void) {
 }
 
 static int decode_audio(void) {
-    if (!P.adec || P.aq_ms >= AQ_MS || P.aq_n >= 250) return 0;
+    /* an empty queue always takes more, whatever the level says: the sound must never stop on a count */
+    if (!P.adec || (P.aq_n && lm_aq_ms(&P.aql) >= AQ_MS) || P.aq_n >= 250) return 0;
     AVPacket *pkt = pq_pop(&P.aq_pkt);
     if (!pkt) return 0;
     int serial = P.serial;
@@ -347,7 +349,7 @@ static int decode_audio(void) {
         if (serial == P.serial && P.aq_n < 256) {
             P.aq[(P.aq_head + P.aq_n) % 256] = (AChunk){ pcm, bytes, off, pts, serial };
             P.aq_n++;
-            P.aq_ms += (int64_t)(bytes - off) * 1000 / (OUT_RATE * P.out_ch * 2);
+            lm_aq_add(&P.aql, bytes - off);
         } else free(pcm);
         pthread_cond_broadcast(&P.cv);
         pthread_mutex_unlock(&P.mu);
@@ -434,7 +436,7 @@ static void *decode_thread(void *arg) {
         progress |= decode_video();
         progress |= decode_sub();
         int need_v = P.vdec && P.vq_n < VQ_MAX && !P.vq_pkt.n;
-        int need_a = P.adec && P.aq_ms < AQ_MS && !P.aq_pkt.n;
+        int need_a = P.adec && (!P.aq_n || lm_aq_ms(&P.aql) < AQ_MS) && !P.aq_pkt.n;
         size_t qbytes = P.vq_pkt.bytes + P.aq_pkt.bytes + P.sq_pkt.bytes;
         if (!P.eof && (need_v || need_a || qbytes < (1u << 20)) && qbytes < PKTQ_MAX) {
             pthread_mutex_unlock(&P.mu);
@@ -509,7 +511,7 @@ static void feed_audio(void) {
     int wrote = 0;
     while (P.aq_n && ar_space(AR) >= FRAME_BYTES) {
         AChunk *c = &P.aq[P.aq_head];
-        if (c->serial != P.serial) { free(c->pcm); P.aq_head = (P.aq_head + 1) % 256; P.aq_n--; continue; }
+        if (c->serial != P.serial) { lm_aq_take(&P.aql, c->bytes - c->off); free(c->pcm); P.aq_head = (P.aq_head + 1) % 256; P.aq_n--; continue; }
         int n = c->bytes - c->off;
         uint64_t space = ar_space(AR) & ~(uint64_t)(FRAME_BYTES - 1);
         if ((uint64_t)n > space) n = (int)space;
@@ -519,8 +521,7 @@ static void feed_audio(void) {
         n = (int)ar_write(AR, (uint8_t *)c->pcm + c->off, (size_t)n);
         wrote += n;
         c->off += n;
-        int64_t ms = (int64_t)n * 1000 / (OUT_RATE * FRAME_BYTES);
-        P.aq_ms -= ms;
+        lm_aq_take(&P.aql, n);
         C.audio_end = C.anchor_pts + ((int64_t)w + n - C.anchor_byte) * 1000 / (OUT_RATE * FRAME_BYTES);
         if (c->off >= c->bytes) { free(c->pcm); P.aq_head = (P.aq_head + 1) % 256; P.aq_n--; }
     }
@@ -639,6 +640,7 @@ void lm_player(const char *params, int fd, int pulse, int render) {
     C.anchor_byte = -1;
     send_info(render);
 
+    lm_aq_init(&P.aql, OUT_RATE * 2 * 2);         /* s16 stereo: the ring is always stereo (open_audio) */
     pthread_mutex_init(&P.mu, NULL);
     pthread_cond_init(&P.cv, NULL);
     /* cover art: a single frame, presented right away */
