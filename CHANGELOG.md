@@ -664,6 +664,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   dark, light and Arabic; not yet on a real session with real monitors, a Linux app's own bar or the GPU path.
 
 ### Fixed
+- **Store → For this computer: no firmware card for a file no package has** (`sdk/suggestengine.js`,
+  `assets/store/suggestions.json` `firmware.notShipped`; reported by the maintainer): on a computer that gives its Intel
+  graphics to a machine (GVT-g), the kernel asks for `i915/gvt/vid_…_rid_….golden_hw_state`, a cache of the vGPU's
+  starting state that GVT-g builds itself when the file isn't there and that no Debian package ships. The Graphics
+  firmware card named it as if firmware-intel-graphics would bring it. Such files are now left out: the card appears
+  only for real missing firmware (here `i915/kbl_dmc_ver1_04.bin`, the display engine's power-saving firmware) and
+  names only that. Tests: `suggest_engine_test.mjs`.
 
 - **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app

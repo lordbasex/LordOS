@@ -126,6 +126,15 @@ eq('unreadable log: nothing', ids(run(facts({ firmware: { readable: false, missi
 eq('firmware plan impossible → explained', ids(run(fw([{ file: 'rtw88/rtw8822c_fw.bin', driver: '' }]), {}, { check: () => false })), ['firmware:firmware-realtek=unavailable']);
 eq('printer plan impossible → hidden (not explained)', ids(run(hp, {}, { check: () => false })), []);
 
+// ---- a file no package ships (GVT-g's own golden state cache) is never offered ----
+{
+  const gvt = { file: 'i915/gvt/vid_0x8086_did_0x9bc5_rid_0x05.golden_hw_state', driver: 'i915' };
+  const dmc = { file: 'i915/kbl_dmc_ver1_04.bin', driver: 'i915' };
+  eq('GVT-g golden state alone: no card', ids(run(fw([gvt]), { nonfree: true })), []);
+  const both = run(fw([dmc, gvt]), { nonfree: true });
+  eq('with real firmware: the card names only that file', [ids(both), both[0]?.params?.files], [['firmware:firmware-intel-graphics=install'], 'i915/kbl_dmc_ver1_04.bin']);
+}
+
 // ---- ordering: installable first, then explained, then installed ----
 const all = facts({ dmi: vmware.dmi, pci: [...nv.pci, ...vmware.pci], usb: hp.usb, firmware: { readable: true, missing: [{ file: 'rtw89/rtw8852b_fw.bin', driver: 'rtw89_8852be' }] } });
 eq('order', ids(run(all, { nonfree: false, installed: ['open-vm-tools'] })),
