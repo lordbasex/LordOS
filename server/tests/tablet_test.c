@@ -212,9 +212,42 @@ static void pad(void) {
     tablet_free(d);
 }
 
+/* a Wacom mouse (lens cursor) tool's wheel on the pen device: whole clicks, or hi-res when the device has it */
+static void tool_wheel(void) {
+    TabCaps c = intuos();
+    c.wheel = 1;
+    TabDev *d = tablet_new(&c);
+    feed(d, EV_ABS, ABS_X, 100); feed(d, EV_ABS, ABS_Y, 100); feed(d, EV_KEY, BTN_TOOL_MOUSE, 1);
+    feed(d, EV_REL, REL_WHEEL, 1);                         /* (with proximity in: not a turn of its own) */
+    CHECK(syn(d) == 1 && fr[0].flags & TF_PROX_IN && !(fr[0].flags & TF_WHEEL));
+    feed(d, EV_REL, REL_WHEEL, -2);
+    CHECK(syn(d) == 1 && fr[0].flags == TF_WHEEL && fr[0].wheel == -240);
+    CHECK(syn(d) == 0);                                    /* told once */
+    feed(d, EV_REL, REL_WHEEL_HI_RES, 60);                 /* ignored without hi-res */
+    CHECK(syn(d) == 0);
+    feed(d, EV_REL, REL_WHEEL, 2000000);                   /* a hostile value is clamped */
+    CHECK(syn(d) == 1 && fr[0].wheel == 1200000);
+    tablet_free(d);
+    c.wheel_hires = 1;
+    d = tablet_new(&c);
+    feed(d, EV_ABS, ABS_X, 100); feed(d, EV_KEY, BTN_TOOL_MOUSE, 1);
+    CHECK(syn(d) == 1);
+    feed(d, EV_REL, REL_WHEEL_HI_RES, 60); feed(d, EV_REL, REL_WHEEL, 0);
+    CHECK(syn(d) == 1 && fr[0].flags == TF_WHEEL && fr[0].wheel == 60);
+    tablet_free(d);
+    c.wheel = 0;                                           /* a pen device with no wheel: nothing */
+    d = tablet_new(&c);
+    feed(d, EV_ABS, ABS_X, 100); feed(d, EV_KEY, BTN_TOOL_PEN, 1);
+    syn(d);
+    feed(d, EV_REL, REL_WHEEL, 1);
+    CHECK(syn(d) == 0);
+    tablet_free(d);
+}
+
 int main(void) {
     kinds();
     pen();
+    tool_wheel();
     pad();
     puts(fails ? "tablet: FAILED" : "tablet: ok");
     return fails != 0;

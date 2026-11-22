@@ -37,6 +37,7 @@ struct TabDev {
     unsigned dirty;                     /* bit AX_*: changed since the last frame */
     uint64_t serial;
     unsigned tool_id;
+    int wheel;                          /* the tool's wheel since the last frame, 1/120 of a click */
     /* pad */
     uint32_t pad_held, pad_sent;        /* bit i: pad button i */
     int ring_v[TAB_PAD_RINGS], strip_v[TAB_PAD_STRIPS];
@@ -148,6 +149,7 @@ TabDev *tablet_open(int fd, const char *name) {
         for (unsigned t = TAB_TOOL_FIRST; t <= TAB_TOOL_LAST; t++)
             if (t != BTN_TOOL_FINGER && HAS(keys, t)) c.tools |= TAB_TOOL_BIT(t);
         c.has_touch = HAS(keys, BTN_TOUCH);
+        if (HAS(ev, EV_REL) && HAS(rel, REL_WHEEL)) { c.wheel = 1; c.wheel_hires = HAS(rel, REL_WHEEL_HI_RES); }
     } else {
         c.nbuttons = pad_codes(c.button, TAB_PAD_BUTTONS, keys);
         static const unsigned short rings[] = { ABS_WHEEL, ABS_THROTTLE }, strips[] = { ABS_RX, ABS_RY };
@@ -299,9 +301,11 @@ static int pen_frame(TabDev *d, TabFrame out[2]) {
         d->down = t;
         f->down = t;
         frame_buttons(d, f, d->held);
+        if (d->wheel && !in) { f->wheel = d->wheel; f->flags |= TF_WHEEL; }
         if (f->flags) n++;
     }
     d->dirty = 0;
+    d->wheel = 0;
     return n;
 }
 
@@ -391,6 +395,13 @@ int tablet_event(TabDev *d, const struct input_event *ev, TabFrame out[2], TabPa
     }
     case EV_MSC:
         if (ev->code == MSC_SERIAL && ev->value) d->serial = (uint32_t)ev->value;
+        break;
+    case EV_REL:                        /* the tool's wheel: hi-res when the device has it, else whole clicks */
+        if (!d->c.wheel) break;
+        if (d->c.wheel_hires ? ev->code == REL_WHEEL_HI_RES : ev->code == REL_WHEEL) {
+            long w = (long)d->wheel + (long)ev->value * (d->c.wheel_hires ? 1 : 120);
+            d->wheel = w > 1200000 ? 1200000 : w < -1200000 ? -1200000 : (int)w;
+        }
         break;
     default:
         break;

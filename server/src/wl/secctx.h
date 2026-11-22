@@ -34,7 +34,8 @@ struct wl_client;
  * to be unsandboxed. 0 or -1. */
 int secctx_init(struct wl_display *dpy, int (*may_create)(struct wl_client *c));
 /* One more say in which globals a client sees (the display has one filter, this one): gate(c, iface) returns 0 to hide
- * iface from c. wl/drmlease.c hides the DRM lease device from every client that may never lease. */
+ * iface from c. Up to four gates, each must agree. wl/drmlease.c hides the DRM lease device from every client that may
+ * never lease; wl/xwshell.c hides xwayland_shell_v1 from every client but Xwayland. */
 void secctx_set_gate(int (*gate)(struct wl_client *c, const char *iface));
 /* The metadata of a client that connected through a security context; NULL for any other client */
 const SecMeta *secctx_of(struct wl_client *c);

@@ -49,6 +49,17 @@ int main(void) {
     check("better: not 300 (past the limit)", wlicon_better(64, 1, 300, 1), 0);
     check("better: not 32 over 64", wlicon_better(64, 1, 32, 1), 0);
     check("better: 192 over 48 (64 from 128 against 80)", wlicon_better(48, 1, 192, 1), 1);
+    /* an X app's _NET_WM_ICON (straight ARGB, little endian words), a 2 × 1 image centred on a 2 × 2 canvas */
+    const uint8_t net[8] = { 0x30, 0x20, 0x10, 0x80, 0x01, 0x02, 0x03, 0x00 };   /* (r 0x10, g 0x20, b 0x30, a 0x80), transparent */
+    WlIcon *xi = wlicon_from_net(net, 2, 1);
+    check("net icon: square canvas", xi ? xi->size : 0, 2);
+    check("net icon: straight alpha kept", xi ? xi->rgba[0] == 0x10 && xi->rgba[1] == 0x20 && xi->rgba[2] == 0x30 && xi->rgba[3] == 0x80 : 0, 1);
+    check("net icon: transparent pixel cleared", xi ? xi->rgba[4] | xi->rgba[5] | xi->rgba[6] | xi->rgba[7] : 1, 0);
+    check("net icon: the row below is empty", xi ? xi->rgba[8] | xi->rgba[11] : 1, 0);
+    wlicon_unref(xi);
+    check("net icon: past 256 px not taken", wlicon_from_net(net, 257, 1) == NULL, 1);
+    check("net icon: 0 px not taken", wlicon_from_net(net, 0, 1) == NULL, 1);
+    check("net icon: freed", (long)wlicon_bytes, 0);
     printf("%s\n", fails ? "wlicon-test: FAILED" : "wlicon-test: ok");
     return fails ? 1 : 0;
 }

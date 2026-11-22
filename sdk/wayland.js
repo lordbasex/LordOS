@@ -168,6 +168,7 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       // a dialog goes where its app asks and isn't remembered; a fixed window keeps its size
       if (d.dialog) args.dialog = true;
       if (d.fixed) args.fixedLinux = true;
+      if (d.skipTaskbar) args.skipTaskbar = true;      // X11 _NET_WM_STATE_SKIP_TASKBAR: no Dock entry of its own
       if (d.parent) { args.parent = idOf(d.parent); args.modal = !!d.modal; }
       const kept = restored || saved || d.dialog ? null : rememberedFrame(placeKeyOf(dockIdOfWindow({ id, args }), args.tag), { fixed: !!d.fixed, size: [w, hh] });
       wm.open('linux', {
@@ -189,7 +190,8 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       break;
     }
     case 'unmap': if (win) wm.close(id, true); if (windowPixelIcons.get()[id]) windowOwnIcon(-1, id); break;
-    case 'icon': windowOwnIcon(sid, id); break;       // xdg_toplevel_icon_manager_v1.set_icon, committed
+    case 'icon': windowOwnIcon(sid, id); break;       // xdg_toplevel_icon_manager_v1.set_icon, committed (X11: _NET_WM_ICON)
+    case 'taskbar': if (win) wm.setArgs(id, { skipTaskbar: !!d.skip }); break;   // X11 _NET_WM_STATE_SKIP_TASKBAR changed
     // the window it belongs to changed, or it became modal or not (xdg-foreign, xdg-dialog-v1)
     case 'parent': if (win) wm.setArgs(id, { parent: d.parent ? idOf(d.parent) : null, modal: !!d.parent && !!d.modal, dialog: win.args?.dialog || !!d.parent }); break;
     case 'title': {                      // an isolated app keeps its name when the title is just its id

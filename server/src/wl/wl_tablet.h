@@ -39,7 +39,7 @@ struct wl_resource *wl__key_focus(void);
 uint32_t wl__pointer_enter_serial(void);
 int  wl__dragging(void);
 void wl__tool_press(struct wl_resource *surface, float x, float y, int down, uint32_t serial);
-void wl__tool_cursor(struct wl_resource *surface, int32_t x, int32_t y);
+int  wl__tool_cursor(struct wl_resource *surface, int32_t x, int32_t y);   /* -1: the surface has another role */
 void wl__pointer_leave(void);
 
 #endif

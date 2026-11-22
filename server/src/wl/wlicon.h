@@ -72,4 +72,31 @@ static inline WlIcon *wlicon_from_argb(const void *data, int side, int stride, i
     return ic;
 }
 
+/* An X app's _NET_WM_ICON image (xwm.c): w × h ARGB words with straight alpha, little endian as they came over the
+ * X connection, copied into a square side = max(w, h) canvas (centred, transparent around it) as straight RGBA
+ * bytes. NULL past the limits or the budget, or without memory. */
+static inline WlIcon *wlicon_from_net(const uint8_t *le, int w, int h) {
+    int side = w > h ? w : h;
+    if (!le || w <= 0 || h <= 0 || side > WLICON_MAX) return NULL;
+    size_t n = (size_t)side * (size_t)side * 4;
+    if (wlicon_bytes + n > WLICON_BUDGET) return NULL;
+    WlIcon *ic = calloc(1, sizeof *ic);
+    uint8_t *px = ic ? calloc(1, n) : NULL;
+    if (!px) { free(ic); return NULL; }
+    int ox = (side - w) / 2, oy = (side - h) / 2;
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            const uint8_t *p = le + ((size_t)y * (size_t)w + (size_t)x) * 4;   /* B, G, R, A */
+            uint8_t *o = px + ((size_t)(y + oy) * (size_t)side + (size_t)(x + ox)) * 4;
+            o[3] = p[3];
+            if (p[3]) { o[0] = p[2]; o[1] = p[1]; o[2] = p[0]; }
+        }
+    ic->refs = 1;
+    ic->size = side;
+    ic->scale = 1;
+    ic->rgba = px;
+    wlicon_bytes += n;
+    return ic;
+}
+
 #endif

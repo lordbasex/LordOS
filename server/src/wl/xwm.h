@@ -14,6 +14,7 @@
 
 struct wl_client;
 struct wl_event_loop;
+struct wl_resource;
 typedef struct XWin XWin;
 
 /* ---- xwm.c, called by xwayland.c ---- */
@@ -26,6 +27,8 @@ void xwm_surface_created(uint32_t res_id);     /* Xwayland created a wl_surface 
 void xwm_surface_gone(XWin *w);                /* its wl_surface was destroyed */
 int  xwm_is_dialog(const XWin *w);             /* transient, or of type dialog */
 int  xwm_is_fixed(const XWin *w);              /* its minimum and maximum size are the same */
+int  xwm_skip_taskbar(const XWin *w);          /* _NET_WM_STATE_SKIP_TASKBAR: no Dock entry of its own */
+void xwm_surface_serial(int sid, uint64_t serial);   /* xwayland-shell-v1: surface sid committed this serial (xwshell.c) */
 void xwm_place(XWin *w, int x, int y);         /* where its content is on screen (logical, from wl_paint) */
 void xwm_resize(XWin *w, int width, int height);   /* the theme's frame gave it this size */
 void xwm_set_state(XWin *w, int maximized, int fullscreen, int minimized);
@@ -64,9 +67,17 @@ int  wlx_scale(void);
 /* Gives the X window's wl_surface its role. Returns the surface id, 0 if that surface doesn't exist
  * (yet) or isn't Xwayland's. */
 int  wlx_attach(uint32_t res_id, XWin *w, const XWinInfo *info);
+int  wlx_attach_id(int sid, XWin *w, const XWinInfo *info);    /* the same, the surface named by xwayland-shell-v1 */
+int  wlx_surface_free(struct wl_resource *surface);            /* Xwayland's, with no role yet */
+int  xwshell_surface_for(uint64_t serial);     /* xwshell.c: the surface that committed this serial, 0 if none yet */
 void wlx_detach(int sid);                      /* the X window was unmapped or destroyed */
 void wlx_set_title(int sid, const char *title);
 void wlx_popup_moved(int sid, int x, int y);
+void wlx_set_parent(int sid, int parent_sid, int modal);   /* WM_TRANSIENT_FOR (0: none), _NET_WM_STATE_MODAL */
+void wlx_attention(int sid, int granted);      /* 0: wants attention (urgency); 1: a request LordOS grants (activate) */
+void wlx_skip_taskbar(int sid, int skip);
+void wlx_set_icon(int sid, const uint8_t *argb_le, int w, int h);  /* _NET_WM_ICON image (straight ARGB), NULL: none */
+int  wlx_work_area(int *x, int *y, int *w, int *h);         /* the first display's work area (logical); 0: none */
 enum { XREQ_MOVE = 1, XREQ_RESIZE, XREQ_MAXIMIZE, XREQ_UNMAXIMIZE, XREQ_MINIMIZE, XREQ_FULLSCREEN, XREQ_UNFULLSCREEN };
 void wlx_request(int sid, int what, int arg);
 void wlx_fullscreen_rect(int *x, int *y, int *w, int *h);  /* the display a fullscreen X window covers */

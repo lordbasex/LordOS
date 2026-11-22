@@ -204,7 +204,13 @@ static struct { int on; struct wl_client *client; double ox, oy; } tch[MAX_TOUCH
 
 static const struct wl_touch_interface touch_impl = { .release = res_destroy };
 
+static int touch_ever;                  /* the seat has had the touch capability (a touchscreen) at some time */
+static uint32_t caps(void);
+
 void wl_input_get_touch(struct wl_client *c, struct wl_resource *seat, uint32_t id) {
+    /* wayland.xml: get_touch on a seat that never had touch is missing_capability (as wlroots) */
+    caps();
+    if (!touch_ever) { wl_resource_post_error(seat, WL_SEAT_ERROR_MISSING_CAPABILITY, "get_touch: the seat never had touch"); return; }
     struct wl_resource *t = wl_resource_create(c, &wl_touch_interface, wl_resource_get_version(seat), id);
     if (!t) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(t, &touch_impl, NULL, link_gone);
@@ -259,6 +265,16 @@ int wl_input_touch(int phase, int id, double x, double y) {
     return 1;
 }
 
+/* A touch's orientation (degrees clockwise from the surface's y axis, tp_orient_degrees): to the app that has the
+ * touch, on its wl_touch objects from version 6 */
+void wl_input_touch_orientation(int id, double degrees) {
+    if (!ready || id < 0 || id >= MAX_TOUCH || !tch[id].on) return;
+    struct wl_resource *r;
+    FOR_CLIENT(&touches, tch[id].client, r)
+        if (wl_resource_get_version(r) >= WL_TOUCH_ORIENTATION_SINCE_VERSION) wl_touch_send_orientation(r, id, wl_fixed_from_double(degrees));
+    mark_frame(tch[id].client);
+}
+
 void wl_input_touch_frame(void) {
     struct wl_resource *r;
     for (int i = 0; i < nframe; i++) FOR_CLIENT(&touches, frame_clients[i], r) wl_touch_send_frame(r);
@@ -277,6 +293,7 @@ static void seat_gone(struct wl_listener *l, void *data) {
 }
 
 static uint32_t caps(void) {
+    if (tp_count(TP_KIND_TOUCHSCREEN)) touch_ever = 1;
     return WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD | (tp_count(TP_KIND_TOUCHSCREEN) ? WL_SEAT_CAPABILITY_TOUCH : 0);
 }
 

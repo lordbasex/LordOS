@@ -23,6 +23,7 @@ void wl_input_hold(int phase, int fingers);
  * listening to wl_touch. */
 int  wl_input_touch(int phase, int id, double x, double y);
 void wl_input_touch_frame(void);
+void wl_input_touch_orientation(int id, double degrees);   /* wl_touch.orientation (v6), before the frame */
 void wl_input_devices_changed(void);    /* a touchscreen was connected or removed: capabilities */
 
 /* called by wl.c */

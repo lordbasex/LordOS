@@ -130,6 +130,73 @@ static void test_props(void) {
     CHECK(x11_wm_hints_input(wmh_yes, 2) == 1);
     CHECK(x11_wm_hints_input(wmh_unset, 2) == 1);
     CHECK(x11_wm_hints_input(NULL, 0) == 1);
+    uint32_t urgent[9] = { 1 | 256, 1 }, calm[9] = { 1, 1 };
+    CHECK(x11_wm_hints_urgent(urgent, 9) == 1);
+    CHECK(x11_wm_hints_urgent(calm, 9) == 0);
+    CHECK(x11_wm_hints_urgent(NULL, 0) == 0);
+}
+
+/* WM_NORMAL_HINTS: what a ConfigureRequest is granted */
+static void test_size_clamp(void) {
+    XSizeHints h = { 300, 200, 0, 0 };
+    int w = 100, hh = 80;
+    x11_size_clamp(&h, &w, &hh);
+    CHECK(w == 300 && hh == 200);
+    h = (XSizeHints){ 300, 200, 640, 480 };
+    w = 2000; hh = 100;
+    x11_size_clamp(&h, &w, &hh);
+    CHECK(w == 640 && hh == 200);
+    h = (XSizeHints){ 300, 200, 100, 100 };                 /* a maximum below the minimum: no maximum */
+    w = 5000; hh = 5000;
+    x11_size_clamp(&h, &w, &hh);
+    CHECK(w == 5000 && hh == 5000);
+    w = 0; hh = -5;
+    x11_size_clamp(NULL, &w, &hh);
+    CHECK(w == 1 && hh == 1);
+    w = 99999; hh = 40000;
+    x11_size_clamp(NULL, &w, &hh);
+    CHECK(w == 32767 && hh == 32767);
+}
+
+static size_t put_icon(uint8_t *b, size_t at, uint32_t w, uint32_t h, uint32_t px) {
+    uint32_t v[2] = { w, h };
+    for (int i = 0; i < 2; i++) for (int k = 0; k < 4; k++) b[4 * (at + (size_t)i) + (size_t)k] = (uint8_t)(v[i] >> (8 * k));
+    at += 2;
+    for (uint64_t i = 0; i < (uint64_t)w * h; i++, at++) for (int k = 0; k < 4; k++) b[4 * at + (size_t)k] = (uint8_t)(px >> (8 * k));
+    return at;
+}
+
+/* _NET_WM_ICON: the image picked, and hostile lengths */
+static void test_net_wm_icon(void) {
+    static uint8_t b[4 * 40000];
+    size_t n = 0, first = 0;
+    int w = 0, h = 0;
+    n = put_icon(b, n, 16, 16, 0xff0000ffu);
+    n = put_icon(b, n, 48, 48, 0xff00ff00u);
+    n = put_icon(b, n, 32, 24, 0xffff0000u);
+    CHECK(x11_net_wm_icon_pick(b, n, 256, 128, &first, &w, &h) == 1 && w == 48 && h == 48 && first == 2 + 256 + 2);
+    CHECK(x11_net_wm_icon_pick(b, n, 256, 20, &first, &w, &h) == 1 && w == 16 && first == 2);
+    CHECK(x11_net_wm_icon_pick(b, n, 40, 128, &first, &w, &h) == 1 && w == 32 && h == 24);   /* 48 is over the limit */
+    /* a width × height longer than the property: that image and what follows are ignored */
+    n = put_icon(b, 0, 8, 8, 0xffffffffu);
+    uint8_t *lie = b + 4 * n;
+    lie[0] = 0x00; lie[1] = 0x10; lie[2] = 0; lie[3] = 0;   /* 4096 */
+    lie[4] = 0x00; lie[5] = 0x10; lie[6] = 0; lie[7] = 0;   /* × 4096 */
+    CHECK(x11_net_wm_icon_pick(b, n + 2 + 10, 256, 128, &first, &w, &h) == 1 && w == 8 && first == 2);
+    /* overflowing sizes, 0 sizes, a truncated header, nothing */
+    memset(b, 0xff, 16);
+    CHECK(x11_net_wm_icon_pick(b, 4, 256, 128, &first, &w, &h) == 0);
+    memset(b, 0, 16);
+    CHECK(x11_net_wm_icon_pick(b, 4, 256, 128, &first, &w, &h) == 0);
+    put_icon(b, 0, 1, 1, 0xff000000u);
+    CHECK(x11_net_wm_icon_pick(b, 2, 256, 128, &first, &w, &h) == 0);     /* no room for its pixel */
+    CHECK(x11_net_wm_icon_pick(b, 3, 256, 128, &first, &w, &h) == 1 && w == 1 && first == 2);
+    CHECK(x11_net_wm_icon_pick(b, 1, 256, 128, &first, &w, &h) == 0);
+    CHECK(x11_net_wm_icon_pick(NULL, 0, 256, 128, &first, &w, &h) == 0);
+    /* a huge image within the property is skipped, a small one after it is still found */
+    n = put_icon(b, 0, 300, 100, 0xffffffffu);
+    n = put_icon(b, n, 24, 24, 0xff123456u);
+    CHECK(x11_net_wm_icon_pick(b, n, 256, 128, &first, &w, &h) == 1 && w == 24 && first == 2 + 30000 + 2);
 }
 
 static void test_policy(void) {
@@ -366,6 +433,8 @@ int main(void) {
     test_setup();
     test_framing();
     test_props();
+    test_size_clamp();
+    test_net_wm_icon();
     test_policy();
     test_display();
     test_xdnd();

@@ -137,6 +137,7 @@ static int s_touch(void *ud, int ph, int id, double x, double y) {
     return wl_input_touch(ph, id, x * w, y * h);
 }
 static void s_touch_frame(void *ud) { (void)ud; wl_input_touch_frame(); }
+static void s_touch_orient(void *ud, int id, double deg) { (void)ud; wl_input_touch_orientation(id, deg); }
 static void s_warp(void *ud, double x, double y) {
     (void)ud;
     double px, py;
@@ -148,7 +149,7 @@ static void s_frame(void *ud) { (void)ud; if (host.flush) host.flush(); }
 
 static const TpSink sink = {
     .motion = s_motion, .button = s_button, .scroll = s_scroll, .pinch = s_pinch, .swipe = s_swipe, .hold = s_hold,
-    .touch = s_touch, .touch_frame = s_touch_frame, .warp = s_warp, .frame = s_frame,
+    .touch = s_touch, .touch_frame = s_touch_frame, .touch_orient = s_touch_orient, .warp = s_warp, .frame = s_frame,
 };
 
 void tp_route_init(const TpHost *h) {

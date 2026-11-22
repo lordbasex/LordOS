@@ -85,7 +85,7 @@ static void set8(xcb_window_t w, xcb_atom_t p, xcb_atom_t type, const char *s, i
 static xcb_atom_t A_WM_PROTOCOLS, A_WM_DELETE, A_WM_TAKE_FOCUS, A_WM_STATE, A_WM_CHANGE_STATE, A_UTF8, A_NET_WM_NAME, A_NET_SUPPORTED,
     A_NET_CHECK, A_NET_ACTIVE, A_NET_STATE, A_FULLSCREEN, A_MAXV, A_MAXH, A_HIDDEN, A_ABOVE, A_ATTENTION, A_MODAL, A_FOCUSED, A_TYPE, A_TYPE_NORMAL,
     A_TYPE_DIALOG, A_PID, A_CLIENT_LIST, A_FRAME, A_WORKAREA, A_MOTIF, A_ICON, A_MOVERESIZE, A_CLIPBOARD, A_TARGETS, A_INCR, A_MIME_UTF8,
-    A_PROP, A_RESOURCE_MANAGER, A_REQ_FRAME;
+    A_PROP, A_RESOURCE_MANAGER, A_REQ_FRAME, A_STACKING, A_SKIP_TASKBAR, A_TYPE_UTILITY, A_CLOSE;
 static void atoms(void) {
     A_WM_PROTOCOLS = atom("WM_PROTOCOLS"); A_WM_DELETE = atom("WM_DELETE_WINDOW"); A_WM_TAKE_FOCUS = atom("WM_TAKE_FOCUS");
     A_WM_STATE = atom("WM_STATE"); A_WM_CHANGE_STATE = atom("WM_CHANGE_STATE"); A_UTF8 = atom("UTF8_STRING");
@@ -98,12 +98,14 @@ static void atoms(void) {
     A_FRAME = atom("_NET_FRAME_EXTENTS"); A_WORKAREA = atom("_NET_WORKAREA"); A_MOTIF = atom("_MOTIF_WM_HINTS"); A_ICON = atom("_NET_WM_ICON");
     A_MOVERESIZE = atom("_NET_WM_MOVERESIZE"); A_CLIPBOARD = atom("CLIPBOARD"); A_TARGETS = atom("TARGETS"); A_INCR = atom("INCR");
     A_MIME_UTF8 = atom("text/plain;charset=utf-8"); A_PROP = atom("WLCONF_SEL"); A_RESOURCE_MANAGER = XCB_ATOM_RESOURCE_MANAGER;
-    A_REQ_FRAME = atom("_NET_REQUEST_FRAME_EXTENTS");
+    A_REQ_FRAME = atom("_NET_REQUEST_FRAME_EXTENTS"); A_STACKING = atom("_NET_CLIENT_LIST_STACKING");
+    A_SKIP_TASKBAR = atom("_NET_WM_STATE_SKIP_TASKBAR"); A_TYPE_UTILITY = atom("_NET_WM_WINDOW_TYPE_UTILITY");
+    A_CLOSE = atom("_NET_CLOSE_WINDOW");
 }
 
 /* ---------------------------------------------------------------- events */
 typedef struct { int map, focus_in, take_focus, delete_win, configure, cw, ch, prop_state; } WinEv;
-#define MAXW 8
+#define MAXW 12
 static struct { xcb_window_t id; WinEv ev; } wins[MAXW];
 static int nwins;
 static WinEv *ev_of(xcb_window_t w) { for (int i = 0; i < nwins; i++) if (wins[i].id == w) return &wins[i].ev; return NULL; }
@@ -224,6 +226,11 @@ static void wm(void) {
 
     /* a normal window: mapped by the WM, given WM_STATE, listed, focused, framed */
     xcb_window_t w1 = make_window("wlconf-x11", 1, 1, 0, A_TYPE_NORMAL, 300, 200);
+    /* before it maps, it asks what its frame will be (EWMH _NET_REQUEST_FRAME_EXTENTS): the WM sets the property */
+    root_message(w1, A_REQ_FRAME, 0, 0, 0, 0);
+    wait_for(c_never, NULL, 400);
+    int rfe = prop32(w1, A_FRAME, v, 4);
+    check("ewmh.frame_extents", "request_answered", rfe == 4, "_NET_REQUEST_FRAME_EXTENTS", "_NET_FRAME_EXTENTS set before the map, on request: %d values", rfe);
     xcb_map_window(X, w1);
     WinEv *e1 = ev_of(w1);
     int mapped = wait_for(c_map, e1, 4000);
@@ -242,6 +249,8 @@ static void wm(void) {
     int ha = prop32(scr->root, A_NET_ACTIVE, &act, 1) == 1;
     check("ewmh.active_window", "root_property", ha && act == w1, "_NET_ACTIVE_WINDOW", "_NET_ACTIVE_WINDOW is the focused window: 0x%x (ours 0x%x)", act, w1);
     check("ewmh.wm_state", "focused", state_has(w1, A_FOCUSED), "_NET_WM_STATE_FOCUSED", "_NET_WM_STATE_FOCUSED on the focused window: %s", state_has(w1, A_FOCUSED) ? "yes" : "no");
+    int sk = prop32(scr->root, A_STACKING, v, 256);
+    check("ewmh.client_list", "stacking_top", sk > 0 && v[sk - 1] == w1, "_NET_CLIENT_LIST_STACKING", "_NET_CLIENT_LIST_STACKING has the focused window on top: %s", sk > 0 && v[sk - 1] == w1 ? "yes" : "no");
 
     /* a title change after map (the driver checks the theme got it) */
     set8(w1, A_NET_WM_NAME, A_UTF8, "wlconf-x11-renamed", 18);
@@ -263,7 +272,7 @@ static void wm(void) {
     root_message(w1, A_NET_STATE, 0, A_MAXV, A_MAXH, 1);
     int mx0 = wait_state(w1, A_MAXV, 0, 2000);
     check("ewmh.wm_state", "maximize_remove", mx0, "_NET_WM_STATE_MAXIMIZED_VERT", "remove maximized: %s", mx0 ? "removed" : "still set");
-    struct { const char *id; xcb_atom_t a; } more[] = { { "above", A_ABOVE }, { "demands_attention", A_ATTENTION }, { "modal", A_MODAL } };
+    struct { const char *id; xcb_atom_t a; } more[] = { { "above", A_ABOVE }, { "modal", A_MODAL }, { "skip_taskbar", A_SKIP_TASKBAR } };
     for (int i = 0; i < 3; i++) {
         root_message(w1, A_NET_STATE, 1, more[i].a, 0, 1);
         int on = wait_state(w1, more[i].a, 1, 1500);
@@ -271,8 +280,14 @@ static void wm(void) {
         snprintf(id, sizeof id, "%s_add", more[i].id);
         check("ewmh.wm_state", id, on, aname(more[i].a), "add %s: %s", aname(more[i].a), on ? "set" : "not set");
         root_message(w1, A_NET_STATE, 0, more[i].a, 0, 1);
-        wait_state(w1, more[i].a, 0, 500);
+        int off = wait_state(w1, more[i].a, 0, 1500);
+        snprintf(id, sizeof id, "%s_remove", more[i].id);
+        check("ewmh.wm_state", id, off, aname(more[i].a), "remove %s: %s", aname(more[i].a), off ? "removed" : "still set");
     }
+    /* the window in front never demands attention (KWin and Mutter clear it on the active window) */
+    root_message(w1, A_NET_STATE, 1, A_ATTENTION, 0, 1);
+    wait_for(c_never, NULL, 500);
+    check("ewmh.wm_state", "demands_attention_focused", !state_has(w1, A_ATTENTION), "_NET_WM_STATE_DEMANDS_ATTENTION", "the focused window asking for attention: %s", state_has(w1, A_ATTENTION) ? "set (it already has it)" : "not set, as KWin and Mutter do");
     /* below its minimum size (WM_NORMAL_HINTS 300×200): a ConfigureRequest for 100×80 */
     uint32_t sz[2] = { 100, 80 };
     xcb_configure_window(X, w1, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, sz);
@@ -281,6 +296,16 @@ static void wm(void) {
     int gw = g ? g->width : 0, gh = g ? g->height : 0;
     free(g);
     check("icccm.wm_normal_hints", "min_size", gw >= 300 && gh >= 200, "WM_NORMAL_HINTS", "a ConfigureRequest below the minimum (300×200) gives %dx%d", gw, gh);
+    uint32_t nh[18] = { (1u << 4) | (1u << 5) };            /* PMinSize | PMaxSize: 300×200 to 500×400 */
+    nh[5] = 300; nh[6] = 200; nh[7] = 500; nh[8] = 400;
+    set32(w1, XCB_ATOM_WM_NORMAL_HINTS, XCB_ATOM_WM_SIZE_HINTS, nh, 18);
+    uint32_t big[2] = { 900, 900 };
+    xcb_configure_window(X, w1, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, big);
+    wait_for(c_never, NULL, 600);
+    g = xcb_get_geometry_reply(X, xcb_get_geometry(X, w1), NULL);
+    gw = g ? g->width : 0; gh = g ? g->height : 0;
+    free(g);
+    check("icccm.wm_normal_hints", "max_size", gw <= 500 && gh <= 400 && gw >= 300, "WM_NORMAL_HINTS", "a ConfigureRequest above the maximum (500×400) gives %dx%d", gw, gh);
 
     /* a transient dialog */
     xcb_window_t w2 = make_window("wlconf-x11-dialog", 1, 0, w1, A_TYPE_DIALOG, 0, 0);
@@ -313,6 +338,43 @@ static void wm(void) {
     set32(w5, A_ICON, XCB_ATOM_CARDINAL, icon, 2 + 256);
     xcb_flush(X);
     wait_for(c_never, NULL, 500);
+
+    /* w1 is no longer in front: it may ask for attention, with _NET_WM_STATE or the ICCCM urgency hint */
+    uint32_t act2 = 0;
+    prop32(scr->root, A_NET_ACTIVE, &act2, 1);
+    if (act2 != w1) {
+        root_message(w1, A_NET_STATE, 1, A_ATTENTION, 0, 1);
+        int at = wait_state(w1, A_ATTENTION, 1, 1500);
+        check("ewmh.wm_state", "demands_attention_add", at, "_NET_WM_STATE_DEMANDS_ATTENTION", "add _NET_WM_STATE_DEMANDS_ATTENTION on a window not in front: %s", at ? "set" : "not set");
+        root_message(w1, A_NET_STATE, 0, A_ATTENTION, 0, 1);
+        int at0 = wait_state(w1, A_ATTENTION, 0, 1500);
+        check("ewmh.wm_state", "demands_attention_remove", at0, "_NET_WM_STATE_DEMANDS_ATTENTION", "remove it: %s", at0 ? "removed" : "still set");
+        uint32_t urg[9] = { 1 | (1u << 8), 1, 1 };        /* InputHint | XUrgencyHint */
+        set32(w1, XCB_ATOM_WM_HINTS, XCB_ATOM_WM_HINTS, urg, 9);
+        int ur = wait_state(w1, A_ATTENTION, 1, 1500);
+        check("icccm.wm_hints", "urgency", ur, "WM_HINTS", "the urgency hint gives _NET_WM_STATE_DEMANDS_ATTENTION: %s", ur ? "yes" : "no");
+        uint32_t calm[9] = { 1, 1, 1 };
+        set32(w1, XCB_ATOM_WM_HINTS, XCB_ATOM_WM_HINTS, calm, 9);
+        int ur0 = wait_state(w1, A_ATTENTION, 0, 1500);
+        check("icccm.wm_hints", "urgency_cleared", ur0, "WM_HINTS", "the urgency hint cleared clears it: %s", ur0 ? "yes" : "no");
+    } else {
+        printf("CHECK ewmh.wm_state demands_attention_add SKIP _NET_WM_STATE_DEMANDS_ATTENTION the first window is still in front\n");
+        printf("CHECK icccm.wm_hints urgency SKIP WM_HINTS the first window is still in front\n");
+    }
+    /* a utility window (a palette) maps as a window */
+    xcb_window_t w6 = make_window("wlconf-x11-utility", 1, 0, w1, A_TYPE_UTILITY, 0, 0);
+    xcb_map_window(X, w6);
+    int m6 = wait_for(c_map, ev_of(w6), 3000);
+    check("ewmh.window_type", "utility_maps", m6, "_NET_WM_WINDOW_TYPE_UTILITY", "a utility window maps: %s", m6 ? "yes" : "no");
+    /* a pager closes a window: _NET_CLOSE_WINDOW becomes WM_DELETE_WINDOW */
+    xcb_window_t w7 = make_window("wlconf-x11-netclose", 1, 0, 0, A_TYPE_NORMAL, 0, 0);
+    xcb_map_window(X, w7);
+    wait_for(c_map, ev_of(w7), 3000);
+    root_message(w7, A_CLOSE, XCB_CURRENT_TIME, 2, 0, 0);
+    int nc = wait_for(c_delete, ev_of(w7), 3000);
+    check("ewmh.close_window", "close_request", nc, "_NET_CLOSE_WINDOW", "_NET_CLOSE_WINDOW from a pager sends WM_DELETE_WINDOW: %s", nc ? "yes" : "no in 3 s");
+    xcb_destroy_window(X, w7);
+    xcb_destroy_window(X, w6);
 
     /* iconify (WM_CHANGE_STATE): WM_STATE Iconic and _NET_WM_STATE_HIDDEN */
     xcb_client_message_event_t m = { .response_type = XCB_CLIENT_MESSAGE, .format = 32, .window = w1, .type = A_WM_CHANGE_STATE };
