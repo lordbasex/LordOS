@@ -15,7 +15,7 @@ import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfa
 import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName, direction } from './i18n.js';
-import { linuxAppFor, windowLinuxApp } from './apps.js';
+import { linuxAppFor, windowLinuxApp, windowPixelIcons } from './apps.js';
 import { shortcutsWho } from './kbinhibitmodel.js';
 import { webOwnerOf } from './webapps.js';
 import { osk } from './osk.js';
@@ -76,6 +76,18 @@ addListener('pointerup', () => { drag = null; });
 // a Linux app's drag of files released over LordOS: who claimed it at the release (wayland.takeDrop) gets the
 // paths once lord-server has read them ('filesdrop' on window 0)
 let dropTaker = null;
+// The icon a Linux window set for itself (xdg-toplevel-icon), re-encoded by lord-server: kept per window, shown only when
+// its app has no installed icon (sdk/apps.js windowIcon: the installed app's icon always wins)
+function windowOwnIcon(sid, id) {
+  let px = null;
+  try { px = typeof lord.wayland.icon === 'function' ? lord.wayland.icon(sid) : null; } catch (e) { px = null; }
+  windowPixelIcons.set((m) => {
+    if (!px && !m[id]) return m;
+    const next = { ...m };
+    if (px) next[id] = px; else delete next[id];
+    return next;
+  });
+}
 globalThis.__lordWayland = (sid, type, d = {}) => {
   if (sid === 0 && type === 'filesdrop') {
     const fn = dropTaker;
@@ -139,10 +151,12 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       // a built-in isolated app that asks for it (manifest "protected": Passwords) is black in captures
       if (d.appId && getApp(d.appId)?.isolated && getApp(d.appId)?.protected) wm.setProtected(id, true);
       wm.setCloseGuard(id, () => { lord.wayland.close(sid); return false; });   // la app decide cuándo cierra
+      windowOwnIcon(sid, id);
       if (d.appId && (getApp(d.appId)?.package || getApp(d.appId)?.isolated)) setTimeout(() => applyAppMenus(d.appId), 0);   // menús de la app aislada (ya mapeada)
       break;
     }
-    case 'unmap': if (win) wm.close(id, true); break;
+    case 'unmap': if (win) wm.close(id, true); if (windowPixelIcons.get()[id]) windowOwnIcon(-1, id); break;
+    case 'icon': windowOwnIcon(sid, id); break;       // xdg_toplevel_icon_manager_v1.set_icon, committed
     // the window it belongs to changed, or it became modal or not (xdg-foreign, xdg-dialog-v1)
     case 'parent': if (win) wm.setArgs(id, { parent: d.parent ? idOf(d.parent) : null, modal: !!d.parent && !!d.modal, dialog: win.args?.dialog || !!d.parent }); break;
     case 'title': {                      // an isolated app keeps its name when the title is just its id

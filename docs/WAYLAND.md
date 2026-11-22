@@ -46,6 +46,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
 | `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (0.8.8.8, checked on VM 127, `wl_textinput.c`, see "Input methods") |
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
+| `xdg_toplevel_icon_manager_v1` | 1 | a window's own icon, shown only when its app has no installed icon (an AppImage, Wine, a game); buffers copied, re-encoded and size-limited, names ignored (see "Window icons", 0.8.9.5) |
 | `ext_idle_notifier_v1` | 1 | an app is told when the person is away from the computer and back, only once they allowed it (the `idle` permission, asked once per app; see "Idle notifications", 0.8.9.5) |
 | `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
 | `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
@@ -1391,6 +1392,27 @@ without input and again when the person is back. That says when someone is at th
 - **Tests.** `build/idlenotify-test` (the decision, idled and resumed, revoked while idled, an inhibitor holding) and
   `wlperf-client idle` in `tests/wlperf_headless.sh`: the first notification asks and gets nothing before the answer,
   an allowed one is told `idled`, a denied one never (`WLPERF_IDLE=deny`).
+
+## Window icons (`xdg_toplevel_icon_manager_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
+
+An app may hand its window an icon. LordOS's rule: **the official icon wins.** A window whose app has an installed icon
+(its `.desktop` entry, a Flatpak's exported one, an isolated or packaged LordOS app, a web app) always shows that one in
+the Dock, the switcher and the Overview (`windowIcon`, `sdk/apps.js`); the app's own icon is used only for a window with
+none of those (an AppImage, a Wine program, a game), instead of a letter. A window never changes another app's icon:
+the icon belongs to that window, and the Dock entry of an app id nobody installed shows its first window's.
+
+- **What lord-server keeps** (`wlicon.h`): each `add_buffer` is copied at once into its own memory, never kept as the
+  client's: shared memory only and square (else `invalid_buffer`), ARGB8888 or XRGB8888, 1 to 256 px a side (larger
+  ones are just not taken), re-encoded from premultiplied ARGB to straight RGBA; of an icon's buffers the one closest
+  to 128 px is kept; at most 16 MB of icons alive in the whole session (past it a buffer is not taken). `set_name` is
+  ignored: a name could show another app's icon (the protocol lets a compositor fall back to the pixels). `set_icon` is
+  double-buffered and applied on the window's commit (`icon` event to JS); an icon is immutable once set
+  (`immutable`). The compositor asks for 64 and 128 px (`icon_size`).
+- **To the shell:** `lord.wayland.icon(window)` gives `{ width, height, data }` (RGBA) for `<Image pixels>`;
+  `sdk/wayland.js` keeps it per window in `windowPixelIcons` (fetched at map and on each `icon` event, dropped at unmap).
+- **Tests:** `build/wlicon-test` (the re-encoding, the limits, the session budget, which buffer is kept) and
+  `wlperf-client icon` (the 64 px buffer of 64, 300 and 48 reaches the theme as 64 × 64 RGBA, a 64 × 32 buffer is
+  `invalid_buffer`).
 
 ## Pending
 

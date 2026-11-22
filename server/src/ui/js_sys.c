@@ -1688,6 +1688,23 @@ static JSValue f_wl_info(JSContext *c, JSValueConst this_val, int argc, JSValueC
     return o;
 }
 
+/* lord.wayland.icon(window) → { width, height, data: ArrayBuffer (RGBA) } | null: the icon a Linux window set for itself
+ * (xdg-toplevel-icon, already re-encoded and size-limited by wl.c), for <Image pixels>; sdk/apps.js shows it only for a
+ * window whose app has no installed icon */
+static JSValue f_wl_icon(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t id = 0;
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0])) return JS_NULL;
+    int side = 0;
+    const uint8_t *px = wl_window_icon(id, &side);
+    if (!px || side <= 0) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "width", JS_NewInt32(c, side));
+    JS_SetPropertyStr(c, o, "height", JS_NewInt32(c, side));
+    JS_SetPropertyStr(c, o, "data", JS_NewArrayBufferCopy(c, px, (size_t)side * (size_t)side * 4));
+    return o;
+}
+
 /* lord.wayland.idleAnswer(app, allow) → bool: the person's answer to the "idle" prompt (ext-idle-notify) lord-server is
  * waiting on for app; anything else is ignored (wl_idle_answer) */
 static JSValue f_wl_idle_answer(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -1868,6 +1885,7 @@ static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("state", 8, f_wl_state),
     JS_CFUNC_DEF("workAreas", 1, f_wl_work_areas),
     JS_CFUNC_DEF("idleAnswer", 2, f_wl_idle_answer),
+    JS_CFUNC_DEF("icon", 1, f_wl_icon),
     JS_CFUNC_DEF("info", 0, f_wl_info),
     JS_CFUNC_DEF("x11SelfScale", 1, f_wl_x11_self_scale),
 };

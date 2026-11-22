@@ -12,6 +12,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **A Linux window's own icon for apps with no installed one, in development** (`xdg-toplevel-icon-v1`, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Window icons"). An AppImage, a Wine program or a game without a `.desktop`
+  entry now shows the icon it hands its window in the Dock, the switcher and the Overview instead of a letter. The
+  installed icon always wins for every other app, icon names are ignored (they could name another app's icon), and the
+  pixels are copied, re-encoded and size-limited by lord-server (square, at most 256 px, 16 MB for the whole session).
+
 - **Linux apps may be told when you're away from the computer, only if you allow it, in development**
   (`ext-idle-notify-v1`, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Idle notifications"). The first time
   an app asks, LordOS shows its own prompt ("‹App› wants to know when you're away from the computer", Allow / Don't

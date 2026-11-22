@@ -11,6 +11,8 @@
  *   transform   a 200×100 buffer with buffer_transform 90: the window is 100×200 (geometry checked by the script)
  *   idle        a 300 ms ext-idle-notify notification for 3 s: prints how many "idled" came (none until the "idle"
  *               permission is allowed; tests/wlperf_headless.sh answers the prompt)
+ *   icon        a window that sets its own icon (xdg-toplevel-icon: the 64 px buffer kept, a 300 px one refused), and a
+ *               non-square buffer that must be invalid_buffer
  *   protocols   the globals and versions of items 4 and 7 (xdg_wm_base 7, linux-dmabuf 5, wp_presentation 2,
  *               cursor-shape 2, single-pixel-buffer, alpha-modifier): the capabilities, the bounds, a single-pixel
  *               buffer at 50 % opacity
@@ -30,6 +32,7 @@
 #include "client/single-pixel-buffer-v1-client-protocol.h"
 #include "client/alpha-modifier-v1-client-protocol.h"
 #include "client/ext-idle-notify-v1-client-protocol.h"
+#include "client/xdg-toplevel-icon-v1-client-protocol.h"
 
 static struct wl_display *dpy;
 static struct wl_compositor *comp;
@@ -39,6 +42,7 @@ static struct wp_presentation *pres;
 static struct wp_single_pixel_buffer_manager_v1 *spb;
 static struct wp_alpha_modifier_v1 *alpha;
 static struct ext_idle_notifier_v1 *idler;
+static struct xdg_toplevel_icon_manager_v1 *iconm;
 static struct wl_seat *seat;
 static uint32_t ver_wm, ver_dmabuf, ver_pres, ver_cursor, ver_spb, ver_alpha;
 static int fails;
@@ -69,7 +73,8 @@ static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char
     else if (!strcmp(iface, wp_single_pixel_buffer_manager_v1_interface.name)) {
         ver_spb = ver;
         spb = wl_registry_bind(r, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
-    } else if (!strcmp(iface, ext_idle_notifier_v1_interface.name)) idler = wl_registry_bind(r, name, &ext_idle_notifier_v1_interface, 1);
+    } else if (!strcmp(iface, xdg_toplevel_icon_manager_v1_interface.name)) iconm = wl_registry_bind(r, name, &xdg_toplevel_icon_manager_v1_interface, 1);
+    else if (!strcmp(iface, ext_idle_notifier_v1_interface.name)) idler = wl_registry_bind(r, name, &ext_idle_notifier_v1_interface, 1);
     else if (!strcmp(iface, wl_seat_interface.name)) seat = wl_registry_bind(r, name, &wl_seat_interface, 1);
     else if (!strcmp(iface, wp_alpha_modifier_v1_interface.name)) {
         ver_alpha = ver;
@@ -333,8 +338,61 @@ static int run_idle(void) {
     return wl_display_get_error(dpy) ? 1 : 0;
 }
 
+/* ---- icon: a window that sets its own icon (a 64 px buffer, a 300 px one that is too large, and a 48 px one), then a
+ * second connection whose non-square buffer must be refused with invalid_buffer ---- */
+static int icon_sizes[8], nicon_sizes;
+static void im_size(void *d, struct xdg_toplevel_icon_manager_v1 *m, int32_t size) { (void)d; (void)m; if (nicon_sizes < 8) icon_sizes[nicon_sizes++] = size; }
+static void im_done(void *d, struct xdg_toplevel_icon_manager_v1 *m) { (void)d; (void)m; }
+static const struct xdg_toplevel_icon_manager_v1_listener im_l = { im_size, im_done };
+static int run_icon(void) {
+    if (!iconm) { printf("FAIL no xdg_toplevel_icon_manager_v1\n"); return 1; }
+    xdg_toplevel_icon_manager_v1_add_listener(iconm, &im_l, NULL);
+    wl_display_roundtrip(dpy);
+    printf("icon: sizes asked:");
+    for (int i = 0; i < nicon_sizes; i++) printf(" %d", icon_sizes[i]);
+    printf("\n");
+    Buf b = buffer(200, 120, 0xff505050u);
+    window("icon", &b, 0);
+    pause_ms(300);
+    struct xdg_toplevel_icon_v1 *ic = xdg_toplevel_icon_manager_v1_create_icon(iconm);
+    xdg_toplevel_icon_v1_set_name(ic, "firefox");          /* ignored: a name could be another app's icon */
+    Buf i64 = buffer(64, 64, 0x80ff0000u), i300 = buffer(300, 300, 0xff00ff00u), i48 = buffer(48, 48, 0xff0000ffu);
+    xdg_toplevel_icon_v1_add_buffer(ic, i64.b, 1);
+    xdg_toplevel_icon_v1_add_buffer(ic, i300.b, 1);
+    xdg_toplevel_icon_v1_add_buffer(ic, i48.b, 1);
+    xdg_toplevel_icon_manager_v1_set_icon(iconm, top, ic);
+    xdg_toplevel_icon_v1_destroy(ic);                       /* the window keeps it */
+    wl_surface_commit(surf);
+    wl_display_roundtrip(dpy);
+    pause_ms(500);
+    check("icon: set, no protocol error", wl_display_get_error(dpy), 0);
+    /* a second connection: a buffer that isn't square is invalid_buffer */
+    struct wl_display *d2 = wl_display_connect(NULL);
+    struct wl_registry *r2 = d2 ? wl_display_get_registry(d2) : NULL;
+    if (!r2) { printf("FAIL second connection\n"); return 1; }
+    struct wl_display *keep = dpy;
+    struct wl_shm *keep_shm = shm;
+    struct xdg_toplevel_icon_manager_v1 *keep_im = iconm;
+    dpy = d2;
+    iconm = NULL;
+    wl_registry_add_listener(r2, &reg_l, NULL);
+    wl_display_roundtrip(d2);
+    Buf bad = buffer(64, 32, 0xffffffffu);
+    struct xdg_toplevel_icon_v1 *ic2 = xdg_toplevel_icon_manager_v1_create_icon(iconm);
+    xdg_toplevel_icon_v1_add_buffer(ic2, bad.b, 1);
+    wl_display_roundtrip(d2);
+    const struct wl_interface *iface = NULL;
+    uint32_t oid = 0, code = wl_display_get_error(d2) ? wl_display_get_protocol_error(d2, &iface, &oid) : 99;
+    check("icon: a 64x32 buffer is invalid_buffer", code == XDG_TOPLEVEL_ICON_V1_ERROR_INVALID_BUFFER && iface == &xdg_toplevel_icon_v1_interface, 1);
+    wl_display_disconnect(d2);
+    dpy = keep;
+    shm = keep_shm;
+    iconm = keep_im;
+    return fails ? 1 : 0;
+}
+
 int main(int argc, char **argv) {
-    if (argc < 2) { fprintf(stderr, "usage: wlperf-client titles|frames N|damage N [S]|transform|protocols|idle\n"); return 2; }
+    if (argc < 2) { fprintf(stderr, "usage: wlperf-client titles|frames N|damage N [S]|transform|protocols|idle|icon\n"); return 2; }
     dpy = wl_display_connect(NULL);
     if (!dpy) { fprintf(stderr, "wlperf-client: no Wayland display\n"); return 2; }
     struct wl_registry *reg = wl_display_get_registry(dpy);
@@ -349,6 +407,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[1], "transform")) r = run_transform();
     else if (!strcmp(argv[1], "protocols")) r = run_protocols();
     else if (!strcmp(argv[1], "idle")) r = run_idle();
+    else if (!strcmp(argv[1], "icon")) r = run_icon();
     else { fprintf(stderr, "wlperf-client: unknown mode %s\n", argv[1]); return 2; }
     wl_display_disconnect(dpy);
     return r || fails ? 1 : 0;

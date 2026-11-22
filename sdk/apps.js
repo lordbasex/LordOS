@@ -299,6 +299,23 @@ function guestIcon(w) {
   return C;
 }
 
+// A Linux window with no installed app: the icon it set itself (windowPixelIcons, filled by sdk/wayland.js), else a letter
+const ownIconOf = new Map();
+function linuxOwnIcon(w, name) {
+  const key = `${w?.id}\u0000${name}`;
+  let C = ownIconOf.get(key);
+  if (!C) {
+    const id = w?.id;
+    C = ({ size = 32 }) => {
+      const px = useStore(windowPixelIcons, (m) => m[id] || null);
+      return px ? h(Image, { pixels: px, style: { width: size, height: size } }) : h(LetterIcon, { size, name });
+    };
+    ownIconOf.set(key, C);
+    if (ownIconOf.size > 256) ownIconOf.delete(ownIconOf.keys().next().value);
+  }
+  return C;
+}
+
 export function windowAppName(w) {
   if (!w) return '';
   // a guest's window (Machines' apps mode): its app's name as the guest said it, and the machine's
@@ -326,7 +343,9 @@ export function windowIcon(w, getApp = registryApp) {
     const pkg = appId ? registryApp(appId) : null;
     if (pkg && (pkg.package || pkg.isolated) && pkg.Icon) return pkg.Icon;
     const a = windowLinuxApp(appId);
-    return a ? a.Icon : ({ size }) => h(LetterIcon, { size, name: appId || w?.title || 'Linux' });
+    // the installed app's icon always wins; only a window whose app has none (an AppImage, Wine, a game) shows the
+    // icon it set itself (xdg-toplevel-icon, sdk/wayland.js), else a letter
+    return a ? a.Icon : linuxOwnIcon(w, appId || w?.title || 'Linux');
   }
   return getApp(w?.id)?.Icon || (({ size }) => h(LetterIcon, { size, name: w?.id }));
 }

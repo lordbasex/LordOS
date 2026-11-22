@@ -88,6 +88,8 @@
 #include "buftf.h"
 #include "idlenotify.h"
 #include "ext-idle-notify-v1-protocol.h"
+#include "xdg-toplevel-icon-v1-protocol.h"
+#include "wlicon.h"
 #include "wl_input.h"
 #include "../gpu/gpu.h"
 #include "../media/media.h"
@@ -169,6 +171,10 @@ struct Surf {
     /* wp_alpha_modifier_v1: its object, and the multiplier pending and current (UINT32_MAX: opaque as drawn) */
     struct wl_resource *am;
     uint32_t p_alpha, alpha;
+    /* xdg_toplevel_icon_v1: the icon the app set, pending until commit (p_icon_set) and current; RGBA, square
+     * (wlicon.h). The shell shows it only for a window with no installed app (sdk/apps.js windowIcon). */
+    WlIcon *p_icon, *icon;
+    int p_icon_set;
     int lw, lh;                 /* logical size (viewporter; otherwise the buffer's) */
     /* wp_viewporter: pending and current (vsw < 0 = no crop, vdw <= 0 = no scaling) */
     struct wl_resource *viewport;
@@ -982,6 +988,13 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     else { s->dmg_full = 0; s->dmg = (BufBox){ 0, 0, 0, 0 }; }  /* a commit of state only */
     s->p_ds_on = s->p_db_on = 0;
     if (s->p_alpha != s->alpha) { s->alpha = s->p_alpha; s->dmg_full = 1; }   /* a new opacity: all of it again */
+    if (s->p_icon_set) {                        /* xdg_toplevel_icon_manager_v1.set_icon, double-buffered */
+        wlicon_unref(s->icon);
+        s->icon = s->p_icon;
+        s->p_icon = NULL;
+        s->p_icon_set = 0;
+        if (s->mapped) emit(s, "icon", "{\"size\":%d}", s->icon ? s->icon->size : 0);
+    }
     s->bscale = s->p_bscale;
     apply_viewport(s);
     if (s->p_input_set) {
@@ -1278,6 +1291,8 @@ static void surface_gone(struct wl_resource *r) {
     if (s->sub) wl_resource_set_user_data(s->sub, NULL);
     if (s->frac) wl_resource_set_user_data(s->frac, NULL);
     if (s->am) wl_resource_set_user_data(s->am, NULL);
+    wlicon_unref(s->p_icon);
+    wlicon_unref(s->icon);
     if (s->kde) wl_resource_set_user_data(s->kde, NULL);
     if (s->deco) wl_resource_set_user_data(s->deco, NULL);
     /* a client may destroy the wl_surface before its role objects: they must not keep the freed Surf, or set_parent,
@@ -4904,6 +4919,81 @@ int wl_shortcuts_answer(const char *app, int allow) {
     return 1;
 }
 
+/* ---- xdg_toplevel_icon_manager_v1: an app's own icon for its window (wlicon.h) ----
+ * Buffers are copied at add_buffer (shared memory only, square, 1…WLICON_MAX px, ARGB/XRGB8888) into lord-server's own
+ * RGBA, the one closest to WLICON_WANT kept; an icon name is ignored (a name would let an app show another app's
+ * icon). The shell uses the result only for a window whose app has no installed icon. */
+typedef struct { WlIcon *ic; int immutable; } IconObj;
+static void icon_obj_gone(struct wl_resource *r) {
+    IconObj *o = wl_resource_get_user_data(r);
+    if (!o) return;
+    wlicon_unref(o->ic);
+    free(o);
+}
+static void icon_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void icon_set_name(struct wl_client *c, struct wl_resource *r, const char *name) {
+    (void)c; (void)name;
+    IconObj *o = wl_resource_get_user_data(r);
+    if (o && o->immutable) wl_resource_post_error(r, XDG_TOPLEVEL_ICON_V1_ERROR_IMMUTABLE, "the icon was already set");
+}
+static void icon_add_buffer(struct wl_client *c, struct wl_resource *r, struct wl_resource *buffer, int32_t scale) {
+    (void)c;
+    IconObj *o = wl_resource_get_user_data(r);
+    if (!o) return;
+    if (o->immutable) { wl_resource_post_error(r, XDG_TOPLEVEL_ICON_V1_ERROR_IMMUTABLE, "the icon was already set"); return; }
+    struct wl_shm_buffer *b = buffer ? wl_shm_buffer_get(buffer) : NULL;
+    int w = b ? wl_shm_buffer_get_width(b) : 0, h = b ? wl_shm_buffer_get_height(b) : 0;
+    if (!b || w != h || w <= 0) { wl_resource_post_error(r, XDG_TOPLEVEL_ICON_V1_ERROR_INVALID_BUFFER, "not a square shared-memory buffer"); return; }
+    uint32_t fmt = wl_shm_buffer_get_format(b);
+    int stride = wl_shm_buffer_get_stride(b);
+    if ((fmt != WL_SHM_FORMAT_ARGB8888 && fmt != WL_SHM_FORMAT_XRGB8888) || stride < w * 4) return;   /* not taken, no error */
+    if (!wlicon_better(o->ic ? o->ic->size : 0, o->ic ? o->ic->scale : 1, w, scale)) return;
+    wl_shm_buffer_begin_access(b);
+    WlIcon *ic = wlicon_from_argb(wl_shm_buffer_get_data(b), w, stride, scale, fmt == WL_SHM_FORMAT_XRGB8888);
+    wl_shm_buffer_end_access(b);
+    if (!ic) return;                                /* past the limits (size, the total kept): not taken */
+    wlicon_unref(o->ic);
+    o->ic = ic;
+}
+static const struct xdg_toplevel_icon_v1_interface icon_impl = {
+    .destroy = icon_destroy, .set_name = icon_set_name, .add_buffer = icon_add_buffer,
+};
+static void iconm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void iconm_create(struct wl_client *c, struct wl_resource *r, uint32_t id) {
+    IconObj *o = calloc(1, sizeof *o);
+    struct wl_resource *res = o ? wl_resource_create(c, &xdg_toplevel_icon_v1_interface, wl_resource_get_version(r), id) : NULL;
+    if (!res) { free(o); wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(res, &icon_impl, o, icon_obj_gone);
+}
+static void iconm_set(struct wl_client *c, struct wl_resource *r, struct wl_resource *toplevel, struct wl_resource *icon) {
+    (void)c; (void)r;
+    Surf *s = toplevel ? wl_resource_get_user_data(toplevel) : NULL;
+    IconObj *o = icon ? wl_resource_get_user_data(icon) : NULL;
+    if (o) o->immutable = 1;
+    if (!s || s->top != toplevel) return;
+    wlicon_unref(s->p_icon);
+    s->p_icon = o && o->ic ? wlicon_ref(o->ic) : NULL;     /* no pixels (or only a name): back to the default icon */
+    s->p_icon_set = 1;
+}
+static const struct xdg_toplevel_icon_manager_v1_interface iconm_impl = { .destroy = iconm_destroy, .create_icon = iconm_create, .set_icon = iconm_set };
+static void bind_iconm(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &xdg_toplevel_icon_manager_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &iconm_impl, NULL, NULL);
+    xdg_toplevel_icon_manager_v1_send_icon_size(r, 64);       /* the sizes the Dock draws at (54 to 86 px, 2x displays) */
+    xdg_toplevel_icon_manager_v1_send_icon_size(r, 128);
+    xdg_toplevel_icon_manager_v1_send_done(r);
+}
+
+/* The window's own icon (RGBA, side × side), or NULL: for lord.wayland.icon. */
+const uint8_t *wl_window_icon(int id, int *side) {
+    Surf *s = find(id);
+    if (!s || !s->icon) return NULL;
+    *side = s->icon->size;
+    return s->icon->rgba;
+}
+
 /* ---- ext_idle_notifier_v1: told when the person is away, with their permission (idlenotify.h) ---- */
 typedef struct {
     struct wl_resource *res;
@@ -5883,6 +5973,7 @@ int wl_start(void) {
     wl_list_init(&rel_pointers);
     wl_list_init(&feedbacks);
     wl_list_init(&idle_notes);
+    wl_global_create(dpy, &xdg_toplevel_icon_manager_v1_interface, 1, NULL, bind_iconm);   /* an app's own icon, for windows with no installed one */
     wl_global_create(dpy, &ext_idle_notifier_v1_interface, 1, NULL, bind_idnm);   /* away from the computer, if allowed */
     if (gpu_active()) ngpu_fmt = gpu_formats(gpu_fmt_cache, 256);
     gpu_set_hooks(wl_gpu_lost, wl_gpu_changed);

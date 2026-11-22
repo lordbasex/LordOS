@@ -8,6 +8,7 @@
 #   transform  a 200×100 buffer turned 90° maps as a 100×200 window
 #   idle       ext-idle-notify: the first notification asks ("idle" permission; the theme here answers WLPERF_IDLE,
 #              allow by default), an allowed one is told idled
+#   icon       xdg-toplevel-icon: the kept buffer, re-encoded to straight RGBA, reaches the theme; a bad one is an error
 #   damage     a client damaging a 10×10 square: every frame painted with only that damage equals a full repaint
 #              (LORD_PAINT_VERIFY=1, the default here; WLPERF_VERIFY=0 turns it off)
 # Run from server/ (tests/run_suites.sh does). Exit 77 when something it needs is missing (the theme bundle: npm run
@@ -31,6 +32,7 @@ printf '{"schema": 9, "desktopChosen": true, "language": "en"}\n' >"$D/home/.con
       if (globalThis.WLPERF_IDLE === 'allow' || globalThis.WLPERF_IDLE === 'deny') setTimeout(() => lord.wayland.idleAnswer(d.app, globalThis.WLPERF_IDLE === 'allow'), 3500);   // after the first client's 3 s
       return undefined;
     }
+    if (type === 'icon') { const px = lord.wayland.icon(id); console.log('WLPERF icon ' + JSON.stringify({ size: d.size, width: px ? px.width : 0, bytes: px ? px.data.byteLength : 0, rgba: px ? [...new Uint8Array(px.data, 0, 4)] : [] })); }
     if (type === 'title' || type === 'map') console.log('WLPERF ' + type + ' ' + JSON.stringify(type === 'map' ? { title: d.title, width: d.width, height: d.height } : d.title));
     return orig(id, type, d);
   };
@@ -96,6 +98,14 @@ if want idle; then
     echo "$out" | grep -q '^idle: [1-9]' || fail "idle: allowed, but never idled"
     p=$(events idlenotify | wc -l)
     [ "$p" -eq 1 ] || fail "idle: $p prompts for one app"
+fi
+if want icon; then
+    client icon || fail "icon: the client"
+    sleep 0.3
+    i=$(events icon | tail -1)
+    echo "icon: $i"
+    # the 64 px buffer (closest to 128 of 64 and 48; 300 is past the limit), as RGBA: XRGB8888 0x80ff0000 is opaque red
+    echo "$i" | grep -q '"size":64,"width":64,"bytes":16384,"rgba":\[255,0,0,255\]' || fail "icon: $i"
 fi
 if want damage; then
     client damage 30 || fail "damage: the client"
