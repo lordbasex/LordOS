@@ -1,6 +1,6 @@
 // theme_cost_scene.mjs — what a change costs in a theme, in native calls (createNode, setStyle, setText, appendChild,
-// insertBefore, removeChild) and in timers, for Lord Flow, Lord Classic and Lord Workspaces alike: node
-// tests/workspaces_test.mjs theme_cost_scene.mjs <default|classic|workspaces>. One 1920×1080 display, three windows.
+// insertBefore, removeChild) and in timers, for Lord Flow, Lord Classic, Lord Workspaces and Lord Celeste alike: node
+// tests/workspaces_test.mjs theme_cost_scene.mjs <default|classic|workspaces|celeste>. One 1920×1080 display, three windows.
 // Prints "ok cost <name> <value>" lines (numbers, not pass/fail: docs/WORKSPACES.md compares them), and fails only if
 // the theme doesn't start. Not in make test: a measurement.
 const live = new Map();
@@ -14,6 +14,7 @@ const sdk = await import('@lordos/sdk');
 const theme = globalThis.__themeUnderTest;
 if (theme === 'default') await import('../../themes/default/index.jsx');
 else if (theme === 'classic') await import('../../themes/classic/index.jsx');
+else if (theme === 'celeste') await import('../../themes/celeste/index.jsx');
 else await import('../../themes/workspaces/index.jsx');
 const { counts } = globalThis.__lordTest;
 const flush = async () => { for (let i = 0; i < 30; i++) await new Promise((res) => setImmediate(res)); await new Promise((res) => setTimeout(res, 5)); for (let i = 0; i < 10; i++) await new Promise((res) => setImmediate(res)); };
