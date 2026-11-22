@@ -81,6 +81,7 @@
 #include "../outputs.h"
 #include "../cursor.h"
 #include "ptrlock.h"
+#include "outpick.h"
 #include "wl_input.h"
 #include "../gpu/gpu.h"
 #include "../media/media.h"
@@ -172,6 +173,7 @@ struct Surf {
     int bscale, p_bscale;
     struct wl_resource *frac;
     unsigned outmask;
+    int fslot;                      /* its main display (output slot, outpick_main; -1 none): its frames and presentation follow it */
     int pref_scale;
     int logged_ratio;               /* buffer px per logical px ×100, last logged (docs/DISPLAYS.md) */
     /* an X11 window (Xwayland): its window manager record, and for a menu or tooltip its place */
@@ -222,6 +224,7 @@ typedef struct { int sid; float x, y; Rect clip; float op; float sx, sy; int med
 static Draw draws[2][128];
 static int ndraws[2];
 static int need_frame;              /* an app changed its content: must present */
+static int frames_held;             /* frame callbacks wait for their own display's frame (wl_frame_done) */
 static Dmabuf *to_release[64];      /* replaced: released after the next frame */
 static int nrelease;
 
@@ -1061,6 +1064,7 @@ static void comp_create_surface(struct wl_client *c, struct wl_resource *r, uint
     wl_list_init(&s->p_buf_destroy.link);
     s->vsw = s->p_vsw = -1;
     s->bscale = s->p_bscale = 1;
+    s->fslot = -1;
     surfs[slot] = s;
     wl_resource_set_implementation(res, &surface_impl, s, surface_gone);
     if (c == xwl_client) xwm_surface_created(id);   /* WL_SURFACE_ID may have come first */
@@ -1277,6 +1281,17 @@ static int slot_for_box(float x0, float y0, float x1, float y1) {
     return best;
 }
 
+/* The slots as outpick.h takes them. */
+static void pick_slots(OutPickSlot *p) {
+    for (int i = 0; i < OUT_MAX; i++)
+        p[i] = (OutPickSlot){ oslots[i].used, oslots[i].o.key, oslots[i].o.x, oslots[i].o.y, oslots[i].o.w, oslots[i].o.h };
+}
+static int slot_key(int slot) {
+    OutPickSlot p[OUT_MAX];
+    pick_slots(p);
+    return outpick_key(p, OUT_MAX, slot);
+}
+
 void wl_set_outputs(const WlOutput *list, int n, int main) {
     if (!dpy) return;
     int keep[OUT_MAX] = { 0 };
@@ -1338,8 +1353,14 @@ static void set_pref_scale(Surf *s, int pct) {
     if (wl_resource_get_version(s->res) >= 6) wl_surface_send_preferred_buffer_scale(s->res, int_scale(pct));
 }
 
-static void surface_outputs(Surf *s, float x, float y, int depth) {
+static void surface_outputs(Surf *s, float x, float y, int depth, int fslot) {
     if (depth > 8) return;
+    if (!depth && s->lw > 0) {                      /* the window's main display: its frames follow it */
+        OutPickSlot p[OUT_MAX];
+        pick_slots(p);
+        fslot = outpick_main(p, OUT_MAX, x, y, x + s->lw, y + s->lh);
+    }
+    s->fslot = fslot;
     unsigned mask = 0;
     int best = 0;
     for (int i = 0; i < OUT_MAX; i++) {
@@ -1353,7 +1374,7 @@ static void surface_outputs(Surf *s, float x, float y, int depth) {
     if (mask != s->outmask) send_enter_leave(s, mask);
     if (best) set_pref_scale(s, best);
     else if (!s->pref_scale) set_pref_scale(s, pointer_scale);
-    for (int k = 0; k < s->nkids; k++) surface_outputs(s->kids[k], x + s->kids[k]->sx, y + s->kids[k]->sy, depth + 1);
+    for (int k = 0; k < s->nkids; k++) surface_outputs(s->kids[k], x + s->kids[k]->sx, y + s->kids[k]->sy, depth + 1, fslot);
 }
 
 static void update_surface_outputs(void) {
@@ -1361,11 +1382,11 @@ static void update_surface_outputs(void) {
         Surf *s = surfs[i];
         if (!s || s->parent || (s->role != R_TOPLEVEL && s->role != R_POPUP) || !s->content) continue;
         float x, y;
-        if (origin(s, &x, &y)) surface_outputs(s, x, y, 0);
+        if (origin(s, &x, &y)) surface_outputs(s, x, y, 0, -1);
     }
     for (int i = 0; i < npopups; i++) {
         float x, y;
-        if (origin(popups[i], &x, &y)) surface_outputs(popups[i], x, y, 0);
+        if (origin(popups[i], &x, &y)) surface_outputs(popups[i], x, y, 0, -1);
     }
 }
 
@@ -3324,7 +3345,8 @@ void wl_paint_fullscreen(Canvas *out) {
 }
 
 int wl_fullscreen_active(void) { return fs_surf && fs_surf->content; }
-int wl_wants_frame(void) { return need_frame; }
+int wl_wants_frame(void) { return need_frame || frames_held; }
+int wl_new_content(void) { return need_frame; }
 
 /* Direct scanout: the fullscreen window has a dmabuf the size of the output, there are no
  * menus on top and the cursor does not need to be drawn (cursor plane or hidden). */
@@ -3356,9 +3378,10 @@ static int surf_hidden(Surf *s) {
     return top && (top->xmin || top->parked || top->covered);
 }
 
-void wl_frame_done(unsigned t) {
+void wl_frame_done(unsigned t, unsigned keys) {
     if (!dpy) return;
     need_frame = 0;
+    frames_held = 0;
     update_surface_outputs();
     for (int i = 0; i < nrelease; i++) {
         Dmabuf *d = to_release[i];
@@ -3373,6 +3396,12 @@ void wl_frame_done(unsigned t) {
         if (hidden && wl_list_empty(&s->frames)) continue;
         if (!framegate_due(&s->fgate, hidden, t)) continue;    /* minimized, a hidden desktop: once a second */
         if (hidden) framegate_sent(&s->fgate, t);
+        /* shown: with a frame of its own display, not another one's (a 60 Hz display's windows paced by a 144 Hz one's
+         * frames drew frames nobody saw); while that display waits for its flip, they wait too */
+        else if (!outpick_due(slot_key(s->fslot), keys)) {
+            if (!wl_list_empty(&s->frames)) frames_held = 1;
+            continue;
+        }
         struct wl_resource *cb, *tmp;
         wl_resource_for_each_safe(cb, tmp, &s->frames) {
             wl_callback_send_done(cb, t);
@@ -3423,7 +3452,7 @@ int wl_frame_unseen(unsigned t) {
         wl_resource_for_each_safe(r, tmp, &s->feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); waiting = 1; }
         wl_resource_for_each_safe(r, tmp, &s->sent_feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); waiting = 1; }
     }
-    need_frame = 0;
+    need_frame = frames_held = 0;
     if (waiting) wl_display_flush_clients(dpy);
     return waiting;
 }
@@ -4911,15 +4940,15 @@ static void bind_presentation(struct wl_client *c, void *data, uint32_t ver, uin
 }
 
 /* The flip finished (main.c, with the KMS time and vblank number). */
-void wl_presented(uint64_t ns, unsigned seq, unsigned refresh_ns) {
+void wl_presented(int key, int main_key, uint64_t ns, unsigned seq, unsigned refresh_ns) {
     if (!dpy) return;
     for (int i = 0; i < MAX_SURF; i++) {
         Surf *s = surfs[i];
-        if (!s) continue;
+        if (!s || wl_list_empty(&s->sent_feedback) || !outpick_presents(slot_key(s->fslot), key, main_key)) continue;
         struct wl_resource *fb, *tmp;
         wl_resource_for_each_safe(fb, tmp, &s->sent_feedback) {
             struct wl_resource *o;
-            for (int k = 0; k < OUT_MAX; k++)          /* the display it is on (the main one if none) */
+            for (int k = 0; k < OUT_MAX; k++)          /* the displays it is on (the main one if none) */
                 if (oslots[k].used && ((s->outmask >> k & 1) || (!s->outmask && k == out_main)))
                     FOR_CLIENT(&oslots[k].res, s->client, o) wp_presentation_feedback_send_sync_output(fb, o);
             uint64_t sec = ns / 1000000000ull;
@@ -5319,7 +5348,7 @@ void wl_set_covered(int id, int covered) {
 void wl_output_resized(void) {
     if (!dpy) return;
     int w = (int)ui.width, h = (int)ui.height;
-    WlOutput o = { 0, 0, w, h, w, h, 60000, 100, w * 254 / 960, h * 254 / 960, "LORD-1", "LordOS display" };
+    WlOutput o = { 0, 0, w, h, w, h, 60000, 100, w * 254 / 960, h * 254 / 960, "LORD-1", "LordOS display", 0 };
     wl_set_outputs(&o, 1, 0);
 }
 

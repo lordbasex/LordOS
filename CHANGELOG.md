@@ -451,6 +451,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Linux apps' frame callbacks and presentation feedback follow their own display, in development** (Wayland audit
+  item 2, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every window's frame
+  callbacks went with any display's frame, so with displays of different refresh rates an app was paced by the fastest
+  one and drew frames nobody saw (three displays at 60, 60 and 144 Hz, simulated in `build/outpick-test`: 198
+  callbacks a second for a window on a 60 Hz display, now 61; 145 on the 144 Hz one). A window's callbacks now go with a
+  frame of its main display (the one with most of it) or when that display has nothing waiting, and its
+  `wp_presentation` feedback is answered by that display's flip with its own time and refresh, not the main
+  display's. A headless lord-server now answers presentation feedback at all (`wlperf-client frames`: 0 of 180 before,
+  180 of 180).
+
 - **A Linux app's title costs a JS event only when it changes, at most once a frame, in development** (Wayland audit item
   1, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every
   `xdg_toplevel.set_title`, even the same title again, went to the theme as a `title` event and re-rendered its window

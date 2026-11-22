@@ -15,7 +15,9 @@ int  wl_fd(void);                       /* for poll; -1 if it did not start */
 void wl_dispatch(void);                 /* there is something on wl_fd */
 void wl_flush(void);                    /* sends what is pending to the clients */
 const char *wl_socket(void);            /* "wayland-0" */
-void wl_frame_done(unsigned time_ms);   /* after presenting a frame */
+/* after presenting a frame: keys = the displays (WlOutput.key bits) that just got one or have none waiting for a flip;
+ * a window's frame callbacks go only with its own display's (OUTPICK_ALL: every window, no monitor) */
+void wl_frame_done(unsigned time_ms, unsigned keys);
 /* Nothing is being drawn (screen off, the session away from the monitor, nobody watching): apps
  * still waiting for a frame callback get it and their presentation feedback is discarded, so
  * none stalls. 1 if some app was waiting. */
@@ -77,6 +79,7 @@ void wl_remap_all(void);                    /* a new JS context (theme switched)
 typedef struct {
     int x, y, w, h, pw, ph, refresh, scale, mm_w, mm_h;
     char name[32], desc[96];
+    int key;                    /* main.c's index of the display: the bit wl_frame_done and wl_presented name it by */
 } WlOutput;
 void wl_set_outputs(const WlOutput *o, int n, int main);
 void wl_set_pointer_scale(int pct);         /* the display under the pointer: cursor-shape images */               /* ui.width/ui.height changed */
@@ -113,8 +116,11 @@ void wl_content_track(int on);
 int  wl_content_take(float *x0, float *y0, float *x1, float *y1);
 void wl_fullscreen_allow(int on);           /* 0 while the sharing indicator must stay on screen */
 int  wl_try_scanout(int cursor_free);       /* GPU path: 1 if fullscreen went straight to the card */
-int  wl_wants_frame(void);                  /* an app changed its content */
-void wl_presented(uint64_t ns, unsigned seq, unsigned refresh_ns);   /* a flip finished (wp_presentation) */
+int  wl_wants_frame(void);                  /* an app changed its content, or frame callbacks wait for their display */
+int  wl_new_content(void);                  /* an app changed its content: the GPU displays must present */
+/* display `key`'s flip finished (wp_presentation): the feedback of the windows on it (-1: every window, no monitor);
+ * main_key: the main display, whose flips answer the windows on no known display */
+void wl_presented(int key, int main_key, uint64_t ns, unsigned seq, unsigned refresh_ns);
 void wl_set_drm_device(dev_t dev);          /* DRM device for linux-dmabuf (CPU path) */
 
 /* Pointer: relative motion (games), locking and confinement (pointer-constraints). */

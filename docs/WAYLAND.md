@@ -1308,6 +1308,17 @@ frame. `tests/wlperf_headless.sh` checks each part against a headless lord-serve
   time. The stall detector now names the event of `__lordWayland` and `__lordTerm` lines (`js __lordWayland title`).
   Measured with `wlperf-client titles`: the title it had set 1000 more times gives 0 events (1000 before); 1000
   different titles in one burst give 2 (1000 before), `b999` last.
+- **Frame callbacks and presentation per display.** Each window has a main display: the one with most of it
+  (`outpick_main`, `src/wl/outpick.h`, computed with the enter/leave events once a frame; subsurfaces follow their
+  window). `main.c` passes `wl_frame_done` the displays that just got a frame or have none waiting for a flip, and a
+  window's callbacks go only with those of its own display; while its display waits for a flip they wait too
+  (`wl_wants_frame` stays on, so the loop runs again after that flip). Before, every window's callbacks went with any
+  display's frame: with a 60 Hz and a 144 Hz display, an app on the 60 Hz one drew about 198 frames a second of which 60
+  were shown (`build/outpick-test`, which runs three displays at 60, 60 and 144 Hz for a simulated second, since a
+  headless lord-server has one display: 61, 61 and 145 callbacks a second now). `wp_presentation` feedback is answered by
+  the flip of the window's display, with that display's time, vblank count and refresh (`wl_presented(key, …)`; a window
+  on no known display follows the main one); a headless lord-server now answers it at the end of each frame (it never
+  did: `wlperf-client frames 3` got 0 of 180 answered, now 180). `WlOutput.key` is main.c's index of each display.
 
 ## Pending
 

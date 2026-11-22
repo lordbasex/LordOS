@@ -391,6 +391,12 @@ build/framegate-test: tests/framegate_test.c src/wl/framegate.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/framegate_test.c
 	./$@ || { rm -f $@; exit 1; }
+# a Linux window's display for its frame callbacks, presentation and new content (src/wl/outpick.h, docs/WAYLAND.md)
+test: build/outpick-test
+build/outpick-test: tests/outpick_test.c src/wl/outpick.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/outpick_test.c
+	./$@ || { rm -f $@; exit 1; }
 # the repeat of a held key in an isolated app (src/app/keyrepeat.h; the compositor sends its clients no repeats)
 test: build/keyrepeat-test
 build/keyrepeat-test: tests/keyrepeat_test.c src/app/keyrepeat.h
