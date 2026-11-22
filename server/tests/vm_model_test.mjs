@@ -715,5 +715,41 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('a pointer menu opens up from the pointer', M.menuSpot({ x: 500, y: 1000 }, 220, 300, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 500, top: 700 });
 }
 
+// ---- the Keys panel (codes from linux/input-event-codes.h) ----
+{
+  const K = M.KEY;
+  eq('evdev codes', [K.ctrl, K.alt, K.shift, K.meta, K.del, K.p, K.left, K.right, K.up, K.down, K.prtsc, K.esc, K.tab, K.f1, K.f10, K.f11, K.f12, K.t, K.s],
+    [29, 56, 42, 125, 111, 25, 105, 106, 103, 108, 99, 1, 15, 59, 68, 87, 88, 20, 31]);
+  eq('editing keys', [K.ins, K.home, K.end, K.pgup, K.pgdn, K.d, K.e, K.r, K.l], [110, 102, 107, 104, 109, 32, 18, 19, 38]);
+  eq('Ctrl+Alt+Del is the same as the Power menu\'s', M.keyCombos(true)[0].codes, M.CTRL_ALT_DEL);
+  const win = Object.fromEntries(M.keyCombos(true).map((c) => [c.id, c.codes]));
+  eq('Windows: Win+P', win.project, [125, 25]);
+  eq('Windows: Win+Shift+← / →', [win.moveLeft, win.moveRight], [[125, 42, 105], [125, 42, 106]]);
+  eq('Windows: Ctrl+Shift+Esc, Win+Shift+S, PrintScreen', [win.taskMgr, win.snip, win.screenshot], [[29, 42, 1], [125, 42, 31], [99]]);
+  eq('Windows: the whole list', Object.keys(win), ['cad', 'start', 'project', 'desktop', 'explorer', 'run', 'lock', 'taskView', 'switchApp', 'closeWin', 'taskMgr', 'moveLeft', 'moveRight', 'maximize', 'minimize', 'screenshot', 'snip']);
+  const lin = Object.fromEntries(M.keyCombos(false).map((c) => [c.id, c.codes]));
+  eq('Linux: the list', Object.keys(lin), ['cadLinux', 'activities', 'switchApp', 'closeWin', 'terminal', 'screenshot']);
+  eq('Linux: Ctrl+Alt+T, Super', [lin.terminal, lin.activities], [[29, 56, 20], [125]]);
+  eq('consoles: Ctrl+Alt+F1 … F7', [M.CONSOLE_KEYS.length, M.CONSOLE_KEYS[0].map((k) => K[k]), M.CONSOLE_KEYS[6].map((k) => K[k])], [7, [29, 56, 59], [29, 56, 65]]);
+  eq('F keys and single keys all have codes', [...M.F_KEYS, ...M.SINGLE_KEYS, ...M.HELD_KEYS].every((k) => K[k] > 0), true);
+  eq('labels', [M.comboLabel(['meta', 'shift', 'left'], true), M.comboLabel(['meta'], false), M.comboLabel(['ctrl', 'alt', 'f3'], false), M.comboLabel(['meta', 'p'], true, (x) => x.toUpperCase())],
+    ['win+shift+←', 'super', 'ctrl+alt+F3', 'WIN+P']);
+  // held keys
+  let l = M.latchToggle([], 125);
+  eq('latch: down at once', l, { latched: [125], send: [[125, 1]] });
+  l = M.latchToggle(l.latched, 42);
+  eq('latch: a second one', l, { latched: [125, 42], send: [[42, 1]] });
+  eq('latch: again lets it go', M.latchToggle(l.latched, 42), { latched: [125], send: [[42, 0]] });
+  eq('a modifier typed keeps them', M.latchKeyUp([29], 42), { latched: [29], send: [] });
+  eq('the next key ends them, in reverse', M.latchKeyUp([125, 42], 25), { latched: [], send: [[42, 0], [125, 0]] });
+  eq('a latched key the person let go of is up', M.latchKeyUp([29, 56], 29), { latched: [56], send: [] });
+  eq('nothing latched: nothing to send', M.latchKeyUp([], 25), { latched: [], send: [] });
+  eq('a combination: in order, reverse, then the held ones', M.comboSend([125, 25], [29]), { latched: [], send: [[125, 1], [25, 1], [25, 0], [125, 0], [29, 0]] });
+  eq('a combination with a key already held doesn\'t press it twice', M.comboSend([125, 42, 105], [42]), { latched: [], send: [[125, 1], [105, 1], [105, 0], [125, 0], [42, 0]] });
+  eq('a single key', M.comboSend([1]), { latched: [], send: [[1, 1], [1, 0]] });
+  eq('release', M.latchRelease([29, 56, 42]), { latched: [], send: [[42, 0], [56, 0], [29, 0]] });
+  eq('modifiers', [29, 97, 42, 54, 56, 100, 125, 126, 25, 1].map(M.isModifier), [true, true, true, true, true, true, true, true, false, false]);
+}
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

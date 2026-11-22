@@ -10,11 +10,12 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps } from './model.js';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
 import { ListHead, AppsSearch, RunningList, LaunchList } from './appslist.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { ClipAskBar } from './clipask.jsx';
+import { KeysBtn, sendKeysItems } from './keys.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, startPrep, needsPrep, soundDevItems } from './ui.jsx';
 import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
 import { opensOf, openStep, withoutAsks, askStale } from './openwith.js';
@@ -24,7 +25,7 @@ import { captureOffer, captureStep, captureEndedByServer, captureLabelKey, CAPTU
 
 const BAR = 48;
 // the window widths the machine's bar needs: all of it with the name and state, and compact (5.3)
-const TOOLS_WIDE = 880, TOOLS_COMPACT = 620;
+const TOOLS_WIDE = 920, TOOLS_COMPACT = 660;
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
 const THUMB_MS = 5000;
 // what changes the screen (frames don't: the media node repaints by itself)
@@ -191,6 +192,8 @@ function Tools({ ctl, floating, compact, tiny }) {
       {/* Capture mouse (6.25): Automatic (the tablet, the pointer free) or Captured; never in apps mode, which says why */}
       <IconBtn sym="capture" label={tr(captureLabelKey({ on: ctl.capOn, why: ctl.capOffer.why }))} on={ctl.capOn}
         disabled={!ctl.capOffer.offered && !ctl.capOn} onClick={ctl.toggleCapture} />
+      {/* Keys: held keys, the guest's combinations, single keys and the on-screen keyboard (keys.jsx) */}
+      <KeysBtn ctl={ctl} />
       <IconMenuBtn sym="eject" label={tr('machines.tb.devices')} items={ctl.devices} />
       {/* the machine's sound (6.9): its menu mutes it or turns it back on and picks the output and input; the microphone
           shows while the guest hears it */}
@@ -250,10 +253,10 @@ function FloatingBar({ ctl, name }) {
   // the bar stays while one of its menus is open (the pointer leaves it to reach the menu's items, 2026-11-20: the
   // resolution menu went away under the pointer) and hides once the menu closes with the pointer elsewhere
   const over = useRef(true);
-  const leave = () => { over.current = false; if (!menus.open) setNear(false); };
+  const leave = () => { over.current = false; if (!menus.open && !menus.panel) setNear(false); };
   useEffect(() => {
-    const a = setTimeout(() => { if (!menus.open) setNear(false); over.current = false; }, 2500), b = setTimeout(() => setHint(false), 5000);
-    const c = setInterval(() => { if (!over.current && !menus.open) setNear(false); }, 300);
+    const a = setTimeout(() => { if (!menus.open && !menus.panel) setNear(false); over.current = false; }, 2500), b = setTimeout(() => setHint(false), 5000);
+    const c = setInterval(() => { if (!over.current && !menus.open && !menus.panel) setNear(false); }, 300);
     return () => { clearTimeout(a); clearTimeout(b); clearInterval(c); };
   }, []);
   const v = stateView(ctl.st?.state, ctl.st?.reason);
@@ -429,6 +432,12 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const filesSeen = useRef(-1);
   const onFiles = useRef(null);
   const buttons = useRef(new Set());
+  // the Keys panel's held keys (model.js latch*): down in the guest until the next key or combination; let go of with
+  // everything else whenever the window stops sending the keyboard (blur, leaving, the machine stopping)
+  const latchRef = useRef([]);
+  const [latched, setLatched] = useState([]);
+  const keysTo = (id, r) => { latchRef.current = r.latched; setLatched(r.latched); if (id) r.send.forEach(([c, v]) => lord.vm.key(id, c, v)); };
+  const dropLatched = () => { if (latchRef.current.length) { latchRef.current = []; setLatched([]); } };
   const wheel = useRef(0);
   const sidRef = useRef(sid);
   sidRef.current = sid;
@@ -589,7 +598,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     });
   }, [shell, shellKeys, focused, st?.console]);
   useEffect(() => {
-    if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } return undefined; }
+    if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } dropLatched(); return undefined; }
     // a key pressed while one of the window's menus is open is the menu's, down and up (Esc closes it)
     const kept = new Set();
     const ka = addListener('keydown', (e) => {
@@ -603,6 +612,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       if (!(e.code > 0)) return;
       if (kept.delete(e.code)) return;
       lord.vm.key(sid, e.code, 0);
+      if (latchRef.current.length) keysTo(sid, latchKeyUp(latchRef.current, e.code));
     });
     const kc = addListener('pointerup', (e) => {
       if (!buttons.current.has(e.button)) return;
@@ -610,7 +620,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       const wait = held.current - Date.now(), b = e.button;
       if (wait > 0) setTimeout(() => lord.vm.button(sid, b, 0), wait + 10); else lord.vm.button(sid, b, 0);
     });
-    return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); };
+    return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); dropLatched(); };
   }, [live, focused, sid]);
   // ❖, ⌥Tab and the desktop's other shortcuts go to the machine too, once the person allowed it (asked the first
   // time); ❖Esc gives them back and takes them again (sdk/kbinhibit.js)
@@ -639,11 +649,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (n) lord.vm.wheel(sid, n, 0);
   };
   const cmd = (c) => { if (sid) { if (c === 'shutdown' && st?.state === 'running' && (!cfgRef.current?.agent || st?.agent?.state === 'connected')) lord.vm.snapshot(sid); lord.vm.cmd(sid, c); } };
-  const cad = () => {
-    if (!sid) return;
-    CTRL_ALT_DEL.forEach((k) => lord.vm.key(sid, k, 1));
-    [...CTRL_ALT_DEL].reverse().forEach((k) => lord.vm.key(sid, k, 0));
-  };
+  const sendCombo = (codes) => { if (sid) keysTo(sid, comboSend(codes, latchRef.current)); };
+  const cad = () => sendCombo(CTRL_ALT_DEL);
   const full = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.fullscreen);
   const m0 = { dir, name, id: winId.split('#vm-')[1] };
   const shot = () => {
@@ -965,7 +972,15 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // why it can't be on: the agent, or a guest whose helper can't list its windows (it needs LordOS or Windows inside)
   const appsWhy = appsBlocked === 'needsTools' ? tr('machines.win.appsNeedsTools') : appsBlocked ? tr('machines.apps.needsAgent') : '';
   const appsLabel = appsOn ? tr('machines.apps.leave') : appsWhy || tr('machines.apps.enter');
+  // the Keys panel: a Windows guest gets the Windows key and its combinations, any other the Super key and Linux's
+  const keys = {
+    windows: !!cfg.windows || /^windows/i.test(st?.agent?.system || '') || familyOf({ ...cfgRef.current, meta: readMeta(dir), name }) === 'windows',
+    latched, ok: !!sid && a.keys, hold: !!sid && a.keys && live && focused,
+    toggle: (c) => { if (sid && live && focused) keysTo(sid, latchToggle(latchRef.current, c)); },
+    send: sendCombo,
+  };
   const ctl = {
+    keys,
     appsOn, appsBlocked, appsLabel, toggleApps: () => setApps(!appsOn),
     sid, cfg, heard, toggleSound, micLive: micOn,
     // the speaker's menu: mute, the output and the input (each applied at once, schema 8), the sound settings
@@ -1017,6 +1032,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         { label: a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause'), disabled: !a.pause && !a.resume, onClick: () => cmd(a.resume ? 'resume' : 'pause') },
         { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => cmd('reset') },
         { label: tr('machines.cmd.cad'), disabled: !a.keys, onClick: cad },
+        { label: tr('machines.keys.send'), disabled: !a.keys, submenu: sendKeysItems(keys) },
         '-',
         { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
         { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy || noSuspend(st, gpu), onClick: () => cmd('suspend') },
@@ -1039,7 +1055,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       { label: tr('machines.menu.devices'), items: ctl.devices.filter((x) => x !== '-') },
       ...(appsActive ? [{ label: tr('machines.apps.menu'), items: appsMenuItems(gApps) }] : []),
     ]);
-  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, gRunning, cfg.transfer, xstate, capOn, capOffer.offered, focused]);
+  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, gRunning, cfg.transfer, xstate, capOn, capOffer.offered, focused, keys.windows]);
   // Esc in the controller leaves apps mode (in a guest's window, Esc is the guest's); in its search field, Esc is the
   // field's (it clears the search first)
   useEffect(() => (appsActive && focused && !askClose ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open && !hasTextFocus()) setApps(false); }) : undefined), [appsActive, focused, askClose]);

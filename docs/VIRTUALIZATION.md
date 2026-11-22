@@ -1739,6 +1739,28 @@ Follows `docs/SHORTCUTS.md`: app menus, ❖ shortcuts for the host while the app
 
 Since 0.8.8.8 the VM window can also take the desktop's shortcuts (❖, ⌥Tab and the rest) while it has the keyboard, so they reach the guest (`apps/machines/vmwindow.jsx` → `sdk/kbinhibit.js`, `sdk/kbinhibitmodel.js`). It follows the same rule as a Linux app's keyboard-shortcuts inhibitor: the person allows it once (the `shortcuts` permission, Settings → Privacy → Keyboard shortcuts), ❖Esc turns it off for that window and back on, and the lock, the console switch and the media keys always stay LordOS's.
 
+**Keys panel** (in development, after 0.8.9.4): a keyboard button on the machine window's bar (and on the full-screen floating
+bar) opens a panel, like noVNC's side keys but richer (`apps/machines/keys.jsx`; the tables and the latch logic are pure, in
+`apps/machines/model.js` `KEY`, `keyCombos`, `latch*`, `comboSend`, tested in `server/tests/vm_model_test.mjs`):
+
+- **Hold down**: Ctrl, Alt, Shift and Win (Windows guests) or Super (the others). A click presses it in the guest and keeps it
+  down until the next key typed into the machine (another modifier keeps them, so held Ctrl + Shift + T works) or the next
+  combination sent; then they go up in reverse. A second click lets it go. Nothing stays stuck: blur, leaving the window, the
+  machine stopping and the window closing all release everything (`lord.vm.release`, the same path as a held physical key).
+- **Combinations**, each one click (down in order, up in reverse, like Ctrl+Alt+Delete). Windows guests: Ctrl+Alt+Del, Win,
+  Win+P, Win+D, Win+E, Win+R, Win+L, Win+Tab, Alt+Tab, Alt+F4, Ctrl+Shift+Esc, Win+Shift+←/→, Win+↑/↓, PrintScreen,
+  Win+Shift+S. Others: Ctrl+Alt+Del, Super, Alt+Tab, Alt+F4, Ctrl+Alt+T, PrintScreen and the text consoles Ctrl+Alt+F1…F7.
+  They go straight to the guest with `lord.vm.key`, never through LordOS's shortcuts, so ❖P reaches a Windows guest without
+  the `shortcuts` permission.
+- **Single keys** (Esc, Tab, Insert, Delete, Home, End, PgUp, PgDn) and **F1–F12**.
+- **Show on-screen keyboard**: LordOS's own (`sdk/osk.js`). Its taps go down the same path as a physical key
+  (`lord.input.tap` → `js_key`) to the window in front, so the machine window forwards them like typed keys, held keys included;
+  no change to the keyboard was needed.
+
+While the panel is open the keyboard keeps typing into the machine (it is not a menu), so a held Win and a P typed after it make
+Win+P; a click outside closes it. The menu bar's **Actions → Send Keys** has the same combinations and single keys; Power and
+Actions keep their own Ctrl+Alt+Delete.
+
 ## 6. Features
 
 ### 6.1 Lifecycle

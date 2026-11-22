@@ -196,6 +196,71 @@ export function wheelSteps(acc, deltaY, precise) {
 // Ctrl+Alt+Delete as evdev codes: press in order, release in reverse
 export const CTRL_ALT_DEL = [29, 56, 111];
 
+// ---- the Keys panel: held keys, combinations and single keys sent straight to the guest ----
+// evdev codes (linux/input-event-codes.h). Sent with lord.vm.key, they never pass through LordOS's shortcuts, so ❖P
+// reaches a Windows guest even while LordOS keeps ❖ for itself.
+export const KEY = {
+  esc: 1, tab: 15, e: 18, r: 19, t: 20, p: 25, ctrl: 29, s: 31, d: 32, l: 38, shift: 42, alt: 56,
+  f1: 59, f2: 60, f3: 61, f4: 62, f5: 63, f6: 64, f7: 65, f8: 66, f9: 67, f10: 68, f11: 87, f12: 88,
+  prtsc: 99, home: 102, up: 103, pgup: 104, left: 105, right: 106, end: 107, down: 108, pgdn: 109, ins: 110, del: 111, meta: 125,
+};
+// the modifiers, left and right: a key the person types with one of these held is still "the next key" only once a
+// key that isn't one is let go of
+const MODIFIERS = new Set([29, 97, 42, 54, 56, 100, 125, 126]);
+export const isModifier = (code) => MODIFIERS.has(code);
+// the keys the panel can hold down, in order; meta is "Windows" or "Super" by the guest's system (keyName)
+export const HELD_KEYS = ['ctrl', 'alt', 'shift', 'meta'];
+const F = (n) => `f${n}`;
+// [id, keys]: the id names what it does (machines.keys.do.<id>), the keys say how it is labelled (keyName)
+const WIN_COMBOS = [
+  ['cad', ['ctrl', 'alt', 'del']], ['start', ['meta']], ['project', ['meta', 'p']], ['desktop', ['meta', 'd']],
+  ['explorer', ['meta', 'e']], ['run', ['meta', 'r']], ['lock', ['meta', 'l']], ['taskView', ['meta', 'tab']],
+  ['switchApp', ['alt', 'tab']], ['closeWin', ['alt', 'f4']], ['taskMgr', ['ctrl', 'shift', 'esc']],
+  ['moveLeft', ['meta', 'shift', 'left']], ['moveRight', ['meta', 'shift', 'right']], ['maximize', ['meta', 'up']],
+  ['minimize', ['meta', 'down']], ['screenshot', ['prtsc']], ['snip', ['meta', 'shift', 's']],
+];
+const LINUX_COMBOS = [
+  ['cadLinux', ['ctrl', 'alt', 'del']], ['activities', ['meta']], ['switchApp', ['alt', 'tab']], ['closeWin', ['alt', 'f4']],
+  ['terminal', ['ctrl', 'alt', 't']], ['screenshot', ['prtsc']],
+];
+export const SINGLE_KEYS = ['esc', 'tab', 'ins', 'del', 'home', 'end', 'pgup', 'pgdn'];
+export const F_KEYS = Array.from({ length: 12 }, (_, i) => F(i + 1));
+// Linux's text consoles: Ctrl+Alt+F1 … F7
+export const CONSOLE_KEYS = Array.from({ length: 7 }, (_, i) => ['ctrl', 'alt', F(i + 1)]);
+const codesOf = (keys) => keys.map((k) => KEY[k]);
+// the combinations for a guest: { id, keys: names, codes }
+export function keyCombos(windows) {
+  return (windows ? WIN_COMBOS : LINUX_COMBOS).map(([id, keys]) => ({ id, keys, codes: codesOf(keys) }));
+}
+// a key's label: letters and F keys as they are, arrows as arrows, the rest by name (names: t of machines.keys.<k>)
+const ARROWS = { left: '←', right: '→', up: '↑', down: '↓' };
+export function keyName(k, windows, names = (x) => x) {
+  if (ARROWS[k]) return ARROWS[k];
+  if (/^f\d+$/.test(k)) return k.toUpperCase();
+  if (k.length === 1) return k.toUpperCase();
+  return names(k === 'meta' ? (windows ? 'win' : 'super') : k);
+}
+export const comboLabel = (keys, windows, names) => keys.map((k) => keyName(k, windows, names)).join('+');
+
+// Held keys (latched): down in the guest from the click until the next key the person types there or the next
+// combination sent, then up in reverse. Each function returns the latched codes left and what to send, [[code, 1|0]].
+export function latchToggle(latched, code) {
+  return latched.includes(code) ? { latched: latched.filter((c) => c !== code), send: [[code, 0]] } : { latched: [...latched, code], send: [[code, 1]] };
+}
+export const latchRelease = (latched) => ({ latched: [], send: [...latched].reverse().map((c) => [c, 0]) });
+// a key let go of in the guest (already sent): a latched one the person pressed and let go of themselves is up now;
+// another modifier keeps them (latched Ctrl + Shift + T); any other key ends them
+export function latchKeyUp(latched, code) {
+  if (latched.includes(code)) return { latched: latched.filter((c) => c !== code), send: [] };
+  if (!latched.length || isModifier(code)) return { latched, send: [] };
+  return latchRelease(latched);
+}
+// a combination: its keys down in order (but those already held), up in reverse, then the held ones up
+export function comboSend(codes, latched = []) {
+  const own = codes.filter((c) => !latched.includes(c));
+  return { latched: [], send: [...own.map((c) => [c, 1]), ...[...own].reverse().map((c) => [c, 0]), ...latchRelease(latched).send] };
+}
+
 // the window's title: "<name> — <state>"
 export const windowTitle = (name, stateText) => (stateText ? `${name} — ${stateText}` : name);
 
