@@ -154,7 +154,9 @@ typedef struct { pid_t pid; int pidfd; uint32_t seq; } Kid;
 void fpsw_main(int sock) {
     prctl(PR_SET_NAME, "lordos-spawn");
     prctl(PR_SET_DUMPABLE, 0);                     /* nothing in the view reads or traces it */
-    prctl(PR_SET_PDEATHSIG, SIGKILL);              /* goes with the app's `flatpak run` */
+    /* no parent-death signal: it serves the app as long as anything of it runs (a launcher like VS Code's `code` leaves
+     * at once and its Electron goes on asking); the view's PID 1 ends it once nothing else is left there
+     * (sandbox_view_helper), and the kernel with the view */
     /* no capability, not even in the view's own user namespace (the --launch-view process created it) */
     struct __user_cap_header_struct ch = { _LINUX_CAPABILITY_VERSION_3, 0 };
     struct __user_cap_data_struct cd[2];

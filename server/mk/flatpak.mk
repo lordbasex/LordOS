@@ -44,3 +44,11 @@ build/sandbox-home-mounts-test: tests/sandbox_home_mounts_test.c src/sec/sandbox
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/sandbox_home_mounts_test.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
 	./$@; r=$$?; [ $$r = 0 ] || [ $$r = 77 ] || { rm -f $@; exit 1; }
+
+# how long the launcher's view lives: what an app leaves behind keeps running, its Spawn helper is ended after it
+# (tests/sandbox_view_lifetime_test.c; 77: no user namespaces here)
+test: build/sandbox-view-lifetime-test
+build/sandbox-view-lifetime-test: tests/sandbox_view_lifetime_test.c src/sec/sandbox.c src/sec/cgroup.c src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/sandbox_view_lifetime_test.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
+	./$@; r=$$?; [ $$r = 0 ] || [ $$r = 77 ] || { rm -f $@; exit 1; }

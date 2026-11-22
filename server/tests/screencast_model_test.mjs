@@ -1,6 +1,6 @@
 // screencast_model_test.mjs — the ScreenCast chooser's choices (sdk/screencastmodel.js): what is offered for what the
 // app asked, picking one or several, and what lord.portal.cast gets.
-import { castChoices, castToggle, castSources, CAST_MAX } from '../../sdk/screencastmodel.js';
+import { castChoices, castToggle, castSources, castAskerName, castWindowOf, CAST_MAX } from '../../sdk/screencastmodel.js';
 
 let ok = 0, bad = 0;
 const eq = (label, got, want) => {
@@ -44,6 +44,19 @@ eq('a key not offered is left out', castSources(['d:99', 'w:nope'], both, frameO
 eq('nothing picked', castSources([], both, frameOf), []);
 const many = { node: 5, also: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
 eq('at most 8 sheets', castSources(['w:linux#4'], both, () => many)[0].also.length, 8);
+
+// the asking app's name: from lord-server's verified identity only (a Flatpak app by its Flathub name, not "flatpak:<id>")
+const look = { linux: (id) => (id === 'gimp' ? 'GIMP' : ''), flatpak: (id) => (id === 'org.chromium.Chromium' ? 'Chromium' : '') };
+eq('asker: flatpak named', castAskerName('flatpak:org.chromium.Chromium', look), 'Chromium');
+eq('asker: flatpak unknown keeps its id', castAskerName('flatpak:org.example.App', look), 'org.example.App');
+eq('asker: desktop named', castAskerName('desktop:gimp', look), 'GIMP');
+eq('asker: desktop unknown', castAskerName('desktop:foo', look), 'foo');
+eq('asker: lpk', castAskerName('lpk:com.x', look), 'com.x');
+eq('asker: none', castAskerName(undefined, look), '');
+// a window choice is named from the live window (its args), not the choice (which has none: "Linux" for all)
+const live = [{ id: 'linux#8', app: 'linux', args: { appId: 'org.chromium.Chromium' } }];
+eq('window of a choice', castWindowOf({ id: 'linux#8', title: 'x' }, live), live[0]);
+eq('window gone: the choice', castWindowOf({ id: 'linux#9', title: 'x' }, live), { id: 'linux#9', title: 'x' });
 
 console.log(`screencast-model-test: ${ok}/${ok + bad}`);
 process.exit(bad ? 1 : 0);

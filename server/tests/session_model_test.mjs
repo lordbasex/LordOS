@@ -72,6 +72,10 @@ eq('in order', ids(planRestore([e('a'), e('b')], new Map())), [['a', true], ['b'
 eq('already open is skipped', ids(planRestore([e('a'), e('a'), e('b')], new Map([['a', 1]]))), [['a', true], ['b', true]]);
 eq('two launches', ids(planRestore([e('a'), e('a')], new Map())), [['a', true], ['a', true]]);
 eq('one launch, two frames', ids(planRestore([e('a'), e('a')], new Map(), (id) => id === 'a')), [['a', true], ['a', false]]);
+// a Flatpak app: one launch for all its windows (a second view never reaches the first: two copies on one profile)
+eq('flatpak runs once', ids(planRestore([e('flatpak:org.chromium.Chromium'), e('flatpak:org.chromium.Chromium'), e('desktop:gimp'), e('desktop:gimp')], new Map(), M.launchesOnce)),
+  [['flatpak:org.chromium.Chromium', true], ['flatpak:org.chromium.Chromium', false], ['desktop:gimp', true], ['desktop:gimp', true]]);
+eq('launchesOnce', [M.launchesOnce('flatpak:com.visualstudio.code'), M.launchesOnce('desktop:code'), M.launchesOnce('app:files'), M.launchesOnce('bogus')], [true, false, false, false]);
 
 // frames on today's screens
 const D = [{ x: 0, y: 0, w: 1280, h: 800 }];

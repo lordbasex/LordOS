@@ -50,6 +50,7 @@ import { linuxPlayersChanged } from './media.js';
 import { trayEvent } from './trayitems.jsx';
 import { globalShortcutsEvent } from './globalshortcuts.jsx';
 import { castEvent, castNames } from './screencast.jsx';
+import { castAskerName } from './screencastmodel.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -475,12 +476,10 @@ function asker(p) {
 // the ScreenCast chooser and its pill (sdk/screencast.jsx) name only the app lord-server verified (its launcher's
 // scope), never the name a process gives itself: with none they say it is an unknown program
 function castAsker(p) {
-  const who = typeof p?.who === 'string' ? p.who : '';
-  if (who.startsWith('desktop:')) {
-    const app = linuxAppFor(who.slice(8));
-    return app ? shortAppName(app) : who.slice(8);
-  }
-  return who.startsWith('lpk:') ? who.slice(4) : who;
+  return castAskerName(p?.who, {
+    linux: (id) => { const app = linuxAppFor(id); return app ? shortAppName(app) : ''; },
+    flatpak: (id) => flatpakAppFor(id)?.name || '',
+  });
 }
 castNames({ app: castAsker, window: windowAppName });
 

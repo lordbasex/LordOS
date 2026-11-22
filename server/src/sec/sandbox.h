@@ -15,6 +15,7 @@
 #define LORD_SEC_SANDBOX_H
 
 #include <stddef.h>
+#include <sys/types.h>
 
 typedef struct {
     const char *id;             /* package id (already validated) */
@@ -165,6 +166,12 @@ int sandbox_x11_path_ok(const char *path);
  * execve. -1 (and nothing launched) if the kernel refuses any step: the caller doesn't start the
  * app. Doesn't allocate. */
 int sandbox_files_isolate(const SandboxFilesCfg *cfg);
+/* In the app's process after sandbox_files_isolate: the pid of a helper it forked (a Flatpak app's Spawn helper), so
+ * PID 1 ends it once nothing else is left in the view; 0 when there is none. Once only. PID 1 otherwise stays while
+ * any process of the view runs (a launcher that starts its real process and leaves), as bubblewrap's PID 1 does. */
+void sandbox_view_helper(pid_t pid);
+/* 1 if a children list ("12 34 ") names a pid other than `except` (PID 1's test; exported for its unit test) */
+int sandbox_view_others_in(const char *list, pid_t except);
 int sandbox_apply_files(const SandboxFilesCfg *cfg);
 /* For keep_home views: Landlock with no filesystem rules, only its scoping (ABI 6): no abstract
  * unix socket and no signal outside the app (the view has no network namespace, so abstract

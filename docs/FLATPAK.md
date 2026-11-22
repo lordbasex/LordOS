@@ -983,6 +983,12 @@ lord-server serves the name itself (`server/src/fpspawn.c`, the argument rules i
   enters any namespace. SpawnExited goes to the caller alone; WATCH_BUS ends the process group when the caller leaves
   the bus; SpawnSignal only reaches the caller's own processes (through the pidfd). At most 32 per app. SpawnStarted
   waits (on each tick, up to 3 s) for bubblewrap's `bwrapinfo.json`, so the relative pid Chromium needs isn't 0.
+- **How long it lives (since 2026-11-22)**: as long as anything of the app runs in its view. The view's PID 1 used to
+  leave with the app's first process, and the kernel then killed the rest: VS Code's `code` starts Electron detached and
+  exits, so VS Code opened a window and vanished. PID 1 now stays while anything the app started runs (as bubblewrap's
+  PID 1 does) and, once only the helper is left, ends it (`sandbox_view_helper` tells PID 1 its pid; the helper has no
+  parent-death signal any more, or it would die with `code` while Electron still asks). A stop (SIGTERM to the view)
+  still ends everything once the app's first process leaves. Test: `build/sandbox-view-lifetime-test`.
 - **Nothing in the background**: lord-server takes the name only while `flatpak` is installed (checked every 30 s, so
   turning Flathub on needs no restart). Without Flatpak nothing is on the bus and nothing runs.
 
@@ -1014,6 +1020,12 @@ died at every start (`trap int3` in libQt6WebEngineCore).
    honour the declaration and show it in the Store?
 4. **Per-app runtime state.** Bind a persistent per-app `$XDG_RUNTIME_DIR/.flatpak/<id>` into the
    view (shared `/tmp` between an app's instances, `flatpak ps`), or keep it private per launch?
+   **Measured 2026-11-22 (Flathub compatibility run):** private per launch breaks every app with a single-instance lock.
+   Flatpak binds `$XDG_RUNTIME_DIR/.flatpak/<id>/tmp` as `/tmp` and `$XDG_RUNTIME_DIR/app/<id>` for all instances of an
+   app; in LordOS both sit in the view's own tmpfs, so a second launch (Open with, the Launcher, a Dock "New Window")
+   can't reach the first instance's socket and runs as a second copy on the same profile: Chromium showed "Profile
+   error occurred" and its databases were locked, four VS Code copies corrupted `argv.json`. Session restore now
+   launches a Flatpak app once (`launchesOnce`); the rest needs this decision.
 5. **Which binary parses appstream** (E7): a mode of `lord-doc` (which already decodes untrusted
    files), or a small new helper?
 6. **Key roll-over.** Accept Flathub's key updates delivered in its signed summary (`xa.gpg-keys`,
