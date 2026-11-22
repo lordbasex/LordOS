@@ -484,6 +484,31 @@ eq('instance', [M.guestInstance('ab12-cd', 4294967295), M.guestInstance('a/../b'
   eq('plan minimize, no follow', [q.minimize.map((w) => w.id), q.follow.length], [[1], 0]);
 }
 eq('guest apps menu', M.guestAppItems([{ name: 'Zeta', token: 'z' }, { name: 'alpha', token: 'a' }, { name: 'dup', token: 'a' }, { name: '', token: 'x' }, null]).map((a) => a.token), ['a', 'z']);
+{
+  // apps mode's Running list: no popups, no owned windows, no slivers; minimized kept; sorted by app, title, id
+  const list = [
+    { id: 7, title: 'Report.docx', app: 'Word', w: 800, h: 600, focused: true },
+    { id: 3, title: '', app: 'Notepad', w: 400, h: 300, minimized: true },
+    { id: 9, title: 'Menu', app: 'Word', owner: 7, topmost: true, w: 200, h: 300 },
+    { id: 10, title: 'Save As', app: 'Word', owner: 7, w: 500, h: 400 },
+    { id: 11, title: 'tiny', app: 'X', w: 4, h: 4 },
+    { id: 5, title: 'Budget.docx', app: 'Word', w: 800, h: 600 },
+    null, { title: 'no id', w: 100, h: 100 },
+  ];
+  const rows = M.runningWindows(list);
+  eq('running windows', rows.map((r) => r.id), [3, 5, 7]);
+  eq('running row (title falls back to the app)', rows[0], { id: 3, title: 'Notepad', app: 'Notepad', minimized: true, focused: false });
+  eq('running none', [M.runningWindows(null), M.runningWindows([])], [[], []]);
+  eq('running key changes with a title, not with a move', [M.runningKey(rows) === M.runningKey(M.runningWindows(list.map((w) => (w ? { ...w, x: 99 } : w)))),
+    M.runningKey(rows) === M.runningKey(M.runningWindows(list.map((w) => (w?.id === 5 ? { ...w, title: 'Other' } : w))))], [true, false]);
+  const apps = M.guestAppItems([{ name: 'Calculator', token: 'c' }, { name: 'Microsoft Edge', token: 'e' }, { name: 'Paint', token: 'p' }, { name: 'Edge Dev Tools', token: 'd' }, { name: 'Configuración', token: 's' }]);
+  eq('apps search empty keeps all', M.appsMatching(apps, '  ').map((a) => a.token), ['c', 's', 'd', 'e', 'p']);
+  eq('apps search: name start, then a word start, then inside', M.appsMatching(apps, 'ed').map((a) => a.token), ['d', 'e']);
+  eq('apps search: accents and case off', M.appsMatching(apps, 'CONFIGURACION').map((a) => a.token), ['s']);
+  eq('apps search: every word', [M.appsMatching(apps, 'micro edge').map((a) => a.token), M.appsMatching(apps, 'micro paint')], [['e'], []]);
+  eq('apps search: inside a word last', M.appsMatching(apps, 'a').map((a) => a.token)[0], 'c');
+  eq('app initial', [M.appInitial(' paint'), M.appInitial(''), M.appInitial('écran')], ['P', '?', 'É']);
+}
 // the boot order (Configure → Boot)
 eq('boot list auto', M.bootList('auto'), ['disk', 'cd', 'network']);
 eq('boot list chosen', M.bootList('network,disk'), ['network', 'disk', 'cd']);
