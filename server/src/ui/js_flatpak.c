@@ -9,7 +9,8 @@
  *   lord.flatpak.take()           → [{ id, line } | { id, done: true, code }] since the last call
  *   lord.flatpak.cancel(id)       → stops that job (its whole process group)
  *   lord.flatpak.loadCatalog(lang) → a job id: Flathub's AppStream read by the sandboxed lord-appstream (E7)
- *   lord.flatpak.catalog()        → [{ id, branch, ref, name, summary, icon, categories, license, developer, verified }]
+ *   lord.flatpak.catalog()        → [{ id, branch, ref, name, summary, icon, categories, license, developer, verified,
+ *                                   updated }]
  *                                   of the last load, every line checked again here (fpakas_line)
  *   lord.flatpak.description(id)  → that app's description from the same load (plain text, paragraphs apart by an
  *                                   empty line), checked again here (fpakas_desc_line), or "": kept out of catalog()
@@ -361,6 +362,7 @@ static JSValue f_catalog(JSContext *c, JSValueConst t, int argc, JSValueConst *a
         JS_SetPropertyStr(c, o, "license", JS_NewString(c, a->license));
         JS_SetPropertyStr(c, o, "developer", JS_NewString(c, a->developer));
         JS_SetPropertyStr(c, o, "verified", JS_NewBool(c, a->verified));
+        JS_SetPropertyStr(c, o, "updated", JS_NewFloat64(c, (double)a->updated));
         JS_SetPropertyUint32(c, arr, (uint32_t)i, o);
     }
     pthread_mutex_unlock(&mu);
