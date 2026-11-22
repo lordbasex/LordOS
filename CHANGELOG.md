@@ -664,6 +664,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   dark, light and Arabic; not yet on a real session with real monitors, a Linux app's own bar or the GPU path.
 
 ### Fixed
+- **Machines: a machine's ··· menu is never cut by the window** (`apps/machines/library.jsx` `CardMenu`, `model.js`
+  `menuSpot`, `popMenuHeight`, `displayUnder`; reported by the maintainer): the library's card and row menu was drawn
+  inside the window and placed for a menu of 330 px, so with Clone, Logs, Show in Files and Open Transfer Folder its
+  last rows went past the window's bottom edge. It is now drawn in the desktop's popover layer, over the window and
+  the Dock, below the ··· button or the pointer, above them when the display has no room below, and always inside the
+  display it opened on (a second, shorter monitor too). Tests: `vm_model_test.mjs` (placement below, above, too tall
+  both ways, the screen's edges, a second display).
 
 - **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
