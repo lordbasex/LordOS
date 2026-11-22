@@ -2,17 +2,20 @@
 //
 // What is captured right now, from what LordOS itself knows, one row per app:
 //   share    the screen-sharing API's holder (sdk/share.js: { app, name, input, token } | null)
-//   casts    the ScreenCast portal's sessions (sdk/screencast.jsx castRuns: [{ id, who, name, screens, windows }])
+//   casts    the ScreenCast portal's sessions (sdk/screencast.jsx castRuns: [{ id, who, seen, name, screens, windows }];
+//            seen: the app lord-server told from the kernel when `who` is '', only to show it, server/src/sec/appid.h)
 //   shots    a screenshot or a color an app just took (shotTaken: [{ key, name, color }]), a few seconds
 //   devices  the camera and microphone LordOS hands out itself: native apps (lord.media) and isolated .lpk apps (the
-//            broker): [{ app, kind: 'camera'|'microphone', media? }]
+//            broker): [{ app, kind: 'camera'|'microphone', media?, detail? }]; detail: what of the app (a machine's name)
 //   linux    what Linux and Flatpak apps capture through PipeWire, as lord-server's PipeWire guard sees it
-//            (server/src/sec/pwguard.c, hw event "capture-use"): [{ app, mic, camera, screen }], app '' an unknown program
+//            (server/src/sec/pwguard.c, hw event "capture-use"): [{ app, name, sys?, exe?, mic, camera, screen }], app ''
+//            with sys 'sound' the sound system's own processes, with exe a program known only by its executable, with
+//            neither an unknown program
 //   studio   the Linux apps reading LordOS Studio's camera device (/dev/video50; server/src/media/mstudio.c, hw event
 //            "studio-use", sdk/studiomodel.js studioUseOf): { apps: [id], camera, effects } | null; each is a camera row
 //            whose via says the real camera behind it and whether effects are on
 //
-//   captureRows(src, { name, enforceable })  → [{ key, app, name, screen, camera, mic, castIds, share, control, own, linux, media, via }]
+//   captureRows(src, { name, enforceable })  → [{ key, app, name, screen, camera, mic, castIds, share, control, own, linux, media, via, sys, details }]
 //     screen: null | 'screen' | 'window' | 'both' | 'shot' | 'color'; own: the camera/microphone is LordOS's (a native or
 //     .lpk app: Turn off = its permission); linux: a Linux app's (Turn off = its firewall restriction), and only an app
 //     the firewall can name; media: a native app's camera source, for the preview
@@ -41,7 +44,7 @@ export function captureRows({ share = null, casts = [], shots = [], devices = []
   const row = (app, label, unknownKey) => {
     const key = app ? keyOf(app) : unknownKey;
     if (!rows.has(key)) {
-      rows.set(key, { key, app: app || '', name: label || '', screen: null, camera: false, mic: false, castIds: [], share: false, control: false, ownApp: '', own: { camera: false, mic: false }, linux: { camera: false, mic: false, screen: false }, media: null, via: null });
+      rows.set(key, { key, app: app || '', name: label || '', screen: null, camera: false, mic: false, castIds: [], share: false, control: false, ownApp: '', own: { camera: false, mic: false }, linux: { camera: false, mic: false, screen: false }, media: null, via: null, sys: '', details: [] });
     }
     const r = rows.get(key);
     if (!r.name && label) r.name = label;
@@ -55,8 +58,11 @@ export function captureRows({ share = null, casts = [], shots = [], devices = []
   }
   for (const c of Array.isArray(casts) ? casts : []) {
     if (!c || typeof c.id !== 'number') continue;
-    // an unknown program's session is its own row: two of them may be two programs
-    const r = row(c.who || '', c.name || (c.who ? name(c.who) : ''), `cast#${c.id}`);
+    // an unknown program's session is its own row: two of them may be two programs. seen: the app lord-server told
+    // from the kernel without a verified scope (Chrome's browser process leaves its own), so its share and its
+    // microphone are one row
+    const app = c.who || (typeof c.seen === 'string' ? c.seen : '');
+    const r = row(app, c.name || (app ? name(app) : ''), `cast#${c.id}`);
     r.castIds.push(c.id);
     const what = c.windows > 0 && c.screens > 0 ? 'both' : c.windows > 0 ? 'window' : 'screen';
     r.screen = widerScreen(r.screen, what);
@@ -70,13 +76,18 @@ export function captureRows({ share = null, casts = [], shots = [], devices = []
     if (!d || !d.app || (d.kind !== 'camera' && d.kind !== 'microphone')) continue;
     const r = row(d.app, d.name || name(d.app));
     r.ownApp = d.app;
+    // what of the app captures: Machines' machine ("Machines — Windows 11 Pro")
+    if (typeof d.detail === 'string' && d.detail && !r.details.includes(d.detail)) r.details.push(d.detail);
     if (d.kind === 'camera') { r.camera = true; r.own.camera = true; if (d.media && !r.media) r.media = d.media; }
     else { r.mic = true; r.own.mic = true; }
   }
   for (const u of Array.isArray(linux) ? linux : []) {
     if (!u || typeof u.app !== 'string') continue;
-    // every unknown program's capture is one row: lord-server can't tell them apart either
-    const r = row(u.app, u.app ? name(u.app) : '', 'unknown');
+    // with no app: the sound system's own processes are one row, each program lord-server knows only by its executable
+    // another, and every other unknown program's capture one more (lord-server can't tell them apart either)
+    const sys = !u.app && typeof u.sys === 'string' ? u.sys : '', exe = !u.app && !sys && typeof u.exe === 'string' ? u.exe : '';
+    const r = row(u.app, u.app ? name(u.app) : (u.name || ''), sys ? `sys:${sys}` : exe ? `exe:${exe}` : 'unknown');
+    if (sys) r.sys = sys;
     const named = !!u.app && enforceable(u.app);
     if (u.mic) { r.mic = true; if (named) r.linux.mic = true; }
     if (u.camera) { r.camera = true; if (named) r.linux.camera = true; }

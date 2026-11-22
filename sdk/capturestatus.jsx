@@ -29,16 +29,22 @@ import { castRuns, castShown, castStop, shotTaken, castAppName } from './screenc
 import { perms, brokerDevices, linuxCapture, studioUse } from './privacy.js';
 import { closeDevicesOf } from './media.js';
 import { firewall } from './monitor.js';
+import { COMPONENTS } from './netmodel.js';
 import { captureRows, captureGlyph, captureSummary, rowStops } from './capturemodel.js';
 import { StudioPanel, studioAvailable } from './studio.jsx';
 import { studioWhat } from './studiomodel.js';
 
 const GREEN = '#30d158';
 
-const isLinuxId = (id) => /^(desktop|flatpak):/.test(id || '');
+// lord-server's ids of Linux apps, a running machine ("desktop:lordos-vm-<uuid>"), LordOS's components and LordOS itself
+const isLinuxId = (id) => /^(desktop|flatpak):/.test(id || '') || id === 'lordos' || /^lordos:/.test(id || '');
+const isMachine = (id) => /^desktop:lordos-vm-/.test(id || '');
 const bare = (id) => (String(id || '').startsWith('lpk:') ? String(id).slice(4) : String(id || ''));
 // "studio": LordOS Studio's own preview (sdk/studio.jsx), opened from this panel
 const nameOf = (id) => (id === 'studio' ? t('studio.name') : isLinuxId(id) ? castAppName({ who: id }) : appName(getApp(bare(id))) || bare(id));
+// Turn off is a firewall restriction of an app's own: never a machine's scope (Machines' own permission covers its
+// microphone), a LordOS component or LordOS itself
+const restrictable = (id) => /^(desktop|flatpak|lpk):/.test(id || '') && !isMachine(id) && firewall.enforceable(id);
 
 // The rows, live
 export function useCaptureRows() {
@@ -48,7 +54,7 @@ export function useCaptureRows() {
   const devices = useStore(brokerDevices);
   const linux = useStore(linuxCapture);
   const studio = useStore(studioUse);
-  return captureRows({ share: holder, casts, shots, devices, linux, studio }, { name: nameOf, enforceable: (id) => firewall.enforceable(id) });
+  return captureRows({ share: holder, casts, shots, devices, linux, studio }, { name: nameOf, enforceable: restrictable });
 }
 
 // ---- the handshake: frames only once an indicator is on screen ----
@@ -162,6 +168,8 @@ function whatText(r) {
 
 function iconFor(id) {
   if (!id) return null;
+  if (isMachine(id)) return getApp('machines')?.Icon || null;
+  if (id === 'lordos' || id.startsWith('lordos:')) { const c = COMPONENTS[id]; return c && c.icon ? getApp(c.icon)?.Icon || null : null; }
   if (id.startsWith('desktop:')) return linuxAppFor(id.slice(8))?.Icon || null;
   if (id.startsWith('flatpak:')) { const a = flatpakAppFor(id.slice(8)); return a && a.flatpakId === id.slice(8) ? a.Icon : null; }
   return getApp(bare(id))?.Icon || null;
@@ -201,7 +209,9 @@ function Row({ r, th }) {
   const Icon = iconFor(r.app);
   const glyph = captureGlyph([r]);
   const stops = rowStops(r);
-  const name = r.name || t('shell.cast.unknownApp');
+  const base = r.name || t('shell.cast.unknownApp');
+  // what of the app captures: "Machines — Windows 11 Pro"
+  const name = r.details && r.details.length ? t('shell.capture.appDetail', { app: base, detail: r.details.join(', ') }) : base;
   const shotOnly = r.screen === 'shot' || r.screen === 'color';
   return (
     <View style={{ gap: 8 }}>
@@ -230,7 +240,8 @@ function Row({ r, th }) {
 }
 
 function Panel({ rows, th, room, onClose, onStudio }) {
-  const unknown = rows.some((r) => !r.app && (r.camera || r.mic));
+  // a program LordOS can't name (the sound system's own processes it can)
+  const unknown = rows.some((r) => !r.app && !r.sys && (r.camera || r.mic));
   // LordOS Studio (docs/CAMERA-STUDIO-PLAN.md 9.1): the camera's effects, in this same panel
   const studio = rows.some((r) => r.camera) && studioAvailable();
   return (

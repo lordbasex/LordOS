@@ -1,6 +1,6 @@
 // screencast_model_test.mjs — the ScreenCast chooser's choices (sdk/screencastmodel.js): what is offered for what the
 // app asked, picking one or several, and what lord.portal.cast gets.
-import { castChoices, castToggle, castSources, castAskerName, castWindowOf, CAST_MAX, shotSource, shotDisplayAt, shotDragRect, shotArea, shotStamp,
+import { castChoices, castToggle, castSources, castAskerName, castWhoName, castWindowOf, CAST_MAX, shotSource, shotDisplayAt, shotDragRect, shotArea, shotStamp,
   shotFreeName, shotPills, SHOT_PILL_MS } from '../../sdk/screencastmodel.js';
 
 let ok = 0, bad = 0;
@@ -56,6 +56,22 @@ eq('asker: desktop named', castAskerName('desktop:gimp', look), 'GIMP');
 eq('asker: desktop unknown', castAskerName('desktop:foo', look), 'foo');
 eq('asker: lpk', castAskerName('lpk:com.x', look), 'com.x');
 eq('asker: none', castAskerName(undefined, look), '');
+// what lord-server tells from the kernel without a verified scope (2026-11-22): a machine, LordOS's parts
+const more = { ...look, machine: (id) => (id === '1b2b4eb6-77dd-42a8-933c-3cf7eac71aa2' ? 'Machines — Windows 11 Pro (prueba)' : ''),
+  lordos: (id) => ({ lordos: 'LordOS', 'lordos:terminal': 'Terminal' })[id] || '' };
+eq('asker: a machine', castAskerName('desktop:lordos-vm-1b2b4eb6-77dd-42a8-933c-3cf7eac71aa2', more), 'Machines — Windows 11 Pro (prueba)');
+eq('asker: a machine not known', castAskerName('desktop:lordos-vm-00000000-0000-0000-0000-000000000000', more), 'lordos-vm-00000000-0000-0000-0000-000000000000');
+eq('asker: not a machine id', castAskerName('desktop:lordos-vm-XYZ', more), 'lordos-vm-XYZ');
+eq('asker: the Terminal', castAskerName('lordos:terminal', more), 'Terminal');
+eq('asker: LordOS', castAskerName('lordos', more), 'LordOS');
+eq('asker: a component not known', castAskerName('lordos:nothing', more), 'lordos:nothing');
+// the indicator's name of a share: the verified app, else what lord-server saw, else the executable
+const wn = { app: (id) => castAskerName(id, { linux: (x) => (x === 'google-chrome' ? 'Google Chrome' : '') }), unknown: (exe) => (exe ? `An unknown program (${exe})` : 'An unknown program') };
+eq('share: verified', castWhoName({ who: 'desktop:google-chrome', seen: 'desktop:x' }, wn), 'Google Chrome');
+eq('share: Chrome\'s browser process out of its scope', castWhoName({ who: '', seen: 'desktop:google-chrome', exe: '' }, wn), 'Google Chrome');
+eq('share: only its executable', castWhoName({ who: '', seen: '', exe: 'obs' }, wn), 'An unknown program (obs)');
+eq('share: nothing known', castWhoName({}, wn), 'An unknown program');
+eq('share: junk', castWhoName({ who: 3, seen: {}, exe: 5 }, wn), 'An unknown program');
 // a window choice is named from the live window (its args), not the choice (which has none: "Linux" for all)
 const live = [{ id: 'linux#8', app: 'linux', args: { appId: 'org.chromium.Chromium' } }];
 eq('window of a choice', castWindowOf({ id: 'linux#8', title: 'x' }, live), live[0]);
