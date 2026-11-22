@@ -129,6 +129,11 @@
  *     VM_WINDATA    apps mode: what the guest's helper said, checked (vmagent.h's parsers) and written again by lord-vm:
  *                   a sealed memfd of a bytes (≤ VM_WINDATA_MAX), b = LAG_WINDOWS, LAG_WINICON or LAG_APPLIST, in that
  *                   kind's layout; c = the list of apps' generation (1, 2, ...). lord-server parses it again before use
+ *     VM_GUEST_LAYOUT where the picture sits in the guest's whole desktop (the guest tools' AGK_DISPLAYS: the shown display
+ *                   and the box around all of them), for the absolute tablet: a, b = the shown display's corner from the
+ *                   desktop's top left (≥ 0), c = its width << 16 | height, d = the desktop's width << 16 | height (each
+ *                   1..32767, the display inside the desktop); all 0: the picture is the whole desktop. Sent to every
+ *                   client on each change; lord-server hands it to lord-vmdisplay (VD_LAYOUT)
  *     VM_WINREFUSED apps mode: the guest couldn't do an action to one of its windows (LAG_WINREFUSED, parsed by lord-vm):
  *                   a = the window's id, b = LAGA_* (1..5), c = LAGR_* (1 it runs as administrator, 2 the system refused).
  *                   Sent to every client
@@ -177,6 +182,10 @@
  *   lord-vm made the guest's mouse relative, VM_CAPTURE): sent as Mouse.RelMotion; while QEMU still says the mouse is
  *   absolute, the helper moves its own position by it and sends that. VD_CAPTURE a = 1 / 0: VD_MOTION is ignored while
  *   captured, and IsAbsolute is asked again sooner for the next 3 s.
+ *   VD_LAYOUT a, b = the shown display's corner in the guest's whole desktop, c, d = its size, e, f = the desktop's size
+ *   (vm_layout_ok; all 0: none). A guest's absolute tablet covers its whole desktop (Windows maps a HID tablet's range over
+ *   every display), and QEMU's Mouse.SetAbsPosition scales by the picture's width: with a layout, VD_MOTION's point is
+ *   given as vd_abs_map's, so it lands on the shown display's pixel instead of somewhere across all of them.
  *   VD_WHEEL a = vertical steps (+ up, − down), b = horizontal steps (+ right). VD_RELEASE_ALL lets go of every
  *   key and button held (window lost focus). VD_RESIZE a, b = the window's size in pixels: the guest is asked
  *   to use it (Console.SetUIInfo), at most every 100 ms. VD_RATE a = the display's refresh rate (1..240; 60 by
@@ -222,7 +231,7 @@ enum {
     VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE,
     VM_REQ_LAST = VM_CAPTURE,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
-    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED,
+    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
 };
 /* VM_CLIP_DENY c: why. BACKGROUND: the machine wasn't in use (its window not in front, nor a few seconds after);
  * STALE: the host's clipboard changed since that offer, or the offer isn't the last; NONE: that form isn't there now
@@ -234,7 +243,9 @@ enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VM
 enum { VJ_NONE = 0, VJ_SUSPEND, VJ_RESUME, VJ_SNAPSHOT, VJ_REVERT, VJ_DELETE, VJ_COUNT };
 enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
 /* VM_AGENT a, VM_AGENT_STATE a and b */
-enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL, VAG_TRANSFER };
+/* VAG_EXTRA_OFF / VAG_EXTRA_ON: the guest tools turn off (and back on) a display of the guest that isn't on a PCI
+ * adapter while the one the picture shows is (AGK_EXTRA; VAC_EXTRA, VAC_EXTRA_OFF say when each is offered) */
+enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL, VAG_TRANSFER, VAG_EXTRA_OFF, VAG_EXTRA_ON };
 enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
 /* 256: LAG_CAP_WINDOWS (vmagent.h), the guest's helper does apps mode.
  * VAC_TRANSFER: the guest has the transfer folder (6.7.1) mounted (Linux: /mnt/LordOS; Windows: VirtioFsSvc runs);
@@ -243,10 +254,12 @@ enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
  * said "noclip": a Linux guest without xclip or wl-clipboard). VAC_CLIPBOARD is set only when the hello says "clipboard";
  * VAC_CLIP_LAZY: it also said "clipreq": the host's clipboard goes in on demand (VM_CLIP_OFFER), never pushed;
  * VAC_OPEN: the guest's tools said "open": a dropped file can be opened there (VM_FILE a = 1, AGK_OPEN);
- * VAC_PLACE: they said "place": files dropped on an apps mode window go to that window (VM_FILE a = 2, AGK_PLACE) */
+ * VAC_PLACE: they said "place": files dropped on an apps mode window go to that window (VM_FILE a = 2, AGK_PLACE);
+ * VAC_EXTRA: the guest has a display that isn't on a PCI adapter besides the PCI one the picture shows, and its tools
+ * can turn it off (VAG_EXTRA_OFF); VAC_EXTRA_OFF: they turned one off and can turn it back on (VAG_EXTRA_ON) */
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
        VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048, VAC_CLIP_LAZY = 4096, VAC_OPEN = 8192,
-       VAC_PLACE = 16384, VAC_ALL = 32767 };
+       VAC_PLACE = 16384, VAC_EXTRA = 32768, VAC_EXTRA_OFF = 65536, VAC_ALL = 131071 };
 /* how long a VM_FILE with a = 1 waits for the guest tools' AGK_OPENED after the copy (a program may ask for consent) */
 #define AG_OPEN_WAIT_MS 120000
 #define VM_WINDATA_MAX (1u << 20)
@@ -310,7 +323,7 @@ typedef struct {
 enum {
     VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS, VD_DMABUF, VD_GUEST_AUDIO,   /* helper → server */
     VD_SHM = 64, VD_FRAME_DONE, VD_KEY, VD_MOTION, VD_BUTTON, VD_WHEEL, VD_RELEASE_ALL,       /* server → helper */
-    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC, VD_AUDIO_OUT, VD_MIC, VD_REL, VD_CAPTURE,
+    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC, VD_AUDIO_OUT, VD_MIC, VD_REL, VD_CAPTURE, VD_LAYOUT,
 };
 /* VD_GUEST_AUDIO a: which of the guest's streams */
 enum { VDG_OUT = 0, VDG_IN = 1 };
@@ -398,6 +411,26 @@ static inline int vm_recv(int sock, VmMsg *m, int *fd) {
 static inline int vd_send(int sock, const VdMsg *m, int fd) { return vm_send_raw(sock, m, sizeof *m, fd); }
 static inline int vd_recv(int sock, VdMsg *m, int *fd) { return vm_recv_raw(sock, m, sizeof *m, fd); }
 
+/* a guest's layout (VM_GUEST_LAYOUT, VD_LAYOUT): all 0 (none), or a shown display of 1..32767 a side inside a desktop
+ * of at most 32767 a side, at ox, oy ≥ 0. 1 yes */
+static inline int vm_layout_ok(int ox, int oy, int sw, int sh, int dw, int dh) {
+    if (!ox && !oy && !sw && !sh && !dw && !dh) return 1;
+    return ox >= 0 && oy >= 0 && sw >= 1 && sh >= 1 && dw >= 1 && dh >= 1 && sw <= 32767 && sh <= 32767 && dw <= 32767 && dh <= 32767 &&
+           ox + sw <= dw && oy + sh <= dh;
+}
+/* the position to give QEMU's Mouse.SetAbsPosition (which scales by the picture's size, pic) for the picture's point p
+ * (one axis), so that a tablet the guest spreads over its whole desktop (desk) lands on the shown display's pixel (that
+ * display off from the desktop's start, shown wide): the middle of that pixel, scaled to the picture's range. Without a
+ * layout (desk 0) p itself, clamped. The picture is pic wide; the shown display normally is too. */
+static inline int vd_abs_map(int p, int pic, int off, int shown, int desk) {
+    if (pic <= 0) return 0;
+    if (p < 0) p = 0;
+    if (p >= pic) p = pic - 1;
+    if (desk <= 0 || shown <= 0 || off < 0 || off + shown > desk) return p;
+    long long g = off + (long long)p * shown / pic;               /* the guest desktop's pixel */
+    long long q = ((2 * g + 1) * pic) / (2LL * desk);
+    return q < 0 ? 0 : q >= pic ? pic - 1 : (int)q;
+}
 static inline VmMsg vm_msg(uint16_t type, uint32_t seq, int a, int b, int c, int d, const char *text) {
     VmMsg m;
     memset(&m, 0, sizeof m);
@@ -418,7 +451,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (m->version != VM_PROTO_VERSION) return 0;
     if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600)) &&
                       (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
-                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_TRANSFER)) &&
+                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_EXTRA_ON)) &&
                       (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX) &&
                                               m->c >= 0 && (!m->c || (m->b == VCF_CLIPX && m->d >= 1 && m->d <= 3)))) &&
                       (m->type != VM_CLIP_OFFER || (m->a > 0 && m->b >= 1 && m->b <= 7 && (m->c == 0 || m->c == 1))) &&
@@ -445,6 +478,8 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_CLIP_DATA: return m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX);
     case VM_FILE_PROGRESS: return m->a >= 0 && m->a <= 100;
     case VM_CLIP_REQ: return m->a > 0 && m->b >= 1 && m->b <= 3;
+    case VM_GUEST_LAYOUT: return vm_layout_ok(m->a, m->b, (m->c >> 16) & 0xffff, m->c & 0xffff, (m->d >> 16) & 0xffff, m->d & 0xffff) &&
+                                 m->c >= 0 && m->d >= 0;
     case VM_WINREFUSED: return m->a != 0 && m->b >= 1 && m->b <= 5 && (m->c == 1 || m->c == 2) && m->d == 0;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
@@ -465,6 +500,7 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_RATE: return m->a >= 1 && m->a <= 240;
     case VD_REL: return m->a >= -VD_REL_MAX && m->a <= VD_REL_MAX && m->b >= -VD_REL_MAX && m->b <= VD_REL_MAX;
     case VD_CAPTURE: return m->a == 0 || m->a == 1;
+    case VD_LAYOUT: return vm_layout_ok(m->a, m->b, m->c, m->d, m->e, m->f);
     case VD_AUDIO_REC: case VD_AUDIO_OUT: case VD_MIC: return m->a == 0 || m->a == 1;
     default: return 0;
     }

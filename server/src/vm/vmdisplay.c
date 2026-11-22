@@ -97,6 +97,7 @@ static struct {
     /* input */
     int motion_pending, mx, my, last_mx, last_my;
     int abs_mouse;
+    int layout[6];                      /* VD_LAYOUT: the shown display in the guest's desktop (0s: none) */
     /* "Capture mouse" (VD_CAPTURE, VD_REL): relative motion gathered until the next send, and until when IsAbsolute is
      * asked again sooner (lord-vm switches the guest's mouse at the same time) */
     int capture, rel_pending, rdx, rdy;
@@ -858,6 +859,10 @@ static void ask_abs(long long now) {
     sd_bus_call_method_async(bus, NULL, NULL, CONSOLE_PATH, "org.freedesktop.DBus.Properties", "Get", on_abs, NULL, "ss", "org.qemu.Display1.Mouse", "IsAbsolute");
 }
 
+/* a picture point for the guest's tablet: onto the shown display of its whole desktop (VD_LAYOUT), or as it is */
+static int abs_x(int x) { return vd_abs_map(x, (int)D.w, D.layout[0], D.layout[2], D.layout[4]); }
+static int abs_y(int y) { return vd_abs_map(y, (int)D.h, D.layout[1], D.layout[3], D.layout[5]); }
+
 /* the pointer's motion gathered since the last send: sent before any button or wheel step that follows it, so a click
  * lands where the pointer is. The machine's window sends a click as VD_MOTION then VD_BUTTON in one burst; with the
  * button sent at once and the motion at the end of the turn, the guest's tablet pressed at the previous position and
@@ -874,7 +879,7 @@ static void send_motion(long long now) {
             int x = D.last_mx + D.rdx, y = D.last_my + D.rdy;
             x = x < 0 ? 0 : x >= (int)D.w ? (int)D.w - 1 : x;
             y = y < 0 ? 0 : y >= (int)D.h ? (int)D.h - 1 : y;
-            call_noreply("org.qemu.Display1.Mouse", "SetAbsPosition", "uu", (uint32_t)x, (uint32_t)y);
+            call_noreply("org.qemu.Display1.Mouse", "SetAbsPosition", "uu", (uint32_t)abs_x(x), (uint32_t)abs_y(y));
             D.last_mx = x; D.last_my = y;
         }
         D.rdx = D.rdy = 0;
@@ -884,7 +889,7 @@ static void send_motion(long long now) {
         D.motion_pending = 0;
         ask_abs(now);
         int x = D.mx < (int)D.w ? D.mx : (int)D.w - 1, y = D.my < (int)D.h ? D.my : (int)D.h - 1;
-        if (D.abs_mouse) call_noreply("org.qemu.Display1.Mouse", "SetAbsPosition", "uu", (uint32_t)x, (uint32_t)y);
+        if (D.abs_mouse) call_noreply("org.qemu.Display1.Mouse", "SetAbsPosition", "uu", (uint32_t)abs_x(x), (uint32_t)abs_y(y));
         else call_noreply("org.qemu.Display1.Mouse", "RelMotion", "ii", x - D.last_mx, y - D.last_my);
         D.last_mx = x; D.last_my = y;
     }
@@ -967,6 +972,11 @@ static int from_server(void) {
             D.abs_fast_until = now_ms() + 3000;
             abs_asked_ms = 0;
             fprintf(stderr, "lord-vmdisplay %s: the mouse is %s\n", me, m.a ? "captured (relative)" : "free (absolute)");
+            break;
+        case VD_LAYOUT:
+            memcpy(D.layout, (int[6]){ m.a, m.b, m.c, m.d, m.e, m.f }, sizeof D.layout);
+            if (m.e) fprintf(stderr, "lord-vmdisplay %s: the tablet points at %dx%d at %d,%d of the guest's %dx%d desktop\n", me, m.c, m.d, m.a, m.b, m.e, m.f);
+            else fprintf(stderr, "lord-vmdisplay %s: the tablet covers the picture\n", me);
             break;
         case VD_RELEASE_ALL: release_all(); break;
         case VD_RESIZE: D.rw = m.a; D.rh = m.b; D.resize_pending = 1; break;

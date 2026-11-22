@@ -1134,7 +1134,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     whose mode is the size the host asked for (a PCI adapter first, then the primary); else the primary on a PCI
     adapter, the first on a PCI adapter, the primary. The size the host asks for is set on it.
 - **Machines: a guest with more than one display shows the right one, in apps mode too, in development** (the guest
-  tools `lordos-guest-win` **w8**; Machines offers the update). On the maintainer's guest with an Intel GVT-g vGPU, the
+  tools `lordos-guest-win` **w9**; Machines offers the update). On the maintainer's guest with an Intel GVT-g vGPU, the
   guest system had a 1022 × 724 primary display that isn't on a PCI adapter (a basic or indirect display) next to the
   vGPU's output, the one the machine's window shows. The tools measured and moved everything on the primary and the
   virtual desktop: lord-vm kept logging "the guest's display is 1022x724 (not the size asked for)", each apps mode
@@ -1165,6 +1165,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     32 bytes; cases in `vm-test`): `agent: guest displays: \\.\DISPLAY2 1920x1080 at 0,0 primary (shown);
     \\.\DISPLAY1 1022x724 at 1920,0 (not a PCI adapter)`. The tools' own log (`%LOCALAPPDATA%\LordOS\lordos-guest-win.log`)
     lists every adapter and monitor, the choice, the primary made, and each apps mode translation and move.
+  - **Clicks and typing land where they're aimed again** (found with w8 on that guest: nothing could be clicked or
+    typed). The guest spreads its absolute tablet over its whole desktop, both displays, while QEMU scales a position by
+    the picture's width, so a click landed scaled across both (often on the display nobody sees, which then took the
+    keyboard's focus). lord-vm now passes where the picture sits in the guest's desktop (`ag_displays_layout`, from
+    `AGK_DISPLAYS`) to lord-server (`VM_GUEST_LAYOUT`) and on to lord-vmdisplay (`VD_LAYOUT`), which gives QEMU the
+    position that lands on the shown display's pixel (`vd_abs_map`; tested with that layout: every pixel within 2, the
+    limit of QEMU's integer position). Without a layout, as before.
+  - **Turn Off the Extra Display** (tools **w9**): the agent's popover offers it when the guest has a display that
+    isn't on a PCI adapter next to the PCI one it shows; the tools leave that display out of the guest's display
+    configuration (never the shown one), remember it, and **Turn the Extra Display Back On** puts every display back
+    (also by itself when no PCI display is left). Not automatic: what that display is isn't known for sure, so the
+    tools log its adapter and the person decides. `AGK_EXTRA` (20, one byte), the tools' hello words `extra` and
+    `extraoff`, `VAG_EXTRA_OFF` / `VAG_EXTRA_ON`, `VAC_EXTRA` / `VAC_EXTRA_OFF`; strict parsers with tests.
+  - The popover shows the LordOS tools' version next to the agent's ("agent 109.1.0 · LordOS tools w9"): the first is
+    qemu-guest-agent's.
 - **Machines: a guest window that runs as administrator can't be closed from LordOS, and LordOS is told, in
   development** (tools w8). The tools run with the person's normal rights, so the guest system drops their close
   message to a program running as administrator (Computer Management, `mmc.exe`) and refuses its moves; the × in the

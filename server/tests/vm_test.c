@@ -789,7 +789,7 @@ static void test_messages(void) {
     /* the transfer folder (6.7.1): VAG_TRANSFER is an agent request (WinFsp's hash as text, or none); the agent's state
      * says whether the guest has it (VAC_TRANSFER) or can once WinFsp is in (VAC_XFER_SETUP) */
     q = vm_msg(VM_AGENT, 7, VAG_TRANSFER, 0, 0, 0, ""); CHECK(vm_msg_valid(&q, 1));
-    q = vm_msg(VM_AGENT, 7, VAG_TRANSFER + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT, 7, VAG_EXTRA_ON + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_FILES | VAC_TRANSFER, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_DISPLAY | (int)LAG_CAP_WINDOWS | VAC_TRANSFER | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
@@ -1599,6 +1599,86 @@ static void test_shown_pick(void) {
     CHECK(ag_shown_pick(d, 3, 1920, 1080, 1, &lock) == 2 && lock == -1);
 }
 
+/* the absolute tablet on a guest with two displays (w8 on the GVT-g guest: clicks landed across both) */
+static void test_tablet_layout(void) {
+    AgDisplay d[2];
+    memset(d, 0, sizeof d);
+    /* after w8 made the vGPU's output primary: \\.\DISPLAY2 1920x1080 at 0,0 (shown), \\.\DISPLAY1 1022x724 at 1920,0 */
+    d[0] = (AgDisplay){ 0, 0, 1920, 1080, AGDS_PRIMARY | AGDS_HW, "\\\\.\\DISPLAY2" };
+    d[1] = (AgDisplay){ 1920, 0, 1022, 724, 0, "\\\\.\\DISPLAY1" };
+    int L[6];
+    CHECK(ag_displays_layout(d, 2, 0, L) == 0 && L[0] == 0 && L[1] == 0 && L[2] == 1920 && L[3] == 1080 && L[4] == 2942 && L[5] == 1080);
+    /* as w7 left it: DISPLAY1 primary at 0,0, DISPLAY2 to its right */
+    d[0].x = 1022; d[1].x = 0;
+    CHECK(ag_displays_layout(d, 2, 0, L) == 0 && L[0] == 1022 && L[1] == 0 && L[4] == 2942 && L[5] == 1080);
+    /* a display left of and above the primary: the box starts there */
+    d[1].x = -1022; d[1].y = -100; d[0].x = 0;
+    CHECK(ag_displays_layout(d, 2, 0, L) == 0 && L[0] == 1022 && L[1] == 100 && L[4] == 2942 && L[5] == 1180);
+    /* one display, none shown, the shown one the whole box (a smaller one inside it): no layout */
+    CHECK(ag_displays_layout(d, 1, 0, L) == 1 && !L[4]);
+    CHECK(ag_displays_layout(d, 2, -1, L) == 1 && !L[0] && !L[4]);
+    d[1] = (AgDisplay){ 0, 0, 800, 600, 0, "X" };
+    CHECK(ag_displays_layout(d, 2, 0, L) == 1);
+    /* too wide for the message */
+    d[1] = (AgDisplay){ 30000, 0, 8192, 600, 0, "X" };
+    CHECK(ag_displays_layout(d, 2, 0, L) == 1);
+
+    /* the mapping: every picture pixel of the shown display lands on its own guest pixel (within 1), as QEMU scales by
+     * the picture's width (0x7fff over it) and the guest spreads that range over its whole desktop */
+    struct { int off, shown, desk; } cases[] = { { 0, 1920, 2942 }, { 1022, 1920, 2942 }, { 0, 1080, 1080 }, { 100, 1080, 1180 } };
+    for (size_t c = 0; c < sizeof cases / sizeof *cases; c++) {
+        int worst = 0, pic = cases[c].shown;
+        for (int p = 0; p < pic; p++) {
+            int q = vd_abs_map(p, pic, cases[c].off, cases[c].shown, cases[c].desk);
+            CHECK(q >= 0 && q < pic);
+            long long abs = (long long)q * 0x7fff / pic;                              /* qemu_input_scale_axis */
+            long long g = abs * cases[c].desk / 0x7fff;                               /* the guest's pixel */
+            int err = (int)(g - (cases[c].off + p));
+            if (err < 0) err = -err;
+            if (err > worst) worst = err;
+        }
+        CHECK(worst <= 2);
+    }
+    /* no layout: as it was (clamped) */
+    CHECK(vd_abs_map(500, 1920, 0, 0, 0) == 500 && vd_abs_map(5000, 1920, 0, 0, 0) == 1919 && vd_abs_map(-3, 1920, 0, 0, 0) == 0);
+    CHECK(vd_abs_map(10, 0, 0, 1920, 2942) == 0);
+    CHECK(vd_abs_map(10, 1920, 2000, 1920, 2942) == 10);                    /* a layout that doesn't fit: ignored */
+    /* the right edge of the shown display stays left of the other display */
+    CHECK(vd_abs_map(1919, 1920, 0, 1920, 2942) * 2942LL / 1920 < 1920);
+
+    /* the messages */
+    VmMsg m = vm_msg(VM_GUEST_LAYOUT, 0, 0, 0, 1920 << 16 | 1080, 2942 << 16 | 1080, NULL);
+    CHECK(vm_msg_valid(&m, 0) && !vm_msg_valid(&m, 1));
+    m = vm_msg(VM_GUEST_LAYOUT, 0, 0, 0, 0, 0, NULL); CHECK(vm_msg_valid(&m, 0));                  /* none */
+    m = vm_msg(VM_GUEST_LAYOUT, 0, 1023, 0, 1920 << 16 | 1080, 2942 << 16 | 1080, NULL); CHECK(!vm_msg_valid(&m, 0));   /* past the box */
+    m = vm_msg(VM_GUEST_LAYOUT, 0, -1, 0, 1920 << 16 | 1080, 2942 << 16 | 1080, NULL); CHECK(!vm_msg_valid(&m, 0));
+    m = vm_msg(VM_GUEST_LAYOUT, 0, 0, 0, 0, 2942 << 16 | 1080, NULL); CHECK(!vm_msg_valid(&m, 0));                      /* no size */
+    m = vm_msg(VM_GUEST_LAYOUT, 0, 0, 0, 1920 << 16 | 1080, (int)(0x8000u << 16 | 1080), NULL); CHECK(!vm_msg_valid(&m, 0));
+    VdMsg v = vd_msg(VD_LAYOUT, 0, 0, 1920, 1080, 2942, 1080); CHECK(vd_msg_valid(&v, 1) && !vd_msg_valid(&v, 0));
+    v = vd_msg(VD_LAYOUT, 0, 0, 0, 0, 0, 0); CHECK(vd_msg_valid(&v, 1));
+    v = vd_msg(VD_LAYOUT, 1100, 0, 1920, 1080, 2942, 1080); CHECK(!vd_msg_valid(&v, 1));
+    v = vd_msg(VD_LAYOUT, 0, 0, 1920, 1080, 40000, 1080); CHECK(!vd_msg_valid(&v, 1));
+
+    /* the extra display (w9): offered only while the shown display is on a PCI adapter and another isn't */
+    d[0] = (AgDisplay){ 0, 0, 1920, 1080, AGDS_PRIMARY | AGDS_HW, "\\\\.\\DISPLAY2" };
+    d[1] = (AgDisplay){ 1920, 0, 1022, 724, 0, "\\\\.\\DISPLAY1" };
+    CHECK(ag_displays_extra(d, 2, 0) == 1);
+    CHECK(ag_displays_extra(d, 2, 1) == 0);                                 /* the shown one isn't PCI */
+    CHECK(ag_displays_extra(d, 1, 0) == 0 && ag_displays_extra(d, 2, -1) == 0 && ag_displays_extra(NULL, 2, 0) == 0);
+    d[1].flags = AGDS_HW; CHECK(ag_displays_extra(d, 2, 0) == 0);           /* two PCI displays: nothing extra */
+    uint8_t one = 1, zero = 0, two = 2, pair[2] = { 1, 0 };
+    int off = -1;
+    CHECK(!ag_extra_parse(&one, 1, &off) && off == 1 && !ag_extra_parse(&zero, 1, &off) && off == 0);
+    CHECK(ag_extra_parse(&two, 1, &off) == -1 && ag_extra_parse(pair, 2, &off) == -1 && ag_extra_parse(NULL, 1, &off) == -1 && ag_extra_parse(&one, 0, &off) == -1);
+    CHECK(ag_hello_caps((const uint8_t *)"w9 gvt extra", 12) == (AG_HELLO_GVT | AG_HELLO_EXTRA));
+    CHECK(ag_hello_caps((const uint8_t *)"w9 extra extraoff", 17) == (AG_HELLO_EXTRA | AG_HELLO_EXTRAOFF));
+    CHECK(ag_hello_caps((const uint8_t *)"w9 extras extraof", 17) == 0);
+    m = vm_msg(VM_AGENT, 1, VAG_EXTRA_OFF, 0, 0, 0, ""); CHECK(vm_msg_valid(&m, 1));
+    m.a = VAG_EXTRA_ON; CHECK(vm_msg_valid(&m, 1));
+    m.a = VAG_EXTRA_ON + 1; CHECK(!vm_msg_valid(&m, 1));
+    m = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXTRA | VAC_EXTRA_OFF, 0, 0, "1\tx"); CHECK(vm_msg_valid(&m, 0));
+}
+
 /* LAG_WINREFUSED and LAGW_ELEVATED (w8: a window that runs as administrator in Windows) */
 static void test_winrefused(void) {
     uint8_t b[LAG_WINREFUSED_BYTES + 1];
@@ -2028,6 +2108,7 @@ int main(void) {
     test_displays();
     test_shown_pick();
     test_winrefused();
+    test_tablet_layout();
     test_apps_mode();
     test_clipx();
     test_log_clean();

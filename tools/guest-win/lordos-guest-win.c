@@ -76,8 +76,10 @@
  * the asked size), is made Windows' primary, and windows come onto it as the tools start too; a window that runs as
  * administrator is said so (LAGW_ELEVATED, when the host's hello says "elevated") and an action the system refuses is
  * answered (LAG_WINREFUSED) */
-#define VERSION "w8"
-#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt"
+/* w9 (2026-11-22): "extra": turns off, when the host asks (AGK_EXTRA), a display that isn't on a PCI adapter next to
+ * the shown one (and back on; by itself too when no PCI display is left), saying "extraoff" while it keeps one off */
+#define VERSION "w9"
+#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt extra"
 
 enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
 enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS, T_MONS };
@@ -246,6 +248,15 @@ static void port_close(const char *why) {
     SetEvent(ans_ev);                   /* a paste waiting for the host stops waiting */
 }
 
+static int send_frame(uint16_t kind, const uint8_t *p, uint32_t n);
+static int extra_is_off(void);
+/* the hello, with "extraoff" while this side keeps an extra display off */
+static void say_hello(void) {
+    char h[sizeof HELLO + 16];
+    int n = snprintf(h, sizeof h, "%s%s", HELLO, extra_is_off() ? " extraoff" : "");
+    send_frame(AGK_HELLO, (const uint8_t *)h, (uint32_t)n);
+}
+
 static int send_frame(uint16_t kind, const uint8_t *p, uint32_t n) {
     if (port == INVALID_HANDLE_VALUE) return -1;
     uint8_t *b = malloc(AG_HEAD + (size_t)n);
@@ -285,7 +296,7 @@ static void port_try_open(void) {
     ResetEvent(stop_ev);
     reader = CreateThread(NULL, 0, reader_main, h, 0, NULL);
     lg("port open");
-    send_frame(AGK_HELLO, (const uint8_t *)HELLO, sizeof HELLO - 1);
+    say_hello();
 }
 
 /* ---- the clipboard ---- */
@@ -785,6 +796,84 @@ static int disp_make_primary(const wchar_t *dev) {
     return r;
 }
 
+/* ---- the extra display (AGK_EXTRA) ----
+ * A display that isn't on a PCI adapter (a basic or indirect display) next to the PCI one the host shows gets the
+ * tablet's clicks, windows and the focus out of sight. Not turned off by itself: what it is isn't known for sure (its
+ * adapter is logged), so the person decides, from Machines (the agent's popover). Off: its paths are left out of the
+ * display configuration (never the shown one's, so at least one stays), saved; remembered in
+ * HKCU\Software\LordOS\GuestWin ExtraDisplaysOff. Back on: Windows extends the desktop over every connected display
+ * again (SDC_TOPOLOGY_EXTEND), also by itself when no PCI display is left. */
+static void mon_get(void);
+static int extra_is_off(void) {
+    DWORD v = 0, n = sizeof v;
+    return RegGetValueW(HKEY_CURRENT_USER, L"Software\\LordOS\\GuestWin", L"ExtraDisplaysOff", RRF_RT_REG_DWORD, NULL, &v, &n) == ERROR_SUCCESS && v;
+}
+static void extra_mark(int off) {
+    DWORD v = (DWORD)off;
+    RegSetKeyValueW(HKEY_CURRENT_USER, L"Software\\LordOS\\GuestWin", L"ExtraDisplaysOff", REG_DWORD, &v, sizeof v);
+}
+
+static int extra_off(void) {
+    mon_get();
+    if (mons_shown < 0 || !mons[mons_shown].hw) { lg("displays: no extra display turned off: the shown one isn't on a PCI adapter"); return -1; }
+    UINT32 np = 0, nm = 0;
+    if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &np, &nm) != ERROR_SUCCESS || !np || !nm || np > 64 || nm > 128) return -1;
+    DISPLAYCONFIG_PATH_INFO *paths = calloc(np, sizeof *paths), *keep = calloc(np, sizeof *keep);
+    DISPLAYCONFIG_MODE_INFO *modes = calloc(nm, sizeof *modes), *km = calloc(nm, sizeof *km);
+    int r = -1;
+    if (paths && keep && modes && km && QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &np, paths, &nm, modes, NULL) == ERROR_SUCCESS) {
+        UINT32 kp = 0, kn = 0, dropped = 0;
+        int shown_kept = 0;
+        for (UINT32 i = 0; i < np; i++) {
+            DISPLAYCONFIG_SOURCE_DEVICE_NAME sn;
+            memset(&sn, 0, sizeof sn);
+            sn.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+            sn.header.size = sizeof sn;
+            sn.header.adapterId = paths[i].sourceInfo.adapterId;
+            sn.header.id = paths[i].sourceInfo.id;
+            int drop = 0;
+            if (DisplayConfigGetDeviceInfo(&sn.header) == ERROR_SUCCESS) {
+                for (int k = 0; k < mons_n; k++)
+                    if (k != mons_shown && !mons[k].hw && !wcscmp(mons[k].dev, sn.viewGdiDeviceName)) drop = 1;
+                if (!wcscmp(mons[mons_shown].dev, sn.viewGdiDeviceName)) shown_kept = 1;
+            }
+            if (drop) {
+                wchar_t desc[128];
+                adapter_of(sn.viewGdiDeviceName, desc, 128);
+                char *dn = to_utf8(sn.viewGdiDeviceName, -1, NULL), *ds = to_utf8(desc, -1, NULL);
+                lg("displays: turning off %s (%s, not on a PCI adapter)", dn ? dn : "?", ds ? ds : "?");
+                free(dn); free(ds);
+                dropped++;
+                continue;
+            }
+            /* a kept path, with its modes copied and its indexes set again */
+            keep[kp] = paths[i];
+            UINT32 si = paths[i].sourceInfo.modeInfoIdx, ti = paths[i].targetInfo.modeInfoIdx;
+            if (si < nm) { km[kn] = modes[si]; keep[kp].sourceInfo.modeInfoIdx = kn++; }
+            if (ti < nm) { km[kn] = modes[ti]; keep[kp].targetInfo.modeInfoIdx = kn++; }
+            kp++;
+        }
+        if (!dropped) lg("displays: no extra display to turn off");
+        else if (!shown_kept || !kp) lg("displays: the shown display isn't in the configuration: nothing turned off");
+        else {
+            LONG e = SetDisplayConfig(kp, keep, kn, km, SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_SAVE_TO_DATABASE | SDC_ALLOW_CHANGES);
+            if (e) lg("displays: turning the extra display off was refused (%ld)", e);
+            else { lg("displays: %u extra display(s) off; Machines can turn them back on", dropped); extra_mark(1); r = 0; }
+        }
+    }
+    free(paths); free(keep); free(modes); free(km);
+    return r;
+}
+
+static int extra_on(const char *why) {
+    LONG e = SetDisplayConfig(0, NULL, 0, NULL, SDC_APPLY | SDC_TOPOLOGY_EXTEND);
+    lg("displays: every display back on (%s): %ld", why, e);
+    if (e) return -1;
+    extra_mark(0);
+    primary_tried[0] = 0;               /* the shown one made the primary again if Windows moved it */
+    return 0;
+}
+
 /* this log: every display adapter and its monitors, attached to the desktop or not (once per change) */
 static void mon_log_adapters(void) {
     DISPLAY_DEVICEW a, m;
@@ -858,6 +947,14 @@ static void mon_scan(void) {
             rescue_pending = 1;                 /* the windows come onto it once the change settles */
             SetTimer(win, T_MONS, 1500, NULL);
         }
+    }
+    /* an extra display was turned off but no display on a PCI adapter is left: everything back on, once */
+    static int extra_auto_tried;
+    int anyhw = 0;
+    for (int i = 0; i < mons_n; i++) anyhw |= mons[i].hw;
+    if (mons_n && !anyhw && !extra_auto_tried && extra_is_off()) {
+        extra_auto_tried = 1;
+        if (!extra_on("no display on a PCI adapter is left") && port != INVALID_HANDLE_VALUE) say_hello();
     }
 }
 
@@ -2039,7 +2136,7 @@ static void on_frame(const Frame *f) {
             host_hello = 1;
             host_clipx = strstr(t, " clipx") != NULL;
             host_elev = strstr(t, " elevated") != NULL;
-            if (strstr(t, " ask")) send_frame(AGK_HELLO, (const uint8_t *)HELLO, sizeof HELLO - 1);
+            if (strstr(t, " ask")) say_hello();
             lg("host: %s", ag_utf8_ok(f->data, f->len) ? t : "(hello)");
             /* the displays, for the host's log (an older lord-vm skips the kind) */
             mons_sent = 0;
@@ -2075,6 +2172,13 @@ static void on_frame(const Frame *f) {
         lg("display: the host wants %ux%u", w, h);
         SetTimer(win, T_DISP, 250, NULL);
         disp_tick();
+        break;
+    }
+    case AGK_EXTRA: {
+        int off;
+        if (!host_hello || ag_extra_parse(f->data, f->len, &off)) break;
+        if (off ? !extra_off() : !extra_on("the host asked")) { mons_stale = 1; SetTimer(win, T_MONS, 1500, NULL); }
+        say_hello();                    /* "extraoff" or not: Machines offers the other button */
         break;
     }
     case LAG_APPS: {
