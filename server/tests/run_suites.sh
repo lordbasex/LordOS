@@ -225,6 +225,7 @@ EOF
     if have node; then run "openwith-model-test (sdk/openwithmodel.js, Files' Open with providers)" node tests/openwith_model_test.mjs; fi
     if have node; then run "vm-openwith-test (apps/machines/openwith.js, a machine in Open with)" node tests/vm_openwith_test.mjs; fi
     if have node; then run "theme-gallery-test (sdk/themegallery.js, Settings → Appearance)" node tests/theme_gallery_test.mjs; fi
+    if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
     if have node; then run "vm-profiles-test (apps/machines/profiles.js, systems.js: .lordprofile import, your systems, PNG logos, library chips)" node tests/vm_profiles_test.mjs; fi
     if have node; then run "photos-places-test (apps/photos/places.js)" node tests/photos_places_test.mjs; fi

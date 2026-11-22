@@ -12,6 +12,42 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
+  (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
+  `docs/NVIDIA-PLAN.md`).
+  - **Settings → Graphics cards** now shows on every computer with a GPU (before, only with two or more). Each card shows
+    its driver with its version (`nvidia 560.35.03 (open)`, `nouveau (Mesa 25.0.7)`, `amdgpu (Mesa …)`). An NVIDIA card
+    says *Experimental — not verified on your card model yet*, has **How to Help Test It** (a new Help article,
+    `graphics-cards`, in English, Spanish and Portuguese), shows whether CUDA's libraries are installed, and lists its
+    roles **AI and compute (CUDA)** and **Desktop** as *Planned* with an honest note and no button: installing NVIDIA's
+    driver and drawing the desktop with it wait for their admin actions and the explicit-sync design to be approved.
+  - **Send a compatibility report:** `lord.sysinfo.gpuReport()` (C, `server/src/sysreport/gpureport.c`) reads only
+    world-readable files and builds a plain-text report: the cards (PCI ids and names, kernel driver, boot display,
+    render node), which one draws the desktop (the card lord-server holds), NVIDIA's module (version, open or
+    proprietary kernel modules), `nvidia-drm` modeset and fbdev, `nouveau`, CUDA's userspace (`libcuda`, `nvidia-smi`,
+    `/dev/nvidia-uvm`), Mesa's version, the Vulkan ICDs with their API version, VA-API and VDPAU drivers, OpenCL,
+    Secure Boot, the kernel's lockdown, only the graphics options of the kernel command line, and how this session
+    composes the screen (and why the GPU didn't start, when it didn't) with its GL renderer. No program is run. The text
+    is scrubbed in C and again in JS (the home → `~`, other `/home/<name>`, the user's and host's names as whole words,
+    MAC addresses, UUIDs, e-mail addresses, serial values) and shown whole before anything else; **Open the Form on
+    GitHub** copies it to the clipboard and opens the new `gpu-report.yml` issue form prefilled (version, card, driver,
+    report), under the browser hand-off's 3000 characters, cut on whole lines and marked. Nothing is sent by LordOS.
+    Messages in all 35 languages.
+  - **From the terminal:** `lordos-sysreport gpu [--json]` prints the same report (without the session's part; the
+    desktop's card is the one the user's lord-server holds), and `lordos-issue --gpu` prints it with the form's address,
+    without asking for a password.
+  - **Tests:** `build/gpureport-test` (a fake machine with an Intel iGPU and two NVIDIA cards, one on the open modules
+    drawing the desktop and one no driver took, full of serials, a MAC, a disk UUID, an address and the user's and
+    host's names that must not come out; NVIDIA's version file in both kinds; the redaction, its cut and 20,000 random
+    inputs, under ASan and UBSan: 67 checks) and `tests/gpu_report_test.mjs` (the JS scrub, the form's address and the
+    summaries: 39 checks).
+  - **For the maintainer's approval, not published:** the issue form `.github/ISSUE_TEMPLATE/gpu-report.yml`, the site
+    page draft "Tested graphics cards" (`web/content/hardware/gpus.{en,es,pt}.md`, `gpus.meta.json`; not wired into the
+    site build), the call for testers (`docs/drafts/nvidia-call-for-testers.{en,es}.md`) and the designs in
+    `docs/NVIDIA-PLAN.md`: the AI / compute role (Debian's non-free driver through LordOS's package engine, guided Secure
+    Boot key enrolment, Flatpak's GL.nvidia extension, four closed admin actions) and NVIDIA drawing the desktop
+    (`nvidia-drm.modeset=1`, GBM/EGL, explicit sync, a boot fallback, a test matrix by generation).
+
 - **Machines from the terminal: the `machines` command, in development** (approved by the maintainer 2026-11-21;
   `docs/VIRTUALIZATION.md` 6.15 "From the terminal"). `machines list [--json]` shows each machine of `~/Machines` with its
   system, state, vCPUs, memory, disk used and graphics; `status NAME [--json]`, `start NAME [--no-window]`, `open NAME`,

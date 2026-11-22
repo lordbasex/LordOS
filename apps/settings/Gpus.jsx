@@ -1,12 +1,19 @@
 // Settings → Graphics cards (docs/MACHINES-GPU.md, "Settings → Graphics cards"; AGENTS.md "Machines' graphics cards"):
-// shown only on a computer with more than one GPU. Every GPU is listed with what uses it; the one drawing this desktop is
-// fixed. A spare Intel iGPU that GVT-g supports can be Unused or shared with Machines (Mode A): the closed admin action
-// gpu-role writes LordOS's fixed module files and the initramfs, and the change takes effect after a restart. Other
+// shown on any computer with a GPU (before the compatibility report, only with more than one). Every GPU is listed
+// with what uses it; the one drawing this desktop is fixed. A spare Intel iGPU that GVT-g supports can be Unused or
+// shared with Machines (Mode A): the closed admin action gpu-role writes LordOS's fixed module files and the initramfs,
+// and the change takes effect after a restart. Other
 // spare cards get no option yet (Machines: dedicated comes later). lord.vm.gpus() is read here; root checks everything
 // again (vmgpu_admin.c).
-import { View, Text, useTheme, useLocale, Segmented, Button, Stepper, admin, session, useSystemInfo, spacing, typeScale } from '@lordos/sdk';
+// NVIDIA (docs/NVIDIA-PLAN.md, approved 2026-11-22 as "experimental, community-verified"): an NVIDIA card says it is
+// experimental, links to the Help article on testing it, and lists its future roles (AI / compute, Desktop) as planned
+// with no button: installing the driver and drawing the desktop with it wait for their admin actions and the
+// explicit-sync design to be approved. "Send a compatibility report" (any card) shows the whole report first
+// (lord.sysinfo.gpuReport(), made and scrubbed in C), then opens the GitHub form filled in (sdk/gpureport.js).
+import { View, Text, ScrollView, useTheme, useLocale, Segmented, Button, Stepper, admin, session, useSystemInfo, spacing, typeScale, openUrl, clipboard, toast, help, lordosVersion } from '@lordos/sdk';
 import { useState } from 'react';
-import { GroupBox, SettingRow, ValueRow, Note, Stack, StatusDot, tint } from './ui.jsx';
+import { GroupBox, SettingRow, ValueRow, Note, Stack, StatusDot, Actions, tint } from './ui.jsx';
+import { readGpuReport, scrubReport, gpuIssueUrl, cardSummary, driverSummary, isNvidia, reportCard, NVIDIA_ROLES } from '../../sdk/gpureport.js';
 
 const INTEL = 0x8086;
 const ROLES = ['unused', 'machines-shared'];
@@ -15,8 +22,10 @@ const ROLES = ['unused', 'machines-shared'];
 export function readGpus() {
   try { return typeof lord.vm?.gpus === 'function' ? lord.vm.gpus() : null; } catch (e) { return null; }
 }
-// the section shows only with more than one GPU: a single one is always the desktop's, with nothing to choose
+// more than one GPU: a single one is always the desktop's, with nothing to choose for Machines
 export const manyGpus = () => (readGpus()?.gpus?.length || 0) > 1;
+// the section shows with any GPU: every card can be reported, and an NVIDIA card says what it can do
+export const anyGpus = () => (readGpus()?.gpus?.length || 0) > 0;
 
 const hex4 = (v) => ((v >>> 0) & 0xffff).toString(16).padStart(4, '0');
 // what a GPU can be given: 'desktop' (fixed), 'shared' (Unused / Machines: shared), 'noGvt' (an Intel iGPU GVT-g doesn't
@@ -57,6 +66,82 @@ function MemlockBox({ memlock, isAdmin, onDone }) {
   );
 }
 
+// An NVIDIA card: experimental, how to help, and the planned roles (no buttons: nothing can be turned on yet)
+function NvidiaBox({ g, info }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const nv = info?.nvidia || {};
+  const card = reportCard(info, g.address);
+  return (
+    <View style={{ gap: spacing.s, paddingVertical: spacing.s }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
+        <StatusDot color={tint.warn} size={10} />
+        <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, fontWeight: 600, color: tint.warn, textAlign: 'start' }}>{tr('settings.gpus.nvExperimental')}</Text>
+        <Button small label={tr('settings.gpus.nvHelp')} onClick={() => help.open('graphics-cards')} />
+      </View>
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.35 }}>{tr('settings.gpus.nvExperimentalHint')}</Text>
+      {card ? <ValueRow label={tr('settings.gpus.cuda')} value={tr(nv.cuda ? 'settings.gpus.installed' : 'settings.gpus.notInstalled')} /> : null}
+      <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, textAlign: 'start', paddingTop: spacing.xs }}>{tr('settings.gpus.roles')}</Text>
+      {NVIDIA_ROLES.map(([id, key]) => (
+        <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, minHeight: 24 }}>
+          <StatusDot color={tint.off} size={8} />
+          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr(key)}</Text>
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'end' }}>{tr('settings.gpus.planned')}</Text>
+        </View>
+      ))}
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.35 }}>{tr('settings.gpus.plannedHint')}</Text>
+    </View>
+  );
+}
+
+// "Send a compatibility report": made on demand, shown whole, then the GitHub form (nothing is sent from here)
+function ReportBox({ rep, setRep }) {
+  const t = useTheme();
+  const { t: tr } = useLocale();
+  const [msg, setMsg] = useState(null);
+  const make = () => {
+    setMsg(null);
+    const r = readGpuReport();
+    if (!r || typeof r.text !== 'string') { setRep(null); setMsg({ ok: false, text: tr('settings.gpus.reportFailed') }); return; }
+    let home = '';
+    try { home = lord.fs.home() || ''; } catch (e) { /* the C side scrubbed it already */ }
+    setRep({ text: scrubReport(r.text, { home }), info: r.info || null });
+  };
+  const desktopCard = () => (rep?.info?.cards || []).find((c) => c.desktop === 1) || (rep?.info?.cards || []).find((c) => isNvidia(c)) || (rep?.info?.cards || [])[0];
+  const send = () => {
+    const c = desktopCard();
+    const url = gpuIssueUrl({ report: rep.text, version: lordosVersion().version, gpu: cardSummary(c), driver: driverSummary(c, rep.info) });
+    clipboard.set(rep.text);                  // the form may get only part of a long report: the rest is in the clipboard
+    if (!openUrl(url)) setMsg({ ok: false, text: tr('settings.gpus.reportNoBrowser') });
+    else toast.set(tr('settings.gpus.reportCopied'));
+  };
+  return (
+    <GroupBox title={tr('settings.gpus.report')} footer={tr('settings.gpus.reportHint')}>
+      {!rep ? (
+        <SettingRow label={tr('settings.gpus.reportRun')} hint={tr('settings.gpus.reportRunHint')}>
+          <Button small primary label={tr('settings.gpus.reportMake')} onClick={make} />
+        </SettingRow>
+      ) : (
+        <View style={{ gap: spacing.s, paddingVertical: spacing.s }}>
+          <Text style={{ fontSize: typeScale.callout, color: t.text, textAlign: 'start' }}>{tr('settings.gpus.reportPreview')}</Text>
+          <View style={{ maxHeight: 220, borderRadius: 8, border: `1px solid ${t.separator}`, backgroundColor: t.mode === 'dark' ? 'rgba(0,0,0,0.2)' : '#f7f7f9' }}>
+            <ScrollView style={{ padding: 8 }}>
+              <Text style={{ fontFamily: 'monospace', fontSize: 11, color: t.text, direction: 'ltr', textAlign: 'start', lineHeight: 1.35 }}>{rep.text}</Text>
+            </ScrollView>
+          </View>
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr('settings.gpus.reportPublic')}</Text>
+          <Actions start>
+            <Button small primary label={tr('settings.gpus.reportOpen')} onClick={send} />
+            <Button small label={tr('settings.gpus.reportCopy')} onClick={() => { clipboard.set(rep.text); toast.set(tr('settings.gpus.reportCopied')); }} />
+            <Button small label={tr('settings.gpus.reportClose')} onClick={() => { setRep(null); setMsg(null); }} />
+          </Actions>
+        </View>
+      )}
+      {msg ? <Note tone={msg.ok ? 'ok' : 'error'}>{msg.text}</Note> : null}
+    </GroupBox>
+  );
+}
+
 export function GpusSettings() {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -65,6 +150,8 @@ export function GpusSettings() {
   const [busy, setBusy] = useState('');          // the address whose role is being written
   const [msg, setMsg] = useState(null);          // { ok, text }
   const [changed, setChanged] = useState(false); // a role written in this visit: restart to apply
+  const [rep, setRep] = useState(null);           // the compatibility report being shown: { text, info }
+  const [facts] = useState(() => readGpuReport()?.info || null);   // drivers, NVIDIA's version, CUDA: read once per visit
   const isAdmin = !!info.admin && admin.available();
   const canRestart = typeof session.canPower === 'function' && session.canPower();
 
@@ -118,7 +205,8 @@ export function GpusSettings() {
                   : kind === 'shared' ? tr(g.gvtOn ? 'settings.gpus.nowShared' : 'settings.gpus.nowUnused') : tr('settings.gpus.nowUnused')}</Text>
             </View>
             <ValueRow label={tr('settings.gpus.address')} value={g.address} mono />
-            <ValueRow label={tr('settings.gpus.driver')} value={g.driver || tr('settings.gpus.noDriver')} />
+            <ValueRow label={tr('settings.gpus.driver')} value={driverSummary(g, facts) || tr('settings.gpus.noDriver')} />
+            {isNvidia(g) ? <NvidiaBox g={g} info={facts} /> : null}
             {kind === 'shared' ? (
               <SettingRow label={tr('settings.gpus.role')} stack disabled={!isAdmin || !!busy}>
                 <Segmented small value={role} onChange={(v) => isAdmin && setRole(g, v)}
@@ -132,6 +220,7 @@ export function GpusSettings() {
       {r.memlock && gpus.some((g) => gpuKind(g) === 'shared') ? <MemlockBox memlock={r.memlock} isAdmin={isAdmin} onDone={() => setR(readGpus())} /> : null}
       {!isAdmin && gpus.some((g) => gpuKind(g) === 'shared') ? <Note>{tr('settings.gpus.needAdmin')}</Note> : null}
       {msg ? <Note tone={msg.ok ? 'ok' : 'error'}>{msg.text}</Note> : null}
+      <ReportBox rep={rep} setRep={setRep} />
     </Stack>
   );
 }

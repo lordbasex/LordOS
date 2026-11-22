@@ -39,6 +39,12 @@
  *                                               the system package `sysprobe`, app/probe.c), or null
  *   lord.sysinfo.markdown()                     the same report as Markdown, as lordos-sysreport prints it,
  *                                               with a "This session" section (System Information's Report tab)
+ *   lord.sysinfo.gpuReport()                    Settings → Graphics cards → "Send a compatibility report"
+ *                                               (sysreport/gpureport.h): { text, info }, text the plain report
+ *                                               (the same as `lordos-sysreport gpu` plus this session's
+ *                                               composition and GL renderer), already scrubbed of the user's
+ *                                               and computer's names and the home's path; info its facts.
+ *                                               Reads only; no argument
  *   lord.sysinfo.peripherals()                  (0.8.7) keyboards, mice, receivers and other devices on this machine's USB
  *                                               and input buses (sysreport/periph.c), for the Hardware tab only: their
  *                                               names can carry a person's, so it is not part of report() or markdown()
@@ -81,6 +87,7 @@
 #include "../sysreport/periph.h"
 #include "../sysreport/facts.h"
 #include "../sysreport/hwsnap.h"
+#include "../sysreport/gpureport.h"
 #include "../sec/codesig.h"
 #include "js_sys.h"
 #include "../bench/lbrun.h"
@@ -98,6 +105,7 @@
 #include "../hw/ppd.h"
 
 #include <fcntl.h>
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1042,8 +1050,43 @@ static JSValue f_sysinfo_peripherals(JSContext *c, JSValueConst t, int argc, JSV
     return json_or_null(c, periph_json(hwscan_root(), NULL));
 }
 
+/* gpuReport() → { text, info } (sysreport/gpureport.h): the card this process holds is the desktop's */
+static JSValue f_sysinfo_gpu_report(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    const char *root = hwscan_root();
+    GpuReport *g = malloc(sizeof *g);
+    if (!g) return JS_NULL;
+    gpureport_collect(g, root, NULL);
+    snprintf(g->lordos, sizeof g->lordos, "%s%s%s", LORD_VERSION, LORD_CHANNEL[0] ? "-" : "", LORD_CHANNEL);
+    gpureport_mark_desktop(g, root, root[0] ? NULL : "/proc/self/fd");
+    GpuInfo gi;
+    gpu_info(&gi);
+    g->session = 1;
+    snprintf(g->composition, sizeof g->composition, "%s", lord_composition());
+    snprintf(g->gpu_init, sizeof g->gpu_init, "%s", gi.why ? gi.why : "");
+    snprintf(g->renderer, sizeof g->renderer, "%s", gi.renderer ? gi.renderer : "");
+    char *raw = gpureport_text(g), *info = gpureport_json(g);
+    free(g);
+    struct passwd *pw = getpwuid(getuid());
+    char host[256] = "";
+    if (gethostname(host, sizeof host - 1)) host[0] = 0;
+    char *text = raw ? gpureport_redacted(raw, pw ? pw->pw_name : NULL, host, getenv("HOME")) : NULL;
+    free(raw);
+    JSValue o = JS_NULL;
+    if (text && info) {
+        o = JS_NewObject(c);
+        JS_SetPropertyStr(c, o, "text", JS_NewString(c, text));
+        JS_SetPropertyStr(c, o, "info", json_or_null(c, info));
+        info = NULL;                                  /* json_or_null frees it */
+    }
+    free(text);
+    free(info);
+    return o;
+}
+
 static const JSCFunctionListEntry sysinfo_funcs[] = {
     JS_CFUNC_DEF("report", 0, f_sysinfo_report),
+    JS_CFUNC_DEF("gpuReport", 0, f_sysinfo_gpu_report),
     JS_CFUNC_DEF("probe", 0, f_sysinfo_probe),
     JS_CFUNC_DEF("facts", 0, f_sysinfo_facts),
     JS_CFUNC_DEF("markdown", 0, f_sysinfo_markdown),

@@ -5,6 +5,9 @@
  *   lordos-sysreport report [--json | --markdown]
  *   lordos-sysreport bench [--quick | --full] [--json]
  *   lordos-fetch [--share] [--color=auto|always|never]      (also: lordos-sysreport fetch …)
+ *   lordos-sysreport gpu [--json]                            the graphics compatibility report (gpureport.h), the
+ *                                                            same text Settings → Graphics cards shows; `lordos-issue
+ *                                                            --gpu` prints it
  *
  * lordos-fetch is a link to this binary. --root <dir> reads a fake tree instead of this machine
  * (tests and fixtures only).
@@ -15,6 +18,7 @@
  * the helper gets no cgroup scope and the desktop test can't run. */
 #include "sysreport.h"
 #include "fetch.h"
+#include "gpureport.h"
 #include "lord_version.h"
 #include "../bench/lbproto.h"
 #include "../bench/lbrun.h"
@@ -37,11 +41,14 @@ static int usage(int fetch) {
         fprintf(stderr, "usage: lordos-sysreport report [--json | --markdown]\n"
                         "       lordos-sysreport bench [--quick | --full] [--json]\n"
                         "       lordos-sysreport fetch [--share] [--color=auto|always|never]\n"
+                        "       lordos-sysreport gpu [--json]\n"
                         "  report prints this computer's hardware and what the system made of it (no serial\n"
                         "  numbers, addresses, host or user names). Markdown by default.\n"
                         "  bench measures it with LordBench, as System Information → Performance does: --quick\n"
                         "  (default, about half a minute) or --full (adds storage and 3 minutes of sustained load,\n"
-                        "  4 to 6 minutes). The result is also saved for the app. Nothing is sent anywhere.\n");
+                        "  4 to 6 minutes). The result is also saved for the app. Nothing is sent anywhere.\n"
+                        "  gpu prints the graphics compatibility report: the cards, their drivers, which one draws\n"
+                        "  the desktop, NVIDIA's driver and CUDA, Mesa, Vulkan and video decoding, Secure Boot.\n");
     return 2;
 }
 
@@ -148,13 +155,38 @@ static int bench(int full, int json) {
     }
 }
 
+/* `lordos-sysreport gpu`: the report Settings → Graphics cards shows, without the session's part (how lord-server
+ * composes the screen is known only inside it). The card that draws the desktop is the one the user's lord-server
+ * holds, when one runs. Scrubbed of this user's and computer's names and home like the one Settings shows. */
+static int gpu_report(const char *root, int json) {
+    GpuReport *g = malloc(sizeof *g);
+    if (!g) return 1;
+    gpureport_collect(g, root, NULL);
+    snprintf(g->lordos, sizeof g->lordos, "%s%s%s", LORD_VERSION, LORD_CHANNEL[0] ? "-" : "", LORD_CHANNEL);
+    gpureport_mark_desktop(g, root, NULL);
+    char *raw = json ? gpureport_json(g) : gpureport_text(g);
+    free(g);
+    char host[256] = "";
+    if (gethostname(host, sizeof host - 1)) host[0] = 0;
+    const char *user = getenv("SUDO_USER");
+    if (!user || !*user) user = getenv("USER");
+    char *out = json ? raw : gpureport_redacted(raw, user, host, getenv("HOME"));
+    if (!json) free(raw);
+    if (!out) { fprintf(stderr, "lordos-sysreport: out of memory\n"); return 1; }
+    fputs(out, stdout);
+    free(out);
+    return ferror(stdout) ? 1 : 0;
+}
+
 int main(int argc, char **argv) {
     const char *root = "", *mode = "markdown", *color = "auto";
     const char *base = strrchr(argv[0], '/');
     base = base ? base + 1 : argv[0];
-    int fetch = !strcmp(base, "lordos-fetch"), report = 0, share = 0, bnch = 0, full = 0, json = 0;
+    int fetch = !strcmp(base, "lordos-fetch"), report = 0, share = 0, bnch = 0, full = 0, json = 0, gpu = 0;
     for (int i = 1; i < argc; i++) {
-        if (!fetch && !report && !bnch && !strcmp(argv[i], "report")) report = 1;
+        if (!fetch && !report && !bnch && !gpu && !strcmp(argv[i], "gpu")) gpu = 1;
+        else if (gpu && !strcmp(argv[i], "--json")) json = 1;
+        else if (!fetch && !report && !bnch && !gpu && !strcmp(argv[i], "report")) report = 1;
         else if (!fetch && !report && !bnch && !strcmp(argv[i], "fetch")) fetch = 1;
         else if (!fetch && !report && !bnch && !strcmp(argv[i], "bench")) bnch = 1;
         else if (bnch && (!strcmp(argv[i], "--quick") || !strcmp(argv[i], "--full"))) full = argv[i][2] == 'f';
@@ -168,6 +200,7 @@ int main(int argc, char **argv) {
         else return usage(fetch);
     }
     if (bnch) return root[0] ? usage(0) : bench(full, json);
+    if (gpu) return gpu_report(root, json);
     if (!report && !fetch) return usage(0);
 
     SysReport *r = malloc(sizeof *r);
