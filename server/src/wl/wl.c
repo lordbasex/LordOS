@@ -1498,7 +1498,7 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     }
     /* full: while the first waits only for its barrier or its time, it goes now (fifo and commit timing never cost a
      * client its connection); one waiting for its acquire point keeps explicit sync's limit */
-    while (s->sq.n >= SOBJ_MAX_PENDING && s->tm && !s->sq_src && !s->sq_poll) {
+    while (s->sq.n >= SOBJ_MAX_PENDING && s->tm && !s->sq_src && !s->sq_polling) {
         Pend *f = sobjq_front(&s->sq);
         if (f->acq.tl && sobj_signalled(f->acq) != 1) break;
         int n = s->sq.n;
@@ -4462,7 +4462,7 @@ static int waits_frame(Surf *s) {
  * its barrier, which wake the loop themselves) */
 static uint64_t timing_left(Surf *s, uint64_t now) {
     Pend *e = sobjq_front(&s->sq);
-    if (!e || !s->tm || s->sq_src || s->sq_poll) return UINT64_MAX;
+    if (!e || !s->tm || s->sq_src || s->sq_polling) return UINT64_MAX;
     const WltUpdate *u = &e->tu;
     if (u->wait_barrier && s->tm->barrier && !timing_nowait(s)) return UINT64_MAX;
     if (!u->has_target) return 0;
